@@ -3,9 +3,11 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German); the
-current plan is `docs/superpowers/plans/2026-11-12-m1-fundament.md`. Parts named
-in the spec but not yet built (wiki, tickets, agents) are planned, not present.
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1
+(`docs/superpowers/plans/2026-11-12-m1-fundament.md`) is built; the next plan is
+`docs/superpowers/plans/2026-11-12-m2-wiki.md`. Parts named in the spec but not yet
+built (wiki, tickets, agents) are planned, not present. Operations: `README.md`
+(Betriebshinweise), `docs/STECKBRIEF.md` (update its measurements each milestone).
 
 ## Stack (present)
 
@@ -61,6 +63,7 @@ cd frontend && npm run dev            # proxies /api to http://localhost:8080
 ```bash
 docker build -t to-herd-cats-ai:local .                 # the image (SPA + API, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
+bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 ```
 
 ```bash

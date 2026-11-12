@@ -48,6 +48,15 @@ throwaway volumes (and a throwaway `.env` if there is none), logs in, checks
 `/ready`, the user id and the published ports, and tears everything down again. It
 ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built beforehand.
 
+## Load measurement
+
+`bash load.sh` starts its own compose project on port 18081 from the image built
+beforehand (`LOAD_BUILD=1` builds it), samples `docker stats` idle, warm and under
+load (20 clients logging in and listing spaces for 60 s), prints the latencies and
+tears everything down. It uses `hey`, else `oha`, else `loadgen.py` (run with the
+backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
+`LOAD_SETTLE` override the defaults. The results go into `docs/STECKBRIEF.md`.
+
 ## Environment
 
 | Variable | Required | Default | Meaning |
