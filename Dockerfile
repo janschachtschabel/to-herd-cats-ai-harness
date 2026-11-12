@@ -59,6 +59,9 @@ ENV PATH=/app/.venv/bin:$PATH \
     HERD_PUBLIC_PORT=8080 \
     HERD_INTERNAL_PORT=9090 \
     OTEL_SERVICE_NAME=to-herd-cats-ai
+# The app runs from /app/.venv. The base image's own pip (with its vendored libraries)
+# and setuptools are never used at runtime, so they are removed instead of patched.
+RUN rm -rf /usr/local/lib/python3.13/site-packages/* /usr/local/bin/pip*
 WORKDIR /app
 COPY --from=tini --chmod=0755 /tini-${TARGETARCH} /usr/bin/tini
 COPY --from=python /app /app
