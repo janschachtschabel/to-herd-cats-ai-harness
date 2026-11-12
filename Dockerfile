@@ -62,6 +62,10 @@ ENV PATH=/app/.venv/bin:$PATH \
 # The app runs from /app/.venv. The base image's own pip (with its vendored libraries)
 # and setuptools are never used at runtime, so they are removed instead of patched.
 RUN rm -rf /usr/local/lib/python3.13/site-packages/* /usr/local/bin/pip*
+# Debian security updates published after the pinned base image was built.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/apt /var/log/dpkg.log
 WORKDIR /app
 COPY --from=tini --chmod=0755 /tini-${TARGETARCH} /usr/bin/tini
 COPY --from=python /app /app
