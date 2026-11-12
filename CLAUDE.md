@@ -1,0 +1,56 @@
+# CLAUDE.md — to-herd-cats-ai (project constitution)
+
+Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
+
+Knowledge & agent cockpit for companies. The authority is the design spec
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German); the
+current plan is `docs/superpowers/plans/2026-11-12-m1-fundament.md`. Parts named
+in the spec but not yet built (frontend, wiki, tickets, agents) are planned, not present.
+
+## Stack (present)
+
+- Backend: Python 3.13, FastAPI, SQLAlchemy 2 async + asyncpg, Alembic, Pydantic v2,
+  PostgreSQL only. Tooling: `uv`, `ruff`, `mypy` (strict), `pytest`.
+- Dependencies: only MIT, BSD, Apache-2.0, ISC or PostgreSQL licenses.
+
+## Hard rules
+
+1. Postgres only. No SQLite code paths. Tests run against a real Postgres (`herd_test`).
+2. `org_id` on every domain table; every query is scoped by the actor's org.
+3. Layers: `router → service → repository`. Routers validate and translate; services
+   own rules; repositories own SQL. No SQL in services, no rules in routers, no
+   business logic in React components.
+4. Files ≤ ~300 lines; split by responsibility.
+5. Every persisted field is read by a code path covered by a test. No fields "for later".
+6. Every list endpoint is paginated (`limit` ≤ 100, `cursor`); every write that can
+   race uses a `version` column and answers 409 on conflict.
+7. Error shape: `{"error": {"code": "<area.reason>", "message": "...", "trace_id": "<32 hex>"}}`.
+8. Service id `to-herd-cats-ai` (log field `service`, `OTEL_SERVICE_NAME`, image, chart).
+   Env vars use the `HERD_` prefix; ports `HERD_PUBLIC_PORT=8080`, `HERD_INTERNAL_PORT=9090`.
+9. Logs never contain header values, cookies, passwords or request bodies.
+10. Secrets never in plaintext columns, URLs or logs.
+11. Every user-facing string goes through i18n (`de` default, `en` complete), semantic
+    keys (`spaces.create.title`).
+
+## Commands
+
+```bash
+cd backend && uv sync
+cd backend && uv run pytest && uv run ruff check . && uv run mypy app
+```
+
+Tests need Postgres; `HERD_TEST_DATABASE_URL` defaults to
+`postgresql+asyncpg://herd:herd@localhost:5433/herd_test`. Backend tests create a
+fresh schema per session and roll back per test.
+
+## Conventions
+
+- Identifiers, comments, docstrings, commit messages in English.
+- Commit messages: `<area>: <imperative summary>`; ported code adds a trailer
+  `Ported-from: to-herd-cats-ai@<sha>:<path>`.
+- Alembic: one migration per slice, never edited after merge.
+
+## Definition of done (per task)
+
+Failing test first → minimal implementation → tests green → ruff/mypy clean →
+docs updated if behaviour changed → commit.
