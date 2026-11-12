@@ -9,7 +9,7 @@ from app.modules.directory.repository import DirectoryEntry
 
 
 class DirectoryQuery(PageParams):
-    """`q`: part of a name (or the start of a person's email); empty lists everyone."""
+    """`q`: part of a person's or group's name (never the email); empty lists everyone."""
 
     q: str = Field(default="", max_length=100)
     type: Literal[PrincipalType.USER, PrincipalType.GROUP] | None = None

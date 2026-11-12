@@ -3,7 +3,7 @@
 import uuid
 from typing import NamedTuple
 
-from sqlalchemy import ColumnElement, String, func, literal, or_, select, tuple_, union_all
+from sqlalchemy import String, func, literal, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.principal import PrincipalType
@@ -30,20 +30,20 @@ class DirectoryRepository:
         after: tuple[str, uuid.UUID] | None,
         limit: int,
     ) -> list[DirectoryEntry]:
-        """Active people whose name contains `text` or whose email starts with it, and
-        groups whose name contains it; case-insensitive, `%` and `_` taken literally."""
+        """Active people and groups whose name contains `text`; case-insensitive, `%`
+        and `_` taken literally. Never the email: members must not probe addresses."""
         parts = []
         if PrincipalType.USER in types:
-            user_match: ColumnElement[bool] = or_(
-                User.name.icontains(text, autoescape=True),
-                User.email.istartswith(text, autoescape=True),
-            )
             parts.append(
                 select(
                     literal(PrincipalType.USER.value, String).label("type"),
                     User.id.label("id"),
                     User.name.label("name"),
-                ).where(User.org_id == org_id, User.is_active.is_(True), user_match)
+                ).where(
+                    User.org_id == org_id,
+                    User.is_active.is_(True),
+                    User.name.icontains(text, autoescape=True),
+                )
             )
         if PrincipalType.GROUP in types:
             parts.append(

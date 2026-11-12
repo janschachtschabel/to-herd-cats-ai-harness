@@ -10,7 +10,7 @@ export const directoryQuery = (q: string) =>
 /** The key that names a principal in "present" sets: "type:id". */
 export const principalKey = (entry: { type: string; id: string }) => `${entry.type}:${entry.id}`
 
-/** People and groups whose name (or email start) matches `q`, without those in `exclude`.
+/** People and groups whose name contains `q`, without those in `exclude`.
  *  Fetched only while `enabled` (the picker is open). */
 export function useDirectory(q: string, exclude: Set<string>, enabled: boolean) {
   const query = useInfiniteQuery({ ...directoryQuery(q), enabled })

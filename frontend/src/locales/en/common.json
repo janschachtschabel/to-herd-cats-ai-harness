@@ -324,8 +324,8 @@
     }
   },
   "directory": {
-    "placeholder": "Type a name or email …",
-    "hint": "Searches names and the start of email addresses.",
+    "placeholder": "Type a name …",
+    "hint": "Searches the names of people and groups.",
     "searching": "Searching …",
     "empty": "Nobody found.",
     "loadMore": "Load more"

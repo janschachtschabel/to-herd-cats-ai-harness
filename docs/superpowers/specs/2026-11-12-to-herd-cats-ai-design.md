@@ -175,7 +175,7 @@ Die wirksame Rolle ist das Maximum aus direkter Mitgliedschaft und Gruppenmitgli
 **Rechtekatalog**:
 
 - Bereichsbezogen: `space.read`, `space.manage`, `page.create`, `page.edit`, `page.publish`, `page.trash`, `page.moderate`, `ticket.read`, `ticket.create`, `ticket.edit`, `ticket.assign`, `channel.post`, `channel.manage`.
-- Systemweit: `space.create`, `user.manage`, `group.manage`, `ai.manage`, `agent.manage`, `agent.create_personal`, `connector.manage`, `skill.manage`, `audit.read`, `mcp.use`, `directory.read` (Personen und Gruppen suchen, um sie Bereichen hinzuzufügen; alle außer Gästen; zeigt nur Typ, ID und Name aktiver Personen und Gruppen).
+- Systemweit: `space.create`, `user.manage`, `group.manage`, `ai.manage`, `agent.manage`, `agent.create_personal`, `connector.manage`, `skill.manage`, `audit.read`, `mcp.use`, `directory.read` (Personen und Gruppen nach Namen suchen, nie nach E-Mail, um sie Bereichen hinzuzufügen; alle außer Gästen; zeigt nur Typ, ID und Name aktiver Personen und Gruppen).
 
 ### 5.4 Rechte von Agenten
 

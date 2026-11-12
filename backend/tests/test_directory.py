@@ -38,15 +38,13 @@ async def test_entries_have_type_id_and_name_only(member_client: AsyncClient, me
     assert body["items"] == [{"type": "user", "id": str(member.id), "name": "Max Member"}]
 
 
-async def test_email_prefix_finds_a_person_without_showing_the_email(
-    member_client: AsyncClient, make_user
-) -> None:
-    lea = await make_user(name="Lea Lange", email="l.lange@example.com")
-    found = await _entries(member_client, q="L.LAN")
-    assert found == [{"type": "user", "id": str(lea.id), "name": "Lea Lange"}]
-    assert "example.com" not in str(found)
-    # A prefix, not a substring: the domain does not match.
+async def test_email_does_not_match(member_client: AsyncClient, make_user) -> None:
+    """Members must not be able to probe whether an email address exists in the org."""
+    await make_user(name="Lea Lange", email="l.lange@example.com")
+    assert await _entries(member_client, q="l.lange") == []
+    assert await _entries(member_client, q="l.lange@example.com") == []
     assert await _entries(member_client, q="example.com") == []
+    assert len(await _entries(member_client, q="Lea")) == 1
 
 
 async def test_wildcards_in_q_are_literal(member_client: AsyncClient, make_user) -> None:

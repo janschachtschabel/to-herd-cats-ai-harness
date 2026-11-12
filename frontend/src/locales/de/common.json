@@ -324,8 +324,8 @@
     }
   },
   "directory": {
-    "placeholder": "Name oder E-Mail eingeben …",
-    "hint": "Sucht in Namen und am Anfang von E-Mail-Adressen.",
+    "placeholder": "Name eingeben …",
+    "hint": "Sucht in den Namen von Personen und Gruppen.",
     "searching": "Suche …",
     "empty": "Niemand gefunden.",
     "loadMore": "Weitere laden"
