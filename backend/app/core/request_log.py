@@ -1,4 +1,5 @@
-"""One `http.request` line per request: method, route template, status, duration.
+"""One `http.request` line per request (method, route template, status, duration), and
+the matching HTTP metrics.
 
 Header values, cookies and bodies are never logged. The one header that is read,
 `x-client-trace-id`, is a correlation id the client chose; it is logged only when it
@@ -14,6 +15,7 @@ from fastapi.routing import iter_route_contexts
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.logging import log_context
+from app.core.metrics import record_http_request
 
 logger = logging.getLogger("app.request")
 
@@ -32,17 +34,18 @@ def _client_trace_id(scope: Scope) -> str | None:
 def route_template(scope: Scope) -> str | None:
     """The matched route's full path template (`/api/items/{id}`), None if nothing matched.
 
-    FastAPI leaves the matched route in `scope["route"]`, but for routes from an included
-    router its `path` lacks the include prefix; `iter_route_contexts` knows the full one.
+    FastAPI leaves an API route in `scope["route"]`, but its `path` lacks the prefix of
+    the router it was included with; plain routes (OpenAPI, docs) leave only their
+    endpoint. `iter_route_contexts` knows every route's full path.
     """
-    route, app = scope.get("route"), scope.get("app")
-    if route is None:
+    route, endpoint = scope.get("route"), scope.get("endpoint")
+    if route is None and endpoint is None:
         return None
-    for context in iter_route_contexts(getattr(app, "routes", [])):
-        if context.original_route is route and context.path:
+    for context in iter_route_contexts(getattr(scope.get("app"), "routes", [])):
+        original = context.original_route
+        if original is route or (route is None and getattr(original, "endpoint", None) is endpoint):
             return context.path
-    path = getattr(route, "path", None)
-    return path if isinstance(path, str) else None
+    return None
 
 
 class RequestLogMiddleware:
@@ -69,12 +72,15 @@ class RequestLogMiddleware:
             try:
                 await self.app(scope, receive, send_wrapper)
             finally:
+                seconds = time.perf_counter() - start
+                route = route_template(scope)
+                record_http_request(scope["method"], route, status, seconds)
                 logger.info(
                     "http.request",
                     extra={
                         "method": scope["method"],
-                        "path": route_template(scope) or scope["path"],
+                        "path": route or scope["path"],
                         "status": status,
-                        "duration_ms": round((time.perf_counter() - start) * 1000, 2),
+                        "duration_ms": round(seconds * 1000, 2),
                     },
                 )

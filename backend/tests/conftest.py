@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import get_session  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
+from app.core.migrations import stamp_head  # noqa: E402
 from app.core.models_base import Base  # noqa: E402
+from app.web.internal import create_internal_app, get_engine  # noqa: E402
 from app.web.public import create_public_app  # noqa: E402
 
 configure_logging(get_settings())
@@ -48,6 +50,7 @@ async def engine() -> AsyncIterator[AsyncEngine]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(stamp_head)  # the schema above is what head describes
     yield engine
     await engine.dispose()
 
@@ -88,4 +91,14 @@ async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
     # raise_app_exceptions=False: let the 500 handler's response reach the test.
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def internal_client(engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
+    """The internal app (probes, metrics), reading the test database."""
+    app = create_internal_app()
+    app.dependency_overrides[get_engine] = lambda: engine
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://internal") as client:
         yield client

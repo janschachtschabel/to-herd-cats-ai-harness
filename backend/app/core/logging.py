@@ -24,6 +24,7 @@ _RECORD_ATTRS = frozenset(vars(logging.LogRecord("", 0, "", 0, "", None, None)))
     "message",
     "asctime",
     "taskName",
+    "color_message",  # uvicorn's ANSI-coloured copy of the message
 }
 
 

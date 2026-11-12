@@ -116,6 +116,16 @@ def test_log_level_is_applied():
         configure_logging(Settings())
 
 
+def test_uvicorn_color_message_is_not_a_field(capsys):
+    logging.getLogger("uvicorn.error").info("plain", extra={"color_message": "\x1b[1mplain"})
+    assert "color_message" not in json.loads(last_line(capsys, "plain"))
+
+
 def test_otlp_exporter_only_when_endpoint_is_set():
     assert span_exporter_from_env({}) is None
     assert span_exporter_from_env({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"})
+
+
+async def test_plain_starlette_routes_are_logged_by_template(client, capsys):
+    await client.get("/api/openapi.json")
+    assert json.loads(last_line(capsys, "http.request"))["path"] == "/api/openapi.json"
