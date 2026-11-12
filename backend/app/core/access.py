@@ -1,100 +1,95 @@
-"""Who acts (`Actor`) and what they may do (`can`, `require`, `visible_space_ids`).
+"""The one permission check (spec 4.2). Every service asks `require` (or `can`); there
+is no other place that decides who may do what.
 
-A stub until the central permission check (M1 Task 7) replaces the bodies; the
-signatures are final. Rules so far:
+- System admins and owners may do everything, in every space of their organisation.
+- System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`).
+- Inside a space the effective role decides: the highest of the actor's direct role
+  and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
+- A space the actor may not read does not exist for it: `require` answers 404 as for
+  an unknown id, and 403 only where the space is visible but the right is missing.
 
-- system admins and owners may do everything;
-- members may create spaces;
-- inside a space the role decides: `viewer` reads, `admin` manages. The role is the
-  highest of the direct and the group memberships; in `open` spaces everyone but a
-  guest is at least `viewer`.
+Each check is one SQL query (`AccessRepository.facts`); lists filter with the SQL of
+`visible_space_ids`, which the check itself uses for readability.
 """
 
 import uuid
-from dataclasses import dataclass
 
 from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import Forbidden, NotFound
-from app.core.permissions import Action, SpaceRole
-from app.core.principal import Principal, SystemRole
+from app.core.access_repository import AccessFacts, AccessRepository, visible_ids_stmt
+from app.core.actor import Actor
+from app.core.errors import Forbidden, NotFound, Unauthorized
+from app.core.permissions import (
+    ADMIN_ROLES,
+    OPEN_SPACE_FLOOR,
+    OPEN_SPACE_READERS,
+    SPACE_ACTION_MIN_ROLE,
+    SYSTEM_ROLE_ACTIONS,
+    Action,
+    SpaceRole,
+)
 from app.modules.auth.context import AuthContext
 from app.modules.groups.repository import GroupRepository
-from app.modules.spaces.models import Space, SpaceKind
-from app.modules.spaces.repository import SpaceRepository
+from app.modules.spaces.models import SpaceKind
 
 __all__ = ["Action", "Actor", "actor_for", "can", "require", "space_role", "visible_space_ids"]
 
-# The lowest space role an action needs.
-_SPACE_ACTIONS = {Action.SPACE_READ: SpaceRole.VIEWER, Action.SPACE_MANAGE: SpaceRole.ADMIN}
-
-
-@dataclass(frozen=True, slots=True)
-class Actor:
-    org_id: uuid.UUID
-    principal: Principal
-    system_role: SystemRole
-    group_ids: frozenset[uuid.UUID]
-
-    @property
-    def is_admin(self) -> bool:
-        return self.system_role in (SystemRole.OWNER, SystemRole.ADMIN)
-
-    @property
-    def principals(self) -> list[Principal]:
-        """Whoever's memberships count for this actor: itself and its groups."""
-        return [self.principal, *(Principal.group(g) for g in sorted(self.group_ids))]
-
 
 async def actor_for(session: AsyncSession, auth: AuthContext) -> Actor:
+    """The caller as the check sees them. A deactivated person does not act."""
+    if not auth.user.is_active:
+        raise Unauthorized(code="auth.session_invalid")
     group_ids = await GroupRepository(session).group_ids_for(auth.principal)
     return Actor(auth.org_id, auth.principal, auth.system_role, group_ids)
 
 
 def visible_space_ids(actor: Actor) -> Select[uuid.UUID]:
     """The ids of every space `actor` may read, as SQL for list filters."""
-    return SpaceRepository.visible_ids_stmt(
-        actor.org_id,
-        None if actor.is_admin else actor.principals,
-        include_open=actor.system_role != SystemRole.GUEST,
-    )
+    return visible_ids_stmt(actor)
 
 
 async def space_role(session: AsyncSession, actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:
-    space = await SpaceRepository(session).get(actor.org_id, space_id)
-    return None if space is None else await _role_in(session, actor, space)
+    """The actor's effective role in the space; None without one (admins included)."""
+    return _effective_role(await AccessRepository(session).facts(actor, space_id))
 
 
 async def can(
     session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID | None = None
 ) -> bool:
-    if action in _SPACE_ACTIONS and space_id is not None:
-        space = await SpaceRepository(session).get(actor.org_id, space_id)
-        if space is None:
-            return False
-        if actor.is_admin:
-            return True
-        role = await _role_in(session, actor, space)
-        return role is not None and role >= _SPACE_ACTIONS[action]
-    if actor.is_admin:
-        return True
-    return action is Action.SPACE_CREATE and actor.system_role == SystemRole.MEMBER
+    if action in SPACE_ACTION_MIN_ROLE and space_id is None:
+        return False
+    scoped = space_id if action in SPACE_ACTION_MIN_ROLE else None
+    return _allows(await AccessRepository(session).facts(actor, scoped), action)
 
 
 async def require(
     session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID | None = None
 ) -> None:
-    """A space the actor cannot see does not exist for them (404, as for an unknown id);
-    a visible one without the right is 403."""
-    if space_id is not None and not await can(session, actor, Action.SPACE_READ, space_id):
+    """Raise unless the actor may do `action` (in the space, if given)."""
+    facts = await AccessRepository(session).facts(actor, space_id)
+    if space_id is not None and not facts.readable:
         raise NotFound(code="space.not_found")
-    if not await can(session, actor, action, space_id):
+    if not _allows(facts, action):
         raise Forbidden(code="auth.permission_denied")
 
 
-async def _role_in(session: AsyncSession, actor: Actor, space: Space) -> SpaceRole | None:
-    roles = await SpaceRepository(session).roles_of(space.id, actor.principals)
-    if space.kind == SpaceKind.OPEN and actor.system_role != SystemRole.GUEST:
-        roles.append(SpaceRole.VIEWER)
+def _effective_role(facts: AccessFacts) -> SpaceRole | None:
+    if facts.system_role is None or facts.kind is None:
+        return None
+    opens = facts.kind == SpaceKind.OPEN and facts.system_role in OPEN_SPACE_READERS
+    roles = [r for r in (facts.member_role, OPEN_SPACE_FLOOR if opens else None) if r]
     return max(roles, default=None)
+
+
+def _allows(facts: AccessFacts, action: Action) -> bool:
+    if facts.system_role is None:
+        return False
+    if action not in SPACE_ACTION_MIN_ROLE:
+        return action in SYSTEM_ROLE_ACTIONS[facts.system_role]
+    if not facts.readable:
+        return False
+    if facts.system_role in ADMIN_ROLES:
+        return True
+    role = _effective_role(facts)
+    return role is not None and role >= SPACE_ACTION_MIN_ROLE[action]

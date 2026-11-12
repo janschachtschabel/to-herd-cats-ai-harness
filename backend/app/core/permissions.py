@@ -1,6 +1,9 @@
-"""The permission catalogue (spec 5.3). Values arrive with the milestone that needs them."""
+"""The permission catalogue (spec 5.3) and which roles grant what. Values arrive with
+the milestone that needs them. The rules are applied in one place: `app.core.access`."""
 
 from enum import StrEnum
+
+from app.core.principal import SystemRole
 
 
 class Action(StrEnum):
@@ -27,6 +30,10 @@ class SpaceRole(StrEnum):
     def rank(self) -> int:
         return list(SpaceRole).index(self)
 
+    @classmethod
+    def from_rank(cls, rank: int) -> "SpaceRole":
+        return list(cls)[rank]
+
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, SpaceRole):
             return NotImplemented
@@ -46,3 +53,28 @@ class SpaceRole(StrEnum):
         if not isinstance(other, SpaceRole):
             return NotImplemented
         return self.rank >= other.rank
+
+
+# The lowest space role each space-scoped action needs.
+SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
+    Action.SPACE_READ: SpaceRole.VIEWER,
+    Action.SPACE_MANAGE: SpaceRole.ADMIN,
+}
+
+# System roles that hold every right, in every space of their organisation (E4).
+ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADMIN})
+
+# System-wide actions per system role.
+SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {
+    SystemRole.OWNER: frozenset(Action),
+    SystemRole.ADMIN: frozenset(Action),
+    SystemRole.MEMBER: frozenset({Action.SPACE_CREATE}),
+    SystemRole.GUEST: frozenset(),
+}
+
+# System roles that read every `open` space as `viewer` without a membership; guests
+# see only spaces they are members of.
+OPEN_SPACE_READERS: frozenset[SystemRole] = frozenset(
+    {SystemRole.OWNER, SystemRole.ADMIN, SystemRole.MEMBER}
+)
+OPEN_SPACE_FLOOR = SpaceRole.VIEWER

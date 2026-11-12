@@ -68,7 +68,7 @@ class AuthService:
         user_session = await self.sessions.get_active(hash_token(token), utcnow())
         if user_session is None or not user_session.user.is_active:
             return None
-        return AuthContext(user=user_session.user)
+        return AuthContext(user=user_session.user, session_id=user_session.id)
 
     async def organization(self, ctx: AuthContext) -> Organization:
         return await self.orgs.get(ctx.org_id)

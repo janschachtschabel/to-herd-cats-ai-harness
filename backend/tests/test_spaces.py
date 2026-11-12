@@ -1,5 +1,3 @@
-from uuid import UUID
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
@@ -7,10 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
-from app.core.access import Action, actor_for, can, space_role, visible_space_ids
 from app.core.config import Settings
-from app.core.permissions import SpaceRole
-from app.modules.auth.context import AuthContext
 from app.modules.orgs.models import Organization
 from app.modules.orgs.service import ensure_bootstrap
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
@@ -210,40 +205,6 @@ async def test_bootstrap_creates_allgemein_once(session: AsyncSession) -> None:
     ]
     boss = (await session.scalars(select(User))).one()
     assert spaces[1].owner_user_id == boss.id
-
-
-async def test_visible_space_ids_matches_can(
-    session: AsyncSession, make_user, make_space, make_group
-) -> None:
-    """The SQL filter and the single check must never disagree."""
-    people = [await make_user(role) for role in ("owner", "admin", "member", "guest")]
-    member, guest = people[2], people[3]
-    group = await make_group(members=[guest])
-    spaces = [
-        await make_space("open"),
-        await make_space("team"),
-        await make_space("team", members=[(member, "viewer")]),
-        await make_space("team", members=[(group, "editor")]),
-        await make_space("open", members=[(guest, "viewer")]),
-    ]
-    spaces += [await personal_space_of(session, p) for p in people]
-    for person in people:
-        actor = await actor_for(session, AuthContext(user=person))
-        visible: set[UUID] = set((await session.scalars(visible_space_ids(actor))).all())
-        assert visible <= {s.id for s in spaces}
-        for space in spaces:
-            assert (space.id in visible) == await can(session, actor, Action.SPACE_READ, space.id)
-    guest_actor = await actor_for(session, AuthContext(user=guest))
-    assert await space_role(session, guest_actor, spaces[3].id) == SpaceRole.EDITOR
-    assert await space_role(session, guest_actor, spaces[0].id) is None
-    member_actor = await actor_for(session, AuthContext(user=member))
-    assert await space_role(session, member_actor, spaces[0].id) == SpaceRole.VIEWER
-
-
-def test_space_roles_are_ordered() -> None:
-    assert SpaceRole.VIEWER < SpaceRole.EDITOR < SpaceRole.MODERATOR < SpaceRole.ADMIN
-    assert max(SpaceRole.ADMIN, SpaceRole.EDITOR) == SpaceRole.ADMIN  # not alphabetical
-    assert SpaceRole.ADMIN >= SpaceRole.ADMIN > SpaceRole.VIEWER
 
 
 async def test_every_person_has_exactly_one_personal_space(

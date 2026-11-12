@@ -36,7 +36,13 @@ class SessionRepository:
             )
         )
 
-    async def delete_for_user(self, org_id: uuid.UUID, user_id: uuid.UUID) -> None:
-        await self.session.execute(
-            delete(UserSession).where(UserSession.org_id == org_id, UserSession.user_id == user_id)
+    async def delete_for_user(
+        self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None
+    ) -> None:
+        """All of the person's sessions, except `keep` if given."""
+        stmt = delete(UserSession).where(
+            UserSession.org_id == org_id, UserSession.user_id == user_id
         )
+        if keep is not None:
+            stmt = stmt.where(UserSession.id != keep)
+        await self.session.execute(stmt)

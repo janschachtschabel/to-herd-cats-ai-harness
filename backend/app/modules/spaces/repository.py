@@ -7,10 +7,11 @@ from sqlalchemy.dialects.postgresql import insert
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.core.repository import BaseRepository, advisory_xact_lock
-from app.modules.spaces.models import Space, SpaceKind, SpaceMember
+from app.modules.spaces.models import Space, SpaceMember
 
 
-def _held_by(principals: Sequence[Principal]) -> ColumnElement[bool]:
+def held_by(principals: Sequence[Principal]) -> ColumnElement[bool]:
+    """Membership rows of any of `principals` (none: matches nothing)."""
     return or_(
         false(),
         *[
@@ -45,19 +46,6 @@ class SpaceRepository(BaseRepository[Space]):
         stmt = select(Space).where(Space.org_id == org_id, Space.owner_user_id == user_id)
         return await self.session.scalar(stmt)
 
-    @staticmethod
-    def visible_ids_stmt(
-        org_id: uuid.UUID, principals: Sequence[Principal] | None, *, include_open: bool
-    ) -> Select[uuid.UUID]:
-        """Ids of the organisation's spaces that `principals` hold a role in, plus the open
-        ones if `include_open`; every space if `principals` is None."""
-        stmt = select(Space.id).where(Space.org_id == org_id)
-        if principals is None:
-            return stmt
-        member = exists().where(SpaceMember.space_id == Space.id, _held_by(principals))
-        open_ = Space.kind == SpaceKind.OPEN if include_open else false()
-        return stmt.where(or_(member, open_))
-
     async def page_among(
         self, ids: Select[uuid.UUID], after: uuid.UUID | None, limit: int
     ) -> list[Space]:
@@ -65,14 +53,6 @@ class SpaceRepository(BaseRepository[Space]):
         if after is not None:
             stmt = stmt.where(Space.id > after)
         return list((await self.session.scalars(stmt)).all())
-
-    async def roles_of(
-        self, space_id: uuid.UUID, principals: Sequence[Principal]
-    ) -> list[SpaceRole]:
-        stmt = select(SpaceMember.role).where(
-            SpaceMember.space_id == space_id, _held_by(principals)
-        )
-        return [SpaceRole(r) for r in (await self.session.scalars(stmt)).all()]
 
     async def member_page(
         self, space_id: uuid.UUID, after: uuid.UUID | None, limit: int
@@ -107,10 +87,10 @@ class SpaceRepository(BaseRepository[Space]):
     async def remove_member(self, space_id: uuid.UUID, principal: Principal) -> bool:
         stmt = (
             delete(SpaceMember)
-            .where(SpaceMember.space_id == space_id, _held_by([principal]))
+            .where(SpaceMember.space_id == space_id, held_by([principal]))
             .returning(SpaceMember.member_id)
         )
         return (await self.session.execute(stmt)).first() is not None
 
     async def delete_memberships_of(self, principal: Principal) -> None:
-        await self.session.execute(delete(SpaceMember).where(_held_by([principal])))
+        await self.session.execute(delete(SpaceMember).where(held_by([principal])))

@@ -31,6 +31,21 @@ async def test_password_change_logs_the_person_out(
     assert await session.scalar(count) == 0
 
 
+async def test_changing_your_own_password_keeps_this_session_only(
+    owner: AsyncClient, owner_user: User, make_client
+) -> None:
+    elsewhere = await make_client(csrf=True)
+    await login(elsewhere, owner_user.email)
+    r = await owner.patch(
+        f"/api/admin/users/{owner_user.id}",
+        json={"password": "brand-new-password", "version": owner_user.version},
+    )
+    assert r.status_code == 200
+    assert (await owner.get("/api/auth/me")).status_code == 200
+    assert (await elsewhere.get("/api/auth/me")).status_code == 401
+    await login(elsewhere, owner_user.email, "brand-new-password")
+
+
 async def test_other_changes_keep_sessions(
     owner: AsyncClient, member_client: AsyncClient, member: User
 ) -> None:

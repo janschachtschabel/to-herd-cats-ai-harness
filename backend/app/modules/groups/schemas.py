@@ -21,7 +21,10 @@ class GroupCreate(BaseModel):
 
 
 class GroupUpdate(BaseModel):
-    """Fields left out stay as they are; an explicit null clears the description."""
+    """Fields left out stay as they are; an explicit null clears the description. Any
+    other field is refused (422)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=500)

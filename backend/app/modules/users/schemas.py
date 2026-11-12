@@ -30,7 +30,9 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    """Fields left out (or null) stay as they are."""
+    """Fields left out (or null) stay as they are; any other field is refused (422)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     system_role: SystemRole | None = None
