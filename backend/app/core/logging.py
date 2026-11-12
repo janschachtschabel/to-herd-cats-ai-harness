@@ -18,6 +18,9 @@ from app.core.config import Settings
 from app.core.telemetry import SERVICE_NAME, current_trace_ids
 
 _context: ContextVar[dict[str, Any] | None] = ContextVar("herd_log_context", default=None)
+# Fields for the request line, which is written after the endpoint and its dependencies
+# have returned: a holder the request middleware owns and code inside the request fills.
+_request_fields: ContextVar[dict[str, Any] | None] = ContextVar("herd_request_fields", default=None)
 
 # Attributes every LogRecord has; anything else on a record came in through `extra=`.
 _RECORD_ATTRS = frozenset(vars(logging.LogRecord("", 0, "", 0, "", None, None))) | {
@@ -36,6 +39,24 @@ def log_context(**fields: Any) -> Iterator[None]:
         yield
     finally:
         _context.reset(token)
+
+
+@contextmanager
+def request_fields() -> Iterator[dict[str, Any]]:
+    """The holder for one request's line (request middleware only)."""
+    holder: dict[str, Any] = {}
+    token = _request_fields.set(holder)
+    try:
+        yield holder
+    finally:
+        _request_fields.reset(token)
+
+
+def bind_request_fields(**fields: Any) -> None:
+    """Put fields on the current request's line too; outside a request this does nothing."""
+    holder = _request_fields.get()
+    if holder is not None:
+        holder.update(fields)
 
 
 def _fields(record: logging.LogRecord) -> dict[str, Any]:

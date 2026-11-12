@@ -37,3 +37,8 @@ async def update_user(
 @router.post("/{user_id}/deactivate", status_code=204)
 async def deactivate_user(user_id: uuid.UUID, ctx: AuthDep, session: SessionDep) -> None:
     await UserService(session).deactivate(ctx, user_id)
+
+
+@router.post("/{user_id}/reactivate", status_code=204)
+async def reactivate_user(user_id: uuid.UUID, ctx: AuthDep, session: SessionDep) -> None:
+    await UserService(session).reactivate(ctx, user_id)

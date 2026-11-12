@@ -8,7 +8,12 @@ from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter
-from app.core.security import hash_token, new_session_token, verify_password
+from app.core.security import (
+    dummy_password_hash,
+    hash_token,
+    new_session_token,
+    verify_password,
+)
 from app.modules.auth.context import AuthContext
 from app.modules.auth.models import UserSession
 from app.modules.auth.repository import SessionRepository
@@ -26,32 +31,31 @@ class AuthService:
         self.orgs = OrganizationRepository(session)
         self.settings = settings
 
-    async def login(
-        self, email: str, password: str, ip: str | None, user_agent: str | None
-    ) -> tuple[User, str]:
+    async def login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
         """A new session for the person; the token goes into the cookie and nowhere else.
 
         Attempts per client address and email are limited; a rejected attempt counts.
-        Single organisation per installation: the person is looked up in it."""
+        Without a usable account a dummy hash is verified, so the answer takes as long
+        either way. Single organisation per installation: the person is looked up in it."""
         limiter = RateLimiter(self.session, limit=self.settings.login_rate_limit_per_minute)
         if not await limiter.allow(f"login:{ip}:{email.lower()}"):
             raise RateLimited(code="auth.too_many_attempts")
         org = await self.orgs.get_default()
         user = await self.users.get_by_email(org.id, email) if org else None
         if user is None or not user.is_active or user.password_hash is None:
+            verify_password(dummy_password_hash(), password)
             raise Unauthorized(code="auth.invalid_credentials")
         if not verify_password(user.password_hash, password):
             raise Unauthorized(code="auth.invalid_credentials")
         token = new_session_token()
         now = utcnow()
+        await self.sessions.delete_expired_for_user(user.org_id, user.id, now)
         await self.sessions.add(
             UserSession(
                 org_id=user.org_id,
                 user_id=user.id,
                 token_hash=hash_token(token),
                 expires_at=now + timedelta(hours=self.settings.session_ttl_hours),
-                ip=ip,
-                user_agent=(user_agent or "")[:300] or None,
             )
         )
         user.last_login_at = now

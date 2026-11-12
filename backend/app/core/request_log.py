@@ -14,7 +14,7 @@ from typing import Any
 from fastapi.routing import iter_route_contexts
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.logging import log_context
+from app.core.logging import log_context, request_fields
 from app.core.metrics import record_http_request
 
 logger = logging.getLogger("app.request")
@@ -68,7 +68,7 @@ class RequestLogMiddleware:
 
         client_trace_id = _client_trace_id(scope)
         fields: dict[str, Any] = {"client_trace_id": client_trace_id} if client_trace_id else {}
-        with log_context(**fields):
+        with log_context(**fields), request_fields() as bound:
             try:
                 await self.app(scope, receive, send_wrapper)
             finally:
@@ -78,6 +78,7 @@ class RequestLogMiddleware:
                 logger.info(
                     "http.request",
                     extra={
+                        **bound,
                         "method": scope["method"],
                         "path": route or scope["path"],
                         "status": status,

@@ -19,9 +19,7 @@ async def login(
     settings: SettingsDep,
 ) -> MeOut:
     ip = request.client.host if request.client else None
-    user, token = await AuthService(session, settings).login(
-        body.email, body.password, ip, request.headers.get("user-agent")
-    )
+    user, token = await AuthService(session, settings).login(body.email, body.password, ip)
     response.set_cookie(
         settings.session_cookie_name,
         token,

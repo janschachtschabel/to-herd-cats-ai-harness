@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+from functools import cache
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -18,6 +19,13 @@ def verify_password(password_hash: str, password: str) -> bool:
         return _hasher.verify(password_hash, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
+
+
+@cache
+def dummy_password_hash() -> str:
+    """A hash of nothing in particular, verified when there is no account to check, so a
+    login takes as long whether or not the address belongs to someone."""
+    return _hasher.hash(secrets.token_urlsafe(16))
 
 
 def new_session_token() -> str:

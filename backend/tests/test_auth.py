@@ -4,13 +4,20 @@ from datetime import timedelta
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.models_base import utcnow
 from app.core.principal import Principal, PrincipalType, SystemRole
-from app.core.security import hash_password, hash_token, new_session_token, verify_password
+from app.core.security import (
+    dummy_password_hash,
+    hash_password,
+    hash_token,
+    new_session_token,
+    verify_password,
+)
+from app.modules.auth import service as auth_service
 from app.modules.auth.models import UserSession
 from app.modules.orgs.models import Organization
 from app.modules.orgs.service import ensure_bootstrap
@@ -94,21 +101,69 @@ async def test_csrf_header_required_for_unsafe_methods(client: AsyncClient, owne
     assert response.json()["error"]["code"] == "auth.csrf"
 
 
-async def test_session_token_is_stored_hashed_with_client_details(
+async def test_session_token_is_stored_hashed(
     client: AsyncClient, owner_user: User, session: AsyncSession
 ) -> None:
-    await client.post(
-        "/api/auth/login",
-        json={"email": owner_user.email, "password": PASSWORD},
-        headers={**CSRF, "User-Agent": "pytest-browser"},
-    )
+    await login(client, owner_user.email)
     token = client.cookies["herd_session"]
     stored = (await session.scalars(select(UserSession))).one()
     assert stored.token_hash == hashlib.sha256(token.encode()).hexdigest() != token
-    assert stored.user_agent == "pytest-browser"
-    assert stored.ip == "127.0.0.1"
     assert stored.org_id == owner_user.org_id
     assert timedelta(hours=167) < stored.expires_at - utcnow() <= timedelta(hours=168)
+
+
+async def test_sessions_store_no_client_details(session: AsyncSession) -> None:
+    """Nothing reads a session's address or browser, so neither is kept."""
+    columns = await session.run_sync(
+        lambda s: {c["name"] for c in inspect(s.connection()).get_columns("user_session")}
+    )
+    assert columns == {"id", "org_id", "user_id", "token_hash", "expires_at"}
+
+
+@pytest.mark.parametrize("case", ["unknown", "inactive", "no_password"])
+async def test_login_without_a_usable_account_still_verifies_a_hash(
+    client: AsyncClient, make_user, monkeypatch, case: str
+) -> None:
+    """Timing must not tell whether an account exists: a dummy hash is verified."""
+    calls: list[str] = []
+    monkeypatch.setattr(auth_service, "verify_password", lambda h, p: calls.append(h) or False)
+    email = "nobody@example.com"
+    if case == "inactive":
+        email = (await make_user(is_active=False)).email
+    elif case == "no_password":
+        user = await make_user()
+        user.password_hash = None
+        email = user.email
+    response = await client.post(
+        "/api/auth/login", json={"email": email, "password": PASSWORD}, headers=CSRF
+    )
+    assert response.status_code == 401
+    assert calls == [dummy_password_hash()]
+
+
+async def test_login_deletes_the_users_expired_sessions(
+    owner: AsyncClient, owner_user: User, member: User, session: AsyncSession, make_client
+) -> None:
+    past = utcnow() - timedelta(minutes=1)
+    for user in (owner_user, member):
+        session.add(
+            UserSession(
+                org_id=user.org_id,
+                user_id=user.id,
+                token_hash=hash_token(new_session_token()),
+                expires_at=past,
+            )
+        )
+    await session.flush()
+    await login(await make_client(csrf=True), owner_user.email)
+    rows = (await session.execute(select(UserSession.user_id, UserSession.expires_at))).all()
+    # The owner's expired one is gone; their two live ones (fixture, new login) and the
+    # other person's expired one are untouched.
+    assert sorted((uid == owner_user.id, exp > utcnow()) for uid, exp in rows) == [
+        (False, False),
+        (True, True),
+        (True, True),
+    ]
 
 
 async def test_expired_session_is_rejected(owner: AsyncClient, session: AsyncSession) -> None:
@@ -138,9 +193,18 @@ async def test_password_is_never_logged(client: AsyncClient, owner_user: User, c
 async def test_resolved_user_is_bound_to_log_lines(owner: AsyncClient, owner_user, capsys) -> None:
     capsys.readouterr()
     assert (await owner.get("/api/_test/whoami")).status_code == 200
-    line = next(x for x in json_lines(capsys.readouterr().out) if x["message"] == "test.whoami")
-    assert line["org_id"] == str(owner_user.org_id)
-    assert line["actor"] == f"user:{owner_user.id}"
+    lines = json_lines(capsys.readouterr().out)
+    for message in ("test.whoami", "http.request"):
+        line = next(x for x in lines if x["message"] == message)
+        assert line["org_id"] == str(owner_user.org_id)
+        assert line["actor"] == f"user:{owner_user.id}"
+
+
+async def test_anonymous_request_line_names_nobody(client: AsyncClient, capsys) -> None:
+    capsys.readouterr()
+    await client.get("/api/auth/me")
+    line = next(x for x in json_lines(capsys.readouterr().out) if x["message"] == "http.request")
+    assert "actor" not in line and "org_id" not in line
 
 
 def test_principal() -> None:

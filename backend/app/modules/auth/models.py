@@ -19,7 +19,5 @@ class UserSession(UuidPk, OrgScoped, Base):
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ip: Mapped[str | None] = mapped_column(String(64))
-    user_agent: Mapped[str | None] = mapped_column(String(300))
 
     user: Mapped[User] = relationship(lazy="joined")

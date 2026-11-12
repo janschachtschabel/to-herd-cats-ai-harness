@@ -80,7 +80,7 @@ async def test_last_owner_cannot_be_demoted_or_deactivated(owner, owner_user):
 
 
 async def test_an_owner_can_step_down_when_another_owner_exists(
-    owner: AsyncClient, owner_user: User, make_user
+    owner: AsyncClient, owner_user: User, make_user, make_client
 ) -> None:
     other = await make_user(SystemRole.OWNER)
     r = await owner.patch(
@@ -88,9 +88,14 @@ async def test_an_owner_can_step_down_when_another_owner_exists(
         json={"system_role": "admin", "version": owner_user.version},
     )
     assert r.status_code == 200 and r.json()["system_role"] == "admin"
-    # `other` is now the last owner.
+    # Now an admin, the former owner may no longer touch an owner.
     r = await owner.post(f"/api/admin/users/{other.id}/deactivate")
-    assert r.status_code == 409
+    assert r.status_code == 403 and r.json()["error"]["code"] == "users.owner_only"
+    # `other` is the last owner and cannot step aside either.
+    other_client = await make_client(csrf=True)
+    await login(other_client, other.email)
+    r = await other_client.post(f"/api/admin/users/{other.id}/deactivate")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "users.last_owner"
 
 
 async def test_inactive_owners_do_not_count(owner: AsyncClient, owner_user: User, make_user):
