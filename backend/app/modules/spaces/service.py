@@ -3,10 +3,13 @@
 Kinds: `open` and `team` are created through the API by anyone with `space.create`, who
 becomes the space's admin; `personal` is created only here, once per person, with that
 person as its one fixed member. Slugs come from the name, unique per organisation
-(`name`, `name-2`, ...), and stay when the space is renamed.
+(`name`, `name-2`, ...), and stay when the space is renamed. Changes made by someone
+are audited in their transaction; the personal space of a new person and the general
+space of a new installation come with `user.created` and bootstrap.
 """
 
 import uuid
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +19,7 @@ from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
 from app.core.slug import slugify
+from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.spaces.repository import SpaceRepository
@@ -48,6 +52,7 @@ class SpaceService:
         await require(self.session, actor, Action.SPACE_CREATE)
         space = await self._insert(actor.org_id, kind, name, description=description, icon=icon)
         await self.spaces.set_member(space.id, actor.principal, SpaceRole.ADMIN)
+        await self._audit(actor, "space.created", space.id, {"kind": kind, "name": name})
         return space
 
     async def create_personal(self, user: User) -> Space:
@@ -77,6 +82,7 @@ class SpaceService:
         space = _found(await self.spaces.get_for_update(actor.org_id, space_id))
         if space.version != version:
             raise Conflict(code="spaces.version_conflict")
+        before = snapshot(space, ("name", "description", "icon"))
         if data.name is not None:
             space.name = data.name
         if "description" in data.model_fields_set:
@@ -85,6 +91,8 @@ class SpaceService:
             space.icon = data.icon
         space.version += 1
         await self.session.flush()
+        if changed := changes(before, space):
+            await self._audit(actor, "space.updated", space.id, {"changes": changed})
         return space
 
     async def members(
@@ -107,14 +115,23 @@ class SpaceService:
         await self._members_changeable(actor, space_id)
         principal = Principal(member_type, member_id)
         await self._ensure_exists(actor.org_id, principal)
-        return await self.spaces.set_member(space_id, principal, role)
+        member = await self.spaces.set_member(space_id, principal, role)
+        await self._audit(actor, "space.member_set", space_id, {**_member(principal), "role": role})
+        return member
 
     async def remove_member(
         self, actor: Actor, space_id: uuid.UUID, member_type: PrincipalType, member_id: uuid.UUID
     ) -> None:
         await self._members_changeable(actor, space_id)
-        if not await self.spaces.remove_member(space_id, Principal(member_type, member_id)):
+        principal = Principal(member_type, member_id)
+        if not await self.spaces.remove_member(space_id, principal):
             raise NotFound(code="spaces.member_not_found")
+        await self._audit(actor, "space.member_removed", space_id, _member(principal))
+
+    async def _audit(
+        self, actor: Actor, action: str, space_id: uuid.UUID, details: dict[str, Any]
+    ) -> None:
+        await record(self.session, actor, action, "space", space_id, details)
 
     async def _space(self, org_id: uuid.UUID, space_id: uuid.UUID) -> Space:
         return _found(await self.spaces.get(org_id, space_id))
@@ -158,6 +175,10 @@ class SpaceService:
             owner_user_id=owner,
         )
         return await self.spaces.add(space)
+
+
+def _member(principal: Principal) -> dict[str, Any]:
+    return {"member_type": principal.type, "member_id": str(principal.id)}
 
 
 def _found(space: Space | None) -> Space:

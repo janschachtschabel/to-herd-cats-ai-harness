@@ -1,12 +1,13 @@
 """People administration: create, change, deactivate, reactivate, list.
 
-Writes for one organisation are serialised (`lock_admin_writes`), so the version check,
-the email check and the last-owner rule hold under concurrent requests. Only an owner
-grants or revokes the owner role, and only an owner changes an owner's password or
-(de)activates an owner.
+Every change is audited in the transaction that makes it. Writes for one organisation
+are serialised (`lock_admin_writes`), so the version check, the email check and the
+last-owner rule hold under concurrent requests. Only an owner grants or revokes the
+owner role, and only an owner changes an owner's password or (de)activates an owner.
 """
 
 import uuid
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,11 +16,15 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
 from app.core.security import hash_password
+from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
 from app.modules.spaces.service import SpaceService
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import UserCreate, UserUpdate
+
+# What `user.updated` reports; a password change is its own entry, without values.
+_AUDITED_FIELDS = ("name", "system_role", "locale")
 
 
 class UserService:
@@ -46,6 +51,7 @@ class UserService:
         )
         await self.users.add(user)
         await SpaceService(self.session).create_personal(user)
+        await self._audit(actor, "user.created", user, {"system_role": user.system_role})
         return user
 
     async def update(
@@ -70,6 +76,7 @@ class UserService:
             raise Conflict(code="users.version_conflict")
         if data.system_role is not None and not _is_owner(data.system_role):
             await self._keep_an_owner(user)
+        before = snapshot(user, _AUDITED_FIELDS)
         if data.name is not None:
             user.name = data.name
         if data.system_role is not None:
@@ -82,17 +89,22 @@ class UserService:
             await self.sessions.delete_for_user(actor.org_id, user.id, keep=keep)
         user.version += 1
         await self.session.flush()
+        if changed := changes(before, user):
+            await self._audit(actor, "user.updated", user, {"changes": changed})
+        if data.password is not None:
+            await self._audit(actor, "user.password_changed", user)
         return user
 
     async def deactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """Deactivated people are logged out at once: all their sessions are deleted."""
         user = await self._activity_target(actor, user_id)
         await self._keep_an_owner(user)
+        await self.sessions.delete_for_user(actor.org_id, user.id)
         if user.is_active:
             user.is_active = False
             user.version += 1
-        await self.sessions.delete_for_user(actor.org_id, user.id)
-        await self.session.flush()
+            await self.session.flush()
+            await self._audit(actor, "user.deactivated", user)
 
     async def reactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """The person can log in again; idempotent."""
@@ -100,13 +112,19 @@ class UserService:
         if not user.is_active:
             user.is_active = True
             user.version += 1
-        await self.session.flush()
+            await self.session.flush()
+            await self._audit(actor, "user.reactivated", user)
 
     async def list(self, actor: Actor, params: PageParams) -> Page[User]:
         await require(self.session, actor, Action.USER_MANAGE)
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.users.page(actor.org_id, after, params.limit + 1)
         return id_page(rows, params.limit, lambda u: u.id)
+
+    async def _audit(
+        self, actor: Actor, action: str, user: User, details: dict[str, Any] | None = None
+    ) -> None:
+        await record(self.session, actor, action, "user", user.id, details)
 
     async def _current(self, actor: Actor, user_id: uuid.UUID) -> User:
         """The person as committed now, with the organisation's admin writes locked."""

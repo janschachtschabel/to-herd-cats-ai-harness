@@ -7,6 +7,9 @@ is no other place that decides who may do what.
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
   an unknown id, and 403 only where the space is visible but the right is missing.
+- When an admin gets into a team or personal space only through admin power (no
+  membership of their own or through a group), `require` notes it in the audit log
+  (spec 5.5), at most once per admin, space and UTC day. `can` only answers.
 
 Each check is one SQL query (`AccessRepository.facts`); lists filter with the SQL of
 `visible_space_ids`, which the check itself uses for readability.
@@ -29,9 +32,13 @@ from app.core.permissions import (
     Action,
     SpaceRole,
 )
+from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import SpaceKind
+
+# Spaces an admin may open without a membership, but not unnoticed.
+ADMIN_ACCESS_AUDITED_KINDS = frozenset({SpaceKind.TEAM, SpaceKind.PERSONAL})
 
 __all__ = ["Action", "Actor", "actor_for", "can", "require", "space_role", "visible_space_ids"]
 
@@ -72,6 +79,16 @@ async def require(
         raise NotFound(code="space.not_found")
     if not _allows(facts, action):
         raise Forbidden(code="auth.permission_denied")
+    if space_id is not None and facts.kind is not None and _by_admin_power(facts):
+        await record_admin_access(session, actor, space_id, facts.kind)
+
+
+def _by_admin_power(facts: AccessFacts) -> bool:
+    return (
+        facts.system_role in ADMIN_ROLES
+        and facts.kind in ADMIN_ACCESS_AUDITED_KINDS
+        and facts.member_role is None
+    )
 
 
 def _effective_role(facts: AccessFacts) -> SpaceRole | None:

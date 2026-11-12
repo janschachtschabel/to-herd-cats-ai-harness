@@ -48,12 +48,15 @@ class GroupRepository(BaseRepository[Group]):
             stmt = stmt.where(GroupMember.member_id > after)
         return list((await self.session.scalars(stmt)).all())
 
-    async def add_member(self, group_id: uuid.UUID, principal: Principal) -> None:
-        """Idempotent, also under concurrent requests."""
-        stmt = insert(GroupMember).values(
-            group_id=group_id, member_type=principal.type, member_id=principal.id
+    async def add_member(self, group_id: uuid.UUID, principal: Principal) -> bool:
+        """Idempotent, also under concurrent requests; True if the member is new."""
+        stmt = (
+            insert(GroupMember)
+            .values(group_id=group_id, member_type=principal.type, member_id=principal.id)
+            .on_conflict_do_nothing()
+            .returning(GroupMember.member_id)
         )
-        await self.session.execute(stmt.on_conflict_do_nothing())
+        return (await self.session.execute(stmt)).first() is not None
 
     async def remove_member(self, group_id: uuid.UUID, principal: Principal) -> bool:
         stmt = (

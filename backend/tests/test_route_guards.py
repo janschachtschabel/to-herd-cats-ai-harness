@@ -25,6 +25,7 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
     users, groups = "/api/admin/users", "/api/admin/groups"
     member_ref = {"member_type": "user", "member_id": str(user.id)}
     return [
+        ("GET", "/api/admin/audit", "/api/admin/audit", None),
         ("GET", users, users, None),
         ("POST", users, users, new_user),
         ("PATCH", f"{users}/{{user_id}}", f"{users}/{user.id}", {"name": "X", "version": 1}),
