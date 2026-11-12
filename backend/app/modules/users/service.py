@@ -16,6 +16,7 @@ from app.core.principal import SystemRole
 from app.core.security import hash_password
 from app.modules.auth.context import AuthContext, ensure_can_manage_users
 from app.modules.auth.repository import SessionRepository
+from app.modules.spaces.service import SpaceService
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import UserCreate, UserUpdate
@@ -27,6 +28,7 @@ class UserService:
         self.sessions = SessionRepository(session)
 
     async def create(self, actor: AuthContext, data: UserCreate) -> User:
+        """The person and, in the same transaction, their personal space."""
         ensure_can_manage_users(actor)
         if data.system_role == SystemRole.OWNER:
             _owner_only(actor)
@@ -41,7 +43,9 @@ class UserService:
             system_role=data.system_role,
             password_hash=hash_password(data.password) if data.password else None,
         )
-        return await self.users.add(user)
+        await self.users.add(user)
+        await SpaceService(self.users.session).create_personal(user)
+        return user
 
     async def update(
         self, actor: AuthContext, user_id: uuid.UUID, data: UserUpdate, version: int

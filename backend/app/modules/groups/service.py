@@ -15,6 +15,7 @@ from app.core.principal import Principal
 from app.modules.groups.models import Group, GroupMember
 from app.modules.groups.repository import GroupRepository
 from app.modules.groups.schemas import GroupCreate, GroupUpdate
+from app.modules.spaces.repository import SpaceRepository
 from app.modules.users.repository import UserRepository
 
 
@@ -52,9 +53,12 @@ class GroupService:
         return group
 
     async def delete(self, actor: Actor, group_id: uuid.UUID) -> None:
-        """Its memberships go with it (the database cascades `group_member`)."""
+        """Its memberships go with it: the database cascades `group_member`; its space
+        memberships (no foreign key: `member_id` is polymorphic) are deleted here."""
         await require(self.session, actor, Action.GROUP_MANAGE)
-        await self.groups.delete(await self._current(actor, group_id))
+        group = await self._current(actor, group_id)
+        await SpaceRepository(self.session).delete_memberships_of(Principal.group(group.id))
+        await self.groups.delete(group)
 
     async def list(self, actor: Actor, params: PageParams) -> Page[Group]:
         await require(self.session, actor, Action.GROUP_MANAGE)

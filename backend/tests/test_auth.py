@@ -267,6 +267,10 @@ async def test_bootstrap_takes_a_lock(session: AsyncSession) -> None:
     """Two replicas starting at once must not both create an organisation."""
     await ensure_bootstrap(session, BOOT)
     held = await session.scalar(
-        text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()")
+        text(
+            "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory'"
+            " AND pid = pg_backend_pid()"
+            " AND ((classid::bigint << 32) | objid::bigint) = hashtextextended('bootstrap', 0)"
+        )
     )
     assert held == 1

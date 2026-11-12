@@ -1,0 +1,166 @@
+"""Spaces and their members.
+
+Kinds: `open` and `team` are created through the API by anyone with `space.create`, who
+becomes the space's admin; `personal` is created only here, once per person, with that
+person as its one fixed member. Slugs come from the name, unique per organisation
+(`name`, `name-2`, ...), and stay when the space is renamed.
+"""
+
+import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.access import Action, Actor, require, visible_space_ids
+from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
+from app.core.permissions import SpaceRole
+from app.core.principal import Principal, PrincipalType
+from app.core.slug import slugify
+from app.modules.groups.repository import GroupRepository
+from app.modules.spaces.models import Space, SpaceKind, SpaceMember
+from app.modules.spaces.repository import SpaceRepository
+from app.modules.spaces.schemas import SpaceUpdate
+from app.modules.users.models import User
+from app.modules.users.repository import UserRepository
+
+GENERAL_SPACE_NAME = "Allgemein"
+GENERAL_SPACE_SLUG = "allgemein"
+_SLUG_BASE_LENGTH = 72  # leaves room for a "-<n>" suffix within the column's 80
+
+
+class SpaceService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.spaces = SpaceRepository(session)
+        self.users = UserRepository(session)
+        self.groups = GroupRepository(session)
+
+    async def create(
+        self,
+        actor: Actor,
+        kind: SpaceKind,
+        name: str,
+        description: str | None = None,
+        icon: str | None = None,
+    ) -> Space:
+        if kind == SpaceKind.PERSONAL:
+            raise ValidationFailed(code="spaces.kind_not_allowed")
+        await require(self.session, actor, Action.SPACE_CREATE)
+        space = await self._insert(actor.org_id, kind, name, description=description, icon=icon)
+        await self.spaces.set_member(space.id, actor.principal, SpaceRole.ADMIN)
+        return space
+
+    async def create_personal(self, user: User) -> Space:
+        """The person's own space; called in the transaction that creates the person."""
+        space = await self._insert(user.org_id, SpaceKind.PERSONAL, user.name, owner=user.id)
+        await self.spaces.set_member(space.id, Principal.user(user.id), SpaceRole.ADMIN)
+        return space
+
+    async def create_general(self, org_id: uuid.UUID) -> None:
+        """The open space every installation starts with (bootstrap), unless it exists."""
+        if not await self.spaces.slug_taken(org_id, GENERAL_SPACE_SLUG):
+            await self._insert(org_id, SpaceKind.OPEN, GENERAL_SPACE_NAME)
+
+    async def get(self, actor: Actor, space_id: uuid.UUID) -> Space:
+        await require(self.session, actor, Action.SPACE_READ, space_id)
+        return await self._space(actor.org_id, space_id)
+
+    async def list_visible(self, actor: Actor, params: PageParams) -> Page[Space]:
+        after = decode_id_cursor(params.cursor) if params.cursor else None
+        rows = await self.spaces.page_among(visible_space_ids(actor), after, params.limit + 1)
+        return id_page(rows, params.limit, lambda s: s.id)
+
+    async def update(
+        self, actor: Actor, space_id: uuid.UUID, data: SpaceUpdate, version: int
+    ) -> Space:
+        await require(self.session, actor, Action.SPACE_MANAGE, space_id)
+        space = _found(await self.spaces.get_for_update(actor.org_id, space_id))
+        if space.version != version:
+            raise Conflict(code="spaces.version_conflict")
+        if data.name is not None:
+            space.name = data.name
+        if "description" in data.model_fields_set:
+            space.description = data.description
+        if "icon" in data.model_fields_set:
+            space.icon = data.icon
+        space.version += 1
+        await self.session.flush()
+        return space
+
+    async def members(
+        self, actor: Actor, space_id: uuid.UUID, params: PageParams
+    ) -> Page[SpaceMember]:
+        await require(self.session, actor, Action.SPACE_READ, space_id)
+        after = decode_id_cursor(params.cursor) if params.cursor else None
+        rows = await self.spaces.member_page(space_id, after, params.limit + 1)
+        return id_page(rows, params.limit, lambda m: m.member_id)
+
+    async def set_member(
+        self,
+        actor: Actor,
+        space_id: uuid.UUID,
+        member_type: PrincipalType,
+        member_id: uuid.UUID,
+        role: SpaceRole,
+    ) -> SpaceMember:
+        """Add a person or a group, or change their role."""
+        await self._members_changeable(actor, space_id)
+        principal = Principal(member_type, member_id)
+        await self._ensure_exists(actor.org_id, principal)
+        return await self.spaces.set_member(space_id, principal, role)
+
+    async def remove_member(
+        self, actor: Actor, space_id: uuid.UUID, member_type: PrincipalType, member_id: uuid.UUID
+    ) -> None:
+        await self._members_changeable(actor, space_id)
+        if not await self.spaces.remove_member(space_id, Principal(member_type, member_id)):
+            raise NotFound(code="spaces.member_not_found")
+
+    async def _space(self, org_id: uuid.UUID, space_id: uuid.UUID) -> Space:
+        return _found(await self.spaces.get(org_id, space_id))
+
+    async def _members_changeable(self, actor: Actor, space_id: uuid.UUID) -> None:
+        await require(self.session, actor, Action.SPACE_MANAGE, space_id)
+        space = await self._space(actor.org_id, space_id)
+        if space.kind == SpaceKind.PERSONAL:
+            raise Conflict(code="spaces.personal_members_fixed")
+
+    async def _ensure_exists(self, org_id: uuid.UUID, principal: Principal) -> None:
+        if principal.type == PrincipalType.USER:
+            if await self.users.get(org_id, principal.id) is None:
+                raise NotFound(code="users.not_found")
+        elif await self.groups.get(org_id, principal.id) is None:
+            raise NotFound(code="groups.not_found")
+
+    async def _insert(
+        self,
+        org_id: uuid.UUID,
+        kind: SpaceKind,
+        name: str,
+        *,
+        description: str | None = None,
+        icon: str | None = None,
+        owner: uuid.UUID | None = None,
+    ) -> Space:
+        await self.spaces.lock_slugs(org_id)
+        base = slugify(name, max_length=_SLUG_BASE_LENGTH)
+        slug, n = base, 1
+        while await self.spaces.slug_taken(org_id, slug):
+            n += 1
+            slug = f"{base}-{n}"
+        space = Space(
+            org_id=org_id,
+            kind=kind,
+            name=name,
+            slug=slug,
+            description=description,
+            icon=icon,
+            owner_user_id=owner,
+        )
+        return await self.spaces.add(space)
+
+
+def _found(space: Space | None) -> Space:
+    if space is None:  # only if it went away after the permission check
+        raise NotFound(code="space.not_found")
+    return space

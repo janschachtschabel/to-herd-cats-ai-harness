@@ -2,6 +2,7 @@
 
 Fixtures: `org`, `owner_user`, `member`, `guest` (users) and `owner`, `member_client`,
 `guest_client` (logged-in httpx clients with the CSRF header), plus `make_user(...)`.
+Every person made here has a personal space, like one made through the API.
 """
 
 from collections.abc import Awaitable, Callable
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.principal import SystemRole
 from app.core.security import hash_password
 from app.modules.orgs.models import Organization
+from app.modules.spaces.service import SpaceService
 from app.modules.users.models import User
 
 CSRF = {"X-Requested-With": "herd"}
@@ -65,6 +67,7 @@ async def make_user(session: AsyncSession, org: Organization) -> MakeUser:
         )
         session.add(user)
         await session.flush()
+        await SpaceService(session).create_personal(user)  # as UserService.create does
         return user
 
     return _make
