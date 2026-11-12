@@ -13,6 +13,7 @@ export type SpaceMember = Schemas['SpaceMemberOut']
 export type SystemRole = Schemas['SystemRole']
 export type AuditEntry = Schemas['AuditOut']
 export type Permission = Schemas['Action']
+export type DirectoryEntry = Schemas['DirectoryEntryOut']
 
 /** One page of a list endpoint: `next_cursor` is null on the last page. */
 export interface Page<T> {

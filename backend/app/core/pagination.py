@@ -1,11 +1,13 @@
-"""Keyset pagination: opaque cursors over (created_at, id), or over id alone.
+"""Keyset pagination: opaque cursors over (created_at, id), over (text key, id), or
+over id alone.
 
 Ids are UUIDv7 and therefore ordered by creation time; tables without `created_at`
-page by id.
+page by id. Lists sorted by name page by (key, id).
 """
 
 import base64
 import binascii
+import json
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -50,6 +52,22 @@ def decode_id_cursor(cursor: str) -> uuid.UUID:
     try:
         return uuid.UUID(bytes=base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
     except (binascii.Error, ValueError) as exc:
+        raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+
+
+def encode_key_cursor(key: str, id_: uuid.UUID) -> str:
+    raw = json.dumps([key, str(id_)]).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_key_cursor(cursor: str) -> tuple[str, uuid.UUID]:
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
+        key, id_ = json.loads(raw)
+        if not isinstance(key, str):
+            raise ValueError("key is not text")
+        return key, uuid.UUID(id_)
+    except (binascii.Error, ValueError, TypeError, UnicodeDecodeError) as exc:
         raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
 
 

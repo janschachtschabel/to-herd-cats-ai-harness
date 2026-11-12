@@ -180,12 +180,10 @@
       "removeNamed": "{{name}} entfernen",
       "personalFixed": "Ein persönlicher Bereich gehört genau einer Person; seine Mitglieder lassen sich nicht ändern.",
       "add": "Mitglied hinzufügen",
-      "type": "Art",
       "who": "Person oder Gruppe",
-      "choose": "Bitte wählen …",
       "addSubmit": "Hinzufügen",
-      "moreCandidates": "Weitere laden",
-      "noDirectory": "Neue Mitglieder kann derzeit nur die Verwaltung hinzufügen."
+      "noDirectory": "Gäste können keine Personen oder Gruppen suchen und deshalb keine Mitglieder hinzufügen.",
+      "pickRequired": "Bitte eine Person oder Gruppe auswählen."
     }
   },
   "users": {
@@ -324,5 +322,12 @@
       "team": "Team",
       "personal": "persönlich"
     }
+  },
+  "directory": {
+    "placeholder": "Name oder E-Mail eingeben …",
+    "hint": "Sucht in Namen und am Anfang von E-Mail-Adressen.",
+    "searching": "Suche …",
+    "empty": "Niemand gefunden.",
+    "loadMore": "Weitere laden"
   }
 }

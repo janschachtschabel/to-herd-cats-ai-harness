@@ -15,7 +15,7 @@ from tests.factories_spaces import personal_space_of
 from tests.test_access import actor_of
 
 SPACES = "/api/spaces"
-ALL_SYSTEM = ["audit.read", "group.manage", "space.create", "user.manage"]
+ALL_SYSTEM = ["audit.read", "directory.read", "group.manage", "space.create", "user.manage"]
 
 
 @pytest.mark.parametrize(
@@ -23,7 +23,7 @@ ALL_SYSTEM = ["audit.read", "group.manage", "space.create", "user.manage"]
     [
         (SystemRole.OWNER, ALL_SYSTEM),
         (SystemRole.ADMIN, ALL_SYSTEM),
-        (SystemRole.MEMBER, ["space.create"]),
+        (SystemRole.MEMBER, ["directory.read", "space.create"]),
         (SystemRole.GUEST, []),
     ],
 )
@@ -38,7 +38,10 @@ async def test_me_lists_system_permissions(
 
 async def test_system_permissions_are_read_live(session: AsyncSession, member: User) -> None:
     actor = await actor_of(session, member)
-    assert [a.value for a in await system_permissions(session, actor)] == ["space.create"]
+    assert [a.value for a in await system_permissions(session, actor)] == [
+        "directory.read",
+        "space.create",
+    ]
     member.system_role = SystemRole.ADMIN
     await session.flush()
     assert [a.value for a in await system_permissions(session, actor)] == ALL_SYSTEM

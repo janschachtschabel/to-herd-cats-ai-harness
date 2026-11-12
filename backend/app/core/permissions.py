@@ -12,6 +12,7 @@ class Action(StrEnum):
     SPACE_MANAGE = "space.manage"
     # System-wide
     SPACE_CREATE = "space.create"
+    DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
     USER_MANAGE = "user.manage"
     GROUP_MANAGE = "group.manage"
     AUDIT_READ = "audit.read"
@@ -68,7 +69,7 @@ ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADM
 SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {
     SystemRole.OWNER: frozenset(Action),
     SystemRole.ADMIN: frozenset(Action),
-    SystemRole.MEMBER: frozenset({Action.SPACE_CREATE}),
+    SystemRole.MEMBER: frozenset({Action.SPACE_CREATE, Action.DIRECTORY_READ}),
     SystemRole.GUEST: frozenset(),
 }
 

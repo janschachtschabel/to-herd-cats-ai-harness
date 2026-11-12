@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm, useWatch } from 'react-hook-form'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/native-select'
-import { useGroups } from '@/features/admin/groups/queries'
-import { useUsers } from '@/features/admin/users/queries'
 import { usePermission } from '@/features/auth/queries'
+import { DirectoryCombobox } from '@/features/directory/DirectoryCombobox'
 import { Field, SaveError } from '@/features/shared/forms'
-import type { Schemas } from '@/lib/api'
+import type { DirectoryEntry, Schemas } from '@/lib/api'
 import { bodySchema } from '@/lib/schemas'
 import { SPACE_ROLES } from './display'
 import { useSetSpaceMember } from './queries'
@@ -15,41 +15,36 @@ import { useSetSpaceMember } from './queries'
 type Values = Schemas['SpaceMemberIn']
 const schema = bodySchema('SpaceMemberIn')
 
-/** Add a person or a group; `present` ("type:id") are left out of the choice. Choosing
- *  needs the lists of the administration. */
+/** Add a person or a group, found in the directory; `present` ("type:id") are not
+ *  offered again. Searching needs `directory.read` (everyone but guests). */
 export function AddMemberForm({ spaceId, present }: { spaceId: string; present: Set<string> }) {
   const { t } = useTranslation()
-  const canListUsers = usePermission('user.manage')
-  const canListGroups = usePermission('group.manage')
-  const users = useUsers(canListUsers)
-  const groups = useGroups(canListGroups)
+  const canSearch = usePermission('directory.read')
   const add = useSetSpaceMember(spaceId)
-  const types: Values['member_type'][] = []
-  if (canListUsers) types.push('user')
-  if (canListGroups) types.push('group')
+  const [picked, setPicked] = useState<DirectoryEntry | null>(null)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { member_type: types[0] ?? 'user', member_id: '', role: 'viewer' },
+    defaultValues: { member_type: 'user', member_id: '', role: 'viewer' },
   })
-  const memberType = useWatch({ control: form.control, name: 'member_type' })
   const errors = form.formState.errors
 
-  if (types.length === 0) {
+  if (!canSearch) {
     return <p className="text-sm text-muted-foreground">{t('spaces.members.noDirectory')}</p>
   }
 
-  const candidates =
-    memberType === 'group'
-      ? groups.items
-          .filter((g) => !present.has(`group:${g.id}`))
-          .map((g) => ({ id: g.id, label: g.name }))
-      : users.items
-          .filter((u) => u.is_active && !present.has(`user:${u.id}`))
-          .map((u) => ({ id: u.id, label: `${u.name} (${u.email})` }))
-  const list = memberType === 'group' ? groups : users
+  const choose = (entry: DirectoryEntry | null) => {
+    setPicked(entry)
+    form.setValue('member_type', entry?.type ?? 'user')
+    form.setValue('member_id', entry?.id ?? '', { shouldValidate: form.formState.isSubmitted })
+  }
 
   const onSubmit = form.handleSubmit((values) =>
-    add.mutate(values, { onSuccess: () => form.reset({ ...values, member_id: '' }) }),
+    add.mutate(values, {
+      onSuccess: () => {
+        setPicked(null)
+        form.reset({ ...values, member_id: '' })
+      },
+    }),
   )
 
   return (
@@ -62,33 +57,19 @@ export function AddMemberForm({ spaceId, present }: { spaceId: string; present: 
       <h3 id="add-member-heading" className="text-sm font-semibold">
         {t('spaces.members.add')}
       </h3>
-      <div className="grid gap-3 sm:grid-cols-[10rem_1fr_10rem]">
-        <Field label={t('spaces.members.type')}>
+      <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+        <Field
+          label={t('spaces.members.who')}
+          hint={t('directory.hint')}
+          error={errors.member_id && t('spaces.members.pickRequired')}
+        >
           {(props) => (
-            <NativeSelect
-              {...props}
-              {...form.register('member_type', {
-                onChange: () => form.setValue('member_id', ''),
-              })}
-            >
-              {types.map((type) => (
-                <option key={type} value={type}>
-                  {t(`principals.${type}`)}
-                </option>
-              ))}
-            </NativeSelect>
-          )}
-        </Field>
-        <Field label={t('spaces.members.who')} error={errors.member_id?.message}>
-          {(props) => (
-            <NativeSelect {...props} disabled={list.isPending} {...form.register('member_id')}>
-              <option value="">{t('spaces.members.choose')}</option>
-              {candidates.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </NativeSelect>
+            <DirectoryCombobox
+              control={props}
+              selected={picked}
+              onSelect={choose}
+              exclude={present}
+            />
           )}
         </Field>
         <Field label={t('spaces.members.role')}>
@@ -103,15 +84,10 @@ export function AddMemberForm({ spaceId, present }: { spaceId: string; present: 
           )}
         </Field>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div>
         <Button type="submit" disabled={add.isPending}>
           {t('spaces.members.addSubmit')}
         </Button>
-        {list.hasMore && (
-          <Button type="button" variant="ghost" onClick={list.loadMore} disabled={list.loadingMore}>
-            {t('spaces.members.moreCandidates')}
-          </Button>
-        )}
       </div>
       <SaveError error={add.error} />
     </form>

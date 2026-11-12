@@ -1,19 +1,22 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import type { Space, SpaceMember } from '@/lib/api'
-import { ADMIN_PERMISSIONS, apiError, makeMe, makeSpace, makeUser, mockApi, page } from '@/test/api'
+import {
+  ADMIN_PERMISSIONS,
+  apiError,
+  makeEntry,
+  makeMe,
+  makeSpace,
+  mockApi,
+  page,
+} from '@/test/api'
 import { renderApp } from '@/test/render'
 
 describe('spaces', () => {
   test('admin creates a team space and adds a group as editor', async () => {
     const me = makeMe(ADMIN_PERMISSIONS)
     const created = makeSpace({ name: 'Team Dienste', my_role: 'admin' })
-    const group = {
-      id: '00000000-0000-7000-8000-0000000000aa',
-      name: 'Redaktion',
-      description: null,
-      version: 1,
-    }
+    const group = makeEntry({ type: 'group', name: 'Redaktion' })
     const members: SpaceMember[] = [
       { member_type: 'user', member_id: me.user.id, role: 'admin', name: 'Mia Muster' },
     ]
@@ -28,8 +31,12 @@ describe('spaces', () => {
         members.push(member)
         return member
       },
-      'GET /api/admin/users': page([makeUser()]),
-      'GET /api/admin/groups': page([group]),
+      'GET /api/directory': (call) =>
+        page(
+          [makeEntry({ name: 'Lea Löwe' }), group].filter((e) =>
+            e.name.includes(call.query.get('q') ?? ''),
+          ),
+        ),
     })
     const { router, user } = await renderApp('/spaces')
 
@@ -48,8 +55,8 @@ describe('spaces', () => {
     })
 
     const form = await screen.findByRole('form', { name: 'Mitglied hinzufügen' })
-    await user.selectOptions(within(form).getByLabelText('Art'), 'Gruppe')
-    await user.selectOptions(within(form).getByLabelText('Person oder Gruppe'), 'Redaktion')
+    await user.type(within(form).getByRole('combobox', { name: 'Person oder Gruppe' }), 'Red')
+    await user.click(await screen.findByRole('option', { name: /Redaktion/ }))
     await user.selectOptions(within(form).getByLabelText('Rolle'), 'Autor')
     await user.click(within(form).getByRole('button', { name: 'Hinzufügen' }))
 
@@ -62,6 +69,88 @@ describe('spaces', () => {
     )
     const row = (await screen.findByText('Redaktion', { selector: 'td span' })).closest('tr')!
     expect(within(row).getByLabelText('Rolle von Redaktion')).toHaveValue('editor')
+  })
+
+  test('a space admin without administration rights finds people in the directory', async () => {
+    const space = makeSpace({ kind: 'team', name: 'Projekt Apfel', my_role: 'admin' })
+    const lea = makeEntry({ name: 'Lea Löwe' })
+    const present = makeEntry({ name: 'Leo Dabei' })
+    const otto = makeEntry({ name: 'Otto Anders' })
+    const api = mockApi({
+      'GET /api/auth/me': makeMe(['directory.read', 'space.create']),
+      'GET /api/spaces': page([space]),
+      'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/members': page([
+        { member_type: 'user', member_id: present.id, role: 'viewer', name: present.name },
+      ]),
+      'GET /api/directory': (call) =>
+        call.query.get('q') ? page([present, lea]) : page([present, otto]),
+      'PUT /api/spaces/:id/members': (call) => ({ ...(call.body as object), name: lea.name }),
+    })
+    const { user } = await renderApp(`/spaces/${space.id}`)
+    const form = await screen.findByRole('form', { name: 'Mitglied hinzufügen' })
+    expect(screen.queryByText(/nur die Verwaltung/)).not.toBeInTheDocument()
+
+    const box = within(form).getByRole('combobox', { name: 'Person oder Gruppe' })
+    await user.click(box)
+    expect(await screen.findByRole('option', { name: /Otto Anders/ })).toBeInTheDocument()
+    await user.type(box, 'Le')
+    // Until the search for "Le" has answered, no stale result can be picked.
+    expect(screen.queryByRole('option', { name: /Otto Anders/ })).not.toBeInTheDocument()
+    const listbox = await screen.findByRole('listbox')
+    expect(await within(listbox).findByRole('option', { name: /Lea Löwe/ })).toBeInTheDocument()
+    // Members already in the space are not offered again.
+    expect(within(listbox).queryByRole('option', { name: /Leo Dabei/ })).not.toBeInTheDocument()
+    // Focus lists everyone; typing is debounced: one search for "Le", none for "L".
+    await waitFor(() =>
+      expect(api.find('GET', '/api/directory').map((c) => c.query.get('q'))).toEqual(['', 'Le']),
+    )
+
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(box).toHaveValue('Lea Löwe')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    await user.click(within(form).getByRole('button', { name: 'Hinzufügen' }))
+    await waitFor(() =>
+      expect(api.find('PUT', `/api/spaces/${space.id}/members`)[0]?.body).toEqual({
+        member_type: 'user',
+        member_id: lea.id,
+        role: 'viewer',
+      }),
+    )
+    expect(api.find('GET', '/api/admin/users')).toEqual([])
+    await waitFor(() => expect(box).toHaveValue(''))
+  })
+
+  test('the picker says when nobody matches and closes on Escape', async () => {
+    const space = makeSpace({ kind: 'team', my_role: 'admin' })
+    mockApi({
+      'GET /api/auth/me': makeMe(['directory.read']),
+      'GET /api/spaces': page([space]),
+      'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/members': page([]),
+      'GET /api/directory': page([]),
+    })
+    const { user } = await renderApp(`/spaces/${space.id}`)
+    const box = await screen.findByRole('combobox', { name: 'Person oder Gruppe' })
+    await user.type(box, 'zzz')
+    expect(await screen.findByText('Niemand gefunden.')).toBeInTheDocument()
+    expect(box).toHaveAttribute('aria-expanded', 'true')
+    await user.keyboard('{Escape}')
+    expect(box).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  test('without directory.read a space admin is told why nobody can be added', async () => {
+    const space = makeSpace({ kind: 'team', my_role: 'admin' })
+    const api = mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([space]),
+      'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/members': page([]),
+    })
+    await renderApp(`/spaces/${space.id}`)
+    expect(await screen.findByText(/Gäste können/)).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Person oder Gruppe' })).not.toBeInTheDocument()
+    expect(api.find('GET', '/api/directory')).toEqual([])
   })
 
   test('the create form checks the limits the API declares', async () => {

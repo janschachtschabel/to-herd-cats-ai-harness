@@ -208,6 +208,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Directory */
+        get: operations["search_directory_api_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces": {
         parameters: {
             query?: never;
@@ -287,7 +304,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "space.create" | "user.manage" | "group.manage" | "audit.read";
+        Action: "space.read" | "space.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read";
         /**
          * AuditOut
          * @description `actor_name`: the acting person's display name (None for other principals).
@@ -327,6 +344,24 @@ export interface components {
             target_id: string;
             /** Target Type */
             target_type: string;
+        };
+        /**
+         * DirectoryEntryOut
+         * @description Who can be added to a space. Deliberately no email or role: any member may read it.
+         */
+        DirectoryEntryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "user" | "group";
         };
         /** GroupCreate */
         GroupCreate: {
@@ -430,6 +465,13 @@ export interface components {
         Page_AuditOut_: {
             /** Items */
             items: components["schemas"]["AuditOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[DirectoryEntryOut] */
+        Page_DirectoryEntryOut_: {
+            /** Items */
+            items: components["schemas"]["DirectoryEntryOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1163,6 +1205,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    search_directory_api_directory_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                q?: string;
+                type?: ("user" | "group") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DirectoryEntryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

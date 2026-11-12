@@ -180,12 +180,10 @@
       "removeNamed": "Remove {{name}}",
       "personalFixed": "A personal space belongs to exactly one person; its members cannot be changed.",
       "add": "Add member",
-      "type": "Kind",
       "who": "Person or group",
-      "choose": "Please choose …",
       "addSubmit": "Add",
-      "moreCandidates": "Load more",
-      "noDirectory": "For now, only the administration can add new members."
+      "noDirectory": "Guests cannot search for people or groups and therefore cannot add members.",
+      "pickRequired": "Please choose a person or group."
     }
   },
   "users": {
@@ -324,5 +322,12 @@
       "team": "team",
       "personal": "personal"
     }
+  },
+  "directory": {
+    "placeholder": "Type a name or email …",
+    "hint": "Searches names and the start of email addresses.",
+    "searching": "Searching …",
+    "empty": "Nobody found.",
+    "loadMore": "Load more"
   }
 }

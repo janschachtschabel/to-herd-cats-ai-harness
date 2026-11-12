@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { Me, Page, Permission, Space, User } from '@/lib/api'
+import type { DirectoryEntry, Me, Page, Permission, Space, User } from '@/lib/api'
 
 export interface Call {
   method: string
@@ -93,6 +93,7 @@ export function page<T>(items: T[], next_cursor: string | null = null): Page<T> 
 
 export const ADMIN_PERMISSIONS: Permission[] = [
   'audit.read',
+  'directory.read',
   'group.manage',
   'space.create',
   'user.manage',
@@ -121,6 +122,10 @@ export function makeMe(permissions: Permission[], user: Partial<User> = {}): Me 
     org: { id: id(), name: 'Beispiel GmbH', slug: 'beispiel' },
     permissions,
   }
+}
+
+export function makeEntry(overrides: Partial<DirectoryEntry> = {}): DirectoryEntry {
+  return { type: 'user', id: id(), name: 'Lea Löwe', ...overrides }
 }
 
 export function makeSpace(overrides: Partial<Space> = {}): Space {
