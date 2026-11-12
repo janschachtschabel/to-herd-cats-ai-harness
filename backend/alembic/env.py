@@ -1,4 +1,7 @@
-"""Alembic environment (async). The URL comes from HERD_DATABASE_URL.
+"""Alembic environment (async). The URL is the app's: HERD_DATABASE_URL with
+HERD_DATABASE_PASSWORD(_FILE) merged in (`Settings.database()`). It is handed over as
+a URL object, never through the ini config, whose interpolation would mangle a `%`
+in an escaped password.
 
 No `fileConfig`: it would disable every logger already in the process. Logging is
 configured once by the application; a bare CLI run gets the same JSON/text logging.
@@ -9,7 +12,8 @@ import logging
 
 from alembic import context
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -19,13 +23,12 @@ if not logging.getLogger().handlers:  # the alembic CLI; the app has configured 
     configure_logging(get_settings())
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=get_settings().database(),
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
@@ -41,7 +44,7 @@ def _run(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = async_engine_from_config(config.get_section(config.config_ini_section) or {})
+    engine = create_async_engine(get_settings().database(), poolclass=NullPool)
     async with engine.connect() as connection:
         await connection.run_sync(_run)
     await engine.dispose()

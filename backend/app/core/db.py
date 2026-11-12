@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,14 +13,14 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import get_settings
 
 
-def make_engine(url: str | None = None) -> AsyncEngine:
-    return create_async_engine(url or get_settings().database_url, pool_pre_ping=True)
+def make_engine(url: str | URL | None = None) -> AsyncEngine:
+    return create_async_engine(url or get_settings().database(), pool_pre_ping=True)
 
 
 class Database:
     """Holds the engine and session factory for one application instance."""
 
-    def __init__(self, url: str | None = None) -> None:
+    def __init__(self, url: str | URL | None = None) -> None:
         self.engine = make_engine(url)
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False)
 

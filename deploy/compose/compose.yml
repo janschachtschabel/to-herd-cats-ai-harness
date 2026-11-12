@@ -29,7 +29,9 @@ services:
         condition: service_healthy
     environment:
       HERD_ROLE: all
-      HERD_DATABASE_URL: postgresql+asyncpg://herd:${POSTGRES_PASSWORD}@db:5432/herd
+      # The password is kept out of the URL; the app merges it in (escaped).
+      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
+      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
       HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}

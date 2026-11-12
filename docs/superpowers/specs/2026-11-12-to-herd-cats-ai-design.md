@@ -539,6 +539,7 @@ Es gibt einen gemeinsamen Tag-Vorrat (`tag`: Name, Farbe, `space_id` oder system
 - Ein Multi-Stage-Image mit `python:3.13-slim` als Basis, Node-Laufzeit nur für `collab` und der SPA als statischen Dateien.
 - Das Image läuft nicht als root, mit nur lesbarem Dateisystem; beschreibbar ist nur `/tmp` (`emptyDir`). Keine Modelle im Image, auch Docling-Modelle nicht: Diese kommen über ein Volume oder einen Init-Container.
 - Der Prozess ist PID 1 (oder `tini`). Er fängt SIGTERM ab und erlaubt einen geordneten Abschluss. Der Worker schließt den laufenden Schritt ab, und DBOS setzt nach dem Neustart fort.
+- Das Datenbank-Passwort steht nie in `HERD_DATABASE_URL`, sondern in `HERD_DATABASE_PASSWORD` oder `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler). Die Konfiguration setzt es maskiert in die URL ein; Alembic nutzt dieselbe URL. Eine URL mit Passwort funktioniert weiter (Tests, lokale Entwicklung).
 - `deploy/compose/` ist die Referenz mit `db`, `app` (`all`) und optional `minio`, `backup` und `otel-collector`.
 - **Helm-Chart**:
   - Pfad `deploy/helm/to-herd-cats-ai/`, `version` = `appVersion` = Version des Dienstes; ein CI-Test hält sie gleich.

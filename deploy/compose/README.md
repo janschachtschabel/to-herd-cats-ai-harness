@@ -52,7 +52,7 @@ ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built beforehand.
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `POSTGRES_PASSWORD` | yes | | Database password (`db` and the app's connection URL; no URL-special characters) |
+| `POSTGRES_PASSWORD` | yes | | Database password; the app gets it as `HERD_DATABASE_PASSWORD`, never inside `HERD_DATABASE_URL` |
 | `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only |
 | `HERD_INTERNAL_TOKEN` | yes | | Token for `/internal/*` on port 9090 |
 | `HERD_BOOTSTRAP_ADMIN_EMAIL` | no | `admin@example.com` | Email of the first owner |

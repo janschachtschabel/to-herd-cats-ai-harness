@@ -2,17 +2,30 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
+from pydantic import Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL, make_url
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="HERD_", env_file=".env", extra="ignore")
+    # hide_input_in_errors: a start-up error must not echo secrets from the environment.
+    model_config = SettingsConfigDict(
+        env_prefix="HERD_", env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     environment: str = "development"  # development | test | production
-    database_url: str = "postgresql+asyncpg://herd:herd@localhost:5433/herd"
-    test_database_url: str = "postgresql+asyncpg://herd:herd@localhost:5433/herd_test"
+    # The password belongs in HERD_DATABASE_PASSWORD or HERD_DATABASE_PASSWORD_FILE
+    # (merged in by `database()`); a URL with a password still works (tests, local dev).
+    database_url: str = Field(
+        default="postgresql+asyncpg://herd:herd@localhost:5433/herd", repr=False
+    )
+    database_password: SecretStr | None = None
+    database_password_file: Path | None = None
+    test_database_url: str = Field(
+        default="postgresql+asyncpg://herd:herd@localhost:5433/herd_test", repr=False
+    )
 
     public_port: int = 8080
     internal_port: int = 9090
@@ -34,6 +47,35 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     role: Literal["api", "migrate", "all"] = "all"
     static_dir: Path | None = None
+
+    _database_password: SecretStr | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _resolve_database_password(self) -> Self:
+        if self.database_password is not None and self.database_password_file is not None:
+            raise ValueError("set HERD_DATABASE_PASSWORD or HERD_DATABASE_PASSWORD_FILE, not both")
+        if self.database_password_file is not None:
+            try:
+                content = self.database_password_file.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise ValueError(
+                    f"HERD_DATABASE_PASSWORD_FILE cannot be read: {exc.strerror}"
+                ) from None
+            content = content.rstrip("\r\n")  # mounted secrets often end with a newline
+            if not content:
+                raise ValueError("HERD_DATABASE_PASSWORD_FILE is empty")
+            self._database_password = SecretStr(content)
+        else:
+            self._database_password = self.database_password
+        return self
+
+    def database(self) -> URL:
+        """The connection URL with the separate password merged in (escaped when the
+        URL is rendered). `str()` and `repr()` of the URL mask the password."""
+        url = make_url(self.database_url)
+        if self._database_password is not None:
+            url = url.set(password=self._database_password.get_secret_value())
+        return url
 
 
 @lru_cache
