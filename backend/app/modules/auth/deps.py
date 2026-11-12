@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.access import Actor, actor_for
 from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.core.errors import Forbidden, Unauthorized
@@ -39,6 +40,14 @@ async def current_auth(
 
 
 AuthDep = Annotated[AuthContext, Depends(current_auth)]
+
+
+async def current_actor(ctx: AuthDep, session: SessionDep) -> Actor:
+    """The caller as the permission check sees them (with their groups)."""
+    return await actor_for(session, ctx)
+
+
+ActorDep = Annotated[Actor, Depends(current_actor)]
 
 
 async def csrf_guard(request: Request) -> None:

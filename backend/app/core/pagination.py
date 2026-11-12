@@ -7,6 +7,7 @@ page by id.
 import base64
 import binascii
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -50,3 +51,10 @@ def decode_id_cursor(cursor: str) -> uuid.UUID:
         return uuid.UUID(bytes=base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
     except (binascii.Error, ValueError) as exc:
         raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+
+
+def id_page[T](rows: list[T], limit: int, key: Callable[[T], uuid.UUID]) -> Page[T]:
+    """`rows` were fetched with `limit + 1`: the extra row tells whether there is more."""
+    items = rows[:limit]
+    more = len(rows) > limit
+    return Page[T](items=items, next_cursor=encode_id_cursor(key(items[-1])) if more else None)

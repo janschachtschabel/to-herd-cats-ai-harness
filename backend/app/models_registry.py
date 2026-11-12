@@ -3,7 +3,8 @@
 from app.core.models_base import Base
 from app.core.ratelimit import RateLimitHit
 from app.modules.auth.models import UserSession
+from app.modules.groups.models import Group, GroupMember
 from app.modules.orgs.models import Organization
 from app.modules.users.models import User
 
-__all__ = ["Base", "Organization", "RateLimitHit", "User", "UserSession"]
+__all__ = ["Base", "Group", "GroupMember", "Organization", "RateLimitHit", "User", "UserSession"]
