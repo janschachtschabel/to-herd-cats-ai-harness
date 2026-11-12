@@ -1,11 +1,18 @@
 import uuid
+from typing import NamedTuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.core.principal import Principal
+from app.core.principal import Principal, PrincipalType
 from app.core.repository import BaseRepository, advisory_xact_lock
 from app.modules.groups.models import Group, GroupMember
+from app.modules.users.models import User
+
+
+class NamedGroupMember(NamedTuple):
+    member: GroupMember
+    name: str
 
 
 class GroupRepository(BaseRepository[Group]):
@@ -37,16 +44,23 @@ class GroupRepository(BaseRepository[Group]):
 
     async def member_page(
         self, group_id: uuid.UUID, after: uuid.UUID | None, limit: int
-    ) -> list[GroupMember]:
+    ) -> list[NamedGroupMember]:
+        """With each person's display name (people only in M1)."""
+        name = (
+            select(User.name)
+            .where(GroupMember.member_type == PrincipalType.USER, User.id == GroupMember.member_id)
+            .scalar_subquery()
+        )
         stmt = (
-            select(GroupMember)
+            select(GroupMember, func.coalesce(name, ""))
             .where(GroupMember.group_id == group_id)
             .order_by(GroupMember.member_id)
             .limit(limit)
         )
         if after is not None:
             stmt = stmt.where(GroupMember.member_id > after)
-        return list((await self.session.scalars(stmt)).all())
+        rows = (await self.session.execute(stmt)).all()
+        return [NamedGroupMember(m, n) for m, n in rows]
 
     async def add_member(self, group_id: uuid.UUID, principal: Principal) -> bool:
         """Idempotent, also under concurrent requests; True if the member is new."""

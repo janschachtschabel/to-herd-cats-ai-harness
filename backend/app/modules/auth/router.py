@@ -48,5 +48,9 @@ async def me(ctx: AuthDep, session: SessionDep, settings: SettingsDep) -> MeOut:
 
 
 async def _me(ctx: AuthContext, session: SessionDep, settings: SettingsDep) -> MeOut:
-    org = await AuthService(session, settings).organization(ctx)
-    return MeOut(user=UserOut.model_validate(ctx.user), org=OrgOut.model_validate(org))
+    service = AuthService(session, settings)
+    return MeOut(
+        user=UserOut.model_validate(ctx.user),
+        org=OrgOut.model_validate(await service.organization(ctx)),
+        permissions=await service.permissions(ctx),
+    )

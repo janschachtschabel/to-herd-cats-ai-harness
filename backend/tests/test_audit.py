@@ -111,7 +111,7 @@ async def test_audit_is_not_written_when_change_fails(
     def _explode(*args: object, **kwargs: object) -> None:
         raise RuntimeError("forced failure after the change")
 
-    monkeypatch.setattr(spaces_router.SpaceMemberOut, "model_validate", _explode)
+    monkeypatch.setattr(spaces_router.SpaceMemberOut, "of", _explode)
     entry = {"member_type": "user", "member_id": str(member.id), "role": "editor"}
     r = await owner.put(f"/api/spaces/{team_space.id}/members", json=entry)
     assert r.status_code == 500
@@ -227,6 +227,7 @@ async def test_audit_list_is_newest_first_filtered_and_paginated(
         "id",
         "actor_type",
         "actor_id",
+        "actor_name",
         "action",
         "target_type",
         "target_id",

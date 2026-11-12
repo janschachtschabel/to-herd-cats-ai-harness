@@ -16,5 +16,5 @@ async def list_audit(
 ) -> Page[AuditOut]:
     page = await AuditService(session).list(actor, query)
     return Page[AuditOut](
-        items=[AuditOut.model_validate(e) for e in page.items], next_cursor=page.next_cursor
+        items=[AuditOut.of(row) for row in page.items], next_cursor=page.next_cursor
     )

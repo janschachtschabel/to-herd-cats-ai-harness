@@ -20,7 +20,9 @@ def _entry(holder: User | Group, role: str) -> dict[str, str]:
 
 
 async def _members(client: AsyncClient, space: Space) -> list[dict[str, str]]:
-    return list((await client.get(f"{SPACES}/{space.id}/members")).json()["items"])
+    """The members without their display names (test_client_view checks those)."""
+    items = (await client.get(f"{SPACES}/{space.id}/members")).json()["items"]
+    return [{k: v for k, v in m.items() if k != "name"} for m in items]
 
 
 async def test_personal_space_members_are_fixed(
@@ -42,7 +44,7 @@ async def test_space_admin_manages_members_but_viewer_cannot(
     assert (await guest_client.get(f"{SPACES}/{space.id}")).status_code == 404
 
     r = await member_client.put(base, json=_entry(guest, "viewer"))
-    assert r.status_code == 200 and r.json() == _entry(guest, "viewer")
+    assert r.status_code == 200 and r.json() == {**_entry(guest, "viewer"), "name": guest.name}
     assert (await guest_client.get(f"{SPACES}/{space.id}")).status_code == 200
     assert {m["member_id"] for m in await _members(guest_client, space)} == {
         str(member.id),

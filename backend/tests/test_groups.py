@@ -27,7 +27,7 @@ async def test_admin_creates_group_and_adds_member(owner: AsyncClient, member: U
     added = await owner.post(f"{GROUPS}/{group['id']}/members", json=_member(member))
     assert added.status_code == 204
     members = (await owner.get(f"{GROUPS}/{group['id']}/members")).json()
-    assert members["items"] == [_member(member)]
+    assert members["items"] == [{**_member(member), "name": "Max Member"}]
     assert (await owner.get(f"{GROUPS}/{group['id']}")).json() == group
     assert [g["id"] for g in (await owner.get(GROUPS)).json()["items"]] == [group["id"]]
 

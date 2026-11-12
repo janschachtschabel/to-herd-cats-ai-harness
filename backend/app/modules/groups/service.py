@@ -15,8 +15,8 @@ from app.core.errors import Conflict, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import Principal
 from app.modules.audit.recorder import changes, record, snapshot
-from app.modules.groups.models import Group, GroupMember
-from app.modules.groups.repository import GroupRepository
+from app.modules.groups.models import Group
+from app.modules.groups.repository import GroupRepository, NamedGroupMember
 from app.modules.groups.schemas import GroupCreate, GroupUpdate
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.users.repository import UserRepository
@@ -79,11 +79,11 @@ class GroupService:
 
     async def members(
         self, actor: Actor, group_id: uuid.UUID, params: PageParams
-    ) -> Page[GroupMember]:
+    ) -> Page[NamedGroupMember]:
         group = await self.get(actor, group_id)
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.groups.member_page(group.id, after, params.limit + 1)
-        return id_page(rows, params.limit, lambda m: m.member_id)
+        return id_page(rows, params.limit, lambda row: row.member.member_id)
 
     async def add_member(self, actor: Actor, group_id: uuid.UUID, principal: Principal) -> None:
         """Idempotent. The person must belong to the organisation."""

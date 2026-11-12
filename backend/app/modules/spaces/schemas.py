@@ -5,11 +5,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
-from app.modules.spaces.models import SpaceKind
+from app.modules.spaces.models import Space, SpaceKind
+from app.modules.spaces.repository import NamedMember
 
 
 class SpaceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    """`my_role` is the caller's role there, for display (system admins: `admin`)."""
 
     id: uuid.UUID
     kind: SpaceKind
@@ -19,6 +20,21 @@ class SpaceOut(BaseModel):
     icon: str | None
     owner_user_id: uuid.UUID | None
     version: int
+    my_role: SpaceRole | None
+
+    @classmethod
+    def of(cls, space: Space, my_role: SpaceRole | None) -> "SpaceOut":
+        return cls(
+            id=space.id,
+            kind=space.kind,
+            name=space.name,
+            slug=space.slug,
+            description=space.description,
+            icon=space.icon,
+            owner_user_id=space.owner_user_id,
+            version=space.version,
+            my_role=my_role,
+        )
 
 
 class SpaceCreate(BaseModel):
@@ -63,8 +79,19 @@ class SpaceMemberIn(BaseModel):
 
 
 class SpaceMemberOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    """`name`: the person's or group's display name."""
 
     member_type: PrincipalType
     member_id: uuid.UUID
     role: SpaceRole
+    name: str
+
+    @classmethod
+    def of(cls, row: NamedMember) -> "SpaceMemberOut":
+        member = row.member
+        return cls(
+            member_type=member.member_type,
+            member_id=member.member_id,
+            role=member.role,
+            name=row.name,
+        )

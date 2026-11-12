@@ -9,11 +9,12 @@ space of a new installation come with `user.created` and bootstrap.
 """
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, require, visible_space_ids
+from app.core.access import Action, Actor, my_roles, require, visible_space_ids
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
@@ -21,8 +22,8 @@ from app.core.principal import Principal, PrincipalType
 from app.core.slug import slugify
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
-from app.modules.spaces.models import Space, SpaceKind, SpaceMember
-from app.modules.spaces.repository import SpaceRepository
+from app.modules.spaces.models import Space, SpaceKind
+from app.modules.spaces.repository import NamedMember, SpaceRepository
 from app.modules.spaces.schemas import SpaceUpdate
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
@@ -70,6 +71,13 @@ class SpaceService:
         await require(self.session, actor, Action.SPACE_READ, space_id)
         return await self._space(actor.org_id, space_id)
 
+    async def my_roles(
+        self, actor: Actor, spaces: Sequence[Space]
+    ) -> dict[uuid.UUID, SpaceRole | None]:
+        """The caller's role in each of `spaces`, for display."""
+        roles = await my_roles(self.session, actor, [s.id for s in spaces])
+        return {s.id: roles.get(s.id) for s in spaces}
+
     async def list_visible(self, actor: Actor, params: PageParams) -> Page[Space]:
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.spaces.page_among(visible_space_ids(actor), after, params.limit + 1)
@@ -97,11 +105,11 @@ class SpaceService:
 
     async def members(
         self, actor: Actor, space_id: uuid.UUID, params: PageParams
-    ) -> Page[SpaceMember]:
+    ) -> Page[NamedMember]:
         await require(self.session, actor, Action.SPACE_READ, space_id)
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.spaces.member_page(space_id, after, params.limit + 1)
-        return id_page(rows, params.limit, lambda m: m.member_id)
+        return id_page(rows, params.limit, lambda row: row.member.member_id)
 
     async def set_member(
         self,
@@ -110,14 +118,14 @@ class SpaceService:
         member_type: PrincipalType,
         member_id: uuid.UUID,
         role: SpaceRole,
-    ) -> SpaceMember:
+    ) -> NamedMember:
         """Add a person or a group, or change their role."""
         await self._members_changeable(actor, space_id)
         principal = Principal(member_type, member_id)
-        await self._ensure_exists(actor.org_id, principal)
+        name = await self._name_of(actor.org_id, principal)
         member = await self.spaces.set_member(space_id, principal, role)
         await self._audit(actor, "space.member_set", space_id, {**_member(principal), "role": role})
-        return member
+        return NamedMember(member, name)
 
     async def remove_member(
         self, actor: Actor, space_id: uuid.UUID, member_type: PrincipalType, member_id: uuid.UUID
@@ -142,12 +150,15 @@ class SpaceService:
         if space.kind == SpaceKind.PERSONAL:
             raise Conflict(code="spaces.personal_members_fixed")
 
-    async def _ensure_exists(self, org_id: uuid.UUID, principal: Principal) -> None:
+    async def _name_of(self, org_id: uuid.UUID, principal: Principal) -> str:
+        """The person's or group's name; 404 unless it exists in the organisation."""
         if principal.type == PrincipalType.USER:
-            if await self.users.get(org_id, principal.id) is None:
+            if (user := await self.users.get(org_id, principal.id)) is None:
                 raise NotFound(code="users.not_found")
-        elif await self.groups.get(org_id, principal.id) is None:
+            return user.name
+        if (group := await self.groups.get(org_id, principal.id)) is None:
             raise NotFound(code="groups.not_found")
+        return group.name
 
     async def _insert(
         self,

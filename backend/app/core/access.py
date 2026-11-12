@@ -16,6 +16,7 @@ Each check is one SQL query (`AccessRepository.facts`); lists filter with the SQ
 """
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +41,17 @@ from app.modules.spaces.models import SpaceKind
 # Spaces an admin may open without a membership, but not unnoticed.
 ADMIN_ACCESS_AUDITED_KINDS = frozenset({SpaceKind.TEAM, SpaceKind.PERSONAL})
 
-__all__ = ["Action", "Actor", "actor_for", "can", "require", "space_role", "visible_space_ids"]
+__all__ = [
+    "Action",
+    "Actor",
+    "actor_for",
+    "can",
+    "my_roles",
+    "require",
+    "space_role",
+    "system_permissions",
+    "visible_space_ids",
+]
 
 
 async def actor_for(session: AsyncSession, auth: AuthContext) -> Actor:
@@ -59,6 +70,28 @@ def visible_space_ids(actor: Actor) -> Select[uuid.UUID]:
 async def space_role(session: AsyncSession, actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:
     """The actor's effective role in the space; None without one (admins included)."""
     return _effective_role(await AccessRepository(session).facts(actor, space_id))
+
+
+async def system_permissions(session: AsyncSession, actor: Actor) -> list[Action]:
+    """The system-wide actions the actor holds now, sorted; none once it no longer acts.
+    Space-scoped actions are not listed: they depend on the space (see `my_roles`)."""
+    role = (await AccessRepository(session).facts(actor, None)).system_role
+    if role is None:
+        return []
+    held = (a for a in SYSTEM_ROLE_ACTIONS[role] if a not in SPACE_ACTION_MIN_ROLE)
+    return sorted(held, key=lambda a: a.value)
+
+
+async def my_roles(
+    session: AsyncSession, actor: Actor, space_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, SpaceRole | None]:
+    """The role to show the actor for each space, in one query: the effective role, and
+    `admin` for system admins and owners, who hold every right in every space (E4).
+    For display only; decisions go through `can` and `require`."""
+    if not space_ids:
+        return {}
+    facts = await AccessRepository(session).facts_in(actor, space_ids)
+    return {space_id: _shown_role(facts[space_id]) for space_id in space_ids if space_id in facts}
 
 
 async def can(
@@ -89,6 +122,12 @@ def _by_admin_power(facts: AccessFacts) -> bool:
         and facts.kind in ADMIN_ACCESS_AUDITED_KINDS
         and facts.member_role is None
     )
+
+
+def _shown_role(facts: AccessFacts) -> SpaceRole | None:
+    if facts.system_role in ADMIN_ROLES:
+        return SpaceRole.ADMIN
+    return _effective_role(facts)
 
 
 def _effective_role(facts: AccessFacts) -> SpaceRole | None:

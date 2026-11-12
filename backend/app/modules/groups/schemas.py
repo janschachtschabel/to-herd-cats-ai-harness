@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.principal import PrincipalType
+from app.modules.groups.repository import NamedGroupMember
 
 
 class GroupOut(BaseModel):
@@ -50,7 +51,14 @@ class GroupMemberIn(BaseModel):
 
 
 class GroupMemberOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    """`name`: the person's display name."""
 
     member_type: PrincipalType
     member_id: uuid.UUID
+    name: str
+
+    @classmethod
+    def of(cls, row: NamedGroupMember) -> "GroupMemberOut":
+        return cls(
+            member_type=row.member.member_type, member_id=row.member.member_id, name=row.name
+        )

@@ -36,7 +36,12 @@ async def test_new_user_gets_personal_space(owner: AsyncClient, make_client) -> 
     assert space["owner_user_id"] == created.json()["id"]
     members = (await lea.get(f"{SPACES}/{space['id']}/members")).json()["items"]
     assert members == [
-        {"member_type": "user", "member_id": space["owner_user_id"], "role": "admin"}
+        {
+            "member_type": "user",
+            "member_id": space["owner_user_id"],
+            "role": "admin",
+            "name": "Lea Löwe",
+        }
     ]
 
 
@@ -65,7 +70,9 @@ async def test_member_creates_space_and_administers_it(
     assert (space["kind"], space["slug"], space["version"]) == (kind, "projekt-uebersicht", 1)
     assert (space["description"], space["icon"], space["owner_user_id"]) == ("d", "📁", None)
     members = (await member_client.get(f"{SPACES}/{space['id']}/members")).json()["items"]
-    assert members == [{"member_type": "user", "member_id": str(member.id), "role": "admin"}]
+    assert members == [
+        {"member_type": "user", "member_id": str(member.id), "role": "admin", "name": member.name}
+    ]
     assert (await member_client.get(f"{SPACES}/{space['id']}")).json() == space
 
 

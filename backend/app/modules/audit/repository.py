@@ -1,12 +1,21 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.principal import PrincipalType
 from app.modules.audit.models import AuditLog
+from app.modules.users.models import User
+
+
+class NamedEntry(NamedTuple):
+    """An entry with its actor's display name (None if the actor is not a person)."""
+
+    entry: AuditLog
+    actor_name: str | None
 
 
 class AuditRepository:
@@ -32,10 +41,15 @@ class AuditRepository:
         action: str | None,
         before: tuple[datetime, uuid.UUID] | None,
         limit: int,
-    ) -> list[AuditLog]:
+    ) -> list[NamedEntry]:
         """Newest first; `before` is the (created_at, id) of the last entry seen."""
+        name = (
+            select(User.name)
+            .where(AuditLog.actor_type == PrincipalType.USER, User.id == AuditLog.actor_id)
+            .scalar_subquery()
+        )
         stmt = (
-            select(AuditLog)
+            select(AuditLog, name)
             .where(AuditLog.org_id == org_id)
             .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
             .limit(limit)
@@ -46,4 +60,4 @@ class AuditRepository:
             stmt = stmt.where(AuditLog.action == action)
         if before is not None:
             stmt = stmt.where(tuple_(AuditLog.created_at, AuditLog.id) < tuple_(*before))
-        return list((await self.session.scalars(stmt)).all())
+        return [NamedEntry(e, n) for e, n in (await self.session.execute(stmt)).all()]

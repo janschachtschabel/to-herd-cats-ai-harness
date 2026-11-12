@@ -1,13 +1,32 @@
 import uuid
 from collections.abc import Sequence
+from typing import NamedTuple
 
-from sqlalchemy import ColumnElement, Select, delete, exists, false, or_, select
+from sqlalchemy import ColumnElement, Select, delete, exists, false, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.permissions import SpaceRole
-from app.core.principal import Principal
+from app.core.principal import Principal, PrincipalType
 from app.core.repository import BaseRepository, advisory_xact_lock
+from app.modules.groups.models import Group
 from app.modules.spaces.models import Space, SpaceMember
+from app.modules.users.models import User
+
+
+class NamedMember(NamedTuple):
+    member: SpaceMember
+    name: str
+
+
+def _member_name() -> ColumnElement[str]:
+    """The display name of a membership's person or group (correlated)."""
+    user = select(User.name).where(
+        SpaceMember.member_type == PrincipalType.USER, User.id == SpaceMember.member_id
+    )
+    group = select(Group.name).where(
+        SpaceMember.member_type == PrincipalType.GROUP, Group.id == SpaceMember.member_id
+    )
+    return func.coalesce(user.scalar_subquery(), group.scalar_subquery(), "")
 
 
 def held_by(principals: Sequence[Principal]) -> ColumnElement[bool]:
@@ -56,16 +75,16 @@ class SpaceRepository(BaseRepository[Space]):
 
     async def member_page(
         self, space_id: uuid.UUID, after: uuid.UUID | None, limit: int
-    ) -> list[SpaceMember]:
+    ) -> list[NamedMember]:
         stmt = (
-            select(SpaceMember)
+            select(SpaceMember, _member_name())
             .where(SpaceMember.space_id == space_id)
             .order_by(SpaceMember.member_id)
             .limit(limit)
         )
         if after is not None:
             stmt = stmt.where(SpaceMember.member_id > after)
-        return list((await self.session.scalars(stmt)).all())
+        return [NamedMember(m, name) for m, name in (await self.session.execute(stmt)).all()]
 
     async def set_member(
         self, space_id: uuid.UUID, principal: Principal, role: SpaceRole

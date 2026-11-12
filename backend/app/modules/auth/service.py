@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.access import Action, actor_for, system_permissions
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
 from app.core.models_base import utcnow
@@ -72,3 +73,7 @@ class AuthService:
 
     async def organization(self, ctx: AuthContext) -> Organization:
         return await self.orgs.get(ctx.org_id)
+
+    async def permissions(self, ctx: AuthContext) -> list[Action]:
+        """The system-wide actions the caller holds now."""
+        return await system_permissions(self.session, await actor_for(self.session, ctx))

@@ -60,7 +60,7 @@ async def list_group_members(
 ) -> Page[GroupMemberOut]:
     page = await GroupService(session).members(actor, group_id, params)
     return Page[GroupMemberOut](
-        items=[GroupMemberOut.model_validate(m) for m in page.items],
+        items=[GroupMemberOut.of(row) for row in page.items],
         next_cursor=page.next_cursor,
     )
 

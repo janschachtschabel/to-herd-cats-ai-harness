@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require
 from app.core.pagination import Page, decode_cursor, encode_cursor
-from app.modules.audit.models import AuditLog
-from app.modules.audit.repository import AuditRepository
+from app.modules.audit.repository import AuditRepository, NamedEntry
 from app.modules.audit.schemas import AuditQuery
 
 
@@ -14,7 +13,7 @@ class AuditService:
         self.session = session
         self.entries = AuditRepository(session)
 
-    async def list(self, actor: Actor, query: AuditQuery) -> Page[AuditLog]:
+    async def list(self, actor: Actor, query: AuditQuery) -> Page[NamedEntry]:
         """The organisation's entries, newest first."""
         await require(self.session, actor, Action.AUDIT_READ)
         before = decode_cursor(query.cursor) if query.cursor else None
@@ -26,7 +25,7 @@ class AuditService:
             limit=query.limit + 1,
         )
         items, more = rows[: query.limit], len(rows) > query.limit
-        last = items[-1] if more else None
-        return Page[AuditLog](
+        last = items[-1].entry if more else None
+        return Page[NamedEntry](
             items=items, next_cursor=encode_cursor(last.created_at, last.id) if last else None
         )

@@ -7,6 +7,7 @@ single check and the list filter cannot drift apart. A later `read_scope` on the
 """
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import ColumnElement, ScalarSelect, Select, and_, case, exists, func, or_, select
@@ -58,6 +59,29 @@ class AccessRepository:
             member_role=SpaceRole.from_rank(row[2]) if row[2] is not None else None,
             readable=bool(row[3]),
         )
+
+    async def facts_in(
+        self, actor: Actor, space_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, AccessFacts]:
+        """`facts` for many spaces of the actor's organisation, in one query, without
+        `readable` (callers pass spaces they already know to be visible)."""
+        rank = (
+            select(func.max(_RANK))
+            .where(SpaceMember.space_id == Space.id, held_by(actor.principals))
+            .correlate(Space)
+            .scalar_subquery()
+        )
+        stmt = select(Space.id, _subject_role(actor), Space.kind, rank).where(
+            _in_scope(actor), Space.id.in_(space_ids)
+        )
+        return {
+            row[0]: AccessFacts(
+                system_role=SystemRole(row[1]) if row[1] else None,
+                kind=SpaceKind(row[2]),
+                member_role=SpaceRole.from_rank(row[3]) if row[3] is not None else None,
+            )
+            for row in await self.session.execute(stmt)
+        }
 
 
 def visible_ids_stmt(actor: Actor) -> Select[uuid.UUID]:
