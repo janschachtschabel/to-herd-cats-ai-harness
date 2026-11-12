@@ -8,11 +8,16 @@ import {
 } from '@tanstack/react-router'
 import { AppShell } from '@/app/shell/AppShell'
 import { adminLinks } from '@/app/shell/nav'
+import { AuditPage } from '@/features/admin/audit/AuditPage'
+import { GroupPage } from '@/features/admin/groups/GroupPage'
+import { GroupsPage } from '@/features/admin/groups/GroupsPage'
+import { UsersPage } from '@/features/admin/users/UsersPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { hasPermission, meQuery } from '@/features/auth/queries'
+import { SpacePage } from '@/features/spaces/SpacePage'
+import { SpacesPage } from '@/features/spaces/SpacesPage'
 import type { Me, Permission } from '@/lib/api'
 import { NotFoundPage } from './NotFoundPage'
-import { PendingPage } from './PendingPage'
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -72,13 +77,16 @@ const indexRoute = createRoute({
 const spacesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/spaces',
-  component: () => <PendingPage titleKey="spaces.title" />,
+  component: SpacesPage,
 })
 
 const spaceRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/spaces/$spaceId',
-  component: () => <PendingPage titleKey="spaces.title" />,
+  component: function SpaceRoute() {
+    const { spaceId } = spaceRoute.useParams()
+    return <SpacePage spaceId={spaceId} />
+  },
 })
 
 /** A page someone without the right must not even learn exists: not found. */
@@ -109,28 +117,31 @@ const usersRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/users',
   loader: ({ context }) => requirePermission(context.me, 'user.manage'),
-  component: () => <PendingPage titleKey="users.title" />,
+  component: UsersPage,
 })
 
 const groupsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/groups',
   loader: ({ context }) => requirePermission(context.me, 'group.manage'),
-  component: () => <PendingPage titleKey="groups.title" />,
+  component: GroupsPage,
 })
 
 const groupRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/groups/$groupId',
   loader: ({ context }) => requirePermission(context.me, 'group.manage'),
-  component: () => <PendingPage titleKey="groups.title" />,
+  component: function GroupRoute() {
+    const { groupId } = groupRoute.useParams()
+    return <GroupPage groupId={groupId} />
+  },
 })
 
 const auditRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/audit',
   loader: ({ context }) => requirePermission(context.me, 'audit.read'),
-  component: () => <PendingPage titleKey="audit.title" />,
+  component: AuditPage,
 })
 
 export const routeTree = rootRoute.addChildren([
