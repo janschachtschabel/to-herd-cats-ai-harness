@@ -45,7 +45,7 @@ Mit **[Jan]** markierte Entscheidungen hat Jan getroffen. Mit **[Claude]** marki
 | # | Entscheidung | Quelle |
 |---|---|---|
 | E1 | Neustart im Repo `to-herd-cats-ai-harness`; Code aus ai-1/ai-2 nur nach Prüfung übernommen | [Jan] |
-| E2 | Lizenz Apache-2.0; nur Abhängigkeiten mit MIT-, BSD-, Apache-2.0-, ISC- oder PostgreSQL-Lizenz; keine AGPL-Bausteine, keine Tiptap-Pro-Erweiterungen | [Jan], Abhängigkeitsregel [Claude] |
+| E2 | Lizenz Apache-2.0; Laufzeitabhängigkeiten nur mit MIT-, MIT-0-, BSD-2-Clause-, BSD-3-Clause-, 0BSD-, Apache-2.0-, ISC-, PostgreSQL-, PSF-2.0-, Python-2.0-, MPL-2.0- (unverändert genutzt), Unlicense-, CC0-1.0-, BlueOak-1.0.0- oder OFL-1.1-Lizenz (Schriften); die schwachen Copyleft- und Public-Domain-Lizenzen sind mit einer Apache-2.0-Verteilung vereinbar. Die CI prüft das. Keine AGPL-Bausteine, keine Tiptap-Pro-Erweiterungen | [Jan], Abhängigkeitsregel [Claude], erweitert in M1 (transitive Abhängigkeiten wie certifi, typing_extensions, Schriften) |
 | E3 | Kanäle und Direktnachrichten im Slack-Stil, dazu Threads an Tickets und Seiten. **Kein separates Postfach**: System und Agenten schreiben ins Nachrichtensystem. System- und Ticketmeldungen sind sichtbar von normaler Kommunikation getrennt (Abschnitt 6) | [Jan] |
 | E4 | Admins sehen alles. Andere sehen private Inhalte nicht. Gemeinsames gehört in Wissens- oder Teambereiche | [Jan] |
 | E5 | KI zentral: Admins richten Verbindungen ein und weisen sie Personen oder Gruppen zu, dazu eine Standardzuordnung. Personen ohne KI sind möglich. Keine persönlichen Schlüssel. Verbrauch wird zentral erfasst | [Jan] |

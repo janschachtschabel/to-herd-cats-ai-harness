@@ -15,7 +15,9 @@ in the spec but not yet built (wiki, tickets, agents) are planned, not present.
   (Radix), TanStack Router (code-based routes in `src/app/router`) and Query, i18next,
   react-hook-form + zod (schemas derived from `openapi.json`), next-themes. Tooling:
   `npm`, `oxlint`, `prettier`, `vitest` + Testing Library.
-- Dependencies: only MIT, BSD, Apache-2.0, ISC or PostgreSQL licenses.
+- Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
+  ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
+  BlueOak-1.0.0 or OFL-1.1 (fonts). CI checks it (`backend/scripts/check_licenses.py`).
 
 ## Hard rules
 
@@ -42,7 +44,10 @@ in the spec but not yet built (wiki, tickets, agents) are planned, not present.
 
 ```bash
 cd backend && uv sync
-cd backend && uv run pytest && uv run ruff check . && uv run mypy app
+cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy app scripts
+cd backend && uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/runtime.txt \
+  && uv run python scripts/check_licenses.py python /tmp/runtime.txt \
+  && uv run python scripts/check_licenses.py npm ../frontend/package-lock.json
 ```
 
 ```bash
@@ -64,6 +69,11 @@ helm lint --strict deploy/helm/to-herd-cats-ai          # also with -f deploy/he
 helm template t deploy/helm/to-herd-cats-ai | kubeconform -strict -summary
 promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
 ```
+
+CI (`.github/workflows/ci.yml`, every push) runs all of the above plus `pip-audit`,
+`npm audit --audit-level=high`, the image build, `smoke.sh` and Trivy. A tag `vX.Y.Z`
+(`release.yml`) publishes `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z`/`:X.Y` and the chart
+as OCI under `ghcr.io/<owner>/charts`; tag, pyproject and chart versions must match.
 
 The backend serves the built SPA when `HERD_STATIC_DIR` points at `frontend/dist`
 (`backend/app/web/spa.py`: CSP, cache headers, index.html fallback outside `/api`).
