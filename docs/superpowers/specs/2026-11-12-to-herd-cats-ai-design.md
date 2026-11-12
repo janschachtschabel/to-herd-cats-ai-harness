@@ -313,6 +313,16 @@ Bei **b-api**-Verbindungen wird im Feld `model` ein **Routenname** statt eines M
 ### 7.2 Zuordnung
 
 - Für die Organisation gibt es eine **Standardzuordnung** (Chat-Verbindung und Modell) und eine **Embedding-Verbindung**. Die Embedding-Verbindung ist organisationsweit, weil der Index einheitlich sein muss.
+
+**Embedding lokal und fest** [Jan, 12.11.2026]: Das Embedding läuft standardmäßig mit einem **lokalen Modell im Worker**. Es ist damit unabhängig von API-Anbietern und von Wechseln des Chat-Modells, und es verlassen keine Inhalte das System. Eine externe Embedding-Verbindung bleibt als Option. Das Modell muss Deutsch können, besser mehrsprachig sein. Die Modellwahl ist offen und wird in der M5-Planung mit einem Vergleich entschieden. Kandidaten:
+
+| Kandidat | Art | Erwartung |
+|---|---|---|
+| `multilingual-e5-small` | Transformer, 384 Dimensionen | gute Qualität, mäßige CPU-Last |
+| `paraphrase-multilingual-MiniLM-L12-v2` | Transformer, 384 Dimensionen | ähnlich, älter |
+| `JanSchachtschabel/m2v-qwen3-4b-256-edu` | statisches Modell (Model2Vec), 256 Dimensionen | um ein Vielfaches schneller, ohne Torch nutzbar, eventuell weniger feinfühlig; könnte im Verbund mit der Volltextsuche reichen |
+
+Der Vergleich in M5 misst auf deutschen Wiki- und Ticket-Texten die Trefferqualität der **Hybridsuche** (Recall@10, MRR), nicht des Embeddings allein. Dazu kommen Durchsatz auf CPU, RAM-Bedarf und Größe (das Modell kommt über ein Volume, nicht ins Image). Mit einem lokalen Modell hat die Embedding-Verbindung `data_location=local`, sodass auch `restricted`-Bereiche indexiert werden.
 - `ai_assignment` gilt je Gruppe oder je Person, überschreibt den Standard und kann auf Personenebene „keine KI“ setzen. Vorrang hat Person vor Gruppe vor Standard.
 - `ai.use` ergibt sich aus der Zuordnung. Personen ohne KI sehen keine KI-Funktionen: Sie können keine Agenten erwähnen, keine Direktnachrichten an Agenten schreiben, keine Tickets an Agenten zuweisen und keine Agenten verwalten. Agenten-Beiträge anderer lesen sie normal.
 - Agenten haben ihre **eigene** Verbindung und ihr eigenes Modell, beides vom Admin gewählt. Der Verbrauch wird trotzdem der auslösenden Person, dem Agenten und dem Bereich zugerechnet.
@@ -609,6 +619,7 @@ M1 und M2 zusammen sind das kleinste sinnvolle Produkt (Wiki mit Rechten). Mit M
 ## 16. Offene Fragen an Jan
 
 - **F1**: Sollen Admins Direktnachrichten in der normalen Oberfläche sehen, oder nur über die protokollierte „Einsicht“ (5.5)? Mein Vorschlag ist die Einsicht, wegen Datenschutz und Betriebsrat.
+- **F4** (für M5): Welches lokale Embedding-Modell? Entscheidung gemeinsam nach dem Vergleich der drei Kandidaten (7.2).
 - **F2**: Wie heißt das Produkt in der Oberfläche? Ich verwende bis auf Weiteres „Herd“, die Dienst-ID ist `to-herd-cats-ai`.
 - **F3**: Ist die Publikumsregel (5.6) so richtig? Sie verhindert, dass ein Agent Wissen aus einem Team-Bereich in einen offenen Kanal trägt. Der Preis: Ein Agent, der in `#allgemein` erwähnt wird, nutzt dort nur offenes Wissen, auch wenn die fragende Person mehr sehen darf. Wer mehr will, fragt den Agenten per Direktnachricht oder im Team-Kanal.
 
