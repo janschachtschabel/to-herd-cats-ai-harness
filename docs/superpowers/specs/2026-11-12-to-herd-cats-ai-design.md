@@ -1,6 +1,6 @@
 # to-herd-cats-ai — Design-Spezifikation
 
-Stand: 12. Nov. 2026 · Status: **zur Freigabe durch Jan** · Lizenz des Projekts: Apache-2.0
+Stand: 12. Nov. 2026 · Status: **freigegeben von Jan am 12.11.2026** (F1–F3 mit den Empfehlungen) · Lizenz des Projekts: Apache-2.0
 Vorarbeiten: [Konzeptabgleich](2026-11-12-konzept-abgleich-design.md), Ideenskizze vom 12.11.2026, Jans Antworten vom 12.11.2026.
 Repos, aus denen Code übernommen werden darf: `janschachtschabel/to-herd-cats-ai` (im Folgenden **ai-1**) und `janschachtschabel/to-herd-cats-ai-2` (**ai-2**).
 
