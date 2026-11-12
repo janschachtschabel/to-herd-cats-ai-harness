@@ -133,3 +133,25 @@ async def test_the_app_engine_uses_the_resolved_url(separate_password_env) -> No
 def test_alembic_uses_the_resolved_url(separate_password_env, engine) -> None:
     """`engine` has migrated the test database; upgrading again connects and is a no-op."""
     upgrade_head()
+
+
+def test_internal_token_and_bootstrap_password_are_hidden(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("HERD_INTERNAL_TOKEN", "token-0f3a9c")
+    monkeypatch.setenv("HERD_BOOTSTRAP_ADMIN_PASSWORD", "boot-pw-7e21")
+    settings = Settings()
+    caplog.set_level(logging.DEBUG)
+    logging.getLogger("test").info("settings %s %r", settings, settings)
+    shown = [
+        repr(settings),
+        str(settings),
+        str(settings.model_dump()),
+        settings.model_dump_json(),
+        caplog.text,
+    ]
+    for text_ in shown:
+        assert "token-0f3a9c" not in text_ and "boot-pw-7e21" not in text_
+    # The readers still get the values.
+    assert settings.internal_token.get_secret_value() == "token-0f3a9c"
+    assert settings.bootstrap_admin_password.get_secret_value() == "boot-pw-7e21"

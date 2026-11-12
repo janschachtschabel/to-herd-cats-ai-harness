@@ -30,7 +30,8 @@ async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
     users = UserRepository(session)
     if await users.exists_any():
         return
-    email, password = settings.bootstrap_admin_email, settings.bootstrap_admin_password
+    email = settings.bootstrap_admin_email
+    password = settings.bootstrap_admin_password.get_secret_value()
     if not (email and password):
         # Nobody can log in yet; the operator has to set the variables and restart.
         logger.warning("bootstrap.skipped", extra={"reason": "credentials_not_configured"})

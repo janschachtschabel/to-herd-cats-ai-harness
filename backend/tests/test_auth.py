@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from httpx import AsyncClient
+from pydantic import SecretStr
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -243,7 +244,7 @@ def test_password_and_token_primitives() -> None:
 
 BOOT = Settings(
     bootstrap_admin_email="Boss@Example.com",
-    bootstrap_admin_password="boss-password-123",
+    bootstrap_admin_password=SecretStr("boss-password-123"),
     bootstrap_org_name="Müller & Söhne",
 )
 
@@ -269,9 +270,14 @@ async def test_bootstrap_does_nothing_once_someone_exists(session, owner_user) -
     assert await session.scalar(select(func.count()).select_from(User)) == 1
 
 
-@pytest.mark.parametrize("missing", ["bootstrap_admin_email", "bootstrap_admin_password"])
-async def test_bootstrap_without_credentials_creates_nothing(session, missing, capsys) -> None:
-    await ensure_bootstrap(session, BOOT.model_copy(update={missing: ""}))
+@pytest.mark.parametrize(
+    ("missing", "empty"),
+    [("bootstrap_admin_email", ""), ("bootstrap_admin_password", SecretStr(""))],
+)
+async def test_bootstrap_without_credentials_creates_nothing(
+    session, missing, empty, capsys
+) -> None:
+    await ensure_bootstrap(session, BOOT.model_copy(update={missing: empty}))
     assert await session.scalar(select(func.count()).select_from(Organization)) == 0
     assert "bootstrap.skipped" in capsys.readouterr().out
 

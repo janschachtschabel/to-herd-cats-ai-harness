@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     public_port: int = 8080
     internal_port: int = 9090
-    internal_token: str = ""
+    internal_token: SecretStr = SecretStr("")
 
     session_cookie_name: str = "herd_session"
     session_ttl_hours: int = 24 * 7
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     login_rate_limit_per_minute: int = 5
 
     bootstrap_admin_email: str = ""
-    bootstrap_admin_password: str = ""
+    bootstrap_admin_password: SecretStr = SecretStr("")
     bootstrap_org_name: str = "Meine Organisation"
 
     log_format: Literal["json", "text"] = "json"
