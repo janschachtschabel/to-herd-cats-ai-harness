@@ -93,7 +93,7 @@ Externe KI-Clients ──HTTPS──► :8080  /mcp     (gleiche Service-Schicht
 - **Service-Schicht**: Jede fachliche Aktion ist eine Methode eines `*Service` in `app/modules/<domain>/service.py`. Router, Agenten-Werkzeuge, MCP-Endpunkt und interne Collab-Schnittstelle rufen ausschließlich Services auf (Prinzip 3 der Skizze).
 - **Schichten** nach ai-1: `router → service → repository`. SQL steht nur in Repositories, Regeln nur in Services.
 - **Rollen**: Bei `HERD_ROLE=all` startet ein Python-Startprogramm API und Worker im selben Prozessverbund und den Collab-Prozess (Node) als Kindprozess, der auf `127.0.0.1:1234` lauscht. Die API leitet `/collab` per WebSocket dorthin weiter. Im Cluster laufen `api`, `worker` und `collab` als eigene Deployments; der Ingress leitet `/collab` direkt an `collab`.
-- **Migrationen**: Bei `HERD_ROLE=all` laufen sie beim Start automatisch. Im Cluster läuft ein einmaliger Job (`HERD_ROLE=migrate`, Helm-Hook), und `/ready` meldet „nicht bereit“, solange das Schema nicht auf dem neuesten Stand ist.
+- **Migrationen**: Bei `HERD_ROLE=all` laufen sie beim Start automatisch. Im Cluster läuft ein einmaliger Job (`HERD_ROLE=migrate`, Helm-Hook), und `/ready` meldet „nicht bereit“, solange die Datenbank keine oder eine ältere, dem Code bekannte Revision hat. Steht sie auf einer Revision, die der Code nicht kennt (eine neuere Version hat vorab migriert), bleibt der Pod bereit. Deshalb müssen Migrationen mit der vorherigen Version verträglich sein: erst erweitern, frühestens eine Version später zurückbauen (expand/contract). *Geändert in M1, Task 14: Mit der strengen Regel „Revision = Head“ wurden die alten Pods bei jedem Upgrade mit Migration sofort nicht bereit, also ein Ausfall pro Upgrade.*
 
 ### 4.2 Die eine Rechteprüfung
 
@@ -509,7 +509,7 @@ Es gibt einen gemeinsamen Tag-Vorrat (`tag`: Name, Farbe, `space_id` oder system
 - Port 8080 ist öffentlich.
 - Port 9090 ist intern:
   - `/health`: Liveness, ohne Datenbank.
-  - `/ready`: Datenbank erreichbar, Migrationen auf dem neuesten Stand, DBOS gestartet (beim Worker).
+  - `/ready`: Datenbank erreichbar, Schema auf dem Head dieses Codes oder neuer (siehe 4.1, Migrationen), DBOS gestartet (beim Worker).
   - `/metrics`: Prometheus.
   - `/internal/*`: nur mit `HERD_INTERNAL_TOKEN`.
 - **Metriken**:

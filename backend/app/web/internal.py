@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import get_database
 from app.core.metrics import render_metrics
-from app.core.migrations import schema_is_current
+from app.core.migrations import schema_is_compatible
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +42,11 @@ def create_internal_app() -> FastAPI:
             async with asyncio.timeout(READY_TIMEOUT_SECONDS):
                 async with engine.connect() as connection:
                     await connection.execute(text("SELECT 1"))
-                current = await schema_is_current(engine)
+                compatible = await schema_is_compatible(engine)
         except Exception as exc:  # any failure to reach the database means "not ready"
             logger.warning("readiness: database unreachable", extra={"error": type(exc).__name__})
             return _not_ready("database")
-        if not current:
+        if not compatible:
             return _not_ready("migrations")
         return {"status": "ready"}
 

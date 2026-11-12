@@ -42,7 +42,7 @@ tests:
               pod: herd-api-a
             exp_annotations:
               summary: "to-herd-cats-ai pod herd/herd-api-a has not been ready for 5 minutes"
-              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable or the schema is not at the newest migration."
+              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable or its schema is older than this release."
 
   - name: HerdNotReady stays quiet when a pod recovers within 5 minutes
     interval: 1m

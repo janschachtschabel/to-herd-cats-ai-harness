@@ -1,10 +1,11 @@
 from unittest.mock import AsyncMock
 
+from alembic.script import ScriptDirectory
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.core.migrations import schema_is_current, stamp_head
+from app.core.migrations import alembic_config, schema_is_compatible, stamp_head
 from app.web.internal import create_internal_app, get_engine
 from tests.conftest import json_lines
 
@@ -19,7 +20,7 @@ async def test_ready_is_ok_with_reachable_database_and_current_schema(internal_c
 
 
 async def test_ready_is_503_when_schema_behind(internal_client, monkeypatch):
-    monkeypatch.setattr("app.web.internal.schema_is_current", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.web.internal.schema_is_compatible", AsyncMock(return_value=False))
     r = await internal_client.get("/ready")
     assert r.status_code == 503 and r.json()["reason"] == "migrations"
 
@@ -37,9 +38,9 @@ async def test_ready_is_503_when_database_unreachable():
     assert r.json() == {"status": "not_ready", "reason": "database"}
 
 
-async def test_schema_is_current_against_the_test_database(engine):
+async def test_schema_is_compatible_at_the_code_head(engine):
     # conftest stamps head after create_all.
-    assert await schema_is_current(engine) is True
+    assert await schema_is_compatible(engine) is True
 
 
 async def test_metrics_count_public_requests(client, internal_client):
@@ -66,14 +67,69 @@ async def test_internal_app_has_no_openapi(internal_client):
     assert (await internal_client.get("/openapi.json")).status_code == 404
 
 
-async def test_schema_is_not_current_without_a_recorded_revision(engine):
+def _baseline_revision() -> str:
+    (base,) = ScriptDirectory.from_config(alembic_config()).get_bases()
+    return base
+
+
+async def _set_revision(engine, revision: str | None) -> None:
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM alembic_version"))
+        if revision is not None:
+            await conn.execute(
+                text("INSERT INTO alembic_version (version_num) VALUES (:r)"), {"r": revision}
+            )
+
+
+async def _restore_head(engine) -> None:
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM alembic_version"))
+        await conn.run_sync(stamp_head)
+
+
+async def test_schema_is_not_compatible_without_a_recorded_revision(engine):
+    await _set_revision(engine, None)
     try:
-        assert await schema_is_current(engine) is False
+        assert await schema_is_compatible(engine) is False
     finally:
-        async with engine.begin() as conn:
-            await conn.run_sync(stamp_head)
+        await _restore_head(engine)
+
+
+async def test_schema_is_not_compatible_at_a_known_older_revision(engine):
+    # The new code's pods wait until the migration job has run.
+    await _set_revision(engine, _baseline_revision())
+    try:
+        assert await schema_is_compatible(engine) is False
+    finally:
+        await _restore_head(engine)
+
+
+async def test_schema_is_compatible_when_the_database_is_newer_than_the_code(engine):
+    # A pre-upgrade migration ran a revision this (old) code does not know: the old pods
+    # stay ready, because migrations are expand-first and backward compatible.
+    await _set_revision(engine, "f00dfacecafe")
+    try:
+        assert await schema_is_compatible(engine) is True
+    finally:
+        await _restore_head(engine)
+
+
+async def test_ready_stays_ok_while_the_database_is_newer(engine, internal_client):
+    await _set_revision(engine, "f00dfacecafe")
+    try:
+        r = await internal_client.get("/ready")
+    finally:
+        await _restore_head(engine)
+    assert r.status_code == 200 and r.json() == {"status": "ready"}
+
+
+async def test_ready_is_503_at_a_known_older_revision(engine, internal_client):
+    await _set_revision(engine, _baseline_revision())
+    try:
+        r = await internal_client.get("/ready")
+    finally:
+        await _restore_head(engine)
+    assert r.status_code == 503 and r.json()["reason"] == "migrations"
 
 
 async def test_ready_probe_does_not_log_on_success(internal_client, capsys):

@@ -1,4 +1,4 @@
-"""Alembic from code: the config, `upgrade head`, and whether the schema is current."""
+"""Alembic from code: the config, `upgrade head`, and whether this code fits the schema."""
 
 from functools import cache
 from pathlib import Path
@@ -44,12 +44,23 @@ def _database_heads(connection: Connection) -> set[str]:
 
 
 @cache
-def _head_revisions() -> frozenset[str]:
-    """The chain's heads; they cannot change while the process runs."""
-    return frozenset(ScriptDirectory.from_config(alembic_config()).get_heads())
+def _code_revisions() -> tuple[frozenset[str], frozenset[str]]:
+    """The chain's heads and every revision it knows; fixed while the process runs."""
+    script = ScriptDirectory.from_config(alembic_config())
+    known = frozenset(rev.revision for rev in script.walk_revisions())
+    return frozenset(script.get_heads()), known
 
 
-async def schema_is_current(engine: AsyncEngine) -> bool:
-    """True when the database stands at the head revision(s) of the migration chain."""
+async def schema_is_compatible(engine: AsyncEngine) -> bool:
+    """Whether this code may serve the database's schema.
+
+    True when the database stands at the code's head, or at a revision this code does
+    not know: a newer release has migrated (pre-upgrade) and its migrations are
+    backward compatible with this release (expand first, contract a release later).
+    False when the database has no revision or stands at a known, older one.
+    """
     async with engine.connect() as connection:
-        return await connection.run_sync(_database_heads) == _head_revisions()
+        database = await connection.run_sync(_database_heads)
+    heads, known = _code_revisions()
+    # An empty set is a subset of `known`, so "no revision" is not compatible.
+    return database == heads or not database <= known

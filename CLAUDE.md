@@ -88,6 +88,10 @@ fresh schema per session and roll back per test.
 - Commit messages: `<area>: <imperative summary>`; ported code adds a trailer
   `Ported-from: to-herd-cats-ai@<sha>:<path>`.
 - Alembic: one migration per slice, never edited after merge.
+- Alembic: migrations must stay backward compatible with the previous release (expand
+  first, contract in a later release). `/ready` stays ready when the database is at a
+  revision this code does not know (a newer release migrated before its pods rolled
+  out); it is not ready only with no revision or a known older one.
 
 ## Definition of done (per task)
 
