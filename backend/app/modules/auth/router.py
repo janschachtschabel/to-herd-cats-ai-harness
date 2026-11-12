@@ -25,7 +25,8 @@ async def login(
         token,
         max_age=settings.session_ttl_hours * 3600,
         httponly=True,
-        secure=settings.cookie_secure,
+        # https as the client saw it (X-Forwarded-Proto from a trusted proxy counts).
+        secure=settings.cookie_secure or request.url.scheme == "https",
         samesite="lax",
         path="/",
     )

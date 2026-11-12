@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, FastAPI
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.errors import install_error_handlers
 from app.core.request_context import RequestContextMiddleware
 from app.core.request_log import RequestLogMiddleware
@@ -14,6 +14,7 @@ from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.users.router import router as users_router
+from app.web.spa import mount_spa
 
 
 def api_router() -> APIRouter:
@@ -28,8 +29,8 @@ def api_router() -> APIRouter:
     return api
 
 
-def create_public_app() -> FastAPI:
-    settings = get_settings()
+def create_public_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
     app = FastAPI(
         title="to-herd-cats-ai",
         openapi_url="/api/openapi.json",
@@ -46,4 +47,6 @@ def create_public_app() -> FastAPI:
         from app.web.test_routes import router as test_router
 
         app.include_router(test_router, prefix="/api")
+    if settings.static_dir is not None:
+        mount_spa(app, settings.static_dir)  # last: it answers every other path
     return app

@@ -2,22 +2,29 @@ import type { QueryClient } from '@tanstack/react-query'
 import {
   createRootRouteWithContext,
   createRoute,
+  lazyRouteComponent,
   notFound,
   Outlet,
   redirect,
 } from '@tanstack/react-router'
 import { AppShell } from '@/app/shell/AppShell'
 import { adminLinks } from '@/app/shell/nav'
-import { AuditPage } from '@/features/admin/audit/AuditPage'
-import { GroupPage } from '@/features/admin/groups/GroupPage'
-import { GroupsPage } from '@/features/admin/groups/GroupsPage'
-import { UsersPage } from '@/features/admin/users/UsersPage'
-import { LoginPage } from '@/features/auth/LoginPage'
 import { hasPermission, meQuery } from '@/features/auth/queries'
-import { SpacePage } from '@/features/spaces/SpacePage'
-import { SpacesPage } from '@/features/spaces/SpacesPage'
 import type { Me, Permission } from '@/lib/api'
 import { NotFoundPage } from './NotFoundPage'
+
+// Every page is its own chunk, loaded when its route is entered or hovered (intent
+// preload), so the first load carries only the shell and the page in view.
+const LoginPage = lazyRouteComponent(() => import('@/features/auth/LoginPage'), 'LoginPage')
+const SpacesPage = lazyRouteComponent(() => import('@/features/spaces/SpacesPage'), 'SpacesPage')
+const SpacePage = lazyRouteComponent(() => import('@/features/spaces/SpacePage'), 'SpacePage')
+const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
+const GroupsPage = lazyRouteComponent(
+  () => import('@/features/admin/groups/GroupsPage'),
+  'GroupsPage',
+)
+const GroupPage = lazyRouteComponent(() => import('@/features/admin/groups/GroupPage'), 'GroupPage')
+const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -83,6 +90,8 @@ const spacesRoute = createRoute({
 const spaceRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/spaces/$spaceId',
+  // The page takes its id as a prop, so the route component wraps it; load it here.
+  loader: () => SpacePage.preload?.(),
   component: function SpaceRoute() {
     const { spaceId } = spaceRoute.useParams()
     return <SpacePage spaceId={spaceId} />
@@ -130,7 +139,10 @@ const groupsRoute = createRoute({
 const groupRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/groups/$groupId',
-  loader: ({ context }) => requirePermission(context.me, 'group.manage'),
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'group.manage')
+    await GroupPage.preload?.()
+  },
   component: function GroupRoute() {
     const { groupId } = groupRoute.useParams()
     return <GroupPage groupId={groupId} />

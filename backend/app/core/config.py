@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     session_cookie_name: str = "herd_session"
     session_ttl_hours: int = 24 * 7
     cookie_secure: bool = False
+    # Reverse proxies whose X-Forwarded-For/-Proto the public port believes (comma
+    # separated IPs or networks, "*" for any); the client IP and scheme come from them.
+    forwarded_allow_ips: str = "127.0.0.1"
     login_rate_limit_per_minute: int = 5
 
     bootstrap_admin_email: str = ""

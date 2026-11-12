@@ -40,6 +40,22 @@ def test_uvicorn_configs_disable_access_log_and_keep_our_logging():
         assert config.access_log is False and config.log_config is None
 
 
+def test_public_server_trusts_forwarded_headers_only_from_configured_proxies():
+    settings = Settings(forwarded_allow_ips="10.0.0.0/8,127.0.0.1")
+    public, internal = launch.server_configs(settings)
+    assert public.proxy_headers is True
+    assert public.forwarded_allow_ips == "10.0.0.0/8,127.0.0.1"
+    # The internal port is reached directly (probes, scrapes): no forwarded headers.
+    assert internal.proxy_headers is False
+
+
+def test_forwarded_allow_ips_defaults_to_localhost(monkeypatch):
+    monkeypatch.delenv("HERD_FORWARDED_ALLOW_IPS", raising=False)
+    assert Settings().forwarded_allow_ips == "127.0.0.1"
+    monkeypatch.setenv("HERD_FORWARDED_ALLOW_IPS", "172.16.0.0/12")
+    assert Settings().forwarded_allow_ips == "172.16.0.0/12"
+
+
 class FakeServer:
     def __init__(self) -> None:
         self.should_exit = False

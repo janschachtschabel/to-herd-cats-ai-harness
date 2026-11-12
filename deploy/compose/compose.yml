@@ -1,0 +1,51 @@
+# Reference deployment: PostgreSQL and the app in one container (HERD_ROLE=all:
+# migrate, then serve). Secrets come from .env next to this file (see .env.example).
+# Only the public port 8080 is published; 9090 (probes, metrics) stays inside.
+name: to-herd-cats-ai
+
+services:
+  db:
+    image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+    environment:
+      POSTGRES_USER: herd
+      POSTGRES_DB: herd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U herd -d herd"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HERD_ROLE: all
+      HERD_DATABASE_URL: postgresql+asyncpg://herd:${POSTGRES_PASSWORD}@db:5432/herd
+      HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+      HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
+      HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+    ports:
+      - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+volumes:
+  db-data:

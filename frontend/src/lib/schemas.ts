@@ -67,4 +67,6 @@ function messageFor(issue: Issue): string {
   }
 }
 
-z.config({ customError: (issue) => messageFor(issue) })
+// jitless: zod would otherwise probe `new Function` to compile validators, which the
+// Content-Security-Policy (no 'unsafe-eval') reports as a violation.
+z.config({ jitless: true, customError: (issue) => messageFor(issue) })

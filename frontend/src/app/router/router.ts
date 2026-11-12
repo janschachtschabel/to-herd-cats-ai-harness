@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
+import { createElement } from 'react'
 import { meQuery } from '@/features/auth/queries'
+import { LoadingState } from '@/features/shared/states'
 import { onUnauthorized } from '@/lib/api'
 import { routeTree } from './routes'
 
@@ -10,6 +12,8 @@ export function createAppRouter(queryClient: QueryClient, history?: RouterHistor
     context: { queryClient },
     history,
     defaultPreload: 'intent',
+    // Shown while a page's code or data takes longer than a moment (pages load lazily).
+    defaultPendingComponent: () => createElement(LoadingState),
     scrollRestoration: true,
   })
   // A request answered 401 means the session is gone: back to the login, and back here after.

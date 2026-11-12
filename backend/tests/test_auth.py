@@ -34,6 +34,19 @@ async def test_me_requires_login(client: AsyncClient) -> None:
     assert response.json()["error"]["code"] == "auth.required"
 
 
+async def test_cookie_is_secure_when_the_request_came_over_https(
+    client: AsyncClient, owner_user: User
+) -> None:
+    """Behind a trusted reverse proxy uvicorn takes the scheme from X-Forwarded-Proto;
+    the session cookie is then Secure without HERD_COOKIE_SECURE."""
+    body = {"email": owner_user.email, "password": PASSWORD}
+    plain = await client.post("/api/auth/login", json=body, headers=CSRF)
+    assert "secure" not in plain.headers["set-cookie"].lower()
+    https = await client.post("https://test/api/auth/login", json=body, headers=CSRF)
+    assert https.status_code == 200
+    assert "secure" in https.headers["set-cookie"].lower()
+
+
 async def test_login_sets_cookie_and_me_works(client: AsyncClient, owner_user: User) -> None:
     response = await client.post(
         "/api/auth/login", json={"email": "Owner@Example.com", "password": PASSWORD}, headers=CSRF

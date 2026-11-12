@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.telemetry import current_trace_ids
 
@@ -53,6 +54,9 @@ class RateLimited(AppError):
     code = "rate_limited"
 
 
+_HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
+
+
 def _body(code: str, message: str) -> dict[str, dict[str, str]]:
     # The active span's trace id: the same one the log lines of this request carry.
     return {"error": {"code": code, "message": message, "trace_id": current_trace_ids()[0]}}
@@ -62,6 +66,14 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content=_body(exc.code, exc.message))
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _handle_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # Raised by routing itself: no route (404), wrong method (405, with `Allow`).
+        code = _HTTP_CODES.get(exc.status_code, f"http.{exc.status_code}")
+        return JSONResponse(
+            status_code=exc.status_code, content=_body(code, code), headers=exc.headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(request: Request, exc: RequestValidationError) -> JSONResponse:

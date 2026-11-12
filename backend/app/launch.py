@@ -58,10 +58,12 @@ def steps_for(role: str) -> tuple[Step, ...]:
     return _STEPS[role]
 
 
-def _config(app: FastAPI, port: int) -> uvicorn.Config:
+def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn.Config:
     # 0.0.0.0: the process runs in a container; which ports are reachable is decided there.
     # access_log off and log_config None: RequestLogMiddleware writes the request line and
     # uvicorn's own loggers propagate to the root handler set up by configure_logging.
+    # Forwarded headers (client IP for audit and rate limits, https scheme for cookies)
+    # are believed only from `forwarded_allow_ips`, and only where it is given.
     return uvicorn.Config(
         app,
         host="0.0.0.0",  # noqa: S104
@@ -69,13 +71,17 @@ def _config(app: FastAPI, port: int) -> uvicorn.Config:
         access_log=False,
         log_config=None,
         server_header=False,
+        proxy_headers=forwarded_allow_ips is not None,
+        forwarded_allow_ips=forwarded_allow_ips,
     )
 
 
 def server_configs(settings: Settings) -> tuple[uvicorn.Config, uvicorn.Config]:
+    """The public server sits behind the reverse proxy; the internal one is reached
+    directly (probes, scrapes) and believes no forwarded headers."""
     return (
-        _config(create_public_app(), settings.public_port),
-        _config(create_internal_app(), settings.internal_port),
+        _config(create_public_app(), settings.public_port, settings.forwarded_allow_ips),
+        _config(create_internal_app(), settings.internal_port, None),
     )
 
 

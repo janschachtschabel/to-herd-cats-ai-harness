@@ -53,6 +53,14 @@ cd frontend && npm run check:api      # fails if those files are stale
 cd frontend && npm run dev            # proxies /api to http://localhost:8080
 ```
 
+```bash
+docker build -t to-herd-cats-ai:local .                 # the image (SPA + API, uid 10001)
+bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
+```
+
+The backend serves the built SPA when `HERD_STATIC_DIR` points at `frontend/dist`
+(`backend/app/web/spa.py`: CSP, cache headers, index.html fallback outside `/api`).
+
 Tests need Postgres; `HERD_TEST_DATABASE_URL` defaults to
 `postgresql+asyncpg://herd:herd@localhost:5433/herd_test`. Backend tests create a
 fresh schema per session and roll back per test.

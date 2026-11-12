@@ -1,0 +1,22 @@
+# The build context is the repository root; the image needs only these sources.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/app/
+!backend/alembic/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/openapi.json
+!frontend/public/
+!frontend/src/
+!frontend/tsconfig*.json
+!frontend/vite.config.ts
+!frontend/components.json
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.env
+**/*.test.ts
+**/*.test.tsx
+frontend/src/test/
