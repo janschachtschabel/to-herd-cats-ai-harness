@@ -1,12 +1,16 @@
-"""Routes that exist only when environment == "test"; they exercise the error handlers."""
+"""Routes that exist only when environment == "test"; they exercise the error handlers
+and the log context."""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter
 
 from app.core.errors import NotFound
+from app.modules.auth.deps import AuthDep
 
 router = APIRouter(prefix="/_test")
+logger = logging.getLogger("app.test_routes")
 
 
 @router.get("/not-found")
@@ -38,3 +42,9 @@ async def item(item_id: int) -> dict[str, int]:
 async def boom_post(payload: dict[str, Any]) -> None:
     # The body is accepted and ignored: it must never show up in the error log.
     raise RuntimeError("boom")
+
+
+@router.get("/whoami")
+async def whoami(ctx: AuthDep) -> dict[str, str]:
+    logger.info("test.whoami")
+    return {"actor": str(ctx.principal)}

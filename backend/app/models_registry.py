@@ -1,0 +1,9 @@
+"""Imports every model, so `Base.metadata` is complete (alembic, schema checks)."""
+
+from app.core.models_base import Base
+from app.core.ratelimit import RateLimitHit
+from app.modules.auth.models import UserSession
+from app.modules.orgs.models import Organization
+from app.modules.users.models import User
+
+__all__ = ["Base", "Organization", "RateLimitHit", "User", "UserSession"]

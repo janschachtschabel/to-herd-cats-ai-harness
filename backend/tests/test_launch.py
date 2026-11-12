@@ -79,3 +79,44 @@ def test_main_exits_with_the_servers_exit_code(monkeypatch):
     with pytest.raises(SystemExit) as exited:
         launch.main()
     assert exited.value.code == 1
+
+
+async def test_serve_bootstraps_before_serving(monkeypatch):
+    seen: list[str] = []
+
+    async def fake_bootstrap(settings):
+        seen.append("bootstrap")
+
+    async def fake_run_servers(servers):
+        seen.append(f"run {len(servers)}")
+        return 0
+
+    monkeypatch.setattr(launch, "bootstrap", fake_bootstrap)
+    monkeypatch.setattr(launch, "run_servers", fake_run_servers)
+    assert await launch.serve(Settings()) == 0
+    assert seen == ["bootstrap", "run 2"]
+
+
+async def test_bootstrap_runs_in_its_own_committed_transaction(monkeypatch):
+    seen: list[object] = []
+
+    class FakeSession:
+        async def commit(self) -> None:
+            seen.append("commit")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc: object) -> None:
+            seen.append("closed")
+
+    class FakeDatabase:
+        session_factory = FakeSession
+
+    async def fake_ensure(session, settings):
+        seen.append(("ensure", type(session).__name__, settings.bootstrap_org_name))
+
+    monkeypatch.setattr(launch, "get_database", lambda: FakeDatabase())
+    monkeypatch.setattr(launch, "ensure_bootstrap", fake_ensure)
+    await launch.bootstrap(Settings(bootstrap_org_name="Acme"))
+    assert seen == [("ensure", "FakeSession", "Acme"), "commit", "closed"]

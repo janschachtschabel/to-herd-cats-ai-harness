@@ -2,22 +2,33 @@
 
 import json
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 os.environ["HERD_ENVIRONMENT"] = "test"  # before any app import: enables /api/_test/*
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import MetaData  # noqa: E402
+from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import get_session  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
-from app.core.migrations import stamp_head  # noqa: E402
-from app.core.models_base import Base  # noqa: E402
+from app.core.migrations import upgrade_head  # noqa: E402
 from app.web.internal import create_internal_app, get_engine  # noqa: E402
 from app.web.public import create_public_app  # noqa: E402
+from tests.factories import (  # noqa: E402, F401
+    guest,
+    guest_client,
+    make_user,
+    member,
+    member_client,
+    org,
+    owner,
+    owner_user,
+)
 
 configure_logging(get_settings())
 
@@ -44,13 +55,21 @@ def last_line(capsys: pytest.CaptureFixture[str], message: str) -> str:
     return json.dumps(matches[-1])
 
 
+def _drop_everything(connection: Connection) -> None:
+    """Whatever an earlier run left behind, including alembic_version."""
+    existing = MetaData()
+    existing.reflect(connection)
+    existing.drop_all(connection)
+
+
 @pytest.fixture(scope="session")
 async def engine() -> AsyncIterator[AsyncEngine]:
+    """The schema is built by the migrations, so the tests run against what production
+    runs; test_migrations checks that the migrated schema matches the models."""
     engine = create_async_engine(get_settings().test_database_url)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(stamp_head)  # the schema above is what head describes
+        await conn.run_sync(_drop_everything)
+        await conn.run_sync(upgrade_head)
     yield engine
     await engine.dispose()
 
@@ -69,8 +88,14 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
             await trans.rollback()
 
 
+MakeClient = Callable[..., Awaitable[AsyncClient]]
+
+
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
+async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
+    """New clients of one public app, all on the test session; each has its own cookies.
+
+    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends."""
     app = create_public_app()
 
     async def _session_override() -> AsyncIterator[AsyncSession]:
@@ -90,8 +115,23 @@ async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides[get_session] = _session_override
     # raise_app_exceptions=False: let the 500 handler's response reach the test.
     transport = ASGITransport(app=app, raise_app_exceptions=False)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+    clients: list[AsyncClient] = []
+
+    async def _make(*, csrf: bool = False) -> AsyncClient:
+        headers = {"X-Requested-With": "herd"} if csrf else {}
+        client = AsyncClient(transport=transport, base_url="http://test", headers=headers)
+        clients.append(client)
+        return client
+
+    yield _make
+    for client in clients:
+        await client.aclose()
+
+
+@pytest.fixture
+async def client(make_client: MakeClient) -> AsyncClient:
+    """An anonymous client without the CSRF header."""
+    return await make_client()
 
 
 @pytest.fixture

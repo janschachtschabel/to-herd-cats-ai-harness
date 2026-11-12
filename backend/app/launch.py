@@ -1,6 +1,7 @@
 """`python -m app.launch`: what this process runs is chosen by HERD_ROLE.
 
-- `api`: the public and the internal app, two uvicorn servers in one event loop.
+- `api`: bootstrap (organisation and first owner, if nobody exists), then the public
+  and the internal app, two uvicorn servers in one event loop.
 - `migrate`: `alembic upgrade head`, then exit (the cluster's one-off job).
 - `all`: migrate first, then as `api` (single container, docker compose).
 
@@ -19,8 +20,10 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.core.config import Settings, get_settings
+from app.core.db import get_database
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
+from app.modules.orgs.service import ensure_bootstrap
 from app.web.internal import create_internal_app
 from app.web.public import create_public_app
 
@@ -106,7 +109,15 @@ async def run_servers(servers: Sequence[Server]) -> int:
             loop.remove_signal_handler(sig)
 
 
+async def bootstrap(settings: Settings) -> None:
+    """The organisation and first owner, in their own transaction, before serving."""
+    async with get_database().session_factory() as session:
+        await ensure_bootstrap(session, settings)
+        await session.commit()
+
+
 async def serve(settings: Settings) -> int:
+    await bootstrap(settings)
     return await run_servers([_Server(config) for config in server_configs(settings)])
 
 

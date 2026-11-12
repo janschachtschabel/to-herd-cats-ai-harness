@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.core.models_base import Base
+from app.models_registry import Base
 
 if not logging.getLogger().handlers:  # the alembic CLI; the app has configured logging
     configure_logging(get_settings())

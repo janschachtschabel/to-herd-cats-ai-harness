@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import Base
@@ -26,3 +26,8 @@ class BaseRepository[ModelT: Base]:
     async def delete(self, entity: ModelT) -> None:
         await self.session.delete(entity)
         await self.session.flush()
+
+
+async def advisory_xact_lock(session: AsyncSession, key: str) -> None:
+    """Serialise writers on `key` until the transaction ends (across all replicas)."""
+    await session.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(key, 0))))

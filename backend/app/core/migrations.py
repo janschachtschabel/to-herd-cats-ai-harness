@@ -20,8 +20,12 @@ def alembic_config() -> Config:
     return config
 
 
-def upgrade_head() -> None:
-    command.upgrade(alembic_config(), "head")
+def upgrade_head(connection: Connection | None = None) -> None:
+    """Migrate to head; on `connection`, inside its transaction, when one is given (tests)."""
+    config = alembic_config()
+    if connection is not None:
+        config.attributes["connection"] = connection
+    command.upgrade(config, "head")
 
 
 def stamp_head(connection: Connection) -> None:

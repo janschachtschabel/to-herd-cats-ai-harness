@@ -1,11 +1,15 @@
-"""Keyset pagination: opaque cursors over (created_at, id)."""
+"""Keyset pagination: opaque cursors over (created_at, id), or over id alone.
+
+Ids are UUIDv7 and therefore ordered by creation time; tables without `created_at`
+page by id.
+"""
 
 import base64
 import binascii
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.errors import ValidationFailed
 
@@ -16,6 +20,9 @@ class PageParams(BaseModel):
 
 
 class Page[T](BaseModel):
+    # Services return pages of ORM rows; routers turn them into pages of schemas.
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     items: list[T]
     next_cursor: str | None = None
 
@@ -31,4 +38,15 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
         ts, id_ = raw.split("|")
         return datetime.fromisoformat(ts), uuid.UUID(id_)
     except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+        raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+
+
+def encode_id_cursor(id_: uuid.UUID) -> str:
+    return base64.urlsafe_b64encode(id_.bytes).decode().rstrip("=")
+
+
+def decode_id_cursor(cursor: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(bytes=base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+    except (binascii.Error, ValueError) as exc:
         raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
