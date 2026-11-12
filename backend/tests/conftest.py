@@ -1,7 +1,9 @@
 """Test fixtures: real Postgres (herd_test), one rolled-back transaction per test."""
 
+import json
 import os
 from collections.abc import AsyncIterator
+from typing import Any
 
 os.environ["HERD_ENVIRONMENT"] = "test"  # before any app import: enables /api/_test/*
 
@@ -11,8 +13,33 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import get_session  # noqa: E402
+from app.core.logging import configure_logging  # noqa: E402
 from app.core.models_base import Base  # noqa: E402
 from app.web.public import create_public_app  # noqa: E402
+
+configure_logging(get_settings())
+
+
+def json_lines(text: str) -> list[dict[str, Any]]:
+    """The JSON log lines in captured output; anything else (pytest noise) is skipped."""
+    lines = []
+    for raw in text.splitlines():
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(parsed, dict):
+            lines.append(parsed)
+    return lines
+
+
+def last_line(capsys: pytest.CaptureFixture[str], message: str) -> str:
+    """The last captured JSON log line whose message is `message`, as raw text."""
+    matches = [
+        line for line in json_lines(capsys.readouterr().out) if line.get("message") == message
+    ]
+    assert matches, f"no log line with message {message!r}"
+    return json.dumps(matches[-1])
 
 
 @pytest.fixture(scope="session")
