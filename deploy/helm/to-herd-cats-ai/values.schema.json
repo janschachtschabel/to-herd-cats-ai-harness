@@ -1,0 +1,257 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "to-herd-cats-ai chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {"type": "string", "description": "Image repository", "minLength": 1},
+        "tag": {"type": "string", "description": "Image tag; empty means the chart's appVersion"},
+        "digest": {"type": "string", "description": "Image digest; empty or sha256:<64 hex>", "pattern": "^(sha256:[a-f0-9]{64})?$"},
+        "pullPolicy": {
+          "type": "string",
+          "description": "Image pull policy",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      },
+      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "description": "The application image"
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "Secrets for pulling the image",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "description": "Secret name", "minLength": 1}
+        },
+        "required": ["name"]
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of API pods"},
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra environment variables (name: value)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "additionalProperties": {"type": "string"}
+        }
+      },
+      "required": ["replicas", "resources", "env"],
+      "description": "The API Deployment (HERD_ROLE=api)"
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": {"type": "string", "description": "Name of an existing Secret whose keys are environment variables"}
+      },
+      "required": ["existingSecret"],
+      "description": "Application secrets, by Secret name only"
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {"type": "string", "description": "External PostgreSQL URL without the password"},
+        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\""}
+      },
+      "required": ["url", "existingSecret"],
+      "description": "External database"
+    },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only)"},
+        "image": {"type": "string", "description": "PostgreSQL (pgvector) image", "minLength": 1},
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "size": {"type": "string", "description": "Size of the data volume", "minLength": 1},
+            "storageClass": {"type": "string", "description": "Storage class; empty: cluster default"}
+          },
+          "required": ["size", "storageClass"]
+        },
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            }
+          }
+        }
+      },
+      "required": ["enabled", "image", "storage", "resources"],
+      "description": "Bundled PostgreSQL"
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Create an Ingress"},
+        "className": {"type": "string", "description": "IngressClass name"},
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "Ingress annotations"
+        },
+        "hosts": {
+          "type": "array",
+          "description": "Hosts and paths",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "host": {"type": "string", "description": "Host name", "minLength": 1},
+              "paths": {
+                "type": "array",
+                "description": "Paths",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {"type": "string", "description": "Path", "minLength": 1},
+                    "pathType": {
+                      "type": "string",
+                      "description": "Path type",
+                      "enum": ["Prefix", "Exact", "ImplementationSpecific"]
+                    }
+                  },
+                  "required": ["path", "pathType"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "description": "TLS entries",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "secretName": {"type": "string", "description": "TLS Secret name"},
+              "hosts": {
+                "type": "array",
+                "description": "Hosts",
+                "items": {"type": "string"}
+              }
+            },
+            "required": ["hosts"]
+          }
+        }
+      },
+      "required": ["enabled", "className", "annotations", "hosts", "tls"],
+      "description": "Ingress for the public port"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Create NetworkPolicies"},
+        "publicFrom": {
+          "type": "array",
+          "description": "NetworkPolicyPeers allowed on port 8080; empty: everyone",
+          "items": {"type": "object"}
+        },
+        "internalFrom": {
+          "type": "array",
+          "description": "NetworkPolicyPeers allowed on port 9090; empty: no one",
+          "items": {"type": "object"}
+        },
+        "egress": {
+          "type": "array",
+          "description": "Extra NetworkPolicyEgressRules",
+          "items": {"type": "object"}
+        }
+      },
+      "required": ["enabled", "publicFrom", "internalFrom", "egress"],
+      "description": "NetworkPolicy"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Create a ServiceMonitor"},
+            "interval": {"type": "string", "description": "Scrape interval", "pattern": "^[0-9]+(ms|s|m|h)$"},
+            "labels": {
+              "type": "object",
+              "additionalProperties": {"type": "string"},
+              "description": "Extra labels"
+            }
+          },
+          "required": ["enabled", "interval", "labels"]
+        },
+        "prometheusRule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Create a PrometheusRule"},
+            "labels": {
+              "type": "object",
+              "additionalProperties": {"type": "string"},
+              "description": "Extra labels"
+            }
+          },
+          "required": ["enabled", "labels"]
+        }
+      },
+      "required": ["serviceMonitor", "prometheusRule"],
+      "description": "Prometheus Operator resources"
+    },
+    "tracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "otlpEndpoint": {"type": "string", "description": "OTLP/HTTP endpoint; empty: no export"}
+      },
+      "required": ["otlpEndpoint"],
+      "description": "OpenTelemetry"
+    }
+  },
+  "required": ["image", "imagePullSecrets", "api", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+}

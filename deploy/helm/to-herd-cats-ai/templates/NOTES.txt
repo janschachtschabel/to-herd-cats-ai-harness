@@ -1,0 +1,15 @@
+to-herd-cats-ai {{ .Chart.AppVersion }} is installed as {{ include "herd.fullname" . }}.
+
+Public port 8080: service {{ include "herd.fullname" . }}{{ if .Values.ingress.enabled }} (Ingress: {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}){{ end }}.
+Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal.
+{{- if .Values.postgresql.enabled }}
+
+The bundled PostgreSQL is for test and staging only (no replication, no backups).
+For production set postgresql.enabled=false, database.url and database.existingSecret.
+{{- end }}
+{{- if not .Values.secrets.existingSecret }}
+
+secrets.existingSecret is empty: no first owner is created. Create a Secret with
+HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD and HERD_INTERNAL_TOKEN and
+set secrets.existingSecret to its name.
+{{- end }}

@@ -58,6 +58,13 @@ docker build -t to-herd-cats-ai:local .                 # the image (SPA + API, 
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
 ```
 
+```bash
+bash deploy/helm/scripts/check-chart-version.sh         # chart version = appVersion = pyproject version
+helm lint --strict deploy/helm/to-herd-cats-ai          # also with -f deploy/helm/to-herd-cats-ai/ci/*-values.yaml
+helm template t deploy/helm/to-herd-cats-ai | kubeconform -strict -summary
+promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
+```
+
 The backend serves the built SPA when `HERD_STATIC_DIR` points at `frontend/dist`
 (`backend/app/web/spa.py`: CSP, cache headers, index.html fallback outside `/api`).
 

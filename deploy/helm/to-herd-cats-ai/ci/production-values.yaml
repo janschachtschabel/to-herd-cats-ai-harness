@@ -1,0 +1,68 @@
+# A production-like configuration for CI (helm lint/template, kubeconform): external
+# database, secrets by reference, Ingress with TLS, NetworkPolicy, ServiceMonitor,
+# PrometheusRule, tracing and a digest-pinned image.
+image:
+  tag: "0.1.0"
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+imagePullSecrets:
+  - name: regcred
+api:
+  replicas: 3
+  env:
+    HERD_COOKIE_SECURE: "true"
+    HERD_FORWARDED_ALLOW_IPS: 10.0.0.0/8
+secrets:
+  existingSecret: herd-app
+database:
+  url: postgresql+asyncpg://herd@db.example.internal:5432/herd
+  existingSecret: herd-db
+postgresql:
+  enabled: false
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+  hosts:
+    - host: herd.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: herd-tls
+      hosts: [herd.example.com]
+networkPolicy:
+  enabled: true
+  publicFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  internalFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 4318
+          protocol: TCP
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+tracing:
+  otlpEndpoint: http://otel-collector.monitoring:4318

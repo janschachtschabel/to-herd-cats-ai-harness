@@ -1,0 +1,18 @@
+# The public port 8080: API and SPA.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

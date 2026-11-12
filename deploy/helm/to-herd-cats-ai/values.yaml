@@ -1,0 +1,118 @@
+# Values of the to-herd-cats-ai chart. Every value is described by values.schema.json.
+# Secrets are never values: the chart only takes the names of existing Secrets.
+
+## @section Image
+
+## @param image.repository Image repository (one image for every role: api, migrate)
+## @param image.tag Image tag; empty means the chart's appVersion
+## @param image.digest Image digest (sha256:...); when set it pins the image, the tag stays for readability
+## @param image.pullPolicy Image pull policy
+image:
+  repository: ghcr.io/janschachtschabel/to-herd-cats-ai
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+## @param imagePullSecrets Names of Secrets for pulling the image, e.g. [{name: regcred}]
+imagePullSecrets: []
+
+## @section API (HERD_ROLE=api)
+
+## @param api.replicas Number of API pods; the processes are stateless
+## @param api.resources Resource requests and limits of the API container
+## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL, HERD_COOKIE_SECURE, HERD_FORWARDED_ALLOW_IPS
+api:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  env: {}
+
+## @section Secrets
+
+## @param secrets.existingSecret Name of an existing Secret whose keys are environment variables (HERD_INTERNAL_TOKEN, HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD); empty: none
+secrets:
+  existingSecret: ""
+
+## @section Database
+
+## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
+## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE)
+database:
+  url: ""
+  existingSecret: ""
+
+## @section Bundled PostgreSQL (for test and staging only)
+
+## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production
+## @param postgresql.image PostgreSQL image (pgvector), pinned by digest
+## @param postgresql.storage.size Size of the data volume
+## @param postgresql.storage.storageClass Storage class of the data volume; empty: the cluster default
+## @param postgresql.resources Resource requests and limits of the PostgreSQL container
+postgresql:
+  enabled: true
+  image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+  storage:
+    size: 8Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+## @section Ingress (public port 8080)
+
+## @param ingress.enabled Create an Ingress for the public port
+## @param ingress.className IngressClass name; empty: the cluster default
+## @param ingress.annotations Annotations of the Ingress
+## @param ingress.hosts Hosts and paths, e.g. [{host: herd.example.com, paths: [{path: /, pathType: Prefix}]}]
+## @param ingress.tls TLS entries, e.g. [{secretName: herd-tls, hosts: [herd.example.com]}]
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: herd.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+## @section NetworkPolicy
+
+## @param networkPolicy.enabled Restrict traffic of the app pods (and of the bundled PostgreSQL to the app)
+## @param networkPolicy.publicFrom Peers allowed on the public port 8080 (NetworkPolicyPeer list, e.g. the ingress controller's namespace); empty: everyone
+## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
+## @param networkPolicy.egress Extra egress rules (NetworkPolicyEgressRule list), e.g. to an external database or OTLP collector; DNS and the bundled PostgreSQL are always allowed
+networkPolicy:
+  enabled: false
+  publicFrom: []
+  internalFrom: []
+  egress: []
+
+## @section Metrics (internal port 9090, /metrics)
+
+## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
+## @param metrics.serviceMonitor.interval Scrape interval
+## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics) and HerdHigh5xx
+## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+  prometheusRule:
+    enabled: false
+    labels: {}
+
+## @section Tracing
+
+## @param tracing.otlpEndpoint OTLP/HTTP endpoint for traces (OTEL_EXPORTER_OTLP_ENDPOINT); empty: no export
+tracing:
+  otlpEndpoint: ""

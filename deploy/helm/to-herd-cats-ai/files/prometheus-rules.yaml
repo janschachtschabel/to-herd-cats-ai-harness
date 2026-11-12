@@ -1,0 +1,34 @@
+# Alerts of to-herd-cats-ai in the plain Prometheus rule-file format. The
+# PrometheusRule template embeds this file unchanged, and
+# `promtool test rules tests/rules-test.yaml` tests it as it is.
+groups:
+  - name: to-herd-cats-ai
+    rules:
+      # The readiness probe (/ready: database reachable, schema at head) has failed
+      # for 5 minutes. Needs kube-state-metrics. Our pods are those with a container
+      # named to-herd-cats-ai (the API Deployment; the migration job's is "migrate").
+      - alert: HerdNotReady
+        expr: |
+          (max by (namespace, pod) (kube_pod_status_ready{condition="true"}) == 0)
+          and on (namespace, pod)
+          max by (namespace, pod) (kube_pod_container_info{container="to-herd-cats-ai"})
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "to-herd-cats-ai pod {{ $labels.namespace }}/{{ $labels.pod }} has not been ready for 5 minutes"
+          description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable or the schema is not at the newest migration."
+      # More than 5 % of the public requests answered 5xx, sustained for 10 minutes
+      # (share over a 5-minute window). Per namespace and scrape job, so several
+      # releases in one cluster alert separately. No traffic, no alert.
+      - alert: HerdHigh5xx
+        expr: |
+          sum by (namespace, job) (rate(herd_http_requests_total{status=~"5.."}[5m]))
+            / sum by (namespace, job) (rate(herd_http_requests_total[5m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5 % of the requests to {{ $labels.namespace }}/{{ $labels.job }} failed with 5xx for 10 minutes"
+          description: "Look at the error logs of to-herd-cats-ai (level ERROR, with trace_id) for the cause."
