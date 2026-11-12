@@ -1,0 +1,93 @@
+import { Link } from '@tanstack/react-router'
+import { History, Shield, UserRound, UsersRound } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useMe } from '@/features/auth/queries'
+import { navLinkActive, navLinkClass } from './navStyles'
+import { adminLinks, visibleSections, type AdminLink, type SectionId } from './nav'
+import { SidebarSpaces } from './SidebarSpaces'
+
+function SectionHeading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="px-2 pt-4 pb-1 text-xs font-medium tracking-wide text-sidebar-muted-foreground uppercase">
+      {children}
+    </h2>
+  )
+}
+
+const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
+  '/admin/users': UserRound,
+  '/admin/groups': UsersRound,
+  '/admin/audit': History,
+}
+
+function AdminSection() {
+  const { t } = useTranslation()
+  const links = adminLinks(useMe())
+  return (
+    <>
+      <SectionHeading>
+        <span className="inline-flex items-center gap-1.5">
+          <Shield className="size-3.5" aria-hidden />
+          {t('nav.admin')}
+        </span>
+      </SectionHeading>
+      <ul className="flex flex-col gap-0.5">
+        {links.map((link) => {
+          const Icon = ADMIN_ICONS[link.to]
+          return (
+            <li key={link.to}>
+              <Link to={link.to} className={navLinkClass} activeProps={navLinkActive}>
+                <Icon className="size-4 shrink-0" aria-hidden />
+                {t(link.labelKey)}
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </>
+  )
+}
+
+function SpacesSection() {
+  const { t } = useTranslation()
+  return (
+    <>
+      <SectionHeading>
+        <Link to="/spaces" className="rounded-sm hover:text-sidebar-foreground">
+          {t('nav.spaces')}
+        </Link>
+      </SectionHeading>
+      <SidebarSpaces />
+    </>
+  )
+}
+
+// Sections of later milestones get their renderer when they arrive.
+const SECTIONS: Partial<Record<SectionId, () => ReactNode>> = {
+  spaces: SpacesSection,
+  admin: AdminSection,
+}
+
+export function Sidebar() {
+  const { t } = useTranslation()
+  const sections = visibleSections(useMe())
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
+        <span aria-hidden className="inline-block size-2.5 rounded-full bg-sidebar-primary" />
+        <span className="text-sm font-semibold tracking-tight">{t('app.name')}</span>
+      </div>
+      <nav aria-label={t('nav.label')} className="flex-1 overflow-y-auto px-2 pb-4">
+        {sections.map((section) => {
+          const Render = SECTIONS[section.id]
+          return Render ? (
+            <section key={section.id} data-section={section.id}>
+              <Render />
+            </section>
+          ) : null
+        })}
+      </nav>
+    </div>
+  )
+}

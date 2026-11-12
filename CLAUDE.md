@@ -5,12 +5,16 @@ Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brain
 Knowledge & agent cockpit for companies. The authority is the design spec
 `docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German); the
 current plan is `docs/superpowers/plans/2026-11-12-m1-fundament.md`. Parts named
-in the spec but not yet built (frontend, wiki, tickets, agents) are planned, not present.
+in the spec but not yet built (wiki, tickets, agents) are planned, not present.
 
 ## Stack (present)
 
 - Backend: Python 3.13, FastAPI, SQLAlchemy 2 async + asyncpg, Alembic, Pydantic v2,
   PostgreSQL only. Tooling: `uv`, `ruff`, `mypy` (strict), `pytest`.
+- Frontend (`frontend/`): React 19, TypeScript strict, Vite, Tailwind 4, shadcn/ui
+  (Radix), TanStack Router (code-based routes in `src/app/router`) and Query, i18next,
+  react-hook-form + zod (schemas derived from `openapi.json`), next-themes. Tooling:
+  `npm`, `oxlint`, `prettier`, `vitest` + Testing Library.
 - Dependencies: only MIT, BSD, Apache-2.0, ISC or PostgreSQL licenses.
 
 ## Hard rules
@@ -31,12 +35,22 @@ in the spec but not yet built (frontend, wiki, tickets, agents) are planned, not
 10. Secrets never in plaintext columns, URLs or logs.
 11. Every user-facing string goes through i18n (`de` default, `en` complete), semantic
     keys (`spaces.create.title`).
+12. The frontend decides what to show only from `/auth/me` `permissions` and a space's
+    `my_role`, never from a role name. API calls live in feature `queries.ts` hooks.
 
 ## Commands
 
 ```bash
 cd backend && uv sync
 cd backend && uv run pytest && uv run ruff check . && uv run mypy app
+```
+
+```bash
+cd frontend && npm ci
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build && node scripts/check-i18n.mjs
+cd frontend && npm run generate:api   # after API changes: openapi.json + src/lib/api-types.ts
+cd frontend && npm run check:api      # fails if those files are stale
+cd frontend && npm run dev            # proxies /api to http://localhost:8080
 ```
 
 Tests need Postgres; `HERD_TEST_DATABASE_URL` defaults to

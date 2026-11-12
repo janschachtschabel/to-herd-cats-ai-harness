@@ -1,0 +1,328 @@
+{
+  "app": {
+    "name": "Herd"
+  },
+  "common": {
+    "actions": "Actions"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loadMore": "Load more",
+    "remove": "Remove",
+    "retry": "Try again",
+    "save": "Save"
+  },
+  "states": {
+    "loading": "Loading …",
+    "loadingMore": "Loading …",
+    "traceId": "Trace ID {{traceId}}"
+  },
+  "forms": {
+    "conflict": "Someone changed this entry in the meantime. Load the current version, then save again – your input is kept.",
+    "reload": "Load current version"
+  },
+  "validation": {
+    "required": "Please fill in.",
+    "email": "Please enter a valid email address.",
+    "invalid": "This value is not valid.",
+    "tooShort_one": "At least {{count}} character.",
+    "tooShort_other": "At least {{count}} characters.",
+    "tooLong_one": "At most {{count}} character.",
+    "tooLong_other": "At most {{count}} characters."
+  },
+  "errors": {
+    "generic": "That did not work.",
+    "network": "The server cannot be reached. Please check the connection.",
+    "forbidden": "You lack the permission for this.",
+    "notFound": "This does not exist (any more).",
+    "internal": "An error occurred on the server.",
+    "validation_failed": "The input is incomplete or invalid.",
+    "auth": {
+      "invalid_credentials": "Email address or password is wrong.",
+      "too_many_attempts": "Too many attempts. Please wait a minute.",
+      "permission_denied": "You lack the permission for this.",
+      "required": "Please log in.",
+      "session_invalid": "Your session has expired. Please log in again.",
+      "csrf": "The request was refused for security reasons."
+    },
+    "users": {
+      "email_taken": "This email address is already taken.",
+      "owner_only": "Only an owner may do this.",
+      "last_owner": "There must be at least one active owner.",
+      "not_found": "This person does not exist.",
+      "version_conflict": "Someone changed this person in the meantime."
+    },
+    "groups": {
+      "name_taken": "A group with this name already exists.",
+      "not_found": "This group does not exist.",
+      "member_not_found": "This person is not in the group.",
+      "version_conflict": "Someone changed this group in the meantime."
+    },
+    "space": {
+      "not_found": "This space does not exist."
+    },
+    "spaces": {
+      "kind_not_allowed": "This kind of space cannot be created.",
+      "personal_members_fixed": "The members of a personal space cannot be changed.",
+      "member_not_found": "This member does not exist.",
+      "version_conflict": "Someone changed this space in the meantime."
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "text": "This page does not exist, or you cannot see it.",
+    "back": "Go to spaces"
+  },
+  "auth": {
+    "title": "Log in",
+    "hint": "Log in with your email address and password.",
+    "email": "Email address",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in …",
+    "logout": "Log out"
+  },
+  "nav": {
+    "label": "Main navigation",
+    "skipToContent": "Skip to content",
+    "toggleSidebar": "Show or hide the sidebar",
+    "activity": "Activity",
+    "search": "Search",
+    "channels": "Channels",
+    "direct": "Direct",
+    "spaces": "Spaces",
+    "spacesFailed": "Spaces could not be loaded.",
+    "work": "Work",
+    "admin": "Administration",
+    "users": "People",
+    "groups": "Groups",
+    "audit": "Audit log"
+  },
+  "userMenu": {
+    "open": "Menu of {{name}}",
+    "language": "Language",
+    "locales": {
+      "de": "Deutsch",
+      "en": "English"
+    },
+    "theme": "Appearance",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "Like the system"
+    }
+  },
+  "roles": {
+    "viewer": "Reader",
+    "editor": "Author",
+    "moderator": "Moderator",
+    "admin": "Manager"
+  },
+  "systemRoles": {
+    "owner": "Owner",
+    "admin": "Administrator",
+    "member": "Member",
+    "guest": "Guest"
+  },
+  "principals": {
+    "user": "Person",
+    "group": "Group",
+    "agent": "Agent"
+  },
+  "spaces": {
+    "title": "Spaces",
+    "description": "All spaces you can see.",
+    "empty": "No spaces yet.",
+    "mine": "My space",
+    "myRole": "Your role: {{role}}",
+    "kinds": {
+      "open": {
+        "label": "Open",
+        "plural": "Open spaces",
+        "hint": "Readable by every member of the organisation."
+      },
+      "team": {
+        "label": "Team",
+        "plural": "Team spaces",
+        "hint": "Visible only to the space's members."
+      },
+      "personal": {
+        "label": "Personal",
+        "plural": "Personal spaces",
+        "hint": "Each belongs to exactly one person."
+      }
+    },
+    "fields": {
+      "kind": "Kind",
+      "name": "Name",
+      "icon": "Icon",
+      "description": "Description"
+    },
+    "create": {
+      "open": "Create space",
+      "title": "Create space",
+      "description": "You become the new space's manager.",
+      "submit": "Create"
+    },
+    "settings": {
+      "open": "Settings",
+      "title": "Space settings"
+    },
+    "members": {
+      "title": "Members",
+      "empty": "This space has no members yet.",
+      "name": "Name",
+      "role": "Role",
+      "roleOf": "Role of {{name}}",
+      "removeNamed": "Remove {{name}}",
+      "personalFixed": "A personal space belongs to exactly one person; its members cannot be changed.",
+      "add": "Add member",
+      "type": "Kind",
+      "who": "Person or group",
+      "choose": "Please choose …",
+      "addSubmit": "Add",
+      "moreCandidates": "Load more",
+      "noDirectory": "For now, only the administration can add new members."
+    }
+  },
+  "users": {
+    "title": "People",
+    "description": "Who can log in, and with which role.",
+    "empty": "No people yet.",
+    "neverLoggedIn": "Never",
+    "status": {
+      "active": "Active",
+      "inactive": "Deactivated"
+    },
+    "fields": {
+      "name": "Name",
+      "email": "Email address",
+      "password": "Password",
+      "newPassword": "New password",
+      "role": "Role",
+      "locale": "Language",
+      "status": "Status",
+      "lastLogin": "Last login"
+    },
+    "create": {
+      "open": "Add person",
+      "title": "Add person",
+      "passwordHint": "At least 10 characters. Without a password the person cannot log in yet.",
+      "submit": "Add"
+    },
+    "edit": {
+      "title": "Edit {{name}}",
+      "openNamed": "Edit {{name}}",
+      "passwordHint": "Leave empty to keep the password. A new password logs the person out everywhere."
+    },
+    "deactivate": {
+      "action": "Deactivate",
+      "openNamed": "Deactivate {{name}}",
+      "title": "Deactivate person?",
+      "text": "{{name}} is logged out at once and can no longer log in. Memberships are kept."
+    },
+    "reactivate": {
+      "action": "Reactivate",
+      "openNamed": "Reactivate {{name}}",
+      "title": "Reactivate person?",
+      "text": "{{name}} can log in again afterwards."
+    }
+  },
+  "groups": {
+    "title": "Groups",
+    "description": "Groups bring people together; they can be members of spaces.",
+    "empty": "No groups yet.",
+    "back": "All groups",
+    "fields": {
+      "name": "Name",
+      "description": "Description"
+    },
+    "create": {
+      "open": "Create group",
+      "title": "Create group",
+      "submit": "Create"
+    },
+    "edit": {
+      "title": "Edit group"
+    },
+    "delete": {
+      "title": "Delete group?",
+      "text": "The group “{{name}}” and its memberships in spaces are deleted."
+    },
+    "members": {
+      "title": "Members",
+      "empty": "This group has no members yet.",
+      "name": "Name",
+      "removeNamed": "Remove {{name}}",
+      "add": "Add person",
+      "choose": "Please choose …",
+      "addSubmit": "Add",
+      "morePeople": "Load more people"
+    }
+  },
+  "audit": {
+    "title": "Audit log",
+    "description": "Who changed what and when, newest first.",
+    "empty": "No entries.",
+    "filter": {
+      "actor": "Person",
+      "anyone": "All people",
+      "action": "Action",
+      "anything": "All actions"
+    },
+    "fields": {
+      "when": "Time",
+      "actor": "Person",
+      "action": "Action",
+      "target": "Concerns",
+      "details": "Details",
+      "ip": "IP address"
+    },
+    "targets": {
+      "user": "Person",
+      "group": "Group",
+      "space": "Space"
+    },
+    "actions": {
+      "user": {
+        "created": "Person added",
+        "updated": "Person changed",
+        "password_changed": "Password changed",
+        "deactivated": "Person deactivated",
+        "reactivated": "Person reactivated"
+      },
+      "group": {
+        "created": "Group created",
+        "updated": "Group changed",
+        "deleted": "Group deleted",
+        "member_added": "Group member added",
+        "member_removed": "Group member removed"
+      },
+      "space": {
+        "created": "Space created",
+        "updated": "Space changed",
+        "member_set": "Space member set",
+        "member_removed": "Space member removed",
+        "admin_access": "Space opened as administrator"
+      }
+    },
+    "detailKeys": {
+      "name": "Name",
+      "description": "Description",
+      "icon": "Icon",
+      "role": "Role",
+      "system_role": "Role",
+      "member_type": "Kind",
+      "kind": "Kind",
+      "locale": "Language"
+    },
+    "kinds": {
+      "open": "open",
+      "team": "team",
+      "personal": "personal"
+    }
+  }
+}
