@@ -92,6 +92,36 @@ describe('live editor', () => {
     expect(offered !== null).toBe(code === 4413)
   })
 
+  test('a server error on every attempt ends "Verbindet …" with the Markdown editor (U3)', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'alt' })
+    liveApi('editor', () => current)
+    await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    act(() => connections[0]!.handlers.onClose(1011))
+    act(() => connections[0]!.handlers.onClose(1011))
+    expect(screen.getByRole('status')).toHaveTextContent('Verbindet …')
+    expect(connections[0]!.destroyed).toBe(false) // the provider tries again
+    act(() => connections[0]!.handlers.onClose(1011))
+    expect(await screen.findByText(/immer wieder mit einem Serverfehler ab/)).toBeInTheDocument()
+    expect(connections[0]!.destroyed).toBe(true)
+    expect(screen.getByRole('link', { name: 'Im Markdown-Editor bearbeiten' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Neu laden' })).toBeInTheDocument()
+  })
+
+  test('a server error after a sync is retried as before', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'alt' })
+    liveApi('editor', () => current)
+    await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    act(() => connections[0]!.handlers.onClose(1011))
+    act(() => connections[0]!.handlers.onClose(1011))
+    join(connections[0]!) // got in: the count starts again
+    act(() => connections[0]!.handlers.onClose(1011))
+    act(() => connections[0]!.handlers.onClose(1011))
+    expect(connections[0]!.destroyed).toBe(false)
+    expect(screen.queryByText(/immer wieder mit einem Serverfehler ab/)).not.toBeInTheDocument()
+  })
+
   test('4422: a page the live editor would change is offered in the Markdown editor', async () => {
     const current = makePage({ space_id: space.id, content_md: '- a\n\n* b' })
     liveApi('editor', () => current)

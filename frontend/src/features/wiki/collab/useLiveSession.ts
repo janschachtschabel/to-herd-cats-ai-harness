@@ -42,8 +42,8 @@ export interface LiveSession {
  * The page's live document: one Y.Doc and connection per generation. Close codes
  * (see liveSession.ts): 4409 → the connection ends, the page is fetched again and a
  * new connection with a fresh document joins the new generation; 4401/4403/4404/4413
- * (and 4400/4503) → stop reconnecting, keep the text read-only; anything else → the
- * provider reconnects by itself.
+ * (and 4400/4503, and 1011 three times before getting in) → stop reconnecting, keep the
+ * text read-only; anything else → the provider reconnects by itself.
  */
 export function useLiveSession(
   page: WikiPage,
@@ -79,6 +79,7 @@ export function useLiveSession(
     if (ended.current !== null && ended.current >= generation) return // waiting for the refetch
     const fresh = new Y.Doc()
     let open = true
+    let serverErrors = 0 // 1011 closes since this connection last got in (U3)
     const confirmation = trackConfirmation(fresh, (value) => open && setUnconfirmed(value))
     const live = connect({
       pageId: page.id,
@@ -86,14 +87,18 @@ export function useLiveSession(
       doc: fresh,
       handlers: {
         onConnected: (value) => open && setConnected(value),
-        onSynced: () => open && setSynced(true),
+        onSynced: () => {
+          serverErrors = 0
+          if (open) setSynced(true)
+        },
         onUnsynced: (count) => open && setUnsynced(count),
         onPeers: (states) => open && setPeers(peersOf(states, live.clientId)),
         onUnrepresentable: (value) => open && setUnrepresentable(value),
         onStored: (snapshot) => open && confirmation.stored(snapshot),
         onClose: (code) => {
           if (!open) return
-          const outcome = closeOutcome(code)
+          const outcome = closeOutcome(code, serverErrors)
+          if (code === 1011) serverErrors += 1
           if (outcome.kind === 'retry') return
           end()
           queueMicrotask(() => live.destroy())

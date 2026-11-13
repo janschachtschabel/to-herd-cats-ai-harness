@@ -94,3 +94,17 @@ test("a document is measured exactly at most once per interval (review M2 S10, T
   assert.ok(!text(ben).includes("ddd"));
   assert.deepEqual(ben.closes, []);
 });
+
+// Review M2 U3: a page whose live state is larger than a message may be (the state goes
+// to a joining browser in one message) is refused at once with 4413, never served.
+test("a page whose state is over the limit is not opened", async () => {
+  live = await liveFixture({
+    markdown: `# Groß\n\n${"Ein Satz mit Wörtern. ".repeat(200)}\n`,
+    createCollabServer,
+    maxStateBytes: 1500,
+  });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  await until(() => anna.closes.includes(4413));
+  assert.equal(anna.provider.synced, false);
+  assert.equal(live.api.saves.length, 0);
+});

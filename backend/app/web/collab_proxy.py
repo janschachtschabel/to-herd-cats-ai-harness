@@ -38,13 +38,20 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_database
 from app.core.errors import AppError
 from app.core.metrics import COLLAB_CONNECTIONS
+from app.modules.wiki.collab_models import MAX_YDOC_BYTES
 from app.modules.wiki.collab_service import CollabService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-MAX_MESSAGE_BYTES = 1024 * 1024
+# One limit with the collab process (review M2 U3; `collab/size.mjs`, checked by a
+# test): it keeps a live state of up to MAX_YDOC_BYTES (the API's cap on a saved state)
+# and sends a joining browser the whole state in one message, so a message may be that
+# large plus its envelope (document name, message type, lengths). The relay passes
+# what the collab process allows, both ways.
+MESSAGE_ENVELOPE_BYTES = 64 * 1024
+MAX_MESSAGE_BYTES = MAX_YDOC_BYTES + MESSAGE_ENVELOPE_BYTES
 OPEN_TIMEOUT_SECONDS = 5.0
 # Checking and dialling together; then the collab process gives the browser 10 s to
 # join its document (4408), so no socket idles before it is live (review M2 R7).

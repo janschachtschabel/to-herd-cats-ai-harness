@@ -44,7 +44,8 @@ async def upstream(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Upstream]:
                 return
             await ws.send(message)
 
-    async with serve(handler, "127.0.0.1", 0) as server:
+    # As large as the collab process takes (its WebSocket server's maxPayload).
+    async with serve(handler, "127.0.0.1", 0, max_size=None) as server:
         port = next(iter(server.sockets)).getsockname()[1]
         seen.url = f"ws://127.0.0.1:{port}"
         monkeypatch.setattr(get_settings(), "collab_url", seen.url)
@@ -56,8 +57,15 @@ async def public_url(real_db: RealDb, monkeypatch: pytest.MonkeyPatch) -> AsyncI
     """The public app served by uvicorn on a free port; its ws:// base URL."""
     monkeypatch.setattr(get_settings(), "internal_token", SecretStr(TOKEN))
     monkeypatch.setattr(get_settings(), "public_url", "http://wiki.example")
+    from app.web.collab_proxy import MAX_MESSAGE_BYTES
+
     config = uvicorn.Config(
-        create_public_app(), host="127.0.0.1", port=0, log_config=None, lifespan="off"
+        create_public_app(),
+        host="127.0.0.1",
+        port=0,
+        log_config=None,
+        lifespan="off",
+        ws_max_size=MAX_MESSAGE_BYTES,  # as app.launch serves it
     )
     server = uvicorn.Server(config)
     task = asyncio.create_task(server.serve())
@@ -163,6 +171,46 @@ async def test_relays_frames_both_ways(public_url: str, setup: Setup, upstream: 
             await ws.recv()
     assert closed.value.rcvd is not None
     assert (closed.value.rcvd.code, closed.value.rcvd.reason) == (4409, "generation_ended")
+
+
+async def test_relays_a_live_state_as_large_as_collab_allows(
+    public_url: str, setup: Setup, upstream: Upstream
+) -> None:
+    """Review M2 U3: the relay capped a message at 1 MiB while the collab process sends a
+    state of up to 5 MiB in one message; a table page of 1 MiB of state never opened."""
+    from app.modules.wiki.collab_models import MAX_YDOC_BYTES
+
+    headers = {"Origin": "http://wiki.example", "Cookie": setup.cookie}
+    state = bytes(range(256)) * (MAX_YDOC_BYTES // 256)  # the whole state in one message
+    async with connect(
+        _url(public_url, setup.page), additional_headers=headers, max_size=None
+    ) as ws:
+        await ws.send(state)
+        assert await ws.recv() == state
+
+
+def test_the_relay_passes_what_the_collab_process_allows() -> None:
+    """One limit (review M2 U3): the collab process's state cap and message cap
+    (collab/size.mjs) are the API's state cap and the relay's message cap."""
+    import re
+    from pathlib import Path
+
+    from app.modules.wiki.collab_models import MAX_YDOC_BYTES
+    from app.web.collab_proxy import MAX_MESSAGE_BYTES, MESSAGE_ENVELOPE_BYTES
+
+    size = (Path(__file__).parents[2] / "collab" / "size.mjs").read_text()
+
+    def constant(name: str) -> int:
+        match = re.search(rf"export const {name} = ([0-9_ *]+);", size)
+        assert match, name
+        value = 1
+        for factor in match.group(1).replace("_", "").split("*"):
+            value *= int(factor)
+        return value
+
+    assert constant("MAX_STATE_BYTES") == MAX_YDOC_BYTES
+    assert constant("MESSAGE_ENVELOPE_BYTES") == MESSAGE_ENVELOPE_BYTES
+    assert MAX_MESSAGE_BYTES == MAX_YDOC_BYTES + MESSAGE_ENVELOPE_BYTES
 
 
 async def test_forwards_cookie_header(public_url: str, setup: Setup, upstream: Upstream) -> None:

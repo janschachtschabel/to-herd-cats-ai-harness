@@ -152,6 +152,13 @@ export function liveExtension({
       }
       const tidied = opened.update !== null;
       if (tidied) Y.applyUpdate(document, opened.update);
+      // A joining browser gets the whole state in one message: over the limit, it would
+      // never arrive (review M2 U3).
+      state.size = size.measure(document);
+      if (!size.fits(state.size)) {
+        log("live page too large", { page_id: context.pageId, state_bytes: state.size.bytes });
+        throw deny(context, CLOSE.tooLarge);
+      }
       if (tidied) {
         // Built or tidied here: saved at once (content unchanged, so no version), so a
         // browser that reconnects later meets the same Yjs history.
@@ -167,7 +174,6 @@ export function liveExtension({
       }
       state.source = contentMd;
       state.baseline = opened.baseline;
-      state.size = size.measure(document);
       live.set(documentName, state);
     },
 

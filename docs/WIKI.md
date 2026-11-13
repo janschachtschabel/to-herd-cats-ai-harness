@@ -188,7 +188,10 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
 - **Nicht vorhanden:** Unterstreichen (kein Markdown dafür), eigene Größen oder
   Farben, eingebettete Inhalte.
 - Ein Live-Zustand hat höchstens 5 MiB und 200.000 Zeichen Markdown, ein
-  WebSocket-Frame höchstens 1 MiB. Nahe der Grenze misst der Collab-Prozess vor jeder
+  WebSocket-Frame höchstens einen ganzen Zustand (5 MiB + 64 KiB: wer einer Seite
+  beitritt, bekommt den Zustand in einer Nachricht; die API reicht genau so viel durch
+  wie der Collab-Prozess annimmt, beide aus derselben Zustandsgrenze). Eine Seite, deren
+  Zustand schon beim Öffnen darüber läge, öffnet der Live-Editor nicht (4413). Nahe der Grenze misst der Collab-Prozess vor jeder
   Änderung genau, wie groß die Seite damit würde (höchstens einmal je Sekunde und
   Seite; eine weitere Änderung in derselben Sekunde wartet bis zur nächsten Messung);
   eine Änderung darüber wird abgelehnt, nur für die Person, die sie geschickt hat
@@ -300,7 +303,10 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
 
 - Der Live-Editor bleibt bei „Verbindet …“ oder „Getrennt – neuer Versuch …“: Das
   Upgrade kommt nicht durch, oder der Collab-Prozess läuft nicht (`/health` auf Port
-  1234 im Collab-Pod; in Compose ein Kindprozess der App). Ohne `HERD_INTERNAL_TOKEN`
+  1234 im Collab-Pod; in Compose ein Kindprozess der App). Endet der Aufbau dreimal in
+  Folge mit 1011 (Serverfehler, etwa eine Nachricht, die ein Proxy dazwischen nicht
+  durchlässt), hört der Editor auf und bietet den Markdown-Editor an („bricht beim
+  Laden immer wieder mit einem Serverfehler ab“). Ohne `HERD_INTERNAL_TOKEN`
   meldet der Editor, dass die Live-Bearbeitung ausgeschaltet ist.
 - Im Browser HTTP 403 beim WebSocket: Origin passt nicht zu `HERD_PUBLIC_URL` bzw. zum
   Host.

@@ -3,7 +3,8 @@
 // - `GET /health` answers 200 (the probe); every other plain request 404.
 // - WebSocket upgrades only on `/collab/<page id>?generation=<n>`, from an allowed
 //   Origin (HERD_PUBLIC_URL, or the request's own host), with the session cookie, at
-//   most 200 at a time, messages up to 1 MB. The live rules are in `live.mjs`.
+//   most 200 at a time, messages up to a whole live state (`size.mjs`; the API's relay
+//   passes the same). The live rules are in `live.mjs`.
 // - One login session (its cookie) holds at most HERD_COLLAB_MAX_PER_SESSION (10)
 //   connections, at most HERD_COLLAB_MAX_PER_PAGE (3) of them on one page, and one
 //   person across all their logins at most HERD_COLLAB_MAX_PER_PERSON (20), never more
@@ -27,9 +28,9 @@ import { InternalApi } from "./api.mjs";
 import { createChecks, inlineChecks } from "./checks.mjs";
 import { liveExtension } from "./live.mjs";
 import { CLOSE, readCookie } from "./protocol.mjs";
+import { MAX_MESSAGE_BYTES } from "./size.mjs";
 
 const PAGE_PATH = /^\/collab\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-const MAX_MESSAGE_BYTES = 1024 * 1024;
 
 function hostOf(value) {
   try {

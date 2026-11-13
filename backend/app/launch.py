@@ -113,7 +113,7 @@ def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn
         server_header=False,
         proxy_headers=forwarded_allow_ips is not None,
         forwarded_allow_ips=forwarded_allow_ips,
-        ws_max_size=MAX_MESSAGE_BYTES,  # live editing (/collab): 1 MiB per message
+        ws_max_size=MAX_MESSAGE_BYTES,  # live editing (/collab): what the collab process takes
     )
 
 

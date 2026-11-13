@@ -302,8 +302,8 @@ kennen.
   die Verwaltung oder ein Passwortwechsel), wird seine Verbindung mit 4403 getrennt;
   hatte er noch ungespeicherte Änderungen, endet die Generation, damit kein anderer
   Browser sie wieder einspielt (die anderen bekommen 4409, ihre ungespeicherten
-  Änderungen gehen verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
-  5 MiB und sein Markdown höchstens 200.000 Zeichen; das prüft der Collab-Prozess schon
+  Änderungen gehen verloren). Ein Live-Zustand hat höchstens 5 MiB, ein WebSocket-Frame
+  höchstens einen ganzen Zustand (5 MiB + 64 KiB), sein Markdown höchstens 200.000 Zeichen; das prüft der Collab-Prozess schon
   vor jeder Änderung, nicht erst beim Speichern: Wer eine Änderung schickt, die darüber
   führt, wird mit 4413 getrennt, die Änderung erreicht niemanden, die anderen arbeiten
   weiter. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
@@ -341,7 +341,7 @@ kennen.
   `nginx.ingress.kubernetes.io/proxy-body-size: 100m` (Standard 1m; so in
   `ci/production-values.yaml`), nginx `client_max_body_size 100m`. Die App prüft ihre
   Grenzen je Route selbst. Ein WebSocket-Frame der Live-Bearbeitung hat höchstens
-  1 MiB. Während der Körper eines Uploads oder Imports ankommt, hält die App keine
+  5 MiB + 64 KiB (ein ganzer Live-Zustand). Während der Körper eines Uploads oder Imports ankommt, hält die App keine
   Datenbankverbindung; kommt `HERD_BODY_READ_TIMEOUT_SECONDS` (Standard 30) lang kein
   weiteres Stück an oder dauert der ganze Körper länger als
   `HERD_BODY_TOTAL_TIMEOUT_SECONDS` (Standard 900), antwortet sie 408 `request.timeout`.

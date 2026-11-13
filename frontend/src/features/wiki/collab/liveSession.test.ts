@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { closeOutcome, liveStatus, peersOf } from './liveSession'
+import { SERVER_ERROR_ATTEMPTS, closeOutcome, liveStatus, peersOf } from './liveSession'
 
 describe('live session', () => {
   test('close codes', () => {
@@ -14,6 +14,18 @@ describe('live session', () => {
     for (const code of [1000, 1006, 1012, 1013, 4408, 4502, 4504]) {
       expect(closeOutcome(code)).toEqual({ kind: 'retry' })
     }
+  })
+
+  // Review M2 U3: a server error (1011) repeated without ever getting in cannot succeed
+  // on retry; the browser stopped looping at "Verbindet …" never.
+  test('a server error repeated without a sync stops', () => {
+    expect(closeOutcome(1011, 0)).toEqual({ kind: 'retry' })
+    expect(closeOutcome(1011, SERVER_ERROR_ATTEMPTS - 2)).toEqual({ kind: 'retry' })
+    expect(closeOutcome(1011, SERVER_ERROR_ATTEMPTS - 1)).toEqual({
+      kind: 'stop',
+      reason: 'server_error',
+    })
+    expect(closeOutcome(1006, SERVER_ERROR_ATTEMPTS)).toEqual({ kind: 'retry' })
   })
 
   test('status', () => {

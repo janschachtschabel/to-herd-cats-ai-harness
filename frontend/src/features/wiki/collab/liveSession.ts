@@ -10,6 +10,7 @@ export type StopReason =
   | 'connection_limit'
   | 'off'
   | 'invalid'
+  | 'server_error'
 
 /** Stops after which reconnecting cannot help, so no "reload" is offered. */
 export const FINAL_STOPS: ReadonlySet<StopReason> = new Set([
@@ -23,7 +24,13 @@ export const MARKDOWN_STOPS: ReadonlySet<StopReason> = new Set([
   'not_roundtrip_safe',
   'too_large',
   'invalid_content',
+  'server_error',
 ])
+
+/** A server error (1011: the collab process or the relay failed on this page) this
+ *  often in a row without getting in stops (review M2 U3): retrying could not help, and
+ *  the editor said "Verbindet …" for ever. */
+export const SERVER_ERROR_ATTEMPTS = 3
 
 export type CloseOutcome =
   /** The generation ended (a change outside the live session): fetch the page and
@@ -45,8 +52,13 @@ const STOPS: Record<number, StopReason> = {
   4503: 'off',
 }
 
-export function closeOutcome(code: number): CloseOutcome {
+/** What a close means; `serverErrors`: the 1011 closes before this one since the
+ *  connection last got in. */
+export function closeOutcome(code: number, serverErrors = 0): CloseOutcome {
   if (code === 4409) return { kind: 'regenerate' }
+  if (code === 1011 && serverErrors + 1 >= SERVER_ERROR_ATTEMPTS) {
+    return { kind: 'stop', reason: 'server_error' }
+  }
   const reason = STOPS[code]
   return reason ? { kind: 'stop', reason } : { kind: 'retry' }
 }

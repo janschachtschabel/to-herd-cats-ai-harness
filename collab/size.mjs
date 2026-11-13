@@ -12,6 +12,12 @@ import * as Y from "yjs";
 import { yDocToMarkdown } from "./markdown.mjs";
 
 export const MAX_STATE_BYTES = 5 * 1024 * 1024;
+// A message carries at most the whole state (a joining browser gets it in one) and its
+// envelope. The API's relay passes exactly this much (`backend/app/web/collab_proxy.py`
+// derives it from the API's own state cap; a backend test checks both agree, review M2
+// U3): before, it passed 1 MiB and a large table page never opened.
+export const MESSAGE_ENVELOPE_BYTES = 64 * 1024;
+export const MAX_MESSAGE_BYTES = MAX_STATE_BYTES + MESSAGE_ENVELOPE_BYTES;
 export const MAX_MARKDOWN_CHARS = 200_000;
 // Markdown characters one byte of a Yjs update can add, generously (a character next
 // to a delimiter written as a reference, `&#x54;`, is six for one): the estimate only
@@ -81,6 +87,8 @@ export function sizeGuard({
 
   return {
     measure,
+    /** Whether a measured size is within the limits. */
+    fits: (size) => size.bytes <= maxStateBytes && size.chars <= maxMarkdownChars,
     /** False when the raw message must be refused; keeps `state.size` current. A
      * message that needs a measurement waits for its turn (one per interval and
      * document): Hocuspocus takes a connection's messages one after the other. */
