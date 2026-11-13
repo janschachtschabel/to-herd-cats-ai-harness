@@ -17,8 +17,9 @@ afterEach(async () => {
 });
 
 const TABLE = "| `a` |\n| --- |";
-// The notice names the kind of cause and the block: the table, block 0.
-const NOTICE = `${UNREPRESENTABLE}:markdown:0`;
+// The notice names the kind of cause, the block (the table, block 0) and the kind of
+// difference (code with a backslash in a table cell, review M2 U12).
+const NOTICE = `${UNREPRESENTABLE}:markdown:0:tableCode`;
 
 /** The code text in the table's only cell. */
 function cellText(doc) {

@@ -27,11 +27,15 @@ const doc = (...content) => ({ type: "doc", content });
 
 const RARE = {
   // Two addresses joined by `+`: the page view links the first only.
-  "two e-mail addresses joined by +": doc(paragraph(text("anna@firma.de+bernd@firma.de"))),
+  "two e-mail addresses joined by +": [
+    doc(paragraph(text("anna@firma.de+bernd@firma.de"))),
+    "address",
+  ],
   // Three nested empty bullets are written `- - -`, which Markdown reads as a rule.
-  "three nested empty bullets": doc(
-    bullets(item(paragraph(), bullets(item(paragraph(), bullets(item(paragraph())))))),
-  ),
+  "three nested empty bullets": [
+    doc(bullets(item(paragraph(), bullets(item(paragraph(), bullets(item(paragraph()))))))),
+    "list",
+  ],
 };
 
 /** The editor's JSON as Y.Doc nodes, as a browser's binding writes them (for blocks
@@ -48,7 +52,7 @@ function yNode(node) {
   return element;
 }
 
-for (const [name, json] of Object.entries(RARE)) {
+for (const [name, [json, detail]] of Object.entries(RARE)) {
   test(`refused, nothing stored: ${name}`, async () => {
     const answer = readBack(json);
     assert.equal(answer.ok, false);
@@ -66,7 +70,7 @@ for (const [name, json] of Object.entries(RARE)) {
       fragment.delete(0, fragment.length);
       fragment.insert(0, json.content.map(yNode));
     });
-    await until(() => heard.includes(`${UNREPRESENTABLE}:markdown:0`));
+    await until(() => heard.includes(`${UNREPRESENTABLE}:markdown:0:${detail}`));
     live.server.hocuspocus.flushPendingStores();
     await until(() => live.api.unrepresentable >= 1);
     assert.equal(live.api.saves.length, stored, "nothing stored");
