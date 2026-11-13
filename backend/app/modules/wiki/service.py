@@ -2,6 +2,10 @@
 (`moves.py`) and the trash (`trash.py`) behind the same service. Who sees what:
 `visibility.py`. `page.publish` publishes any draft; `page.edit` one's own.
 
+Every ancestor of a published page is published: publishing below a draft, and moving
+or restoring published pages below one, answer 409 `page.parent_draft`. So whoever
+sees a page also sees its parent.
+
 Slugs stay when a page is renamed, so addresses are stable; they change only when a
 page moves next to a sibling with the same slug (`moves.py`).
 """
@@ -174,6 +178,12 @@ class PageService:
         check_version(page, version)
         if page.status == PageStatus.PUBLISHED:
             raise Conflict(code="page.already_published")
+        if page.parent_id is not None:
+            # The parent cannot turn back into a draft (there is no unpublish), and a
+            # move of this page waits for the row lock held here.
+            parent = await self.repo(actor).live_in_space(page.space_id, page.parent_id)
+            if parent is None or parent.status != PageStatus.PUBLISHED:
+                raise Conflict(code="page.parent_draft")
         page.status = PageStatus.PUBLISHED
         page.published_at = utcnow()
         touch(page, actor)

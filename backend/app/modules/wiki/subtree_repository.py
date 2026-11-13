@@ -10,10 +10,10 @@ through pages with the same time.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, Select, delete, func, or_, select, tuple_, update
+from sqlalchemy import ColumnElement, Select, delete, exists, func, or_, select, tuple_, update
 from sqlalchemy.orm import aliased
 
-from app.modules.wiki.models import Page
+from app.modules.wiki.models import Page, PageStatus
 from app.modules.wiki.repository import PageRepository
 
 _SEGMENTS = func.length(Page.path) - func.length(func.replace(Page.path, "/", "")) + 1
@@ -30,6 +30,18 @@ class SubtreeRepository(PageRepository):
             self._live(), Page.space_id == space_id, _at_or_below(path)
         )
         return int(await self.session.scalar(stmt) or 0)
+
+    async def published_at_or_below(self, space_id: uuid.UUID, path: str) -> bool:
+        """Whether the live page at `path` or a live descendant is published."""
+        stmt = select(
+            exists().where(
+                self._live(),
+                Page.space_id == space_id,
+                Page.status == PageStatus.PUBLISHED,
+                _at_or_below(path),
+            )
+        )
+        return bool(await self.session.scalar(stmt))
 
     async def rewrite_descendant_paths(self, space_id: uuid.UUID, old: str, new: str) -> None:
         """Live pages below `old` move below `new`."""

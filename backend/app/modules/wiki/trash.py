@@ -18,7 +18,7 @@ from app.core.errors import Conflict, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_cursor, encode_cursor
 from app.modules.audit.recorder import record
-from app.modules.wiki.models import MAX_DEPTH, Page
+from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.tree import child_path, depth_of
 from app.modules.wiki.visibility import PageReader, check_version, page_not_found, touch
@@ -43,7 +43,8 @@ class PageTrash:
 
     async def restore(self, actor: Actor, page_id: uuid.UUID) -> Page:
         """Back to its parent if that is outside the trash, else to the top level;
-        409 `page.path_taken` if a page holds that path now."""
+        409 `page.path_taken` if a page holds that path now, 409 `page.parent_draft`
+        if published pages would come back below a draft."""
         pages = self.reader.subtree(actor)
         page = await self._trashed(actor, pages, page_id)
         await self.reader.require_in_space(actor, Action.PAGE_TRASH, page)
@@ -53,6 +54,9 @@ class PageTrash:
         parent = None
         if page.parent_id is not None:
             parent = await pages.live_in_space(page.space_id, page.parent_id)
+        published = any(p.status == PageStatus.PUBLISHED for p in [page, *below])
+        if parent is not None and parent.status != PageStatus.PUBLISHED and published:
+            raise Conflict(code="page.parent_draft")
         new_path = child_path(parent.path if parent else None, page.slug)
         if await pages.by_path(page.space_id, new_path) is not None:
             raise Conflict(code="page.path_taken")

@@ -4,6 +4,9 @@ siblings, and the paths of the whole subtree rewritten in the same transaction.
 Every move holds the space's tree lock and re-reads what it decides on, so two moves
 that would each be fine alone but together make a cycle (A under B, B under A) are
 decided one after the other: the second sees the first and answers 409.
+
+Published pages do not go below a draft (409 `page.parent_draft`): whoever sees a page
+sees its parent.
 """
 
 import uuid
@@ -13,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, Actor
 from app.core.errors import Conflict, ValidationFailed
 from app.modules.audit.recorder import record
-from app.modules.wiki.models import MAX_DEPTH, Page
+from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.tree import child_path, depth_of, unique_slug
 from app.modules.wiki.visibility import PageReader, check_version, page_not_found, touch
@@ -68,6 +71,10 @@ class PageMoves:
                 raise ValidationFailed(code="page.move_other_space")
             if parent.id == page.id or parent.path.startswith(f"{page.path}/"):
                 raise Conflict(code="page.move_cycle")
+            if parent.status != PageStatus.PUBLISHED and await pages.published_at_or_below(
+                page.space_id, page.path
+            ):
+                raise Conflict(code="page.parent_draft")
             parent_path = parent.path
         taken = await pages.sibling_slugs(page.space_id, new_parent_id)
         slug = unique_slug(page.slug, taken) if page.slug in taken else page.slug
