@@ -165,7 +165,10 @@ function items(r, depth, type) {
  * check refuses such a document (test/typed.test.mjs); the generator leaves it out. */
 function cellSafe(node) {
   if (!node.marks?.some((mark) => mark.type === "code")) return node;
-  return { ...node, text: node.text.replace(/\\(?=\|)/g, "/") };
+  // Control characters are dropped on saving (`canonical.mjs`), so one between the two
+  // does not keep them apart.
+  // eslint-disable-next-line no-control-regex -- control characters are what it skips
+  return { ...node, text: node.text.replace(/\\(?=[\u0000-\u001f\u007f-\u009f]*\|)/g, "/") };
 }
 
 function table(r) {
