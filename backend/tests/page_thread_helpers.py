@@ -1,7 +1,6 @@
 """Helpers for the page-thread tests: the timeline handler run over every wiki event so
 far (as the worker would, again where it had them), a page's thread and its messages."""
 
-import json
 from typing import Any
 
 from httpx import AsyncClient
@@ -36,7 +35,7 @@ async def messages(client: AsyncClient, conversation_id: str, **params: Any) -> 
 
 
 def keys(items: list[dict[str, Any]]) -> list[str]:
-    return [json.loads(m["body_md"])["key"] for m in items if m["kind"] == "system"]
+    return [m["system"]["key"] for m in items if m["kind"] == "system"]
 
 
 async def events_of(session: AsyncSession, *types: str) -> list[str]:

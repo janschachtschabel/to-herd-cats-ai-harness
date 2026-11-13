@@ -117,6 +117,14 @@ async def test_a_timeline_entry_names_no_page_its_reader_cannot_see(
     unseen = [m["system"] for m in await messages(desk.viewer, thread["id"])]
     assert unseen[1]["key"] == "ticket.page_linked"
     assert unseen[1]["new"] is None  # neither the title nor the id
+    # Nor anywhere else in the answer: a system entry's raw body is never shown (P1).
+    listed = await desk.viewer.get(f"/api/conversations/{thread['id']}/messages")
+    assert listed.status_code == 200 and page["id"] not in listed.text
+    entry = next(m for m in listed.json()["items"] if m["system"]["key"] == "ticket.page_linked")
+    assert entry["kind"] == "system" and entry["body_md"] == ""
+    one = await desk.viewer.get(f"/api/messages/{entry['id']}")
+    assert one.status_code == 200, one.text
+    assert page["id"] not in one.text and one.json()["body_md"] == ""
 
 
 async def test_rights_to_link(desk: Desk, make_space: MakeSpace) -> None:

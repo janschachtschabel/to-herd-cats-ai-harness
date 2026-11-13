@@ -240,10 +240,12 @@ class SystemEntryOut(BaseModel):
 
 class MessageOut(BaseModel):
     """`author` is null for system messages; those carry `system` instead (null for
-    all others). A deleted message keeps its place with `deleted_at` set and an empty
-    `body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their
-    thread). `mentions`: the people mentioned who may see the conversation;
-    `reactions`: by emoji, the first reacted with first."""
+    all others) and an empty `body_md`: their stored body holds ids the reader may not
+    be allowed to see, `system` only what is named for the reader (review M4 P1). A
+    deleted message keeps its place with `deleted_at` set and an empty `body_md`.
+    `reply_count` and `last_reply_at` belong to top-level messages (their thread).
+    `mentions`: the people mentioned who may see the conversation; `reactions`: by
+    emoji, the first reacted with first."""
 
     id: uuid.UUID
     conversation_id: uuid.UUID
@@ -275,7 +277,7 @@ class MessageOut(BaseModel):
             parent_id=message.parent_id,
             author=author,
             kind=message.kind,
-            body_md=message.body_md,
+            body_md="" if message.kind == MessageKind.SYSTEM else message.body_md,
             client_id=message.client_id,
             created_at=message.created_at,
             edited_at=message.edited_at,

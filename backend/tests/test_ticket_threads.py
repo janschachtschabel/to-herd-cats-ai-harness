@@ -13,6 +13,7 @@ from app.core.principal import Principal
 from app.modules.messaging.models import Conversation, ConversationKind, Message
 from app.modules.spaces.repository import SpaceRepository
 from tests.factories_messaging import post, send
+from tests.factories_spaces import MakeSpace
 from tests.factories_tickets import Desk, new_ticket, patch, status_of
 from tests.factories_wiki import new_page, publish
 from tests.page_thread_helpers import keys, messages, thread_of, timeline
@@ -208,9 +209,12 @@ async def test_activity_and_search_lead_to_the_ticket(desk: Desk, session: Async
     assert nothing.json()["items"] == []
 
 
-async def _body(items: list[dict[str, Any]], key: str) -> dict[str, Any]:
-    body: dict[str, Any] = next(
-        json.loads(m["body_md"]) for m in items if m["system"] and m["system"]["key"] == key
+async def _body(session: AsyncSession, items: list[dict[str, Any]], key: str) -> dict[str, Any]:
+    """The stored body of the entry with `key` (the API shows only `system`)."""
+    entry = next(m for m in items if m["system"] and m["system"]["key"] == key)
+    assert entry["body_md"] == ""
+    body: dict[str, Any] = json.loads(
+        await session.scalar(select(Message.body_md).where(Message.id == entry["id"])) or ""
     )
     return body
 
@@ -228,7 +232,44 @@ async def test_a_deleted_status_moves_tickets_with_a_timeline_entry(
     assert r.status_code == 204
     await ticket_handlers(session)
     items = await messages(desk.viewer, (await ticket_thread(desk.viewer, ticket))["id"])
-    body = await _body(items, "ticket.status_changed")
+    body = await _body(session, items, "ticket.status_changed")
     assert (body["from"], body["to"]) == (review["id"], active["id"])
     entry = next(m["system"] for m in items if m["system"]["key"] == "ticket.status_changed")
-    assert entry["old"] == {"value": review["id"], "name": None}  # the status is gone
+    assert entry["old"] is None  # the status is gone: neither name nor id
+
+
+async def test_an_entry_names_no_ticket_or_status_its_reader_cannot_see(
+    desk: Desk, session: AsyncSession, make_space: MakeSpace
+) -> None:
+    """Review M4 P1: whatever ids an entry was written with, a reader sees a parent's key
+    or a status's name only where it may see that space, and never the raw id."""
+    secret = await make_space("team", "Geheim", members=[(desk.users["editor"], "editor")])
+    hidden = await new_ticket(desk.editor, secret.id, "Versteckt")
+    ticket = await new_ticket(desk.editor, desk.space_id)
+    thread = await ticket_thread(desk.viewer, ticket)
+    for key, ref in (
+        ("ticket.parent_changed", hidden["id"]),
+        ("ticket.status_changed", hidden["status"]["id"]),
+    ):
+        body = {"key": key, "actor": desk.id_of("editor"), "from": None, "to": ref}
+        await session.execute(
+            text(
+                "INSERT INTO message (id, org_id, conversation_id, author_type, kind, body_md,"
+                " client_id, created_at, reply_count)"
+                " SELECT gen_random_uuid(), org_id, id, 'system', 'system', :body,"
+                " gen_random_uuid(), now(), 0 FROM conversation WHERE id = :id"
+            ),
+            {"id": thread["id"], "body": json.dumps(body)},
+        )
+    listed = await desk.viewer.get(f"/api/conversations/{thread['id']}/messages")
+    assert listed.status_code == 200, listed.text
+    assert hidden["id"] not in listed.text and hidden["status"]["id"] not in listed.text
+    entries = {m["system"]["key"]: m["system"] for m in listed.json()["items"] if m["system"]}
+    assert entries["ticket.parent_changed"]["new"] is None
+    assert entries["ticket.status_changed"]["new"] is None
+    seen = await desk.editor.get(f"/api/conversations/{thread['id']}/messages")
+    named = {m["system"]["key"]: m["system"] for m in seen.json()["items"] if m["system"]}
+    assert named["ticket.parent_changed"]["new"] == {
+        "value": hidden["id"],
+        "name": f"HC-{hidden['number']}",
+    }

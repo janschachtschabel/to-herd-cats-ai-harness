@@ -3,7 +3,9 @@ summed up (`mine` from the reader's side), the author's name, and a system messa
 timeline entry read from its body (a key with parameters, for the client to word),
 the ids in it named (people, ticket statuses, parent tickets, linked pages). For
 messages the reader has been allowed to see; at most six queries for a whole page. A
-linked page the reader cannot see is left out (neither its title nor its id)."""
+linked page, a status or a ticket the reader cannot see (or that is gone) is left out:
+neither its name nor its id (review M4 P1; the raw body is never shown either, see
+`MessageOut`)."""
 
 import json
 import uuid
@@ -12,6 +14,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.access import Action, space_ids_with
 from app.core.actor import Actor
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.social_repository import (
@@ -60,24 +63,26 @@ class _Names:
     people: dict[uuid.UUID, str]
     statuses: dict[uuid.UUID, str]
     tickets: dict[uuid.UUID, int]
-    pages: dict[uuid.UUID, str]  # only those the reader sees
+    pages: dict[uuid.UUID, str]  # these three: only those the reader sees
 
     def of(self, key: str, value: object) -> SystemValue | None:
         if not isinstance(value, str):
             return None
         ref = _uuid(value)
+        if key in PERSON_KEYS:
+            return SystemValue(value=value, name=self.people.get(ref) if ref else None)
+        if key in PAGE_KEYS | STATUS_KEYS | TICKET_KEYS:  # named only where seen
+            name = self._seen(key, ref) if ref is not None else None
+            return SystemValue(value=value, name=name) if name is not None else None
+        return SystemValue(value=value, name=None)
+
+    def _seen(self, key: str, ref: uuid.UUID) -> str | None:
         if key in PAGE_KEYS:
-            title = self.pages.get(ref) if ref is not None else None
-            return SystemValue(value=value, name=title) if title is not None else None
-        name: str | None = None
-        if ref is not None and key in PERSON_KEYS:
-            name = self.people.get(ref)
-        elif ref is not None and key in STATUS_KEYS:
-            name = self.statuses.get(ref)
-        elif ref is not None and key in TICKET_KEYS:
-            number = self.tickets.get(ref)
-            name = ticket_key(number) if number is not None else None
-        return SystemValue(value=value, name=name)
+            return self.pages.get(ref)
+        if key in STATUS_KEYS:
+            return self.statuses.get(ref)
+        number = self.tickets.get(ref)
+        return ticket_key(number) if number is not None else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +148,7 @@ async def message_views(
     people = {m.author_id for m in messages if m.author_id is not None}
     people |= {a for b in present if (a := _uuid(b.get("actor"))) is not None}
     people |= _refs(present, PERSON_KEYS)
-    tickets = TicketNameRepository(session, actor.org_id)
+    tickets = TicketNameRepository(session, actor.org_id, space_ids_with(actor, Action.TICKET_READ))
     names = _Names(
         people=await UserRepository(session).names(actor.org_id, people),
         statuses=await tickets.status_names(_refs(present, STATUS_KEYS)),

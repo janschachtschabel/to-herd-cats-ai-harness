@@ -6,7 +6,6 @@ The script talks to the public API as the browser does; here to the test app. Th
 worker's handlers run in the test's transaction (`settle`), as in test_page_threads.
 """
 
-import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -132,10 +131,7 @@ async def test_the_page_discussion_starts_with_system_entries(demo: dict[str, An
     seeded, clara = demo["seeded"], demo["clients"]["clara"]
     thread = await _get(clara, f"/api/pages/{seeded.page_id}/thread")
     items = await _top(clara, thread["id"])
-    kinds = [
-        json.loads(m["body_md"])["key"] if m["kind"] == "system" else m["author"]["name"]
-        for m in items
-    ]
+    kinds = [m["system"]["key"] if m["kind"] == "system" else m["author"]["name"] for m in items]
     assert kinds == [
         "page.created",
         "page.published",

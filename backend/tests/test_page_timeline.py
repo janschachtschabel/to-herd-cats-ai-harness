@@ -33,7 +33,9 @@ async def test_publishing_writes_one_system_message_even_when_delivered_twice(
     assert keys(items) == ["page.created", "page.published"]
     system = items[1]
     assert system["author"] is None and system["kind"] == "system"
-    assert json.loads(system["body_md"]) == {
+    assert system["body_md"] == ""  # the client words `system` (review M4 P1)
+    stored = await session.scalar(select(Message.body_md).where(Message.id == system["id"]))
+    assert json.loads(stored or "") == {
         "key": "page.published",
         "actor": str(wiki.users["editor"].id),
     }
@@ -84,8 +86,7 @@ async def test_every_page_change_with_a_timeline_entry_emits_its_event(
         "page.trashed",
         "page.restored",
     ]
-    restore = next(m for m in items if "version_restored" in m["body_md"])
-    assert json.loads(restore["body_md"])["number"] == 1
+    restore = next(m for m in items if m["system"]["key"] == "page.version_restored")
     assert restore["system"]["number"] == 1
     refused = await wiki.editor.post(f"/api/pages/{parent['id']}/publish", json={"version": 99})
     assert refused.status_code == 409  # a refused change emits nothing
