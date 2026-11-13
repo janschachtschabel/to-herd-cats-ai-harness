@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     password_hash_concurrency: int = Field(default=2, ge=1)
     # Requests that may wait for one of those slots; more are answered 429 at once.
     password_hash_queue: int = Field(default=16, ge=0)
+    # Largest request body accepted (bytes); larger ones are answered 413.
+    max_body_bytes: int = Field(default=1024 * 1024, ge=1)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

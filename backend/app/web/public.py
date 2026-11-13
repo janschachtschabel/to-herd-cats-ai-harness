@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, FastAPI
 
+from app.core.body_limit import BodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from app.core.nul_guard import NulGuardMiddleware
@@ -43,6 +44,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     )
     # Added first is innermost: errors are answered before the request line is written.
     app.add_middleware(NulGuardMiddleware)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)

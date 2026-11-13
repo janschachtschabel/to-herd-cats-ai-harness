@@ -56,7 +56,7 @@ class RateLimited(AppError):
     retry_after: int | None = None  # seconds, sent as `Retry-After`
 
 
-_HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
+_HTTP_CODES = {404: "not_found", 405: "method_not_allowed", 413: "request.too_large"}
 
 
 def error_body(code: str, message: str) -> dict[str, dict[str, str]]:

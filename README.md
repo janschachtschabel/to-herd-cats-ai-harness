@@ -159,6 +159,12 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   Datenbankverbindung und keine Sperre. Vor dieser Änderung (im Event-Loop) schaffte ein Pod
   auf der Messmaschine rund 15 Anmeldungen je Sekunde (siehe
   [Steckbrief](docs/STECKBRIEF.md)); neu gemessen ist das nicht.
+- **Größe des Anfragekörpers**: höchstens `HERD_MAX_BODY_BYTES` (Standard 1048576,
+  1 MiB) je Anfrage, für jeden Pfad; größere bekommen 413 (`request.too_large`), bevor
+  irgendetwas den Körper puffert: sofort bei zu großem `Content-Length`, sonst (chunked)
+  beim Lesen ab dem ersten Teil über der Grenze. Ein Ingress davor darf größer oder
+  gleich eingestellt sein (ingress-nginx: `proxy-body-size`, Standard 1m); im Chart über
+  `api.env` setzbar.
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
   30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
   `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche; es zählen

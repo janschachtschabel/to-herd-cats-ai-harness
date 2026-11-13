@@ -7,6 +7,7 @@ text, not a NUL). Cursors carry text inside base64 and are checked where they ar
 decoded (`core.pagination`).
 """
 
+import asyncio
 import re
 
 from fastapi.responses import JSONResponse
@@ -17,6 +18,13 @@ from app.core.errors import error_body
 MESSAGE = "Text must not contain NUL characters"
 # An odd number of backslashes, then u0000: a JSON escape of NUL.
 _JSON_NUL = re.compile(rb"(?<!\\)(?:\\\\)*\\u0000")
+# Bodies larger than this are scanned in a worker thread, not in the event loop.
+OFF_LOOP_BYTES = 256 * 1024
+
+
+def contains_nul(body: bytes) -> bool:
+    """Linear: two substring searches; the regex runs only if the escape occurs."""
+    return b"\x00" in body or (b"\\u0000" in body and _JSON_NUL.search(body) is not None)
 
 
 def _has_nul_in_url(scope: Scope) -> bool:
@@ -45,18 +53,21 @@ class NulGuardMiddleware:
         if not _is_json(scope):
             await self.app(scope, receive, send)
             return
-        # Read the body once, check it, then hand the same messages to the app.
+        # Read the body once (the body limit, outside, bounds it), check it, then hand
+        # the same messages to the app. Chunks are joined once: linear in the size.
         messages: list[Message] = []
-        body = b""
         while True:
             message = await receive()
             messages.append(message)
-            if message["type"] != "http.request":
+            if message["type"] != "http.request" or not message.get("more_body", False):
                 break
-            body += message.get("body", b"")
-            if not message.get("more_body", False):
-                break
-        if b"\x00" in body or _JSON_NUL.search(body):
+        body = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.request")
+        if len(body) > OFF_LOOP_BYTES:
+            found = await asyncio.to_thread(contains_nul, body)
+        else:
+            found = contains_nul(body)
+        del body  # the messages keep the chunks; no second copy while the app runs
+        if found:
             await self._refuse(scope, receive, send)
             return
 
