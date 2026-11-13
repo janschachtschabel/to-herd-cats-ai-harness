@@ -39,3 +39,36 @@ for (const [label, limits] of [
     assert.deepEqual(ben.closes, []);
   });
 }
+
+test("the size is measured exactly before an update is admitted (review M2 S5)", async () => {
+  // 300 characters fit under a limit of 400: admitted, though a rough estimate of what
+  // the update could add would refuse it. 200 more do not fit: refused.
+  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400 });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  await synced(anna);
+  type(anna.doc, ` ${"a".repeat(300)}`);
+  await until(() => live.api.saves.some((s) => s.content_md.includes("a".repeat(300))));
+  assert.deepEqual(anna.closes, []);
+  type(anna.doc, "b".repeat(200));
+  await until(() => anna.closes.includes(4413));
+  assert.ok(live.api.saves.every((s) => !s.content_md.includes("bbbb")));
+});
+
+test("a long text in one cell of a long table keeps the session (review M2 S5)", async () => {
+  const rows = Array.from({ length: 400 }, (_, i) => `| ${i} | Artikel ${i} |`);
+  const markdown = ["| Nr | Name |", "| --- | --- |", ...rows].join("\n");
+  live = await liveFixture({ markdown, createCollabServer });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  const ben = live.open({ cookie: "herd_session=token-b" });
+  await Promise.all([synced(anna), synced(ben)]);
+  const table = anna.doc.getXmlFragment("default").get(0);
+  const cell = table.get(1).get(1).get(0).get(0); // row 0, column "Name": its text
+  const note = " Hinweis: bitte vor der Ausgabe prüfen.".repeat(16); // 608 characters
+  cell.insert(cell.length, note);
+  await until(() => live.api.saves.some((s) => s.content_md.includes(note.trim())));
+  const stored = live.api.saves.at(-1).content_md;
+  // Stored in proportion to the content: the note once, no padding of other rows.
+  assert.ok(stored.length < markdown.length + note.length + 10, `${stored.length} characters`);
+  assert.deepEqual(anna.closes, []);
+  assert.deepEqual(ben.closes, []);
+});

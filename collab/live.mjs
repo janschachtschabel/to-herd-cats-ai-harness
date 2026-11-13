@@ -38,7 +38,7 @@ import {
   yDocToMarkdown,
 } from "./markdown.mjs";
 import { presenceGuard } from "./presence.mjs";
-import { carriesContent, sizeGuard } from "./size.mjs";
+import { sizeGuard } from "./size.mjs";
 import {
   CLOSE,
   FLUSH,
@@ -148,7 +148,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       else if (!state || state.discarded) close = CLOSE.generationEnded;
       else if (state.holding)
         close = CLOSE.retry; // the generation is being ended
-      else if (carriesContent(update) && !size.admit(document, state, update.length)) {
+      else if (!size.admit(document, state, update)) {
         close = CLOSE.tooLarge; // only this sender; the document stays as it was
         closeSocket(context, close);
       }
