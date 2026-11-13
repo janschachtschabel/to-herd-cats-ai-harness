@@ -83,6 +83,77 @@ describe('profile', () => {
     expect(within(form).getByLabelText('Neues Passwort')).toHaveValue('')
   })
 
+  test('after a password change the language is stored with the new version', async () => {
+    let current = makeMe(['space.create'])
+    const bump = () =>
+      (current = { ...current, user: { ...current.user, version: current.user.version + 1 } })
+    const api = mockApi({
+      'GET /api/auth/me': () => current,
+      'GET /api/spaces': page([]),
+      'POST /api/auth/me/password': () => (bump(), { status: 204 }),
+      'PATCH /api/auth/me': (call: Call) => {
+        const body = call.body as { locale: 'de' | 'en'; version: number }
+        if (body.version !== current.user.version) return apiError(409, 'users.version_conflict')
+        current = { ...current, user: { ...current.user, locale: body.locale } }
+        bump()
+        return current
+      },
+    })
+    const { user } = await renderApp('/profile')
+    const form = await screen.findByRole('form', { name: 'Passwort ändern' })
+    await user.type(within(form).getByLabelText('Aktuelles Passwort'), 'altes-passwort-1')
+    await user.type(within(form).getByLabelText('Neues Passwort'), 'neues-passwort-1')
+    await user.click(within(form).getByRole('button', { name: 'Passwort ändern' }))
+    await within(form).findByRole('status')
+    await user.selectOptions(screen.getByLabelText('Sprache'), 'en')
+    await waitFor(() => expect(current.user.locale).toBe('en'))
+    expect(api.find('PATCH', '/api/auth/me').map((c) => c.body)).toEqual([
+      { locale: 'en', version: 2 },
+    ])
+    expect(await screen.findByRole('heading', { name: 'Profile', level: 1 })).toBeInTheDocument()
+  })
+
+  test('a version changed elsewhere is read again and the language stored once more', async () => {
+    let current = makeMe(['space.create'])
+    const api = mockApi({
+      'GET /api/auth/me': () => current,
+      'GET /api/spaces': page([]),
+      'PATCH /api/auth/me': (call: Call) => {
+        const body = call.body as { locale: 'de' | 'en'; version: number }
+        if (body.version !== current.user.version) return apiError(409, 'users.version_conflict')
+        current = { ...current, user: { ...current.user, locale: body.locale, version: 3 } }
+        return current
+      },
+    })
+    const { user } = await renderApp('/profile')
+    await screen.findByRole('heading', { name: 'Profil', level: 1 })
+    current = { ...current, user: { ...current.user, version: 2 } } // another tab
+    await user.selectOptions(screen.getByLabelText('Sprache'), 'en')
+    await waitFor(() => expect(current.user.locale).toBe('en'))
+    expect(api.find('PATCH', '/api/auth/me').map((c) => c.body)).toEqual([
+      { locale: 'en', version: 1 },
+      { locale: 'en', version: 2 },
+    ])
+    expect(await screen.findByRole('heading', { name: 'Profile', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  test('if the language cannot be stored, it comes back and the person is told', async () => {
+    mockApi({
+      'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/spaces': page([]),
+      'PATCH /api/auth/me': apiError(409, 'users.version_conflict'),
+    })
+    const { user } = await renderApp('/profile')
+    await screen.findByRole('heading', { name: 'Profil', level: 1 })
+    await user.selectOptions(screen.getByLabelText('Sprache'), 'en')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Die Sprache wurde nicht gespeichert.')
+    expect(screen.getByRole('heading', { name: 'Profil', level: 1 })).toBeInTheDocument()
+    await user.click(within(alert).getByRole('button', { name: 'Schließen' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   test('a too short new password is refused before sending', async () => {
     const api = mockApi({ 'GET /api/auth/me': makeMe([]), 'GET /api/spaces': page([]) })
     const { user } = await renderApp('/profile')

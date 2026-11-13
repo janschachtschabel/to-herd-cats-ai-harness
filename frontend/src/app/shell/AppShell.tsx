@@ -2,6 +2,7 @@ import { PanelLeft } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { LocaleError } from '@/features/profile/LocaleError'
 import { useUserLocale } from '@/features/profile/queries'
 import { cn } from '@/lib/utils'
 import { Sidebar } from './Sidebar'
@@ -46,7 +47,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto focus:outline-none">
-          <div className="mx-auto w-full max-w-5xl px-6 py-8">{children}</div>
+          <div className="mx-auto w-full max-w-5xl px-6 py-8">
+            <LocaleError />
+            {children}
+          </div>
         </main>
       </div>
     </div>

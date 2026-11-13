@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import type { User } from '@/lib/api'
-import { ADMIN_PERMISSIONS, apiError, makeMe, makeUser, mockApi, page } from '@/test/api'
+import { ADMIN_PERMISSIONS, apiError, type Call, makeMe, makeUser, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 
 describe('administration', () => {
@@ -119,6 +119,26 @@ describe('administration', () => {
     await waitFor(() =>
       expect(api.find('POST', `/api/admin/users/${lea.id}/deactivate`)).toHaveLength(1),
     )
+  })
+
+  test('an admin editing their own account sees the change as themselves', async () => {
+    let me = makeMe(ADMIN_PERMISSIONS)
+    mockApi({
+      'GET /api/auth/me': () => me,
+      'GET /api/spaces': page([]),
+      'GET /api/admin/users': () => page([me.user]),
+      'PATCH /api/admin/users/:id': (call: Call) => {
+        me = { ...me, user: { ...me.user, ...(call.body as Partial<User>), version: 2 } }
+        return me.user
+      },
+    })
+    const { user } = await renderApp('/admin/users')
+    await user.click(await screen.findByRole('button', { name: 'Mia Muster bearbeiten' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.clear(within(dialog).getByLabelText('Name'))
+    await user.type(within(dialog).getByLabelText('Name'), 'Mia Neu')
+    await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
+    expect(await screen.findByRole('button', { name: 'Menü von Mia Neu' })).toBeInTheDocument()
   })
 
   test('admin adds a person to a group', async () => {

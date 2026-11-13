@@ -110,6 +110,7 @@
     "title": "Profil",
     "description": "Deine Einstellungen für diese Anwendung.",
     "language": "Sprache",
+    "localeNotSaved": "Die Sprache wurde nicht gespeichert.",
     "password": {
       "title": "Passwort ändern",
       "current": "Aktuelles Passwort",

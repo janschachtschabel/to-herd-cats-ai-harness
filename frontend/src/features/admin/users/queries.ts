@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { meQuery } from '@/features/auth/queries'
 import { api, unwrap, type Schemas } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
 
@@ -11,9 +12,16 @@ export function useUsers(enabled = true) {
   return usePaged({ ...usersQuery, enabled })
 }
 
+/** The list again; and `me` too when the change was to oneself (it moves one's version
+ *  and may change one's name or language). */
 function useInvalidateUsers() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: usersQuery.queryKey })
+  return (userId?: string) => {
+    if (userId && queryClient.getQueryData(meQuery.queryKey)?.user.id === userId) {
+      void queryClient.invalidateQueries({ queryKey: meQuery.queryKey, exact: true })
+    }
+    return queryClient.invalidateQueries({ queryKey: usersQuery.queryKey })
+  }
 }
 
 export function useCreateUser() {
@@ -35,7 +43,7 @@ export function useUpdateUser(userId: string) {
           body,
         }),
       ),
-    onSuccess: () => invalidate(),
+    onSuccess: () => invalidate(userId),
   })
 }
 
