@@ -213,6 +213,7 @@
       "alone": "Nobody else is here right now.",
       "done": "Done",
       "hint": "Changes are saved automatically (within 10 seconds at most) and appear for everyone editing the page right now.",
+      "notSaved": "Your latest changes are not saved yet. Please try again in a moment.",
       "leaveConfirm": "Not all changes have reached the server yet. Leave anyway?",
       "regenerated": "The page was changed outside the live session (saved, restored or moved). The current version is loaded.",
       "copy": "Copy my text as Markdown",

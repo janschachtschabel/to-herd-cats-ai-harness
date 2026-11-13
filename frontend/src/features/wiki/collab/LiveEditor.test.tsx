@@ -16,6 +16,8 @@ interface FakeConnection {
 }
 const connections: FakeConnection[] = []
 const events: string[] = []
+/** What the server answers to "I am done" (true: everything is stored). */
+let finishAnswer: () => boolean = () => true
 
 vi.mock('./connect', async (original) => ({
   ...(await original<typeof import('./connect')>()),
@@ -23,12 +25,12 @@ vi.mock('./connect', async (original) => ({
     const connection = { ...options, destroyed: false }
     connections.push(connection)
     const destroy = () => void (connection.destroyed = true)
-    const flush = async () => {
+    const finish = async () => {
       await new Promise((resolve) => setTimeout(resolve, 20)) // the server confirms
       events.push('flushed')
-      destroy()
+      return finishAnswer()
     }
-    return { provider: null, clientId: 1, destroy, flush }
+    return { provider: null, clientId: 1, destroy, finish }
   },
 }))
 
@@ -67,6 +69,7 @@ function typeInto(doc: Y.Doc, text: string) {
 beforeEach(() => {
   connections.length = 0
   events.length = 0
+  finishAnswer = () => true
 })
 
 describe('live editor', () => {
@@ -199,6 +202,39 @@ describe('live editor', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Abmelden' }))
     await waitFor(() => expect(events).toEqual(['flushed', 'logout']))
     expect(connections[0]!.destroyed).toBe(true)
+  })
+
+  test('"Fertig" waits for the save, then shows what the server stored (review R3)', async () => {
+    let current = makePage({ space_id: space.id, content_md: 'Alter Text' })
+    const api = liveApi('editor', () => current)
+    finishAnswer = () => {
+      current = { ...current, content_md: 'Alter Text NEU-GETIPPT', version: 2 }
+      return true
+    }
+    const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    join(connections[0]!)
+    typeInto(connections[0]!.doc, 'NEU-GETIPPT')
+    const trees = api.find('GET', `/api/spaces/${space.id}/pages/tree`).length
+    await user.click(screen.getByRole('button', { name: 'Fertig' }))
+    await waitFor(() => expect(router.state.location.search).toEqual({}))
+    expect(await screen.findByText('Alter Text NEU-GETIPPT')).toBeInTheDocument()
+    expect(events).toEqual(['flushed'])
+    expect(connections[0]!.destroyed).toBe(true)
+    expect(api.find('GET', `/api/spaces/${space.id}/pages/tree`).length).toBeGreaterThan(trees)
+  })
+
+  test('"Fertig" stays in the editor while the server has not stored everything', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'Alter Text' })
+    liveApi('editor', () => current)
+    finishAnswer = () => false
+    const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    join(connections[0]!)
+    await user.click(screen.getByRole('button', { name: 'Fertig' }))
+    expect(await screen.findByText(/noch nicht gespeichert/)).toBeInTheDocument()
+    expect(router.state.location.search).toEqual({ view: 'live' })
+    expect(connections[0]!.destroyed).toBe(false)
   })
 
   test('a viewer gets the read-only page without a live connection', async () => {

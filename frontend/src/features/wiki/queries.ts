@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { api, ApiError, unwrap, type Schemas, type TreeNode, type WikiPage } from '@/lib/api'
 
 // The tree endpoint is paged (≤ 100 per request); the tree needs every page, so the
@@ -18,6 +19,7 @@ export const wikiKeys = {
   tagged: (spaceId: string, tagId: string) => ['wiki', 'tree', spaceId, 'tag', tagId] as const,
   page: (pageId: string) => ['wiki', 'page', pageId] as const,
   byPath: (spaceId: string, path: string) => ['wiki', 'path', spaceId, path] as const,
+  versions: (pageId: string) => ['wiki', 'versions', pageId] as const,
 }
 
 /** Every page of the tree, or (with `tag`) the pages carrying that tag: the server
@@ -172,6 +174,21 @@ export function useMovePage(page: WikiPage) {
 }
 
 /** Fetches the page as it is on the server now (after a conflict). */
+/** Changes made elsewhere (the live session saves in the collab process): the page,
+ *  its versions and the tree are fetched again (review M2 R3). */
+export function useRefreshPage() {
+  const queryClient = useQueryClient()
+  return useCallback(
+    (page: WikiPage) => {
+      void queryClient.invalidateQueries({ queryKey: wikiKeys.page(page.id) })
+      void queryClient.invalidateQueries({ queryKey: wikiKeys.byPath(page.space_id, page.path) })
+      void queryClient.invalidateQueries({ queryKey: wikiKeys.versions(page.id) })
+      void invalidateTree(queryClient, page.space_id)
+    },
+    [queryClient],
+  )
+}
+
 export function useFetchLatestPage() {
   const queryClient = useQueryClient()
   return async (page: WikiPage): Promise<WikiPage> => {

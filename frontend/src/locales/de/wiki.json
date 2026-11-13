@@ -213,6 +213,7 @@
       "alone": "Niemand sonst ist gerade hier.",
       "done": "Fertig",
       "hint": "Änderungen werden automatisch gespeichert (spätestens nach 10 Sekunden) und erscheinen bei allen, die die Seite gerade bearbeiten.",
+      "notSaved": "Die letzten Änderungen sind noch nicht gespeichert. Bitte versuche es gleich noch einmal.",
       "leaveConfirm": "Noch nicht alle Änderungen sind beim Server angekommen. Trotzdem verlassen?",
       "regenerated": "Die Seite wurde außerhalb der Live-Sitzung geändert (gespeichert, wiederhergestellt oder verschoben). Der aktuelle Stand ist geladen.",
       "copy": "Meinen Text als Markdown kopieren",

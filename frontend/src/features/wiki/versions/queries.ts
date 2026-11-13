@@ -1,10 +1,10 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, unwrap, type WikiPage } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
-import { refetchOnConflict, storePage } from '../queries'
+import { refetchOnConflict, storePage, wikiKeys } from '../queries'
 
 export const versionsQuery = (pageId: string) =>
-  pagedQuery(['wiki', 'versions', pageId], async (cursor) =>
+  pagedQuery(wikiKeys.versions(pageId), async (cursor) =>
     unwrap(
       await api.GET('/api/pages/{page_id}/versions', {
         params: { path: { page_id: pageId }, query: { cursor } },

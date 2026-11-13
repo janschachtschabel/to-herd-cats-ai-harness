@@ -41,6 +41,13 @@ export const CLOSE = {
   retry: [1013, "retry"],
 };
 
+// Stateless messages: a browser that is done asks for an immediate save (`flush`) and
+// is told whether everything it sent is stored (review M2 R3).
+export const FLUSH = "herd:flush";
+export const SAVED = "herd:saved";
+export const UNSAVED = "herd:unsaved";
+const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection per second
+
 const DENIAL = { 401: CLOSE.unauthorized, 403: CLOSE.forbidden, 404: CLOSE.notFound };
 // Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
 // browser shows initials in white on them.
@@ -243,6 +250,25 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       else if (!state || state.discarded) close = CLOSE.generationEnded;
       else if (state.holding) close = CLOSE.retry; // the generation is being ended
       if (close) throw Object.assign(new Error(close[1]), { code: close[0], reason: close[1] });
+    },
+
+    /** "I am done": save now, then say whether everything is stored. */
+    async onStateless({ connection, document, documentName, payload }) {
+      if (payload !== FLUSH) return;
+      const state = live.get(documentName);
+      const { context } = connection;
+      const now = Date.now();
+      const due = now - (context.flushedAt ?? 0) >= FLUSH_INTERVAL_MS;
+      if (state && due && state.dirty.size > 0 && !state.discarded && !state.holding) {
+        context.flushedAt = now;
+        try {
+          await document.saveMutex.runExclusive(() => store(document, documentName, state));
+        } catch (error) {
+          if (!(error instanceof ApiUnavailable)) throw error;
+        }
+      }
+      const stored = state && !state.discarded && state.dirty.size === 0;
+      connection.sendStateless(stored ? SAVED : UNSAVED);
     },
 
     /** A connection that leaves with unsaved edits is saved at once, while its

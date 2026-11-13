@@ -72,3 +72,46 @@ test("an ended session's edits are saved, then only its connection closes (4401)
     return live.api.saves.some((s) => s.content_md.includes("weiter"));
   });
 });
+
+/** The client's "I am done" (review M2 R3): the server saves and answers when stored. */
+function finish(c) {
+  return new Promise((resolve) => {
+    const answer = ({ payload }) => {
+      c.provider.off("stateless", answer);
+      resolve(payload);
+    };
+    c.provider.on("stateless", answer);
+    c.provider.sendStateless("herd:flush");
+  });
+}
+
+test("a client that is done gets its edits saved before it leaves", { timeout: 8000 }, async () => {
+  await start();
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  await synced(anna);
+  await until(() => live.api.saves.length === 1);
+  type(anna.doc, " fertig");
+  await until(() => !anna.provider.hasUnsyncedChanges);
+  assert.equal(await finish(anna), "herd:saved");
+  assert.equal(live.api.saves.length, 2);
+  assert.match(live.api.saves[1].content_md, /fertig/);
+  // Nothing new: answered at once, nothing saved again.
+  assert.equal(await finish(anna), "herd:saved");
+  assert.equal(live.api.saves.length, 2);
+});
+
+test("a flush that cannot be saved says so", { timeout: 8000 }, async () => {
+  await start();
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  await synced(anna);
+  await until(() => live.api.saves.length === 1);
+  live.api.saveAnswer = () => [503, {}];
+  type(anna.doc, " offen");
+  await until(() => !anna.provider.hasUnsyncedChanges);
+  assert.equal(await finish(anna), "herd:unsaved");
+  live.api.saveAnswer = () => [200, { generation: 0, version: 2 }]; // the API is back
+  assert.equal(await finish(anna), "herd:unsaved", "at most one forced save per second");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal(await finish(anna), "herd:saved");
+  assert.match(live.api.saves.at(-1).content_md, /offen/);
+});

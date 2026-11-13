@@ -49,16 +49,21 @@ zählt sie nicht mit.
 - **Gemeinsam bearbeiten** öffnet den Live-Editor: Alle, die die Seite so geöffnet
   haben, sehen die Änderungen der anderen sofort, dazu Namen und Cursor. Gespeichert
   wird automatisch (höchstens alle 2 s, spätestens nach 10 s); die Statusanzeige zeigt
-  „Synchronisiert“, „Speichert …“ oder „Getrennt“. Leser bekommen diese Schaltfläche
-  nicht.
+  „Synchronisiert“, „Speichert …“ oder „Getrennt“. **Fertig** speichert sofort und
+  zeigt danach die Seite so, wie der Server sie hat; kann der Server das nicht
+  bestätigen (z. B. API kurz weg), bleibt der Editor offen und sagt das. Leser bekommen
+  diese Schaltfläche nicht.
 - **Generationen:** Speichern im Markdown-Editor, Wiederherstellen einer Version,
   Verschieben und Papierkorb beenden eine laufende Live-Sitzung. Die offenen
   Live-Editoren melden „Die Seite wurde außerhalb der Live-Sitzung geändert“, laden den
   neuen Stand und arbeiten in einer neuen Sitzung weiter. Wer dabei einen anderen Text
   hatte, kann ihn als Markdown kopieren. Ein alter Live-Stand überschreibt den neuen
   nie; bis die offenen Editoren das Ende bemerken, vergehen bis zu 5 s.
-- Verliert jemand während der Live-Bearbeitung das Schreibrecht (Rolle, Abmeldung,
-  Deaktivierung), wird seine Verbindung getrennt und sein Editor schreibgeschützt.
+- Verliert jemand während der Live-Bearbeitung das Schreibrecht (Rolle, Deaktivierung,
+  Abmeldung durch einen Administrator), wird seine Verbindung getrennt und sein Editor
+  schreibgeschützt; seine ungespeicherten Eingaben werden verworfen. Eine normale
+  Abmeldung oder abgelaufene Sitzung ist kein Rechteentzug: Was die Person getippt hat,
+  wird zuerst gespeichert, dann endet nur ihre Verbindung.
 
 ### Versionen, Papierkorb, Tags, Anhänge, Suche
 

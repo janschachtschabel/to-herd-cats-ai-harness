@@ -1,13 +1,13 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import type { WikiPage } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useLeaveGuard } from '../editor/useLeaveGuard'
-import { useFetchLatestPage } from '../queries'
+import { useFetchLatestPage, useRefreshPage } from '../queries'
 import { useWiki } from '../WikiContext'
 import type { Connect } from './connect'
 import { LiveSurface } from './LiveSurface'
@@ -31,10 +31,33 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   const fetchLatest = useFetchLatestPage()
   const live = useLiveSession(page, () => fetchLatest(page), connect)
   const [copied, setCopied] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const [notSaved, setNotSaved] = useState(false)
+  const navigate = useNavigate()
+  const refreshPage = useRefreshPage()
+  // Leaving the editor shows the server's state: live saves bypass the page cache.
+  const latest = useRef(page)
+  useEffect(() => {
+    latest.current = page
+  })
+  useEffect(() => () => refreshPage(latest.current), [refreshPage])
   const editable = live.stopped === null && live.status !== 'connecting'
   const unsaved = live.unsynced > 0 || (live.stopped !== null && !!live.lost && !copied)
   useLeaveGuard(unsaved, t('wiki.live.leaveConfirm'))
   const lost = live.lost && live.lost !== page.content_md.trim() ? live.lost : null
+
+  async function done() {
+    setFinishing(true)
+    const saved = await live.finish()
+    setFinishing(false)
+    setNotSaved(!saved)
+    if (saved) {
+      await navigate({
+        to: '/spaces/$spaceId/p/$',
+        params: { spaceId: space.id, _splat: page.path },
+      })
+    }
+  }
 
   async function copy() {
     if (!lost) return
@@ -61,14 +84,17 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
         </div>
         <div className="flex items-center gap-3">
           <Presence peers={live.peers} />
-          <Button variant="outline" asChild>
-            <Link to="/spaces/$spaceId/p/$" params={{ spaceId: space.id, _splat: page.path }}>
-              <Check aria-hidden />
-              {t('wiki.live.done')}
-            </Link>
+          <Button variant="outline" disabled={finishing} onClick={() => void done()}>
+            <Check aria-hidden />
+            {t('wiki.live.done')}
           </Button>
         </div>
       </div>
+      {notSaved && !live.stopped && (
+        <Alert variant="destructive">
+          <AlertDescription className="text-foreground">{t('wiki.live.notSaved')}</AlertDescription>
+        </Alert>
+      )}
       {(live.stopped || live.regenerated) && (
         <Alert variant={live.stopped ? 'destructive' : 'default'}>
           <AlertDescription className="flex flex-col gap-2 text-foreground">

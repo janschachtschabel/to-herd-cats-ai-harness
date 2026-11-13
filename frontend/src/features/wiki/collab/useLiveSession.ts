@@ -21,6 +21,9 @@ export interface LiveSession {
   lost: string | null
   unsynced: number
   retry: () => void
+  /** "Fertig": true once the server has stored everything typed here (or nothing more
+   *  can be stored because the session ended); false while that is not confirmed. */
+  finish: () => Promise<boolean>
 }
 
 /**
@@ -47,6 +50,7 @@ export function useLiveSession(
   const [lost, setLost] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const ended = useRef<number | null>(null) // the generation a 4409 ended
+  const current = useRef<{ live: LiveConnection; open: () => boolean } | null>(null)
   const refetchRef = useRef(refetch)
   useEffect(() => {
     refetchRef.current = refetch
@@ -89,9 +93,11 @@ export function useLiveSession(
         },
       },
     })
+    current.current = { live, open: () => open }
     const unregister = beforeLogout(async () => {
+      if (open) await live.finish?.()
       open = false
-      await (live.flush?.() ?? Promise.resolve(live.destroy()))
+      live.destroy()
     })
     setDoc(fresh)
     setConnection(live)
@@ -100,6 +106,7 @@ export function useLiveSession(
     setStopped(null)
     return () => {
       open = false
+      current.current = null
       unregister()
       live.destroy()
       fresh.destroy()
@@ -113,6 +120,12 @@ export function useLiveSession(
     setAttempt((n) => n + 1)
   }, [])
 
+  const finish = useCallback(async () => {
+    const session = current.current
+    if (!session || !session.open() || !session.live.finish) return true
+    return session.live.finish()
+  }, [])
+
   return {
     doc,
     connection,
@@ -124,5 +137,6 @@ export function useLiveSession(
     lost,
     unsynced,
     retry,
+    finish,
   }
 }
