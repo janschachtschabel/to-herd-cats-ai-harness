@@ -64,8 +64,8 @@ def decode_key_cursor(cursor: str) -> tuple[str, uuid.UUID]:
     try:
         raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
         key, id_ = json.loads(raw)
-        if not isinstance(key, str):
-            raise ValueError("key is not text")
+        if not isinstance(key, str) or "\x00" in key:
+            raise ValueError("key is not storable text")
         return key, uuid.UUID(id_)
     except (binascii.Error, ValueError, TypeError, UnicodeDecodeError) as exc:
         raise ValidationFailed("Invalid cursor", code="validation_failed") from exc

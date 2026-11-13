@@ -58,7 +58,7 @@ class RateLimited(AppError):
 _HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
 
 
-def _body(code: str, message: str) -> dict[str, dict[str, str]]:
+def error_body(code: str, message: str) -> dict[str, dict[str, str]]:
     # The active span's trace id: the same one the log lines of this request carry.
     return {"error": {"code": code, "message": message, "trace_id": current_trace_ids()[0]}}
 
@@ -66,21 +66,21 @@ def _body(code: str, message: str) -> dict[str, dict[str, str]]:
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=_body(exc.code, exc.message))
+        return JSONResponse(status_code=exc.status_code, content=error_body(exc.code, exc.message))
 
     @app.exception_handler(StarletteHTTPException)
     async def _handle_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         # Raised by routing itself: no route (404), wrong method (405, with `Allow`).
         code = _HTTP_CODES.get(exc.status_code, f"http.{exc.status_code}")
         return JSONResponse(
-            status_code=exc.status_code, content=_body(code, code), headers=exc.headers
+            status_code=exc.status_code, content=error_body(code, code), headers=exc.headers
         )
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
         fields = ", ".join(".".join(str(p) for p in e["loc"]) for e in exc.errors() if e.get("loc"))
         message = f"Invalid request: {fields}" if fields else "Invalid request"
-        return JSONResponse(status_code=422, content=_body("validation_failed", message))
+        return JSONResponse(status_code=422, content=error_body("validation_failed", message))
 
 
 class UnhandledErrorMiddleware:
@@ -113,6 +113,6 @@ class UnhandledErrorMiddleware:
             if started:  # too late for an answer; the server closes the connection
                 return
             response = JSONResponse(
-                status_code=500, content=_body("internal", "Internal server error")
+                status_code=500, content=error_body("internal", "Internal server error")
             )
             await response(scope, receive, send)

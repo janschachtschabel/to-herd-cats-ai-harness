@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI
 
 from app.core.config import Settings, get_settings
 from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
+from app.core.nul_guard import NulGuardMiddleware
 from app.core.request_context import RequestContextMiddleware
 from app.core.request_log import RequestLogMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -39,6 +40,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     # Added first is innermost: errors are answered before the request line is written.
+    app.add_middleware(NulGuardMiddleware)
     app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)

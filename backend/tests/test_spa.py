@@ -178,7 +178,8 @@ async def test_nothing_outside_static_dir_is_read(
     status, body = await raw_get(client_with_static, path)
     assert SECRET.encode() not in body
     assert b"root:" not in body
-    assert status in (200, 404), (path, status)
+    # 422: a NUL anywhere in the URL is refused before routing (core.nul_guard).
+    assert status in ((422,) if "\x00" in path else (200, 404)), (path, status)
     if status == 200:
         assert body == INDEX.encode()
 
