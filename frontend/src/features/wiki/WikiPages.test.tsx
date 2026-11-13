@@ -62,16 +62,22 @@ describe('wiki', () => {
     await user.keyboard('{ArrowRight}{ArrowRight}{ArrowDown}')
     expect(within(start).getByRole('treeitem', { name: 'Urlaub' })).toHaveFocus()
     await user.keyboard('{Enter}')
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/spaces/${space.id}/p/start/urlaub`),
+    // Navigating renders the page view for the first time in this file; on a busy
+    // machine that took longer than the default 1 s once (review R17).
+    const slow = { timeout: 10_000 }
+    await waitFor(
+      () => expect(router.state.location.pathname).toBe(`/spaces/${space.id}/p/start/urlaub`),
+      slow,
     )
-    expect(await screen.findByRole('heading', { level: 2, name: 'Urlaub' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Urlaub' }, slow),
+    ).toBeInTheDocument()
     // Breadcrumbs and the resolved wiki link lead to the parent.
     const crumbs = screen.getByRole('navigation', { name: 'Seitenpfad' })
     expect(within(crumbs).getByRole('link', { name: 'Start' })).toBeInTheDocument()
     const article = screen.getByRole('article')
     expect(within(article).getAllByRole('link', { name: 'Start' })).toHaveLength(2)
-  })
+  }, 20_000)
 
   test('viewer sees no edit actions', async () => {
     wikiApi('viewer')
