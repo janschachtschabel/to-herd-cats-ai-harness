@@ -10,6 +10,6 @@ For production set postgresql.enabled=false, database.url and database.existingS
 {{- if not .Values.secrets.existingSecret }}
 
 secrets.existingSecret is empty: no first owner is created. Create a Secret with
-HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD and HERD_INTERNAL_TOKEN and
-set secrets.existingSecret to its name.
+HERD_BOOTSTRAP_ADMIN_EMAIL and HERD_BOOTSTRAP_ADMIN_PASSWORD and set
+secrets.existingSecret to its name.
 {{- end }}

@@ -135,10 +135,14 @@ def test_alembic_uses_the_resolved_url(separate_password_env, engine) -> None:
     upgrade_head()
 
 
-def test_internal_token_and_bootstrap_password_are_hidden(
+def test_no_setting_without_a_reader() -> None:
+    """HERD_INTERNAL_TOKEN comes with its first reader (M2, /internal/*), not before."""
+    assert "internal_token" not in Settings.model_fields
+
+
+def test_bootstrap_password_is_hidden(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setenv("HERD_INTERNAL_TOKEN", "token-0f3a9c")
     monkeypatch.setenv("HERD_BOOTSTRAP_ADMIN_PASSWORD", "boot-pw-7e21")
     settings = Settings()
     caplog.set_level(logging.DEBUG)
@@ -151,7 +155,6 @@ def test_internal_token_and_bootstrap_password_are_hidden(
         caplog.text,
     ]
     for text_ in shown:
-        assert "token-0f3a9c" not in text_ and "boot-pw-7e21" not in text_
-    # The readers still get the values.
-    assert settings.internal_token.get_secret_value() == "token-0f3a9c"
+        assert "boot-pw-7e21" not in text_
+    # The reader still gets the value.
     assert settings.bootstrap_admin_password.get_secret_value() == "boot-pw-7e21"

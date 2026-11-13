@@ -22,7 +22,6 @@ if [[ ! -f "$env_file" ]]; then
     echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
     echo "HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com"
     echo "HERD_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 24)"
-    echo "HERD_INTERNAL_TOKEN=$(openssl rand -hex 24)"
   } >"$env_file"
 fi
 compose=(docker compose -p to-herd-cats-ai-smoke --env-file "$env_file" -f compose.yml)

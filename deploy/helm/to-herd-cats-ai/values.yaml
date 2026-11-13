@@ -37,7 +37,7 @@ api:
 
 ## @section Secrets
 
-## @param secrets.existingSecret Name of an existing Secret whose keys are environment variables (HERD_INTERNAL_TOKEN, HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD); empty: none
+## @param secrets.existingSecret Name of an existing Secret whose keys are environment variables (HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD); empty: none
 secrets:
   existingSecret: ""
 

@@ -44,7 +44,7 @@ helm install herd deploy/helm/to-herd-cats-ai \
 ```
 
 Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `password`,
-`herd-env` die Variablen `HERD_INTERNAL_TOKEN`, `HERD_BOOTSTRAP_ADMIN_EMAIL` und
+`herd-env` die Variablen `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD`. Jeder Wert ist in [`values.yaml`](deploy/helm/to-herd-cats-ai/values.yaml) beschrieben;
 `ci/production-values.yaml` ist ein vollständiges Beispiel (externe Datenbank, Ingress
 mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
@@ -126,6 +126,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   sein: erst erweitern, frühestens eine Version später zurückbauen.
 - **Alarm `HerdNotReady`** braucht kube-state-metrics (`kube_pod_status_ready`,
   `kube_pod_container_info`). Ohne kube-state-metrics feuert er nie.
+- **Port 9090** (`/health`, `/ready`, `/metrics`) hat keine Anmeldung; ihn schützt nur
+  das Netz (Compose veröffentlicht ihn nicht, im Chart kein Ingress, optional
+  `networkPolicy.internalFrom`). Ein Token für interne Endpunkte kommt erst mit M2.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
   `networkPolicy.internalFrom` niemanden an Port 9090, also auch Prometheus nicht:
   Prometheus dort eintragen. Mit externer Datenbank braucht es eine Egress-Regel zu

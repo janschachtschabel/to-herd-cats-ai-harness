@@ -29,7 +29,6 @@ class Settings(BaseSettings):
 
     public_port: int = 8080
     internal_port: int = 9090
-    internal_token: SecretStr = SecretStr("")
 
     session_cookie_name: str = "herd_session"
     session_ttl_hours: int = 24 * 7

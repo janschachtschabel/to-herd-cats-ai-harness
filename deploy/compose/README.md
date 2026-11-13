@@ -65,7 +65,6 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 |---|---|---|---|
 | `POSTGRES_PASSWORD` | yes | | Database password; the app gets it as `HERD_DATABASE_PASSWORD`, never inside `HERD_DATABASE_URL` |
 | `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only |
-| `HERD_INTERNAL_TOKEN` | yes | | Token for `/internal/*` on port 9090 |
 | `HERD_BOOTSTRAP_ADMIN_EMAIL` | no | `admin@example.com` | Email of the first owner |
 | `HERD_BIND_ADDRESS` | no | `127.0.0.1` | Host address port 8080 is published on |
 | `HERD_HOST_PORT` | no | `8080` | Host port for the app |
