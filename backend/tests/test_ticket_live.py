@@ -23,7 +23,15 @@ async def test_ticket_changes_reach_the_space_and_stop_with_the_membership(
     await drain(real_db.database)
     event = await watching.until_event("ticket.created")
     assert event.data["ticket_id"] == ticket["id"]
-    assert set(event.data) == {"conversation_id", "message_id", "parent_id", "ticket_id"}
+    # The space too, so a client refreshes only that space's lists (review M4 P4).
+    assert event.data["space_id"] == space
+    assert set(event.data) == {
+        "conversation_id",
+        "message_id",
+        "parent_id",
+        "ticket_id",
+        "space_id",
+    }
     await not_in.expect_nothing()
 
     removed = await owner.client.delete(f"/api/spaces/{space}/members/user/{member.id}")

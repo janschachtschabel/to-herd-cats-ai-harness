@@ -2,6 +2,7 @@ import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/r
 import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
 import { ticketKeys } from '@/features/tickets/keys'
+import { ticketEventKeys } from '@/features/tickets/live'
 import { useLive, type LiveEvent } from '@/lib/live'
 import { activityKeys, messagingKeys } from './keys'
 
@@ -61,7 +62,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'ticket.created':
     case 'ticket.updated':
       // Its timeline entries arrive as `message.created` in the ticket's thread.
-      return [ticketKeys.all]
+      return ticketEventKeys(queryClient, event.ticketId, event.spaceId)
   }
 }
 

@@ -1,6 +1,6 @@
-/** The query keys of tickets. Every key starts with `tickets`, so one live event about
- *  a ticket (`ticket.created`, `ticket.updated`) refreshes every ticket view at once:
- *  lists, the ticket, the board, the epics, the counter, the links of a page. */
+/** The query keys of tickets. Every key starts with `tickets` (a `resync` or one's own
+ *  change refreshes them all); a live event about a ticket refreshes only what it can
+ *  change (`live.ts`): the ticket, its space's views, the lists and counter. */
 export const ticketKeys = {
   all: ['tickets'] as const,
   lists: ['tickets', 'list'] as const,

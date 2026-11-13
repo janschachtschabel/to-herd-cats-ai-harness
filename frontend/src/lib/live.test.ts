@@ -74,6 +74,7 @@ describe('live stream', () => {
         messageId: 'm1',
         parentId: null,
         ticketId: null,
+        spaceId: null,
       },
     ])
     unmount()
@@ -110,14 +111,15 @@ describe('live stream', () => {
       messageId: null,
       parentId: null,
       ticketId: null,
+      spaceId: null,
     })
   })
 
-  test('ticket events carry the ticket and its thread', () => {
+  test('ticket events carry the ticket, its space and its thread', () => {
     expect(
       parseLiveEvent(
         'ticket.updated',
-        '{"conversation_id":"c1","message_id":null,"parent_id":null,"ticket_id":"t1"}',
+        '{"conversation_id":"c1","message_id":null,"parent_id":null,"ticket_id":"t1","space_id":"s1"}',
       ),
     ).toEqual({
       type: 'ticket.updated',
@@ -125,6 +127,7 @@ describe('live stream', () => {
       messageId: null,
       parentId: null,
       ticketId: 't1',
+      spaceId: 's1',
     })
   })
 })

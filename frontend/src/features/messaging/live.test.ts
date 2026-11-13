@@ -24,17 +24,35 @@ const KEYS = {
   ticketCounts: ticketKeys.counts,
   board: ticketKeys.board('space'),
   pageTickets: ticketKeys.pageTickets('page'),
+  spaceList: ticketKeys.list({ who: 'all', space: 'space' }),
+  otherSpaceList: ticketKeys.list({ who: 'all', space: 'other' }),
+  otherTicket: ticketKeys.detail(7),
+  otherBoard: ticketKeys.board('other'),
+  column: ticketKeys.column('space', 'status', {}),
+  epics: ticketKeys.epics('space'),
+  otherEpics: ticketKeys.epics('other'),
+  children: ticketKeys.children('parent'),
+  statuses: ticketKeys.statuses('space'),
+  ticketThread: ticketKeys.thread(42),
+}
+
+/** What the ticket queries hold where the invalidation reads it (the ticket's id). */
+const DATA: Partial<Record<keyof typeof KEYS, object>> = {
+  ticket: { id: 't', number: 42 },
+  otherTicket: { id: 'u', number: 7 },
 }
 
 /** A client holding every key above, fresh; returns which keys an event made stale. */
 function staleAfter(event: Partial<LiveEvent> & Pick<LiveEvent, 'type'>): string[] {
   const client = new QueryClient()
-  for (const key of Object.values(KEYS)) client.setQueryData(key, { items: [] })
+  for (const [name, key] of Object.entries(KEYS))
+    client.setQueryData(key, DATA[name as keyof typeof KEYS] ?? { items: [] })
   invalidateFor(client, {
     conversationId: null,
     messageId: null,
     parentId: null,
     ticketId: null,
+    spaceId: null,
     ...event,
   })
   return Object.entries(KEYS)
@@ -43,6 +61,24 @@ function staleAfter(event: Partial<LiveEvent> & Pick<LiveEvent, 'type'>): string
 }
 
 describe('live invalidation', () => {
+  const ALL_TICKETS = [
+    'ticketList',
+    'ticket',
+    'ticketCounts',
+    'board',
+    'pageTickets',
+    'spaceList',
+    'otherSpaceList',
+    'otherTicket',
+    'otherBoard',
+    'column',
+    'epics',
+    'otherEpics',
+    'children',
+    'statuses',
+    'ticketThread',
+  ]
+
   test('resync refreshes every conversation, counter and activity query, nothing else', () => {
     expect(staleAfter({ type: 'resync' })).toEqual([
       'channels',
@@ -56,21 +92,30 @@ describe('live invalidation', () => {
       'pageThread',
       'activity',
       'activityCount',
-      'ticketList',
+      ...ALL_TICKETS,
+    ])
+  })
+
+  test('a ticket event refreshes that ticket and the views of its space only (review M4 P4)', () => {
+    const affected = [
+      'ticketList', // "my tickets" spans every space
       'ticket',
       'ticketCounts',
       'board',
       'pageTickets',
-    ])
+      'spaceList',
+      'column',
+      'epics',
+      'children',
+    ]
+    const event = { conversationId: 'a', ticketId: 't', spaceId: 'space' }
+    expect(staleAfter({ type: 'ticket.updated', ...event })).toEqual(affected)
+    expect(staleAfter({ type: 'ticket.created', ...event })).toEqual(affected)
   })
 
-  test('a ticket event refreshes every ticket view, nothing of messaging', () => {
-    const tickets = ['ticketList', 'ticket', 'ticketCounts', 'board', 'pageTickets']
+  test('a ticket event without its space refreshes every ticket view', () => {
     expect(staleAfter({ type: 'ticket.updated', conversationId: 'a', ticketId: 't' })).toEqual(
-      tickets,
-    )
-    expect(staleAfter({ type: 'ticket.created', conversationId: 'a', ticketId: 't' })).toEqual(
-      tickets,
+      ALL_TICKETS,
     )
   })
 
@@ -125,6 +170,7 @@ describe('coalescing', () => {
         messageId: `m${i}`,
         parentId: null,
         ticketId: null,
+        spaceId: null,
       })
       coalescer.add({
         type: 'conversation.read',
@@ -132,6 +178,7 @@ describe('coalescing', () => {
         messageId: null,
         parentId: null,
         ticketId: null,
+        spaceId: null,
       })
     }
     expect(spy).not.toHaveBeenCalled()
@@ -154,6 +201,7 @@ describe('coalescing', () => {
       messageId: null,
       parentId: null,
       ticketId: null,
+      spaceId: null,
     })
     vi.advanceTimersByTime(COALESCE_MS)
     expect(spy).toHaveBeenCalledTimes(1) // a new window after the last
@@ -163,6 +211,7 @@ describe('coalescing', () => {
       messageId: null,
       parentId: null,
       ticketId: null,
+      spaceId: null,
     })
     coalescer.stop()
     vi.advanceTimersByTime(COALESCE_MS)

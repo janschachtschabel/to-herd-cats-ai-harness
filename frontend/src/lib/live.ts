@@ -27,6 +27,8 @@ export interface LiveEvent {
   parentId: string | null
   /** The ticket of `ticket.created` / `ticket.updated` (its thread is `conversationId`). */
   ticketId: string | null
+  /** The ticket's space (ticket events only). */
+  spaceId: string | null
 }
 
 /** `limited`: the server refused another stream for this session (429, too many tabs). */
@@ -41,6 +43,7 @@ const RESYNC: LiveEvent = {
   messageId: null,
   parentId: null,
   ticketId: null,
+  spaceId: null,
 }
 
 let status: LiveStatus = 'connecting'
@@ -67,7 +70,7 @@ function idOrNull(value: unknown): string | null {
 }
 
 /** An event's data (`{"conversation_id", "message_id", "parent_id"}`, tickets add
- *  `ticket_id`); null if unreadable. */
+ *  `ticket_id` and `space_id`); null if unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')
@@ -79,6 +82,7 @@ export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | n
       messageId: idOrNull(fields.message_id),
       parentId: idOrNull(fields.parent_id),
       ticketId: idOrNull(fields.ticket_id),
+      spaceId: idOrNull(fields.space_id),
     }
   } catch {
     return null
