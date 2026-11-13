@@ -1,5 +1,5 @@
-# Checks for pull requests and for pushes to main: backend, frontend, chart, image and
-# licenses. A tag runs them once, called by the release workflow before anything is
+# Checks for pull requests and for pushes to main: backend, frontend, collab, chart,
+# image and licenses. A tag runs them once, called by the release workflow before anything is
 # published (no push trigger for tags here, so nothing runs twice). A pull request's
 # own pushes run as `pull_request` only (no branch push trigger besides main). Actions are pinned by commit;
 # Renovate keeps the pins current. Only the default GITHUB_TOKEN (read) is used.
@@ -93,6 +93,49 @@ jobs:
       - run: npm run check:api
       - run: npm audit --audit-level=high
 
+  # The live-editing process (collab/): lint, its tests against a fake internal API,
+  # and the end-to-end test: the real API (role all, which starts this process) on a
+  # scratch database, two Yjs clients through the WebSocket relay.
+  collab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: collab
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: collab/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:integration
+        env:
+          HERD_IT_ADMIN_URL: postgresql://herd:herd@localhost:5433/herd_test
+      - run: npm audit --audit-level=high
+
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -173,3 +216,5 @@ jobs:
           uv run python scripts/check_licenses.py python "$RUNNER_TEMP/runtime.txt"
       - name: Frontend runtime dependencies (package-lock.json without dev)
         run: uv run python scripts/check_licenses.py npm ../frontend/package-lock.json
+      - name: Collab runtime dependencies (package-lock.json without dev)
+        run: uv run python scripts/check_licenses.py npm ../collab/package-lock.json

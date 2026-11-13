@@ -80,9 +80,12 @@ cd frontend && npm ci && npm run dev   # Vite; leitet /api an http://localhost:8
 ```
 
 `HERD_ROLE` wählt, was der Prozess tut: `all` (Standard: migrieren, dann bedienen),
-`api` oder `migrate`. Alle Einstellungen sind `HERD_*`-Variablen
-(`backend/app/core/config.py`). Nach Änderungen an der API `npm run generate:api`
-im Frontend ausführen.
+`api`, `migrate` oder `collab` (nur der Live-Bearbeitungsprozess, `node
+collab/server.mjs`). In `all` startet die API den Collab-Prozess als Kindprozess auf
+`127.0.0.1:${HERD_COLLAB_PORT}`, wenn `HERD_INTERNAL_TOKEN` gesetzt ist (dafür
+`cd collab && npm ci`); ohne Token bleibt die Live-Bearbeitung aus. Alle
+Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Änderungen
+an der API `npm run generate:api` im Frontend ausführen.
 
 Regeln für Beiträge: [`CLAUDE.md`](CLAUDE.md) (Schichten, `org_id`, Paginierung,
 Fehlerform, i18n, Lizenzen, Commit-Format). Neue Funktionen beginnen mit einem
@@ -98,6 +101,8 @@ cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check
   && uv run mypy app scripts
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
   && node scripts/check-i18n.mjs && npm run check:api
+cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
+                                       # Wegwerf-Datenbank (psql, uv nötig), zwei Yjs-Clients
 docker build -t to-herd-cats-ai:local . && bash deploy/compose/smoke.sh   # endet mit SMOKE OK
 bash deploy/compose/load.sh            # Ressourcen und Laufzeiten für den Steckbrief
 ```
@@ -143,6 +148,25 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   `HERD_INTERNAL_TOKEN` (mindestens 32 Zeichen, etwa `openssl rand -hex 32`; API und
   Collab-Prozess brauchen denselben Wert). Ohne gesetztes Token antwortet `/internal/*`
   immer mit 503 (`internal.disabled`), und die Live-Bearbeitung ist aus.
+- **Live-Bearbeitung**: Browser verbinden sich per WebSocket mit
+  `/collab/<seiten-id>?generation=<collab_generation>` am öffentlichen Port; die API
+  prüft Origin (gleich dem von `HERD_PUBLIC_URL`, ohne diese gleich dem angefragten
+  Host; sonst HTTP 403), Sitzungs-Cookie, Sichtbarkeit, `page.edit` und die Generation
+  wie die REST-API und reicht erst dann Frames an den Collab-Prozess
+  (`HERD_COLLAB_URL`, Standard `ws://127.0.0.1:1234`) weiter. Abgelehnt wird mit
+  Schließcodes, die der Browser lesen kann: 4401 (keine gültige Sitzung), 4403 (kein
+  Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
+  beendet: Seite neu laden), 4413 (Zustand zu groß), 4502/4503 (Collab-Prozess nicht
+  erreichbar bzw. aus), 1013 (später erneut versuchen). Gespeichert wird höchstens alle
+  2 s, spätestens nach 10 s; alle 5 s prüft der Collab-Prozess Generation und Rechte.
+  Eine Speicherung im Markdown-Modus, Wiederherstellen, Verschieben und Papierkorb
+  beenden die laufende Live-Sitzung (4409). Verliert jemand das Recht (Rolle,
+  Abmeldung, Deaktivierung), wird seine Verbindung mit 4403 getrennt; hatte er noch
+  ungespeicherte Änderungen, endet die Generation, damit kein anderer Browser sie
+  wieder einspielt (die anderen bekommen 4409, ihre ungespeicherten Änderungen gehen
+  verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
+  5 MiB. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
+  `herd_collab_saves_total{result}` die Speicherungen.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
   `networkPolicy.internalFrom` niemanden an Port 9090, also auch Prometheus nicht:
   Prometheus dort eintragen. Mit externer Datenbank braucht es eine Egress-Regel zu

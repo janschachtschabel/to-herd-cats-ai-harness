@@ -1,5 +1,6 @@
 import asyncio
 import signal
+import sys
 
 import pytest
 
@@ -9,7 +10,12 @@ from app.core.config import Settings
 
 @pytest.mark.parametrize(
     ("role", "steps"),
-    [("api", ("serve",)), ("migrate", ("migrate",)), ("all", ("migrate", "serve"))],
+    [
+        ("api", ("serve",)),
+        ("migrate", ("migrate",)),
+        ("all", ("migrate", "serve")),
+        ("collab", ("collab",)),
+    ],
 )
 def test_steps_per_role(role, steps):
     assert launch.steps_for(role) == steps
@@ -38,6 +44,11 @@ def test_uvicorn_configs_disable_access_log_and_keep_our_logging():
     assert (public.port, internal.port) == (8080, 9090)
     for config in (public, internal):
         assert config.access_log is False and config.log_config is None
+
+
+def test_websocket_messages_are_limited_to_1_mib():
+    public, _ = launch.server_configs(Settings())
+    assert public.ws_max_size == 1024 * 1024
 
 
 def test_public_server_trusts_forwarded_headers_only_from_configured_proxies():
@@ -109,7 +120,7 @@ async def test_serve_bootstraps_before_serving(monkeypatch):
 
     monkeypatch.setattr(launch, "bootstrap", fake_bootstrap)
     monkeypatch.setattr(launch, "run_servers", fake_run_servers)
-    assert await launch.serve(Settings()) == 0
+    assert await launch.serve(Settings(role="api")) == 0
     assert seen == ["bootstrap", "run 2"]
 
 
@@ -136,3 +147,67 @@ async def test_bootstrap_runs_in_its_own_committed_transaction(monkeypatch):
     monkeypatch.setattr(launch, "ensure_bootstrap", fake_ensure)
     await launch.bootstrap(Settings(bootstrap_org_name="Acme"))
     assert seen == [("ensure", "FakeSession", "Acme"), "commit", "closed"]
+
+
+TOKEN = "l" * 40
+
+
+async def test_all_starts_the_collab_process_only_with_an_internal_token(monkeypatch):
+    seen: list[object] = []
+
+    async def fake_bootstrap(settings):
+        pass
+
+    async def fake_run_servers(servers):
+        seen.append(servers)
+        return 0
+
+    monkeypatch.setattr(launch, "bootstrap", fake_bootstrap)
+    monkeypatch.setattr(launch, "run_servers", fake_run_servers)
+    await launch.serve(Settings(role="all"))
+    await launch.serve(Settings(role="all", internal_token=TOKEN, internal_port=9191))
+    await launch.serve(Settings(role="api", internal_token=TOKEN))
+    without, with_token, api = seen
+    assert len(without) == 2 and len(api) == 2
+    assert len(with_token) == 3
+    child = with_token[2]
+    assert isinstance(child, launch.CollabProcess)
+    assert child.command[0] == "node" and child.command[1].endswith("collab/server.mjs")
+    assert child.env["HERD_COLLAB_HOST"] == "127.0.0.1"
+    assert child.env["HERD_COLLAB_API_URL"] == "http://127.0.0.1:9191"
+    assert child.env["HERD_INTERNAL_TOKEN"] == TOKEN
+    assert child.env["HERD_COLLAB_PORT"] == "1234"
+
+
+async def test_collab_process_is_stopped_with_the_servers():
+    child = launch.CollabProcess([sys.executable, "-c", "import time; time.sleep(30)"], {})
+    loop = asyncio.get_running_loop()
+    loop.call_later(0.3, signal.raise_signal, signal.SIGTERM)
+    other = FakeServer()
+    assert await asyncio.wait_for(launch.run_servers([other, child]), timeout=10) == 0
+    assert other.stopped
+    assert child.returncode is not None
+
+
+async def test_collab_process_ending_ends_the_launcher_with_3():
+    child = launch.CollabProcess([sys.executable, "-c", "pass"], {})
+    other = FakeServer()
+    assert await asyncio.wait_for(launch.run_servers([other, child]), timeout=10) == 3
+    assert other.stopped
+
+
+async def test_missing_node_ends_the_launcher_with_3():
+    child = launch.CollabProcess(["/nonexistent/node"], {})
+    assert await asyncio.wait_for(launch.run_servers([FakeServer(), child]), timeout=10) == 3
+
+
+def test_role_collab_runs_node_in_place(monkeypatch):
+    calls = []
+    settings = Settings(role="collab", internal_token=TOKEN, collab_api_url="http://api:9090")
+    monkeypatch.setattr(launch, "get_settings", lambda: settings)
+    monkeypatch.setattr(launch.os, "execvpe", lambda *args: calls.append(args))
+    launch.main()
+    ((file, argv, env),) = calls
+    assert file == "node" and argv[1].endswith("collab/server.mjs")
+    assert env["HERD_COLLAB_HOST"] == "0.0.0.0"
+    assert env["HERD_COLLAB_API_URL"] == "http://api:9090"

@@ -21,6 +21,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.45.2",
     "prometheus-client>=0.26.0",
     "argon2-cffi>=25.1",
+    "websockets>=15",
 ]
 
 [dependency-groups]

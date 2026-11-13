@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,6 +12,7 @@ from sqlalchemy.engine import URL, make_url
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
 INTERNAL_TOKEN_MIN_LENGTH = 32
+_REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -> repo
 
 
 class Settings(BaseSettings):
@@ -36,6 +38,16 @@ class Settings(BaseSettings):
     # Guards /internal/* (header X-Herd-Internal-Token); unset, /internal/* answers 503.
     # Shared with the collab process. At least 32 characters (`openssl rand -hex 32`).
     internal_token: SecretStr | None = None
+    # The address browsers use (scheme://host[:port]); WebSocket Origins must match it.
+    # Unset, an Origin must match the host the request came to.
+    public_url: str | None = None
+    # Live editing: where the API relays /collab to (the collab process), the port the
+    # collab process listens on, how it reaches the internal API (default: this
+    # process's internal port), and its script (`node <collab_script>`).
+    collab_url: str = "ws://127.0.0.1:1234"
+    collab_port: int = 1234
+    collab_api_url: str | None = None
+    collab_script: Path = _REPO_ROOT / "collab" / "server.mjs"
 
     session_cookie_name: str = "herd_session"
     session_ttl_hours: int = 24 * 7
@@ -67,7 +79,7 @@ class Settings(BaseSettings):
 
     log_format: Literal["json", "text"] = "json"
     log_level: str = "INFO"
-    role: Literal["api", "migrate", "all"] = "all"
+    role: Literal["api", "migrate", "all", "collab"] = "all"
     static_dir: Path | None = None
 
     _database_password: SecretStr | None = PrivateAttr(default=None)
@@ -92,6 +104,14 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"HERD_INTERNAL_TOKEN must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _public_url_is_an_origin(self) -> Self:
+        if self.public_url is not None:
+            url = urlsplit(self.public_url)
+            if url.scheme not in ("http", "https") or not url.netloc:
+                raise ValueError("HERD_PUBLIC_URL must be an http(s) URL like https://wiki.example")
         return self
 
     @model_validator(mode="after")

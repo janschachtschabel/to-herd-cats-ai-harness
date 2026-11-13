@@ -6,7 +6,7 @@ to that directory and /metrics aggregates them with the multiprocess collector.
 
 import os
 
-from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Histogram
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client import generate_latest as _generate_latest
 from prometheus_client.multiprocess import MultiProcessCollector
 
@@ -48,4 +48,10 @@ COLLAB_SAVES = Counter(
     "Saves of live-editing sessions through the internal API, by result.",
     ["result"],
     registry=REGISTRY,
+)
+COLLAB_CONNECTIONS = Gauge(
+    "herd_collab_connections",
+    "Open live-editing connections relayed by the public port.",
+    registry=REGISTRY,
+    multiprocess_mode="livesum",
 )

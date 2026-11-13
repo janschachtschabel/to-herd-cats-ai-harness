@@ -25,6 +25,7 @@ from app.modules.wiki import router as wiki
 from app.modules.wiki.attachments_router import attachments, page_attachments
 from app.modules.wiki.transfer_router import page_export, space_transfer
 from app.modules.wiki.versions_router import page_versions
+from app.web.collab_proxy import router as collab_relay
 from app.web.spa import mount_spa
 
 
@@ -82,6 +83,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     configure_tracing(app, settings)
     app.include_router(api_router())
+    app.include_router(collab_relay)  # WebSocket /collab/{page_id}
 
     if settings.environment == "test":
         from app.web.test_routes import router as test_router
