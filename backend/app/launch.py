@@ -7,9 +7,12 @@
   HERD_INTERNAL_TOKEN is set, the collab process (`node collab/server.mjs`) as a child
   on 127.0.0.1:HERD_COLLAB_PORT. If the child ends, the launcher stops and exits 3.
 - `collab`: the collab process alone, in place of the launcher (its own deployment).
+- `worker`: the outbox dispatcher (`app.worker`) and the internal port only (probes,
+  metrics); `all` runs the worker next to the API, in the same event loop.
 
-SIGTERM and SIGINT stop both servers in an orderly way; if one server ends (for
-example because its port is taken), the other is stopped too.
+SIGTERM and SIGINT stop every server in an orderly way (the worker finishes the batch
+in progress); if one ends (for example because its port is taken), the others are
+stopped too.
 """
 
 import asyncio
@@ -33,6 +36,7 @@ from app.modules.orgs.service import ensure_bootstrap
 from app.web.collab_proxy import MAX_MESSAGE_BYTES
 from app.web.internal import create_internal_app
 from app.web.public import create_public_app
+from app.worker.main import Worker, create_worker
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,7 @@ _STEPS: dict[str, tuple[Step, ...]] = {
     "migrate": ("migrate",),
     "all": ("migrate", "serve"),
     "collab": ("collab",),
+    "worker": ("serve",),
 }
 
 COLLAB_EXIT_CODE = 3
@@ -90,13 +95,20 @@ def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn
     )
 
 
-def server_configs(settings: Settings) -> tuple[uvicorn.Config, uvicorn.Config]:
+def server_configs(
+    settings: Settings, worker: Worker | None = None
+) -> tuple[uvicorn.Config, uvicorn.Config]:
     """The public server sits behind the reverse proxy; the internal one is reached
     directly (probes, scrapes) and believes no forwarded headers."""
     return (
         _config(create_public_app(), settings.public_port, settings.forwarded_allow_ips),
-        _config(create_internal_app(), settings.internal_port, None),
+        _config(create_internal_app(worker=worker), settings.internal_port, None),
     )
+
+
+def internal_config(settings: Settings, worker: Worker) -> uvicorn.Config:
+    """The internal server alone (role worker)."""
+    return _config(create_internal_app(worker=worker), settings.internal_port, None)
 
 
 async def _serve(server: Server) -> int:
@@ -229,9 +241,15 @@ async def bootstrap(settings: Settings) -> None:
 
 
 async def serve(settings: Settings) -> int:
+    if settings.role == "worker":
+        alone = create_worker(get_database())
+        return await run_servers([_Server(internal_config(settings, alone)), alone])
     remove_stale_spools(settings.data_dir)
     await bootstrap(settings)
-    servers: list[Server] = [_Server(config) for config in server_configs(settings)]
+    worker = create_worker(get_database()) if settings.role == "all" else None
+    servers: list[Server] = [_Server(config) for config in server_configs(settings, worker)]
+    if worker is not None:
+        servers.append(worker)
     if settings.role == "all":
         if settings.internal_token is None:
             logger.warning("live editing off: HERD_INTERNAL_TOKEN is not set")

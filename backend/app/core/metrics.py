@@ -55,3 +55,25 @@ COLLAB_CONNECTIONS = Gauge(
     registry=REGISTRY,
     multiprocess_mode="livesum",
 )
+
+# The outbox (spec 12.3), written by the worker's dispatcher. The gauges are read from
+# the database on every pass, so every worker reports the same backlog: take the max.
+OUTBOX_PENDING = Gauge(
+    "herd_outbox_pending",
+    "Outbox events neither dispatched nor failed.",
+    registry=REGISTRY,
+    multiprocess_mode="livemax",
+)
+OUTBOX_OLDEST_PENDING = Gauge(
+    "herd_outbox_oldest_pending_seconds",
+    "Age of the oldest pending outbox event (0 without one).",
+    registry=REGISTRY,
+    multiprocess_mode="livemax",
+)
+OUTBOX_DISPATCHES = Counter(
+    "herd_outbox_dispatch_total",
+    "Handler deliveries of outbox events, by handler and result "
+    "(ok, duplicate, error; failed: the event gave up after its last attempt).",
+    ["handler", "result"],
+    registry=REGISTRY,
+)

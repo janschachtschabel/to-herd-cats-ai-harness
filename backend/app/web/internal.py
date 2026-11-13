@@ -1,5 +1,6 @@
 """The internal application (port HERD_INTERNAL_PORT): probes, metrics and the
-internal collab API.
+internal collab API. In a process that runs the worker, `/ready` also needs the
+worker's loop to be running and to reach the database.
 
 Never reachable through the public port and not part of the public OpenAPI document.
 `/internal/*` needs the header `X-Herd-Internal-Token` equal to HERD_INTERNAL_TOKEN
@@ -9,6 +10,7 @@ Never reachable through the public port and not part of the public OpenAPI docum
 import asyncio
 import hmac
 import logging
+from typing import Protocol
 
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -52,6 +54,13 @@ def internal_router() -> APIRouter:
     return internal
 
 
+class Readiness(Protocol):
+    """Something in the process whose state `/ready` reports too (the worker)."""
+
+    @property
+    def ready(self) -> bool: ...
+
+
 def get_engine() -> AsyncEngine:
     return get_database().engine
 
@@ -60,7 +69,8 @@ def _not_ready(reason: str) -> JSONResponse:
     return JSONResponse(status_code=503, content={"status": "not_ready", "reason": reason})
 
 
-def create_internal_app() -> FastAPI:
+def create_internal_app(*, worker: Readiness | None = None) -> FastAPI:
+    """With `worker`, `/ready` also waits for the worker's loop (roles worker and all)."""
     app = FastAPI(title="to-herd-cats-ai internal", openapi_url=None, docs_url=None, redoc_url=None)
     app.add_middleware(BodyLimitMiddleware, max_bytes=INTERNAL_MAX_BODY_BYTES)
     app.add_middleware(UnhandledErrorMiddleware)
@@ -85,6 +95,8 @@ def create_internal_app() -> FastAPI:
             return _not_ready("database")
         if not compatible:
             return _not_ready("migrations")
+        if worker is not None and not worker.ready:
+            return _not_ready("worker")
         return {"status": "ready"}
 
     @app.get("/metrics")

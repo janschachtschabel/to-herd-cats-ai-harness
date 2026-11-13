@@ -83,7 +83,7 @@ class Settings(BaseSettings):
 
     log_format: Literal["json", "text"] = "json"
     log_level: str = "INFO"
-    role: Literal["api", "migrate", "all", "collab"] = "all"
+    role: Literal["api", "migrate", "all", "collab", "worker"] = "all"
     static_dir: Path | None = None
 
     _database_password: SecretStr | None = PrivateAttr(default=None)

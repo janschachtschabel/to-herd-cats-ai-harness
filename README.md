@@ -137,8 +137,10 @@ cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http:/
 ```
 
 `HERD_ROLE` wählt, was der Prozess tut: `all` (Standard: migrieren, dann bedienen),
-`api`, `migrate` oder `collab` (nur der Live-Bearbeitungsprozess, `node
-collab/server.mjs`). In `all` startet die API den Collab-Prozess als Kindprozess auf
+`api`, `migrate`, `worker` (nur der Verteiler der Outbox und der interne Port 9090;
+mehrere Worker nebeneinander sind sicher) oder `collab` (nur der
+Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. In
+`all` startet die API den Collab-Prozess als Kindprozess auf
 `127.0.0.1:${HERD_COLLAB_PORT}`, wenn `HERD_INTERNAL_TOKEN` gesetzt ist (dafür
 `cd collab && npm ci`); ohne Token bleibt die Live-Bearbeitung aus. Alle
 Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Änderungen

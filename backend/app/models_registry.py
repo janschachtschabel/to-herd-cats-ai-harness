@@ -1,6 +1,7 @@
 """Imports every model, so `Base.metadata` is complete (alembic, schema checks)."""
 
 from app.core.models_base import Base
+from app.core.outbox import EventDelivery, EventOutbox
 from app.core.ratelimit import RateLimitHit
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
@@ -16,6 +17,8 @@ __all__ = [
     "Attachment",
     "AuditLog",
     "Base",
+    "EventDelivery",
+    "EventOutbox",
     "Group",
     "GroupMember",
     "Organization",

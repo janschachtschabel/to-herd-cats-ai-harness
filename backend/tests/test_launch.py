@@ -169,9 +169,9 @@ async def test_all_starts_the_collab_process_only_with_an_internal_token(monkeyp
     await launch.serve(Settings(role="all", internal_token=TOKEN, internal_port=9191))
     await launch.serve(Settings(role="api", internal_token=TOKEN))
     without, with_token, api = seen
-    assert len(without) == 2 and len(api) == 2
-    assert len(with_token) == 3
-    child = with_token[2]
+    assert len(without) == 3 and len(api) == 2  # all: public, internal, worker
+    assert len(with_token) == 4
+    child = with_token[3]
     assert isinstance(child, launch.CollabProcess)
     assert child.command[0] == "node" and child.command[1].endswith("collab/server.mjs")
     assert child.env["HERD_COLLAB_HOST"] == "127.0.0.1"
