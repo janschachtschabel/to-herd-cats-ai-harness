@@ -10,27 +10,18 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 
-const WIKI_LINK = /\[\[([^\]\n]+)\]\]/g; // as resolveWikiLinks in the frontend
-const FENCE = /^\s*(```|~~~)/;
+import { WIKI_LINK, outsideCode } from "./syntax.mjs";
+
 const IGNORED = new Set(["position", "spread"]);
 
-/** `[[Titel]]` → `[Titel](wiki:Titel)`, outside fenced code (as the page view does). */
+/** `[[Titel]]` → `[Titel](wiki:Titel)`, outside code (as the page view does). */
 export function markWikiLinks(markdown) {
-  let inFence = false;
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (FENCE.test(line)) {
-        inFence = !inFence;
-        return line;
-      }
-      if (inFence) return line;
-      return line.replace(WIKI_LINK, (_, raw) => {
-        const title = raw.trim();
-        return `[${title}](wiki:${encodeURIComponent(title)})`;
-      });
-    })
-    .join("\n");
+  return outsideCode(markdown, (text) =>
+    text.replace(WIKI_LINK, (_, raw) => {
+      const title = raw.trim();
+      return `[${title}](wiki:${encodeURIComponent(title)})`;
+    }),
+  );
 }
 
 function normalize(node) {

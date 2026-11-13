@@ -1,7 +1,7 @@
-import { Editor, Extension, getSchema, Node } from '@tiptap/core'
-import { MarkdownManager } from '@tiptap/markdown'
+import { Editor, Extension, getSchema, Mark } from '@tiptap/core'
 import { describe, expect, test } from 'vitest'
-import { allowedUri, extensions, keepWikiLinks, RAW_MARKDOWN } from '@collab/schema.mjs'
+import { allowedUri, extensions, RAW_MARKDOWN } from '@collab/schema.mjs'
+import { jsonToMarkdown } from '@collab/serialize.mjs'
 import collabPackage from '../../../../../collab/package.json'
 import frontendPackage from '../../../../package.json'
 
@@ -17,17 +17,33 @@ describe('the shared editor schema', () => {
   })
 
   test("resolves Tiptap from this project, not from collab's node_modules", () => {
-    const [starterKit, codeBlock] = extensions()
+    const [starterKit, code] = extensions()
     expect(starterKit).toBeInstanceOf(Extension)
-    expect(codeBlock).toBeInstanceOf(Node)
+    expect(code).toBeInstanceOf(Mark)
   })
 
   test('Markdown written in the browser is what the server writes', () => {
-    const manager = new MarkdownManager({ extensions: extensions() })
-    const markdown = '# Titel\n\n- [x] fertig [[Seite]]\n\n```raw-markdown\n<div>roh</div>\n```'
-    expect(keepWikiLinks(manager.serialize(manager.parse(markdown)).trim())).toBe(
-      '# Titel\n\n- [x] fertig [[Seite]]\n\n<div>roh</div>',
-    )
+    const text = (value: string) => ({ type: 'text', text: value })
+    const json = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 1 }, content: [text('Titel')] },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [text('fertig [[Seite]]')] }],
+            },
+          ],
+        },
+        { type: 'codeBlock', attrs: { language: RAW_MARKDOWN }, content: [text('<div>roh</div>')] },
+      ],
+    }
+    // The document is valid for the editor and written as the server writes it.
+    expect(() => getSchema(extensions()).nodeFromJSON(json).check()).not.toThrow()
+    expect(jsonToMarkdown(json)).toBe('# Titel\n\n- [x] fertig [[Seite]]\n\n<div>roh</div>')
     expect(allowedUri('javascript:alert(1)')).toBe(false)
     expect(allowedUri('/spaces/x')).toBe(true)
     expect(allowedUri('mailto:a@b.de')).toBe(true)

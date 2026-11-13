@@ -101,20 +101,19 @@ for (const path of docs) {
   });
 }
 
-test("a page whose blocks change meaning only together is not opened", () => {
-  // Two bullet lists (different markers) come back as one list.
-  const markdown = "- eins\n\n* zwei";
-  assert.equal(liveDocument(markdown).safe, false);
-  assert.equal(liveDocument("- eins\n\n- zwei").safe, true);
+test("two lists in a row stay two lists", () => {
+  // The second list takes the other marker, so they are not joined into one.
+  for (const markdown of ["- eins\n\n* zwei", "1. eins\n\n1) zwei"]) {
+    assertKeepsMeaning(markdown, markdown);
+  }
 });
 
-test("a block the editor would change is kept as a raw block", () => {
-  // marked and the page view disagree on this table (a `|` inside code ends the cell
-  // for the page view): written back unchanged.
+test("a table is read the way the page view reads it", () => {
+  // A `|` inside code ends the cell for the page view; the editor reads it the same way
+  // (one parser for both), so the table is rich text and keeps its meaning.
   const markdown = "Text\n\n| A | B |\n|---|---|\n| x | `a|b` |\n\nEnde";
-  const { markdown: out, json } = liveSave(markdown);
-  assert.equal(rawBlocks(json), 1);
-  assert.equal(out, markdown);
+  assertKeepsMeaning("table", markdown);
+  assert.equal(rawBlocks(liveSave(markdown).json), 0);
 });
 
 test("the comparison sees what the page view sees", () => {

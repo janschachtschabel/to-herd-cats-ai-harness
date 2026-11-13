@@ -1,0 +1,219 @@
+// Markdown → the editor's document, read with the page view's own parser (review M2
+// S2/S3): micromark with the GFM extensions builds the syntax tree that react-markdown
+// renders, and that tree is turned into the editor's nodes. One parser for the page
+// view, the live editor and the save check, so the editor never reads a page
+// differently from the page view.
+//
+// A top-level block holding what the editor cannot show (raw HTML, reference links
+// and definitions, footnotes, ...) becomes a raw block (`raw-markdown` code block)
+// with exactly its source text, written back unchanged.
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmFromMarkdown } from "mdast-util-gfm";
+import { gfm } from "micromark-extension-gfm";
+import { RAW_MARKDOWN } from "./schema.mjs";
+import { WIKI_LINK, outsideCode } from "./syntax.mjs";
+
+// `[[Titel]]` while parsing: a link `[…]()` of the same length whose text is
+// private-use characters. Like the page view's `[Titel](wiki:…)` it is a link of its
+// own (it ends the text around it, so an address before it is linked the same way) and
+// punctuation at both ends; it is restored as the title's text afterwards.
+const HOLE = "\ue000";
+
+const UNSUPPORTED = new Set([
+  "html",
+  "definition",
+  "footnoteDefinition",
+  "footnoteReference",
+  "linkReference",
+  "imageReference",
+  "yaml",
+]);
+
+/** Whether the editor can represent the node and everything inside it. */
+export function supported(node) {
+  if (UNSUPPORTED.has(node.type)) return false;
+  return (node.children ?? []).every(supported);
+}
+
+/** The page view resolves `[[Titel]]` before parsing (outside code): the title is
+ * literal text for it. Each one is replaced by a placeholder of the same length, so
+ * source positions stay valid: the placeholder's position in the original Markdown is
+ * the wiki link's text. */
+function hideWikiLinks(markdown) {
+  return outsideCode(markdown, (text) =>
+    text.replace(WIKI_LINK, (match) => `[${HOLE.repeat(match.length - 4)}]()`),
+  );
+}
+
+/** A placeholder link (see HOLE). */
+function isHole(node) {
+  return (
+    node.url === "" &&
+    node.children.length === 1 &&
+    node.children[0].type === "text" &&
+    /^\ue000+$/.test(node.children[0].value)
+  );
+}
+
+function withMark(nodes, mark) {
+  return nodes.map((node) => ({ ...node, marks: [...(node.marks ?? []), mark] }));
+}
+
+function inline(nodes, source) {
+  const out = [];
+  for (const node of nodes) {
+    switch (node.type) {
+      case "text":
+        if (node.value) out.push({ type: "text", text: node.value });
+        break;
+      case "inlineCode":
+        if (node.value) {
+          out.push({ type: "text", text: node.value, marks: [{ type: "code" }] });
+        }
+        break;
+      case "emphasis":
+        out.push(...withMark(inline(node.children, source), { type: "italic" }));
+        break;
+      case "strong":
+        out.push(...withMark(inline(node.children, source), { type: "bold" }));
+        break;
+      case "delete":
+        out.push(...withMark(inline(node.children, source), { type: "strike" }));
+        break;
+      case "link":
+        if (isHole(node)) {
+          const { start, end } = node.position;
+          out.push({ type: "text", text: source.slice(start.offset, end.offset) });
+          break;
+        }
+        out.push(
+          ...withMark(inline(node.children, source), {
+            type: "link",
+            attrs: { href: node.url, title: node.title ?? null },
+          }),
+        );
+        break;
+      case "image":
+        out.push({
+          type: "image",
+          attrs: { src: node.url, alt: node.alt ?? null, title: node.title ?? null },
+        });
+        break;
+      case "break":
+        out.push({ type: "hardBreak" });
+        break;
+      default:
+        throw new Error(`unsupported inline ${node.type}`);
+    }
+  }
+  return out;
+}
+
+const paragraph = (content) => ({ type: "paragraph", content });
+
+function items(list, source) {
+  return list.children.map((item) => {
+    let content = blocks(item.children, source);
+    if (content[0]?.type !== "paragraph") content = [paragraph([]), ...content];
+    if (item.checked === null || item.checked === undefined) {
+      return { type: "listItem", content };
+    }
+    return { type: "taskItem", attrs: { checked: item.checked }, content };
+  });
+}
+
+/** A list; a GFM list that mixes task items and plain items becomes one list per run
+ * (the editor has two kinds). */
+function lists(node, source) {
+  if (node.ordered) {
+    const start = node.start ?? 1;
+    return [{ type: "orderedList", attrs: { start }, content: items(node, source) }];
+  }
+  const out = [];
+  for (const item of items(node, source)) {
+    const type = item.type === "taskItem" ? "taskList" : "bulletList";
+    if (out.at(-1)?.type === type) out.at(-1).content.push(item);
+    else out.push({ type, content: [item] });
+  }
+  return out;
+}
+
+function table(node, source) {
+  return {
+    type: "table",
+    content: node.children.map((row, index) => ({
+      type: "tableRow",
+      content: row.children.map((cell, column) => ({
+        type: index === 0 ? "tableHeader" : "tableCell",
+        attrs: { align: node.align?.[column] ?? null },
+        content: [{ type: "tableParagraph", content: inline(cell.children, source) }],
+      })),
+    })),
+  };
+}
+
+function block(node, source) {
+  switch (node.type) {
+    case "paragraph":
+      return [paragraph(inline(node.children, source))];
+    case "heading":
+      return [
+        { type: "heading", attrs: { level: node.depth }, content: inline(node.children, source) },
+      ];
+    case "thematicBreak":
+      return [{ type: "horizontalRule" }];
+    case "blockquote": {
+      const content = blocks(node.children, source);
+      return [{ type: "blockquote", content: content.length ? content : [paragraph([])] }];
+    }
+    case "list":
+      return lists(node, source);
+    case "code": {
+      const language = [node.lang, node.meta].filter(Boolean).join(" ") || null;
+      const content = node.value ? [{ type: "text", text: node.value }] : [];
+      return [{ type: "codeBlock", attrs: { language }, content }];
+    }
+    case "table":
+      return [table(node, source)];
+    default:
+      throw new Error(`unsupported block ${node.type}`);
+  }
+}
+
+function blocks(nodes, source) {
+  return nodes.flatMap((node) => block(node, source));
+}
+
+/** A raw block: the source text of a block the editor cannot show. */
+export function rawBlock(text) {
+  return {
+    type: "codeBlock",
+    attrs: { language: RAW_MARKDOWN },
+    content: text ? [{ type: "text", text }] : [],
+  };
+}
+
+/**
+ * The editor's document for the Markdown. Each top-level block becomes editor nodes,
+ * or a raw block when it holds what the editor cannot show or when `keepRaw(index,
+ * source)` says so. Returns the document and the top-level blocks' source texts.
+ */
+export function parseMarkdown(markdown, keepRaw = () => false) {
+  const hidden = hideWikiLinks(markdown);
+  const tree = fromMarkdown(hidden, {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+  const sources = [];
+  const content = [];
+  tree.children.forEach((node, index) => {
+    const source = markdown.slice(node.position.start.offset, node.position.end.offset);
+    sources.push(source);
+    if (!supported(node) || keepRaw(index, source)) {
+      content.push(rawBlock(source));
+    } else {
+      content.push(...block(node, markdown));
+    }
+  });
+  return { json: { type: "doc", content }, sources };
+}

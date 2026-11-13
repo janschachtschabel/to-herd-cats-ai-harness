@@ -10,7 +10,7 @@ const roundTrip = (md) => yDocToMarkdown(markdownToYDoc(md));
 const FIXTURES = {
   headings: "# Eins\n\n## Zwei\n\n###### Sechs",
   paragraphs: "Erster Absatz.\n\nZweiter Absatz.",
-  marks: "Text mit **fett**, *kursiv*, ~~durch~~ und `code`.",
+  marks: "Text mit **fett**, _kursiv_, ~~durch~~ und `code`.",
   links: '[Seite](https://example.com "Titel") und [relativ](/spaces/x/p/a) und <mailto:a@b.de>',
   images: "![Logo](/api/attachments/01a1d2d9-2de5-75db-9dc6-a6fa1307273d?inline=1)",
   lists: "- a\n- b\n  - c\n\n1. eins\n2. zwei",

@@ -1,6 +1,42 @@
-// Markdown spelling helpers for the editor's serializer (`schema.mjs`): what Tiptap's
-// serializer writes would otherwise mean something else when read again (review M2 R1).
-// Plain ESM without dependencies; the browser's live editor uses it too.
+// Markdown spelling helpers shared by the parser (`parse.mjs`) and the serializer
+// (`serialize.mjs`, `inline.mjs`). Plain ESM without dependencies; the browser's live
+// editor uses them too.
+
+/** `[[Titel]]`: a link to another page, resolved by the page view on the source text
+ * outside code (frontend/src/features/wiki/markdown.ts `resolveWikiLinks`). */
+export const WIKI_LINK = /\[\[([^\]\n]+)\]\]/g;
+
+const FENCE = /^\s*(```|~~~)/;
+const CODE_SPAN = /(?<!\\)(`+)[^`][\s\S]*?(?<!`)\1(?!`)|(`+)/g;
+
+/** The Markdown with `replace` applied to the text outside fenced code and code spans,
+ * line by line, the way the page view finds wiki links. */
+export function outsideCode(markdown, replace) {
+  let inFence = false;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (FENCE.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      let out = "";
+      let last = 0;
+      for (const match of line.matchAll(CODE_SPAN)) {
+        if (match[2]) continue; // a lone backtick run is text
+        out += replace(line.slice(last, match.index)) + match[0];
+        last = match.index + match[0].length;
+      }
+      return out + replace(line.slice(last));
+    })
+    .join("\n");
+}
+
+/** A link mark as one string (canonical form, `canonical.mjs`): href and title. */
+export function linkKey(attrs) {
+  return `link\u0000${attrs?.href ?? ""}\u0000${attrs?.title ?? ""}`;
+}
 
 /** A link or image destination that reads back as the same URL: `<…>` when it holds
  * spaces, angle brackets, backslashes or unbalanced parentheses. */
@@ -11,18 +47,13 @@ export function destination(url) {
     depth += char === "(" ? 1 : char === ")" ? -1 : 0;
     if (depth < 0) break;
   }
-  if (depth === 0 && !/[\s<>\\]/.test(value)) return value;
+  if (value && depth === 0 && !/[\s<>\\\p{Cc}]/u.test(value)) return value;
   return `<${value.replace(/[\\<>]/g, "\\$&")}>`;
 }
 
 /** A link or image title in double quotes. */
 export function title(value) {
   return `"${String(value).replace(/[\\"]/g, "\\$&")}"`;
-}
-
-/** Image alt text (the serializer writes it unescaped). */
-export function altText(value) {
-  return String(value ?? "").replace(/[\\[\]]/g, "\\$&");
 }
 
 // A line of paragraph text that would start a block when read again: ATX heading,
@@ -36,53 +67,12 @@ const BLOCK_START = [
   /^( {0,3})([-*_])(?:[ \t]*\2){2,}[ \t]*$/,
 ];
 
-/** Paragraph text whose lines cannot be read as the start of another block: the
- * first character of such a line is backslash-escaped (`\# kein Titel`, `2026\. …`). */
-export function escapeBlockStarts(markdown) {
-  return markdown
-    .split("\n")
-    .map((line) => {
-      for (const pattern of BLOCK_START) {
-        const match = pattern.exec(line);
-        if (match) return `${match[1]}\\${line.slice(match[1].length)}`;
-      }
-      return line;
-    })
-    .join("\n");
-}
-
-const ESCAPED_WIKI_LINK = /\\\[\\\[([^\n]+?)\\\]\\\]/g; // `\[\[Titel\]\]`
-const FENCE = /^\s*(```|~~~)/;
-const CODE_SPAN = /(?<!\\)(`+)[^`][\s\S]*?(?<!`)\1(?!`)|(`+)/g;
-
-function unescapeWikiLinks(text) {
-  // The serializer escapes `_`, `*`, `~`, `` ` `` and `\` inside the title too; the
-  // page view looks the page up by the title as written.
-  return text.replace(
-    ESCAPED_WIKI_LINK,
-    (_, inner) => `[[${inner.replace(/\\([\\`*_~])/g, "$1")}]]`,
-  );
-}
-
-/** The serializer escapes brackets, which would turn `[[Titel]]` (a link to another
- * page, resolved by the browser) into literal text: wiki links are written back as
- * they came, outside fenced code and code spans. */
-export function keepWikiLinks(markdown) {
-  let inFence = false;
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (FENCE.test(line)) inFence = !inFence;
-      else if (!inFence) {
-        let out = "";
-        let last = 0;
-        for (const match of line.matchAll(CODE_SPAN)) {
-          out += unescapeWikiLinks(line.slice(last, match.index)) + match[0];
-          last = match.index + match[0].length;
-        }
-        return out + unescapeWikiLinks(line.slice(last));
-      }
-      return line;
-    })
-    .join("\n");
+/** A line of inline text that cannot be read as the start of another block: the
+ * character that would start it is backslash-escaped (`\# kein Titel`, `2026\. …`). */
+export function escapeBlockStart(line) {
+  for (const pattern of BLOCK_START) {
+    const match = pattern.exec(line);
+    if (match) return `${match[1]}\\${line.slice(match[1].length)}`;
+  }
+  return line;
 }

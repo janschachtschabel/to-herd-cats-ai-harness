@@ -1,16 +1,20 @@
 // The editor's extensions, one list for the browser's live editor and for the collab
-// process (Markdown conversion), so both use the same schema. Plain ESM, depends
-// only on Tiptap packages.
+// process, so both use the same schema. Plain ESM, depends only on Tiptap packages.
+//
+// The schema holds only what Markdown can say (review M2 S2): images are inline, as in
+// Markdown; a table cell holds one line of text (`tableParagraph`: no blocks, no hard
+// breaks); a heading has no hard breaks; code may carry a link or emphasis
+// (`` [`a`](b) ``, `` **`a`** ``). Markdown is read and written by `parse.mjs` and
+// `serialize.mjs`, not by Tiptap's Markdown support.
+import { Node } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
+import Code from "@tiptap/extension-code";
 import CodeBlock from "@tiptap/extension-code-block";
+import Heading from "@tiptap/extension-heading";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
-import Paragraph from "@tiptap/extension-paragraph";
-import { Table, TableKit } from "@tiptap/extension-table";
-import { ListItem, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
-import { altText, destination, escapeBlockStarts, keepWikiLinks, title } from "./syntax.mjs";
-
-export { keepWikiLinks };
+import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
 
 export const RAW_MARKDOWN = "raw-markdown";
 
@@ -25,128 +29,57 @@ export function allowedUri(url) {
   return LINK_PROTOCOLS.has(value.slice(0, colon).toLowerCase());
 }
 
-function text(node) {
-  return (node.content ?? []).map((child) => child.text ?? "").join("");
-}
+const LINE = "(text | image)*"; // inline content without hard breaks
 
-/** A fence longer than any run of backticks in the code, so the code cannot end it. */
-function fenceFor(code) {
-  const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
-  return "`".repeat(Math.max(3, longest + 1));
-}
-
-/** Code blocks; a `raw-markdown` block is Markdown the editor cannot show, written
- * back exactly as it came. */
-const SafeCodeBlock = CodeBlock.extend({
-  renderMarkdown(node) {
-    const code = text(node);
-    const language = node.attrs?.language || "";
-    if (language === RAW_MARKDOWN) return code;
-    const fence = fenceFor(code);
-    return `${fence}${language}\n${code}\n${fence}`;
-  },
+/** The one line of text of a table cell (GFM cells hold inline content only). */
+const TableParagraph = Node.create({
+  name: "tableParagraph",
+  content: LINE,
+  parseHTML: () => [
+    { tag: "p", context: "tableCell/", priority: 60 },
+    { tag: "p", context: "tableHeader/", priority: 60 },
+  ],
+  renderHTML: () => ["p", 0],
 });
 
-const NBSP = "\u00a0";
-const EMPTY_PARAGRAPH = "&nbsp;";
-
-/** Paragraphs whose text cannot turn into other blocks when read again, and a
- * paragraph of a single `&nbsp;` (a deliberate blank paragraph) kept as one. An image
- * alone in its paragraph stays in it (images are inline, review M2 S1). */
-const SafeParagraph = Paragraph.extend({
-  parseMarkdown(token, helpers) {
-    return helpers.createNode("paragraph", undefined, helpers.parseInline(token.tokens ?? []));
-  },
-  renderMarkdown(node, h, ctx) {
-    const content = node.content ?? [];
-    if (content.length === 0) {
-      const previous = ctx?.previousNode;
-      const afterEmpty = previous?.type === "paragraph" && !(previous.content ?? []).length;
-      return afterEmpty ? EMPTY_PARAGRAPH : "";
-    }
-    if (content.length === 1 && content[0].text === NBSP && !content[0].marks?.length) {
-      return EMPTY_PARAGRAPH;
-    }
-    return escapeBlockStarts(h.renderChildren(content));
-  },
-});
-
-/** Link destinations and titles written so they read back as the same link. */
-const SafeLink = Link.extend({
-  renderMarkdown(node, h) {
-    const href = destination(node.attrs?.href ?? "");
-    const text = h.renderChildren(node);
-    return node.attrs?.title
-      ? `[${text}](${href} ${title(node.attrs.title)})`
-      : `[${text}](${href})`;
-  },
-});
-
-const SafeImage = Image.extend({
-  renderMarkdown(node) {
-    const src = destination(node.attrs?.src ?? "");
-    const alt = altText(node.attrs?.alt);
-    return node.attrs?.title ? `![${alt}](${src} ${title(node.attrs.title)})` : `![${alt}](${src})`;
-  },
-});
-
-// Tiptap's own ordered-list tokenizer misreads content indented by three spaces
-// (`1. Text` followed by a code block); marked's list tokens are read instead, item by
-// item like a bullet list's.
-const MarkedOrderedList = OrderedList.extend({
-  markdownTokenizer: null,
-  parseMarkdown(token, helpers) {
-    if (token.type !== "list" || !token.ordered) return [];
-    const content = token.items ? helpers.parseChildren(token.items) : [];
-    const start = typeof token.start === "number" ? token.start : 1;
-    return { type: "orderedList", ...(start !== 1 && { attrs: { start } }), content };
-  },
-});
-
-// The table serializer surrounds a table with blank lines of its own, which the next
-// conversion reads as empty paragraphs: every live save would add blank lines.
-const TightTable = Table.extend({
-  renderMarkdown(node, h) {
-    return this.parent(node, h).replace(/^\n+|\n+$/g, "");
-  },
-});
-
-// Text after a nested block in a list item (`1. a`, a code block, then more text)
-// comes as a bare text token whose inline formatting Tiptap would drop: read it as
-// the paragraph it is.
-const BlockTextListItem = ListItem.extend({
-  parseMarkdown(token, helpers) {
-    const tokens = (token.tokens ?? []).map((child) =>
-      child.type === "text" && child.tokens ? { ...child, type: "paragraph" } : child,
-    );
-    return this.parent({ ...token, tokens }, helpers);
+/** Images as Markdown has them: source, alt text and title; no marks (the Y.Doc keeps
+ * none on an image, so a linked image could not be shared; it stays a raw block). */
+const MarkdownImage = Image.extend({
+  marks: "",
+  addAttributes() {
+    return {
+      src: { default: null },
+      alt: { default: null },
+      title: { default: null },
+    };
   },
 });
 
 export function extensions() {
   return [
     StarterKit.configure({
-      codeBlock: false,
+      code: false,
+      heading: false,
       undoRedo: false, // the browser uses Yjs' undo
       underline: false, // no Markdown for it
       // Each browser that joins would add its own empty last paragraph to the shared
-      // document (saved as `&nbsp;`); the gap cursor reaches the end without one.
+      // document; the gap cursor reaches the end without one.
       trailingNode: false,
-      paragraph: false,
       link: false,
-      orderedList: false,
-      listItem: false,
+      codeBlock: false,
     }),
-    BlockTextListItem,
-    SafeParagraph,
-    SafeLink.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
-    MarkedOrderedList,
-    SafeCodeBlock,
+    Code.extend({ excludes: "" }),
+    Heading.extend({ content: LINE }),
+    CodeBlock,
+    Link.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
     // Inline, as in Markdown: an image may stand in a sentence, a cell, a list item or a
     // heading; as a block node the browser would delete such a paragraph (review M2 S1).
-    SafeImage.configure({ inline: true }),
-    TightTable.configure({ resizable: false }),
-    TableKit.configure({ table: false }),
+    MarkdownImage.configure({ inline: true }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader.extend({ content: "tableParagraph" }),
+    TableCell.extend({ content: "tableParagraph" }),
+    TableParagraph,
     TaskList,
     TaskItem.configure({ nested: true }),
   ];
