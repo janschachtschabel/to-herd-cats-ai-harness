@@ -56,7 +56,7 @@ describe('conversation', () => {
     expect(other.queryByRole('button', { name: 'Nachricht bearbeiten' })).toBeNull()
     expect(other.queryByRole('button', { name: 'Nachricht löschen' })).toBeNull()
     expect(other.getByRole('button', { name: 'Reaktion hinzufügen' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Nachricht an #allgemein' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Nachricht an #allgemein' })).toBeInTheDocument()
   })
 
   test('a moderator of the space deletes others’ messages, never edits them', async () => {
@@ -76,7 +76,7 @@ describe('conversation', () => {
     conversationApi({ conversation: channel, messages, role: 'admin' })
     await renderApp(`/c/${channel.id}`)
     await screen.findByText('Alt')
-    expect(screen.queryByRole('textbox', { name: /Nachricht an/ })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /Nachricht an/ })).toBeNull()
     expect(screen.getByRole('note')).toHaveTextContent('Dieser Kanal ist archiviert.')
     const own = within(article('Mia Muster', 'Alt'))
     expect(own.queryByRole('button', { name: 'Nachricht bearbeiten' })).toBeNull()
@@ -109,7 +109,7 @@ describe('conversation', () => {
       },
     })
     const { user } = await renderApp(`/c/${channel.id}`)
-    const box = await screen.findByRole('textbox', { name: 'Nachricht an #allgemein' })
+    const box = await screen.findByRole('combobox', { name: 'Nachricht an #allgemein' })
     await user.type(box, 'Erste Zeile{Shift>}{Enter}{/Shift}zweite Zeile{Enter}')
     expect(box).toHaveValue('')
     const pending = await screen.findByText('Wird gesendet …')
@@ -148,11 +148,15 @@ describe('conversation', () => {
       },
     })
     const { user } = await renderApp(`/c/${channel.id}`)
-    const box = await screen.findByRole('textbox', { name: 'Nachricht an #allgemein' })
+    const box = await screen.findByRole('combobox', { name: 'Nachricht an #allgemein' })
+    expect(box).toHaveAttribute('aria-expanded', 'false')
     await user.type(box, 'Frage an @le')
     const option = await screen.findByRole('option', { name: 'Lea Löwe' })
     expect(option).toHaveAttribute('aria-selected', 'true')
+    expect(box).toHaveAttribute('aria-expanded', 'true')
+    expect(box).toHaveAttribute('aria-autocomplete', 'list')
     await user.keyboard('{Enter}')
+    expect(box).toHaveAttribute('aria-expanded', 'false')
     expect(box).toHaveValue(`Frage an @[Lea Löwe](user:${lea.id}) `)
     await user.type(box, 'bitte{Enter}')
     await waitFor(() =>
@@ -167,6 +171,33 @@ describe('conversation', () => {
     expect(
       await screen.findByText('Nicht benachrichtigt: Lea Löwe – kann dieses Gespräch nicht sehen.'),
     ).toBeInTheDocument()
+  })
+
+  test('a thread whose message is not among the loaded ones shows it all the same', async () => {
+    const channel = makeConversation()
+    const parent = makeMessage({
+      conversation_id: channel.id,
+      body_md: 'Alte Frage',
+      reply_count: 1,
+    })
+    const reply = makeMessage({
+      conversation_id: channel.id,
+      parent_id: parent.id,
+      body_md: 'Späte Antwort',
+    })
+    const api = conversationApi({
+      conversation: channel,
+      messages: [makeMessage({ conversation_id: channel.id, body_md: 'Neueres' })],
+      extra: {
+        'GET /api/messages/:id': parent,
+        'GET /api/messages/:id/replies': page([reply]),
+      },
+    })
+    await renderApp(`/c/${channel.id}?thread=${parent.id}&message=${reply.id}`)
+    const thread = await screen.findByRole('complementary', { name: 'Thread' })
+    expect(await within(thread).findByText('Alte Frage')).toBeInTheDocument()
+    expect(within(thread).getByText('Späte Antwort')).toBeInTheDocument()
+    expect(api.find('GET', `/api/messages/${parent.id}`)).toHaveLength(1)
   })
 
   test('a conversation one lost access to says so instead of failing', async () => {

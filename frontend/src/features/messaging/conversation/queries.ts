@@ -2,6 +2,7 @@ import {
   infiniteQueryOptions,
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
   type InfiniteData,
   type QueryClient,
@@ -64,6 +65,21 @@ export const repliesQuery = (conversationId: string, parentId: string) =>
 
 export function useReplies(conversationId: string, parentId: string) {
   return usePaged(repliesQuery(conversationId, parentId))
+}
+
+/** One message by id: a thread's parent that is not among the loaded messages (an
+ *  older one, a link to a reply). Asked only while `enabled`. */
+export function useMessage(conversationId: string, messageId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...messagingKeys.message(conversationId, messageId)],
+    queryFn: async () =>
+      unwrap(
+        await api.GET('/api/messages/{message_id}', {
+          params: { path: { message_id: messageId } },
+        }),
+      ),
+    enabled,
+  })
 }
 
 type Pages = InfiniteData<Page<Message>>

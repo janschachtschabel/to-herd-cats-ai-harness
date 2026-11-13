@@ -61,7 +61,7 @@ describe('page discussion', () => {
     ).toBeInTheDocument()
     expect(within(panel).getByText('Jemand hat Version 2 wiederhergestellt.')).toBeInTheDocument()
     expect(within(panel).getByText('Gilt das auch für Teilzeit?')).toBeInTheDocument()
-    expect(within(panel).getByRole('textbox', { name: 'Zur Seite schreiben' })).toBeInTheDocument()
+    expect(within(panel).getByRole('combobox', { name: 'Zur Seite schreiben' })).toBeInTheDocument()
 
     await user.click(within(panel).getByRole('checkbox', { name: 'Systemmeldungen ausblenden' }))
     await waitFor(() =>

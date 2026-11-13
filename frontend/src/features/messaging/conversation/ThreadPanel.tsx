@@ -9,7 +9,7 @@ import { ConversationContext, useConversationView } from './ConversationContext'
 import { MessageItem } from './MessageItem'
 import { PendingItem } from './PendingItem'
 import { usePending } from './pending'
-import { useReplies } from './queries'
+import { useMessage, useReplies } from './queries'
 import { CannotPost } from './CannotPost'
 
 /** A message's thread beside the conversation: the message, its replies (oldest
@@ -23,13 +23,15 @@ export function ThreadPanel({
   parentId: string
   /** In place of the conversation (a narrow panel) rather than beside it. */
   inline?: boolean
-  /** The message itself, if it is among the loaded ones. */
+  /** The message itself, if it is among the loaded ones (else it is fetched). */
   parent: Message | undefined
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const view = useConversationView()
   const { conversation } = view
+  const fetched = useMessage(conversation.id, parentId, parent === undefined)
+  const top = parent ?? fetched.data
   const replies = useReplies(conversation.id, parentId)
   const pending = usePending(conversation.id, parentId)
   const sent = new Set(replies.items.map((m) => m.client_id))
@@ -48,9 +50,9 @@ export function ThreadPanel({
       </header>
       <ConversationContext.Provider value={inThread}>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {parent && (
+          {top && (
             <div className="border-b pb-2">
-              <MessageItem message={parent} />
+              <MessageItem message={top} />
             </div>
           )}
           {replies.isPending ? (

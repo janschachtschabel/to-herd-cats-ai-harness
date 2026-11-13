@@ -128,6 +128,10 @@ export function Composer({
       <div className="flex items-end gap-2">
         <textarea
           ref={area}
+          // A combobox while typing "@name": the people list is its popup.
+          role="combobox"
+          aria-expanded={pickerOpen}
+          aria-autocomplete="list"
           aria-label={label}
           aria-describedby={hintId}
           aria-controls={pickerOpen ? listId : undefined}
