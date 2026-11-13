@@ -2,9 +2,8 @@
 
 Kinds: `open` and `team` are created through the API by anyone with `space.create`, who
 becomes the space's admin; `personal` is created only here, once per person, with that
-person as its one fixed member. Slugs come from the name, unique per organisation
-(`name`, `name-2`, ...), and stay when the space is renamed. Changes made by someone
-are audited in their transaction; the personal space of a new person and the general
+person as its one fixed member. Names need not be unique; URLs use ids. Changes made
+by someone are audited in their transaction; the personal space of a new person and the general
 space of a new installation come with `user.created` and bootstrap.
 """
 
@@ -19,7 +18,6 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
-from app.core.slug import slugify
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import Space, SpaceKind
@@ -29,8 +27,6 @@ from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 
 GENERAL_SPACE_NAME = "Allgemein"
-GENERAL_SPACE_SLUG = "allgemein"
-_SLUG_BASE_LENGTH = 72  # leaves room for a "-<n>" suffix within the column's 80
 
 
 class SpaceService:
@@ -64,7 +60,7 @@ class SpaceService:
 
     async def create_general(self, org_id: uuid.UUID) -> None:
         """The open space every installation starts with (bootstrap), unless it exists."""
-        if not await self.spaces.slug_taken(org_id, GENERAL_SPACE_SLUG):
+        if not await self.spaces.general_exists(org_id, GENERAL_SPACE_NAME):
             await self._insert(org_id, SpaceKind.OPEN, GENERAL_SPACE_NAME)
 
     async def get(self, actor: Actor, space_id: uuid.UUID) -> Space:
@@ -177,17 +173,10 @@ class SpaceService:
         icon: str | None = None,
         owner: uuid.UUID | None = None,
     ) -> Space:
-        await self.spaces.lock_slugs(org_id)
-        base = slugify(name, max_length=_SLUG_BASE_LENGTH)
-        slug, n = base, 1
-        while await self.spaces.slug_taken(org_id, slug):
-            n += 1
-            slug = f"{base}-{n}"
         space = Space(
             org_id=org_id,
             kind=kind,
             name=name,
-            slug=slug,
             description=description,
             icon=icon,
             owner_user_id=owner,

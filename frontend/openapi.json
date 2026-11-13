@@ -344,16 +344,11 @@
           "name": {
             "title": "Name",
             "type": "string"
-          },
-          "slug": {
-            "title": "Slug",
-            "type": "string"
           }
         },
         "required": [
           "id",
-          "name",
-          "slug"
+          "name"
         ],
         "title": "OrgOut",
         "type": "object"
@@ -723,10 +718,6 @@
             ],
             "title": "Owner User Id"
           },
-          "slug": {
-            "title": "Slug",
-            "type": "string"
-          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -736,7 +727,6 @@
           "id",
           "kind",
           "name",
-          "slug",
           "description",
           "icon",
           "owner_user_id",

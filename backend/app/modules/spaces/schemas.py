@@ -15,7 +15,6 @@ class SpaceOut(BaseModel):
     id: uuid.UUID
     kind: SpaceKind
     name: str
-    slug: str
     description: str | None
     icon: str | None
     owner_user_id: uuid.UUID | None
@@ -28,7 +27,6 @@ class SpaceOut(BaseModel):
             id=space.id,
             kind=space.kind,
             name=space.name,
-            slug=space.slug,
             description=space.description,
             icon=space.icon,
             owner_user_id=space.owner_user_id,

@@ -119,7 +119,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
 export function makeMe(permissions: Permission[], user: Partial<User> = {}): Me {
   return {
     user: makeUser({ email: 'me@example.com', name: 'Mia Muster', ...user }),
-    org: { id: id(), name: 'Beispiel GmbH', slug: 'beispiel' },
+    org: { id: id(), name: 'Beispiel GmbH' },
     permissions,
   }
 }
@@ -133,7 +133,6 @@ export function makeSpace(overrides: Partial<Space> = {}): Space {
     id: id(),
     kind: 'team',
     name: 'Projekt Apfel',
-    slug: 'projekt-apfel',
     description: null,
     icon: null,
     owner_user_id: null,

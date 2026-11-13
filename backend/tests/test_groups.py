@@ -124,7 +124,7 @@ async def test_names_are_unique(owner: AsyncClient, group: Group, make_group) ->
 async def test_members_are_people_of_the_organisation(
     owner: AsyncClient, group: Group, member: User, make_user, session: AsyncSession
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
     stranger = await make_user(organization=elsewhere)
@@ -170,7 +170,7 @@ async def test_lists_are_paginated(owner: AsyncClient, make_group, make_user) ->
 async def test_other_organisations_groups_are_invisible(
     owner: AsyncClient, session: AsyncSession
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
     foreign = await GroupRepository(session).add(Group(org_id=elsewhere.id, name="Fremd"))

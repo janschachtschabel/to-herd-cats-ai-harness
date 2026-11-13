@@ -56,7 +56,7 @@ async def real_db(engine: AsyncEngine) -> AsyncIterator[RealDb]:
     set_database(database)
     try:
         async with database.session_factory() as session:
-            org = Organization(name="Real Org", slug="real-org")
+            org = Organization(name="Real Org")
             session.add(org)
             await session.flush()
             emails = {}

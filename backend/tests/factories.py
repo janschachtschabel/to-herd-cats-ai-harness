@@ -37,7 +37,7 @@ async def login(client: AsyncClient, email: str, password: str = PASSWORD) -> di
 
 @pytest.fixture
 async def org(session: AsyncSession) -> Organization:
-    organization = Organization(name="Test Org", slug="test-org")
+    organization = Organization(name="Test Org")
     session.add(organization)
     await session.flush()
     return organization

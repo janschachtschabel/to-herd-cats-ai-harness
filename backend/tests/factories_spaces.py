@@ -49,7 +49,6 @@ async def make_space(session: AsyncSession, org: Organization) -> MakeSpace:
                 org_id=org.id,
                 kind=SpaceKind(kind),
                 name=name or f"Space {counter}",
-                slug=f"space-{counter}",
             )
         )
         for holder, role in members:

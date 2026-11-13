@@ -32,7 +32,7 @@ async def test_new_user_gets_personal_space(owner: AsyncClient, make_client) -> 
     spaces = (await lea.get(SPACES)).json()["items"]
     assert [s["kind"] for s in spaces] == ["personal"]
     space = spaces[0]
-    assert (space["name"], space["slug"]) == ("Lea Löwe", "lea-loewe")
+    assert space["name"] == "Lea Löwe"
     assert space["owner_user_id"] == created.json()["id"]
     members = (await lea.get(f"{SPACES}/{space['id']}/members")).json()["items"]
     assert members == [
@@ -67,7 +67,7 @@ async def test_member_creates_space_and_administers_it(
     )
     assert r.status_code == 201, r.text
     space = r.json()
-    assert (space["kind"], space["slug"], space["version"]) == (kind, "projekt-uebersicht", 1)
+    assert (space["kind"], space["name"], space["version"]) == (kind, "Projekt Übersicht", 1)
     assert (space["description"], space["icon"], space["owner_user_id"]) == ("d", "📁", None)
     members = (await member_client.get(f"{SPACES}/{space['id']}/members")).json()["items"]
     assert members == [
@@ -76,17 +76,16 @@ async def test_member_creates_space_and_administers_it(
     assert (await member_client.get(f"{SPACES}/{space['id']}")).json() == space
 
 
-async def test_slug_gets_a_suffix_on_collision(owner: AsyncClient, make_user) -> None:
-    slugs = [
-        (await owner.post(SPACES, json={"kind": "team", "name": "Projekt X"})).json()["slug"]
+async def test_names_need_not_be_unique(owner: AsyncClient, make_user) -> None:
+    ids = {
+        (await owner.post(SPACES, json={"kind": "team", "name": "Projekt X"})).json()["id"]
         for _ in range(3)
-    ]
-    assert slugs == ["projekt-x", "projekt-x-2", "projekt-x-3"]
-    # Personal spaces share the namespace: two people with one name.
+    }
+    assert len(ids) == 3
     first = await make_user(name="Kim")
     second = await make_user(name="Kim")
-    spaces = {s["owner_user_id"]: s["slug"] for s in (await owner.get(SPACES)).json()["items"]}
-    assert (spaces[str(first.id)], spaces[str(second.id)]) == ("kim", "kim-2")
+    names = {s["owner_user_id"]: s["name"] for s in (await owner.get(SPACES)).json()["items"]}
+    assert (names[str(first.id)], names[str(second.id)]) == ("Kim", "Kim")
 
 
 @pytest.mark.parametrize("kind", ["team", "personal"])
@@ -133,17 +132,14 @@ async def test_admin_sees_every_space(
 async def test_other_organisations_spaces_are_invisible(
     owner: AsyncClient, session: AsyncSession
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
-    foreign = Space(org_id=elsewhere.id, kind=SpaceKind.OPEN, name="Fremd", slug="fremd")
+    foreign = Space(org_id=elsewhere.id, kind=SpaceKind.OPEN, name="Fremd")
     session.add(foreign)
     await session.flush()
     assert (await owner.get(f"{SPACES}/{foreign.id}")).status_code == 404
     assert str(foreign.id) not in await _ids(owner)
-    # The same slug may exist in another organisation.
-    r = await owner.post(SPACES, json={"kind": "open", "name": "Fremd"})
-    assert r.json()["slug"] == "fremd"
 
 
 async def test_update_checks_version_and_never_changes_kind(
@@ -162,7 +158,6 @@ async def test_update_checks_version_and_never_changes_kind(
         "🍎",
         2,
     )
-    assert body["slug"] == space.slug  # links stay valid across renames
     stale = await member_client.patch(base, json={"name": "Alt", "version": 1})
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "spaces.version_conflict"
@@ -206,9 +201,9 @@ async def test_bootstrap_creates_allgemein_once(session: AsyncSession) -> None:
     await ensure_bootstrap(session, BOOT)
     await ensure_bootstrap(session, BOOT)
     spaces = (await session.scalars(select(Space).order_by(Space.kind))).all()
-    assert [(s.kind, s.slug, s.name) for s in spaces] == [
-        ("open", "allgemein", "Allgemein"),
-        ("personal", "boss", "boss"),
+    assert [(s.kind, s.name) for s in spaces] == [
+        ("open", "Allgemein"),
+        ("personal", "boss"),
     ]
     boss = (await session.scalars(select(User))).one()
     assert spaces[1].owner_user_id == boss.id

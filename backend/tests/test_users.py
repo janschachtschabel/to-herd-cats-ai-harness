@@ -198,7 +198,7 @@ async def test_list_is_paginated(owner: AsyncClient, make_user) -> None:
 async def test_other_organisations_are_invisible(
     owner: AsyncClient, make_user, session: AsyncSession
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
     stranger = await make_user(organization=elsewhere)

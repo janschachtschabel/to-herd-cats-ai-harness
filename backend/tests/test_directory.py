@@ -65,7 +65,7 @@ async def test_inactive_people_and_other_organisations_are_left_out(
     member_client: AsyncClient, make_user, session
 ) -> None:
     await make_user(name="Ina Inaktiv", is_active=False)
-    other = Organization(name="Other", slug="other")
+    other = Organization(name="Other")
     session.add(other)
     await session.flush()
     await make_user(name="Fritz Fremd", organization=other)

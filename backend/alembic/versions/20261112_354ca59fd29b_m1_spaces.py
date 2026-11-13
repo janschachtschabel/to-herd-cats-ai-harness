@@ -21,7 +21,6 @@ def upgrade() -> None:
         "space",
         sa.Column("kind", sa.String(length=16), nullable=False),
         sa.Column("name", sa.String(length=120), nullable=False),
-        sa.Column("slug", sa.String(length=80), nullable=False),
         sa.Column("description", sa.String(length=1000), nullable=True),
         sa.Column("icon", sa.String(length=32), nullable=True),
         sa.Column("owner_user_id", sa.UUID(), nullable=True),
@@ -44,7 +43,6 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_space")),
         sa.UniqueConstraint("org_id", "owner_user_id", name=op.f("uq_space_org_id_owner_user_id")),
-        sa.UniqueConstraint("org_id", "slug", name=op.f("uq_space_org_id_slug")),
     )
     op.create_index(op.f("ix_space_org_id"), "space", ["org_id"], unique=False)
     op.create_table(

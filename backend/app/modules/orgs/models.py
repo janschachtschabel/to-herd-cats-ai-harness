@@ -10,4 +10,3 @@ class Organization(UuidPk, Base):
     __tablename__ = "organization"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)

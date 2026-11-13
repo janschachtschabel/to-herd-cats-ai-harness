@@ -21,7 +21,6 @@ class Space(UuidPk, OrgScoped, Base):
 
     __tablename__ = "space"
     __table_args__ = (
-        UniqueConstraint("org_id", "slug"),
         UniqueConstraint("org_id", "owner_user_id"),
         CheckConstraint("kind IN ('open', 'team', 'personal')", name="kind"),
         CheckConstraint("(kind = 'personal') = (owner_user_id IS NOT NULL)", name="personal_owner"),
@@ -29,7 +28,6 @@ class Space(UuidPk, OrgScoped, Base):
 
     kind: Mapped[SpaceKind] = mapped_column(String(16), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    slug: Mapped[str] = mapped_column(String(80), nullable=False)  # stays when renamed
     description: Mapped[str | None] = mapped_column(String(1000))
     icon: Mapped[str | None] = mapped_column(String(32))
     # The person a personal space belongs to; NULL for every other kind.

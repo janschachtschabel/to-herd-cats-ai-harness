@@ -107,7 +107,7 @@ async def test_deactivated_people_keep_their_memberships(
 async def test_new_members_must_exist_in_the_organisation(
     owner: AsyncClient, team_space: Space, make_user, session: AsyncSession
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
     stranger = await make_user(organization=elsewhere)

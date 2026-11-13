@@ -20,10 +20,8 @@ def upgrade() -> None:
     op.create_table(
         "organization",
         sa.Column("name", sa.String(length=120), nullable=False),
-        sa.Column("slug", sa.String(length=80), nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_organization")),
-        sa.UniqueConstraint("slug", name=op.f("uq_organization_slug")),
     )
     op.create_table(
         "rate_limit_hit",

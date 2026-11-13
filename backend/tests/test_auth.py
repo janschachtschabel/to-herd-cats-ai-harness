@@ -61,7 +61,7 @@ async def test_login_sets_cookie_and_me_works(client: AsyncClient, owner_user: U
     assert body["user"]["email"] == "owner@example.com"
     assert body["user"]["system_role"] == "owner"
     assert body["user"]["version"] == owner_user.version
-    assert body["org"] == {"id": str(owner_user.org_id), "name": "Test Org", "slug": "test-org"}
+    assert body["org"] == {"id": str(owner_user.org_id), "name": "Test Org"}
     assert "password_hash" not in body["user"]
 
     me = await client.get("/api/auth/me")
@@ -266,7 +266,7 @@ BOOT = Settings(
 async def test_bootstrap_creates_org_and_owner(session: AsyncSession, client: AsyncClient) -> None:
     await ensure_bootstrap(session, BOOT)
     org = (await session.scalars(select(Organization))).one()
-    assert (org.name, org.slug) == ("Müller & Söhne", "mueller-soehne")
+    assert org.name == "Müller & Söhne"
     user = (await session.scalars(select(User))).one()
     assert (user.email, user.system_role, user.org_id) == ("boss@example.com", "owner", org.id)
     await login(client, "boss@example.com", "boss-password-123")

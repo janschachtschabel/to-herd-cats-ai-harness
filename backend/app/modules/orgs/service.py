@@ -8,7 +8,6 @@ from app.core.config import Settings
 from app.core.principal import SystemRole
 from app.core.repository import advisory_xact_lock
 from app.core.security import hash_password_async
-from app.core.slug import slugify
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
@@ -40,7 +39,7 @@ async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
     org = await orgs.get_default()
     if org is None:
         name = settings.bootstrap_org_name
-        org = await orgs.add(Organization(name=name, slug=slugify(name)))
+        org = await orgs.add(Organization(name=name))
     owner = await users.add(
         User(
             org_id=org.id,

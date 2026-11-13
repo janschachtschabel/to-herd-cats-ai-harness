@@ -458,8 +458,6 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            /** Slug */
-            slug: string;
         };
         /** Page[AuditOut] */
         Page_AuditOut_: {
@@ -582,8 +580,6 @@ export interface components {
             name: string;
             /** Owner User Id */
             owner_user_id: string | null;
-            /** Slug */
-            slug: string;
             /** Version */
             version: number;
         };

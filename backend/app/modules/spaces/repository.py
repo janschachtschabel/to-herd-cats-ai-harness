@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
-from app.core.repository import BaseRepository, advisory_xact_lock
+from app.core.repository import BaseRepository
 from app.modules.groups.models import Group
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.users.models import User
@@ -43,12 +43,11 @@ def held_by(principals: Sequence[Principal]) -> ColumnElement[bool]:
 class SpaceRepository(BaseRepository[Space]):
     model = Space
 
-    async def lock_slugs(self, org_id: uuid.UUID) -> None:
-        """Serialise slug allocation in an organisation (find a free one, then insert)."""
-        await advisory_xact_lock(self.session, f"spaces:{org_id}")
-
-    async def slug_taken(self, org_id: uuid.UUID, slug: str) -> bool:
-        stmt = select(exists().where(Space.org_id == org_id, Space.slug == slug))
+    async def general_exists(self, org_id: uuid.UUID, name: str) -> bool:
+        """Whether the organisation has an open space of that name (bootstrap's)."""
+        stmt = select(
+            exists().where(Space.org_id == org_id, Space.kind == SpaceKind.OPEN, Space.name == name)
+        )
         return bool(await self.session.scalar(stmt))
 
     async def get_for_update(self, org_id: uuid.UUID, space_id: uuid.UUID) -> Space | None:

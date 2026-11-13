@@ -8,4 +8,3 @@ class OrgOut(BaseModel):
 
     id: uuid.UUID
     name: str
-    slug: str

@@ -62,9 +62,7 @@ async def actors_and_spaces(
             if kind == SpaceKind.PERSONAL:  # someone else's, the person joins it below
                 space = await personal_space_of(session, await make_user())
             else:
-                space = await spaces.add(
-                    Space(org_id=org.id, kind=kind, name="x", slug=f"s-{uuid7()}")
-                )
+                space = await spaces.add(Space(org_id=org.id, kind=kind, name="x"))
             direct, via_group = MODES[mode]
             if direct:
                 await spaces.set_member(space.id, Principal.user(person.id), direct)
@@ -173,10 +171,10 @@ async def test_require_hides_invisible_spaces_and_forbids_the_rest(
 async def test_other_organisations_spaces_do_not_exist_for_their_admins(
     session: AsyncSession, owner_user: User
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
-    foreign = Space(org_id=elsewhere.id, kind=SpaceKind.OPEN, name="F", slug="f")
+    foreign = Space(org_id=elsewhere.id, kind=SpaceKind.OPEN, name="F")
     session.add(foreign)
     await session.flush()
     actor = await actor_of(session, owner_user)

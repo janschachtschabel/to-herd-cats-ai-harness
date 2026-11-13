@@ -251,7 +251,7 @@ async def test_audit_list_is_newest_first_filtered_and_paginated(
 async def test_other_organisations_entries_are_invisible(
     owner: AsyncClient, session: AsyncSession, make_user
 ) -> None:
-    elsewhere = Organization(name="Elsewhere", slug="elsewhere")
+    elsewhere = Organization(name="Elsewhere")
     session.add(elsewhere)
     await session.flush()
     stranger = await make_user("owner", organization=elsewhere)

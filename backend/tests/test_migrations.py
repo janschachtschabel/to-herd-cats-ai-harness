@@ -15,6 +15,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from sqlalchemy import inspect
 from sqlalchemy.engine import Connection
 
 from app.core.migrations import alembic_config
@@ -69,3 +70,15 @@ async def test_migrated_schema_matches_the_models(engine) -> None:
     must find nothing to do, or models and migrations have drifted apart."""
     async with engine.connect() as conn:
         assert await conn.run_sync(_model_drift) == []
+
+
+async def test_slugs_are_not_stored(engine) -> None:
+    """URLs use ids; a slug nobody reads is not kept (organisation and space)."""
+    async with engine.connect() as conn:
+        columns = await conn.run_sync(
+            lambda c: {
+                t: {col["name"] for col in inspect(c).get_columns(t)}
+                for t in ("organization", "space")
+            }
+        )
+    assert "slug" not in columns["organization"] | columns["space"]
