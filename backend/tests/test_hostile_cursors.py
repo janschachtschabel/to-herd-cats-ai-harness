@@ -90,6 +90,7 @@ async def test_hostile_cursors_answer_422_everywhere(
     ticket = await owner.post(f"/api/spaces/{space_id}/tickets", json={"title": "Ticket"})
     ids = {
         "{number}": str(ticket.json()["number"]),
+        "{category}": "open",
         "{status_id}": ticket.json()["status"]["id"],
         "{inspection_id}": inspection.json()["id"],
         "{space_id}": space_id,

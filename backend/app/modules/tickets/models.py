@@ -198,6 +198,11 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
     reporter_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     # A day without time or zone (plan M4 decision 7).
     due_on: Mapped[date | None] = mapped_column(Date)
+    # When the status last changed (or the ticket was made): set by the database
+    # (trigger `work_item_status_changed_at`, migration m4b), whatever code writes.
+    status_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     # The planned or active sprint it is in (or a closed one it was finished in);
     # none: the backlog.
     sprint_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))

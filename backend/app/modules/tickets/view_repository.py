@@ -27,7 +27,7 @@ from app.modules.tickets.repository import PRIORITY_RANK, TicketRepository, Tick
 
 OPEN_CATEGORIES = (StatusCategory.OPEN, StatusCategory.ACTIVE, StatusCategory.REVIEW)
 _DUE = func.coalesce(WorkItem.due_on, LAST_DAY)
-_BOARD_KEY = (-PRIORITY_RANK, _DUE, WorkItem.number)
+BOARD_KEY = (-PRIORITY_RANK, _DUE, WorkItem.number)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,13 +63,13 @@ class ViewRepository(TicketRepository):
     ) -> dict[uuid.UUID, list[TicketView]]:
         """Up to `limit` tickets of every status of the space, in board order, in one
         statement (a rank within each status)."""
-        rank = func.row_number().over(partition_by=WorkItem.status_id, order_by=_BOARD_KEY)
+        rank = func.row_number().over(partition_by=WorkItem.status_id, order_by=BOARD_KEY)
         ranked = select(WorkItem.id, rank.label("rank")).where(
             self._visible(), self._in_space(space_id)
         )
         inner = self._filtered(ranked, filters).subquery()
         top = select(inner.c.id).where(inner.c.rank <= limit)
-        stmt = self._views().where(WorkItem.id.in_(top)).order_by(*_BOARD_KEY)
+        stmt = self._views().where(WorkItem.id.in_(top)).order_by(*BOARD_KEY)
         columns: dict[uuid.UUID, list[TicketView]] = defaultdict(list)
         for row in await self.session.execute(stmt):
             view = self._view(row)
@@ -89,10 +89,10 @@ class ViewRepository(TicketRepository):
         stmt = self._filtered(stmt, filters)
         if after is not None:
             stmt = stmt.where(
-                tuple_(*_BOARD_KEY)
+                tuple_(*BOARD_KEY)
                 > tuple_(literal(after.rank), literal(after.due), literal(after.number))
             )
-        rows = await self.session.execute(stmt.order_by(*_BOARD_KEY).limit(limit))
+        rows = await self.session.execute(stmt.order_by(*BOARD_KEY).limit(limit))
         return [self._view(row) for row in rows]
 
     async def epics(

@@ -41,6 +41,7 @@ class Filters:
     status_categories: tuple[StatusCategory, ...] = ()
     status_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None = None
+    unassigned: bool = False  # only tickets assigned to nobody
     reporter_id: uuid.UUID | None = None
     kind: TicketKind | None = None
     priority: Priority | None = None

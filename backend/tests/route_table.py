@@ -108,6 +108,8 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/spaces/{space_id}/tickets", "space"),
     ("GET", "/api/tickets", "session"),
     ("GET", "/api/tickets/counts", "session"),
+    ("GET", "/api/tickets/my-board", "session"),
+    ("GET", "/api/tickets/my-board/{category}", "session"),
     ("GET", "/api/spaces/{space_id}/board", "space"),
     ("GET", "/api/spaces/{space_id}/board/{status_id}", "space"),
     ("GET", "/api/spaces/{space_id}/epics", "space"),
@@ -115,6 +117,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/tickets/{number}", "ticket"),
     ("GET", "/api/tickets/{number}/thread", "ticket"),  # the ticket's discussion
     ("PUT", "/api/tickets/{number}/tags", "ticket"),
+    ("POST", "/api/tickets/{number}/move-category", "ticket"),
     ("GET", "/api/tickets/{number}/pages", "ticket"),
     ("PUT", "/api/tickets/{number}/pages/{page_id}", "ticket"),
     ("DELETE", "/api/tickets/{number}/pages/{page_id}", "ticket"),
@@ -185,6 +188,7 @@ def concrete(
         "{member_type}": "user",
         "{member_id}": str(uuid7()),
         "{number}": "1",
+        "{category}": "open",
         "{tag_id}": str(uuid7()),
         "{attachment_id}": str(uuid7()),
         "{inspection_id}": str(uuid7()),
@@ -235,6 +239,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/spaces/{space_id}/tickets"): {"title": "X"},
     ("PATCH", "/api/tickets/{number}"): {"title": "X", "version": 1},
     ("PUT", "/api/tickets/{number}/tags"): {"tag_ids": [], "version": 1},
+    ("POST", "/api/tickets/{number}/move-category"): {"category": "open", "version": 1},
     ("POST", "/api/spaces/{space_id}/ticket-statuses"): {"name": "X", "category": "open"},
     ("PATCH", "/api/ticket-statuses/{status_id}"): {"name": "X", "version": 1},
     ("POST", "/api/spaces/{space_id}/sprints"): {

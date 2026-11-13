@@ -1,14 +1,21 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 
 from app.core.actor import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.tickets.daily import DailyBoard
 from app.modules.tickets.listing import Filters
 from app.modules.tickets.models import TicketKind
-from app.modules.tickets.router import PersonQuery, SprintQuery, TagQuery, person, sprint_filter
+from app.modules.tickets.router import (
+    AssigneeQuery,
+    SprintQuery,
+    TagQuery,
+    assignee_filter,
+    sprint_filter,
+)
 from app.modules.tickets.schemas import TicketSummaryOut
 from app.modules.tickets.view_schemas import BoardColumnOut, BoardOut, EpicOut, TicketCountsOut
 from app.modules.tickets.views import TicketViews
@@ -30,10 +37,10 @@ def _filters(
     sprint: str | None,
 ) -> Filters:
     return Filters(
-        assignee_id=person(assignee, actor, "assignee"),
         kind=kind,
         tag_ids=tuple(dict.fromkeys(tag or ())),
         epic_id=epic,
+        **assignee_filter(assignee, actor),
         **sprint_filter(sprint),
     )
 
@@ -44,14 +51,21 @@ async def board(
     actor: ActorDep,
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=100, description="tickets per column")] = 50,
-    assignee: PersonQuery = None,
+    assignee: AssigneeQuery = None,
     kind: TicketKind | None = None,
     tag: TagQuery = None,
     epic: EpicQuery = None,
     sprint: SprintQuery = None,
+    group_by: Annotated[
+        Literal["assignee"] | None, Query(description="`assignee`: a row per person")
+    ] = None,
 ) -> BoardOut:
-    """The space's statuses in order, each with its count and first tickets."""
+    """The space's statuses in order, each with its count and first tickets; with
+    `group_by=assignee` (the daily view) a row per person instead, `limit` tickets per
+    cell."""
     filters = _filters(actor, assignee, kind, tag, epic, sprint)
+    if group_by == "assignee":
+        return BoardOut.of_daily(await DailyBoard(session).board(actor, space_id, filters, limit))
     columns = await TicketViews(session).board(actor, space_id, filters, limit)
     return BoardOut(columns=[BoardColumnOut.of(c) for c in columns])
 
@@ -63,7 +77,7 @@ async def board_column(
     params: Annotated[PageParams, Query()],
     actor: ActorDep,
     session: SessionDep,
-    assignee: PersonQuery = None,
+    assignee: AssigneeQuery = None,
     kind: TicketKind | None = None,
     tag: TagQuery = None,
     epic: EpicQuery = None,

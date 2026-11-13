@@ -31,6 +31,9 @@ tickets = APIRouter(prefix="/tickets", tags=["tickets"])
 ticket_threads = APIRouter(prefix="/tickets/{number}/thread", tags=["messaging"])
 
 PersonQuery = Annotated[str | None, Query(description="`me` or a person's id")]
+AssigneeQuery = Annotated[
+    str | None, Query(description="`me`, a person's id, or `none`: assigned to nobody")
+]
 SprintQuery = Annotated[str | None, Query(description="a sprint's id, or `none`: the backlog")]
 TagQuery = Annotated[
     list[uuid.UUID] | None, Query(max_length=MAX_TAGS, description="only with every tag")
@@ -70,7 +73,14 @@ def sprint_filter(value: str | None) -> dict[str, Any]:
         raise ValidationFailed("sprint: `none` or an id", code="validation_failed") from None
 
 
-async def _full(session: AsyncSession, actor: Actor, view: TicketView) -> TicketOut:
+def assignee_filter(value: str | None, actor: Actor) -> dict[str, Any]:
+    """The filters of an `assignee` parameter: `none` (nobody), `me` or a person's id."""
+    if value == "none":
+        return {"unassigned": True}
+    return {"assignee_id": person(value, actor, "assignee")}
+
+
+async def full_ticket(session: AsyncSession, actor: Actor, view: TicketView) -> TicketOut:
     children = await TicketService(session).children(actor, view)
     return TicketOut.full(view, children)
 
@@ -91,7 +101,7 @@ async def create_ticket(
         parent_id=body.parent_id,
         assignee=_principal(body.assignee),
     )
-    return await _full(session, actor, view)
+    return await full_ticket(session, actor, view)
 
 
 @tickets.get("", response_model=Page[TicketSummaryOut])
@@ -102,7 +112,7 @@ async def list_tickets(
     space_id: uuid.UUID | None = None,
     status_category: Annotated[list[StatusCategory] | None, Query()] = None,
     status_id: uuid.UUID | None = None,
-    assignee: PersonQuery = None,
+    assignee: AssigneeQuery = None,
     reporter: PersonQuery = None,
     kind: TicketKind | None = None,
     priority: Priority | None = None,
@@ -118,7 +128,6 @@ async def list_tickets(
         space_id=space_id,
         status_categories=tuple(status_category or ()),
         status_id=status_id,
-        assignee_id=person(assignee, actor, "assignee"),
         reporter_id=person(reporter, actor, "reporter"),
         kind=kind,
         priority=priority,
@@ -126,6 +135,7 @@ async def list_tickets(
         q=q,
         due_before=due_before,
         tag_ids=tuple(dict.fromkeys(tag or ())),
+        **assignee_filter(assignee, actor),
         **sprint_filter(sprint),
     )
     page = await TicketService(session).list(actor, filters, sort, params)
@@ -137,7 +147,7 @@ async def list_tickets(
 @tickets.get("/{number}", response_model=TicketOut)
 async def get_ticket(number: int, actor: ActorDep, session: SessionDep) -> TicketOut:
     view = await TicketService(session).get(actor, ticket_number(number))
-    return await _full(session, actor, view)
+    return await full_ticket(session, actor, view)
 
 
 @tickets.patch("/{number}", response_model=TicketOut)
@@ -148,7 +158,7 @@ async def update_ticket(
     if "assignee" in values:
         values["assignee"] = _principal(values["assignee"])
     view = await TicketService(session).update(actor, ticket_number(number), body.version, values)
-    return await _full(session, actor, view)
+    return await full_ticket(session, actor, view)
 
 
 @tickets.put("/{number}/tags", response_model=TicketOut)
@@ -159,7 +169,7 @@ async def set_ticket_tags(
     view = await TicketTags(session).set(
         actor, ticket_number(number), body.tag_ids, version=body.version
     )
-    return await _full(session, actor, view)
+    return await full_ticket(session, actor, view)
 
 
 def ticket_number(number: int) -> int:

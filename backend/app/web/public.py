@@ -33,6 +33,7 @@ from app.modules.search.router import router as search_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
 from app.modules.tickets import link_router as ticket_links
+from app.modules.tickets import my_board_router as my_board
 from app.modules.tickets import router as tickets
 from app.modules.tickets import sprint_router as ticket_sprints
 from app.modules.tickets import status_router as ticket_statuses
@@ -77,6 +78,8 @@ def api_router() -> APIRouter:
     api.include_router(messaging_live.live)
     api.include_router(tickets.space_tickets)
     api.include_router(ticket_views.ticket_counts)  # before /tickets/{number}
+    api.include_router(my_board.my_board)  # before /tickets/{number}
+    api.include_router(my_board.ticket_moves)
     api.include_router(ticket_views.space_views)
     api.include_router(tickets.tickets)
     api.include_router(ticket_links.ticket_pages)

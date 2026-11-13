@@ -267,6 +267,8 @@ class TicketRepository:
             stmt = stmt.where(
                 WorkItem.assignee_type == PrincipalType.USER, WorkItem.assignee_id == f.assignee_id
             )
+        if f.unassigned:
+            stmt = stmt.where(WorkItem.assignee_id.is_(None))
         if f.reporter_id is not None:
             stmt = stmt.where(
                 WorkItem.reporter_type == PrincipalType.USER, WorkItem.reporter_id == f.reporter_id

@@ -1205,7 +1205,9 @@ export interface paths {
         };
         /**
          * Board
-         * @description The space's statuses in order, each with its count and first tickets.
+         * @description The space's statuses in order, each with its count and first tickets; with
+         *     `group_by=assignee` (the daily view) a row per person instead, `limit` tickets per
+         *     cell.
          */
         get: operations["board_api_spaces__space_id__board_get"];
         put?: never;
@@ -1648,6 +1650,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tickets/my-board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Board
+         * @description My tickets of every space where I may read tickets, by status category.
+         */
+        get: operations["get_my_board_api_tickets_my_board_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/my-board/{category}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Board Column
+         * @description More of one column (its `next_cursor`); `open`, `active`, `review` or `done`.
+         */
+        get: operations["my_board_column_api_tickets_my_board__category__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tickets/{number}": {
         parameters: {
             query?: never;
@@ -1664,6 +1706,26 @@ export interface paths {
         head?: never;
         /** Update Ticket */
         patch: operations["update_ticket_api_tickets__number__patch"];
+        trace?: never;
+    };
+    "/api/tickets/{number}/move-category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Category
+         * @description Into the first status of the category in the ticket's own space (`ticket.edit`).
+         */
+        post: operations["move_category_api_tickets__number__move_category_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/tickets/{number}/pages": {
@@ -1961,6 +2023,27 @@ export interface components {
             target_type: string;
         };
         /**
+         * BoardCellOut
+         * @description A person's tickets in one status: how many, how many changed status since the
+         *     board's `changed_since`, the first of them in board order, and the cursor for more
+         *     (`GET /api/spaces/{space_id}/board/{status_id}?assignee=<id>|none`).
+         */
+        BoardCellOut: {
+            /** Changed */
+            changed: number;
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["DailyCardOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /**
+             * Status Id
+             * Format: uuid
+             */
+            status_id: string;
+        };
+        /**
          * BoardColumnOut
          * @description A status of the board: how many tickets it holds under the filters, the first
          *     of them in board order (priority, due date with none last, number), and the
@@ -1977,11 +2060,34 @@ export interface components {
         };
         /**
          * BoardOut
-         * @description The space's statuses in their order, each a column.
+         * @description The space's statuses in their order, each a column. Grouped by assignee
+         *     (`group_by=assignee`, the daily view): `columns` carry the statuses and their
+         *     counts only (no tickets), `rows` the people (by name, at most 100,
+         *     `rows_truncated` beyond; the row of the unassigned last) and `changed_since` the
+         *     moment the last working day began (0:00 UTC; on a Monday: Friday's).
          */
         BoardOut: {
+            /** Changed Since */
+            changed_since?: string | null;
             /** Columns */
             columns: components["schemas"]["BoardColumnOut"][];
+            /** Rows */
+            rows?: components["schemas"]["BoardRowOut"][] | null;
+            /**
+             * Rows Truncated
+             * @default false
+             */
+            rows_truncated?: boolean;
+        };
+        /**
+         * BoardRowOut
+         * @description A person's row (`assignee` null: the tickets assigned to nobody), a cell per
+         *     status of the space in order.
+         */
+        BoardRowOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            /** Cells */
+            cells: components["schemas"]["BoardCellOut"][];
         };
         /** ChannelCreate */
         ChannelCreate: {
@@ -2232,6 +2338,60 @@ export interface components {
             version: number;
         };
         /**
+         * DailyCardOut
+         * @description A ticket of the daily view; `changed`: its status changed (or it was made) since
+         *     the board's `changed_since`.
+         */
+        DailyCardOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            /** Changed */
+            changed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            parent: components["schemas"]["ParentOut"] | null;
+            priority: components["schemas"]["Priority"];
+            reporter: components["schemas"]["PersonOut"];
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Sprint Id */
+            sprint_id: string | null;
+            status: components["schemas"]["StatusRef"];
+            /**
+             * Status Changed At
+             * Format: date-time
+             */
+            status_changed_at: string;
+            /** Tags */
+            tags: components["schemas"]["TagOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
          * DataLocation
          * @enum {string}
          */
@@ -2364,6 +2524,11 @@ export interface components {
             /** Sprint Id */
             sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
+            /**
+             * Status Changed At
+             * Format: date-time
+             */
+            status_changed_at: string;
             /** Tags */
             tags: components["schemas"]["TagOut"][];
             /** Title */
@@ -2841,10 +3006,104 @@ export interface components {
             system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
+         * MoveCategory
+         * @description Into the first status of `category` in the ticket's space (422
+         *     `ticket.category_empty` without one); `version` is the ticket version read.
+         */
+        MoveCategory: {
+            category: components["schemas"]["StatusCategory"];
+            /** Version */
+            version: number;
+        };
+        /**
          * MoveOpenTo
          * @enum {string}
          */
         MoveOpenTo: "next" | "backlog";
+        /**
+         * MyBoardOut
+         * @description My tickets of every space I may read, by category: open, active, review, done
+         *     (done: finished in the last 14 days; cancelled ones are not shown).
+         */
+        MyBoardOut: {
+            /** Columns */
+            columns: components["schemas"]["MyColumnOut"][];
+        };
+        /**
+         * MyCardOut
+         * @description A ticket on my board, with the name of its space.
+         */
+        MyCardOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            parent: components["schemas"]["ParentOut"] | null;
+            priority: components["schemas"]["Priority"];
+            reporter: components["schemas"]["PersonOut"];
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Space Name */
+            space_name: string;
+            /** Sprint Id */
+            sprint_id: string | null;
+            status: components["schemas"]["StatusRef"];
+            /**
+             * Status Changed At
+             * Format: date-time
+             */
+            status_changed_at: string;
+            /** Tags */
+            tags: components["schemas"]["TagOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** MyCardPage */
+        MyCardPage: {
+            /** Items */
+            items: components["schemas"]["MyCardOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * MyColumnOut
+         * @description A status category: how many of my tickets it holds, the first of them in board
+         *     order (priority, due date with none last, number), and the cursor for more
+         *     (`GET /api/tickets/my-board/{category}`).
+         */
+        MyColumnOut: {
+            category: components["schemas"]["StatusCategory"];
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["MyCardOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /**
          * MyUsageOut
          * @description The caller's own usage in the period (whole UTC days).
@@ -3896,6 +4155,11 @@ export interface components {
             /** Sprint Id */
             sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
+            /**
+             * Status Changed At
+             * Format: date-time
+             */
+            status_changed_at: string;
             /** Tags */
             tags: components["schemas"]["TagOut"][];
             /** Title */
@@ -3912,6 +4176,7 @@ export interface components {
          * TicketSummaryOut
          * @description A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
          *     number. `version` guards writes (send it back; stale → 409). `tags` by name.
+         *     `status_changed_at`: when its status last changed (or it was made).
          */
         TicketSummaryOut: {
             assignee: components["schemas"]["PersonOut"] | null;
@@ -3943,6 +4208,11 @@ export interface components {
             /** Sprint Id */
             sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
+            /**
+             * Status Changed At
+             * Format: date-time
+             */
+            status_changed_at: string;
             /** Tags */
             tags: components["schemas"]["TagOut"][];
             /** Title */
@@ -7159,7 +7429,7 @@ export interface operations {
             query?: {
                 /** @description tickets per column */
                 limit?: number;
-                /** @description `me` or a person's id */
+                /** @description `me`, a person's id, or `none`: assigned to nobody */
                 assignee?: string | null;
                 kind?: components["schemas"]["TicketKind"] | null;
                 /** @description only with every tag */
@@ -7168,6 +7438,8 @@ export interface operations {
                 epic?: string | null;
                 /** @description a sprint's id, or `none`: the backlog */
                 sprint?: string | null;
+                /** @description `assignee`: a row per person */
+                group_by?: "assignee" | null;
             };
             header?: never;
             path: {
@@ -7202,7 +7474,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
-                /** @description `me` or a person's id */
+                /** @description `me`, a person's id, or `none`: assigned to nobody */
                 assignee?: string | null;
                 kind?: components["schemas"]["TicketKind"] | null;
                 /** @description only with every tag */
@@ -8167,7 +8439,7 @@ export interface operations {
                 space_id?: string | null;
                 status_category?: components["schemas"]["StatusCategory"][] | null;
                 status_id?: string | null;
-                /** @description `me` or a person's id */
+                /** @description `me`, a person's id, or `none`: assigned to nobody */
                 assignee?: string | null;
                 /** @description `me` or a person's id */
                 reporter?: string | null;
@@ -8229,6 +8501,72 @@ export interface operations {
             };
         };
     };
+    get_my_board_api_tickets_my_board_get: {
+        parameters: {
+            query?: {
+                /** @description tickets per column */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyBoardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_board_column_api_tickets_my_board__category__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                category: components["schemas"]["StatusCategory"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyCardPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ticket_api_tickets__number__get: {
         parameters: {
             query?: never;
@@ -8272,6 +8610,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TicketUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_category_api_tickets__number__move_category_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveCategory"];
             };
         };
         responses: {
