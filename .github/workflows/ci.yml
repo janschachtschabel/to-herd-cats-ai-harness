@@ -234,8 +234,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -t to-herd-cats-ai:local .
       # The unmodified smoke test: compose build (from the cache above), start, log
-      # in, probes, user id, published ports, tear down.
+      # in, probes, user id, published ports, a message over the live stream, tear down.
       - run: bash deploy/compose/smoke.sh
+      # Two API nodes, a worker and collab (compose.nodes.yml) from the same image: a
+      # message posted on node A arrives on a live stream of node B.
+      - run: bash deploy/compose/smoke.sh
+        env:
+          SMOKE_NODES: "1"
+          SMOKE_SKIP_BUILD: "1"
       - name: Trivy (HIGH and CRITICAL with a fix available fail the job)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

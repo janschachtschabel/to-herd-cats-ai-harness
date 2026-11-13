@@ -1,19 +1,42 @@
 #!/usr/bin/env bash
 # Smoke test of the compose reference: build, start, log in, check probes and user,
 # create a page with an attachment (the files volume), open its live-editing
-# WebSocket with and without the session cookie, tear down. Runs as its own compose project on its own port, with throwaway volumes,
-# so a running installation next to it is not touched. Ends with "SMOKE OK".
+# WebSocket with and without the session cookie, receive a posted message over the
+# live stream (/api/stream: outbox, worker, NOTIFY, SSE), tear down. Runs as its own
+# compose project on its own ports, with throwaway volumes, so a running installation
+# next to it is not touched. Ends with "SMOKE OK".
 #
 #   bash deploy/compose/smoke.sh            (SMOKE_PORT=18080 by default)
 #   SMOKE_SKIP_BUILD=1 bash deploy/compose/smoke.sh   (use an image built beforehand,
 #                                            tagged to-herd-cats-ai:${HERD_IMAGE_TAG:-local})
+#   SMOKE_NODES=1 bash deploy/compose/smoke.sh        (compose.nodes.yml: two API nodes,
+#       a worker, collab and a migration run in place of role all; the message is posted
+#       on node A and must arrive on a stream of node B, SMOKE_PORT_B=18081 by default)
 set -euo pipefail
 cd "$(dirname "$0")"
 
 export HERD_HOST_PORT="${SMOKE_PORT:-18080}"
+export HERD_HOST_PORT_B="${SMOKE_PORT_B:-18081}"
 export HERD_BIND_ADDRESS=127.0.0.1
 base="http://127.0.0.1:${HERD_HOST_PORT}"
 work="$(mktemp -d)"
+stream_pid=""
+
+# One node in role all (app), or two API nodes, a worker and collab (SMOKE_NODES=1).
+project=to-herd-cats-ai-smoke
+files=(-f compose.yml)
+node_a=app
+servers=(app)
+worker=app
+base_b="$base"
+if [[ ${SMOKE_NODES:-0} == 1 ]]; then
+  project=to-herd-cats-ai-smoke-nodes
+  files+=(-f compose.nodes.yml)
+  node_a=api-a
+  servers=(api-a api-b worker)
+  worker=worker
+  base_b="http://127.0.0.1:${HERD_HOST_PORT_B}"
+fi
 
 # The secrets: .env if there is one, else a throwaway one (removed again below).
 env_file=.env
@@ -26,13 +49,14 @@ if [[ ! -f "$env_file" ]]; then
     echo "HERD_INTERNAL_TOKEN=$(openssl rand -hex 32)"
   } >"$env_file"
 fi
-compose=(docker compose -p to-herd-cats-ai-smoke --env-file "$env_file" -f compose.yml)
+compose=(docker compose -p "$project" --env-file "$env_file" "${files[@]}")
 
 cleanup() {
   status=$?
+  if [[ -n $stream_pid ]]; then kill "$stream_pid" 2>/dev/null || true; fi
   if [[ $status -ne 0 ]]; then
-    echo "SMOKE FAILED; app logs:" >&2
-    "${compose[@]}" logs --no-color --tail 80 app >&2 || true
+    echo "SMOKE FAILED; logs:" >&2
+    "${compose[@]}" logs --no-color --tail 80 >&2 || true
   fi
   "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$work"
@@ -55,19 +79,28 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -c "$jar" -X POST "$base/api/auth/
   --data "{\"email\": \"${email:-admin@example.com}\", \"password\": \"$password\"}")
 [[ $code == 200 ]] || fail "login answered $code"
 
-code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" "$base/api/auth/me")
-[[ $code == 200 ]] || fail "/api/auth/me answered $code"
+for url in "$base" "$base_b"; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" "$url/api/auth/me")
+  [[ $code == 200 ]] || fail "$url/api/auth/me answered $code"
+done
 
-"${compose[@]}" exec -T app python -c \
-  "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9090/ready', timeout=5)" \
-  || fail "/ready on 9090 is not 200"
+# Every process of the app answers /ready on its internal port (a worker only while its
+# loop reaches the database) and runs as 10001.
+for service in "${servers[@]}"; do
+  "${compose[@]}" exec -T "$service" python -c \
+    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9090/ready', timeout=5)" \
+    || fail "/ready on 9090 of $service is not 200"
+  uid="$("${compose[@]}" exec -T "$service" id -u | tr -d '\r')"
+  [[ $uid == 10001 ]] || fail "$service runs as uid $uid"
+done
 
-uid="$("${compose[@]}" exec -T app id -u | tr -d '\r')"
-[[ $uid == 10001 ]] || fail "app runs as uid $uid"
-
-ports="$("${compose[@]}" ps app --format '{{.Ports}}')"
+# Only the API nodes publish a port, and only 8080.
+ports="$("${compose[@]}" ps "$node_a" --format '{{.Ports}}')"
 grep -q -- '->8080/tcp' <<<"$ports" || fail "port 8080 is not published ($ports)"
-if grep -q -- '->9090' <<<"$ports"; then fail "port 9090 is published ($ports)"; fi
+for service in $("${compose[@]}" ps --services); do
+  ports="$("${compose[@]}" ps "$service" --format '{{.Ports}}')"
+  if grep -q -- '->9090\|->1234\|->5432' <<<"$ports"; then fail "$service publishes $ports"; fi
+done
 
 headers="$(curl -s -D - -o "$work/index.html" "$base/spaces")"
 grep -q 'id="root"' "$work/index.html" || fail "/spaces did not serve the SPA"
@@ -93,7 +126,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -X POST -H 'X-Requested-
 cookie="$(awk '$6 == "herd_session" {print $6 "=" $7}' "$jar")"
 origin="$(value HERD_PUBLIC_URL || true)"
 "${compose[@]}" exec -T -e COOKIE="$cookie" -e PAGE="$page_id" -e GENERATION="$generation" \
-  -e ORIGIN="${origin:-http://127.0.0.1:8080}" app python - <<'PY' \
+  -e ORIGIN="${origin:-http://127.0.0.1:8080}" "$node_a" python - <<'PY' \
   || fail "the live-editing WebSocket did not behave"
 import os
 from websockets.exceptions import ConnectionClosed
@@ -128,5 +161,46 @@ with connect(url, additional_headers=origin) as ws:
     except ConnectionClosed as closed:
         assert closed.rcvd is not None and closed.rcvd.code == 4401, closed.rcvd
 PY
+
+# Messages, live: a stream on node B (the one node without SMOKE_NODES), a message in
+# #allgemein posted on node A. The worker hands the outbox event to publish_live, which
+# NOTIFYs every node; node B's hub finds the stream and sends `message.created`.
+channel_id="$(api "$base/api/channels" | python3 -c \
+  'import json, sys; print(next(c["id"] for c in json.load(sys.stdin)["items"] if c["name"] == "allgemein"))')" \
+  || fail "no channel #allgemein"
+stream="$work/stream"
+curl -sN -b "$jar" --max-time 120 "$base_b/api/stream" >"$stream" 2>/dev/null &
+stream_pid=$!
+for _ in $(seq 50); do grep -q '^retry: ' "$stream" && break; sleep 0.2; done
+grep -q '^retry: ' "$stream" || fail "the live stream on $base_b did not open"
+message="$(api -X POST "$base/api/conversations/$channel_id/messages" --data '{"body_md": "Smoke"}')"
+message_id="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["id"])' "$message")" \
+  || fail "posting a message answered $message"
+received() {
+  python3 - "$stream" "$message_id" <<'PY'
+import json
+import sys
+
+for frame in open(sys.argv[1], encoding="utf-8").read().split("\n\n"):
+    fields = dict(line.split(": ", 1) for line in frame.splitlines() if ": " in line)
+    if fields.get("event") == "message.created":
+        if json.loads(fields["data"]).get("message_id") == sys.argv[2]:
+            sys.exit(0)
+sys.exit(1)
+PY
+}
+for _ in $(seq 100); do received && break; sleep 0.2; done
+received || fail "message $message_id did not arrive on the live stream of $base_b"
+kill "$stream_pid" 2>/dev/null || true
+stream_pid=""
+
+# The worker delivered it (with SMOKE_NODES the worker service is the only dispatcher).
+dispatched() {
+  "${compose[@]}" exec -T "$worker" python -c \
+    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
+    | grep -Eq '^herd_outbox_dispatch_total\{handler="publish_live",result="ok"\} [1-9]'
+}
+for _ in $(seq 10); do dispatched && break; sleep 0.5; done
+dispatched || fail "$worker reports no publish_live delivery"
 
 echo "SMOKE OK"

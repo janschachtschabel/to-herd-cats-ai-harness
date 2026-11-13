@@ -1,5 +1,7 @@
 # Reference deployment: PostgreSQL and the app in one container (HERD_ROLE=all:
-# migrate, then serve, with the live-editing process as a child on 127.0.0.1).
+# migrate, then serve, with the worker (outbox: notifications, page timelines, live
+# updates) in the same process and the live-editing process as a child on 127.0.0.1).
+# compose.nodes.yml runs the roles in separate containers instead (two API nodes).
 # Secrets come from .env next to this file (see .env.example). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
 # the collab port stay inside. Attachments live on the volume app-data (/data).

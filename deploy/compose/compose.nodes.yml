@@ -1,0 +1,114 @@
+# Two API nodes and a worker, on top of compose.yml: the acceptance setup for live
+# delivery across nodes (a message written on node A arrives live on node B, spec 14/M3)
+# and for the roles one by one, as the Helm chart runs them:
+#
+#   docker compose -f compose.yml -f compose.nodes.yml up -d --build --wait
+#
+# `app` (role all) is switched off. `migrate` migrates once and exits; `api-a` and
+# `api-b` serve (role api, published on HERD_HOST_PORT and HERD_HOST_PORT_B); `worker`
+# is the only outbox dispatcher (role worker: notifications, page timelines, live
+# updates); `collab` runs live editing (role collab) and calls the API nodes' internal
+# port under the alias `api`. Both API nodes share the files volume (one host). Only the
+# two public ports are published; 9090 and the collab port stay inside.
+
+x-node: &node
+  image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+x-database: &database
+  # The password is kept out of the URL; the app merges it in (escaped).
+  HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
+  HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+
+x-api-env: &api-env
+  <<: *database
+  HERD_ROLE: api
+  HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+  HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
+  HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+  HERD_COLLAB_URL: ws://collab:1234
+  HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+  HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
+  HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+
+x-after-migrate: &after-migrate
+  db:
+    condition: service_healthy
+  migrate:
+    condition: service_completed_successfully
+
+services:
+  app:
+    profiles: [single]  # off here: the services below take its place
+
+  migrate:
+    <<: *node
+    environment:
+      <<: *database
+      HERD_ROLE: migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  api-a:
+    <<: *node
+    environment: *api-env
+    depends_on: *after-migrate
+    ports:
+      - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
+    volumes:
+      - app-data:/data
+    networks:
+      default:
+        aliases: [api]
+    stop_grace_period: 30s
+
+  api-b:
+    <<: *node
+    environment: *api-env
+    depends_on: *after-migrate
+    ports:
+      - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT_B:-8081}:8080"
+    volumes:
+      - app-data:/data
+    networks:
+      default:
+        aliases: [api]
+    stop_grace_period: 30s
+
+  worker:
+    <<: *node
+    environment:
+      <<: *database
+      HERD_ROLE: worker
+    depends_on: *after-migrate
+    stop_grace_period: 30s
+
+  collab:
+    <<: *node
+    environment:
+      HERD_ROLE: collab
+      HERD_COLLAB_API_URL: http://api:9090
+      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
+      HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+    # The image's health check asks port 9090, which the collab role does not serve.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    stop_grace_period: 30s

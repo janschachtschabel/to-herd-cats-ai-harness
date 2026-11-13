@@ -1,7 +1,10 @@
 # to-herd-cats-ai with Docker Compose
 
 The reference deployment: PostgreSQL (`db`) and the app (`app`, `HERD_ROLE=all`:
-migrate, then serve, with the live-editing process as a child) in one container. The
+migrate, then serve, with the worker and the live-editing process) in one container.
+The worker hands the events of every change (outbox) to notifications, page
+timelines and live updates; in `all` it runs in the API's process and shares its
+database pool. The
 app runs as user 10001 with a read-only filesystem (writable: `/tmp` and the volume
 `app-data` on `/data`, the attachments) and no capabilities. Only port 8080 is
 published; port 9090 (`/health`, `/ready`, `/metrics`, the collab process's internal
@@ -11,6 +14,26 @@ Live editing needs `HERD_INTERNAL_TOKEN` (at least 32 characters, `openssl rand 
 32`). Set `HERD_PUBLIC_URL` to the address browsers use (e.g. `https://wiki.example`
 behind a reverse proxy); empty, a WebSocket's Origin must match the host it was sent
 to. The reverse proxy must pass WebSocket upgrades on `/collab/`.
+
+Live updates (new messages, reactions, activity) reach the browser as Server-Sent
+Events on `GET /api/stream`: one response per tab that stays open for hours. The reverse
+proxy must not buffer it and must allow a read timeout of at least an hour. The app
+sends `X-Accel-Buffering: no` (nginx then passes the stream through unbuffered) and a
+comment line every 15 s. nginx, for example:
+
+```nginx
+location /api/stream {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+    proxy_send_timeout 1h;
+}
+```
+
+A cut stream is no data loss: the browser reconnects after 5 s and reloads what it
+shows.
 
 ## Start
 
@@ -52,15 +75,35 @@ Restore only into an empty database (a fresh installation, before its first star
 -d herd < herd.dump`). The attachments go back with `docker compose exec -T app tar -C
 /data -x < herd-files.tar`. Test the restore regularly.
 
+## Two API nodes and a worker
+
+`compose.nodes.yml` replaces `app` with the roles one by one, as the Helm chart runs
+them: `migrate` (once, then exits), `api-a` and `api-b` (role `api`, published on
+`HERD_HOST_PORT` and `HERD_HOST_PORT_B`, default 8081), `worker` (role `worker`, the only
+outbox dispatcher) and `collab` (role `collab`). A message written on one node arrives
+live on the other through PostgreSQL (`LISTEN`/`NOTIFY`). It is the acceptance setup for
+live delivery across nodes, not a production layout (one host, one database).
+
+```bash
+docker compose -f compose.yml -f compose.nodes.yml up -d --build --wait
+docker compose -f compose.yml -f compose.nodes.yml down -v
+```
+
 ## Smoke test
 
 `bash smoke.sh` builds the image, starts its own compose project on port 18080 with
 throwaway volumes (and a throwaway `.env` if there is none), logs in, checks
 `/ready`, the user id and the published ports, creates a page with an attachment (the
 files volume), opens the page's live-editing WebSocket with the owner's cookie (the
-collab process authenticates it) and without one (closed with 4401), and tears
-everything down again. It
-ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built beforehand.
+collab process authenticates it) and without one (closed with 4401), opens the live
+stream (`/api/stream`), posts a message in `#allgemein` and waits for its
+`message.created` event, checks that the worker counted the delivery
+(`herd_outbox_dispatch_total{handler="publish_live",result="ok"}`), and tears everything
+down again. It ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built
+beforehand. `SMOKE_NODES=1` runs the same on `compose.nodes.yml` (project
+`to-herd-cats-ai-smoke-nodes`, ports `SMOKE_PORT`/`SMOKE_PORT_B`, default 18080/18081):
+`/ready` of both API nodes and the worker, the message posted on node A and received on
+a stream of node B.
 
 ## Load measurement
 
@@ -79,7 +122,8 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only |
 | `HERD_BOOTSTRAP_ADMIN_EMAIL` | no | `admin@example.com` | Email of the first owner |
 | `HERD_BIND_ADDRESS` | no | `127.0.0.1` | Host address port 8080 is published on |
-| `HERD_HOST_PORT` | no | `8080` | Host port for the app |
+| `HERD_HOST_PORT` | no | `8080` | Host port for the app (node A in `compose.nodes.yml`) |
+| `HERD_HOST_PORT_B` | no | `8081` | Host port for node B (`compose.nodes.yml` only) |
 | `HERD_FORWARDED_ALLOW_IPS` | no | `127.0.0.1` | Reverse proxies whose `X-Forwarded-For`/`-Proto` are believed (IPs or networks, comma separated) |
 | `HERD_COOKIE_SECURE` | no | `false` | Always mark the session cookie `Secure` (it is anyway when the request came over https) |
 | `HERD_LOG_LEVEL` | no | `INFO` | Log level |
