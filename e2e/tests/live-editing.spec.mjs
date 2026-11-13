@@ -90,16 +90,19 @@ test("a Markdown save ends the live session; the live editor shows the new text"
 
 test("a page the live editor would change is not opened (4422)", async () => {
   const space = await teamSpace(anna, "Treue");
-  const doc = await publishedPage(anna, space.id, "Listen", "- eins\n\n* zwei");
+  // An indented code block right before an ordered list starting at 0 that holds HTML:
+  // no form the editor can write reads back the same (`collab/markdown.mjs`).
+  const markdown = "    b\n0. <x>";
+  const doc = await publishedPage(anna, space.id, "Roh", markdown);
 
   const a = await anna.newPage();
   await a.goto(pageUrl(space, doc, "live"));
   await expect(
     a.getByText("enthält Markdown, die der Live-Editor nicht unverändert"),
   ).toBeVisible();
-  await expect(surface(a, "Listen")).not.toHaveAttribute("contenteditable", "true");
+  await expect(surface(a, "Roh")).not.toHaveAttribute("contenteditable", "true");
   await a.getByRole("link", { name: "Im Markdown-Editor bearbeiten" }).click();
-  await expect(a.getByRole("textbox", { name: "Markdown" })).toHaveValue("- eins\n\n* zwei");
+  await expect(a.getByRole("textbox", { name: "Markdown" })).toHaveValue(markdown);
   const stored = await call(anna, "GET", `/api/pages/${doc.id}`);
-  expect(stored.content_md).toBe("- eins\n\n* zwei");
+  expect(stored.content_md).toBe(markdown);
 });
