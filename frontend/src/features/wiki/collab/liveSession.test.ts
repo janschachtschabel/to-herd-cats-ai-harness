@@ -8,6 +8,7 @@ describe('live session', () => {
     expect(closeOutcome(4403)).toEqual({ kind: 'stop', reason: 'forbidden' })
     expect(closeOutcome(4404)).toEqual({ kind: 'stop', reason: 'not_found' })
     expect(closeOutcome(4413)).toEqual({ kind: 'stop', reason: 'too_large' })
+    expect(closeOutcome(4422)).toEqual({ kind: 'stop', reason: 'not_roundtrip_safe' })
     expect(closeOutcome(4503)).toEqual({ kind: 'stop', reason: 'off' })
     for (const code of [1000, 1006, 1012, 1013, 4502]) {
       expect(closeOutcome(code)).toEqual({ kind: 'retry' })

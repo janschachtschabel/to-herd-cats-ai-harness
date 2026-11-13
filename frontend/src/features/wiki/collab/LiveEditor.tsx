@@ -12,6 +12,7 @@ import { useWiki } from '../WikiContext'
 import type { Connect } from './connect'
 import { LiveSurface } from './LiveSurface'
 import { Presence } from './Presence'
+import { FINAL_STOPS } from './liveSession'
 import { useLiveSession } from './useLiveSession'
 
 const STATUS_STYLE = {
@@ -79,9 +80,20 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
                   {copied ? t('wiki.live.copied') : t('wiki.live.copy')}
                 </Button>
               )}
-              {live.stopped && live.stopped !== 'unauthorized' && (
+              {live.stopped && !FINAL_STOPS.has(live.stopped) && (
                 <Button size="sm" variant="outline" onClick={live.retry}>
                   {t('wiki.live.reload')}
+                </Button>
+              )}
+              {live.stopped === 'not_roundtrip_safe' && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link
+                    to="/spaces/$spaceId/p/$"
+                    params={{ spaceId: space.id, _splat: page.path }}
+                    search={{ view: 'edit' }}
+                  >
+                    {t('wiki.live.markdownEditor')}
+                  </Link>
                 </Button>
               )}
             </div>

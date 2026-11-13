@@ -93,13 +93,27 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Ziele), Bilder, Aufzählungen, nummerierte Listen, Aufgabenlisten (auch
   verschachtelt), Zitate, Codeblöcke, Tabellen, Trennlinien, Wiki-Links `[[Titel]]`.
 - **Unverändert durchgereicht:** Was der Editor nicht darstellen kann (rohes HTML,
-  Referenzlinks, Fußnoten und Ähnliches), erscheint dort als Codeblock und wird beim
-  Speichern genau so zurückgeschrieben, wie es kam.
+  Referenzlinks, Fußnoten, verlinkte Bilder und Ähnliches), erscheint dort als
+  Codeblock und wird beim Speichern genau so zurückgeschrieben, wie es kam. Ebenso jeder
+  Block, den der Editor sonst anders zurückschreiben würde, als er gemeint war.
 - **Umgeschrieben, aber gleichbedeutend:** Nach einer Live-Speicherung kann das Markdown
-  anders aussehen als vorher: Tabellenzellen werden aufgefüllt, um Tabellen stehen
-  Leerzeilen, Listen- und Hervorhebungszeichen werden vereinheitlicht, Zeichen mit
+  anders aussehen als vorher: Tabellenzellen werden aufgefüllt, Listen- und
+  Hervorhebungszeichen vereinheitlicht (`*` → `-`, `_` → `*`), Setext- werden
+  ATX-Überschriften, eingerückter Code wird zum Codeblock mit Zäunen, lockere Listen
+  werden eng, benannte Zeichen wie `&copy;` stehen als Zeichen (`©`), Zeichen mit
   Markdown-Bedeutung im Text werden maskiert (aus `[x]` wird `\[x\]`, Wiki-Links
-  ausgenommen). Der Diff der Versionen zeigt das als Änderung.
+  ausgenommen). Die Seitenansicht zeigt danach dasselbe; der Diff der Versionen zeigt
+  die Schreibweise als Änderung, aber erst, wenn jemand live etwas geändert hat.
+- **Sicherheitsnetz:** Bevor eine Seite live geöffnet wird, liest der Collab-Prozess
+  ihr Markdown mit demselben Parser wie die Seitenansicht (micromark mit GFM), wandelt
+  es in den Editor und zurück und vergleicht beide Syntaxbäume (Leerraum innerhalb von
+  Text und eng/locker bei Listen zählen nicht). Weichen sie ab, öffnet der Live-Editor
+  die Seite nicht (Close-Code 4422) und bietet den Markdown-Editor an. Beispiel: zwei
+  aufeinanderfolgende Listen mit verschiedenen Aufzählungszeichen (`-` und `*`), die
+  der Editor zu einer Liste zusammenzöge.
+- **Öffnen ohne Ändern ändert nichts:** Wer den Live-Editor öffnet und ohne Eingabe
+  wieder schließt, erzeugt weder eine Version noch ein anderes Markdown. Auch eine
+  Änderung, die wieder zurückgenommen wurde, lässt das gespeicherte Markdown, wie es war.
 - **Nicht vorhanden:** Unterstreichen (kein Markdown dafür), eigene Größen oder
   Farben, eingebettete Inhalte.
 - Ein Live-Zustand hat höchstens 5 MiB, ein WebSocket-Frame höchstens 1 MiB. Größere

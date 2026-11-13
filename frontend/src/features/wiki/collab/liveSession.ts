@@ -1,7 +1,16 @@
 /** How the browser reacts to the close codes of `/collab/<page>` (relay and collab
  *  process; README "Live-Bearbeitung"). */
 export type StopReason =
-  'unauthorized' | 'forbidden' | 'not_found' | 'too_large' | 'off' | 'invalid'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'too_large'
+  | 'not_roundtrip_safe'
+  | 'off'
+  | 'invalid'
+
+/** Stops after which reconnecting cannot help, so no "reload" is offered. */
+export const FINAL_STOPS: ReadonlySet<StopReason> = new Set(['unauthorized', 'not_roundtrip_safe'])
 
 export type CloseOutcome =
   /** The generation ended (a change outside the live session): fetch the page and
@@ -18,6 +27,7 @@ const STOPS: Record<number, StopReason> = {
   4403: 'forbidden',
   4404: 'not_found',
   4413: 'too_large',
+  4422: 'not_roundtrip_safe',
   4503: 'off',
 }
 

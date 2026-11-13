@@ -214,7 +214,9 @@ kennen.
   (`HERD_COLLAB_URL`, Standard `ws://127.0.0.1:1234`) weiter. Abgelehnt wird mit
   Schließcodes, die der Browser lesen kann: 4401 (keine gültige Sitzung), 4403 (kein
   Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
-  beendet: Seite neu laden), 4413 (Zustand zu groß), 4502/4503 (Collab-Prozess nicht
+  beendet: Seite neu laden), 4413 (Zustand zu groß), 4422 (`collab.not_roundtrip_safe`:
+  der Live-Editor würde die Bedeutung des Markdowns ändern, siehe `docs/WIKI.md`; der
+  Browser bietet den Markdown-Editor an), 4502/4503 (Collab-Prozess nicht
   erreichbar bzw. aus), 1013 (später erneut versuchen). Gespeichert wird höchstens alle
   2 s, spätestens nach 10 s; alle 5 s prüft der Collab-Prozess Generation und Rechte.
   Eine Speicherung im Markdown-Modus, Wiederherstellen, Verschieben und Papierkorb

@@ -128,3 +128,37 @@ export function type(doc, text) {
   }
   node.insert(node.length, text);
 }
+
+/** A collab server against a fake API, with `open()` for clients; `stop()` ends all. */
+export async function liveFixture({ markdown, createCollabServer, ...options } = {}) {
+  const api = await fakeApi(markdown === undefined ? {} : { markdown });
+  const server = createCollabServer({
+    apiUrl: api.url,
+    token: "i".repeat(40),
+    publicUrl: ORIGIN,
+    checkIntervalMs: 100,
+    debounceMs: 50,
+    maxDebounceMs: 200,
+    retryMs: 50,
+    log: () => {},
+    ...options,
+  });
+  const address = await server.listen(0, "127.0.0.1");
+  const base = `ws://127.0.0.1:${address.port}`;
+  const clients = [];
+  return {
+    api,
+    server,
+    base,
+    open(clientOptions, { generation = 0, page = PAGE } = {}) {
+      const c = client(`${base}/collab/${page}?generation=${generation}`, clientOptions);
+      clients.push(c);
+      return c;
+    },
+    async stop() {
+      for (const c of clients.splice(0)) c.destroy();
+      await server.close();
+      await api.close();
+    },
+  };
+}

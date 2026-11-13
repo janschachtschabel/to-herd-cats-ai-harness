@@ -5,6 +5,10 @@
 // and the document name must be `page:<that id>`. Every connection authenticates
 // with the person's session cookie at the API (`/internal/collab/auth`).
 //
+// A page is opened only if the editor can show it without changing what it means
+// (`liveDocument` in markdown.mjs); otherwise 4422 `collab.not_roundtrip_safe`. A save
+// whose Markdown equals what was loaded keeps the stored Markdown as it was written.
+//
 // Saves (debounced 2 s, at the latest after 10 s) send the Markdown and the Yjs
 // state together with the sessions that edited since the last save. Every 5 s each
 // open document asks the API whether its generation and its people still hold.
@@ -19,7 +23,7 @@
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
-import { markdownToYDoc, yDocToMarkdown } from "./markdown.mjs";
+import { jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
 
 export const CLOSE = {
   generationEnded: [4409, "generation_ended"],
@@ -28,6 +32,7 @@ export const CLOSE = {
   unauthorized: [4401, "unauthorized"],
   notFound: [4404, "not_found"],
   tooLarge: [4413, "too_large"],
+  notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
   retry: [1013, "retry"],
 };
 
@@ -111,7 +116,10 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
     const editors = [...state.dirty.keys()];
     if (editors.length === 0) return;
     const ydoc = Y.encodeStateAsUpdate(document);
-    const contentMd = yDocToMarkdown(document);
+    let contentMd = yDocToMarkdown(document);
+    // Unchanged from what was loaded (an edit undone, or a browser tidying the
+    // document's structure): the stored Markdown stays exactly as it was written.
+    if (contentMd === state.baseline) contentMd = state.source;
     for (const sessionId of editors) state.dirty.delete(sessionId);
     let answer;
     try {
@@ -167,9 +175,12 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       if (stored) {
         Y.applyUpdate(document, Buffer.from(stored, "base64"));
       } else {
+        // Only a page the editor can show without changing its meaning is opened.
+        const converted = liveDocument(contentMd);
+        if (!converted.safe) throw deny(context, CLOSE.notRoundTripSafe);
         // Built from the Markdown: saved at once (content unchanged, so no version),
         // so a browser that reconnects later meets the same Yjs history.
-        Y.applyUpdate(document, Y.encodeStateAsUpdate(markdownToYDoc(contentMd)));
+        Y.applyUpdate(document, Y.encodeStateAsUpdate(jsonToYDoc(converted.json)));
         const saved = await api.save(context.pageId, {
           generation,
           ydoc: Y.encodeStateAsUpdate(document),
@@ -180,6 +191,8 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
         if (saved.status === 409) throw deny(context, CLOSE.generationEnded);
         if (saved.status !== 200) throw deny(context, DENIAL[saved.status] ?? CLOSE.forbidden);
       }
+      state.source = contentMd;
+      state.baseline = yDocToMarkdown(document);
       live.set(documentName, state);
     },
 

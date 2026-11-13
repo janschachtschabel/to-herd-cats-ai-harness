@@ -136,6 +136,21 @@ describe('live editor', () => {
     expect(connections).toHaveLength(1)
   })
 
+  test('4422: a page the live editor would change is offered in the Markdown editor', async () => {
+    const current = makePage({ space_id: space.id, content_md: '- a\n\n* b' })
+    liveApi('editor', () => current)
+    const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    act(() => connections[0]!.handlers.onClose(4422))
+    expect(
+      await screen.findByText(/die der Live-Editor nicht unverändert bearbeiten kann/),
+    ).toBeInTheDocument()
+    expect(connections[0]!.destroyed).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Neu laden' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Im Markdown-Editor bearbeiten' }))
+    await waitFor(() => expect(router.state.location.search).toEqual({ view: 'edit' }))
+  })
+
   test('1013 and other transient closes leave reconnecting to the provider', async () => {
     const current = makePage({ space_id: space.id })
     liveApi('editor', () => current)

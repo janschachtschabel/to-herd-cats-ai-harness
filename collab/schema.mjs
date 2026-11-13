@@ -4,8 +4,13 @@
 import StarterKit from "@tiptap/starter-kit";
 import CodeBlock from "@tiptap/extension-code-block";
 import Image from "@tiptap/extension-image";
-import { TableKit } from "@tiptap/extension-table";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
+import Link from "@tiptap/extension-link";
+import Paragraph from "@tiptap/extension-paragraph";
+import { Table, TableKit } from "@tiptap/extension-table";
+import { ListItem, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
+import { altText, destination, escapeBlockStarts, keepWikiLinks, title } from "./syntax.mjs";
+
+export { keepWikiLinks };
 
 export const RAW_MARKDOWN = "raw-markdown";
 
@@ -42,6 +47,83 @@ const SafeCodeBlock = CodeBlock.extend({
   },
 });
 
+const NBSP = "\u00a0";
+const EMPTY_PARAGRAPH = "&nbsp;";
+
+/** Paragraphs whose text cannot turn into other blocks when read again, and a
+ * paragraph of a single `&nbsp;` (a deliberate blank paragraph) kept as one. */
+const SafeParagraph = Paragraph.extend({
+  parseMarkdown(token, helpers) {
+    const tokens = token.tokens ?? [];
+    if (tokens.length === 1 && tokens[0].type === "image") return helpers.parseChildren(tokens);
+    return helpers.createNode("paragraph", undefined, helpers.parseInline(tokens));
+  },
+  renderMarkdown(node, h, ctx) {
+    const content = node.content ?? [];
+    if (content.length === 0) {
+      const previous = ctx?.previousNode;
+      const afterEmpty = previous?.type === "paragraph" && !(previous.content ?? []).length;
+      return afterEmpty ? EMPTY_PARAGRAPH : "";
+    }
+    if (content.length === 1 && content[0].text === NBSP && !content[0].marks?.length) {
+      return EMPTY_PARAGRAPH;
+    }
+    return escapeBlockStarts(h.renderChildren(content));
+  },
+});
+
+/** Link destinations and titles written so they read back as the same link. */
+const SafeLink = Link.extend({
+  renderMarkdown(node, h) {
+    const href = destination(node.attrs?.href ?? "");
+    const text = h.renderChildren(node);
+    return node.attrs?.title
+      ? `[${text}](${href} ${title(node.attrs.title)})`
+      : `[${text}](${href})`;
+  },
+});
+
+const SafeImage = Image.extend({
+  renderMarkdown(node) {
+    const src = destination(node.attrs?.src ?? "");
+    const alt = altText(node.attrs?.alt);
+    return node.attrs?.title ? `![${alt}](${src} ${title(node.attrs.title)})` : `![${alt}](${src})`;
+  },
+});
+
+// Tiptap's own ordered-list tokenizer misreads content indented by three spaces
+// (`1. Text` followed by a code block); marked's list tokens are read instead, item by
+// item like a bullet list's.
+const MarkedOrderedList = OrderedList.extend({
+  markdownTokenizer: null,
+  parseMarkdown(token, helpers) {
+    if (token.type !== "list" || !token.ordered) return [];
+    const content = token.items ? helpers.parseChildren(token.items) : [];
+    const start = typeof token.start === "number" ? token.start : 1;
+    return { type: "orderedList", ...(start !== 1 && { attrs: { start } }), content };
+  },
+});
+
+// The table serializer surrounds a table with blank lines of its own, which the next
+// conversion reads as empty paragraphs: every live save would add blank lines.
+const TightTable = Table.extend({
+  renderMarkdown(node, h) {
+    return this.parent(node, h).replace(/^\n+|\n+$/g, "");
+  },
+});
+
+// Text after a nested block in a list item (`1. a`, a code block, then more text)
+// comes as a bare text token whose inline formatting Tiptap would drop: read it as
+// the paragraph it is.
+const BlockTextListItem = ListItem.extend({
+  parseMarkdown(token, helpers) {
+    const tokens = (token.tokens ?? []).map((child) =>
+      child.type === "text" && child.tokens ? { ...child, type: "paragraph" } : child,
+    );
+    return this.parent({ ...token, tokens }, helpers);
+  },
+});
+
 export function extensions() {
   return [
     StarterKit.configure({
@@ -51,30 +133,20 @@ export function extensions() {
       // Each browser that joins would add its own empty last paragraph to the shared
       // document (saved as `&nbsp;`); the gap cursor reaches the end without one.
       trailingNode: false,
-      link: { openOnClick: false, isAllowedUri: (url) => allowedUri(url) },
+      paragraph: false,
+      link: false,
+      orderedList: false,
+      listItem: false,
     }),
+    BlockTextListItem,
+    SafeParagraph,
+    SafeLink.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
+    MarkedOrderedList,
     SafeCodeBlock,
-    Image,
-    TableKit.configure({ table: { resizable: false } }),
+    SafeImage,
+    TightTable.configure({ resizable: false }),
+    TableKit.configure({ table: false }),
     TaskList,
     TaskItem.configure({ nested: true }),
   ];
-}
-
-const ESCAPED_WIKI_LINK = /\\\[\\\[([^\n]+?)\\\]\\\]/g; // `\[\[Titel\]\]`
-const FENCE = /^\s*(```|~~~)/;
-
-/** The serializer escapes brackets, which would turn `[[Titel]]` (a link to another
- * page, resolved by the browser) into literal text: wiki links are written back as
- * they came, outside fenced code. */
-export function keepWikiLinks(markdown) {
-  let inFence = false;
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (FENCE.test(line)) inFence = !inFence;
-      else if (!inFence) return line.replace(ESCAPED_WIKI_LINK, "[[$1]]");
-      return line;
-    })
-    .join("\n");
 }

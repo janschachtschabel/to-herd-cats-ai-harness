@@ -19,6 +19,8 @@ const SHARED = [
   '@tiptap/extension-image',
   '@tiptap/extension-table',
   '@tiptap/extension-list',
+  '@tiptap/extension-link',
+  '@tiptap/extension-paragraph',
   'yjs',
 ]
 

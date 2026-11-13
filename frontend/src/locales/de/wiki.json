@@ -218,6 +218,7 @@
       "copy": "Meinen Text als Markdown kopieren",
       "copied": "Kopiert",
       "reload": "Neu laden",
+      "markdownEditor": "Im Markdown-Editor bearbeiten",
       "status": {
         "connecting": "Verbindet …",
         "synced": "Synchronisiert",
@@ -231,7 +232,8 @@
         "not_found": "Diese Seite ist nicht mehr sichtbar (verschoben, gelöscht oder Rechte geändert).",
         "too_large": "Die Seite ist zu groß für die Live-Bearbeitung. Bearbeite sie im Markdown-Editor.",
         "off": "Die Live-Bearbeitung ist auf diesem Server ausgeschaltet.",
-        "invalid": "Die Live-Sitzung wurde beendet."
+        "invalid": "Die Live-Sitzung wurde beendet.",
+        "not_roundtrip_safe": "Diese Seite enthält Markdown, die der Live-Editor nicht unverändert bearbeiten kann. Damit nichts an ihrer Bedeutung verloren geht, bearbeite sie im Markdown-Editor."
       },
       "tools": {
         "bold": "Fett",
