@@ -81,7 +81,14 @@ describe('leaving the live editor', () => {
   test('a state that cannot be saved: asked, so worded', async () => {
     fake.finishAnswer = () => false
     const { router, connection, leave } = await typed('neuer Satz')
-    act(() => connection.handlers.onUnrepresentable({ kind: 'markdown', block: 0, through: null }))
+    act(() =>
+      connection.handlers.onUnrepresentable({
+        kind: 'markdown',
+        block: 0,
+        through: null,
+        detail: null,
+      }),
+    )
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     leave()
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))

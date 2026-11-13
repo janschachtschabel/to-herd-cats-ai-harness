@@ -2,6 +2,7 @@ import * as Y from 'yjs'
 
 const NOTICE = 'herd:unrepresentable'
 const KINDS = ['structure', 'reopen', 'markdown', 'tooLarge'] as const
+const DETAILS = ['tableCode', 'address', 'list'] as const
 const START_LENGTH = 40
 
 /** Why the latest state cannot be saved, and where, as far as the save check knows it
@@ -14,19 +15,25 @@ export interface Unsaveable {
   kind: (typeof KINDS)[number] | 'unknown'
   block: number | null
   through: number | null
+  /** The kind of difference for kind `markdown` (collab/cause.mjs), for an example that
+   *  fits it (review M2 U12); null when not known. */
+  detail: (typeof DETAILS)[number] | null
 }
 
-/** The notice the collab process sends (`herd:unrepresentable:<kind>:<where>`, where
- *  is `<block>` or `<block>-<through>`), or null for any other message. */
+/** The notice the collab process sends (`herd:unrepresentable:<kind>:<where>[:<detail>]`,
+ *  where is `<block>` or `<block>-<through>`), or null for any other message. */
 export function unsaveable(payload: string): Unsaveable | null {
   if (payload !== NOTICE && !payload.startsWith(`${NOTICE}:`)) return null
-  const [kind = '', where = ''] = payload.slice(NOTICE.length + 1).split(':')
+  const [kind = '', where = '', detail = ''] = payload.slice(NOTICE.length + 1).split(':')
   const known = (KINDS as readonly string[]).includes(kind)
   const match = known ? /^(\d+)(?:-(\d+))?$/.exec(where) : null
   return {
     kind: known ? (kind as Unsaveable['kind']) : 'unknown',
     block: match ? Number(match[1]) : null,
     through: match?.[2] ? Number(match[2]) : null,
+    detail: (DETAILS as readonly string[]).includes(detail)
+      ? (detail as Unsaveable['detail'])
+      : null,
   }
 }
 

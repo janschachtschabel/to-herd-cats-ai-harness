@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { blockStart, unsaveable } from './unsaveable'
 
 test('the notice of the collab process names the kind of cause and the block', () => {
-  const none = { through: null }
+  const none = { through: null, detail: null }
   expect(unsaveable('herd:unrepresentable:markdown:3')).toEqual({
     kind: 'markdown',
     block: 3,
@@ -25,6 +25,7 @@ test('the notice of the collab process names the kind of cause and the block', (
     kind: 'markdown',
     block: 1,
     through: 2,
+    detail: null,
   })
   expect(unsaveable('herd:representable')).toBeNull()
 })
@@ -55,5 +56,17 @@ test('a state over the table cell cap is too large (review M2 U2)', () => {
     kind: 'tooLarge',
     block: 4,
     through: null,
+    detail: null,
   })
+})
+
+test('the kind of difference comes after the place (review M2 U12)', () => {
+  expect(unsaveable('herd:unrepresentable:markdown:0:address')).toEqual({
+    kind: 'markdown',
+    block: 0,
+    through: null,
+    detail: 'address',
+  })
+  expect(unsaveable('herd:unrepresentable:markdown::neu')?.detail).toBeNull()
+  expect(unsaveable('herd:unrepresentable:markdown:2')?.detail).toBeNull()
 })

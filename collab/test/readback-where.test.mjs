@@ -80,3 +80,60 @@ test("the notice carries the block, or the pair", async () => {
     "herd:unrepresentable:unknown:",
   );
 });
+
+// Review M2 U12: the notice's example fits the cause the check found.
+test("a state that reads back differently names a cause that fits", () => {
+  const cases = [
+    [doc(paragraph(text("Eins")), codeCell("a\\|")), "tableCode"],
+    [doc(paragraph(text("anna@firma.de+bernd@firma.de"))), "address"],
+    [doc(paragraph(text("a@e.g+@e.o~"))), "address"],
+    [
+      doc({
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              paragraph(),
+              {
+                type: "bulletList",
+                content: [
+                  {
+                    type: "listItem",
+                    content: [
+                      paragraph(),
+                      {
+                        type: "bulletList",
+                        content: [{ type: "listItem", content: [paragraph()] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      "list",
+    ],
+  ];
+  for (const [json, detail] of cases) {
+    const result = readBack(json);
+    assert.equal(result.ok, false);
+    assert.equal(result.kind, "markdown");
+    assert.equal(result.detail, detail, JSON.stringify(json));
+  }
+  assert.equal(readBack(doc(paragraph(text("Eins")))).detail, undefined);
+});
+
+test("the notice carries the cause after the place", async () => {
+  const { unrepresentableNotice } = await import("../protocol.mjs");
+  assert.equal(
+    unrepresentableNotice({ kind: "markdown", block: 0, detail: "address" }),
+    "herd:unrepresentable:markdown:0:address",
+  );
+  assert.equal(
+    unrepresentableNotice({ kind: "markdown", block: null, detail: null }),
+    "herd:unrepresentable:markdown:",
+  );
+});

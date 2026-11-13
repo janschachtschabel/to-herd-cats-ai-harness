@@ -8,6 +8,7 @@
 // top-level blocks must come back as a raw block with the same text.
 import { withAutolinks } from "./autolink.mjs";
 import { canonical } from "./canonical.mjs";
+import { causeOf } from "./cause.mjs";
 import { editorProblem, liveDocument, normalized } from "./markdown.mjs";
 import { difference } from "./meaning.mjs";
 import { parseMarkdown, rawBlock } from "./parse.mjs";
@@ -37,7 +38,8 @@ function splitRaw(node, sources) {
  * Markdown unchanged) or "markdown" (it reads back as something else). `block`: the
  * index of the first top-level block that fails on its own; when none does, of the
  * first of two neighbours that fail together (`through`: the second; review M2 U1);
- * null when neither is found. */
+ * null when neither is found. `detail` (kind "markdown"): the kind of difference
+ * (`cause.mjs`), for an example that fits (U12). */
 export function readBack(json) {
   const result = check(json);
   if (result.ok) return result;
@@ -80,9 +82,12 @@ function check(json) {
           sources.splice(index, 1);
           return true;
         }).json;
-  const where = difference(withAutolinks(canonical(expected)), withAutolinks(canonical(back)));
+  const mine = withAutolinks(canonical(expected));
+  const theirs = withAutolinks(canonical(back));
+  const where = difference(mine, theirs);
   if (where !== null) {
-    return { ok: false, markdown, problem: `reads back differently at ${where}`, kind: "markdown" };
+    const problem = `reads back differently at ${where}`;
+    return { ok: false, markdown, problem, kind: "markdown", detail: causeOf(mine, theirs, where) };
   }
   return { ok: true, markdown };
 }

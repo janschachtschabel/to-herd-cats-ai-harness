@@ -159,7 +159,11 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   speichern …“), die Sitzung läuft weiter. Der Hinweis nennt die Art der Ursache
   (würde als Markdown anders gelesen; ließe sich live nicht wieder öffnen; Aufbau
   ungültig) und, soweit die Prüfung es weiß, den Block (Nummer und Textanfang): den
-  ersten, der auch allein durchfällt. Wer den Editor so verlässt, wird gefragt.
+  ersten, der auch allein durchfällt, sonst die ersten zwei Nachbarn, die nur zusammen
+  durchfallen. Bei „würde anders gelesen“ nennt er, wenn bekannt, die Art (Code mit
+  Backslash in einer Tabellenzelle; eine Adresse, die die Seite anders verlinkt; eine
+  Liste, die als anderer Block gelesen würde) mit einem passenden Beispiel, sonst keins.
+  Wer den Editor so verlässt, wird gefragt.
   Sobald ein späterer Stand gespeichert ist, verschwindet der Hinweis. Bekannter Fall:
   Code in einer Tabellenzelle mit einem Backslash direkt vor `|` (GFM liest `\|` dort
   als maskierten Strich und `\\|` als Zellenende; kein Markdown sagt das). Geprüft

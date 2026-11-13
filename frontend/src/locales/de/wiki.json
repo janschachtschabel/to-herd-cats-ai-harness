@@ -215,7 +215,12 @@
       "hint": "Änderungen werden automatisch gespeichert (spätestens nach 10 Sekunden) und erscheinen bei allen, die die Seite gerade bearbeiten.",
       "notSaved": "Die letzten Änderungen sind noch nicht gespeichert. Bitte versuche es gleich noch einmal.",
       "unsaveable": {
-        "markdown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: er würde als Markdown anders gelesen, als er hier aussieht (etwa ein Backslash direkt vor | in Code in einer Tabelle).",
+        "markdown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: er würde als Markdown anders gelesen, als er hier aussieht.",
+        "example": {
+          "tableCode": "Ursache ist Code mit einem Backslash in einer Tabellenzelle: ein Backslash direkt vor | lässt sich dort nicht als Markdown schreiben.",
+          "address": "Ursache ist eine Adresse oder E-Mail-Adresse, die die Seite anders verlinken würde, als sie hier steht (etwa zwei mit + verbundene E-Mail-Adressen).",
+          "list": "Ursache ist eine Liste, die Markdown als etwas anderes lesen würde (etwa leere verschachtelte Punkte, die als Trennlinie gelesen würden)."
+        },
         "reopen": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: das Markdown ließe sich im Live-Editor nicht unverändert wieder öffnen.",
         "structure": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: sein Aufbau ist für den Editor ungültig.",
         "unknown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern.",

@@ -215,7 +215,12 @@
       "hint": "Changes are saved automatically (within 10 seconds at most) and appear for everyone editing the page right now.",
       "notSaved": "Your latest changes are not saved yet. Please try again in a moment.",
       "unsaveable": {
-        "markdown": "The current state cannot be saved as Markdown like this: as Markdown it would read differently from what is shown here (for example a backslash right before | in code inside a table).",
+        "markdown": "The current state cannot be saved as Markdown like this: as Markdown it would read differently from what is shown here.",
+        "example": {
+          "tableCode": "The cause is code with a backslash in a table cell: a backslash right before | cannot be written as Markdown there.",
+          "address": "The cause is an address or e-mail address the page would link differently from how it stands here (for example two e-mail addresses joined by +).",
+          "list": "The cause is a list Markdown would read as something else (for example empty nested items read as a rule)."
+        },
         "reopen": "The current state cannot be saved as Markdown like this: the live editor could not open the Markdown again unchanged.",
         "structure": "The current state cannot be saved as Markdown like this: its structure is not valid for the editor.",
         "unknown": "The current state cannot be saved as Markdown like this.",

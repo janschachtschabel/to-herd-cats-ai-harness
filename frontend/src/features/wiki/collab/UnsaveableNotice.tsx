@@ -17,6 +17,7 @@ export function UnsaveableNotice({ notice, doc }: { notice: Unsaveable; doc: Y.D
             cells: MAX_TABLE_CELLS.toLocaleString(i18n.language),
           })}
         </p>
+        {notice.detail && <p>{t(`wiki.live.unsaveable.example.${notice.detail}`)}</p>}
         {notice.block !== null && (
           <p>
             {t(

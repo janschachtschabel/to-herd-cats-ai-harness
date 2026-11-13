@@ -228,7 +228,12 @@ describe('live editor', () => {
     typeInto(connections[0]!.doc, 'Erster Absatz')
     typeInto(connections[0]!.doc, 'Zweiter Absatz')
     act(() =>
-      connections[0]!.handlers.onUnrepresentable({ kind: 'markdown', block: 1, through: null }),
+      connections[0]!.handlers.onUnrepresentable({
+        kind: 'markdown',
+        block: 1,
+        through: null,
+        detail: null,
+      }),
     )
     expect(screen.getByText(/lässt sich so nicht als Markdown speichern/)).toBeInTheDocument()
     // The notice names the cause and the block (fix wave 3).

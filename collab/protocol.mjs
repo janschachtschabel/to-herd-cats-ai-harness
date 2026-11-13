@@ -29,13 +29,13 @@ export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection
 // The first is followed by `:<kind>:<where>`: the kind of cause (`structure`, `reopen`,
 // `markdown`, `readback.mjs`; `tooLarge`, `unknown`) and the index of the top-level
 // block, `<first>-<second>` for two neighbours that fail only together, empty if
-// unknown.
+// unknown; then `:<detail>` when the kind of difference is known (`cause.mjs`).
 export const UNREPRESENTABLE = "herd:unrepresentable";
 
 /** The notice for a state that cannot be stored (see UNREPRESENTABLE). */
-export function unrepresentableNotice({ kind, block = null, through = null }) {
+export function unrepresentableNotice({ kind, block = null, through = null, detail = null }) {
   const where = block === null ? "" : through === null ? `${block}` : `${block}-${through}`;
-  return `${UNREPRESENTABLE}:${kind}:${where}`;
+  return `${UNREPRESENTABLE}:${kind}:${where}${detail ? `:${detail}` : ""}`;
 }
 export const REPRESENTABLE = "herd:representable";
 // To every connection after each successful save: what is stored, as a Yjs snapshot
