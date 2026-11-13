@@ -11,6 +11,7 @@ Locks (review focus 4): a written ticket `FOR UPDATE`, a parent being set `FOR S
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import (
     ColumnElement,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     exists,
     func,
     literal,
+    or_,
     select,
     tuple_,
 )
@@ -251,7 +253,9 @@ class TicketRepository:
         rows = await self.session.execute(stmt.limit(limit))
         return [self._view(row) for row in rows]
 
-    def _filtered(self, stmt: ViewSelect, f: Filters) -> ViewSelect:
+    def _filtered[S: Select[*tuple[Any, ...]]](self, stmt: S, f: Filters) -> S:
+        """`stmt` (over `work_item`; joined with its status for a category filter)
+        narrowed by the filters."""
         if f.space_id is not None:
             stmt = stmt.where(WorkItem.space_id == f.space_id)
         if f.status_categories:
@@ -274,6 +278,9 @@ class TicketRepository:
             stmt = stmt.where(WorkItem.parent_id == f.parent_id)
         if f.due_before is not None:
             stmt = stmt.where(WorkItem.due_on < f.due_before)
+        if f.epic_id is not None:
+            stories = select(WorkItem.id).where(WorkItem.parent_id == f.epic_id)
+            stmt = stmt.where(or_(WorkItem.parent_id == f.epic_id, WorkItem.parent_id.in_(stories)))
         for tag_id in f.tag_ids:  # every one of them
             stmt = stmt.where(WorkItem.id.in_(_tagged(tag_id)))
         if f.q is not None:

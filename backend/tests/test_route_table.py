@@ -115,6 +115,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/admin/dm-inspect/{inspection_id}/messages", "admin"),
     ("POST", "/api/spaces/{space_id}/tickets", "space"),
     ("GET", "/api/tickets", "session"),
+    ("GET", "/api/tickets/counts", "session"),
+    ("GET", "/api/spaces/{space_id}/board", "space"),
+    ("GET", "/api/spaces/{space_id}/board/{status_id}", "space"),
+    ("GET", "/api/spaces/{space_id}/epics", "space"),
     ("GET", "/api/tickets/{number}", "ticket"),
     ("PATCH", "/api/tickets/{number}", "ticket"),
     ("GET", "/api/tickets/{number}/thread", "ticket"),  # the ticket's discussion

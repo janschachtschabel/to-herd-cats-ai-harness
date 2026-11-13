@@ -391,6 +391,61 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "BoardColumnOut": {
+        "description": "A status of the board: how many tickets it holds under the filters, the first\nof them in board order (priority, due date with none last, number), and the\ncursor for more (`GET /api/spaces/{space_id}/board/{status_id}`).",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TicketSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusRef"
+          }
+        },
+        "required": [
+          "status",
+          "count",
+          "items",
+          "next_cursor"
+        ],
+        "title": "BoardColumnOut",
+        "type": "object"
+      },
+      "BoardOut": {
+        "description": "The space's statuses in their order, each a column.",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/BoardColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "title": "BoardOut",
+        "type": "object"
+      },
       "ChannelCreate": {
         "properties": {
           "name": {
@@ -853,6 +908,122 @@
           "last_message_at"
         ],
         "title": "DmOut",
+        "type": "object"
+      },
+      "EpicOut": {
+        "description": "An epic with how many children it has per status category (its progress).",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/PersonOut"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusRef"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagOut"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "key",
+          "space_id",
+          "kind",
+          "title",
+          "status",
+          "priority",
+          "assignee",
+          "reporter",
+          "due_on",
+          "parent",
+          "tags",
+          "version",
+          "created_at",
+          "updated_at",
+          "children"
+        ],
+        "title": "EpicOut",
         "type": "object"
       },
       "GroupCreate": {
@@ -2353,6 +2524,33 @@
         "title": "Page[DmOut]",
         "type": "object"
       },
+      "Page_EpicOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EpicOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[EpicOut]",
+        "type": "object"
+      },
       "Page_GroupMemberOut_": {
         "properties": {
           "items": {
@@ -3705,6 +3903,20 @@
           "version"
         ],
         "title": "TagsSet",
+        "type": "object"
+      },
+      "TicketCountsOut": {
+        "description": "For the sidebar: the caller's tickets that are open, active or in review.",
+        "properties": {
+          "assigned_open": {
+            "title": "Assigned Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "assigned_open"
+        ],
+        "title": "TicketCountsOut",
         "type": "object"
       },
       "TicketCreate": {
@@ -8508,6 +8720,298 @@
         ]
       }
     },
+    "/api/spaces/{space_id}/board": {
+      "get": {
+        "description": "The space's statuses in order, each with its count and first tickets.",
+        "operationId": "board_api_spaces__space_id__board_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "tickets per column",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "tickets per column",
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`me` or a person's id",
+            "in": "query",
+            "name": "assignee",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`me` or a person's id",
+              "title": "Assignee"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TicketKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "only with every tag",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only with every tag",
+              "title": "Tag"
+            }
+          },
+          {
+            "description": "only an epic's children and their children",
+            "in": "query",
+            "name": "epic",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only an epic's children and their children",
+              "title": "Epic"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Board",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/board/{status_id}": {
+      "get": {
+        "description": "More of one column, in board order (the column's `next_cursor`).",
+        "operationId": "board_column_api_spaces__space_id__board__status_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "status_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Status Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "`me` or a person's id",
+            "in": "query",
+            "name": "assignee",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`me` or a person's id",
+              "title": "Assignee"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TicketKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "only with every tag",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only with every tag",
+              "title": "Tag"
+            }
+          },
+          {
+            "description": "only an epic's children and their children",
+            "in": "query",
+            "name": "epic",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only an epic's children and their children",
+              "title": "Epic"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TicketSummaryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Board Column",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/spaces/{space_id}/channels": {
       "get": {
         "operationId": "list_space_channels_api_spaces__space_id__channels_get",
@@ -8639,6 +9143,78 @@
         "summary": "Create Channel",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/epics": {
+      "get": {
+        "description": "The space's epics, newest first, with their progress; an epic's children come\nfrom the list (`parent`).",
+        "operationId": "epics_api_spaces__space_id__epics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EpicOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Epics",
+        "tags": [
+          "tickets"
         ]
       }
     },
@@ -9940,6 +10516,7 @@
                     "format": "uuid",
                     "type": "string"
                   },
+                  "maxItems": 20,
                   "type": "array"
                 },
                 {
@@ -9983,6 +10560,27 @@
           }
         },
         "summary": "List Tickets",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets/counts": {
+      "get": {
+        "operationId": "counts_api_tickets_counts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCountsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Counts",
         "tags": [
           "tickets"
         ]

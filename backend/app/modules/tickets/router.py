@@ -11,7 +11,7 @@ from app.core.pagination import Page, PageParams
 from app.core.principal import Principal
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.tickets.listing import Filters, Sort
-from app.modules.tickets.models import Priority, StatusCategory, TicketKind
+from app.modules.tickets.models import MAX_TAGS, Priority, StatusCategory, TicketKind
 from app.modules.tickets.repository import TicketView
 from app.modules.tickets.schemas import (
     AssigneeIn,
@@ -28,6 +28,9 @@ space_tickets = APIRouter(prefix="/spaces/{space_id}/tickets", tags=["tickets"])
 tickets = APIRouter(prefix="/tickets", tags=["tickets"])
 
 PersonQuery = Annotated[str | None, Query(description="`me` or a person's id")]
+TagQuery = Annotated[
+    list[uuid.UUID] | None, Query(max_length=MAX_TAGS, description="only with every tag")
+]
 
 
 def _principal(ref: AssigneeIn | dict[str, Any] | None) -> Principal | None:
@@ -38,7 +41,7 @@ def _principal(ref: AssigneeIn | dict[str, Any] | None) -> Principal | None:
     return Principal(ref.type, ref.id)
 
 
-def _person(value: str | None, actor: Actor, name: str) -> uuid.UUID | None:
+def person(value: str | None, actor: Actor, name: str) -> uuid.UUID | None:
     """`me`, a person's id, or nothing."""
     if value is None:
         return None
@@ -89,7 +92,7 @@ async def list_tickets(
     parent: Annotated[uuid.UUID | None, Query(description="the parent's id")] = None,
     q: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
     due_before: date | None = None,
-    tag: Annotated[list[uuid.UUID] | None, Query(description="only with every tag")] = None,
+    tag: TagQuery = None,
     sort: Sort = Sort.UPDATED,
 ) -> Page[TicketSummaryOut]:
     """The tickets of every space where the caller may read them."""
@@ -97,8 +100,8 @@ async def list_tickets(
         space_id=space_id,
         status_categories=tuple(status_category or ()),
         status_id=status_id,
-        assignee_id=_person(assignee, actor, "assignee"),
-        reporter_id=_person(reporter, actor, "reporter"),
+        assignee_id=person(assignee, actor, "assignee"),
+        reporter_id=person(reporter, actor, "reporter"),
         kind=kind,
         priority=priority,
         parent_id=parent,

@@ -48,6 +48,7 @@ class Filters:
     q: str | None = None
     due_before: date | None = None
     tag_ids: tuple[uuid.UUID, ...] = ()  # tickets carrying every one of them
+    epic_id: uuid.UUID | None = None  # an epic's children and their children
 
 
 @dataclass(frozen=True, slots=True)

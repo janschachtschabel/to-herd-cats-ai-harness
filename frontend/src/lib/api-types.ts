@@ -945,6 +945,46 @@ export interface paths {
         patch: operations["update_space_api_spaces__space_id__patch"];
         trace?: never;
     };
+    "/api/spaces/{space_id}/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Board
+         * @description The space's statuses in order, each with its count and first tickets.
+         */
+        get: operations["board_api_spaces__space_id__board_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/board/{status_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Board Column
+         * @description More of one column, in board order (the column's `next_cursor`).
+         */
+        get: operations["board_column_api_spaces__space_id__board__status_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/channels": {
         parameters: {
             query?: never;
@@ -957,6 +997,27 @@ export interface paths {
         put?: never;
         /** Create Channel */
         post: operations["create_channel_api_spaces__space_id__channels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/epics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Epics
+         * @description The space's epics, newest first, with their progress; an epic's children come
+         *     from the list (`parent`).
+         */
+        get: operations["epics_api_spaces__space_id__epics_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1231,6 +1292,23 @@ export interface paths {
          * @description The tickets of every space where the caller may read them.
          */
         get: operations["list_tickets_api_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Counts */
+        get: operations["counts_api_tickets_counts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1520,6 +1598,29 @@ export interface components {
             /** Target Type */
             target_type: string;
         };
+        /**
+         * BoardColumnOut
+         * @description A status of the board: how many tickets it holds under the filters, the first
+         *     of them in board order (priority, due date with none last, number), and the
+         *     cursor for more (`GET /api/spaces/{space_id}/board/{status_id}`).
+         */
+        BoardColumnOut: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["TicketSummaryOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            status: components["schemas"]["StatusRef"];
+        };
+        /**
+         * BoardOut
+         * @description The space's statuses in their order, each a column.
+         */
+        BoardOut: {
+            /** Columns */
+            columns: components["schemas"]["BoardColumnOut"][];
+        };
         /** ChannelCreate */
         ChannelCreate: {
             /** Name */
@@ -1682,6 +1783,51 @@ export interface components {
             space_id: string | null;
             /** Topic */
             topic: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * EpicOut
+         * @description An epic with how many children it has per status category (its progress).
+         */
+        EpicOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            children: components["schemas"]["ChildCounts"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            parent: components["schemas"]["ParentOut"] | null;
+            priority: components["schemas"]["Priority"];
+            reporter: components["schemas"]["PersonOut"];
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            status: components["schemas"]["StatusRef"];
+            /** Tags */
+            tags: components["schemas"]["TagOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
             /** Version */
             version: number;
         };
@@ -2283,6 +2429,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[EpicOut] */
+        Page_EpicOut_: {
+            /** Items */
+            items: components["schemas"]["EpicOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[GroupMemberOut] */
         Page_GroupMemberOut_: {
             /** Items */
@@ -2770,6 +2923,14 @@ export interface components {
             tag_ids: string[];
             /** Version */
             version: number;
+        };
+        /**
+         * TicketCountsOut
+         * @description For the sidebar: the caller's tickets that are open, active or in review.
+         */
+        TicketCountsOut: {
+            /** Assigned Open */
+            assigned_open: number;
         };
         /**
          * TicketCreate
@@ -5465,6 +5626,89 @@ export interface operations {
             };
         };
     };
+    board_api_spaces__space_id__board_get: {
+        parameters: {
+            query?: {
+                /** @description tickets per column */
+                limit?: number;
+                /** @description `me` or a person's id */
+                assignee?: string | null;
+                kind?: components["schemas"]["TicketKind"] | null;
+                /** @description only with every tag */
+                tag?: string[] | null;
+                /** @description only an epic's children and their children */
+                epic?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    board_column_api_spaces__space_id__board__status_id__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description `me` or a person's id */
+                assignee?: string | null;
+                kind?: components["schemas"]["TicketKind"] | null;
+                /** @description only with every tag */
+                tag?: string[] | null;
+                /** @description only an epic's children and their children */
+                epic?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+                status_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TicketSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_space_channels_api_spaces__space_id__channels_get: {
         parameters: {
             query?: {
@@ -5523,6 +5767,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    epics_api_spaces__space_id__epics_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_EpicOut_"];
                 };
             };
             /** @description Validation Error */
@@ -6218,6 +6496,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    counts_api_tickets_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCountsOut"];
                 };
             };
         };
