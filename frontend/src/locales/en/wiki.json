@@ -214,6 +214,7 @@
       "done": "Done",
       "hint": "Changes are saved automatically (within 10 seconds at most) and appear for everyone editing the page right now.",
       "notSaved": "Your latest changes are not saved yet. Please try again in a moment.",
+      "unrepresentable": "The current state cannot be saved as Markdown like this (for example a backslash right before | in code inside a table). The latest changes stay unsaved until it is changed; the session goes on.",
       "leaveConfirm": "Not all changes have reached the server yet. Leave anyway?",
       "regenerated": "The page was changed outside the live session (saved, restored or moved). The current version is loaded.",
       "copy": "Copy my text as Markdown",

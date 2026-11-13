@@ -45,7 +45,8 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   const lost = live.lost && live.lost !== page.content_md.trim() ? live.lost : null
   // Once stopped, nothing more reaches the server: only text that differs from the
   // page is at stake (not the editor's own empty paragraph of a refused session).
-  const unsaved = live.stopped === null ? live.unsynced > 0 : !!lost && !copied
+  const unsaved =
+    live.stopped === null ? live.unsynced > 0 || live.unrepresentable : !!lost && !copied
   useLeaveGuard(unsaved, t('wiki.live.leaveConfirm'))
 
   async function done() {
@@ -95,6 +96,13 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
       {notSaved && !live.stopped && (
         <Alert variant="destructive">
           <AlertDescription className="text-foreground">{t('wiki.live.notSaved')}</AlertDescription>
+        </Alert>
+      )}
+      {live.unrepresentable && !live.stopped && (
+        <Alert variant="destructive">
+          <AlertDescription className="text-foreground">
+            {t('wiki.live.unrepresentable')}
+          </AlertDescription>
         </Alert>
       )}
       {(live.stopped || live.regenerated) && (

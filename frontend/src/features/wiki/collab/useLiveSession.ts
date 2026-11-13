@@ -20,6 +20,8 @@ export interface LiveSession {
    *  generation, so text that may not have been saved can be copied. */
   lost: string | null
   unsynced: number
+  /** The latest state cannot be saved as Markdown: the edits stay unsaved. */
+  unrepresentable: boolean
   retry: () => void
   /** Stop for good on the browser's side (the shared document cannot be shown). */
   refuse: (reason: StopReason) => void
@@ -46,6 +48,7 @@ export function useLiveSession(
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [unsynced, setUnsynced] = useState(0)
+  const [unrepresentable, setUnrepresentable] = useState(false)
   const [peers, setPeers] = useState<Peer[]>([])
   const [stopped, setStopped] = useState<StopReason | null>(null)
   const [regenerated, setRegenerated] = useState(false)
@@ -75,6 +78,7 @@ export function useLiveSession(
         onSynced: () => open && setSynced(true),
         onUnsynced: (count) => open && setUnsynced(count),
         onPeers: (states) => open && setPeers(peersOf(states, live.clientId)),
+        onUnrepresentable: (value) => open && setUnrepresentable(value),
         onClose: (code) => {
           if (!open) return
           const outcome = closeOutcome(code)
@@ -124,6 +128,7 @@ export function useLiveSession(
     setConnection(live)
     setSynced(false)
     setUnsynced(0)
+    setUnrepresentable(false)
     setStopped(null)
     return () => {
       open = false
@@ -159,6 +164,7 @@ export function useLiveSession(
     regenerated,
     lost,
     unsynced,
+    unrepresentable,
     retry,
     refuse,
     finish,

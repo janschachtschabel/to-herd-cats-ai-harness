@@ -6,6 +6,10 @@ import type * as Y from 'yjs'
 export const FLUSH = 'herd:flush'
 export const SAVED = 'herd:saved'
 export const UNSAVED = 'herd:unsaved'
+// The document's latest state cannot be stored as Markdown (nothing is stored until a
+// later state can be), and that a later state was stored (review M2 S2/S3).
+export const UNREPRESENTABLE = 'herd:unrepresentable'
+export const REPRESENTABLE = 'herd:representable'
 const FINISH_TIMEOUT_MS = 5000
 
 export interface AwarenessState {
@@ -19,6 +23,8 @@ export interface LiveHandlers {
   onSynced: () => void
   onUnsynced: (count: number) => void
   onPeers: (states: AwarenessState[]) => void
+  /** True while the latest state cannot be saved as Markdown. */
+  onUnrepresentable: (unrepresentable: boolean) => void
 }
 
 /** One live connection of a page's document. */
@@ -57,6 +63,11 @@ export const connectLive: Connect = ({ pageId, generation, doc, handlers }) => {
     onSynced: ({ state }) => state && handlers.onSynced(),
     onUnsyncedChanges: ({ number }) => handlers.onUnsynced(number),
     onAwarenessChange: ({ states }) => handlers.onPeers(states as AwarenessState[]),
+    onStateless: ({ payload }) => {
+      if (payload === UNREPRESENTABLE || payload === REPRESENTABLE) {
+        handlers.onUnrepresentable(payload === UNREPRESENTABLE)
+      }
+    },
   })
   return {
     provider,

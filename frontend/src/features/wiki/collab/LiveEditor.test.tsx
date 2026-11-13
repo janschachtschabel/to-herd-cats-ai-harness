@@ -187,6 +187,29 @@ describe('live editor', () => {
     expect(connections[0]!.destroyed).toBe(false)
   })
 
+  test('a state that cannot be saved as Markdown is shown, and the session goes on', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'Alter Text' })
+    liveApi('editor', () => current)
+    const { router } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    join(connections[0]!)
+    act(() => connections[0]!.handlers.onUnrepresentable(true))
+    expect(screen.getByText(/lässt sich so nicht als Markdown speichern/)).toBeInTheDocument()
+    expect(connections[0]!.destroyed).toBe(false)
+    expect(await screen.findByRole('textbox', { name: 'Inhalt von „Handbuch“' })).toHaveAttribute(
+      'contenteditable',
+      'true',
+    )
+    // Leaving asks first: the latest edits are not stored.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    act(() => void router.navigate({ to: '/spaces/$spaceId', params: { spaceId: space.id } }))
+    await waitFor(() => expect(confirm).toHaveBeenCalled())
+    expect(router.state.location.search).toEqual({ view: 'live' })
+    confirm.mockRestore()
+    act(() => connections[0]!.handlers.onUnrepresentable(false))
+    expect(screen.queryByText(/lässt sich so nicht als Markdown speichern/)).not.toBeInTheDocument()
+  })
+
   test('a viewer gets the read-only page without a live connection', async () => {
     const current = makePage({ space_id: space.id, content_md: '# Handbuch\n\nNur lesen.' })
     liveApi('viewer', () => current)
