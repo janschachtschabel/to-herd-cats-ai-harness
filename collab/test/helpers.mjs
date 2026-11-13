@@ -56,7 +56,12 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
     if (request.method === "GET") {
       return reply([
         200,
-        { generation: state.generation, ydoc_b64: null, content_md: state.markdown, title: "T" },
+        {
+          generation: state.generation,
+          ydoc_b64: state.ydoc ?? null,
+          content_md: state.markdown,
+          title: "T",
+        },
       ]);
     }
     if (request.method === "PUT") {

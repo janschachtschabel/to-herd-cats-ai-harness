@@ -94,3 +94,15 @@ export const REPORTED = {
   "link target with spaces": { markdown: "[Datei](<mein dokument.pdf>)\n", editable: true },
   "wiki link with underscore": { markdown: "Siehe [[API_Keys]] und [[a_b *c*]]\n", editable: true },
 };
+
+/** Review 2 (S1): images next to text, which the browser used to delete on opening. */
+export const IMAGES_IN_TEXT = {
+  "image in a sentence":
+    "# Anleitung\n\nKlicke auf ![Speichern](/icons/save.png) und dann auf Fertig.\n\nEnde\n",
+  "image in a table cell": "| API | Status |\n|---|---|\n| v1 | ![ok](/ok.png) |\n",
+  "image in a list item": "1. Öffne das Menü ![Menü](/menu.png) oben rechts\n2. Wähle Export\n",
+  "image in a heading": "# ![Logo](/logo.png) Handbuch\n\nText\n",
+  "two images in a line": "![a](/a.png) ![b](/b.png)\n",
+  "image and caption": "![a](/a.png)\nBildunterschrift\n",
+  "image in text (corpus)": "Vorher ![a](x.png) nachher\n",
+};

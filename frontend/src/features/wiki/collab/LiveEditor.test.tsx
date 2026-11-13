@@ -1,76 +1,17 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import * as Y from 'yjs'
-import type { SpaceRole, WikiPage } from '@/lib/api'
-import { makeMe, makePage, makeSpace, mockApi, nodeOf, page } from '@/test/api'
+import { makeMe, makePage, mockApi, nodeOf, page } from '@/test/api'
 import { renderApp } from '@/test/render'
-import type { LiveHandlers } from './connect'
+import { fake, join, liveApi, space, typeInto } from './fakeLive.test-helper'
 
-/** The fake provider: every connection the editor opens, with its handlers. */
-interface FakeConnection {
-  pageId: string
-  generation: number
-  doc: Y.Doc
-  handlers: LiveHandlers
-  destroyed: boolean
-}
-const connections: FakeConnection[] = []
-const events: string[] = []
-/** What the server answers to "I am done" (true: everything is stored). */
-let finishAnswer: () => boolean = () => true
+const { connections, events } = fake
 
 vi.mock('./connect', async (original) => ({
   ...(await original<typeof import('./connect')>()),
-  connectLive: (options: Omit<FakeConnection, 'destroyed'>) => {
-    const connection = { ...options, destroyed: false }
-    connections.push(connection)
-    const destroy = () => void (connection.destroyed = true)
-    const finish = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20)) // the server confirms
-      events.push('flushed')
-      return finishAnswer()
-    }
-    return { provider: null, clientId: 1, destroy, finish }
-  },
+  connectLive: (await import('./fakeLive.test-helper')).fakeConnectLive,
 }))
 
-const space = makeSpace({ name: 'Handbuch' })
-
-function liveApi(role: SpaceRole, current: () => WikiPage) {
-  const roleSpace = { ...space, my_role: role }
-  return mockApi({
-    'GET /api/auth/me': makeMe([]),
-    'GET /api/spaces': page([roleSpace]),
-    'GET /api/spaces/:id': roleSpace,
-    'GET /api/spaces/:id/pages/tree': () => page([nodeOf(current())]),
-    'GET /api/spaces/:id/pages/by-path': () => current(),
-    'GET /api/pages/:id': () => current(),
-    'GET /api/tags': page([]),
-    'GET /api/pages/:id/attachments': page([]),
-  })
-}
-
-/** The server's side of a connection: connected and synced. */
-function join(connection: FakeConnection) {
-  act(() => {
-    connection.handlers.onConnected(true)
-    connection.handlers.onSynced()
-  })
-}
-
-function typeInto(doc: Y.Doc, text: string) {
-  act(() => {
-    const paragraph = new Y.XmlElement('paragraph')
-    paragraph.insert(0, [new Y.XmlText(text)])
-    doc.getXmlFragment('default').push([paragraph])
-  })
-}
-
-beforeEach(() => {
-  connections.length = 0
-  events.length = 0
-  finishAnswer = () => true
-})
+beforeEach(() => fake.reset())
 
 describe('live editor', () => {
   test('shows presence of other editors and the sync state', async () => {
@@ -216,7 +157,7 @@ describe('live editor', () => {
   test('"Fertig" waits for the save, then shows what the server stored (review R3)', async () => {
     let current = makePage({ space_id: space.id, content_md: 'Alter Text' })
     const api = liveApi('editor', () => current)
-    finishAnswer = () => {
+    fake.finishAnswer = () => {
       current = { ...current, content_md: 'Alter Text NEU-GETIPPT', version: 2 }
       return true
     }
@@ -236,7 +177,7 @@ describe('live editor', () => {
   test('"Fertig" stays in the editor while the server has not stored everything', async () => {
     const current = makePage({ space_id: space.id, content_md: 'Alter Text' })
     liveApi('editor', () => current)
-    finishAnswer = () => false
+    fake.finishAnswer = () => false
     const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
     await waitFor(() => expect(connections).toHaveLength(1))
     join(connections[0]!)

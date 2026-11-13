@@ -235,7 +235,8 @@
         "off": "Live editing is turned off on this server.",
         "invalid": "The live session has ended.",
         "connection_limit": "You have too many live connections open (at most 3 per page and 10 in all per sign-in). Close other windows with this page and reload.",
-        "not_roundtrip_safe": "This page contains Markdown that the live editor cannot edit without changing it. To keep its meaning intact, edit it in the Markdown editor."
+        "not_roundtrip_safe": "This page contains Markdown that the live editor cannot edit without changing it. To keep its meaning intact, edit it in the Markdown editor.",
+        "invalid_content": "The live editor cannot show the shared state of this page. So that nothing is lost, the session was ended without saving anything. Edit the page in the Markdown editor."
       },
       "tools": {
         "bold": "Bold",

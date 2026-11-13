@@ -54,3 +54,17 @@ test("a structural change without a change of meaning keeps the stored Markdown"
   Y.transact(c.doc, () => text.delete(text.length - 1, 1));
   await until(() => live.api.saves.at(-1).content_md === UNTIDY);
 });
+
+test("a stored live state the editor's schema does not allow is not opened (4422)", async () => {
+  // E.g. kept from an older release: a paragraph holding a block. The browser would
+  // delete it and that deletion would be saved (review M2 S1: never a repaired document).
+  await start("Text");
+  const doc = new Y.Doc();
+  const paragraph = new Y.XmlElement("paragraph");
+  paragraph.insert(0, [new Y.XmlElement("horizontalRule")]);
+  doc.getXmlFragment("default").insert(0, [paragraph]);
+  live.api.ydoc = Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64");
+  const c = live.open({ cookie: "herd_session=token-a" });
+  await until(() => c.closes.includes(4422));
+  assert.equal(live.api.saves.length, 0, "nothing saved");
+});

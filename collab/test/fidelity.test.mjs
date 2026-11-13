@@ -6,17 +6,43 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { jsonToMarkdown, liveDocument, RAW_LANGUAGE } from "../markdown.mjs";
+import { yDocToProsemirrorJSON } from "y-prosemirror";
+import {
+  FIELD,
+  editorProblem,
+  jsonToMarkdown,
+  jsonToYDoc,
+  liveDocument,
+  RAW_LANGUAGE,
+} from "../markdown.mjs";
 import { difference, meaningOf, sameMeaning } from "../meaning.mjs";
-import { CONSTRUCTS, REPORTED } from "./constructs.mjs";
+import { CONSTRUCTS, IMAGES_IN_TEXT, REPORTED } from "./constructs.mjs";
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 
-/** The Markdown a live session saves for the page (after one edit anywhere). */
+/** Every word the page view shows (text, link targets, image sources and alt texts). */
+function wordsOf(tree, out = new Set()) {
+  for (const key of ["value", "url", "alt"]) {
+    const value = String(tree[key] ?? "").replace(/wiki:[^)\s]*/g, ""); // the title is the text
+    for (const word of value.match(/[\p{L}\d]{2,}/gu) ?? []) out.add(word);
+  }
+  for (const child of tree.children ?? []) wordsOf(child, out);
+  return out;
+}
+
+/** The Markdown a live session saves for the page (after one edit anywhere), the way
+ * the browser gets it: through the Y.Doc, valid for the editor's schema (review M2 S1,
+ * S8), and with everything the page shows still in the document. */
 function liveSave(markdown) {
   const document = liveDocument(markdown);
   assert.ok(document.safe, "opened for live editing");
-  return { markdown: jsonToMarkdown(document.json), json: document.json };
+  assert.equal(editorProblem(document.json), null, "valid for the browser's editor");
+  const json = yDocToProsemirrorJSON(jsonToYDoc(document.json), FIELD);
+  const content = JSON.stringify(json);
+  for (const word of wordsOf(meaningOf(markdown))) {
+    assert.ok(content.includes(word), `"${word}" missing from the editor's document`);
+  }
+  return { markdown: jsonToMarkdown(json), json };
 }
 
 function assertKeepsMeaning(name, markdown) {
@@ -38,6 +64,15 @@ for (const [name, { markdown, editable }] of Object.entries(REPORTED)) {
     assertKeepsMeaning(name, markdown);
     const { json } = liveSave(markdown);
     assert.equal(rawBlocks(json) === 0, editable, editable ? "editable" : "kept as raw block");
+  });
+}
+
+for (const [name, markdown] of Object.entries(IMAGES_IN_TEXT)) {
+  test(`an image next to text stays rich text and unchanged (review S1): ${name}`, () => {
+    assertKeepsMeaning(name, markdown);
+    const { json } = liveSave(markdown);
+    assert.equal(rawBlocks(json), 0, "edited as rich text");
+    assert.ok(JSON.stringify(json).includes('"image"'));
   });
 }
 

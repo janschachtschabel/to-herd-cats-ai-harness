@@ -235,7 +235,8 @@
         "off": "Die Live-Bearbeitung ist auf diesem Server ausgeschaltet.",
         "invalid": "Die Live-Sitzung wurde beendet.",
         "connection_limit": "Du hast zu viele Live-Verbindungen offen (höchstens 3 je Seite und 10 insgesamt je Anmeldung). Schließe andere Fenster mit dieser Seite und lade neu.",
-        "not_roundtrip_safe": "Diese Seite enthält Markdown, die der Live-Editor nicht unverändert bearbeiten kann. Damit nichts an ihrer Bedeutung verloren geht, bearbeite sie im Markdown-Editor."
+        "not_roundtrip_safe": "Diese Seite enthält Markdown, die der Live-Editor nicht unverändert bearbeiten kann. Damit nichts an ihrer Bedeutung verloren geht, bearbeite sie im Markdown-Editor.",
+        "invalid_content": "Der Live-Editor kann den gemeinsamen Stand dieser Seite nicht darstellen. Damit nichts verloren geht, wurde die Sitzung beendet, ohne etwas zu speichern. Bearbeite die Seite im Markdown-Editor."
       },
       "tools": {
         "bold": "Fett",

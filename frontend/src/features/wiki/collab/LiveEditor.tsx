@@ -12,7 +12,7 @@ import { useWiki } from '../WikiContext'
 import type { Connect } from './connect'
 import { LiveSurface } from './LiveSurface'
 import { Presence } from './Presence'
-import { FINAL_STOPS } from './liveSession'
+import { FINAL_STOPS, MARKDOWN_STOPS } from './liveSession'
 import { useLiveSession } from './useLiveSession'
 
 const STATUS_STYLE = {
@@ -113,7 +113,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
                   {t('wiki.live.reload')}
                 </Button>
               )}
-              {(live.stopped === 'not_roundtrip_safe' || live.stopped === 'too_large') && (
+              {live.stopped && MARKDOWN_STOPS.has(live.stopped) && (
                 <Button size="sm" variant="outline" asChild>
                   <Link
                     to="/spaces/$spaceId/p/$"
@@ -135,6 +135,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
         editable={editable}
         label={t('wiki.live.label', { title: page.title })}
         userName={me?.user.name ?? ''}
+        onContentError={() => live.refuse('invalid_content')}
       />
       <p className="text-xs text-muted-foreground">{t('wiki.live.hint')}</p>
     </section>

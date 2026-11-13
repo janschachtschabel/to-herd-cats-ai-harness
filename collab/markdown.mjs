@@ -99,13 +99,12 @@ function rawBlock(token) {
   return `${marks}${RAW_LANGUAGE}\n${body}\n${marks}${trailing || "\n"}`;
 }
 
-function convert(markdown) {
-  return jsonToMarkdown(manager.parse(markdown));
-}
-
-/** Whether the block comes back from the editor meaning the same. */
+/** Whether the block comes back from the editor meaning the same, and the editor can
+ * show it as built. */
 function survives(raw) {
-  return difference(meaningOf(raw), meaningOf(convert(raw))) === null;
+  const json = manager.parse(raw);
+  if (editorProblem(json) !== null) return false;
+  return difference(meaningOf(raw), meaningOf(jsonToMarkdown(json))) === null;
 }
 
 /** The Markdown with every block the editor cannot represent wrapped as a raw block;
@@ -133,13 +132,32 @@ export function jsonToMarkdown(json) {
   return keepWikiLinks(manager.serialize(json).replace(/^\n+|\n+$/g, ""));
 }
 
+/** Why the browser's editor would not show the document as it is, or null (review M2
+ * S1): it must be valid for the editor's schema (the browser drops what is not, and
+ * that deletion would be saved), and it must come back unchanged from the Y.Doc. */
+export function editorProblem(json) {
+  // An empty page: the browser shows its own empty paragraph and adds it on typing.
+  if (json?.type === "doc" && !json.content?.length) return null;
+  let node;
+  try {
+    node = schema.nodeFromJSON(json);
+    node.check();
+  } catch (error) {
+    return `invalid: ${error.message}`;
+  }
+  const back = yDocToProsemirrorJSON(prosemirrorJSONToYDoc(schema, json, FIELD), FIELD);
+  return schema.nodeFromJSON(back).eq(node) ? null : "changed by the Y.Doc";
+}
+
 /** The editor document for the Markdown, or `safe: false` when the editor would
- * change what the page means (then it must not be edited live). */
+ * change what the page means or could not show it as built (then it must not be
+ * edited live). */
 export function liveDocument(markdown) {
   const source = normalized(markdown);
   const meaning = meaningOf(source);
   for (const strict of [false, true]) {
     const json = manager.parse(protect(source, { strict }));
+    if (editorProblem(json) !== null) continue;
     if (difference(meaning, meaningOf(jsonToMarkdown(json))) === null) return { safe: true, json };
   }
   return { safe: false, json: null };

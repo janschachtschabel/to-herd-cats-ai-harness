@@ -6,12 +6,24 @@ export type StopReason =
   | 'not_found'
   | 'too_large'
   | 'not_roundtrip_safe'
+  | 'invalid_content'
   | 'connection_limit'
   | 'off'
   | 'invalid'
 
 /** Stops after which reconnecting cannot help, so no "reload" is offered. */
-export const FINAL_STOPS: ReadonlySet<StopReason> = new Set(['unauthorized', 'not_roundtrip_safe'])
+export const FINAL_STOPS: ReadonlySet<StopReason> = new Set([
+  'unauthorized',
+  'not_roundtrip_safe',
+  'invalid_content',
+])
+
+/** Stops after which the page can still be edited in the Markdown editor. */
+export const MARKDOWN_STOPS: ReadonlySet<StopReason> = new Set([
+  'not_roundtrip_safe',
+  'too_large',
+  'invalid_content',
+])
 
 export type CloseOutcome =
   /** The generation ended (a change outside the live session): fetch the page and

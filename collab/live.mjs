@@ -28,7 +28,8 @@
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
-import { jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
+import { yDocToProsemirrorJSON } from "y-prosemirror";
+import { FIELD, editorProblem, jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { carriesContent, sizeGuard } from "./size.mjs";
 import {
@@ -194,6 +195,9 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
       if (stored) {
         Y.applyUpdate(document, Buffer.from(stored, "base64"));
+        // A state the browser's editor would repair (and save repaired) is not opened.
+        const problem = editorProblem(yDocToProsemirrorJSON(document, FIELD));
+        if (problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
       } else {
         // Only a page the editor can show without changing its meaning is opened.
         const converted = liveDocument(contentMd);

@@ -51,12 +51,11 @@ const NBSP = "\u00a0";
 const EMPTY_PARAGRAPH = "&nbsp;";
 
 /** Paragraphs whose text cannot turn into other blocks when read again, and a
- * paragraph of a single `&nbsp;` (a deliberate blank paragraph) kept as one. */
+ * paragraph of a single `&nbsp;` (a deliberate blank paragraph) kept as one. An image
+ * alone in its paragraph stays in it (images are inline, review M2 S1). */
 const SafeParagraph = Paragraph.extend({
   parseMarkdown(token, helpers) {
-    const tokens = token.tokens ?? [];
-    if (tokens.length === 1 && tokens[0].type === "image") return helpers.parseChildren(tokens);
-    return helpers.createNode("paragraph", undefined, helpers.parseInline(tokens));
+    return helpers.createNode("paragraph", undefined, helpers.parseInline(token.tokens ?? []));
   },
   renderMarkdown(node, h, ctx) {
     const content = node.content ?? [];
@@ -143,7 +142,9 @@ export function extensions() {
     SafeLink.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
     MarkedOrderedList,
     SafeCodeBlock,
-    SafeImage,
+    // Inline, as in Markdown: an image may stand in a sentence, a cell, a list item or a
+    // heading; as a block node the browser would delete such a paragraph (review M2 S1).
+    SafeImage.configure({ inline: true }),
     TightTable.configure({ resizable: false }),
     TableKit.configure({ table: false }),
     TaskList,

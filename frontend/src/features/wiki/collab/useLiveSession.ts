@@ -21,6 +21,8 @@ export interface LiveSession {
   lost: string | null
   unsynced: number
   retry: () => void
+  /** Stop for good on the browser's side (the shared document cannot be shown). */
+  refuse: (reason: StopReason) => void
   /** "Fertig": true once the server has stored everything typed here (or nothing more
    *  can be stored because the session ended); false while that is not confirmed. */
   finish: () => Promise<boolean>
@@ -50,7 +52,11 @@ export function useLiveSession(
   const [lost, setLost] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const ended = useRef<number | null>(null) // the generation a 4409 ended
-  const current = useRef<{ live: LiveConnection; open: () => boolean } | null>(null)
+  const current = useRef<{
+    live: LiveConnection
+    open: () => boolean
+    stop: (reason: StopReason) => void
+  } | null>(null)
   const refetchRef = useRef(refetch)
   useEffect(() => {
     refetchRef.current = refetch
@@ -73,10 +79,7 @@ export function useLiveSession(
           if (!open) return
           const outcome = closeOutcome(code)
           if (outcome.kind === 'retry') return
-          open = false
-          setLost(liveMarkdown(fresh))
-          setConnected(false)
-          setPeers([])
+          end()
           queueMicrotask(() => live.destroy())
           if (outcome.kind === 'stop') {
             setStopped(outcome.reason)
@@ -93,7 +96,25 @@ export function useLiveSession(
         },
       },
     })
-    current.current = { live, open: () => open }
+    function end() {
+      open = false
+      let text: string | null = null
+      try {
+        text = liveMarkdown(fresh)
+      } catch {
+        // content the schema does not allow: nothing to copy
+      }
+      setLost(text)
+      setConnected(false)
+      setPeers([])
+    }
+    const stop = (reason: StopReason) => {
+      if (!open) return
+      live.destroy() // at once: nothing more may reach the server
+      end()
+      setStopped(reason)
+    }
+    current.current = { live, open: () => open, stop }
     const unregister = beforeLogout(async () => {
       if (open) await live.finish?.()
       open = false
@@ -120,6 +141,8 @@ export function useLiveSession(
     setAttempt((n) => n + 1)
   }, [])
 
+  const refuse = useCallback((reason: StopReason) => current.current?.stop(reason), [])
+
   const finish = useCallback(async () => {
     const session = current.current
     if (!session || !session.open() || !session.live.finish) return true
@@ -137,6 +160,7 @@ export function useLiveSession(
     lost,
     unsynced,
     retry,
+    refuse,
     finish,
   }
 }

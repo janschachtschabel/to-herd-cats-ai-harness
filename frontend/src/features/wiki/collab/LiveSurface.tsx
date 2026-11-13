@@ -18,12 +18,15 @@ export function LiveSurface({
   editable,
   label,
   userName,
+  onContentError,
 }: {
   doc: Y.Doc
   connection: LiveConnection | null
   editable: boolean
   label: string
   userName: string
+  /** The shared document holds what the schema does not allow (review M2 S1). */
+  onContentError: () => void
 }) {
   const provider = connection?.provider ?? null
   const editor = useEditor(
@@ -36,6 +39,13 @@ export function LiveSurface({
           : []),
       ],
       editable,
+      // Content the schema does not allow is never repaired into the shared document
+      // (the repair would be saved): the session stops instead.
+      enableContentCheck: true,
+      onContentError: ({ disableCollaboration }) => {
+        onContentError()
+        disableCollaboration()
+      },
       editorProps: {
         attributes: {
           'aria-label': label,
