@@ -25,6 +25,7 @@ class Action(StrEnum):
     AUDIT_READ = "audit.read"
     PAGE_PURGE = "page.purge"  # delete a trashed page for good (system admins)
     TAG_MANAGE = "tag.manage"  # system-wide tags (space tags: `page.moderate`)
+    DM_INSPECT = "dm.inspect"  # read others' direct messages: audited, with a reason, 60 min
 
 
 class SpaceRole(StrEnum):

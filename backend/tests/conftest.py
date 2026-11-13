@@ -31,6 +31,7 @@ from tests.factories import (  # noqa: E402, F401
     owner_user,
 )
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
+from tests.factories_dms import people  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_messaging import chat  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401

@@ -90,6 +90,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/messages/{message_id}/replies", "message"),
     ("PATCH", "/api/messages/{message_id}", "message"),
     ("DELETE", "/api/messages/{message_id}", "message"),
+    ("POST", "/api/dms", "session"),
+    ("GET", "/api/dms", "session"),
+    ("GET", "/api/admin/dm-inspect", "admin"),
+    ("POST", "/api/admin/dm-inspect", "admin"),
+    ("GET", "/api/admin/dm-inspect/{inspection_id}/messages", "admin"),
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -136,10 +141,16 @@ def _concrete(
         "{number}": "1",
         "{tag_id}": str(uuid7()),
         "{attachment_id}": str(uuid7()),
+        "{inspection_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
-    queries = {"/by-path": "?path=x", "/diff": "?from=1&to=1", "/attachments": "?filename=x.txt"}
+    queries = {
+        "/by-path": "?path=x",
+        "/diff": "?from=1&to=1",
+        "/attachments": "?filename=x.txt",
+        "/dm-inspect": f"?user_id={uuid7()}",
+    }
     return template + next((q for end, q in queries.items() if template.endswith(end)), "")
 
 

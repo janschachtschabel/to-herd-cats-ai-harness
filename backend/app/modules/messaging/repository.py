@@ -2,11 +2,12 @@
 by what the actor may see (`ConversationScope`), so a conversation it cannot see is
 never even loaded:
 
-- a channel: its space is one the actor may read (`access.visible_space_ids`).
+- a channel: its space is one the actor may read (`access.visible_space_ids`);
+- a direct message: the actor is one of its participants and still active (admins
+  have no clause of their own: they read others' DMs only through an inspection).
 
-Direct messages (participants) and page threads (the page's visibility) add their
-clause to `visible_conversations` (Tasks 4 and 8); messages are seen where their
-conversation is (`message_repository.py`).
+Page threads (the page's visibility) add their clause to `visible_conversations`
+(Task 8); messages are seen where their conversation is (`message_repository.py`).
 """
 
 import uuid
@@ -15,15 +16,27 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, Select, and_, exists, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.principal import Principal
 from app.core.repository import advisory_xact_lock
-from app.modules.messaging.models import Conversation, ConversationKind
+from app.modules.messaging.models import Conversation, ConversationKind, ConversationParticipant
+from app.modules.users.models import User
 
 
 @dataclass(frozen=True, slots=True)
 class ConversationScope:
     org_id: uuid.UUID
+    principal: Principal  # whose view it is
     space_ids: Select[uuid.UUID]  # the spaces the actor may read (SQL)
     post_space_ids: Select[uuid.UUID]  # the spaces where it holds `channel.post` (SQL)
+
+
+def takes_part(principal: Principal) -> ColumnElement[bool]:
+    """The (correlated) conversation has `principal` among its participants."""
+    return exists().where(
+        ConversationParticipant.conversation_id == Conversation.id,
+        ConversationParticipant.principal_type == principal.type,
+        ConversationParticipant.principal_id == principal.id,
+    )
 
 
 def visible_conversations(scope: ConversationScope) -> ColumnElement[bool]:
@@ -32,7 +45,11 @@ def visible_conversations(scope: ConversationScope) -> ColumnElement[bool]:
         Conversation.kind == ConversationKind.CHANNEL,
         Conversation.space_id.in_(scope.space_ids),
     )
-    return and_(Conversation.org_id == scope.org_id, or_(false(), channel))
+    active = exists().where(
+        User.org_id == scope.org_id, User.id == scope.principal.id, User.is_active.is_(True)
+    )
+    dm = and_(Conversation.kind == ConversationKind.DM, takes_part(scope.principal), active)
+    return and_(Conversation.org_id == scope.org_id, or_(false(), channel, dm))
 
 
 @dataclass(frozen=True, slots=True)

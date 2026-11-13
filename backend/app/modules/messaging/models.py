@@ -1,9 +1,15 @@
 """Conversations and their messages (spec 6.1). One model for every kind of
-conversation; M3 begins with channels (`kind = channel`), which belong to a space and
-are seen by whoever may read it. Direct messages and page threads add their kinds,
-columns and checks with their own migrations (Tasks 4 and 8).
+conversation:
 
-A channel's name is unique in its space, ignoring case, archived channels included.
+- `channel`: belongs to a space and is seen by whoever may read it. Its name is
+  unique in its space, ignoring case, archived channels included.
+- `dm`: a direct message between 2 and 9 people (`conversation_participant`), in no
+  space, seen only by its participants. `dm_key` (a hash of the sorted participants)
+  is unique per organisation, so the same group always meets in the same
+  conversation; participants never change. An admin reads one only through an
+  inspection (`dm_inspection`, spec 5.5).
+
+Page threads add their kind, columns and checks with their own migration (Task 8).
 
 Messages: top level (`parent_id` NULL) or a reply to a top-level message of the same
 conversation (one level; the services check it). A top-level message counts its
@@ -41,18 +47,30 @@ MAX_TOPIC_CHARS = 250
 MAX_BODY_CHARS = 20_000
 
 
+MIN_DM_PEOPLE = 2
+MAX_DM_PEOPLE = 9
+MAX_REASON_CHARS = 500
+
+
 class ConversationKind(StrEnum):
     CHANNEL = "channel"
+    DM = "dm"
 
 
 class Conversation(UuidPk, OrgScoped, Base):
     __tablename__ = "conversation"
     __table_args__ = (
-        CheckConstraint("kind IN ('channel')", name="kind"),
+        CheckConstraint("kind IN ('channel', 'dm')", name="kind"),
         CheckConstraint(
             "kind <> 'channel' OR (space_id IS NOT NULL AND name IS NOT NULL)",
             name="channel_fields",
         ),
+        CheckConstraint(
+            "(kind = 'dm') = (dm_key IS NOT NULL)"
+            " AND (kind <> 'dm' OR (space_id IS NULL AND name IS NULL AND topic IS NULL))",
+            name="dm_fields",
+        ),
+        UniqueConstraint("org_id", "dm_key"),
         CheckConstraint(
             "(created_by_type IS NULL) = (created_by_id IS NULL)", name="created_by_pair"
         ),
@@ -66,6 +84,8 @@ class Conversation(UuidPk, OrgScoped, Base):
     name: Mapped[str | None] = mapped_column(String(MAX_CHANNEL_NAME_CHARS))
     topic: Mapped[str | None] = mapped_column(String(MAX_TOPIC_CHARS))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A direct message's participants, as a hash (`dms.dm_key`); NULL for other kinds.
+    dm_key: Mapped[str | None] = mapped_column(String(64))
     # Who created it; NULL for what the system set up (`#allgemein`).
     created_by_type: Mapped[PrincipalType | None] = mapped_column(String(16))
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
@@ -84,6 +104,44 @@ Index(
     unique=True,
     postgresql_where=text("kind = 'channel'"),
 )
+
+
+class ConversationParticipant(OrgScoped, Base):
+    """A person in a direct message (M3: people only; agents widen the CHECK in M5)."""
+
+    __tablename__ = "conversation_participant"
+    __table_args__ = (
+        CheckConstraint("principal_type IN ('user')", name="principal_type"),
+        Index("ix_conversation_participant_principal", "principal_type", "principal_id"),
+    )
+
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE"), primary_key=True
+    )
+    principal_type: Mapped[PrincipalType] = mapped_column(String(16), primary_key=True)
+    principal_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+
+
+class DmInspection(UuidPk, OrgScoped, Base):
+    """An admin's read-only look into a direct message (spec 5.5): with a reason, for a
+    limited time, recorded in the audit log, shown to the participants."""
+
+    __tablename__ = "dm_inspection"
+    __table_args__ = (
+        CheckConstraint(f"char_length(reason) <= {MAX_REASON_CHARS}", name="reason_length"),
+        CheckConstraint("expires_at > granted_at", name="expiry"),
+        Index("ix_dm_inspection_conversation_id", "conversation_id"),
+    )
+
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class MessageKind(StrEnum):

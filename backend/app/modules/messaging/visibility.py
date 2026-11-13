@@ -7,6 +7,8 @@ Rights (spec 5.3) come only from `core/access.py`:
 - Writing in a channel needs `channel.post` in its space (`viewer` and up), managing
   it `channel.manage` (`moderator` and up). Nobody writes in an archived channel
   (409 `conversation.archived`); reading stays possible.
+- A direct message belongs to no space: its participants see it and write in it
+  (guests too), nobody else. It has nothing to manage.
 """
 
 import uuid
@@ -15,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can, require, space_ids_with, visible_space_ids
 from app.core.errors import Conflict, NotFound
-from app.modules.messaging.models import Conversation
+from app.modules.messaging.models import Conversation, ConversationKind
 from app.modules.messaging.repository import ConversationRepository, ConversationScope
 
 
@@ -37,7 +39,10 @@ class ConversationReader:
 
     def scope(self, actor: Actor) -> ConversationScope:
         return ConversationScope(
-            actor.org_id, visible_space_ids(actor), space_ids_with(actor, Action.CHANNEL_POST)
+            actor.org_id,
+            actor.principal,
+            visible_space_ids(actor),
+            space_ids_with(actor, Action.CHANNEL_POST),
         )
 
     def repo(self, actor: Actor) -> ConversationRepository:
@@ -52,7 +57,8 @@ class ConversationReader:
         conversation = await self.repo(actor).visible(conversation_id, lock=lock)
         if conversation is None:
             raise conversation_not_found()
-        await self.require_in_space(actor, Action.SPACE_READ, conversation)
+        if conversation.kind != ConversationKind.DM:  # a DM: seen means taking part
+            await self.require_in_space(actor, Action.SPACE_READ, conversation)
         return conversation
 
     async def require_in_space(
@@ -68,12 +74,19 @@ class ConversationReader:
             raise conversation_not_found() from None
 
     async def can_post(self, actor: Actor, conversation: Conversation) -> bool:
-        if conversation.archived_at is not None or conversation.space_id is None:
+        """For a conversation the actor has read (`readable`)."""
+        if conversation.archived_at is not None:
+            return False
+        if conversation.kind == ConversationKind.DM:
+            return True
+        if conversation.space_id is None:
             return False
         return await can(self.session, actor, Action.CHANNEL_POST, conversation.space_id)
 
     async def require_post(self, actor: Actor, conversation: Conversation) -> None:
-        """The right to write in the conversation now (403 without it, 409 archived)."""
-        await self.require_in_space(actor, Action.CHANNEL_POST, conversation)
+        """The right to write in a conversation the actor has read (`readable`) now
+        (403 without it, 409 archived)."""
+        if conversation.kind != ConversationKind.DM:
+            await self.require_in_space(actor, Action.CHANNEL_POST, conversation)
         if conversation.archived_at is not None:
             raise Conflict(code="conversation.archived")

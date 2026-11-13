@@ -16,6 +16,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/dm-inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find Dms
+         * @description `dm.inspect`: a person's DMs, participants and times only (audited).
+         */
+        get: operations["find_dms_api_admin_dm_inspect_get"];
+        put?: never;
+        /**
+         * Grant Inspection
+         * @description `dm.inspect`: read one DM for 60 minutes, with a reason (audited, and shown to
+         *     its participants).
+         */
+        post: operations["grant_inspection_api_admin_dm_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/dm-inspect/{inspection_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspected Messages
+         * @description The inspected DM's messages, replies included, newest first; 404 once the
+         *     inspection has expired.
+         */
+        get: operations["inspected_messages_api_admin_dm_inspect__inspection_id__messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/groups": {
         parameters: {
             query?: never;
@@ -357,6 +403,30 @@ export interface paths {
         get: operations["search_directory_api_directory_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Dms
+         * @description The caller's direct messages, the most recently active first.
+         */
+        get: operations["list_dms_api_dms_get"];
+        put?: never;
+        /**
+         * Open Dm
+         * @description The caller's conversation with these people: new (201) or the one they have.
+         */
+        post: operations["open_dm_api_dms_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -885,7 +955,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect";
         /**
          * AttachmentOut
          * @description `url` downloads it (`?inline=1` shows raster images in the page). `mime` is what
@@ -982,12 +1052,14 @@ export interface components {
          * ConversationKind
          * @enum {string}
          */
-        ConversationKind: "channel";
+        ConversationKind: "channel" | "dm";
         /**
          * ConversationOut
          * @description `can_post`: whether the caller may write here now (the right in the space, and
          *     the channel not archived). `created_by` is null for what the system set up.
-         *     `version` guards writes (send it back; stale → 409).
+         *     `version` guards writes (send it back; stale → 409). A direct message lists its
+         *     `participants` and, on its own (`GET /conversations/{id}`), every admin
+         *     `inspections` of it; both are empty for other kinds.
          */
         ConversationOut: {
             /** Archived At */
@@ -1005,9 +1077,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Inspections */
+            inspections?: components["schemas"]["InspectionNoteOut"][];
             kind: components["schemas"]["ConversationKind"];
             /** Name */
             name: string | null;
+            /** Participants */
+            participants?: components["schemas"]["ParticipantOut"][];
             /** Space Id */
             space_id: string | null;
             /** Topic */
@@ -1051,6 +1127,51 @@ export interface components {
              * @enum {string}
              */
             type: "user" | "group";
+        };
+        /**
+         * DmOpen
+         * @description The other people (the caller is added); 2 to 9 people in all.
+         */
+        DmOpen: {
+            /** User Ids */
+            user_ids: string[];
+        };
+        /**
+         * DmOut
+         * @description A direct message in the caller's list: `last_message_at` is its newest
+         *     top-level message (null before the first).
+         */
+        DmOut: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Can Post */
+            can_post: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["PrincipalRef"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inspections */
+            inspections?: components["schemas"]["InspectionNoteOut"][];
+            kind: components["schemas"]["ConversationKind"];
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Name */
+            name: string | null;
+            /** Participants */
+            participants?: components["schemas"]["ParticipantOut"][];
+            /** Space Id */
+            space_id: string | null;
+            /** Topic */
+            topic: string | null;
+            /** Version */
+            version: number;
         };
         /** GroupCreate */
         GroupCreate: {
@@ -1138,6 +1259,77 @@ export interface components {
             created: number;
             /** Skipped */
             skipped: components["schemas"]["SkippedOut"][];
+        };
+        /**
+         * InspectableDmOut
+         * @description What an inspecting admin learns before an inspection: who, and when, no content.
+         */
+        InspectableDmOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Participants */
+            participants: components["schemas"]["ParticipantOut"][];
+        };
+        /** InspectionCreate */
+        InspectionCreate: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * InspectionNoteOut
+         * @description An admin looked into this direct message (spec 5.5): when, and who.
+         */
+        InspectionNoteOut: {
+            /** Admin Name */
+            admin_name: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+        };
+        /**
+         * InspectionOut
+         * @description Read the DM's messages at `/admin/dm-inspect/{id}/messages` until `expires_at`.
+         */
+        InspectionOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Granted At
+             * Format: date-time
+             */
+            granted_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1361,6 +1553,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[DmOut] */
+        Page_DmOut_: {
+            /** Items */
+            items: components["schemas"]["DmOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[GroupMemberOut] */
         Page_GroupMemberOut_: {
             /** Items */
@@ -1372,6 +1571,13 @@ export interface components {
         Page_GroupOut_: {
             /** Items */
             items: components["schemas"]["GroupOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[InspectableDmOut] */
+        Page_InspectableDmOut_: {
+            /** Items */
+            items: components["schemas"]["InspectableDmOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1437,6 +1643,21 @@ export interface components {
             items: components["schemas"]["VersionSummaryOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * ParticipantOut
+         * @description A person in a direct message; one who was deactivated stays listed.
+         */
+        ParticipantOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
         };
         /**
          * PasswordChangeIn
@@ -1894,6 +2115,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_dms_api_admin_dm_inspect_get: {
+        parameters: {
+            query: {
+                /** @description whose direct messages */
+                user_id: string;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_InspectableDmOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_inspection_api_admin_dm_inspect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inspected_messages_api_admin_dm_inspect__inspection_id__messages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                inspection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MessageOut_"];
                 };
             };
             /** @description Validation Error */
@@ -2794,6 +3116,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_DirectoryEntryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dms_api_dms_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DmOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_dm_api_dms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DmOpen"];
+            };
+        };
+        responses: {
+            /** @description the group's conversation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
                 };
             };
             /** @description Validation Error */

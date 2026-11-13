@@ -11,6 +11,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.modules.groups.models import Group
+from app.modules.users.models import User
 from app.web.public import create_public_app
 
 UUID = "0190f0f0-0000-7000-8000-000000000000"
@@ -63,12 +64,15 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/spaces/{space_id}/channels",
         "/api/conversations/{conversation_id}/messages",
         "/api/messages/{message_id}/replies",
+        "/api/dms",
+        "/api/admin/dm-inspect",
+        "/api/admin/dm-inspect/{inspection_id}/messages",
     } <= set(endpoints)
 
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
 async def test_hostile_cursors_answer_422_everywhere(
-    name: str, owner: AsyncClient, group: Group
+    name: str, owner: AsyncClient, group: Group, member: User
 ) -> None:
     space_id = (await owner.post("/api/spaces", json={"kind": "team", "name": "T"})).json()["id"]
     page = await owner.post(f"/api/spaces/{space_id}/pages", json={"title": "Seite"})
@@ -76,7 +80,13 @@ async def test_hostile_cursors_answer_422_everywhere(
     message = await owner.post(
         f"/api/conversations/{channel.json()['id']}/messages", json={"body_md": "m"}
     )
+    dm = await owner.post("/api/dms", json={"user_ids": [str(member.id)]})
+    inspection = await owner.post(
+        "/api/admin/dm-inspect",
+        json={"conversation_id": dm.json()["id"], "reason": "hostile cursor test"},
+    )
     ids = {
+        "{inspection_id}": inspection.json()["id"],
         "{space_id}": space_id,
         "{group_id}": str(group.id),
         "{page_id}": page.json()["id"],
@@ -87,7 +97,9 @@ async def test_hostile_cursors_answer_422_everywhere(
         path = template
         for placeholder, value in ids.items():
             path = path.replace(placeholder, value)
-        response = await owner.get(path, params={"cursor": HOSTILE[name]})
+        # Lists that need more than a cursor.
+        extra = {"user_id": str(member.id)} if template == "/api/admin/dm-inspect" else {}
+        response = await owner.get(path, params={"cursor": HOSTILE[name], **extra})
         if name == "empty":
             # An empty cursor means "first page".
             assert response.status_code == 200, (path, response.text)

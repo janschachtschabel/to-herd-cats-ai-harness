@@ -12,6 +12,7 @@ text never goes into events or logs.
 """
 
 import uuid
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,8 +24,15 @@ from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
 from app.modules.messaging import threads
+from app.modules.messaging.dm_repository import DmRepository, InspectionNote, Participant
 from app.modules.messaging.message_repository import MessageRepository
-from app.modules.messaging.models import MAX_BODY_CHARS, Conversation, Message, MessageKind
+from app.modules.messaging.models import (
+    MAX_BODY_CHARS,
+    Conversation,
+    ConversationKind,
+    Message,
+    MessageKind,
+)
 from app.modules.messaging.visibility import ConversationReader
 
 
@@ -45,6 +53,17 @@ def checked_body(body_md: str) -> str:
     return body_md
 
 
+@dataclass(frozen=True, slots=True)
+class ConversationView:
+    """A conversation as its reader is shown it; a DM with its people and with every
+    admin inspection of it (transparency towards the participants, spec 5.5)."""
+
+    conversation: Conversation
+    can_post: bool
+    participants: list[Participant]
+    inspections: list[InspectionNote]
+
+
 class ConversationService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -56,6 +75,16 @@ class ConversationService:
     async def can_post(self, actor: Actor, conversation: Conversation) -> bool:
         """For display; writes check again (`ConversationReader.require_post`)."""
         return await self.reader.can_post(actor, conversation)
+
+    async def view(self, actor: Actor, conversation: Conversation) -> ConversationView:
+        """For a conversation the actor has read (`get`)."""
+        can_post = await self.reader.can_post(actor, conversation)
+        if conversation.kind != ConversationKind.DM:
+            return ConversationView(conversation, can_post, [], [])
+        repo = DmRepository(self.session, self.reader.scope(actor))
+        people = await repo.participants([conversation.id])
+        inspections = await repo.inspections(conversation.id)
+        return ConversationView(conversation, can_post, people[conversation.id], inspections)
 
 
 class MessageService:

@@ -1,5 +1,5 @@
 """Keyset pagination: opaque cursors over (created_at, id), over (text key, id), over
-(score, id) for ranked results, or over id alone.
+(score, id) for ranked results, over (id key, id) or over id alone.
 
 Ids are UUIDv7 and therefore ordered by creation time; tables without `created_at`
 page by id. Lists sorted by name page by (key, id).
@@ -79,6 +79,21 @@ def decode_id_cursor(cursor: str) -> uuid.UUID:
     """Any 16 bytes are a position (ids are opaque); anything else is invalid."""
     try:
         return uuid.UUID(bytes=_b64(cursor))
+    except Exception as exc:
+        raise _invalid(exc) from exc
+
+
+def encode_id_pair_cursor(first: uuid.UUID, second: uuid.UUID) -> str:
+    """Two ids: a sort key that is itself an id (UUIDv7) and the row's id."""
+    return base64.urlsafe_b64encode(first.bytes + second.bytes).decode().rstrip("=")
+
+
+def decode_id_pair_cursor(cursor: str) -> tuple[uuid.UUID, uuid.UUID]:
+    try:
+        raw = _b64(cursor)
+        if len(raw) != 32:
+            raise ValueError("not two ids")
+        return uuid.UUID(bytes=raw[:16]), uuid.UUID(bytes=raw[16:])
     except Exception as exc:
         raise _invalid(exc) from exc
 

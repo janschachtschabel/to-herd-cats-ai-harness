@@ -18,6 +18,7 @@ SPACES = "/api/spaces"
 ALL_SYSTEM = [
     "audit.read",
     "directory.read",
+    "dm.inspect",
     "group.manage",
     "page.purge",
     "space.create",

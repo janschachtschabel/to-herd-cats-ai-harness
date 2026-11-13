@@ -37,8 +37,13 @@ def _page(page: Page[ListedConversation]) -> Page[ConversationOut]:
 
 
 async def _out(session: AsyncSession, actor: Actor, conversation: Conversation) -> ConversationOut:
-    can_post = await ConversationService(session).can_post(actor, conversation)
-    return ConversationOut.of(conversation, can_post=can_post)
+    view = await ConversationService(session).view(actor, conversation)
+    return ConversationOut.of(
+        conversation,
+        can_post=view.can_post,
+        participants=view.participants,
+        inspections=view.inspections,
+    )
 
 
 @space_channels.get("", response_model=Page[ConversationOut])
@@ -109,7 +114,7 @@ async def unarchive_channel(
     return await _out(session, actor, channel)
 
 
-def _messages(page: Page[Message]) -> Page[MessageOut]:
+def message_page(page: Page[Message]) -> Page[MessageOut]:
     return Page[MessageOut](
         items=[MessageOut.of(m) for m in page.items], next_cursor=page.next_cursor
     )
@@ -132,7 +137,7 @@ async def list_messages(
     page = await MessageService(session).list(
         actor, conversation_id, params, before=before, after=after
     )
-    return _messages(page)
+    return message_page(page)
 
 
 @conversations.post(
@@ -164,7 +169,7 @@ async def list_replies(
     session: SessionDep,
 ) -> Page[MessageOut]:
     """The message's thread, oldest first."""
-    return _messages(await MessageService(session).replies(actor, message_id, params))
+    return message_page(await MessageService(session).replies(actor, message_id, params))
 
 
 @messages.patch("/{message_id}", response_model=MessageOut)

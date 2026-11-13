@@ -22,7 +22,8 @@ def _admin_routes() -> set[tuple[str, str]]:
 def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, object] | None]]:
     """(method, template, concrete path, valid body)."""
     new_user = {"email": "neu@example.com", "name": "Neu", "password": "a-long-password"}
-    users, groups = "/api/admin/users", "/api/admin/groups"
+    users, groups, inspect = "/api/admin/users", "/api/admin/groups", "/api/admin/dm-inspect"
+    grant = {"conversation_id": str(uuid7()), "reason": "a reason of some length"}
     member_ref = {"member_type": "user", "member_id": str(user.id)}
     return [
         ("GET", "/api/admin/audit", "/api/admin/audit", None),
@@ -42,6 +43,14 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
             "DELETE",
             f"{groups}/{{group_id}}/members/{{member_type}}/{{member_id}}",
             f"{groups}/{group.id}/members/user/{user.id}",
+            None,
+        ),
+        ("GET", inspect, f"{inspect}?user_id={user.id}", None),
+        ("POST", inspect, inspect, grant),
+        (
+            "GET",
+            f"{inspect}/{{inspection_id}}/messages",
+            f"{inspect}/{uuid7()}/messages",
             None,
         ),
     ]

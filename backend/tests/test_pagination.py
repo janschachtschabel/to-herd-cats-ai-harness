@@ -11,9 +11,11 @@ from app.core.pagination import (
     PageParams,
     decode_cursor,
     decode_id_cursor,
+    decode_id_pair_cursor,
     decode_score_cursor,
     encode_cursor,
     encode_id_cursor,
+    encode_id_pair_cursor,
     encode_score_cursor,
 )
 
@@ -43,6 +45,17 @@ def test_id_cursor_round_trip():
 def test_invalid_id_cursor_is_422(cursor):
     with pytest.raises(ValidationFailed):
         decode_id_cursor(cursor)
+
+
+def test_id_pair_cursor_round_trip():
+    pair = (uuid7(), uuid7())
+    assert decode_id_pair_cursor(encode_id_pair_cursor(*pair)) == pair
+
+
+@pytest.mark.parametrize("cursor", ["not-a-cursor", "", encode_id_cursor(uuid7()), "!!"])
+def test_invalid_id_pair_cursor_is_422(cursor):
+    with pytest.raises(ValidationFailed):
+        decode_id_pair_cursor(cursor)
 
 
 def test_score_cursor_round_trip():

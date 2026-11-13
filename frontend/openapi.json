@@ -18,7 +18,8 @@
           "group.manage",
           "audit.read",
           "page.purge",
-          "tag.manage"
+          "tag.manage",
+          "dm.inspect"
         ],
         "title": "Action",
         "type": "string"
@@ -235,13 +236,14 @@
       },
       "ConversationKind": {
         "enum": [
-          "channel"
+          "channel",
+          "dm"
         ],
         "title": "ConversationKind",
         "type": "string"
       },
       "ConversationOut": {
-        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409).",
+        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds.",
         "properties": {
           "archived_at": {
             "anyOf": [
@@ -279,6 +281,13 @@
             "title": "Id",
             "type": "string"
           },
+          "inspections": {
+            "items": {
+              "$ref": "#/components/schemas/InspectionNoteOut"
+            },
+            "title": "Inspections",
+            "type": "array"
+          },
           "kind": {
             "$ref": "#/components/schemas/ConversationKind"
           },
@@ -292,6 +301,13 @@
               }
             ],
             "title": "Name"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantOut"
+            },
+            "title": "Participants",
+            "type": "array"
           },
           "space_id": {
             "anyOf": [
@@ -405,6 +421,150 @@
           "name"
         ],
         "title": "DirectoryEntryOut",
+        "type": "object"
+      },
+      "DmOpen": {
+        "additionalProperties": false,
+        "description": "The other people (the caller is added); 2 to 9 people in all.",
+        "properties": {
+          "user_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 9,
+            "minItems": 1,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids"
+        ],
+        "title": "DmOpen",
+        "type": "object"
+      },
+      "DmOut": {
+        "description": "A direct message in the caller's list: `last_message_at` is its newest\ntop-level message (null before the first).",
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can_post": {
+            "title": "Can Post",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrincipalRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inspections": {
+            "items": {
+              "$ref": "#/components/schemas/InspectionNoteOut"
+            },
+            "title": "Inspections",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantOut"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "space_id",
+          "name",
+          "topic",
+          "archived_at",
+          "created_by",
+          "created_at",
+          "version",
+          "can_post",
+          "last_message_at"
+        ],
+        "title": "DmOut",
         "type": "object"
       },
       "GroupCreate": {
@@ -618,6 +778,128 @@
           "skipped"
         ],
         "title": "ImportResultOut",
+        "type": "object"
+      },
+      "InspectableDmOut": {
+        "description": "What an inspecting admin learns before an inspection: who, and when, no content.",
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantOut"
+            },
+            "title": "Participants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "participants",
+          "created_at",
+          "last_message_at"
+        ],
+        "title": "InspectableDmOut",
+        "type": "object"
+      },
+      "InspectionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "reason"
+        ],
+        "title": "InspectionCreate",
+        "type": "object"
+      },
+      "InspectionNoteOut": {
+        "description": "An admin looked into this direct message (spec 5.5): when, and who.",
+        "properties": {
+          "admin_name": {
+            "title": "Admin Name",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "admin_name"
+        ],
+        "title": "InspectionNoteOut",
+        "type": "object"
+      },
+      "InspectionOut": {
+        "description": "Read the DM's messages at `/admin/dm-inspect/{id}/messages` until `expires_at`.",
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "granted_at": {
+            "format": "date-time",
+            "title": "Granted At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "reason",
+          "granted_at",
+          "expires_at"
+        ],
+        "title": "InspectionOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -1227,6 +1509,33 @@
         "title": "Page[DirectoryEntryOut]",
         "type": "object"
       },
+      "Page_DmOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DmOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[DmOut]",
+        "type": "object"
+      },
       "Page_GroupMemberOut_": {
         "properties": {
           "items": {
@@ -1279,6 +1588,33 @@
           "items"
         ],
         "title": "Page[GroupOut]",
+        "type": "object"
+      },
+      "Page_InspectableDmOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InspectableDmOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[InspectableDmOut]",
         "type": "object"
       },
       "Page_MessageOut_": {
@@ -1522,6 +1858,31 @@
           "items"
         ],
         "title": "Page[VersionSummaryOut]",
+        "type": "object"
+      },
+      "ParticipantOut": {
+        "description": "A person in a direct message; one who was deactivated stays listed.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "is_active"
+        ],
+        "title": "ParticipantOut",
         "type": "object"
       },
       "PasswordChangeIn": {
@@ -2690,6 +3051,192 @@
         "summary": "List Audit",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/api/admin/dm-inspect": {
+      "get": {
+        "description": "`dm.inspect`: a person's DMs, participants and times only (audited).",
+        "operationId": "find_dms_api_admin_dm_inspect_get",
+        "parameters": [
+          {
+            "description": "whose direct messages",
+            "in": "query",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "description": "whose direct messages",
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InspectableDmOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find Dms",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "post": {
+        "description": "`dm.inspect`: read one DM for 60 minutes, with a reason (audited, and shown to\nits participants).",
+        "operationId": "grant_inspection_api_admin_dm_inspect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Inspection",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/admin/dm-inspect/{inspection_id}/messages": {
+      "get": {
+        "description": "The inspected DM's messages, replies included, newest first; 404 once the\ninspection has expired.",
+        "operationId": "inspected_messages_api_admin_dm_inspect__inspection_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inspection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Inspection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MessageOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspected Messages",
+        "tags": [
+          "messaging"
         ]
       }
     },
@@ -4088,6 +4635,118 @@
         "summary": "Search Directory",
         "tags": [
           "directory"
+        ]
+      }
+    },
+    "/api/dms": {
+      "get": {
+        "description": "The caller's direct messages, the most recently active first.",
+        "operationId": "list_dms_api_dms_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DmOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Dms",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "post": {
+        "description": "The caller's conversation with these people: new (201) or the one they have.",
+        "operationId": "open_dm_api_dms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DmOpen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "the group's conversation"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Dm",
+        "tags": [
+          "messaging"
         ]
       }
     },
