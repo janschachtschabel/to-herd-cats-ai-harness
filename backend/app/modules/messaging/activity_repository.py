@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, func, select, update
+from sqlalchemy import ColumnElement, and_, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -83,6 +83,24 @@ class NotificationRepository:
             .values(rows)
             .on_conflict_do_nothing(index_elements=["user_id", "message_id", "reason"])
             .returning(Notification)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def withdraw_mentions(
+        self, message: Message, keep: Sequence[uuid.UUID]
+    ) -> list[uuid.UUID]:
+        """Remove the unread `mention` notifications of `message` for people not in
+        `keep`; whose they were."""
+        stmt = (
+            delete(Notification)
+            .where(
+                Notification.org_id == self.org_id,
+                Notification.message_id == message.id,
+                Notification.reason == NotificationReason.MENTION,
+                Notification.read_at.is_(None),
+                Notification.user_id.not_in(keep),
+            )
+            .returning(Notification.user_id)
         )
         return list((await self.session.scalars(stmt)).all())
 

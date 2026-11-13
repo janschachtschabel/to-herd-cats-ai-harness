@@ -196,6 +196,34 @@ async def test_an_edit_that_adds_a_mention_notifies(chat: Chat, session: AsyncSe
     assert (await entries(chat.editor))[0]["snippet"] == "auch @editor"
 
 
+async def test_an_edit_that_drops_a_mention_withdraws_its_unread_notification(
+    chat: Chat, session: AsyncSession
+) -> None:
+    """Review M3 N10: what is still unread goes; what the person has read stays."""
+    message = await mention(chat, "viewer", "viewer2", "editor")
+    await deliver(session)
+    (seen,) = await entries(chat.editor)
+    assert (await chat.editor.post(f"{ACTIVITY}/{seen['id']}/read")).status_code == 204
+    changes = await _count(session, "activity.changed")
+    edited = await chat.viewer.patch(
+        f"/api/messages/{message['id']}", json={"body_md": "doch nicht", "mentions": []}
+    )
+    assert edited.status_code == 200
+    await deliver(session)
+    await deliver(session)  # a second delivery changes nothing more
+    assert await entries(chat.viewer2) == []
+    assert (await chat.viewer2.get(f"{ACTIVITY}/count")).json() == {"open": 0, "unread": 0}
+    assert [e["id"] for e in await entries(chat.editor)] == [seen["id"]]  # read: kept
+    assert await _count(session, "activity.changed") == changes + 1  # viewer2's view only
+    payloads = await session.scalars(
+        select(EventOutbox.payload)
+        .where(EventOutbox.type == "activity.changed")
+        .order_by(EventOutbox.id.desc())
+        .limit(1)
+    )
+    assert payloads.one() == {"user_id": str(chat.users["viewer2"].id)}
+
+
 async def test_deleted_messages_notify_nobody(chat: Chat, session: AsyncSession) -> None:
     kept = await mention(chat, "viewer", "viewer2")
     await deliver(session)

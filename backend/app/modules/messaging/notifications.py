@@ -2,7 +2,9 @@
 handler `notify_on_message` (`handlers.py`) in the handler's transaction:
 
 - `mention`: everyone the message mentions (stored mentions, `mentions.py`), on
-  `message.created` and on `message.updated` (a mention added by an edit);
+  `message.created` and on `message.updated` (a mention added by an edit). An edit
+  that drops a mention withdraws that person's notification while it is unread
+  (`activity.changed` to that person); a read one stays.
 - `reply` (on `message.created` only): the author of the thread's top message and
   everyone who replied in the thread before this reply, unless they get a `mention`
   for it.
@@ -35,9 +37,14 @@ async def notify_on_message(session: AsyncSession, event: Event) -> None:
     if message is None or message.deleted_at is not None or message.author_id is None:
         return
     wanted: dict[uuid.UUID, NotificationReason] = {}
-    mentioned = await MentionRepository(session, event.org_id).of([message.id])
-    for user_id in mentioned.get(message.id, []):
+    mentioned = (await MentionRepository(session, event.org_id).of([message.id])).get(
+        message.id, []
+    )
+    for user_id in mentioned:
         wanted[user_id] = NotificationReason.MENTION
+    if event.type == "message.updated":
+        for user_id in await repo.withdraw_mentions(message, mentioned):
+            await _withdrawn(session, event, user_id)
     if event.type == "message.created" and message.parent_id is not None:
         parent = await repo.message(message.parent_id)
         if parent is not None:
@@ -48,6 +55,19 @@ async def notify_on_message(session: AsyncSession, event: Event) -> None:
     added = await repo.add(message, [(u, r) for u, r in wanted.items() if u in readers])
     for notification in added:
         await _created(session, event, notification)
+
+
+async def _withdrawn(session: AsyncSession, event: Event, user_id: uuid.UUID) -> None:
+    """The person's activity view lost an entry (ids only, for that person)."""
+    await emit(
+        session,
+        type="activity.changed",
+        actor=event.acting,
+        space_id=None,
+        subject_type="user",
+        subject_id=user_id,
+        payload={"user_id": str(user_id)},
+    )
 
 
 async def _created(session: AsyncSession, event: Event, notification: Notification) -> None:
