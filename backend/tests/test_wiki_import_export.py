@@ -124,6 +124,26 @@ async def test_import_skips_existing_paths_and_reports_why(wiki: Wiki) -> None:
     assert "handbuch/kind" in await _tree(wiki.admin, wiki.space_id)
 
 
+async def test_a_nul_escaped_in_front_matter_skips_the_entry(wiki: Wiki) -> None:
+    """Review M2 R10: decoded from a JSON escape, the NUL is caught like one in the
+    text (invalid_text), never a 500 from the database."""
+    files: dict[str, bytes | str] = {
+        "titel.md": '---\ntitle: "a\\u0000b"\n---\nText',
+        "tags.md": '---\ntags: ["a\\u0000b"]\n---\nText',
+        "status.md": '---\nstatus: "draft\\u0000"\n---\nText',
+        "gut.md": "---\ntitle: Gut\n---\nText",
+    }
+    r = await _import(wiki.admin, wiki.space_id, _zip(files))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["created"] == 1
+    assert sorted((s["path"], s["reason"]) for s in body["skipped"]) == [
+        ("status.md", "invalid_text"),
+        ("tags.md", "invalid_text"),
+        ("titel.md", "invalid_text"),
+    ]
+
+
 async def test_import_needs_space_manage(wiki: Wiki) -> None:
     for client in (wiki.editor, wiki.moderator):
         _error(await _import(client, wiki.space_id, _zip(FIXTURE)), 403, "auth.permission_denied")

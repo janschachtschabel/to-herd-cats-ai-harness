@@ -76,6 +76,10 @@ def title_of(name: str) -> str:
     return (words[:1].upper() + words[1:])[:MAX_TITLE_CHARS] or "Seite"
 
 
+def _strings(value: str | list[str]) -> list[str]:
+    return [value] if isinstance(value, str) else value
+
+
 def _title(meta: frontmatter.Meta, body: str, stem: str) -> str:
     given = meta.get("title")
     if isinstance(given, str) and given.strip():
@@ -197,6 +201,9 @@ class PageImport:
             self._skip(file.info, "invalid_text")
             return
         meta, body = frontmatter.parse(text)
+        if any("\x00" in v for value in meta.values() for v in _strings(value)):
+            self._skip(file.info, "invalid_text")  # a NUL written as a JSON escape
+            return
         if len(body) > MAX_CONTENT_CHARS:
             self._skip(file.info, "too_large")
             return
