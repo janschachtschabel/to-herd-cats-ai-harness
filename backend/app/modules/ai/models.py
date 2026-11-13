@@ -1,4 +1,4 @@
-"""AI connections (spec 7.1) and who uses which (spec 7.2).
+"""AI connections (spec 7.1), who uses which (spec 7.2) and usage (spec 7.4).
 
 `secret_ref` is a reference (`env:HERD_AI_*` or `enc:<token>`, `core/secrets.py`), never
 the key itself; NULL for a provider that needs none (a local server). `models` are the
@@ -8,23 +8,29 @@ private addresses) and whether calls may stream (`b_api`: never).
 """
 
 import uuid
+from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     ForeignKey,
+    Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
+from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
 
 MAX_NAME_CHARS = 120
 MAX_URL_CHARS = 500
@@ -92,6 +98,11 @@ class AiConnection(UuidPk, OrgScoped, Timestamps, Base):
     requests_per_minute: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     purpose: Mapped[Purpose] = mapped_column(String(16), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Optional prices per model, EUR per million tokens: {model: {"input", "output"}}
+    # as decimal strings (`usage.record_usage`).
+    prices: Mapped[dict[str, dict[str, str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
     # Bumped by every write; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
@@ -152,3 +163,38 @@ class UserAssignment(OrgScoped, Base):
     )
     model: Mapped[str | None] = mapped_column(String(MAX_MODEL_CHARS))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class UsageRecord(UuidPk, OrgScoped, Base):
+    """One model call or one embedding batch (spec 7.4), written only by
+    `usage.record_usage`. A ledger: rows are only added, and the ids it names (person,
+    agent, run, space, connection) carry no foreign key, so it outlives what it names.
+    `tokens_in` includes the cached tokens (`tokens_cached` is that part of it);
+    `cost` (EUR) only when the connection has a price for the model."""
+
+    __tablename__ = "usage_record"
+    __table_args__ = (
+        Index("ix_usage_record_org_id_created_at", "org_id", "created_at"),
+        Index("ix_usage_record_user_id_created_at", "user_id", "created_at"),
+        Index("ix_usage_record_run_id", "run_id"),
+        CheckConstraint(
+            "tokens_in >= 0 AND tokens_out >= 0 AND tokens_cached BETWEEN 0 AND tokens_in",
+            name="tokens",
+        ),
+        CheckConstraint("duration_ms >= 0", name="duration_ms"),
+    )
+
+    user_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    space_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    connection_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    model: Mapped[str] = mapped_column(String(MAX_MODEL_CHARS), nullable=False)
+    tokens_in: Mapped[int] = mapped_column(Integer, nullable=False)
+    tokens_out: Mapped[int] = mapped_column(Integer, nullable=False)
+    tokens_cached: Mapped[int] = mapped_column(Integer, nullable=False)
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 8))
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

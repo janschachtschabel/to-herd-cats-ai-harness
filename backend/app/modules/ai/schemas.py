@@ -5,6 +5,7 @@ import json
 import re
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any, Self
 
 from pydantic import (
@@ -62,6 +63,26 @@ SECRET_LIKE_KEY = re.compile(
     r"api[_-]?key|secret|passw|authori[sz]ation|bearer|credential|^token$|access[_-]?token",
     re.IGNORECASE,
 )
+
+
+# EUR per million tokens.
+PricePerMillion = Annotated[Decimal, Field(ge=0, le=1_000_000, max_digits=13, decimal_places=6)]
+
+
+class Price(BaseModel):
+    """A model's price per million tokens (EUR); cached tokens count as input."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    input: PricePerMillion
+    output: PricePerMillion
+
+
+Prices = Annotated[dict[ModelName, Price], Field(max_length=MAX_MODELS)]
+
+
+def stored_prices(prices: dict[str, Price]) -> dict[str, dict[str, str]]:
+    return {m: {"input": str(p.input), "output": str(p.output)} for m, p in prices.items()}
 
 
 class SecretIn(BaseModel):
@@ -143,6 +164,7 @@ class ConnectionCreate(_ConnectionFields):
     requests_per_minute: PerMinute = 60
     purpose: Purpose = Purpose.CHAT
     enabled: bool = True
+    prices: Prices | None = None
 
 
 class ConnectionUpdate(_ConnectionFields):
@@ -161,6 +183,7 @@ class ConnectionUpdate(_ConnectionFields):
     requests_per_minute: PerMinute | None = None
     purpose: Purpose | None = None
     enabled: bool | None = None
+    prices: Prices | None = None
     version: int
 
     @model_validator(mode="after")
@@ -172,7 +195,8 @@ class ConnectionUpdate(_ConnectionFields):
 
 
 class ConnectionOut(BaseModel):
-    """`streaming`: whether calls to it may stream (never for `b_api`)."""
+    """`streaming`: whether calls to it may stream (never for `b_api`). `prices`: per
+    model, where set (usage costs stay empty without)."""
 
     id: uuid.UUID
     name: str
@@ -188,6 +212,7 @@ class ConnectionOut(BaseModel):
     requests_per_minute: int
     purpose: Purpose
     enabled: bool
+    prices: dict[str, Price]
     streaming: bool
     version: int
     created_at: datetime
@@ -210,6 +235,7 @@ class ConnectionOut(BaseModel):
             requests_per_minute=c.requests_per_minute,
             purpose=c.purpose,
             enabled=c.enabled,
+            prices={m: Price.model_validate(p) for m, p in c.prices.items()},
             streaming=streams(c.kind),
             version=c.version,
             created_at=c.created_at,

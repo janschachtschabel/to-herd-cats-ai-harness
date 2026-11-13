@@ -36,7 +36,7 @@ from app.modules.ai.models import (
 )
 from app.modules.ai.provider import CheckStatus, ProviderFailure, Target
 from app.modules.ai.repository import ConnectionRepository
-from app.modules.ai.schemas import ConnectionCreate, ConnectionUpdate, SecretIn
+from app.modules.ai.schemas import ConnectionCreate, ConnectionUpdate, SecretIn, stored_prices
 from app.modules.audit.recorder import changes, record, snapshot
 
 # Fields an update may change, besides the secret; audited by name and value.
@@ -52,6 +52,7 @@ _FIELDS = (
     "requests_per_minute",
     "purpose",
     "enabled",
+    "prices",
 )
 
 
@@ -110,6 +111,7 @@ class ConnectionService:
                 requests_per_minute=data.requests_per_minute,
                 purpose=data.purpose,
                 enabled=data.enabled,
+                prices=stored_prices(data.prices or {}),
             )
         )
         details = {**snapshot(connection, _FIELDS), "kind": kind}
@@ -132,6 +134,8 @@ class ConnectionService:
             value = getattr(data, name)
             if name == "base_url":
                 value = _base_url(value, connection.kind)
+            elif name == "prices":
+                value = stored_prices(value)
             setattr(connection, name, value)
         details: dict[str, Any] = {"changes": changes(before, connection)}
         if "secret" in data.model_fields_set:

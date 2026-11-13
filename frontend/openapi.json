@@ -733,6 +733,25 @@
               }
             ]
           },
+          "prices": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Price-Input"
+                },
+                "maxProperties": 500,
+                "propertyNames": {
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices"
+          },
           "purpose": {
             "$ref": "#/components/schemas/Purpose",
             "default": "chat"
@@ -777,7 +796,7 @@
         "type": "string"
       },
       "ConnectionOut": {
-        "description": "`streaming`: whether calls to it may stream (never for `b_api`).",
+        "description": "`streaming`: whether calls to it may stream (never for `b_api`). `prices`: per\nmodel, where set (usage costs stay empty without).",
         "properties": {
           "base_url": {
             "title": "Base Url",
@@ -826,6 +845,13 @@
           "param_family": {
             "$ref": "#/components/schemas/ParamFamily"
           },
+          "prices": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Price-Output"
+            },
+            "title": "Prices",
+            "type": "object"
+          },
           "purpose": {
             "$ref": "#/components/schemas/Purpose"
           },
@@ -869,6 +895,7 @@
           "requests_per_minute",
           "purpose",
           "enabled",
+          "prices",
           "streaming",
           "version",
           "created_at",
@@ -977,6 +1004,25 @@
                 "type": "null"
               }
             ]
+          },
+          "prices": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Price-Input"
+                },
+                "maxProperties": 500,
+                "propertyNames": {
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices"
           },
           "purpose": {
             "anyOf": [
@@ -1572,6 +1618,16 @@
         ],
         "title": "GroupAssignmentOut",
         "type": "object"
+      },
+      "GroupBy": {
+        "enum": [
+          "user",
+          "agent",
+          "space",
+          "connection"
+        ],
+        "title": "GroupBy",
+        "type": "string"
       },
       "GroupCreate": {
         "properties": {
@@ -2309,7 +2365,7 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others). A deleted message keeps its place with `deleted_at` set and an empty\n`body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their\nthread). `mentions`: the people mentioned who may see the conversation;\n`reactions`: by emoji, the first reacted with first.",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first.",
         "properties": {
           "author": {
             "anyOf": [
@@ -2640,6 +2696,69 @@
           "not_notified"
         ],
         "title": "MessageWriteOut",
+        "type": "object"
+      },
+      "MyUsageOut": {
+        "description": "The caller's own usage in the period (whole UTC days).",
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "first_day": {
+            "format": "date",
+            "title": "First Day",
+            "type": "string"
+          },
+          "last_day": {
+            "format": "date",
+            "title": "Last Day",
+            "type": "string"
+          },
+          "tokens_cached": {
+            "title": "Tokens Cached",
+            "type": "integer"
+          },
+          "tokens_in": {
+            "title": "Tokens In",
+            "type": "integer"
+          },
+          "tokens_out": {
+            "title": "Tokens Out",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "title": "Unpriced Calls",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calls",
+          "tokens_in",
+          "tokens_out",
+          "tokens_cached",
+          "cost",
+          "unpriced_calls",
+          "duration_ms",
+          "first_day",
+          "last_day"
+        ],
+        "title": "MyUsageOut",
         "type": "object"
       },
       "NotificationReason": {
@@ -3567,6 +3686,33 @@
         "title": "Page[UnreadOut]",
         "type": "object"
       },
+      "Page_UsageRowOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[UsageRowOut]",
+        "type": "object"
+      },
       "Page_UserAssignmentOut_": {
         "properties": {
           "items": {
@@ -3786,6 +3932,64 @@
           "name"
         ],
         "title": "PersonOut",
+        "type": "object"
+      },
+      "Price-Input": {
+        "additionalProperties": false,
+        "description": "A model's price per million tokens (EUR); cached tokens count as input.",
+        "properties": {
+          "input": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Input"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Output"
+          }
+        },
+        "required": [
+          "input",
+          "output"
+        ],
+        "title": "Price",
+        "type": "object"
+      },
+      "Price-Output": {
+        "additionalProperties": false,
+        "description": "A model's price per million tokens (EUR); cached tokens count as input.",
+        "properties": {
+          "input": {
+            "title": "Input",
+            "type": "string"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input",
+          "output"
+        ],
+        "title": "Price",
         "type": "object"
       },
       "PrincipalRef": {
@@ -5390,6 +5594,88 @@
           "mentions"
         ],
         "title": "UnreadOut",
+        "type": "object"
+      },
+      "UsageRowOut": {
+        "description": "One UTC day and, when grouped, one person, agent, space or connection (`key_id`;\nnull for calls without one, such as an embedding batch). `name`: the key's\ndisplay name where known.",
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tokens_cached": {
+            "title": "Tokens Cached",
+            "type": "integer"
+          },
+          "tokens_in": {
+            "title": "Tokens In",
+            "type": "integer"
+          },
+          "tokens_out": {
+            "title": "Tokens Out",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "title": "Unpriced Calls",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calls",
+          "tokens_in",
+          "tokens_out",
+          "tokens_cached",
+          "cost",
+          "unpriced_calls",
+          "duration_ms",
+          "day",
+          "key_id",
+          "name"
+        ],
+        "title": "UsageRowOut",
         "type": "object"
       },
       "UserAssignmentIn": {
@@ -7653,6 +7939,214 @@
           }
         },
         "summary": "Test Connection",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/usage": {
+      "get": {
+        "description": "Sums per UTC day (newest first), at most 366 days.",
+        "operationId": "list_usage_api_ai_usage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "first UTC day; default: 29 days before `to`",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "first UTC day; default: 29 days before `to`",
+              "title": "From"
+            }
+          },
+          {
+            "description": "last UTC day; default: today",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "last UTC day; default: today",
+              "title": "To"
+            }
+          },
+          {
+            "description": "group each day further",
+            "in": "query",
+            "name": "by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "group each day further",
+              "title": "By"
+            }
+          },
+          {
+            "description": "only this run's calls",
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only this run's calls",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_UsageRowOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Usage",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/usage/me": {
+      "get": {
+        "operationId": "my_usage_api_ai_usage_me_get",
+        "parameters": [
+          {
+            "description": "first UTC day; default: 29 days before `to`",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "first UTC day; default: 29 days before `to`",
+              "title": "From"
+            }
+          },
+          {
+            "description": "last UTC day; default: today",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "last UTC day; default: today",
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyUsageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Usage",
         "tags": [
           "ai"
         ]

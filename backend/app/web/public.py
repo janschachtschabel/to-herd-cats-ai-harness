@@ -17,6 +17,7 @@ from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.telemetry import configure_tracing
 from app.modules.ai import assignment_router as ai_assignments
 from app.modules.ai import router as ai
+from app.modules.ai import usage_router as ai_usage
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
@@ -86,6 +87,7 @@ def api_router() -> APIRouter:
     api.include_router(audit_router)
     api.include_router(ai.connections)
     api.include_router(ai_assignments.assignments)
+    api.include_router(ai_usage.usage)
     return api
 
 

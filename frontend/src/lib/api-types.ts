@@ -465,6 +465,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Usage
+         * @description Sums per UTC day (newest first), at most 366 days.
+         */
+        get: operations["list_usage_api_ai_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/usage/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Usage */
+        get: operations["my_usage_api_ai_usage_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -1896,6 +1933,10 @@ export interface components {
             /** Name */
             name: string;
             param_family?: components["schemas"]["ParamFamily"] | null;
+            /** Prices */
+            prices?: {
+                [key: string]: components["schemas"]["Price-Input"];
+            } | null;
             /** @default chat */
             purpose?: components["schemas"]["Purpose"];
             /**
@@ -1917,7 +1958,8 @@ export interface components {
         ConnectionKind: "openai" | "openai_compatible" | "b_api" | "local";
         /**
          * ConnectionOut
-         * @description `streaming`: whether calls to it may stream (never for `b_api`).
+         * @description `streaming`: whether calls to it may stream (never for `b_api`). `prices`: per
+         *     model, where set (usage costs stay empty without).
          */
         ConnectionOut: {
             /** Base Url */
@@ -1947,6 +1989,10 @@ export interface components {
             /** Name */
             name: string;
             param_family: components["schemas"]["ParamFamily"];
+            /** Prices */
+            prices: {
+                [key: string]: components["schemas"]["Price-Output"];
+            };
             purpose: components["schemas"]["Purpose"];
             /** Requests Per Minute */
             requests_per_minute: number;
@@ -1985,6 +2031,10 @@ export interface components {
             /** Name */
             name?: string | null;
             param_family?: components["schemas"]["ParamFamily"] | null;
+            /** Prices */
+            prices?: {
+                [key: string]: components["schemas"]["Price-Input"];
+            } | null;
             purpose?: components["schemas"]["Purpose"] | null;
             /** Requests Per Minute */
             requests_per_minute?: number | null;
@@ -2196,6 +2246,11 @@ export interface components {
             position: number;
             target: components["schemas"]["TargetOut"];
         };
+        /**
+         * GroupBy
+         * @enum {string}
+         */
+        GroupBy: "user" | "agent" | "space" | "connection";
         /** GroupCreate */
         GroupCreate: {
             /** Description */
@@ -2539,10 +2594,12 @@ export interface components {
         /**
          * MessageOut
          * @description `author` is null for system messages; those carry `system` instead (null for
-         *     all others). A deleted message keeps its place with `deleted_at` set and an empty
-         *     `body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their
-         *     thread). `mentions`: the people mentioned who may see the conversation;
-         *     `reactions`: by emoji, the first reacted with first.
+         *     all others) and an empty `body_md`: their stored body holds ids the reader may not
+         *     be allowed to see, `system` only what is named for the reader (review M4 P1). A
+         *     deleted message keeps its place with `deleted_at` set and an empty `body_md`.
+         *     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
+         *     `mentions`: the people mentioned who may see the conversation; `reactions`: by
+         *     emoji, the first reacted with first.
          */
         MessageOut: {
             author: components["schemas"]["MessageAuthorOut"] | null;
@@ -2639,6 +2696,36 @@ export interface components {
             /** Reply Count */
             reply_count: number;
             system: components["schemas"]["SystemEntryOut"] | null;
+        };
+        /**
+         * MyUsageOut
+         * @description The caller's own usage in the period (whole UTC days).
+         */
+        MyUsageOut: {
+            /** Calls */
+            calls: number;
+            /** Cost */
+            cost: string | null;
+            /** Duration Ms */
+            duration_ms: number;
+            /**
+             * First Day
+             * Format: date
+             */
+            first_day: string;
+            /**
+             * Last Day
+             * Format: date
+             */
+            last_day: string;
+            /** Tokens Cached */
+            tokens_cached: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Unpriced Calls */
+            unpriced_calls: number;
         };
         /**
          * NotificationReason
@@ -2935,6 +3022,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[UsageRowOut] */
+        Page_UsageRowOut_: {
+            /** Items */
+            items: components["schemas"]["UsageRowOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[UserAssignmentOut] */
         Page_UserAssignmentOut_: {
             /** Items */
@@ -3024,6 +3118,26 @@ export interface components {
             /** Name */
             name: string | null;
             type: components["schemas"]["PrincipalType"];
+        };
+        /**
+         * Price
+         * @description A model's price per million tokens (EUR); cached tokens count as input.
+         */
+        "Price-Input": {
+            /** Input */
+            input: number | string;
+            /** Output */
+            output: number | string;
+        };
+        /**
+         * Price
+         * @description A model's price per million tokens (EUR); cached tokens count as input.
+         */
+        "Price-Output": {
+            /** Input */
+            input: string;
+            /** Output */
+            output: string;
         };
         /** PrincipalRef */
         PrincipalRef: {
@@ -3662,6 +3776,37 @@ export interface components {
             mentions: number;
             /** Unread */
             unread: number;
+        };
+        /**
+         * UsageRowOut
+         * @description One UTC day and, when grouped, one person, agent, space or connection (`key_id`;
+         *     null for calls without one, such as an embedding batch). `name`: the key's
+         *     display name where known.
+         */
+        UsageRowOut: {
+            /** Calls */
+            calls: number;
+            /** Cost */
+            cost: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Key Id */
+            key_id: string | null;
+            /** Name */
+            name: string | null;
+            /** Tokens Cached */
+            tokens_cached: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Unpriced Calls */
+            unpriced_calls: number;
         };
         /**
          * UserAssignmentIn
@@ -4973,6 +5118,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_usage_api_ai_usage_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description first UTC day; default: 29 days before `to` */
+                from?: string | null;
+                /** @description last UTC day; default: today */
+                to?: string | null;
+                /** @description group each day further */
+                by?: components["schemas"]["GroupBy"] | null;
+                /** @description only this run's calls */
+                run_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_UsageRowOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_usage_api_ai_usage_me_get: {
+        parameters: {
+            query?: {
+                /** @description first UTC day; default: 29 days before `to` */
+                from?: string | null;
+                /** @description last UTC day; default: today */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyUsageOut"];
                 };
             };
             /** @description Validation Error */
