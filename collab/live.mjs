@@ -29,6 +29,7 @@ import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
+import { carriesContent, sizeGuard } from "./size.mjs";
 import {
   CLOSE,
   FLUSH,
@@ -50,7 +51,8 @@ const DENIAL = {
   413: CLOSE.tooLarge,
 };
 
-export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} }) {
+export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {}, ...limits }) {
+  const size = sizeGuard(limits);
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
   const joined = new WeakSet(); // sockets that completed the handshake and joined a document
   const ending = new Set(); // document names whose generation must end before anyone joins
@@ -210,6 +212,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       }
       state.source = contentMd;
       state.baseline = yDocToMarkdown(document);
+      state.size = size.measure(document);
       live.set(documentName, state);
     },
 
@@ -227,12 +230,17 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       joined.add(context.socket);
     },
 
-    async beforeHandleMessage({ context, documentName }) {
+    async beforeHandleMessage({ context, document, documentName, update }) {
       const state = live.get(documentName);
       let close = null;
       if (context.closing) close = context.closing;
       else if (!state || state.discarded) close = CLOSE.generationEnded;
-      else if (state.holding) close = CLOSE.retry; // the generation is being ended
+      else if (state.holding)
+        close = CLOSE.retry; // the generation is being ended
+      else if (carriesContent(update) && !size.admit(document, state, update.length)) {
+        close = CLOSE.tooLarge; // only this sender; the document stays as it was
+        closeSocket(context, close);
+      }
       if (close) throw Object.assign(new Error(close[1]), { code: close[0], reason: close[1] });
     },
 

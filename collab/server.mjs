@@ -88,9 +88,18 @@ export function createCollabServer({
   maxDebounceMs = 10000,
   retryMs = 5000,
   log = logger({ service: "to-herd-cats-ai", component: "collab" }),
+  maxStateBytes,
+  maxMarkdownChars,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
-  const extension = liveExtension({ api, cookieName, retryMs, log });
+  const extension = liveExtension({
+    api,
+    cookieName,
+    retryMs,
+    log,
+    maxStateBytes,
+    maxMarkdownChars,
+  });
   const hocuspocus = new Hocuspocus({
     name: "to-herd-cats-ai-collab",
     quiet: true,

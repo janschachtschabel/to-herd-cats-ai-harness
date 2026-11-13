@@ -239,7 +239,10 @@ kennen.
   hatte er noch ungespeicherte Änderungen, endet die Generation, damit kein anderer
   Browser sie wieder einspielt (die anderen bekommen 4409, ihre ungespeicherten
   Änderungen gehen verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
-  5 MiB. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
+  5 MiB und sein Markdown höchstens 200.000 Zeichen; das prüft der Collab-Prozess schon
+  vor jeder Änderung, nicht erst beim Speichern: Wer eine Änderung schickt, die darüber
+  führt, wird mit 4413 getrennt, die Änderung erreicht niemanden, die anderen arbeiten
+  weiter. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen.
 - **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen
   Prozesses; zwei Prozesse würden die Bearbeitenden einer Seite aufteilen, und keiner
