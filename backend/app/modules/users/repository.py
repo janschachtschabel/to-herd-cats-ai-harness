@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import func, select
 
@@ -33,6 +34,15 @@ class UserRepository(BaseRepository[User]):
         if after is not None:
             stmt = stmt.where(User.id > after)
         return list((await self.session.scalars(stmt)).all())
+
+    async def names(
+        self, org_id: uuid.UUID, user_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """The names of these people of the organisation (deactivated ones too)."""
+        if not user_ids:
+            return {}
+        stmt = select(User.id, User.name).where(User.org_id == org_id, User.id.in_(user_ids))
+        return {user_id: name for user_id, name in await self.session.execute(stmt)}
 
     async def exists_any(self) -> bool:
         return bool(await self.session.scalar(select(select(User.id).exists())))

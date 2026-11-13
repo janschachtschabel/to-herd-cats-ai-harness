@@ -108,6 +108,12 @@ async def test_publishing_writes_one_system_message_even_when_delivered_twice(
         "key": "page.published",
         "actor": str(wiki.users["editor"].id),
     }
+    editor = wiki.users["editor"]
+    assert system["system"] == {
+        "key": "page.published",
+        "actor": {"id": str(editor.id), "name": editor.name},
+        "number": None,
+    }
     hidden = await messages(wiki.viewer, thread["id"], include_system="false")
     assert hidden == []
 
@@ -149,6 +155,7 @@ async def test_every_page_change_with_a_timeline_entry_emits_its_event(
     ]
     restore = next(m for m in items if "version_restored" in m["body_md"])
     assert json.loads(restore["body_md"])["number"] == 1
+    assert restore["system"]["number"] == 1
     refused = await wiki.editor.post(f"/api/pages/{parent['id']}/publish", json={"version": 99})
     assert refused.status_code == 409  # a refused change emits nothing
     assert (await _events(session, "page.published")).count("page.published") == 2

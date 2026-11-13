@@ -17,7 +17,7 @@ from app.modules.messaging.models import (
     MessageKind,
 )
 from app.modules.messaging.social_repository import ReactionSummary
-from app.modules.messaging.views import MessageView
+from app.modules.messaging.views import MessageView, SystemEntry
 
 # No line breaks or other control characters: a name is one line in the sidebar.
 ChannelName = Annotated[
@@ -185,16 +185,47 @@ class ReactionOut(BaseModel):
         return cls(emoji=summary.emoji, count=summary.count, mine=summary.mine)
 
 
+class MessageAuthorOut(BaseModel):
+    """Who wrote a message, with the name to show (null if unknown)."""
+
+    type: PrincipalType
+    id: uuid.UUID
+    name: str | None
+
+
+class PersonNameOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class SystemEntryOut(BaseModel):
+    """A system message's timeline entry, for the client to word: `key` is the page
+    event (`page.published`, ...), `actor` who caused it (null if unknown), `number`
+    the restored version (only for `page.version_restored`)."""
+
+    key: str
+    actor: PersonNameOut | None
+    number: int | None
+
+    @classmethod
+    def of(cls, entry: SystemEntry) -> "SystemEntryOut":
+        actor = None
+        if entry.actor_id is not None and entry.actor_name is not None:
+            actor = PersonNameOut(id=entry.actor_id, name=entry.actor_name)
+        return cls(key=entry.key, actor=actor, number=entry.number)
+
+
 class MessageOut(BaseModel):
-    """`author` is null for system messages. A deleted message keeps its place with
-    `deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong
-    to top-level messages (their thread). `mentions`: the people mentioned who may see
-    the conversation; `reactions`: by emoji, the first reacted with first."""
+    """`author` is null for system messages; those carry `system` instead (null for
+    all others). A deleted message keeps its place with `deleted_at` set and an empty
+    `body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their
+    thread). `mentions`: the people mentioned who may see the conversation;
+    `reactions`: by emoji, the first reacted with first."""
 
     id: uuid.UUID
     conversation_id: uuid.UUID
     parent_id: uuid.UUID | None
-    author: PrincipalRef | None
+    author: MessageAuthorOut | None
     kind: MessageKind
     body_md: str
     client_id: uuid.UUID | None
@@ -205,13 +236,16 @@ class MessageOut(BaseModel):
     last_reply_at: datetime | None
     mentions: list[uuid.UUID]
     reactions: list[ReactionOut]
+    system: SystemEntryOut | None
 
     @classmethod
     def of(cls, view: MessageView) -> "MessageOut":
         message = view.message
         author = None
         if message.author_id is not None:
-            author = PrincipalRef(type=PrincipalType(message.author_type), id=message.author_id)
+            author = MessageAuthorOut(
+                type=PrincipalType(message.author_type), id=message.author_id, name=view.author_name
+            )
         return cls(
             id=message.id,
             conversation_id=message.conversation_id,
@@ -227,6 +261,7 @@ class MessageOut(BaseModel):
             last_reply_at=message.last_reply_at,
             mentions=view.mentions,
             reactions=[ReactionOut.of(r) for r in view.reactions],
+            system=SystemEntryOut.of(view.system) if view.system else None,
         )
 
 

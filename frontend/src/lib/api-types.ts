@@ -1653,6 +1653,20 @@ export interface components {
             user: components["schemas"]["UserOut"];
         };
         /**
+         * MessageAuthorOut
+         * @description Who wrote a message, with the name to show (null if unknown).
+         */
+        MessageAuthorOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            type: components["schemas"]["PrincipalType"];
+        };
+        /**
          * MessageCreate
          * @description `parent_id`: a top-level message of the same conversation, to reply in its
          *     thread. `client_id`: the client's key for this message; sending again with the
@@ -1712,13 +1726,14 @@ export interface components {
         MessageKind: "human" | "system";
         /**
          * MessageOut
-         * @description `author` is null for system messages. A deleted message keeps its place with
-         *     `deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong
-         *     to top-level messages (their thread). `mentions`: the people mentioned who may see
-         *     the conversation; `reactions`: by emoji, the first reacted with first.
+         * @description `author` is null for system messages; those carry `system` instead (null for
+         *     all others). A deleted message keeps its place with `deleted_at` set and an empty
+         *     `body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their
+         *     thread). `mentions`: the people mentioned who may see the conversation;
+         *     `reactions`: by emoji, the first reacted with first.
          */
         MessageOut: {
-            author: components["schemas"]["PrincipalRef"] | null;
+            author: components["schemas"]["MessageAuthorOut"] | null;
             /** Body Md */
             body_md: string;
             /** Client Id */
@@ -1753,6 +1768,7 @@ export interface components {
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
             reply_count: number;
+            system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
          * MessageUpdate
@@ -1773,7 +1789,7 @@ export interface components {
          *     the conversation, and ids of nobody (indistinguishable on purpose).
          */
         MessageWriteOut: {
-            author: components["schemas"]["PrincipalRef"] | null;
+            author: components["schemas"]["MessageAuthorOut"] | null;
             /** Body Md */
             body_md: string;
             /** Client Id */
@@ -1810,6 +1826,7 @@ export interface components {
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
             reply_count: number;
+            system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
          * NotificationReason
@@ -2103,6 +2120,16 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** PersonNameOut */
+        PersonNameOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** PrincipalRef */
         PrincipalRef: {
             /**
@@ -2253,6 +2280,19 @@ export interface components {
             name?: string | null;
             /** Version */
             version: number;
+        };
+        /**
+         * SystemEntryOut
+         * @description A system message's timeline entry, for the client to word: `key` is the page
+         *     event (`page.published`, ...), `actor` who caused it (null if unknown), `number`
+         *     the restored version (only for `page.version_restored`).
+         */
+        SystemEntryOut: {
+            actor: components["schemas"]["PersonNameOut"] | null;
+            /** Key */
+            key: string;
+            /** Number */
+            number: number | null;
         };
         /**
          * SystemRole

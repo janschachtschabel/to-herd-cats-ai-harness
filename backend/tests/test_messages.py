@@ -29,7 +29,9 @@ def _message(message_id: object) -> str:
 async def test_viewers_post_and_everyone_who_sees_reads(chat: Chat) -> None:
     message = await post(chat.viewer, chat.channel_id, "Hallo **alle**")
     assert message["kind"] == "human" and message["body_md"] == "Hallo **alle**"
-    assert message["author"] == {"type": "user", "id": str(chat.users["viewer"].id)}
+    viewer = chat.users["viewer"]
+    assert message["author"] == {"type": "user", "id": str(viewer.id), "name": viewer.name}
+    assert message["system"] is None
     assert message["conversation_id"] == chat.channel_id and message["parent_id"] is None
     assert (message["reply_count"], message["last_reply_at"]) == (0, None)
     assert (message["edited_at"], message["deleted_at"]) == (None, None)

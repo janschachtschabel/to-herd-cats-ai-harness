@@ -1244,6 +1244,37 @@
         "title": "MeOut",
         "type": "object"
       },
+      "MessageAuthorOut": {
+        "description": "Who wrote a message, with the name to show (null if unknown).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "title": "MessageAuthorOut",
+        "type": "object"
+      },
       "MessageCreate": {
         "additionalProperties": false,
         "description": "`parent_id`: a top-level message of the same conversation, to reply in its\nthread. `client_id`: the client's key for this message; sending again with the\nsame key returns the first message (200) instead of a second one. `mentions`:\nwhom the text mentions (`@[Name](user:<id>)`); at most 50.",
@@ -1370,12 +1401,12 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages. A deleted message keeps its place with\n`deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong\nto top-level messages (their thread). `mentions`: the people mentioned who may see\nthe conversation; `reactions`: by emoji, the first reacted with first.",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others). A deleted message keeps its place with `deleted_at` set and an empty\n`body_md`. `reply_count` and `last_reply_at` belong to top-level messages (their\nthread). `mentions`: the people mentioned who may see the conversation;\n`reactions`: by emoji, the first reacted with first.",
         "properties": {
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PrincipalRef"
+                "$ref": "#/components/schemas/MessageAuthorOut"
               },
               {
                 "type": "null"
@@ -1482,6 +1513,16 @@
           "reply_count": {
             "title": "Reply Count",
             "type": "integer"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1498,7 +1539,8 @@
           "reply_count",
           "last_reply_at",
           "mentions",
-          "reactions"
+          "reactions",
+          "system"
         ],
         "title": "MessageOut",
         "type": "object"
@@ -1544,7 +1586,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PrincipalRef"
+                "$ref": "#/components/schemas/MessageAuthorOut"
               },
               {
                 "type": "null"
@@ -1659,6 +1701,16 @@
           "reply_count": {
             "title": "Reply Count",
             "type": "integer"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemEntryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1676,6 +1728,7 @@
           "last_reply_at",
           "mentions",
           "reactions",
+          "system",
           "not_notified"
         ],
         "title": "MessageWriteOut",
@@ -2545,6 +2598,25 @@
         "title": "PasswordChangeIn",
         "type": "object"
       },
+      "PersonNameOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PersonNameOut",
+        "type": "object"
+      },
       "PrincipalRef": {
         "properties": {
           "id": {
@@ -2937,6 +3009,43 @@
           "version"
         ],
         "title": "SpaceUpdateIn",
+        "type": "object"
+      },
+      "SystemEntryOut": {
+        "description": "A system message's timeline entry, for the client to word: `key` is the page\nevent (`page.published`, ...), `actor` who caused it (null if unknown), `number`\nthe restored version (only for `page.version_restored`).",
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonNameOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          }
+        },
+        "required": [
+          "key",
+          "actor",
+          "number"
+        ],
+        "title": "SystemEntryOut",
         "type": "object"
       },
       "SystemRole": {
