@@ -54,8 +54,23 @@ def test_idle_connections_outlast_the_connection_pools_of_proxies_and_clients():
     every common pool: nginx and ALB 60 s, Traefik 90 s, Caddy 120 s."""
     public, internal = launch.server_configs(Settings())
     for config in (public, internal):
-        assert config.timeout_keep_alive == launch.KEEP_ALIVE_SECONDS
-    assert launch.KEEP_ALIVE_SECONDS > 120
+        assert config.timeout_keep_alive == launch.DEFAULT_KEEP_ALIVE_SECONDS
+    assert launch.DEFAULT_KEEP_ALIVE_SECONDS == 150
+
+
+def test_keep_alive_follows_herd_keep_alive_seconds(monkeypatch):
+    """Review M4-1 P14: a proxy whose upstream pool idles longer (Google's load balancers
+    600 s, an ALB set higher) needs a longer keep-alive than the default."""
+    monkeypatch.setenv("HERD_KEEP_ALIVE_SECONDS", "650")
+    public, internal = launch.server_configs(Settings())
+    assert (public.timeout_keep_alive, internal.timeout_keep_alive) == (650, 650)
+
+
+@pytest.mark.parametrize("value", ["0", "4", "3601", "-1", "soon"])
+def test_keep_alive_out_of_bounds_is_a_start_up_error(monkeypatch, value):
+    monkeypatch.setenv("HERD_KEEP_ALIVE_SECONDS", value)
+    with pytest.raises(ValueError, match="HERD_KEEP_ALIVE_SECONDS"):
+        launch.server_configs(Settings())
 
 
 def test_websocket_messages_are_limited_to_what_the_collab_process_takes():

@@ -261,10 +261,15 @@ Collab-Prozess weiter. Daraus folgt für Proxy und Ingress:
    Leerlauf-Timeout ab 30 s genügt. Ein Limit für die gesamte Dauer einer Verbindung
    (GKE) beendet dagegen auch aktive Sitzungen: Der Editor verbindet sich dann neu,
    ohne Datenverlust, aber mit kurzem „Getrennt“.
-   Leerlaufende HTTP-Verbindungen (Keep-Alive) hält die App 150 s offen. Ein Proxy,
-   der Verbindungen zur App wiederverwendet, muss sie früher schließen, sonst trifft
-   eine Anfrage gelegentlich eine Verbindung, die die App gerade schließt (502 vom
-   Proxy). Ab Werk passen nginx und ALB (60 s), Traefik (90 s) und Caddy (120 s).
+   Leerlaufende HTTP-Verbindungen (Keep-Alive) hält die App `HERD_KEEP_ALIVE_SECONDS`
+   lang offen (Standard 150, erlaubt 5 bis 3600; ein anderer Wert ist ein Startfehler).
+   Regel: **länger als das Leerlauf-Timeout des Proxys zu seinen Upstreams.** Ein
+   Proxy, der Verbindungen zur App wiederverwendet, muss sie früher schließen als die
+   App, sonst trifft eine Anfrage gelegentlich eine Verbindung, die die App gerade
+   schließt (502 vom Proxy). Ab Werk passen mit 150 s nginx und ALB (60 s), Traefik
+   (90 s) und Caddy (120 s). Google-Load-Balancer halten Backend-Verbindungen 600 s:
+   dort etwa `HERD_KEEP_ALIVE_SECONDS=620`; wer das Leerlauf-Timeout eines ALB
+   hochsetzt, setzt den Wert darüber.
 4. **Größen:** Anhänge bis 25 MiB, Importe bis 100 MiB; der Proxy muss das
    durchlassen (sonst 413 vom Proxy). Alle anderen Anfragen höchstens 1 MiB.
 5. **Client-Adresse und Schema:** `HERD_FORWARDED_ALLOW_IPS` auf die Adresse des

@@ -27,6 +27,8 @@ from typing import Literal, Protocol
 
 import uvicorn
 from fastapi import FastAPI
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.config import Settings, get_settings
 from app.core.db import get_database
@@ -54,12 +56,34 @@ _STEPS: dict[str, tuple[Step, ...]] = {
 
 COLLAB_EXIT_CODE = 3
 COLLAB_STOP_SECONDS = 15.0
-# How long an idle keep-alive connection stays open. A client that reuses a pooled
-# connection at the moment the server closes it gets the request reset (ECONNRESET; a
-# reverse proxy answers 502 to a POST). Uvicorn's 5 s are shorter than the pools in
-# front of it (nginx upstream and ALB 60 s, Traefik 90 s, Caddy 120 s): the server
-# must be the side that outlasts them, so that the client always closes first.
-KEEP_ALIVE_SECONDS = 150
+# How long an idle keep-alive connection stays open (HERD_KEEP_ALIVE_SECONDS). A client
+# that reuses a pooled connection at the moment the server closes it gets the request
+# reset (ECONNRESET; a reverse proxy answers 502 to a POST). Uvicorn's 5 s are shorter
+# than the pools in front of it (nginx upstream and ALB 60 s, Traefik 90 s, Caddy
+# 120 s): the server must be the side that outlasts them, so that the client always
+# closes first. A proxy that keeps its upstream connections longer (Google's load
+# balancers 600 s, an ALB set higher) needs a longer value (review M4-1 P14).
+DEFAULT_KEEP_ALIVE_SECONDS = 150
+KEEP_ALIVE_BOUNDS = (5, 3600)
+
+
+class _KeepAlive(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="HERD_", env_file=".env", extra="ignore")
+
+    keep_alive_seconds: int = Field(
+        default=DEFAULT_KEEP_ALIVE_SECONDS, ge=KEEP_ALIVE_BOUNDS[0], le=KEEP_ALIVE_BOUNDS[1]
+    )
+
+
+def keep_alive_seconds() -> int:
+    """HERD_KEEP_ALIVE_SECONDS, within KEEP_ALIVE_BOUNDS; otherwise a start-up error."""
+    try:
+        return _KeepAlive().keep_alive_seconds
+    except ValidationError:
+        low, high = KEEP_ALIVE_BOUNDS
+        raise ValueError(
+            f"HERD_KEEP_ALIVE_SECONDS must be a whole number of seconds from {low} to {high}"
+        ) from None
 
 
 class Server(Protocol):
@@ -104,7 +128,9 @@ def steps_for(role: str) -> tuple[Step, ...]:
     return _STEPS[role]
 
 
-def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn.Config:
+def _config(
+    app: FastAPI, port: int, forwarded_allow_ips: str | None, keep_alive: int
+) -> uvicorn.Config:
     # 0.0.0.0: the process runs in a container; which ports are reachable is decided there.
     # access_log off and log_config None: RequestLogMiddleware writes the request line and
     # uvicorn's own loggers propagate to the root handler set up by configure_logging.
@@ -119,7 +145,7 @@ def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn
         server_header=False,
         proxy_headers=forwarded_allow_ips is not None,
         forwarded_allow_ips=forwarded_allow_ips,
-        timeout_keep_alive=KEEP_ALIVE_SECONDS,
+        timeout_keep_alive=keep_alive,
         ws_max_size=MAX_MESSAGE_BYTES,  # live editing (/collab): what the collab process takes
     )
 
@@ -129,15 +155,20 @@ def server_configs(
 ) -> tuple[uvicorn.Config, uvicorn.Config]:
     """The public server sits behind the reverse proxy; the internal one is reached
     directly (probes, scrapes) and believes no forwarded headers."""
+    keep_alive = keep_alive_seconds()
     return (
-        _config(create_public_app(), settings.public_port, settings.forwarded_allow_ips),
-        _config(create_internal_app(worker=worker), settings.internal_port, None),
+        _config(
+            create_public_app(), settings.public_port, settings.forwarded_allow_ips, keep_alive
+        ),
+        _config(create_internal_app(worker=worker), settings.internal_port, None, keep_alive),
     )
 
 
 def internal_config(settings: Settings, worker: Worker) -> uvicorn.Config:
     """The internal server alone (role worker)."""
-    return _config(create_internal_app(worker=worker), settings.internal_port, None)
+    return _config(
+        create_internal_app(worker=worker), settings.internal_port, None, keep_alive_seconds()
+    )
 
 
 async def _serve(server: Server) -> int:
