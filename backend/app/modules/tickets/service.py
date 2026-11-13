@@ -130,7 +130,8 @@ class TicketService:
         self, actor: Actor, number: int, version: int, values: dict[str, Any]
     ) -> TicketView:
         """`values`: the fields the client sent (`TicketUpdate`), null ones included."""
-        repo, ticket = await editable(self.session, actor, number, version)
+        parent_id = values.get("parent_id")
+        repo, ticket = await editable(self.session, actor, number, version, parent_id=parent_id)
         changes = await self._changes(actor, repo, ticket, values)
         status = None
         if Field.STATUS in changes:

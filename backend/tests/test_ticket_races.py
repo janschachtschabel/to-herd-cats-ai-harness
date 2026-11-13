@@ -115,3 +115,41 @@ async def test_a_kind_change_racing_a_new_child(
             created.text,
         )
         assert {changed.status_code, created.status_code} <= {200, 201, 422}
+
+
+async def test_two_tickets_made_each_others_parent_at_once(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    """Review M4 P2: each request holds its own ticket and asks for the other as parent;
+    the locks are taken in one order, so one wins and the other is refused (422), never
+    a deadlock answered with 500."""
+    clients, space = await _owner_and_space(real_db, make_real_client)
+    url = f"/api/spaces/{space['id']}/tickets"
+    for _ in range(4):
+        a = (await clients[0].post(url, json={"title": "A", "kind": "story"})).json()
+        b = (await clients[1].post(url, json={"title": "B", "kind": "story"})).json()
+        answers = await asyncio.gather(
+            clients[0].patch(
+                f"/api/tickets/{a['number']}",
+                json={"version": 1, "parent_id": b["id"], "kind": "task"},
+            ),
+            clients[1].patch(
+                f"/api/tickets/{b['number']}",
+                json={"version": 1, "parent_id": a["id"], "kind": "task"},
+            ),
+        )
+        codes = sorted(answer.status_code for answer in answers)
+        assert codes == [200, 422], [answer.text for answer in answers]
+        refused = next(answer for answer in answers if answer.status_code == 422)
+        assert refused.json()["error"]["code"] == "ticket.parent_invalid"
+        async with real_db.database.session_factory() as session:
+            parents = dict(
+                (
+                    await session.execute(
+                        select(WorkItem.id, WorkItem.parent_id).where(
+                            WorkItem.id.in_([a["id"], b["id"]])
+                        )
+                    )
+                ).all()
+            )
+        assert sum(parent is not None for parent in parents.values()) == 1

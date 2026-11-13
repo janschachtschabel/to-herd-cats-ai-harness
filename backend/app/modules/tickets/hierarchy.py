@@ -8,7 +8,8 @@ is strictly higher (bug/task → story → epic).
 Races (review focus 4): whoever sets a parent holds the parent's row (`FOR SHARE`),
 whoever changes a kind holds its own row (`FOR UPDATE`) and then reads its children,
 so a kind change and a new child under it run one after the other and the second
-sees the first.
+sees the first. A ticket and its new parent are locked in the order of their ids, so
+two tickets made each other's parent at once do not deadlock (review M4 P2).
 """
 
 from collections.abc import Iterable

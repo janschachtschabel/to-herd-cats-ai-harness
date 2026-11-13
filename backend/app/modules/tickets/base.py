@@ -45,11 +45,26 @@ async def readable(
 
 
 async def editable(
-    session: AsyncSession, actor: Actor, number: int, version: int | None = None
+    session: AsyncSession,
+    actor: Actor,
+    number: int,
+    version: int | None = None,
+    *,
+    parent_id: uuid.UUID | None = None,
 ) -> tuple[TicketRepository, WorkItem]:
     """The ticket, locked, for a change: `ticket.edit` (403), and, with `version`, the
-    version the client read (409 `ticket.version_conflict`)."""
+    version the client read (409 `ticket.version_conflict`).
+
+    With the `parent_id` the change sets, the two rows are locked in the order of their
+    ids (review M4 P2): a parent with the lower id is held (`FOR SHARE`) before the
+    ticket, otherwise after it (`_check_hierarchy`). Two tickets made each other's
+    parent at once then wait for each other in turn instead of deadlocking, and the
+    second sees the first's change."""
     repo = ticket_repository(session, actor)
+    if parent_id is not None:
+        found = await repo.by_number(number)
+        if found is not None and parent_id < found.id:
+            await repo.parent_in(found.space_id, parent_id)
     ticket = await readable(session, actor, repo, number, lock=True)
     await require(session, actor, Action.TICKET_EDIT, ticket.space_id)
     if version is not None and ticket.version != version:

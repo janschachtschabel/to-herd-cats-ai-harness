@@ -5,7 +5,8 @@ a number that is taken but hidden and one that is free is the same statement wit
 same empty answer (review focus 1).
 
 Locks (review focus 4): a written ticket `FOR UPDATE`, a parent being set `FOR SHARE`
-(see `hierarchy.py`), a status being taken `FOR KEY SHARE` (`status_repository.py`).
+(see `hierarchy.py`; the two in the order of their ids, `base.editable`), a status
+being taken `FOR KEY SHARE` (`status_repository.py`).
 """
 
 import uuid
