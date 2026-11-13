@@ -13,6 +13,8 @@ export const REPRESENTABLE = 'herd:representable'
 // This browser's editor changed the document it had just loaded before the person did
 // anything; it stopped instead of sending the change (review M2 ruling B; counted).
 export const LOAD_MUTATION = 'herd:load-mutation'
+// After each save: what the server stored, as a Yjs snapshot in base64 (review M2 T5).
+export const STORED = 'herd:stored:'
 const FINISH_TIMEOUT_MS = 5000
 
 export interface AwarenessState {
@@ -28,6 +30,8 @@ export interface LiveHandlers {
   onPeers: (states: AwarenessState[]) => void
   /** True while the latest state cannot be saved as Markdown. */
   onUnrepresentable: (unrepresentable: boolean) => void
+  /** The server stored this state (a Yjs snapshot). */
+  onStored: (snapshot: Uint8Array) => void
 }
 
 /** One live connection of a page's document. */
@@ -69,7 +73,11 @@ export const connectLive: Connect = ({ pageId, generation, doc, handlers }) => {
     onUnsyncedChanges: ({ number }) => handlers.onUnsynced(number),
     onAwarenessChange: ({ states }) => handlers.onPeers(states as AwarenessState[]),
     onStateless: ({ payload }) => {
-      if (payload === UNREPRESENTABLE || payload === REPRESENTABLE) {
+      if (payload.startsWith(STORED)) {
+        handlers.onStored(
+          Uint8Array.from(atob(payload.slice(STORED.length)), (c) => c.charCodeAt(0)),
+        )
+      } else if (payload === UNREPRESENTABLE || payload === REPRESENTABLE) {
         handlers.onUnrepresentable(payload === UNREPRESENTABLE)
       }
     },

@@ -1,5 +1,6 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import * as Y from 'yjs'
 import { makeMe, makePage, mockApi, nodeOf, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 import { fake, join, liveApi, space, typeInto } from './fakeLive.test-helper'
@@ -208,6 +209,41 @@ describe('live editor', () => {
     confirm.mockRestore()
     act(() => connections[0]!.handlers.onUnrepresentable(false))
     expect(screen.queryByText(/lässt sich so nicht als Markdown speichern/)).not.toBeInTheDocument()
+  })
+
+  test('leaving before a change is stored asks first, until the server acknowledges it (T5)', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'Alter Text' })
+    liveApi('editor', () => current)
+    const { router } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    const connection = connections[0]!
+    join(connection)
+    // Sent at once (nothing unsynced), not yet stored: the save comes seconds later, and a
+    // state the server refuses is never stored.
+    typeInto(connection.doc, 'neuer Satz')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    act(() => void router.navigate({ to: '/spaces/$spaceId', params: { spaceId: space.id } }))
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
+    expect(router.state.location.search).toEqual({ view: 'live' })
+    // The server stored it and says so: leaving asks nothing.
+    act(() => connection.handlers.onStored(Y.encodeSnapshot(Y.snapshot(connection.doc))))
+    act(() => void router.navigate({ to: '/spaces/$spaceId', params: { spaceId: space.id } }))
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/spaces/${space.id}`))
+    expect(confirm).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  test('"Fertig" does not leave while the latest change is not acknowledged as stored', async () => {
+    const current = makePage({ space_id: space.id, content_md: 'Alter Text' })
+    liveApi('editor', () => current)
+    fake.acknowledge = false // the server answers "saved" but its snapshot lacks the change
+    const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    join(connections[0]!)
+    typeInto(connections[0]!.doc, 'neuer Satz')
+    await user.click(screen.getByRole('button', { name: 'Fertig' }))
+    expect(await screen.findByText(/noch nicht gespeichert/)).toBeInTheDocument()
+    expect(router.state.location.search).toEqual({ view: 'live' })
   })
 
   test('a viewer gets the read-only page without a live connection', async () => {

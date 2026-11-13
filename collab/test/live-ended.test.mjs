@@ -77,6 +77,7 @@ test("an ended session's edits are saved, then only its connection closes (4401)
 function finish(c) {
   return new Promise((resolve) => {
     const answer = ({ payload }) => {
+      if (payload.startsWith("herd:stored:")) return; // the acknowledgement of the save
       c.provider.off("stateless", answer);
       resolve(payload);
     };

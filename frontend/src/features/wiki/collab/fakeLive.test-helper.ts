@@ -19,10 +19,13 @@ export const fake = {
   events: [] as string[],
   /** What the server answers to "I am done" (true: everything is stored). */
   finishAnswer: (() => true) as () => boolean,
+  /** Whether a save the server answers as done acknowledges the document's state. */
+  acknowledge: true,
   reset() {
     fake.connections.length = 0
     fake.events.length = 0
     fake.finishAnswer = () => true
+    fake.acknowledge = true
   },
 }
 
@@ -33,7 +36,12 @@ export function fakeConnectLive(options: Omit<FakeConnection, 'destroyed'>): Liv
   const finish = async () => {
     await new Promise((resolve) => setTimeout(resolve, 20)) // the server confirms
     fake.events.push('flushed')
-    return fake.finishAnswer()
+    const saved = fake.finishAnswer()
+    // The server acknowledges what it stored before it answers (collab/documents.mjs).
+    if (saved && fake.acknowledge) {
+      connection.handlers.onStored(Y.encodeSnapshot(Y.snapshot(connection.doc)))
+    }
+    return saved
   }
   const reportLoadMutation = () => void fake.events.push('load-mutation')
   return { provider: null, clientId: 1, destroy, finish, reportLoadMutation }

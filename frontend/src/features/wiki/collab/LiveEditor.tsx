@@ -43,11 +43,23 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   useEffect(() => () => refreshPage(latest.current), [refreshPage])
   const editable = live.stopped === null && live.status !== 'connecting'
   const lost = live.lost && live.lost !== page.content_md.trim() ? live.lost : null
-  // Once stopped, nothing more reaches the server: only text that differs from the
-  // page is at stake (not the editor's own empty paragraph of a refused session).
+  // Unsaved while a change made here is not acknowledged as stored (review M2 T5). Once
+  // stopped, nothing more reaches the server: only text that differs from the page is at
+  // stake (not the editor's own empty paragraph of a refused session).
   const unsaved =
-    live.stopped === null ? live.unsynced > 0 || live.unrepresentable : !!lost && !copied
-  useLeaveGuard(unsaved, t('wiki.live.leaveConfirm'))
+    live.stopped === null
+      ? live.unsynced > 0 || live.unrepresentable || live.unconfirmed
+      : !!lost && !copied
+  // "Fertig" leaves once the server confirmed everything is stored, before this renders
+  // again: the guard reads the latest answer when leaving.
+  const leave = useRef({ unsaved, confirmed: false })
+  useEffect(() => {
+    leave.current.unsaved = unsaved
+  })
+  useLeaveGuard(
+    () => leave.current.unsaved && !leave.current.confirmed,
+    t('wiki.live.leaveConfirm'),
+  )
 
   async function done() {
     setFinishing(true)
@@ -55,6 +67,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
     setFinishing(false)
     setNotSaved(!saved)
     if (saved) {
+      leave.current.confirmed = true
       await navigate({
         to: '/spaces/$spaceId/p/$',
         params: { spaceId: space.id, _splat: page.path },

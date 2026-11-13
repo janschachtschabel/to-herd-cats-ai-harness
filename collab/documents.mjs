@@ -6,11 +6,13 @@
 // written so is not stored: the last good Markdown stays, the API counts it
 // (`herd_collab_saves_total{result="unrepresentable"}`), every connection is told
 // (`herd:unrepresentable`, the session goes on) and the edits stay unsaved until a
-// later state saves (`herd:representable`).
+// later state saves (`herd:representable`). Every stored state is acknowledged to every
+// connection with its snapshot (`herd:stored:`), so a browser knows when its own changes
+// are stored.
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { yDocToJSON } from "./markdown.mjs";
-import { CLOSE, REPRESENTABLE, UNREPRESENTABLE, closeSocket } from "./protocol.mjs";
+import { CLOSE, REPRESENTABLE, STORED, UNREPRESENTABLE, closeSocket } from "./protocol.mjs";
 import { readBack } from "./readback.mjs";
 
 export function documentRules({ api, log, retryMs, ending }) {
@@ -108,6 +110,7 @@ export function documentRules({ api, log, retryMs, ending }) {
     const written = readBack(yDocToJSON(document));
     if (!written.ok) return unrepresentable(document, state, written.problem);
     const ydoc = Y.encodeStateAsUpdate(document);
+    const snapshot = Buffer.from(Y.encodeSnapshot(Y.snapshot(document))).toString("base64");
     // Unchanged from what was loaded (an edit undone, or a browser tidying the
     // document's structure): the stored Markdown stays exactly as it was written.
     const contentMd = written.markdown === state.baseline ? state.source : written.markdown;
@@ -126,6 +129,7 @@ export function documentRules({ api, log, retryMs, ending }) {
       throw error;
     }
     if (answer.status === 200) {
+      tell(document, `${STORED}${snapshot}`);
       if (state.unrepresentable) tell(document, REPRESENTABLE);
       state.unrepresentable = false;
       return;

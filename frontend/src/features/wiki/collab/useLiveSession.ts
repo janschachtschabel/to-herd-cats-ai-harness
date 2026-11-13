@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import type { WikiPage } from '@/lib/api'
 import { beforeLogout } from '@/lib/beforeLogout'
+import { trackConfirmation } from './confirmation'
 import { connectLive, type Connect, type LiveConnection } from './connect'
 import { liveMarkdown } from './liveMarkdown'
 import { closeOutcome, liveStatus, peersOf, type Peer, type StopReason } from './liveSession'
@@ -22,6 +23,8 @@ export interface LiveSession {
   unsynced: number
   /** The latest state cannot be saved as Markdown: the edits stay unsaved. */
   unrepresentable: boolean
+  /** A change made here is not yet acknowledged as stored (review M2 T5). */
+  unconfirmed: boolean
   retry: () => void
   /** Stop for good on the browser's side (the shared document cannot be shown). */
   refuse: (reason: StopReason) => void
@@ -52,6 +55,7 @@ export function useLiveSession(
   const [synced, setSynced] = useState(false)
   const [unsynced, setUnsynced] = useState(0)
   const [unrepresentable, setUnrepresentable] = useState(false)
+  const [unconfirmed, setUnconfirmed] = useState(false)
   const [peers, setPeers] = useState<Peer[]>([])
   const [stopped, setStopped] = useState<StopReason | null>(null)
   const [regenerated, setRegenerated] = useState(false)
@@ -62,6 +66,7 @@ export function useLiveSession(
     live: LiveConnection
     open: () => boolean
     stop: (reason: StopReason) => void
+    unconfirmed: () => boolean
   } | null>(null)
   const refetchRef = useRef(refetch)
   useEffect(() => {
@@ -72,6 +77,7 @@ export function useLiveSession(
     if (ended.current !== null && ended.current >= generation) return // waiting for the refetch
     const fresh = new Y.Doc()
     let open = true
+    const confirmation = trackConfirmation(fresh, (value) => open && setUnconfirmed(value))
     const live = connect({
       pageId: page.id,
       generation,
@@ -82,6 +88,7 @@ export function useLiveSession(
         onUnsynced: (count) => open && setUnsynced(count),
         onPeers: (states) => open && setPeers(peersOf(states, live.clientId)),
         onUnrepresentable: (value) => open && setUnrepresentable(value),
+        onStored: (snapshot) => open && confirmation.stored(snapshot),
         onClose: (code) => {
           if (!open) return
           const outcome = closeOutcome(code)
@@ -121,7 +128,7 @@ export function useLiveSession(
       end()
       setStopped(reason)
     }
-    current.current = { live, open: () => open, stop }
+    current.current = { live, open: () => open, stop, unconfirmed: confirmation.unconfirmed }
     const unregister = beforeLogout(async () => {
       if (open) await live.finish?.()
       open = false
@@ -132,10 +139,12 @@ export function useLiveSession(
     setSynced(false)
     setUnsynced(0)
     setUnrepresentable(false)
+    setUnconfirmed(false)
     setStopped(null)
     return () => {
       open = false
       current.current = null
+      confirmation.destroy()
       unregister()
       live.destroy()
       fresh.destroy()
@@ -161,7 +170,8 @@ export function useLiveSession(
   const finish = useCallback(async () => {
     const session = current.current
     if (!session || !session.open() || !session.live.finish) return true
-    return session.live.finish()
+    // Stored, and the acknowledgement holds every change made here.
+    return (await session.live.finish()) && !session.unconfirmed()
   }, [])
 
   return {
@@ -175,6 +185,7 @@ export function useLiveSession(
     lost,
     unsynced,
     unrepresentable,
+    unconfirmed,
     retry,
     refuse,
     loadMutation,

@@ -6,7 +6,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import * as Y from "yjs";
 import { createCollabServer } from "../server.mjs";
-import { FLUSH, REPRESENTABLE, SAVED, UNREPRESENTABLE, UNSAVED } from "../protocol.mjs";
+import { FLUSH, REPRESENTABLE, SAVED, STORED, UNREPRESENTABLE, UNSAVED } from "../protocol.mjs";
 import { liveFixture, synced, until } from "./helpers.mjs";
 
 let live;
@@ -69,4 +69,43 @@ test("someone joining a document that cannot be saved is told at once", async ()
   const ben = live.open({ cookie: "herd_session=token-b" });
   const benHears = listen(ben);
   await until(() => benHears.includes(UNREPRESENTABLE));
+});
+
+/** Whether the stored snapshot holds every change the client made (its own clock and
+ * everything it deleted). */
+function holds(payload, doc, deleted) {
+  const snapshot = Y.decodeSnapshot(Buffer.from(payload.slice(STORED.length), "base64"));
+  if ((snapshot.sv.get(doc.clientID) ?? 0) < Y.getState(doc.store, doc.clientID)) return false;
+  return deleted.every((id) => Y.isDeleted(snapshot.ds, id));
+}
+
+test("every stored state is acknowledged to everyone; a refused one is not (T5)", async () => {
+  live = await liveFixture({ markdown: TABLE, createCollabServer });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  const ben = live.open({ cookie: "herd_session=token-b" });
+  await Promise.all([synced(anna), synced(ben)]);
+  const annaHears = listen(anna);
+  const benHears = listen(ben);
+  const text = cellText(anna.doc);
+  const [{ attributes }] = text.toDelta();
+  Y.transact(anna.doc, () => text.insert(text.length, "x", attributes));
+  const stored = () => annaHears.filter((p) => p.startsWith(STORED));
+  await until(() => stored().some((p) => holds(p, anna.doc, [])));
+  await until(() => benHears.some((p) => p.startsWith(STORED)));
+
+  // A refused state: no acknowledgement holds it.
+  const before = stored().length;
+  Y.transact(anna.doc, () => text.insert(text.length, "\\|", attributes));
+  await until(() => annaHears.includes(UNREPRESENTABLE));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.ok(
+    stored()
+      .slice(before)
+      .every((p) => !holds(p, anna.doc, [])),
+  );
+
+  // Deleting it again is stored: the acknowledgement holds the deletion too.
+  Y.transact(anna.doc, () => text.delete(text.length - 2, 2));
+  const deleted = [new Y.ID(anna.doc.clientID, Y.getState(anna.doc.store, anna.doc.clientID) - 1)];
+  await until(() => stored().some((p) => holds(p, anna.doc, deleted)));
 });

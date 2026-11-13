@@ -28,6 +28,11 @@ export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection
 // (nothing is stored until a later state can be), and that a later state was stored.
 export const UNREPRESENTABLE = "herd:unrepresentable";
 export const REPRESENTABLE = "herd:representable";
+// To every connection after each successful save: what is stored, as a Yjs snapshot
+// (state vector and deletions, base64) after the prefix. A browser whose own changes
+// are all in it knows they are stored; one that leaves before is asked first (review M2
+// T5). A state that is not stored (refused, or the API answered otherwise) is not sent.
+export const STORED = "herd:stored:";
 // From a browser whose editor changed the document it had just loaded before the person
 // did anything: it stopped instead of sending the change (review M2 ruling B; counted).
 export const LOAD_MUTATION = "herd:load-mutation";
