@@ -95,6 +95,11 @@ function ownChangesOnly(plugin) {
   });
 }
 
+/** Typing and pasting link only text that starts with `http://`, `https://` or `www.`
+ * (review M2 U5): Tiptap's default also linked file names and domain-like words
+ * (`README.md`, `app.py`), which the page view shows as text. */
+export const shouldAutoLink = (text) => /^(https?:\/\/|www\.)/i.test(text);
+
 const MarkdownLink = Link.extend({
   addProseMirrorPlugins() {
     return this.parent().map(ownChangesOnly);
@@ -117,7 +122,11 @@ export function extensions() {
     Code.extend({ excludes: "" }),
     Heading.extend({ content: LINE }),
     CodeBlock,
-    MarkdownLink.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
+    MarkdownLink.configure({
+      openOnClick: false,
+      isAllowedUri: (url) => allowedUri(url),
+      shouldAutoLink,
+    }),
     // Inline, as in Markdown: an image may stand in a sentence, a cell, a list item or a
     // heading; as a block node the browser would delete such a paragraph (review M2 S1).
     MarkdownImage.configure({ inline: true }),

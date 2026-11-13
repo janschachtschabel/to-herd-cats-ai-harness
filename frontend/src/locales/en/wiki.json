@@ -264,7 +264,8 @@
         "taskList": "Task list",
         "quote": "Quote",
         "codeBlock": "Code block",
-        "rule": "Divider"
+        "rule": "Divider",
+        "unlink": "Remove link"
       }
     }
   },

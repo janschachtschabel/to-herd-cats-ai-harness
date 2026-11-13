@@ -264,7 +264,8 @@
         "taskList": "Aufgabenliste",
         "quote": "Zitat",
         "codeBlock": "Codeblock",
-        "rule": "Trennlinie"
+        "rule": "Trennlinie",
+        "unlink": "Link entfernen"
       }
     }
   },

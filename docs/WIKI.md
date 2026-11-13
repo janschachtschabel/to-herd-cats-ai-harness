@@ -104,6 +104,11 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   durchgestrichen, Inline-Code, Links (nur `http`, `https`, `mailto` und relative
   Ziele), Bilder, Aufzählungen, nummerierte Listen, Aufgabenlisten (auch
   verschachtelt), Zitate, Codeblöcke, Tabellen, Trennlinien, Wiki-Links `[[Titel]]`.
+- **Links beim Tippen:** Zum Link wird beim Tippen oder Einfügen nur, was mit
+  `http://`, `https://` oder `www.` beginnt, wie die Seitenansicht es verlinkt;
+  Dateinamen und Wörter mit Punkt (`README.md`, `app.py`, `example.com`) bleiben Text.
+  Einen Link nimmt die Schaltfläche „Link entfernen“ der Werkzeugleiste wieder weg (der
+  Text bleibt); aus dem Text erreicht man sie mit Umschalt+Tab.
 - **Unverändert durchgereicht:** Was der Editor nicht darstellen kann (rohes HTML,
   Referenzlinks, Fußnoten, verlinkte Bilder und Ähnliches), erscheint dort als
   Codeblock und wird beim Speichern genau so zurückgeschrieben, wie es kam. Ebenso jeder
@@ -182,9 +187,10 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
 - **Leerraum:** Mehrere Leerzeichen, Leerzeichen am Zeilenanfang und leere Absätze zeigt
   der Editor, die Seitenansicht nicht: Markdown fasst sie zusammen, und die
   Speicherprüfung vergleicht, was die Seitenansicht zeigt.
-- **Adressen ohne Leerzeichen danach:** Eine Adresse, die direkt am Ende eines Absatzes
-  oder mitten in einem Wort getippt wird, ist im Editor Text, auf der Seite aber ein
-  Link (GFM verlinkt sie). Beim nächsten Öffnen zeigt auch der Editor den Link, und die
+- **Adressen ohne Leerzeichen danach:** Eine Adresse, die direkt am Ende eines Absatzes,
+  mitten in einem Wort oder mit einem Satzzeichen direkt danach getippt wird
+  (`(https://example.org/x).`), und eine E-Mail-Adresse sind im Editor Text, auf der
+  Seite aber ein Link (GFM verlinkt sie). Beim nächsten Öffnen zeigt auch der Editor den Link, und die
   nächste Speicherung schreibt `<https://…>`. Markdown kann „nicht verlinkt“ dort nicht
   ausdrücken (`collab/autolink.mjs`).
 - **Nicht vorhanden:** Unterstreichen (kein Markdown dafür), eigene Größen oder

@@ -14,6 +14,7 @@ import {
   ListChecks,
   ListOrdered,
   Minus,
+  Unlink,
   Quote,
   SquareCode,
   Strikethrough,
@@ -100,6 +101,15 @@ const TOOLS = [
   { id: 'rule', icon: Minus, active: null, run: (c: Chain) => c.setHorizontalRule() },
 ] as const
 
+/** Takes the link at the caret (or in the selection) off, keeping its text (review M2
+ *  U5: typing could link a word nobody meant as a link, and nothing took it off). */
+const UNLINK = {
+  id: 'unlink',
+  icon: Unlink,
+  enabled: (e: Editor) => e.isActive('link'),
+  run: (c: Chain) => c.extendMarkRange('link').unsetLink(),
+} as const
+
 /** Formatting buttons; each says whether it applies at the cursor (aria-pressed). */
 export function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
   const { t } = useTranslation()
@@ -107,6 +117,10 @@ export function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolea
     editor,
     selector: ({ editor: current }) =>
       TOOLS.map((tool) => (tool.active ? tool.active(current) : false)),
+  })
+  const inLink = useEditorState({
+    editor,
+    selector: ({ editor: current }) => UNLINK.enabled(current),
   })
   return (
     <div
@@ -131,6 +145,19 @@ export function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolea
           <tool.icon aria-hidden />
         </Button>
       ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={disabled || !inLink}
+        aria-label={t('wiki.live.tools.unlink')}
+        onClick={() => {
+          markInput(editor)
+          UNLINK.run(editor.chain().focus()).run()
+        }}
+      >
+        <UNLINK.icon aria-hidden />
+      </Button>
     </div>
   )
 }
