@@ -14,6 +14,11 @@ export const messagingKeys = {
     parentId
       ? (['messaging', 'replies', id, parentId] as const)
       : (['messaging', 'replies', id] as const),
+  /** One message by id (a thread's parent not among the loaded ones, a link). */
+  message: (id: string, messageId?: string) =>
+    messageId
+      ? (['messaging', 'message', id, messageId] as const)
+      : (['messaging', 'message', id] as const),
   pageThread: (pageId: string) => ['messaging', 'page-thread', pageId] as const,
 }
 

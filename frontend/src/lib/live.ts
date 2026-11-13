@@ -11,6 +11,8 @@ export const LIVE_EVENTS = [
   'conversation.read',
   'channel.changed',
   'activity.changed',
+  'access.changed',
+  'dm.inspected',
   'resync',
 ] as const
 
