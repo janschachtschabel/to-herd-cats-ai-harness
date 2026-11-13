@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.models_base import utcnow
 from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Page
 
@@ -51,13 +50,12 @@ class CollabRepository:
 
     async def put_state(self, page_id: uuid.UUID, generation: int, ydoc: bytes) -> None:
         """Replace the page's live state (the caller holds the page row lock)."""
-        now = utcnow()
         stmt = insert(PageCollabState).values(
-            page_id=page_id, org_id=self.org_id, generation=generation, ydoc=ydoc, updated_at=now
+            page_id=page_id, org_id=self.org_id, generation=generation, ydoc=ydoc
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=[PageCollabState.page_id],
-            set_={"generation": generation, "ydoc": ydoc, "updated_at": now},
+            set_={"generation": generation, "ydoc": ydoc},
             where=PageCollabState.org_id == self.org_id,
         )
         await self.session.execute(stmt)
