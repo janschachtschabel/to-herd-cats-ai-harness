@@ -251,7 +251,8 @@ kennen.
   vor jeder Änderung, nicht erst beim Speichern: Wer eine Änderung schickt, die darüber
   führt, wird mit 4413 getrennt, die Änderung erreicht niemanden, die anderen arbeiten
   weiter. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
-  `herd_collab_saves_total{result}` die Speicherungen.
+  `herd_collab_saves_total{result}` die Speicherungen (`unrepresentable`: ein Stand,
+  der sich nicht als Markdown speichern ließ, siehe `docs/WIKI.md`).
 - **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen
   Prozesses; zwei Prozesse würden die Bearbeitenden einer Seite aufteilen, und keiner
   sähe die Änderungen des anderen. Das Chart setzt deshalb `replicas: 1` und

@@ -106,27 +106,60 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Codeblock und wird beim Speichern genau so zurückgeschrieben, wie es kam. Ebenso jeder
   Block, den der Editor sonst anders zurückschreiben würde, als er gemeint war.
 - **Umgeschrieben, aber gleichbedeutend:** Nach einer Live-Speicherung kann das Markdown
-  anders aussehen als vorher: Tabellenzellen werden aufgefüllt, Listen- und
-  Hervorhebungszeichen vereinheitlicht (`*` → `-`, `_` → `*`), Setext- werden
-  ATX-Überschriften, eingerückter Code wird zum Codeblock mit Zäunen, lockere Listen
-  werden eng, benannte Zeichen wie `&copy;` stehen als Zeichen (`©`), Zeichen mit
-  Markdown-Bedeutung im Text werden maskiert (aus `[x]` wird `\[x\]`, Wiki-Links
-  ausgenommen). Die Seitenansicht zeigt danach dasselbe; der Diff der Versionen zeigt
-  die Schreibweise als Änderung, aber erst, wenn jemand live etwas geändert hat.
+  anders aussehen als vorher: Tabellen stehen kompakt (eine Leerstelle um jede Zelle,
+  kein Auffüllen auf Spaltenbreite), Listen- und Hervorhebungszeichen werden
+  vereinheitlicht (`*` → `-` bei Listen, `*kursiv*` → `_kursiv_`, `__fett__` →
+  `**fett**`; folgt eine Liste direkt auf eine andere, nimmt sie das andere Zeichen,
+  damit es zwei bleiben), Setext- werden ATX-Überschriften, eingerückter Code wird zum
+  Codeblock mit Zäunen, lockere Listen werden eng, wo der Inhalt das zulässt, benannte
+  Zeichen wie `&copy;` stehen als Zeichen (`©`), Adressen im Text als `<https://…>` bzw.
+  `<name@example.org>`, Zeichen mit Markdown-Bedeutung im Text werden maskiert (aus
+  `[x]` wird `\[x\]`, Wiki-Links ausgenommen). Die Seitenansicht zeigt danach dasselbe;
+  der Diff der Versionen zeigt die Schreibweise als Änderung, aber erst, wenn jemand
+  live etwas geändert hat.
+- **Wiki-Links** `[[Titel]]` gelten nur im Text, wie die Seitenansicht sie liest: in
+  Code, Codeblöcken und in Link-Texten sind sie keine. Ein `(` direkt nach `]]` wird
+  maskiert, damit kein Link daraus wird.
+- **Tabellenzellen** halten eine Zeile Text (Markdown hat keine Zeilenumbrüche in
+  Zellen): Enter und Umschalt+Enter fügen dort nichts ein. Die erste Zeile ist die
+  Kopfzeile.
+- **Bilder** stehen im Text wie in Markdown; `![Alt](adresse)` getippt wird zum Bild.
+- **Speicherprüfung:** Vor jeder Live-Speicherung liest der Collab-Prozess das Markdown,
+  das er schreiben will, wieder ein und vergleicht es mit dem Dokument im Editor;
+  außerdem muss es die Prüfung beim Öffnen (unten) bestehen. Fällt eine der beiden
+  durch, wird dieser Stand nicht gespeichert: das zuletzt gespeicherte Markdown bleibt,
+  `herd_collab_saves_total{result="unrepresentable"}` zählt mit, und alle im Editor
+  sehen einen Hinweis („Der aktuelle Stand lässt sich so nicht als Markdown
+  speichern …“), die Sitzung läuft weiter. Wer den Editor so verlässt, wird gefragt.
+  Sobald ein späterer Stand gespeichert ist, verschwindet der Hinweis. Bekannter Fall:
+  Code in einer Tabellenzelle mit einem Backslash direkt vor `|` (GFM liest `\|` dort
+  als maskierten Strich und `\\|` als Zellenende; kein Markdown sagt das). Geprüft
+  wird das mit erzeugten Dokumenten (`collab/test/generative.test.mjs`, 2.000 je Lauf;
+  ein Lauf über 20.000 fand nach den Korrekturen keinen weiteren Fall).
 - **Sicherheitsnetz:** Bevor eine Seite live geöffnet wird, liest der Collab-Prozess
   ihr Markdown mit demselben Parser wie die Seitenansicht (micromark mit GFM), wandelt
   es in den Editor und zurück und vergleicht beide Syntaxbäume (Leerraum innerhalb von
-  Text und eng/locker bei Listen zählen nicht). Weichen sie ab, öffnet der Live-Editor
-  die Seite nicht (Close-Code 4422) und bietet den Markdown-Editor an. Beispiel: zwei
-  aufeinanderfolgende Listen mit verschiedenen Aufzählungszeichen (`-` und `*`), die
-  der Editor zu einer Liste zusammenzöge.
+  Text und eng/locker bei Listen zählen nicht). Weichen sie ab, wird der betroffene
+  Block als Codeblock unverändert durchgereicht; geht auch das nicht, öffnet der
+  Live-Editor die Seite nicht (Close-Code 4422) und bietet den Markdown-Editor an. Das
+  betrifft nur Ausgefallenes, etwa einen eingerückten Codeblock direkt vor einer mit 0
+  beginnenden nummerierten Liste aus HTML. Als Codeblock bleiben unter anderem
+  nummerierte Aufgabenlisten (`1. [ ] …`), die der Editor nicht kennt.
 - **Öffnen ohne Ändern ändert nichts:** Wer den Live-Editor öffnet und ohne Eingabe
   wieder schließt, erzeugt weder eine Version noch ein anderes Markdown. Auch eine
   Änderung, die wieder zurückgenommen wurde, lässt das gespeicherte Markdown, wie es war.
 - **Nicht vorhanden:** Unterstreichen (kein Markdown dafür), eigene Größen oder
   Farben, eingebettete Inhalte.
-- Ein Live-Zustand hat höchstens 5 MiB, ein WebSocket-Frame höchstens 1 MiB. Größere
-  Seiten bearbeitet man im Markdown-Editor; der Live-Editor sagt das dann.
+- Ein Live-Zustand hat höchstens 5 MiB und 200.000 Zeichen Markdown, ein
+  WebSocket-Frame höchstens 1 MiB. Nahe der Grenze misst der Collab-Prozess vor jeder
+  Änderung genau, wie groß die Seite damit würde (höchstens einmal je Sekunde und
+  Seite); eine Änderung darüber wird abgelehnt, nur für die Person, die sie geschickt
+  hat (4413), die anderen arbeiten weiter. Größere Seiten bearbeitet man im
+  Markdown-Editor; der Live-Editor sagt das dann.
+- **Abmelden:** Eine offene Live-Verbindung endet mit der nächsten Prüfung, also bis zu
+  5 s nach dem Abmelden; was in diesen Sekunden noch ankommt, wird unter dem Namen der
+  Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und
+  würde verworfen); das ist so entschieden (Prüfung M2, S9).
 
 ## Betrieb hinter einem Reverse Proxy
 
@@ -214,8 +247,11 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
 - Close-Codes (in den Entwicklerwerkzeugen des Browsers): 4401 Sitzung ungültig, 4403
   kein Schreibrecht, 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
   zu groß, 4422 Seite nicht verlustfrei live bearbeitbar, 4429 zu viele Verbindungen
-  dieser Anmeldung (3 je Seite, 10 insgesamt), 4408/4504 Verbindungsaufbau zu langsam,
+  (je Anmeldung 3 je Seite und 10 insgesamt, je Person 20 über alle Anmeldungen, nie
+  mehr als ein Viertel aller), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
+  nichts gesendet (der Browser verbindet sich neu),
   4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
-  `revoked`, `too_large`, `refused`).
+  `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
+  Markdown speichern ließ).

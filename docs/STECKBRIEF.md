@@ -207,6 +207,30 @@ argon2-Prüfungen (je 64 MiB) gleichzeitig laufen.
   Im Cluster läuft der Collab-Prozess als eigener Pod; ihn allein hat hier niemand
   gemessen, sein RSS ist der beste Anhaltspunkt.
 
+### Gemessen: Speicherprüfung und Größenmessung der Live-Bearbeitung
+
+Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki-Seite
+`collab/test/corpus/it-handbuch.md` so oft hintereinander, bis die Größe erreicht ist:
+
+| Seite (Zeichen Markdown) | Speicherprüfung je Speicherung (Median / max) |
+|---|---|
+| 980 | 14 ms / 17 ms |
+| 20.620 | 142 ms / 154 ms |
+| 150.244 | 1.110 ms / 1.310 ms |
+
+- Die Speicherprüfung (Markdown schreiben, mit dem Parser der Seitenansicht wieder
+  lesen, vergleichen, Prüfung wie beim Öffnen) läuft bei jeder Live-Speicherung, also
+  höchstens alle 2 s je Seite, auf der Event-Loop des Collab-Prozesses; solange sie
+  läuft, wartet jede andere Nachricht. Vor einer Optimierung in derselben Welle waren es
+  43 ms / 371 ms / 3,2 s.
+- Die genaue Größenmessung nahe der Grenze (Kopie des Dokuments und Markdown) kostet
+  bei 150.000 Zeichen etwa 130 ms (Kopie) plus 90–120 ms (Markdown), höchstens einmal je
+  Sekunde und Seite, und nur, wenn die Seite höchstens ein paar hundert Zeichen unter
+  der Grenze liegt.
+- Die Messung mit 10 Editoren oben stammt von vor Fix-Welle 2 (Image, `docker stats`);
+  sie ist mit der Speicherprüfung nicht wiederholt (`docker build` geht in dieser
+  Sandbox nicht).
+
 ### Nicht gemessen (hier nicht möglich oder nicht gemacht)
 
 - Echte Browser als Editoren in dieser Zahl (Last und Darstellung im Browser); die
