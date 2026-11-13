@@ -8,11 +8,11 @@ what was found: a `bild.png` that is HTML is refused as HTML, and a PNG named
 """
 
 import json
-import zipfile
 from dataclasses import dataclass
 from typing import IO
 
 from app.core.errors import AppError
+from app.modules.wiki import archive
 
 
 class UnsupportedType(AppError):
@@ -87,18 +87,22 @@ def _binary(head: bytes) -> FileType | None:
 
 
 def _archive(file: IO[bytes]) -> FileType | None:
-    """ZIP, or the Office format whose parts it holds (names only; nothing is
-    unpacked). A broken archive is nothing allowed."""
+    """ZIP, or the Office format whose parts it holds (names only, read one directory
+    record at a time; nothing is unpacked). A broken archive is nothing allowed."""
+    office: set[FileType] = set()
+    typed = False
     try:
-        file.seek(0)
-        with zipfile.ZipFile(file) as archive:
-            names = archive.namelist()
-    except (zipfile.BadZipFile, OSError, ValueError, EOFError):
+        found = archive.directory(file)
+        for raw in archive.entry_names(file, found, limit=None):
+            name = raw.decode("utf-8", "replace")
+            typed = typed or name == "[Content_Types].xml"
+            office.update(kind for prefix, kind in _OFFICE.items() if name.startswith(prefix))
+    except (AppError, OSError, ValueError):
         return None
-    if "[Content_Types].xml" in names:
-        for prefix, office in _OFFICE.items():
-            if any(name.startswith(prefix) for name in names):
-                return office
+    if typed:
+        for kind in _OFFICE.values():  # the first that fits, as before
+            if kind in office:
+                return kind
     return ZIP
 
 

@@ -1,7 +1,10 @@
 """Reading an uploaded ZIP without trusting it.
 
-- Entry count: read from the end-of-central-directory record before the directory is
-  parsed, so an archive with millions of entries is refused without building them.
+- Directory: nothing the archive declares about itself is trusted. The central
+  directory is located from the end record (zip64 included) and walked record by
+  record with bounded memory (`entry_names`); the walk stops at the entry limit, and a
+  directory whose records disagree with the declared count or size is no ZIP. Only
+  then does `zipfile` parse it, and only up to `MAX_DIRECTORY_BYTES`.
 - Size: the sum of the declared sizes is checked up front; reads are bounded too, and
   `zipfile` never yields more than an entry declares (a lie fails its CRC check).
 - Names: no absolute paths, drive letters, `..`, symlinks or other special files; the
@@ -13,16 +16,22 @@ import stat
 import struct
 import zipfile
 import zlib
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import IO
 
 from app.core.errors import AppError, ValidationFailed
 
 MAX_ENTRIES = 2000
 MAX_UNPACKED_BYTES = 200 * 1024 * 1024
+# What 2,000 ordinary records take with room to spare (about 150 bytes each in practice).
+MAX_DIRECTORY_BYTES = MAX_ENTRIES * 2048
 
 _EOCD = b"PK\x05\x06"
 _EOCD64_LOCATOR = b"PK\x06\x07"
 _EOCD64 = b"PK\x06\x06"
+_RECORD = b"PK\x01\x02"
+_RECORD_BYTES = 46
 _TAIL = 22 + 0xFFFF  # the record plus the longest comment
 
 
@@ -35,34 +44,74 @@ def invalid_zip() -> ValidationFailed:
     return ValidationFailed(code="import.invalid_zip")
 
 
-def declared_entries(file: IO[bytes]) -> int:
-    """The number of entries the archive's last end record states (zip64 included)."""
+@dataclass(frozen=True, slots=True)
+class Directory:
+    """Where the central directory is (`start`, `size` in bytes) and how many records
+    it claims to hold."""
+
+    start: int
+    size: int
+    entries: int
+
+
+def directory(file: IO[bytes]) -> Directory:
+    """The central directory as the last end record states it (zip64 included);
+    `invalid_zip` when there is none or it points outside the file."""
     file.seek(0, io.SEEK_END)
-    size = file.tell()
-    file.seek(max(0, size - _TAIL))
+    length = file.tell()
+    base = max(0, length - _TAIL)
+    file.seek(base)
     tail = file.read()
     at = tail.rfind(_EOCD)
     if at < 0 or len(tail) - at < 22:
         raise invalid_zip()
-    entries = struct.unpack("<H", tail[at + 10 : at + 12])[0]
-    if entries != 0xFFFF:
-        return int(entries)
-    locator = tail.rfind(_EOCD64_LOCATOR, 0, at)
-    if locator < 0 or at - locator < 20:
+    entries, size, _ = struct.unpack("<HLL", tail[at + 10 : at + 20])
+    end = base + at
+    if entries == 0xFFFF or size == 0xFFFFFFFF:
+        # zip64: the record sits right before its locator, which sits right before
+        # the end record (where `zipfile` looks for it as well).
+        if tail.rfind(_EOCD64_LOCATOR, 0, at) != at - 20 or end < 76:
+            raise invalid_zip()
+        file.seek(end - 76)
+        record = file.read(56)
+        if record[:4] != _EOCD64:
+            raise invalid_zip()
+        entries, size = struct.unpack("<QQ", record[32:48])
+        end -= 76
+    if size > end:
         raise invalid_zip()
-    offset = struct.unpack("<Q", tail[locator + 8 : locator + 16])[0]
-    file.seek(offset)
-    record = file.read(56)
-    if len(record) < 56 or record[:4] != _EOCD64:
+    return Directory(start=end - size, size=size, entries=int(entries))
+
+
+def entry_names(file: IO[bytes], found: Directory, limit: int | None) -> Iterator[bytes]:
+    """The raw name of each record of the central directory, read one record at a
+    time (memory stays flat whatever the directory holds). More than `limit` records
+    is `ArchiveTooLarge`; a record that is no record, or a directory whose records do
+    not fill it exactly or do not match its declared count, is `invalid_zip`."""
+    position, end, count = found.start, found.start + found.size, 0
+    while position < end:
+        file.seek(position)
+        header = file.read(_RECORD_BYTES)
+        if len(header) < _RECORD_BYTES or header[:4] != _RECORD:
+            raise invalid_zip()
+        count += 1
+        if limit is not None and count > limit:
+            raise ArchiveTooLarge()
+        name_len, extra_len, comment_len = struct.unpack("<HHH", header[28:34])
+        yield file.read(name_len)
+        position += _RECORD_BYTES + name_len + extra_len + comment_len
+    if position != end or count != found.entries:
         raise invalid_zip()
-    return int(struct.unpack("<Q", record[32:40])[0])
 
 
 def open_archive(file: IO[bytes]) -> zipfile.ZipFile:
-    """The archive, once its count and declared sizes are within the limits; 413
+    """The archive, once its directory and declared sizes are within the limits; 413
     `import.too_large` above them, 422 `import.invalid_zip` if it is no ZIP."""
-    if declared_entries(file) > MAX_ENTRIES:
+    found = directory(file)
+    if found.entries > MAX_ENTRIES or found.size > MAX_DIRECTORY_BYTES:
         raise ArchiveTooLarge()
+    for _ in entry_names(file, found, MAX_ENTRIES):
+        pass
     try:
         file.seek(0)
         archive = zipfile.ZipFile(file)
