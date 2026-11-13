@@ -57,10 +57,13 @@ function slow(...kinds) {
 }
 
 test("a page that takes too long to check is too large for live editing", async () => {
-  live = await liveFixture({ markdown: "Text", createCollabServer, checks: slow("open") });
+  const lines = [];
+  const log = (message, fields) => lines.push({ message, ...fields });
+  live = await liveFixture({ markdown: "Text", createCollabServer, checks: slow("open"), log });
   const anna = live.open({ cookie: "herd_session=token-a" });
   await until(() => anna.closes.includes(4413));
   assert.equal(live.api.saves.length, 0);
+  assert.equal(lines.find(({ message }) => message === "live check failed")?.reason, "timeout");
 });
 
 test("a state that takes too long to check is not stored; the notice says why", async () => {

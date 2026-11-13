@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { MAX_TABLE_CELLS, markdownTableCells } from "./cells.mjs";
-import { CheckFailed } from "./checks.mjs";
+import { CheckFailed, CheckTimedOut } from "./checks.mjs";
 import { documentEstimate, pageEstimate } from "./memory.mjs";
 import { CLOSE, deny } from "./protocol.mjs";
 
@@ -48,7 +48,9 @@ export function openRules({ api, log, checks, size, live, memory }) {
     const check = (work) =>
       work.catch((error) => {
         if (!(error instanceof CheckFailed)) throw error;
-        const reason = error.cause?.code ?? "check_failed"; // no message: no page text
+        // No message: no page text.
+        const reason =
+          error instanceof CheckTimedOut ? "timeout" : (error.cause?.code ?? "check_failed");
         log("live check failed", { page_id: context.pageId, reason });
         throw deny(context, CLOSE.tooLarge);
       });
