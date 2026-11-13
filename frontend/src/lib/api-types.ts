@@ -291,6 +291,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Assignments */
+        get: operations["get_assignments_api_ai_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/assignments/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Default Assignment */
+        put: operations["set_default_assignment_api_ai_assignments_default_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/assignments/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Group Assignments */
+        get: operations["list_group_assignments_api_ai_assignments_groups_get"];
+        /**
+         * Set Group Assignments
+         * @description Replace the ordered list (at most 100); names the version of `GET` (409).
+         */
+        put: operations["set_group_assignments_api_ai_assignments_groups_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/assignments/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Assignments */
+        get: operations["list_user_assignments_api_ai_assignments_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/assignments/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set User Assignment */
+        put: operations["set_user_assignment_api_ai_assignments_users__user_id__put"];
+        post?: never;
+        /**
+         * Remove User Assignment
+         * @description The person falls back to their groups' or the standard assignment.
+         */
+        delete: operations["remove_user_assignment_api_ai_assignments_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/connections": {
         parameters: {
             query?: never;
@@ -1512,7 +1605,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "ai.use";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -1606,6 +1699,15 @@ export interface components {
              * @constant
              */
             type: "user";
+        };
+        /**
+         * AssignmentsOut
+         * @description The standard assignment; `version` guards it and the group list.
+         */
+        AssignmentsOut: {
+            default: components["schemas"]["TargetOut"] | null;
+            /** Version */
+            version: number;
         };
         /**
          * AttachmentOut
@@ -1944,6 +2046,15 @@ export interface components {
          */
         DataLocation: "local" | "eu" | "external";
         /**
+         * DefaultIn
+         * @description `target: null`: no standard, so only people and groups with an assignment have AI.
+         */
+        DefaultIn: {
+            target: components["schemas"]["TargetIn"] | null;
+            /** Version */
+            version: number;
+        };
+        /**
          * DiffOut
          * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
          *     followed by an `insert`.
@@ -2072,12 +2183,40 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** GroupAssignmentOut */
+        GroupAssignmentOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Position */
+            position: number;
+            target: components["schemas"]["TargetOut"];
+        };
         /** GroupCreate */
         GroupCreate: {
             /** Description */
             description?: string | null;
             /** Name */
             name: string;
+        };
+        /** GroupItemIn */
+        GroupItemIn: {
+            /**
+             * Connection Id
+             * Format: uuid
+             */
+            connection_id: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Model */
+            model: string;
         };
         /**
          * GroupMemberIn
@@ -2129,6 +2268,16 @@ export interface components {
             description?: string | null;
             /** Name */
             name?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * GroupsIn
+         * @description The whole ordered list; for a person in several groups the first one wins.
+         */
+        GroupsIn: {
+            /** Items */
+            items: components["schemas"]["GroupItemIn"][];
             /** Version */
             version: number;
         };
@@ -2304,8 +2453,12 @@ export interface components {
          * MeOut
          * @description `permissions`: the system-wide actions the caller holds; clients decide what to
          *     show from these (and from a space's `my_role`), never from the role's name.
+         *     `ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives
+         *     them (nothing else about the connection); null without.
          */
         MeOut: {
+            /** Ai Model */
+            ai_model: string | null;
             org: components["schemas"]["OrgOut"];
             /** Permissions */
             permissions: components["schemas"]["Action"][];
@@ -2684,6 +2837,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[GroupAssignmentOut] */
+        Page_GroupAssignmentOut_: {
+            /** Items */
+            items: components["schemas"]["GroupAssignmentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[GroupMemberOut] */
         Page_GroupMemberOut_: {
             /** Items */
@@ -2772,6 +2932,13 @@ export interface components {
         Page_UnreadOut_: {
             /** Items */
             items: components["schemas"]["UnreadOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[UserAssignmentOut] */
+        Page_UserAssignmentOut_: {
+            /** Items */
+            items: components["schemas"]["UserAssignmentOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3205,6 +3372,31 @@ export interface components {
             version: number;
         };
         /**
+         * TargetIn
+         * @description A chat connection and one of its models (route names for the b-api).
+         */
+        TargetIn: {
+            /**
+             * Connection Id
+             * Format: uuid
+             */
+            connection_id: string;
+            /** Model */
+            model: string;
+        };
+        /** TargetOut */
+        TargetOut: {
+            /**
+             * Connection Id
+             * Format: uuid
+             */
+            connection_id: string;
+            /** Connection Name */
+            connection_name: string;
+            /** Model */
+            model: string;
+        };
+        /**
          * TicketCountsOut
          * @description For the sidebar: the caller's tickets that are open, active or in review.
          */
@@ -3470,6 +3662,36 @@ export interface components {
             mentions: number;
             /** Unread */
             unread: number;
+        };
+        /**
+         * UserAssignmentIn
+         * @description A connection and model, or `no_ai: true`. `version`: the one read, or null to
+         *     create (409 if the person has one meanwhile).
+         */
+        UserAssignmentIn: {
+            /**
+             * No Ai
+             * @default false
+             */
+            no_ai?: boolean;
+            target?: components["schemas"]["TargetIn"] | null;
+            /** Version */
+            version: number | null;
+        };
+        /** UserAssignmentOut */
+        UserAssignmentOut: {
+            /** No Ai */
+            no_ai: boolean;
+            target: components["schemas"]["TargetOut"] | null;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** User Name */
+            user_name: string;
+            /** Version */
+            version: number;
         };
         /** UserCreate */
         UserCreate: {
@@ -4290,6 +4512,222 @@ export interface operations {
     reactivate_user_api_admin_users__user_id__reactivate_post: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_assignments_api_ai_assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentsOut"];
+                };
+            };
+        };
+    };
+    set_default_assignment_api_ai_assignments_default_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefaultIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_group_assignments_api_ai_assignments_groups_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_GroupAssignmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_group_assignments_api_ai_assignments_groups_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_assignments_api_ai_assignments_users_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_UserAssignmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_assignment_api_ai_assignments_users__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAssignmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAssignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_user_assignment_api_ai_assignments_users__user_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
             header?: never;
             path: {
                 user_id: string;

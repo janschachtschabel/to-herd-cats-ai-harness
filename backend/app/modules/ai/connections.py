@@ -24,6 +24,7 @@ from app.core.errors import AppError, Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.ai import provider
 from app.modules.ai.access import require_ai
+from app.modules.ai.assignment_repository import AssignmentRepository
 from app.modules.ai.models import (
     DEFAULT_BASE_URL,
     DEFAULT_MODEL,
@@ -145,6 +146,8 @@ class ConnectionService:
         await require_ai(self.session, actor, Action.AI_MANAGE)
         repo = self.repo(actor)
         connection = await self._current(repo, connection_id, version)
+        if await AssignmentRepository(self.session, actor.org_id).connection_in_use(connection.id):
+            raise Conflict(code="ai.connection_in_use")
         details = {"name": connection.name}
         await repo.delete(connection)
         await self._audit(actor, "ai_connection.deleted", connection, details)

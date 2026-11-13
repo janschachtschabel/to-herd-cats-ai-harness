@@ -1,4 +1,4 @@
-"""AI connections (spec 7.1): the providers an organisation's admins set up.
+"""AI connections (spec 7.1) and who uses which (spec 7.2).
 
 `secret_ref` is a reference (`env:HERD_AI_*` or `enc:<token>`, `core/secrets.py`), never
 the key itself; NULL for a provider that needs none (a local server). `models` are the
@@ -7,11 +7,21 @@ the connection's standard model. `kind` decides the egress rules (`local`: http 
 private addresses) and whether calls may stream (`b_api`: never).
 """
 
+import uuid
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
@@ -83,4 +93,62 @@ class AiConnection(UuidPk, OrgScoped, Timestamps, Base):
     purpose: Mapped[Purpose] = mapped_column(String(16), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Bumped by every write; a write names the version it read (409).
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class OrgAssignment(Base):
+    """The organisation's standard assignment (spec 7.2): a chat connection and a model,
+    or none (then nobody has AI until an admin assigns some). `version` also guards
+    the ordered list of group assignments, which is replaced as a whole."""
+
+    __tablename__ = "ai_org_assignment"
+    __table_args__ = (CheckConstraint("(connection_id IS NULL) = (model IS NULL)", name="target"),)
+
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("organization.id", ondelete="CASCADE"), primary_key=True
+    )
+    connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT"), index=True
+    )
+    model: Mapped[str | None] = mapped_column(String(MAX_MODEL_CHARS))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class GroupAssignment(OrgScoped, Base):
+    """A group's assignment; for a person in several groups the lowest `position`
+    wins."""
+
+    __tablename__ = "ai_group_assignment"
+    __table_args__ = (UniqueConstraint("org_id", "position"),)
+
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("user_group.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ai_connection.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    model: Mapped[str] = mapped_column(String(MAX_MODEL_CHARS), nullable=False)
+
+
+class UserAssignment(OrgScoped, Base):
+    """A person's own assignment: a connection and a model, or expressly no AI."""
+
+    __tablename__ = "ai_user_assignment"
+    __table_args__ = (
+        CheckConstraint("(connection_id IS NULL) = (model IS NULL)", name="target"),
+        CheckConstraint("no_ai = (connection_id IS NULL)", name="no_ai"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True
+    )
+    no_ai: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT"), index=True
+    )
+    model: Mapped[str | None] = mapped_column(String(MAX_MODEL_CHARS))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

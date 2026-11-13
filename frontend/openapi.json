@@ -24,7 +24,8 @@
           "page.purge",
           "tag.manage",
           "dm.inspect",
-          "ai.manage"
+          "ai.manage",
+          "ai.use"
         ],
         "title": "Action",
         "type": "string"
@@ -249,6 +250,31 @@
           "id"
         ],
         "title": "AssigneeIn",
+        "type": "object"
+      },
+      "AssignmentsOut": {
+        "description": "The standard assignment; `version` guards it and the group list.",
+        "properties": {
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "default",
+          "version"
+        ],
+        "title": "AssignmentsOut",
         "type": "object"
       },
       "AttachmentOut": {
@@ -1149,6 +1175,32 @@
         "title": "DataLocation",
         "type": "string"
       },
+      "DefaultIn": {
+        "additionalProperties": false,
+        "description": "`target: null`: no standard, so only people and groups with an assignment have AI.",
+        "properties": {
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "target",
+          "version"
+        ],
+        "title": "DefaultIn",
+        "type": "object"
+      },
       "DiffOut": {
         "description": "Line by line from `from_number` to `to_number`; a changed line is a `delete`\nfollowed by an `insert`.",
         "properties": {
@@ -1493,6 +1545,34 @@
         "title": "EpicOut",
         "type": "object"
       },
+      "GroupAssignmentOut": {
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetOut"
+          }
+        },
+        "required": [
+          "group_id",
+          "group_name",
+          "position",
+          "target"
+        ],
+        "title": "GroupAssignmentOut",
+        "type": "object"
+      },
       "GroupCreate": {
         "properties": {
           "description": {
@@ -1518,6 +1598,34 @@
           "name"
         ],
         "title": "GroupCreate",
+        "type": "object"
+      },
+      "GroupItemIn": {
+        "additionalProperties": false,
+        "properties": {
+          "connection_id": {
+            "format": "uuid",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "connection_id",
+          "model"
+        ],
+        "title": "GroupItemIn",
         "type": "object"
       },
       "GroupMemberIn": {
@@ -1638,6 +1746,30 @@
           "version"
         ],
         "title": "GroupUpdateIn",
+        "type": "object"
+      },
+      "GroupsIn": {
+        "additionalProperties": false,
+        "description": "The whole ordered list; for a person in several groups the first one wins.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupItemIn"
+            },
+            "maxItems": 100,
+            "title": "Items",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "version"
+        ],
+        "title": "GroupsIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1984,8 +2116,19 @@
         "type": "object"
       },
       "MeOut": {
-        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.",
+        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without.",
         "properties": {
+          "ai_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Model"
+          },
           "org": {
             "$ref": "#/components/schemas/OrgOut"
           },
@@ -2003,7 +2146,8 @@
         "required": [
           "user",
           "org",
-          "permissions"
+          "permissions",
+          "ai_model"
         ],
         "title": "MeOut",
         "type": "object"
@@ -3045,6 +3189,33 @@
         "title": "Page[EpicOut]",
         "type": "object"
       },
+      "Page_GroupAssignmentOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupAssignmentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[GroupAssignmentOut]",
+        "type": "object"
+      },
       "Page_GroupMemberOut_": {
         "properties": {
           "items": {
@@ -3394,6 +3565,33 @@
           "items"
         ],
         "title": "Page[UnreadOut]",
+        "type": "object"
+      },
+      "Page_UserAssignmentOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserAssignmentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[UserAssignmentOut]",
         "type": "object"
       },
       "Page_UserOut_": {
@@ -4481,6 +4679,53 @@
         "title": "TagsSet",
         "type": "object"
       },
+      "TargetIn": {
+        "additionalProperties": false,
+        "description": "A chat connection and one of its models (route names for the b-api).",
+        "properties": {
+          "connection_id": {
+            "format": "uuid",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "model"
+        ],
+        "title": "TargetIn",
+        "type": "object"
+      },
+      "TargetOut": {
+        "properties": {
+          "connection_id": {
+            "format": "uuid",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "connection_name": {
+            "title": "Connection Name",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "connection_name",
+          "model"
+        ],
+        "title": "TargetOut",
+        "type": "object"
+      },
       "TicketCountsOut": {
         "description": "For the sidebar: the caller's tickets that are open, active or in review.",
         "properties": {
@@ -5145,6 +5390,83 @@
           "mentions"
         ],
         "title": "UnreadOut",
+        "type": "object"
+      },
+      "UserAssignmentIn": {
+        "additionalProperties": false,
+        "description": "A connection and model, or `no_ai: true`. `version`: the one read, or null to\ncreate (409 if the person has one meanwhile).",
+        "properties": {
+          "no_ai": {
+            "default": false,
+            "title": "No Ai",
+            "type": "boolean"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "UserAssignmentIn",
+        "type": "object"
+      },
+      "UserAssignmentOut": {
+        "properties": {
+          "no_ai": {
+            "title": "No Ai",
+            "type": "boolean"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "user_name": {
+            "title": "User Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "user_name",
+          "no_ai",
+          "target",
+          "version"
+        ],
+        "title": "UserAssignmentOut",
         "type": "object"
       },
       "UserCreate": {
@@ -6666,6 +6988,327 @@
         "summary": "Reactivate User",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/ai/assignments": {
+      "get": {
+        "operationId": "get_assignments_api_ai_assignments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Assignments",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/assignments/default": {
+      "put": {
+        "operationId": "set_default_assignment_api_ai_assignments_default_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Default Assignment",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/assignments/groups": {
+      "get": {
+        "operationId": "list_group_assignments_api_ai_assignments_groups_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GroupAssignmentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Group Assignments",
+        "tags": [
+          "ai"
+        ]
+      },
+      "put": {
+        "description": "Replace the ordered list (at most 100); names the version of `GET` (409).",
+        "operationId": "set_group_assignments_api_ai_assignments_groups_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Group Assignments",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/assignments/users": {
+      "get": {
+        "operationId": "list_user_assignments_api_ai_assignments_users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_UserAssignmentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List User Assignments",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/assignments/users/{user_id}": {
+      "delete": {
+        "description": "The person falls back to their groups' or the standard assignment.",
+        "operationId": "remove_user_assignment_api_ai_assignments_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove User Assignment",
+        "tags": [
+          "ai"
+        ]
+      },
+      "put": {
+        "operationId": "set_user_assignment_api_ai_assignments_users__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAssignmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAssignmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set User Assignment",
+        "tags": [
+          "ai"
         ]
       }
     },

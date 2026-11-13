@@ -31,6 +31,7 @@ class Action(StrEnum):
     TAG_MANAGE = "tag.manage"  # system-wide tags (space tags: `page.moderate`)
     DM_INSPECT = "dm.inspect"  # read others' direct messages: audited, with a reason, 60 min
     AI_MANAGE = "ai.manage"  # AI connections, assignments and usage (spec 7)
+    AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
 
 
 class SpaceRole(StrEnum):
@@ -91,10 +92,14 @@ SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
 # System roles that hold every right, in every space of their organisation (E4).
 ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADMIN})
 
+# System-wide actions no role grants: `access.can` derives them (`ai.use` from the
+# person's AI assignment, plan M5 decision 5).
+DERIVED_ACTIONS: frozenset[Action] = frozenset({Action.AI_USE})
+
 # System-wide actions per system role.
 SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {
-    SystemRole.OWNER: frozenset(Action),
-    SystemRole.ADMIN: frozenset(Action),
+    SystemRole.OWNER: frozenset(Action) - DERIVED_ACTIONS,
+    SystemRole.ADMIN: frozenset(Action) - DERIVED_ACTIONS,
     SystemRole.MEMBER: frozenset({Action.SPACE_CREATE, Action.DIRECTORY_READ}),
     SystemRole.GUEST: frozenset(),
 }

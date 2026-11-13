@@ -138,6 +138,7 @@ export function makeMe(permissions: Permission[], user: Partial<User> = {}): Me 
     user: makeUser({ email: 'me@example.com', name: 'Mia Muster', ...user }),
     org: { id: id(), name: 'Beispiel GmbH' },
     permissions,
+    ai_model: null,
   }
 }
 

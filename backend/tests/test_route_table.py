@@ -155,6 +155,13 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/ai/connections/{connection_id}", "ai"),
     ("POST", "/api/ai/connections/{connection_id}/test", "ai"),
     ("POST", "/api/ai/connections/{connection_id}/models", "ai"),
+    ("GET", "/api/ai/assignments", "ai"),
+    ("PUT", "/api/ai/assignments/default", "ai"),
+    ("GET", "/api/ai/assignments/groups", "ai"),
+    ("PUT", "/api/ai/assignments/groups", "ai"),
+    ("GET", "/api/ai/assignments/users", "ai"),
+    ("PUT", "/api/ai/assignments/users/{user_id}", "ai"),
+    ("DELETE", "/api/ai/assignments/users/{user_id}", "ai"),
 ]
 
 
@@ -176,7 +183,10 @@ def _concrete(
     message_id: object | None = None,
     status_id: object | None = None,
 ) -> str:
-    versioned_delete = template == "/api/ai/connections/{connection_id}"
+    versioned_delete = template in (
+        "/api/ai/connections/{connection_id}",
+        "/api/ai/assignments/users/{user_id}",
+    )
     ids = {
         "{message_id}": str(message_id or uuid7()),
         "{conversation_id}": str(conversation_id or uuid7()),
@@ -261,6 +271,9 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/ai/connections"): {"name": "X"},
     ("PATCH", "/api/ai/connections/{connection_id}"): {"name": "X", "version": 1},
     ("POST", "/api/ai/connections/{connection_id}/models"): {"version": 1},
+    ("PUT", "/api/ai/assignments/default"): {"target": None, "version": 1},
+    ("PUT", "/api/ai/assignments/groups"): {"items": [], "version": 1},
+    ("PUT", "/api/ai/assignments/users/{user_id}"): {"no_ai": True, "version": None},
 }
 
 

@@ -2,7 +2,9 @@
 is no other place that decides who may do what.
 
 - System admins and owners may do everything, in every space of their organisation.
-- System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`).
+- System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`), except the
+  derived ones (`DERIVED_ACTIONS`): `ai.use` holds whoever the AI assignment gives a
+  usable connection (`modules/ai/effective.py`); no role grants it.
 - Inside a space the effective role decides: the highest of the actor's direct role
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
@@ -32,6 +34,7 @@ from app.core.actor import Actor
 from app.core.errors import Forbidden, NotFound, Unauthorized
 from app.core.permissions import (
     ADMIN_ROLES,
+    DERIVED_ACTIONS,
     OPEN_SPACE_FLOOR,
     OPEN_SPACE_READERS,
     SPACE_ACTION_MIN_ROLE,
@@ -39,6 +42,8 @@ from app.core.permissions import (
     Action,
     SpaceRole,
 )
+from app.core.principal import PrincipalType
+from app.modules.ai.effective import effective_assignment
 from app.modules.audit.models import ADMIN_ACCESS
 from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
@@ -92,7 +97,8 @@ async def system_permissions(session: AsyncSession, actor: Actor) -> list[Action
     role = (await AccessRepository(session).facts(actor, None)).system_role
     if role is None:
         return []
-    held = (a for a in SYSTEM_ROLE_ACTIONS[role] if a not in SPACE_ACTION_MIN_ROLE)
+    held = [a for a in SYSTEM_ROLE_ACTIONS[role] if a not in SPACE_ACTION_MIN_ROLE]
+    held += [a for a in sorted(DERIVED_ACTIONS) if await _derived(session, actor, a)]
     return sorted(held, key=lambda a: a.value)
 
 
@@ -111,6 +117,8 @@ async def my_roles(
 async def can(
     session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID | None = None
 ) -> bool:
+    if action in DERIVED_ACTIONS:
+        return await _derived(session, actor, action)
     if action in SPACE_ACTION_MIN_ROLE and space_id is None:
         return False
     scoped = space_id if action in SPACE_ACTION_MIN_ROLE else None
@@ -121,6 +129,10 @@ async def require(
     session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID | None = None
 ) -> None:
     """Raise unless the actor may do `action` (in the space, if given)."""
+    if action in DERIVED_ACTIONS:
+        if not await _derived(session, actor, action):
+            raise Forbidden(code="auth.permission_denied")
+        return
     facts = await AccessRepository(session).facts(actor, space_id)
     if space_id is not None and not facts.readable:
         raise NotFound(code="space.not_found")
@@ -129,6 +141,15 @@ async def require(
     if space_id is not None and facts.kind is not None and _by_admin_power(facts):
         if first_time(session, (ADMIN_ACCESS, actor.principal, space_id)):
             await record_admin_access(session, actor, space_id, facts.kind)
+
+
+async def _derived(session: AsyncSession, actor: Actor, action: Action) -> bool:
+    """`ai.use`: a person whose assignment gives a usable connection (active, no
+    guest: `effective.judge` reads both afresh)."""
+    assert action == Action.AI_USE
+    if actor.principal.type != PrincipalType.USER:
+        return False
+    return await effective_assignment(session, actor.org_id, actor.principal.id) is not None
 
 
 def _by_admin_power(facts: AccessFacts) -> bool:

@@ -86,4 +86,5 @@ async def _me(ctx: AuthContext, session: SessionDep, settings: SettingsDep) -> M
         user=UserOut.model_validate(ctx.user),
         org=OrgOut.model_validate(await service.organization(ctx)),
         permissions=await service.permissions(ctx),
+        ai_model=await service.ai_model(ctx),
     )

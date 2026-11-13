@@ -12,8 +12,11 @@ class LoginRequest(BaseModel):
 
 class MeOut(BaseModel):
     """`permissions`: the system-wide actions the caller holds; clients decide what to
-    show from these (and from a space's `my_role`), never from the role's name."""
+    show from these (and from a space's `my_role`), never from the role's name.
+    `ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives
+    them (nothing else about the connection); null without."""
 
     user: UserOut
     org: OrgOut
     permissions: list[Action]
+    ai_model: str | None

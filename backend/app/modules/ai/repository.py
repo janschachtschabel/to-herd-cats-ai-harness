@@ -26,6 +26,17 @@ class ConnectionRepository:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         return await self.session.scalar(stmt)
 
+    async def get_shared(self, connection_id: uuid.UUID) -> AiConnection | None:
+        """The connection, locked shared until the transaction ends: whoever assigns it
+        holds it against a concurrent deletion (which locks it exclusively)."""
+        stmt = (
+            select(AiConnection)
+            .where(AiConnection.org_id == self.org_id, AiConnection.id == connection_id)
+            .with_for_update(read=True)
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
     async def page(self, after: uuid.UUID | None, limit: int) -> list[AiConnection]:
         stmt = (
             select(AiConnection)

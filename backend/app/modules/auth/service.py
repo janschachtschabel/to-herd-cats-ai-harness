@@ -18,6 +18,7 @@ from app.core.security import (
     verify_against_dummy,
     verify_password_async,
 )
+from app.modules.ai.effective import effective_assignment
 from app.modules.auth.context import AuthContext
 from app.modules.auth.models import UserSession
 from app.modules.auth.repository import SessionRepository
@@ -134,6 +135,11 @@ class AuthService:
     async def permissions(self, ctx: AuthContext) -> list[Action]:
         """The system-wide actions the caller holds now."""
         return await system_permissions(self.session, await actor_for(self.session, ctx))
+
+    async def ai_model(self, ctx: AuthContext) -> str | None:
+        """The model of the caller's effective AI assignment, if they have `ai.use`."""
+        effective = await effective_assignment(self.session, ctx.org_id, ctx.user.id)
+        return effective.model if effective else None
 
 
 async def _verify(password_hash: str | None, password: str) -> bool:
