@@ -88,6 +88,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/conversations/{conversation_id}/unarchive", "conversation"),
     ("GET", "/api/conversations/{conversation_id}/messages", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/messages", "conversation"),
+    ("GET", "/api/messages/{message_id}", "message"),
     ("GET", "/api/messages/{message_id}/replies", "message"),
     ("PATCH", "/api/messages/{message_id}", "message"),
     ("DELETE", "/api/messages/{message_id}", "message"),

@@ -5886,6 +5886,48 @@
           "messaging"
         ]
       },
+      "get": {
+        "description": "One message (a thread's parent, a link to a message), for whoever sees its\nconversation; 404 `message.not_found` for anyone else.",
+        "operationId": "get_message_api_messages__message_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Message",
+        "tags": [
+          "messaging"
+        ]
+      },
       "patch": {
         "operationId": "edit_message_api_messages__message_id__patch",
         "parameters": [

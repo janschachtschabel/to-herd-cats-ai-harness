@@ -181,6 +181,15 @@ async def post_message(
     return await _written(session, actor, posted.message, posted.not_notified)
 
 
+@messages.get("/{message_id}", response_model=MessageOut)
+async def get_message(message_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> MessageOut:
+    """One message (a thread's parent, a link to a message), for whoever sees its
+    conversation; 404 `message.not_found` for anyone else."""
+    message, _ = await MessageService(session).readable(actor, message_id)
+    (view,) = await message_views(session, actor, [message])
+    return MessageOut.of(view)
+
+
 @messages.get("/{message_id}/replies", response_model=Page[MessageOut])
 async def list_replies(
     message_id: uuid.UUID,
