@@ -22,7 +22,7 @@ ingress:
   enabled: true
   className: nginx
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m  # imports up to HERD_IMPORT_MAX_BYTES (100 MiB), attachments 25 MiB
   hosts:
     - host: herd.example.com
       paths:
