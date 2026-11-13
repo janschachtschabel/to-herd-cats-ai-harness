@@ -176,17 +176,19 @@ function table(r) {
   const align = Array.from({ length: columns }, () =>
     r.pick([null, null, "left", "right", "center"]),
   );
-  const row = (type) => ({
+  // A row added in the editor (Tab in the last cell) has no alignment of its own until
+  // the editor gives it its columns' (review M2 T3): the save check reads it so.
+  const row = (type, added = false) => ({
     type: "tableRow",
     content: align.map((value) => ({
       type,
-      attrs: { align: value },
+      attrs: { align: added ? null : value },
       content: [{ type: "tableParagraph", content: inline(r, { breaks: false }).map(cellSafe) }],
     })),
   });
   const rows = [row("tableHeader")];
   const body = r.int(0, 3);
-  for (let i = 0; i < body; i++) rows.push(row("tableCell"));
+  for (let i = 0; i < body; i++) rows.push(row("tableCell", r.chance(0.2)));
   return { type: "table", content: rows };
 }
 

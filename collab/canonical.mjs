@@ -139,7 +139,10 @@ export function retidy(list) {
   return runs(tidy(out));
 }
 
-function cell(node, header) {
+const EMPTY_CELL = { content: [{ type: "tableParagraph" }] };
+
+/** A cell; its alignment is its column's (`align`, the header cell's). */
+function cell(node, header, align) {
   const attrs = node.attrs ?? {};
   const paragraphs = (node.content ?? []).map((child) => ({
     type: child.type,
@@ -147,7 +150,7 @@ function cell(node, header) {
   }));
   return {
     type: header ? "tableHeader" : "tableCell",
-    align: attrs.align ?? null,
+    align,
     colspan: attrs.colspan ?? 1,
     rowspan: attrs.rowspan ?? 1,
     content: paragraphs,
@@ -203,14 +206,24 @@ export function blockOf(node) {
       return { type: node.type, content: (node.content ?? []).map(blockOf) };
     case "orderedList":
       return { type: node.type, start: attrs.start ?? 1, content: node.content.map(blockOf) };
-    case "table":
+    case "table": {
+      // As wide as its widest row (the page view shows as many cells as the header
+      // has, review M2 T10); a column has one alignment, the header cell's (review M2
+      // T3: a row added in the editor has none of its own).
+      const rows = node.content ?? [];
+      const width = Math.max(0, ...rows.map((row) => (row.content ?? []).length));
+      const header = rows[0]?.content ?? [];
+      const align = (column) => header[column]?.attrs?.align ?? null;
       return {
         type: "table",
-        content: (node.content ?? []).map((row, index) => ({
+        content: rows.map((row, index) => ({
           type: row.type,
-          content: (row.content ?? []).map((child) => cell(child, index === 0)),
+          content: Array.from({ length: width }, (_, column) =>
+            cell(row.content?.[column] ?? EMPTY_CELL, index === 0, align(column)),
+          ),
         })),
       };
+    }
     default:
       return { type: node.type, attrs, content: (node.content ?? []).map(blockOf) };
   }

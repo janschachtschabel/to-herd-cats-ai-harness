@@ -39,3 +39,7 @@ declare module '@collab/editor.mjs' {
   export function markInput(editor: Editor): void
   export function hadInput(editor: Editor): boolean
 }
+
+declare module '@collab/tables.mjs' {
+  export function flattenTableSpans<T extends ParentNode>(root: T): T
+}

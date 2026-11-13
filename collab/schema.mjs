@@ -2,11 +2,11 @@
 // process, so both use the same schema. Plain ESM, depends only on Tiptap packages.
 //
 // The schema holds only what Markdown can say (review M2 S2): images are inline, as in
-// Markdown; a table cell holds one line of text (`tableParagraph`: no blocks, no hard
-// breaks); a heading has no hard breaks; code may carry a link or emphasis
+// Markdown; tables as GFM has them (`tables.mjs`: a cell holds one line of text, no
+// merged cells, one alignment per column); a heading has no hard breaks; code may carry a link or emphasis
 // (`` [`a`](b) ``, `` **`a`** ``). Markdown is read and written by `parse.mjs` and
 // `serialize.mjs`, not by Tiptap's Markdown support.
-import { InputRule, Node } from "@tiptap/core";
+import { InputRule } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { ySyncPluginKey } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
@@ -15,8 +15,8 @@ import CodeBlock from "@tiptap/extension-code-block";
 import Heading from "@tiptap/extension-heading";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
-import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { tableExtensions } from "./tables.mjs";
 
 export const RAW_MARKDOWN = "raw-markdown";
 // The Y.Doc binding's plugin key: every transaction the binding makes carries its meta.
@@ -34,17 +34,6 @@ export function allowedUri(url) {
 }
 
 const LINE = "(text | image)*"; // inline content without hard breaks
-
-/** The one line of text of a table cell (GFM cells hold inline content only). */
-const TableParagraph = Node.create({
-  name: "tableParagraph",
-  content: LINE,
-  parseHTML: () => [
-    { tag: "p", context: "tableCell/", priority: 60 },
-    { tag: "p", context: "tableHeader/", priority: 60 },
-  ],
-  renderHTML: () => ["p", 0],
-});
 
 // `![alt](src)` or `![alt](src "title")` just typed (Tiptap's image rule).
 const TYPED_IMAGE = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
@@ -120,11 +109,7 @@ export function extensions() {
     // Inline, as in Markdown: an image may stand in a sentence, a cell, a list item or a
     // heading; as a block node the browser would delete such a paragraph (review M2 S1).
     MarkdownImage.configure({ inline: true }),
-    Table.configure({ resizable: false }),
-    TableRow,
-    TableHeader.extend({ content: "tableParagraph" }),
-    TableCell.extend({ content: "tableParagraph" }),
-    TableParagraph,
+    ...tableExtensions(),
     TaskList,
     TaskItem.configure({ nested: true }),
   ];

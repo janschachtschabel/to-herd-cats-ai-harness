@@ -21,7 +21,38 @@ const code = (value, language = "bash") => ({
 });
 const link = (href) => ({ type: "link", attrs: { href } });
 
+const cellOf = (type, align, value) => ({
+  type,
+  attrs: { align },
+  content: [{ type: "tableParagraph", content: value ? [text(value)] : [] }],
+});
+const rowOf = (type, aligns, ...values) => ({
+  type: "tableRow",
+  content: values.map((value, column) => cellOf(type, aligns[column] ?? null, value)),
+});
+
 const CASES = {
+  // Tab in the last cell adds a row whose cells carry no alignment (review M2 T3): the
+  // alignment is the column's.
+  "a row added to a table with an aligned column": [
+    doc({
+      type: "table",
+      content: [
+        rowOf("tableHeader", [null, "right"], "Name", "Wert"),
+        rowOf("tableCell", [null, "right"], "a", "1"),
+        rowOf("tableCell", [], "b", "2"),
+      ],
+    }),
+    "| Name | Wert |\n| --- | --: |\n| a | 1 |\n| b | 2 |",
+  ],
+  // The page view shows as many cells as the header has (review M2 T10).
+  "a row longer than the header": [
+    doc({
+      type: "table",
+      content: [rowOf("tableHeader", [], "a"), rowOf("tableCell", [], "1", "2")],
+    }),
+    "| a |  |\n| --- | --- |\n| 1 | 2 |",
+  ],
   "bold and italic overlapping": [
     doc(
       paragraph(text("fett ", "bold"), text("beides", "bold", "italic"), text(" kursiv", "italic")),
