@@ -23,3 +23,5 @@
 **/*.test.ts
 **/*.test.tsx
 frontend/src/test/
+**/*.test-helper.ts
+**/*.test-helper.tsx
