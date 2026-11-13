@@ -1,7 +1,10 @@
 """`LISTEN` on one Postgres channel over a connection of its own, outside the pool.
 
 The connection is held for the life of the process; it is checked every
-PING_SECONDS and opened again after a loss, with a growing wait. `on_connect` runs
+PING_SECONDS and opened again after a loss. The wait before the next attempt grows
+(1 s, 2 s, ... up to MAX_WAIT_SECONDS) only while attempts fail; once a connection
+listens again it is back at FIRST_WAIT_SECONDS, so every loss after a healthy
+connection costs about a second. `on_connect` runs
 after every (re)connect: notifications sent while no connection listened are lost,
 so the owner catches up there. Errors are logged by type only (asyncpg's messages
 may quote the connection string).
@@ -19,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 PING_SECONDS = 30.0
 PING_TIMEOUT_SECONDS = 5.0
+FIRST_WAIT_SECONDS = 1.0
 MAX_WAIT_SECONDS = 30.0
 
 
@@ -40,14 +44,14 @@ class Listener:
         self.on_notify = on_notify
         self.on_connect = on_connect
         self.connected = False
+        self._wait = FIRST_WAIT_SECONDS
 
     async def run(self, stop: asyncio.Event) -> None:
         """Listen until `stop` is set."""
-        wait = 1.0
+        self._wait = FIRST_WAIT_SECONDS
         while not stop.is_set():
             try:
                 await self._listen(stop)
-                wait = 1.0
             except Exception as exc:
                 logger.warning(
                     "listen.connection_lost",
@@ -57,8 +61,8 @@ class Listener:
                 self.connected = False
             if not stop.is_set():
                 with suppress(TimeoutError):
-                    await asyncio.wait_for(stop.wait(), timeout=wait)
-                wait = min(wait * 2, MAX_WAIT_SECONDS)
+                    await asyncio.wait_for(stop.wait(), timeout=self._wait)
+                self._wait = min(self._wait * 2, MAX_WAIT_SECONDS)
 
     async def _listen(self, stop: asyncio.Event) -> None:
         connection = await asyncpg.connect(asyncpg_dsn(self.url))
@@ -69,6 +73,7 @@ class Listener:
                 self.channel, lambda _connection, _pid, _channel, payload: self.on_notify(payload)
             )
             self.connected = True
+            self._wait = FIRST_WAIT_SECONDS  # this connection works: start the waits anew
             if self.on_connect is not None:
                 self.on_connect()
             while not stop.is_set() and not lost.is_set():

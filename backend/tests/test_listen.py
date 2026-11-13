@@ -45,3 +45,30 @@ async def test_listener_receives_and_comes_back_after_a_lost_connection() -> Non
         await asyncio.wait_for(task, timeout=10)
         await other.close()
     assert listener.connected is False
+
+
+async def test_every_loss_after_a_healthy_connection_reconnects_after_the_first_wait() -> None:
+    """The wait grows only while connecting fails; a connection that listened resets
+    it, so the fifth loss in a row costs about a second like the first (review N2)."""
+    url = make_url(get_settings().test_database_url)
+    connects: list[float] = []
+    loop = asyncio.get_running_loop()
+    listener = Listener(url, CHANNEL, lambda _payload: None, lambda: connects.append(loop.time()))
+    stop = asyncio.Event()
+    task = asyncio.create_task(listener.run(stop))
+    other = await asyncpg.connect(asyncpg_dsn(url))
+    try:
+        await _until(lambda: listener.connected and connects)
+        for loss in range(1, 6):
+            lost_at = loop.time()
+            await other.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                " WHERE pid <> pg_backend_pid() AND query = $1",
+                f'LISTEN "{CHANNEL}"',
+            )
+            await _until(lambda n=loss: len(connects) == n + 1 and listener.connected, 15.0)
+            assert connects[-1] - lost_at < 2.5, f"loss {loss}: {connects[-1] - lost_at:.1f} s"
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, timeout=10)
+        await other.close()
