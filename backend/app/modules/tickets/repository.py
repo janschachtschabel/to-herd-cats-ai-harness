@@ -282,6 +282,10 @@ class TicketRepository:
         if f.epic_id is not None:
             stories = select(WorkItem.id).where(WorkItem.parent_id == f.epic_id)
             stmt = stmt.where(or_(WorkItem.parent_id == f.epic_id, WorkItem.parent_id.in_(stories)))
+        if f.sprint_id is not None:
+            stmt = stmt.where(WorkItem.sprint_id == f.sprint_id)
+        if f.backlog:
+            stmt = stmt.where(WorkItem.sprint_id.is_(None))
         for tag_id in f.tag_ids:  # every one of them
             stmt = stmt.where(WorkItem.id.in_(_tagged(tag_id)))
         if f.q is not None:

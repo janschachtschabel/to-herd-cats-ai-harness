@@ -24,7 +24,13 @@ from app.modules.messaging.social_models import ConversationRead, MessageMention
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import Space, SpaceMember
 from app.modules.tags.models import Tag, Tagging
-from app.modules.tickets.models import TicketCounter, TicketPageLink, TicketStatus, WorkItem
+from app.modules.tickets.models import (
+    Sprint,
+    TicketCounter,
+    TicketPageLink,
+    TicketStatus,
+    WorkItem,
+)
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
@@ -57,6 +63,7 @@ __all__ = [
     "Reaction",
     "Space",
     "SpaceMember",
+    "Sprint",
     "Tag",
     "Tagging",
     "TicketCounter",

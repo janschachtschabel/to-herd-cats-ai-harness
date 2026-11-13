@@ -14,6 +14,9 @@ workflow per space.
 - `work_item`: the ticket. Parent and child live in the same space, as do a ticket and
   its status: a database trigger refuses anything else. Tickets are never deleted on
   their own (cancelled is a status); they go with their space.
+- `sprint` (plan M4b): a time box of a space. At most one sprint per space is active
+  (a unique partial index); a ticket is in at most one sprint, always one of its own
+  space (a foreign key over sprint and space). A closed sprint keeps its tally.
 """
 
 import uuid
@@ -26,12 +29,14 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -46,6 +51,8 @@ MAX_STATUS_NAME_CHARS = 40
 MAX_TITLE_CHARS = 200
 MAX_DESCRIPTION_CHARS = 100_000
 MAX_TAGS = 20  # per ticket
+MAX_SPRINT_NAME_CHARS = 80
+MAX_SPRINT_GOAL_CHARS = 500
 
 
 def ticket_key(number: int) -> str:
@@ -80,6 +87,12 @@ class Priority(StrEnum):
     @property
     def rank(self) -> int:
         return list(Priority).index(self)
+
+
+class SprintState(StrEnum):
+    PLANNED = "planned"
+    ACTIVE = "active"
+    CLOSED = "closed"
 
 
 def _in(column: str, values: type[StrEnum]) -> str:
@@ -156,6 +169,13 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
         Index("ix_work_item_assignee", "assignee_type", "assignee_id"),
         Index("ix_work_item_parent_id", "parent_id"),
         Index("ix_work_item_search_tsv", "search_tsv", postgresql_using="gin"),
+        Index("ix_work_item_sprint_id", "sprint_id"),
+        # A ticket's sprint is one of its own space (plan M4b decision 1).
+        ForeignKeyConstraint(
+            ["sprint_id", "space_id"],
+            ["sprint.id", "sprint.space_id"],
+            name="fk_work_item_sprint_id_sprint",
+        ),
     )
 
     space_id: Mapped[uuid.UUID] = mapped_column(
@@ -178,6 +198,9 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
     reporter_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     # A day without time or zone (plan M4 decision 7).
     due_on: Mapped[date | None] = mapped_column(Date)
+    # The planned or active sprint it is in (or a closed one it was finished in);
+    # none: the backlog.
+    sprint_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     # Bumped by every change to the row; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     # Read only by the list's text filter and the search; deferred.
@@ -202,3 +225,47 @@ class TicketPageLink(OrgScoped, Base):
     linked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class Sprint(UuidPk, OrgScoped, Base):
+    """A time box of a space (plan M4b decision 2): planned, then active, then closed.
+    Closing it records its tally (decision 3): the tickets it held, those done, those
+    carried on to the next sprint or the backlog; null until then."""
+
+    __tablename__ = "sprint"
+    __table_args__ = (
+        CheckConstraint(_in("state", SprintState), name="state"),
+        CheckConstraint("ends_on >= starts_on", name="dates"),
+        CheckConstraint(
+            f"char_length(name) BETWEEN 1 AND {MAX_SPRINT_NAME_CHARS}", name="name_length"
+        ),
+        CheckConstraint(f"char_length(goal) <= {MAX_SPRINT_GOAL_CHARS}", name="goal_length"),
+        CheckConstraint(
+            "(state = 'closed') = (planned_count IS NOT NULL)"
+            " AND (planned_count IS NULL) = (done_count IS NULL)"
+            " AND (planned_count IS NULL) = (carried_count IS NULL)",
+            name="tally",
+        ),
+        UniqueConstraint("id", "space_id"),  # what a ticket's sprint refers to
+        Index("ix_sprint_space_id_state", "space_id", "state"),
+        Index(
+            "uq_sprint_space_id_active",
+            "space_id",
+            unique=True,
+            postgresql_where=text("state = 'active'"),
+        ),
+    )
+
+    space_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("space.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(MAX_SPRINT_NAME_CHARS), nullable=False)
+    goal: Mapped[str] = mapped_column(String(MAX_SPRINT_GOAL_CHARS), default="", nullable=False)
+    starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[date] = mapped_column(Date, nullable=False)
+    state: Mapped[SprintState] = mapped_column(String(16), nullable=False)
+    # Bumped by every change to the row; a write names the version it read (409).
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    planned_count: Mapped[int | None] = mapped_column(Integer)
+    done_count: Mapped[int | None] = mapped_column(Integer)
+    carried_count: Mapped[int | None] = mapped_column(Integer)

@@ -48,8 +48,8 @@ class TicketCreate(BaseModel):
 
 
 class TicketUpdate(BaseModel):
-    """Fields left out stay as they are; null clears `due_on`, `parent_id` and
-    `assignee` (the others cannot be null). Taking an unassigned ticket or letting go
+    """Fields left out stay as they are; null clears `due_on`, `parent_id`, `assignee`
+    and `sprint_id` (the others cannot be null). Taking an unassigned ticket or letting go
     of one's own needs `ticket.edit`; any other assignment `ticket.assign`."""
 
     model_config = ConfigDict(extra="forbid")
@@ -62,6 +62,9 @@ class TicketUpdate(BaseModel):
     due_on: date | None = None
     parent_id: uuid.UUID | None = None
     assignee: AssigneeIn | None = None
+    sprint_id: uuid.UUID | None = Field(
+        default=None, description="a planned or active sprint of the space; null: the backlog"
+    )
     version: int
 
     @field_validator("title", "description_md", "kind", "status_id", "priority")
@@ -130,6 +133,7 @@ class TicketSummaryOut(BaseModel):
     reporter: PersonOut
     due_on: date | None
     parent: ParentOut | None
+    sprint_id: uuid.UUID | None
     tags: list[TagOut]
     version: int
     created_at: datetime
@@ -162,6 +166,7 @@ class TicketSummaryOut(BaseModel):
             "reporter": PersonOut(type=t.reporter_type, id=t.reporter_id, name=view.reporter_name),
             "due_on": t.due_on,
             "parent": parent,
+            "sprint_id": t.sprint_id,
             "tags": [TagOut.of(tag) for tag in view.tags],
             "version": t.version,
             "created_at": t.created_at,

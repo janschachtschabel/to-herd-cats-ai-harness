@@ -31,6 +31,7 @@ tickets = APIRouter(prefix="/tickets", tags=["tickets"])
 ticket_threads = APIRouter(prefix="/tickets/{number}/thread", tags=["messaging"])
 
 PersonQuery = Annotated[str | None, Query(description="`me` or a person's id")]
+SprintQuery = Annotated[str | None, Query(description="a sprint's id, or `none`: the backlog")]
 TagQuery = Annotated[
     list[uuid.UUID] | None, Query(max_length=MAX_TAGS, description="only with every tag")
 ]
@@ -54,6 +55,19 @@ def person(value: str | None, actor: Actor, name: str) -> uuid.UUID | None:
         return uuid.UUID(value)
     except ValueError:
         raise ValidationFailed(f"{name}: `me` or an id", code="validation_failed") from None
+
+
+def sprint_filter(value: str | None) -> dict[str, Any]:
+    """The filters of a `sprint` parameter: a sprint's id, `none` (the backlog) or
+    nothing."""
+    if value is None:
+        return {}
+    if value == "none":
+        return {"backlog": True}
+    try:
+        return {"sprint_id": uuid.UUID(value)}
+    except ValueError:
+        raise ValidationFailed("sprint: `none` or an id", code="validation_failed") from None
 
 
 async def _full(session: AsyncSession, actor: Actor, view: TicketView) -> TicketOut:
@@ -96,6 +110,7 @@ async def list_tickets(
     q: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
     due_before: date | None = None,
     tag: TagQuery = None,
+    sprint: SprintQuery = None,
     sort: Sort = Sort.UPDATED,
 ) -> Page[TicketSummaryOut]:
     """The tickets of every space where the caller may read them."""
@@ -111,6 +126,7 @@ async def list_tickets(
         q=q,
         due_before=due_before,
         tag_ids=tuple(dict.fromkeys(tag or ())),
+        **sprint_filter(sprint),
     )
     page = await TicketService(session).list(actor, filters, sort, params)
     return Page[TicketSummaryOut](

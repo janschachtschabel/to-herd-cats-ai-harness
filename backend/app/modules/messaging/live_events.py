@@ -6,7 +6,8 @@ only, never content:
 
     {"t": <SSE event name>, "o": <org_id>, "c": <conversation_id|null>,
      "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>,
-     "w": <ticket_id>, "s": <space_id> (ticket events only)}
+     "w": <ticket_id>, "s": <space_id> (ticket events only),
+     "r": <sprint_id> (sprint events only, with "s")}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -14,7 +15,10 @@ see conversation `c` gets it (`dm.inspected`: a DM's participants, not the inspe
 administrator). Ticket events (`ticket.created`, `ticket.updated`) name the ticket's
 thread as `c`, so whoever may see the thread, that is whoever may read tickets in the
 ticket's space, gets them, the ticket as `w` and its space as `s` (a client refreshes
-that ticket and that space's lists only, review M4 P4). Every API process's hub
+that ticket and that space's lists only, review M4 P4). Sprint events
+(`sprint.created|updated|started|closed`, plan M4b) are one `sprint.changed` for the
+space `s`: whoever may read tickets there gets it, with the space's and the sprint's
+id (and nothing else). Every API process's hub
 (`live.py`) decodes it again; anything it cannot use is dropped. Payloads stay far
 below Postgres' 8000-byte limit (about 330 bytes).
 """
@@ -49,9 +53,15 @@ LIVE_TYPES: dict[str, str] = {
     "dm.inspected": "dm.inspected",
     "ticket.created": "ticket.created",
     "ticket.updated": "ticket.updated",
+    "sprint.created": "sprint.changed",
+    "sprint.updated": "sprint.changed",
+    "sprint.started": "sprint.changed",
+    "sprint.closed": "sprint.changed",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
+# Events for whoever may read tickets in the event's space (no conversation, no person).
+SPACE_TYPES = frozenset({"sprint.created", "sprint.updated", "sprint.started", "sprint.closed"})
 # Events for one person: the payload's `user_id` is who gets them.
 FOR_ONE_PERSON = frozenset(
     {"notification.created", "conversation.read", "activity.changed", "access.changed"}
@@ -67,7 +77,13 @@ class LiveEvent:
     parent_id: uuid.UUID | None
     user_id: uuid.UUID | None
     ticket_id: uuid.UUID | None = None
-    space_id: uuid.UUID | None = None  # ticket events only
+    space_id: uuid.UUID | None = None  # ticket and sprint events only
+    sprint_id: uuid.UUID | None = None  # sprint events only
+
+    @property
+    def for_space(self) -> bool:
+        """For the space's ticket readers: neither a conversation nor a person."""
+        return self.conversation_id is None and self.user_id is None and self.space_id is not None
 
     def payload(self) -> str:
         data = {
@@ -82,11 +98,18 @@ class LiveEvent:
             data["w"] = str(self.ticket_id)
         if self.space_id is not None:
             data["s"] = str(self.space_id)
+        if self.sprint_id is not None:
+            data["r"] = str(self.sprint_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
         """The server-sent event: its name and the ids a client reloads by (a ticket
-        event also `ticket_id` and `space_id`)."""
+        event also `ticket_id` and `space_id`; a sprint event only `space_id` and
+        `sprint_id`)."""
+        if self.for_space:
+            return sse_frame(
+                self.name, {"space_id": str(self.space_id), "sprint_id": _text(self.sprint_id)}
+            )
         data = {
             "conversation_id": _text(self.conversation_id),
             "message_id": _text(self.message_id),
@@ -114,6 +137,19 @@ def of_event(event: Event) -> LiveEvent | None:
         return None
     payload = event.payload
     ticket = event.type in TICKET_TYPES
+    if event.type in SPACE_TYPES:
+        if event.space_id is None:
+            return None
+        return LiveEvent(
+            name=name,
+            org_id=event.org_id,
+            conversation_id=None,
+            message_id=None,
+            parent_id=None,
+            user_id=None,
+            space_id=event.space_id,
+            sprint_id=_uuid(payload.get("sprint_id")),
+        )
     return LiveEvent(
         name=name,
         org_id=event.org_id,
@@ -148,13 +184,15 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        ids = {key: _strict_uuid(data.get(key)) for key in ("c", "m", "p", "u", "w", "s")}
+        ids = {key: _strict_uuid(data.get(key)) for key in ("c", "m", "p", "u", "w", "s", "r")}
         org_id = _strict_uuid(data.get("o"))
     except (ValueError, TypeError, RecursionError):
         return None
     if org_id is None:
         return None
-    return LiveEvent(data["t"], org_id, ids["c"], ids["m"], ids["p"], ids["u"], ids["w"], ids["s"])
+    return LiveEvent(
+        data["t"], org_id, ids["c"], ids["m"], ids["p"], ids["u"], ids["w"], ids["s"], ids["r"]
+    )
 
 
 def _strict_uuid(value: object) -> uuid.UUID | None:

@@ -37,6 +37,7 @@ export function makeTicketSummary(overrides: Partial<TicketSummary> = {}): Ticke
     reporter: { type: 'user', id: 'jan', name: 'Jan Jansen' },
     due_on: null,
     parent: null,
+    sprint_id: null,
     tags: [],
     version: 1,
     created_at: '2026-11-13T08:00:00Z',

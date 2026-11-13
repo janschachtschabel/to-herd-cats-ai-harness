@@ -34,6 +34,7 @@ from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
 from app.modules.tickets import link_router as ticket_links
 from app.modules.tickets import router as tickets
+from app.modules.tickets import sprint_router as ticket_sprints
 from app.modules.tickets import status_router as ticket_statuses
 from app.modules.tickets import view_router as ticket_views
 from app.modules.users.router import router as users_router
@@ -82,6 +83,8 @@ def api_router() -> APIRouter:
     api.include_router(ticket_links.page_tickets)
     api.include_router(ticket_statuses.space_statuses)
     api.include_router(ticket_statuses.statuses)
+    api.include_router(ticket_sprints.space_sprints)
+    api.include_router(ticket_sprints.sprints)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)

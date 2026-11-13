@@ -1,6 +1,8 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
-a space, page, conversation, message, ticket status or ticket without a role answers
-404 exactly like something that does not exist."""
+a space, page, conversation, message, ticket status, ticket or sprint without a role
+answers 404 exactly like something that does not exist."""
+
+from datetime import date
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -13,6 +15,7 @@ from app.modules.messaging.service import MessageService
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import TicketStatus
 from app.modules.tickets.service import TicketService
+from app.modules.tickets.sprints import SprintService
 from app.modules.users.models import User
 from app.modules.wiki.service import PageService
 from tests.route_table import BODIES, ROUTES, concrete
@@ -100,3 +103,24 @@ async def test_ticket_routes_hide_tickets_without_a_role(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == "ticket.not_found"
+
+
+async def test_sprint_routes_hide_sprints_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    sprint = await SprintService(session).create(
+        actor,
+        team_space.id,
+        name="Geheim",
+        goal="",
+        starts_on=date(2026, 11, 16),
+        ends_on=date(2026, 11, 27),
+    )
+    for method, template, guard in ROUTES:
+        if guard == "sprint":
+            path = concrete(template, sprint_id=sprint.id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "sprint.not_found"

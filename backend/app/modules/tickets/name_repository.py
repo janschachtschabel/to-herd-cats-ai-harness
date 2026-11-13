@@ -1,5 +1,5 @@
 """The names a ticket timeline entry shows for the ids it was written with (status
-names, parent keys), for the message views: only of the spaces where the reader may
+names, parent keys, sprint names), for the message views: only of the spaces where the reader may
 read tickets (`space_ids`), so an id of anything else is never named (review M4 P1)."""
 
 import uuid
@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.tickets.models import TicketStatus, WorkItem
+from app.modules.tickets.models import Sprint, TicketStatus, WorkItem
 
 
 class TicketNameRepository:
@@ -42,3 +42,15 @@ class TicketNameRepository:
             WorkItem.space_id.in_(self.space_ids),
         )
         return {row.id: row.number for row in await self.session.execute(stmt)}
+
+    async def sprint_names(self, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """The names of these sprints (one hidden has none)."""
+        wanted = list(set(ids))
+        if not wanted:
+            return {}
+        stmt = select(Sprint.id, Sprint.name).where(
+            Sprint.org_id == self.org_id,
+            Sprint.id.in_(wanted),
+            Sprint.space_id.in_(self.space_ids),
+        )
+        return {row.id: row.name for row in await self.session.execute(stmt)}

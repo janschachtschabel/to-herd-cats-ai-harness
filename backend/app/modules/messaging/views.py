@@ -1,9 +1,9 @@
 """Messages as their reader is shown them: with whom they mention, their reactions
 summed up (`mine` from the reader's side), the author's name, and a system message's
 timeline entry read from its body (a key with parameters, for the client to word),
-the ids in it named (people, ticket statuses, parent tickets, linked pages). For
-messages the reader has been allowed to see; at most six queries for a whole page. A
-linked page, a status or a ticket the reader cannot see (or that is gone) is left out:
+the ids in it named (people, ticket statuses, parent tickets, sprints, linked pages). For
+messages the reader has been allowed to see; at most seven queries for a whole page. A
+linked page, a status, a sprint or a ticket the reader cannot see (or that is gone) is left out:
 neither its name nor its id (review M4 P1; the raw body is never shown either, see
 `MessageOut`)."""
 
@@ -30,6 +30,7 @@ from app.modules.wiki.visibility import PageReader
 PERSON_KEYS = frozenset({"ticket.assigned", "ticket.unassigned"})
 STATUS_KEYS = frozenset({"ticket.status_changed"})
 TICKET_KEYS = frozenset({"ticket.parent_changed"})
+SPRINT_KEYS = frozenset({"ticket.sprint_changed"})
 PAGE_KEYS = frozenset({"ticket.page_linked", "ticket.page_unlinked"})
 
 
@@ -62,7 +63,8 @@ class _Names:
     people: dict[uuid.UUID, str]
     statuses: dict[uuid.UUID, str]
     tickets: dict[uuid.UUID, str]  # keys (`HC-12`)
-    pages: dict[uuid.UUID, str]  # these three: only those the reader sees
+    sprints: dict[uuid.UUID, str]
+    pages: dict[uuid.UUID, str]  # these four: only those the reader sees
 
     def of(self, key: str, value: object) -> SystemValue | None:
         if not isinstance(value, str):
@@ -70,7 +72,7 @@ class _Names:
         ref = _uuid(value)
         if key in PERSON_KEYS:
             return SystemValue(value=value, name=self.people.get(ref) if ref else None)
-        if key in PAGE_KEYS | STATUS_KEYS | TICKET_KEYS:  # named only where seen
+        if key in PAGE_KEYS | STATUS_KEYS | TICKET_KEYS | SPRINT_KEYS:  # named only where seen
             name = self._seen(key, ref) if ref is not None else None
             return SystemValue(value=value, name=name) if name is not None else None
         return SystemValue(value=value, name=None)
@@ -80,6 +82,8 @@ class _Names:
             return self.pages.get(ref)
         if key in STATUS_KEYS:
             return self.statuses.get(ref)
+        if key in SPRINT_KEYS:
+            return self.sprints.get(ref)
         return self.tickets.get(ref)
 
 
@@ -153,6 +157,7 @@ async def message_views(
         people=await UserRepository(session).names(actor.org_id, people),
         statuses=await tickets.status_names(_refs(present, STATUS_KEYS)),
         tickets={ref: hooks.key(number) for ref, number in numbers.items()},
+        sprints=await tickets.sprint_names(_refs(present, SPRINT_KEYS)),
         pages=await PageReader(session).titles(actor, _refs(present, PAGE_KEYS)),
     )
     return [

@@ -20,6 +20,8 @@ ship without a decision on who may call it. Guards:
   number nobody has.
 - `ticket_status`: a role in the status's space; otherwise 404
   `ticket_status.not_found`.
+- `sprint`: a role in the sprint's space; otherwise 404 `sprint.not_found`, as for an
+  id nobody has (plan M4b).
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
@@ -121,6 +123,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/spaces/{space_id}/ticket-statuses", "space"),
     ("PATCH", "/api/ticket-statuses/{status_id}", "ticket_status"),
     ("DELETE", "/api/ticket-statuses/{status_id}", "ticket_status"),
+    ("GET", "/api/spaces/{space_id}/sprints", "space"),
+    ("POST", "/api/spaces/{space_id}/sprints", "space"),
+    ("PATCH", "/api/sprints/{sprint_id}", "sprint"),
+    ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
+    ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
@@ -162,6 +169,7 @@ def concrete(
     conversation_id: object | None = None,
     message_id: object | None = None,
     status_id: object | None = None,
+    sprint_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -184,6 +192,7 @@ def concrete(
         "{notification_id}": str(uuid7()),
         "{status_id}": str(status_id or uuid7()),
         "{connection_id}": str(uuid7()),
+        "{sprint_id}": str(sprint_id or uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -228,6 +237,14 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PUT", "/api/tickets/{number}/tags"): {"tag_ids": [], "version": 1},
     ("POST", "/api/spaces/{space_id}/ticket-statuses"): {"name": "X", "category": "open"},
     ("PATCH", "/api/ticket-statuses/{status_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/spaces/{space_id}/sprints"): {
+        "name": "X",
+        "starts_on": "2026-11-16",
+        "ends_on": "2026-11-27",
+    },
+    ("PATCH", "/api/sprints/{sprint_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
+    ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},
     ("PATCH", "/api/ai/connections/{connection_id}"): {"name": "X", "version": 1},
     ("POST", "/api/ai/connections/{connection_id}/models"): {"version": 1},

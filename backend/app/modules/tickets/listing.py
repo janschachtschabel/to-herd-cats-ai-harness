@@ -49,6 +49,8 @@ class Filters:
     due_before: date | None = None
     tag_ids: tuple[uuid.UUID, ...] = ()  # tickets carrying every one of them
     epic_id: uuid.UUID | None = None  # an epic's children and their children
+    sprint_id: uuid.UUID | None = None
+    backlog: bool = False  # only tickets in no sprint
 
 
 @dataclass(frozen=True, slots=True)

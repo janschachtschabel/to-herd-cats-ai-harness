@@ -23,6 +23,8 @@ class TicketNames(Protocol):
 
     async def numbers(self, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, int]: ...
 
+    async def sprint_names(self, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]: ...
+
 
 class TicketHooks(Protocol):
     def number(
@@ -38,7 +40,7 @@ class TicketHooks(Protocol):
     def names(
         self, session: AsyncSession, org_id: uuid.UUID, space_ids: Select[uuid.UUID]
     ) -> TicketNames:
-        """Names of ticket statuses and keys, only within `space_ids`."""
+        """Names of ticket statuses, sprints and keys, only within `space_ids`."""
         ...
 
     async def people(

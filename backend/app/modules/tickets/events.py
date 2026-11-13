@@ -9,6 +9,10 @@ an event exists exactly when its change committed. One event per change:
   enumeration values or dates. Tags are only named.
   A title or description change is only named, never carried (plan M4 Global
   Constraints): payloads hold ids and enumeration values, never text.
+- `sprint.created`, `sprint.updated`, `sprint.started`, `sprint.closed` (plan M4b;
+  payload `sprint_id` and `fields`, the names of the fields that changed); subject:
+  the sprint. Closing a sprint also writes one `ticket.updated` (field `sprint`) per
+  ticket it moves.
 
 Subject: the ticket; space: its space.
 """
@@ -26,6 +30,11 @@ from app.core.outbox import Acting, emit
 TICKET_CREATED = "ticket.created"
 TICKET_UPDATED = "ticket.updated"
 TICKET_EVENTS = (TICKET_CREATED, TICKET_UPDATED)
+SPRINT_CREATED = "sprint.created"
+SPRINT_UPDATED = "sprint.updated"
+SPRINT_STARTED = "sprint.started"
+SPRINT_CLOSED = "sprint.closed"
+SPRINT_EVENTS = (SPRINT_CREATED, SPRINT_UPDATED, SPRINT_STARTED, SPRINT_CLOSED)
 
 
 class Field(StrEnum):
@@ -38,6 +47,7 @@ class Field(StrEnum):
     PAGE = "page"  # a page linked (from null to its id) or unlinked (from its id to null)
     PARENT = "parent"
     PRIORITY = "priority"
+    SPRINT = "sprint"
     STATUS = "status"
     TAGS = "tags"
     TITLE = "title"
@@ -51,6 +61,7 @@ VALUED = frozenset(
         Field.PAGE,
         Field.PARENT,
         Field.PRIORITY,
+        Field.SPRINT,
         Field.STATUS,
     }
 )
@@ -100,4 +111,24 @@ async def ticket_event(
         subject_type="ticket",
         subject_id=ticket_id,
         payload=payload(ticket_id, conversation_id, changes),
+    )
+
+
+async def sprint_event(
+    session: AsyncSession,
+    actor: Acting,
+    type_: str,
+    *,
+    sprint_id: uuid.UUID,
+    space_id: uuid.UUID,
+    fields: list[str],
+) -> None:
+    await emit(
+        session,
+        type=type_,
+        actor=actor,
+        space_id=space_id,
+        subject_type="sprint",
+        subject_id=sprint_id,
+        payload={"sprint_id": str(sprint_id), "fields": sorted(fields)},
     )

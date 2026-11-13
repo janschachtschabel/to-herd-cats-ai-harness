@@ -36,12 +36,14 @@ from app.modules.tickets.base import (
 from app.modules.tickets.events import TICKET_CREATED, TICKET_UPDATED, Changes, Field
 from app.modules.tickets.models import (
     Priority,
+    Sprint,
     StatusCategory,
     TicketKind,
     TicketStatus,
     WorkItem,
 )
 from app.modules.tickets.repository import TicketRepository, TicketView
+from app.modules.tickets.sprints import check_sprint, hold_for_move
 from app.modules.tickets.statuses import status_repository
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
@@ -131,8 +133,11 @@ class TicketService:
     ) -> TicketView:
         """`values`: the fields the client sent (`TicketUpdate`), null ones included."""
         parent_id = values.get("parent_id")
+        held: dict[uuid.UUID, Sprint] = {}
+        if "sprint_id" in values:
+            held = await hold_for_move(self.session, actor, number, values["sprint_id"])
         repo, ticket = await editable(self.session, actor, number, version, parent_id=parent_id)
-        changes = await self._changes(actor, repo, ticket, values)
+        changes = await self._changes(actor, repo, ticket, values, held)
         status = None
         if Field.STATUS in changes:
             status = await self._status(actor, ticket.space_id, values["status_id"])
@@ -176,9 +181,15 @@ class TicketService:
         return status
 
     async def _changes(
-        self, actor: Actor, repo: TicketRepository, ticket: WorkItem, values: dict[str, Any]
+        self,
+        actor: Actor,
+        repo: TicketRepository,
+        ticket: WorkItem,
+        values: dict[str, Any],
+        sprints: dict[uuid.UUID, Sprint],
     ) -> Changes:
-        """What the request changes, after checking the hierarchy and the assignment."""
+        """What the request changes, after checking the hierarchy, the assignment and the
+        sprint (`sprints`: those held for the change)."""
         changes: dict[Field, tuple[Any, Any]] = {}
         simple = {
             "title": Field.TITLE,
@@ -198,6 +209,10 @@ class TicketService:
             if new != old:
                 await check_assignment(self.session, actor, repo, ticket.space_id, old, new)
                 changes[Field.ASSIGNEE] = (old.id if old else None, new.id if new else None)
+        if "sprint_id" in values and values["sprint_id"] != ticket.sprint_id:
+            if values["sprint_id"] is not None:
+                check_sprint(sprints, ticket.space_id, values["sprint_id"])
+            changes[Field.SPRINT] = (ticket.sprint_id, values["sprint_id"])
         if Field.KIND in changes or Field.PARENT in changes:
             await self._check_hierarchy(repo, ticket, values, changes)
         return changes
@@ -246,7 +261,16 @@ def _assignee(ticket: WorkItem) -> Principal | None:
 
 
 def _apply(ticket: WorkItem, values: dict[str, Any], changes: Changes) -> None:
-    for name in ("title", "description_md", "kind", "status_id", "priority", "due_on", "parent_id"):
+    for name in (
+        "title",
+        "description_md",
+        "kind",
+        "status_id",
+        "priority",
+        "due_on",
+        "parent_id",
+        "sprint_id",
+    ):
         if name in values:
             setattr(ticket, name, values[name])
     if Field.ASSIGNEE in changes:

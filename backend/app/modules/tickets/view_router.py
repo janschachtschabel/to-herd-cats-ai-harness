@@ -8,7 +8,7 @@ from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.tickets.listing import Filters
 from app.modules.tickets.models import TicketKind
-from app.modules.tickets.router import PersonQuery, TagQuery, person
+from app.modules.tickets.router import PersonQuery, SprintQuery, TagQuery, person, sprint_filter
 from app.modules.tickets.schemas import TicketSummaryOut
 from app.modules.tickets.view_schemas import BoardColumnOut, BoardOut, EpicOut, TicketCountsOut
 from app.modules.tickets.views import TicketViews
@@ -27,12 +27,14 @@ def _filters(
     kind: TicketKind | None,
     tag: list[uuid.UUID] | None,
     epic: uuid.UUID | None,
+    sprint: str | None,
 ) -> Filters:
     return Filters(
         assignee_id=person(assignee, actor, "assignee"),
         kind=kind,
         tag_ids=tuple(dict.fromkeys(tag or ())),
         epic_id=epic,
+        **sprint_filter(sprint),
     )
 
 
@@ -46,9 +48,10 @@ async def board(
     kind: TicketKind | None = None,
     tag: TagQuery = None,
     epic: EpicQuery = None,
+    sprint: SprintQuery = None,
 ) -> BoardOut:
     """The space's statuses in order, each with its count and first tickets."""
-    filters = _filters(actor, assignee, kind, tag, epic)
+    filters = _filters(actor, assignee, kind, tag, epic, sprint)
     columns = await TicketViews(session).board(actor, space_id, filters, limit)
     return BoardOut(columns=[BoardColumnOut.of(c) for c in columns])
 
@@ -64,9 +67,10 @@ async def board_column(
     kind: TicketKind | None = None,
     tag: TagQuery = None,
     epic: EpicQuery = None,
+    sprint: SprintQuery = None,
 ) -> Page[TicketSummaryOut]:
     """More of one column, in board order (the column's `next_cursor`)."""
-    filters = _filters(actor, assignee, kind, tag, epic)
+    filters = _filters(actor, assignee, kind, tag, epic, sprint)
     page = await TicketViews(session).column(actor, space_id, status_id, filters, params)
     return Page[TicketSummaryOut](
         items=[TicketSummaryOut.of(v) for v in page.items], next_cursor=page.next_cursor

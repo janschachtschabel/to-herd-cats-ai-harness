@@ -1585,6 +1585,18 @@
             "title": "Space Id",
             "type": "string"
           },
+          "sprint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sprint Id"
+          },
           "status": {
             "$ref": "#/components/schemas/StatusRef"
           },
@@ -1622,6 +1634,7 @@
           "reporter",
           "due_on",
           "parent",
+          "sprint_id",
           "tags",
           "version",
           "created_at",
@@ -2738,6 +2751,14 @@
         "title": "MessageWriteOut",
         "type": "object"
       },
+      "MoveOpenTo": {
+        "enum": [
+          "next",
+          "backlog"
+        ],
+        "title": "MoveOpenTo",
+        "type": "string"
+      },
       "MyUsageOut": {
         "description": "The caller's own usage in the period (whole UTC days).",
         "properties": {
@@ -3567,6 +3588,33 @@
           "items"
         ],
         "title": "Page[SpaceOut]",
+        "type": "object"
+      },
+      "Page_SprintOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SprintOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[SprintOut]",
         "type": "object"
       },
       "Page_StatusOut_": {
@@ -4566,6 +4614,236 @@
         "title": "SpaceUpdateIn",
         "type": "object"
       },
+      "SprintClose": {
+        "additionalProperties": false,
+        "description": "Where the sprint's unfinished tickets go: the space's next planned sprint (the\none that starts first) or the backlog.",
+        "properties": {
+          "move_open_to": {
+            "$ref": "#/components/schemas/MoveOpenTo"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "move_open_to"
+        ],
+        "title": "SprintClose",
+        "type": "object"
+      },
+      "SprintCreate": {
+        "additionalProperties": false,
+        "description": "A new sprint, planned; `ends_on` is no earlier than `starts_on`.",
+        "properties": {
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "goal": {
+            "default": "",
+            "description": "a short text",
+            "maxLength": 500,
+            "title": "Goal",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "starts_on",
+          "ends_on"
+        ],
+        "title": "SprintCreate",
+        "type": "object"
+      },
+      "SprintOut": {
+        "description": "`tally` only for a closed sprint. `version` guards writes (stale \u2192 409).",
+        "properties": {
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "goal": {
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SprintState"
+          },
+          "tally": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SprintTally"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "name",
+          "goal",
+          "starts_on",
+          "ends_on",
+          "state",
+          "tally",
+          "version"
+        ],
+        "title": "SprintOut",
+        "type": "object"
+      },
+      "SprintStart": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SprintStart",
+        "type": "object"
+      },
+      "SprintState": {
+        "enum": [
+          "planned",
+          "active",
+          "closed"
+        ],
+        "title": "SprintState",
+        "type": "string"
+      },
+      "SprintTally": {
+        "description": "Recorded when the sprint closed: the tickets it held then, those done, and those\ncarried on (to the next sprint or the backlog).",
+        "properties": {
+          "carried": {
+            "title": "Carried",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "planned": {
+            "title": "Planned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "planned",
+          "done",
+          "carried"
+        ],
+        "title": "SprintTally",
+        "type": "object"
+      },
+      "SprintUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are (none can be null); a closed sprint does not\nchange (409 `sprint.state_invalid`).",
+        "properties": {
+          "ends_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends On"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "description": "a short text",
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "starts_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts On"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SprintUpdate",
+        "type": "object"
+      },
       "StatusCategory": {
         "enum": [
           "open",
@@ -5253,6 +5531,18 @@
             "title": "Space Id",
             "type": "string"
           },
+          "sprint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sprint Id"
+          },
           "status": {
             "$ref": "#/components/schemas/StatusRef"
           },
@@ -5290,6 +5580,7 @@
           "reporter",
           "due_on",
           "parent",
+          "sprint_id",
           "tags",
           "version",
           "created_at",
@@ -5367,6 +5658,18 @@
             "title": "Space Id",
             "type": "string"
           },
+          "sprint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sprint Id"
+          },
           "status": {
             "$ref": "#/components/schemas/StatusRef"
           },
@@ -5404,6 +5707,7 @@
           "reporter",
           "due_on",
           "parent",
+          "sprint_id",
           "tags",
           "version",
           "created_at",
@@ -5439,7 +5743,7 @@
       },
       "TicketUpdate": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are; null clears `due_on`, `parent_id` and\n`assignee` (the others cannot be null). Taking an unassigned ticket or letting go\nof one's own needs `ticket.edit`; any other assignment `ticket.assign`.",
+        "description": "Fields left out stay as they are; null clears `due_on`, `parent_id`, `assignee`\nand `sprint_id` (the others cannot be null). Taking an unassigned ticket or letting go\nof one's own needs `ticket.edit`; any other assignment `ticket.assign`.",
         "properties": {
           "assignee": {
             "anyOf": [
@@ -5507,6 +5811,19 @@
                 "type": "null"
               }
             ]
+          },
+          "sprint_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a planned or active sprint of the space; null: the backlog",
+            "title": "Sprint Id"
           },
           "status_id": {
             "anyOf": [
@@ -11106,6 +11423,24 @@
               "description": "only an epic's children and their children",
               "title": "Epic"
             }
+          },
+          {
+            "description": "a sprint's id, or `none`: the backlog",
+            "in": "query",
+            "name": "sprint",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "a sprint's id, or `none`: the backlog",
+              "title": "Sprint"
+            }
           }
         ],
         "responses": {
@@ -11263,6 +11598,24 @@
               ],
               "description": "only an epic's children and their children",
               "title": "Epic"
+            }
+          },
+          {
+            "description": "a sprint's id, or `none`: the backlog",
+            "in": "query",
+            "name": "sprint",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "a sprint's id, or `none`: the backlog",
+              "title": "Sprint"
             }
           }
         ],
@@ -11975,6 +12328,148 @@
         ]
       }
     },
+    "/api/spaces/{space_id}/sprints": {
+      "get": {
+        "description": "The space's sprints: the active one, then the planned ones (earliest start\nfirst), then the closed ones (latest end first); `state` narrows them.",
+        "operationId": "list_sprints_api_spaces__space_id__sprints_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/SprintState"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SprintOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sprints",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "post": {
+        "operationId": "create_sprint_api_spaces__space_id__sprints_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SprintOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Sprint",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/spaces/{space_id}/ticket-statuses": {
       "get": {
         "description": "The space's statuses in order.",
@@ -12219,6 +12714,167 @@
         "summary": "List Trash",
         "tags": [
           "wiki"
+        ]
+      }
+    },
+    "/api/sprints/{sprint_id}": {
+      "patch": {
+        "operationId": "update_sprint_api_sprints__sprint_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sprint_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sprint Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SprintOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Sprint",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/sprints/{sprint_id}/close": {
+      "post": {
+        "description": "Active \u2192 closed: unfinished tickets go to the next planned sprint or the\nbacklog; the sprint keeps its tally.",
+        "operationId": "close_sprint_api_sprints__sprint_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sprint_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sprint Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintClose"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SprintOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Sprint",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/sprints/{sprint_id}/start": {
+      "post": {
+        "description": "Planned \u2192 active; 409 `sprint.active_exists` while the space has an active one.",
+        "operationId": "start_sprint_api_sprints__sprint_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sprint_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sprint Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SprintOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Sprint",
+        "tags": [
+          "tickets"
         ]
       }
     },
@@ -12807,6 +13463,24 @@
               ],
               "description": "only with every tag",
               "title": "Tag"
+            }
+          },
+          {
+            "description": "a sprint's id, or `none`: the backlog",
+            "in": "query",
+            "name": "sprint",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "a sprint's id, or `none`: the backlog",
+              "title": "Sprint"
             }
           },
           {

@@ -1402,6 +1402,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/sprints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sprints
+         * @description The space's sprints: the active one, then the planned ones (earliest start
+         *     first), then the closed ones (latest end first); `state` narrows them.
+         */
+        get: operations["list_sprints_api_spaces__space_id__sprints_get"];
+        put?: never;
+        /** Create Sprint */
+        post: operations["create_sprint_api_spaces__space_id__sprints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/ticket-statuses": {
         parameters: {
             query?: never;
@@ -1451,6 +1473,64 @@ export interface paths {
         get: operations["list_trash_api_spaces__space_id__trash_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sprints/{sprint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Sprint */
+        patch: operations["update_sprint_api_sprints__sprint_id__patch"];
+        trace?: never;
+    };
+    "/api/sprints/{sprint_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Sprint
+         * @description Active → closed: unfinished tickets go to the next planned sprint or the
+         *     backlog; the sprint keeps its tally.
+         */
+        post: operations["close_sprint_api_sprints__sprint_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sprints/{sprint_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Sprint
+         * @description Planned → active; 409 `sprint.active_exists` while the space has an active one.
+         */
+        post: operations["start_sprint_api_sprints__sprint_id__start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2281,6 +2361,8 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+            /** Sprint Id */
+            sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
             /** Tags */
             tags: components["schemas"]["TagOut"][];
@@ -2759,6 +2841,11 @@ export interface components {
             system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
+         * MoveOpenTo
+         * @enum {string}
+         */
+        MoveOpenTo: "next" | "backlog";
+        /**
          * MyUsageOut
          * @description The caller's own usage in the period (whole UTC days).
          */
@@ -3041,6 +3128,13 @@ export interface components {
         Page_SpaceOut_: {
             /** Items */
             items: components["schemas"]["SpaceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[SprintOut] */
+        Page_SprintOut_: {
+            /** Items */
+            items: components["schemas"]["SprintOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3399,6 +3493,114 @@ export interface components {
             version: number;
         };
         /**
+         * SprintClose
+         * @description Where the sprint's unfinished tickets go: the space's next planned sprint (the
+         *     one that starts first) or the backlog.
+         */
+        SprintClose: {
+            move_open_to: components["schemas"]["MoveOpenTo"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * SprintCreate
+         * @description A new sprint, planned; `ends_on` is no earlier than `starts_on`.
+         */
+        SprintCreate: {
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Goal
+             * @description a short text
+             * @default
+             */
+            goal?: string;
+            /** Name */
+            name: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+        };
+        /**
+         * SprintOut
+         * @description `tally` only for a closed sprint. `version` guards writes (stale → 409).
+         */
+        SprintOut: {
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Goal */
+            goal: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            state: components["schemas"]["SprintState"];
+            tally: components["schemas"]["SprintTally"] | null;
+            /** Version */
+            version: number;
+        };
+        /** SprintStart */
+        SprintStart: {
+            /** Version */
+            version: number;
+        };
+        /**
+         * SprintState
+         * @enum {string}
+         */
+        SprintState: "planned" | "active" | "closed";
+        /**
+         * SprintTally
+         * @description Recorded when the sprint closed: the tickets it held then, those done, and those
+         *     carried on (to the next sprint or the backlog).
+         */
+        SprintTally: {
+            /** Carried */
+            carried: number;
+            /** Done */
+            done: number;
+            /** Planned */
+            planned: number;
+        };
+        /**
+         * SprintUpdate
+         * @description Fields left out stay as they are (none can be null); a closed sprint does not
+         *     change (409 `sprint.state_invalid`).
+         */
+        SprintUpdate: {
+            /** Ends On */
+            ends_on?: string | null;
+            /** Goal */
+            goal?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
          * StatusCategory
          * @enum {string}
          */
@@ -3691,6 +3893,8 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+            /** Sprint Id */
+            sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
             /** Tags */
             tags: components["schemas"]["TagOut"][];
@@ -3736,6 +3940,8 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+            /** Sprint Id */
+            sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
             /** Tags */
             tags: components["schemas"]["TagOut"][];
@@ -3762,8 +3968,8 @@ export interface components {
         };
         /**
          * TicketUpdate
-         * @description Fields left out stay as they are; null clears `due_on`, `parent_id` and
-         *     `assignee` (the others cannot be null). Taking an unassigned ticket or letting go
+         * @description Fields left out stay as they are; null clears `due_on`, `parent_id`, `assignee`
+         *     and `sprint_id` (the others cannot be null). Taking an unassigned ticket or letting go
          *     of one's own needs `ticket.edit`; any other assignment `ticket.assign`.
          */
         TicketUpdate: {
@@ -3776,6 +3982,11 @@ export interface components {
             /** Parent Id */
             parent_id?: string | null;
             priority?: components["schemas"]["Priority"] | null;
+            /**
+             * Sprint Id
+             * @description a planned or active sprint of the space; null: the backlog
+             */
+            sprint_id?: string | null;
             /** Status Id */
             status_id?: string | null;
             /** Title */
@@ -6955,6 +7166,8 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description only an epic's children and their children */
                 epic?: string | null;
+                /** @description a sprint's id, or `none`: the backlog */
+                sprint?: string | null;
             };
             header?: never;
             path: {
@@ -6996,6 +7209,8 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description only an epic's children and their children */
                 epic?: string | null;
+                /** @description a sprint's id, or `none`: the backlog */
+                sprint?: string | null;
             };
             header?: never;
             path: {
@@ -7402,6 +7617,76 @@ export interface operations {
             };
         };
     };
+    list_sprints_api_spaces__space_id__sprints_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                state?: components["schemas"]["SprintState"][] | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SprintOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_sprint_api_spaces__space_id__sprints_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SprintCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SprintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_statuses_api_spaces__space_id__ticket_statuses_get: {
         parameters: {
             query?: {
@@ -7527,6 +7812,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TrashedPageOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_sprint_api_sprints__sprint_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sprint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SprintUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SprintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_sprint_api_sprints__sprint_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sprint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SprintClose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SprintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_sprint_api_sprints__sprint_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sprint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SprintStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SprintOut"];
                 };
             };
             /** @description Validation Error */
@@ -7789,6 +8179,8 @@ export interface operations {
                 due_before?: string | null;
                 /** @description only with every tag */
                 tag?: string[] | null;
+                /** @description a sprint's id, or `none`: the backlog */
+                sprint?: string | null;
                 sort?: components["schemas"]["Sort"];
             };
             header?: never;
