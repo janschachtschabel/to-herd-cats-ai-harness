@@ -5,7 +5,7 @@ import asyncio
 import uuid
 
 import asyncpg
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.core.config import get_settings
 from app.core.outbox import OUTBOX_CHANNEL, EventActor, EventOutbox, emit
@@ -91,3 +91,17 @@ async def test_emit_names_the_actor_and_the_space(real_db: RealDb) -> None:
         row = await session.get(EventOutbox, event.id)
     assert row is not None
     assert (row.actor_type, row.actor_id, row.space_id) == ("user", actor.principal.id, None)
+
+
+
+async def test_a_delivery_record_holds_only_what_is_read(real_db: RealDb) -> None:
+    """Hard rule 5 (review M3 N14): the dispatcher reads which handler had which event;
+    nothing reads when, so no column holds it."""
+    async with real_db.database.session_factory() as session:
+        columns = await session.scalars(
+            text(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_schema = current_schema() AND table_name = 'event_delivery'"
+            )
+        )
+        assert sorted(columns) == ["event_id", "handler"]

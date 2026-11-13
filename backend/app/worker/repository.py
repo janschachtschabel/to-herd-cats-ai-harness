@@ -50,7 +50,7 @@ class OutboxRepository:
         transaction has written but not committed is waited for."""
         stmt = (
             insert(EventDelivery)
-            .values(event_id=event_id, handler=handler, delivered_at=func.now())
+            .values(event_id=event_id, handler=handler)
             .on_conflict_do_nothing(index_elements=["event_id", "handler"])
             .returning(EventDelivery.event_id)
         )

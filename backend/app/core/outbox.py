@@ -84,9 +84,6 @@ class EventDelivery(Base):
         primary_key=True,
     )
     handler: Mapped[str] = mapped_column(String(MAX_HANDLER_CHARS), primary_key=True)
-    delivered_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, nullable=False
-    )
 
 
 class Acting(Protocol):
