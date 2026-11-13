@@ -58,8 +58,12 @@ function isHole(node) {
   );
 }
 
+/** The nodes with the mark added; a hard break takes none (the Y.Doc keeps none on it,
+ * and its marks are those of the text around it, `canonical.mjs`). */
 function withMark(nodes, mark) {
-  return nodes.map((node) => ({ ...node, marks: [...(node.marks ?? []), mark] }));
+  return nodes.map((node) =>
+    node.type === "hardBreak" ? node : { ...node, marks: [...(node.marks ?? []), mark] },
+  );
 }
 
 function inline(nodes, source) {

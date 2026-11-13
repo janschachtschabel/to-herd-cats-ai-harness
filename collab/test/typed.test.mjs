@@ -83,6 +83,25 @@ const CASES = {
     doc({ type: "bulletList", content: [item(paragraph(), { type: "horizontalRule" })] }),
     "- ___",
   ],
+  "a wiki link before a parenthesis": [doc(paragraph(text("[[Seite]](x)"))), "[[Seite]]\\(x)"],
+  "a link in a table whose address holds a pipe": [
+    doc({
+      type: "table",
+      content: [
+        {
+          type: "tableRow",
+          content: [
+            {
+              type: "tableHeader",
+              attrs: { align: null },
+              content: [{ type: "tableParagraph", content: [text("a", link("/x?a|b"))] }],
+            },
+          ],
+        },
+      ],
+    }),
+    "| [a](/x?a\\|b) |\n| --- |",
+  ],
   "a table cell with a pipe": [
     doc({
       type: "table",

@@ -35,22 +35,24 @@ function normalize(node) {
   return out;
 }
 
-const MARKS = new Set(["emphasis", "strong", "delete"]);
+const MARKS = new Set(["emphasis", "strong", "delete", "link"]);
 
-/** Bold, italic and strike wrapped directly around each other look the same in any
- * order (`~~**x**~~`, `**~~x~~**`): such a chain is put in one order. */
+/** Bold, italic, strike and a link wrapped directly around each other look the same
+ * in any order (`~~**x**~~`, `**~~x~~**`, `**[x](u)**`, `[**x**](u)`): such a chain is
+ * put in one order. */
 function sortChain(node) {
-  const types = [];
+  const chain = [];
   let inner = node;
   while (MARKS.has(inner.type)) {
-    types.push(inner.type);
-    if (inner.children?.length !== 1 || !MARKS.has(inner.children[0].type)) break;
-    inner = inner.children[0];
+    const { children, ...own } = inner;
+    chain.push(own);
+    if (children?.length !== 1 || !MARKS.has(children[0].type)) break;
+    inner = children[0];
   }
-  if (types.length < 2) return node;
-  const sorted = [...types].sort();
-  let out = { type: sorted.at(-1), children: inner.children };
-  for (const type of sorted.slice(0, -1).reverse()) out = { type, children: [out] };
+  if (chain.length < 2) return node;
+  const sorted = chain.sort((a, b) => (a.type < b.type ? -1 : a.type > b.type ? 1 : 0));
+  let out = { ...sorted.at(-1), children: inner.children };
+  for (const own of sorted.slice(0, -1).reverse()) out = { ...own, children: [out] };
   return out;
 }
 

@@ -11,7 +11,7 @@ import { WIKI_LINK, destination, title } from "./syntax.mjs";
 const PUNCTUATION = /^[\p{P}\p{S}]$/u;
 const WHITESPACE = /^\s$/u;
 const DELIMITER = { bold: "**", italic: "_", strike: "~~" };
-const ORDER = ["link", "bold", "italic", "strike"]; // outermost first on a tie
+const ORDER = ["bold", "italic", "strike", "link"]; // outermost first on a tie
 // Characters with a meaning in inline Markdown; `|` for tables, `@` for e-mail
 // autolinks.
 const SPECIAL = /[\\`*_[\]~<&|@]/;
@@ -25,13 +25,16 @@ const reference = (char) =>
 const WORD = /[\p{L}\p{N}]/u;
 
 /** One character of text as Markdown. */
-function escaped(chars, i) {
+function escaped(chars, i, inLink = false) {
   const char = chars[i];
   if (char === " ") return " ";
+  // A link's text holds no autolinks.
+  if (inLink && char === "@") return char;
   // `_` between two letters or digits can neither open nor close emphasis.
   if (char === "_" && WORD.test(chars[i - 1] ?? "") && WORD.test(chars[i + 1] ?? "")) return char;
   if (SPECIAL.test(char)) return `\\${char}`;
   if (ODD_SPACE.test(char)) return reference(char);
+  if (inLink) return char;
   // Autolink literals the editor shows as text: `https\://`, `www\.`.
   if (char === ":" && chars[i + 1] === "/" && chars[i + 2] === "/") return "\\:";
   if (char === "." && /www$/i.test(chars.slice(Math.max(0, i - 3), i).join(""))) return "\\.";
@@ -56,7 +59,7 @@ function textUnits(text, inLink) {
   let last = 0;
   const plain = (part) => {
     const chars = [...part];
-    chars.forEach((char, i) => units.push({ char, out: escaped(chars, i) }));
+    chars.forEach((char, i) => units.push({ char, out: escaped(chars, i, inLink) }));
   };
   for (const match of inLink ? [] : text.matchAll(WIKI_LINK)) {
     plain(text.slice(last, match.index));
@@ -80,16 +83,20 @@ function altText(alt) {
   return [...alt].map((char) => (SPECIAL.test(char) || char === "!" ? `\\${char}` : char)).join("");
 }
 
-function image(run) {
-  const src = destination(run.src);
+// In a table a `|` ends the cell wherever it stands, unless it is escaped.
+const cellSafe = (value, inTable) => (inTable ? value.replace(/\|/g, "\\|") : value);
+
+function image(run, inTable) {
+  const src = cellSafe(destination(run.src), inTable);
   const text = altText(run.alt);
-  return run.title ? `![${text}](${src} ${title(run.title)})` : `![${text}](${src})`;
+  const end = run.title ? `${src} ${cellSafe(title(run.title), inTable)}` : src;
+  return `![${text}](${end})`;
 }
 
-function linkEnd(key) {
+function linkEnd(key, inTable) {
   const [, href, linkTitle] = key.split("\u0000");
-  const target = destination(href);
-  return linkTitle ? `](${target} ${title(linkTitle)})` : `](${target})`;
+  const target = cellSafe(destination(href), inTable);
+  return linkTitle ? `](${target} ${cellSafe(title(linkTitle), inTable)})` : `](${target})`;
 }
 
 // CommonMark autolinks: `<https://example.org>`, `<anna@example.org>`.
@@ -124,7 +131,7 @@ function pieces(runs, inTable) {
   const close = (key) => {
     out.push(
       markType(key) === "link"
-        ? { kind: "atom", gap: "close", out: linkEnd(key) }
+        ? { kind: "atom", gap: "close", out: linkEnd(key, inTable) }
         : { kind: "close", out: DELIMITER[key] },
     );
   };
@@ -153,7 +160,7 @@ function pieces(runs, inTable) {
     }
     if (auto) out.push({ kind: "atom", out: auto });
     else if (run.t === "br") out.push({ kind: "atom", out: "\\\n" });
-    else if (run.t === "img") out.push({ kind: "atom", out: image(run) });
+    else if (run.t === "img") out.push({ kind: "atom", out: image(run, inTable) });
     else if (run.marks.includes("code"))
       out.push({ kind: "atom", out: codeSpan(run.text, inTable) });
     else {
@@ -224,11 +231,14 @@ function flank(list) {
 }
 
 /** Last touches once every piece is written: a `!` right before `[` would start an
- * image; a bare `_` (`escaped`) must still stand between two letters or digits. */
+ * image, a `(` right after `]` a link; a bare `_` (`escaped`) must still stand between
+ * two letters or digits. */
 function tidy(list) {
   list.forEach((piece, i) => {
     if (piece.kind !== "text" || piece.char === null) return;
     if (piece.out === "!" && list[i + 1]?.out.startsWith("[")) piece.out = "\\!";
+    // `(` right after a wiki link's `]]` would make it a link.
+    if (piece.out === "(" && lastChar(list[i - 1]) === "]") piece.out = "\\(";
     if (piece.out === "_") {
       const word =
         WORD.test(lastChar(list[i - 1]) ?? "") && WORD.test(firstChar(list[i + 1]) ?? "");

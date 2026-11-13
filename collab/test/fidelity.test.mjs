@@ -109,7 +109,12 @@ test("two lists in a row stay two lists", () => {
 });
 
 test("marks around each other keep their meaning in any order", () => {
-  for (const markdown of ["~~**x**~~ und ***y*** und _~~z~~_", " 0. ~~**x**~~\n\n       )"]) {
+  const samples = ["~~**x**~~ und ***y*** und _~~z~~_", " 0. ~~**x**~~\n\n       )"];
+  for (const markdown of [
+    ...samples,
+    "[**a**](b) und **[a](b)** und _www.g_",
+    "- _-\\\n  ._\n\n* ;",
+  ]) {
     assertKeepsMeaning(markdown, markdown);
     assert.equal(rawBlocks(liveSave(markdown).json), 0, markdown);
   }
