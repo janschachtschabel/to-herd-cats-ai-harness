@@ -5,7 +5,7 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 3 (Nachrichten) ist gebaut.** Aus M1: Anmeldung, Personen,
+**Stand: Meilenstein 4 (Tickets) ist gebaut.** Aus M1: Anmeldung, Personen,
 Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine Rechteprüfung, Audit, die
 Oberfläche mit Navigation und Verwaltung, Image, Compose, Helm-Chart und CI. Aus M2
 ein Wiki in jedem Bereich:
@@ -41,12 +41,32 @@ Aus M3 Nachrichten:
 - **Einsicht in Direktnachrichten** für Administratoren: nur lesend, mit Begründung,
   60 Minuten, im Audit, und die Teilnehmenden sehen, dass eingesehen wurde.
 
-Aufgaben (M4) und KI-Agenten (ab M5) folgen. Bedienung und Betrieb des Wikis:
-[`docs/WIKI.md`](docs/WIKI.md), der Nachrichten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md).
+Aus M4 Tickets:
+
+- **Tickets** je Bereich mit Schlüssel (`HC-42`): Epic, Story, Aufgabe, Fehler in einer
+  Hierarchie von höchstens drei Ebenen, Priorität, Fälligkeit, zugewiesene Person
+  („Übernehmen“, „Abgeben“, zuweisen ab Moderator), Markdown-Beschreibung.
+- **Status-Workflow je Bereich** (Standard: Neu, In Arbeit, Zur Prüfung, Erledigt,
+  Verworfen; anlegen, umbenennen, ordnen, löschen mit Ersatz); was zählt, ist die
+  Kategorie des Status, nie sein Name.
+- **Ansichten:** Liste über alle sichtbaren Bereiche mit Filtern in der Adresse und
+  „Meine Tickets“ (mit Zähler in der Seitenleiste), **Board** je Bereich (ziehen, per
+  Tastatur oder über das Menü, live bei allen), **Epic-Übersicht** mit Fortschritt.
+- **Ticket-Diskussion** mit grauen Systemmeldungen je Änderung, ausblendbar;
+  Zuweisungen und Kommentare zu eigenen Tickets in der Aktivität. **Kanäle bleiben frei
+  von Ticketmeldungen:** Ein Schlüssel oder Link in einer Nachricht zeigt nur eine Karte,
+  die sich selbst aktualisiert, und nur, wer das Ticket sehen darf.
+- **Verknüpfte Seiten** (von beiden Seiten, auch über Bereichsgrenzen; sichtbar nur, wer
+  beide Enden sieht), **Tags** und **Suche** (Strg+K findet Tickets, auch über
+  `HC-42`).
+
+KI-Agenten folgen ab M5. Bedienung und Betrieb des Wikis:
+[`docs/WIKI.md`](docs/WIKI.md), der Nachrichten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md),
+der Tickets: [`docs/TICKETS.md`](docs/TICKETS.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
-[Demo M3](docs/demo/m3.md),
+[Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
@@ -186,8 +206,11 @@ Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Ände
 an der API `npm run generate:api` im Frontend ausführen.
 
 Demodaten für eine frische Test-Installation (drei Personen, der Bereich „Team Nord“
-mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht
-und eine Seiten-Diskussion mit Systemmeldungen; der Worker muss laufen):
+mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht,
+eine Seiten-Diskussion mit Systemmeldungen, dazu neun Tickets: ein Epic mit Stories,
+Aufgaben und einem Fehler in mehreren Status samt einem eigenen Status „Blockiert“,
+Zuweisungen, Tags, eine verknüpfte Seite, Kommentare und ein Ticket-Schlüssel im Kanal;
+der Worker muss laufen):
 
 ```bash
 cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
@@ -214,14 +237,15 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
                                        # Wegwerf-Datenbank (psql, uv nötig), zwei Yjs-Clients
 cd e2e && npm ci && npx playwright install chromium && npx playwright test
-                                       # Browser: Live-Bearbeitung und Nachrichten mit zwei
+                                       # Browser: Live-Bearbeitung, Nachrichten und Tickets mit zwei
                                        # Personen in der echten App (Rolle all mit Worker,
                                        # Wegwerf-Datenbank); vorher
                                        # `npm run build` in frontend/. Ein vorhandenes Chromium
                                        # nimmt PLAYWRIGHT_CHROMIUM_EXECUTABLE.
 docker build -t to-herd-cats-ai:local . && bash deploy/compose/smoke.sh   # endet mit SMOKE OK
 SMOKE_NODES=1 bash deploy/compose/smoke.sh   # zwei API-Knoten und Worker: Nachricht an A,
-                                       # live über /api/stream an B
+                                       # live über /api/stream an B; beide Läufe legen
+                                       # ein Ticket an und warten auf die Systemmeldungen
 bash deploy/compose/load.sh            # Ressourcen und Laufzeiten für den Steckbrief
 ```
 
@@ -232,7 +256,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M3. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M4. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -423,7 +447,7 @@ kennen.
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
-  Systemmeldungen der Seiten-Diskussion und die Live-Zustellung. Bis M6 ohne DBOS (Plan
+  Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M6 ohne DBOS (Plan
   M3, Entscheidung 1). `HERD_ROLE=worker` hat nur den internen Port (`/ready` meldet, ob
   seine Schleife läuft, die Datenbank erreicht und innerhalb von vier Zeitgrenzen
   vorankommt); `HERD_ROLE=all` enthält den Worker und teilt
@@ -464,15 +488,25 @@ kennen.
   ihm entfernt oder in der Rolle geändert wird (direkt oder über eine Gruppe), bekommt
   sofort `access.changed` (ohne IDs) und lädt neu; die Teilnehmenden einer
   Direktnachricht, in die die Verwaltung Einsicht nimmt, bekommen sofort `dm.inspected`.
-  Der Browser fasst Aktualisierungen 250 ms lang zusammen. Lücke: Ein Wechsel der
-  Bereichsart (offen/Team) sendet kein `access.changed`.
+  Der Browser fasst Aktualisierungen 250 ms lang zusammen. Die Art eines Bereichs
+  (offen/Team) ändert sich nie.
 - **Einsicht in Direktnachrichten** (`dm.inspect`, nur Inhaber und Administratoren):
   Begründung 10 bis 500 Zeichen, 60 Minuten, nur lesend, nur für die Person, die sie
   begonnen hat; Audit `dm.admin_lookup` (Liste der Gespräche einer Person) und
   `dm.admin_access` (mit Begründung). Sonst haben Administratoren in fremden
   Direktnachrichten kein Recht, auch nicht in der Suche.
-- **Nachrichteninhalte** stehen nie im Log, in `NOTIFY`-Nutzlasten, in Ereignissen der
-  Outbox oder in Metrik-Labels; Live-Ereignisse tragen nur IDs.
+- **Tickets (seit M4):** Schlüssel mit festem Präfix `HC`, Nummern je Organisation
+  fortlaufend. Tickets werden nicht gelöscht, sondern verworfen (Status der Kategorie
+  `cancelled`); mit ihrem Bereich verschwinden sie. Ein unsichtbares Ticket antwortet
+  über seine Nummer genau wie eine freie Nummer (404 `ticket.not_found`). Kein Ticket
+  schreibt in Kanäle oder Direktnachrichten. Ein Worker verarbeitet hier rund 90
+  Ereignisse je Sekunde; Massenanlagen über die API (über 40 Tickets je Sekunde
+  dauerhaft) lassen die Outbox wachsen, Systemmeldungen kommen dann später
+  ([Steckbrief](docs/STECKBRIEF.md#tickets-m4)). Keine neuen Einstellungen. Einzelheiten:
+  [`docs/TICKETS.md`](docs/TICKETS.md#betrieb).
+- **Nachrichteninhalte** und Titel oder Beschreibungen von Tickets stehen nie im Log, in
+  `NOTIFY`-Nutzlasten, in Ereignissen der Outbox oder in Metrik-Labels; Live-Ereignisse
+  tragen nur IDs.
 
 ## Lizenz
 

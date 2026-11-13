@@ -3,21 +3,27 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1, M2 and M3
-(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
-`2026-11-13-m3-nachrichten.md`) are built; the next milestone is M4 (tickets), its plan
-is not written yet. Present: identity, groups, spaces, roles, `can()`, audit (M1); the
-wiki: pages and tree, Markdown and live editor (`collab/` process, generations),
-versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text search, import/export
-(M2); messaging: event outbox and worker role, channels, direct messages (2–9 people),
-threads, mentions, reactions, read state, page threads with a system timeline,
-notifications and the activity view, message search, live delivery over SSE
-(LISTEN/NOTIFY, several API nodes), audited admin inspection of DMs (M3). Planned, not
-present: tickets, AI and agents, DBOS (M6: the outbox dispatcher is a plain loop until
-then), embeddings, S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
-`docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
-and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
-behind a proxy).
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4 (plans
+`docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
+`2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`) are built; the next
+milestone is M5 "KI-Grundlage" (spec 14), its plan is not written yet. Present:
+identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree, Markdown
+and live editor (`collab/` process, generations), versions, trash, tags, attachments
+(`HERD_DATA_DIR`), full-text search, import/export (M2); messaging: event outbox and
+worker role, channels, direct messages (2–9 people), threads, mentions, reactions, read
+state, page threads with a system timeline, notifications and the activity view, message
+search, live delivery over SSE (LISTEN/NOTIFY, several API nodes), audited admin
+inspection of DMs (M3); tickets: key `HC-<n>` numbered per org, kinds
+epic/story/task/bug with a three-level hierarchy, statuses per space whose category
+alone drives logic, assignment, list and "my tickets", board, epic overview, a ticket
+thread with a system timeline, ticket cards in messages (client-side, nothing written to
+channels), page links, tags, search (M4). Planned, not present: AI and agents (agent
+assignees and their ticket rules come in M6), DBOS (M6: the outbox dispatcher is a plain
+loop until then), embeddings, S3, collab with Redis. Operations: `README.md`
+(Betriebshinweise), `docs/STECKBRIEF.md` (update its measurements each milestone),
+`docs/WIKI.md` (wiki use and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging
+use, worker/outbox, SSE behind a proxy), `docs/TICKETS.md` (ticket use and operation).
+Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
 
@@ -33,12 +39,21 @@ behind a proxy).
   (`modules/messaging/handlers.py`), live hub `modules/messaging/live.py` (asyncpg
   LISTEN via `core/listen.py`, SSE `GET /api/stream`); frontend one `EventSource` per
   tab (`src/lib/live.ts`), events only invalidate TanStack Query keys.
+- Tickets: module `modules/tickets` (statuses, hierarchy, assignment, links, tagging,
+  views for board/epics/counts, search part; `base.py` holds what its services share),
+  thread kind `thread_ticket` in `modules/messaging`, handlers `ticket_timeline` and
+  `notify_on_ticket`; the key prefix is the constant `KEY_PREFIX` (`tickets/models.py`)
+  and `TICKET_PREFIX` (`frontend/src/features/tickets/refs.ts`). Frontend
+  `features/tickets` (board with `@dnd-kit/core`, no sortable); what to offer comes from
+  `ticketAbilities(my_role)`.
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
-- Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing and
-  messaging in the real app (role all, worker included) on a throwaway database; a CI
-  job of its own.
+- Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
+  messaging and tickets in the real app (role all, worker included) on a throwaway
+  database; a CI job of its own. Helpers per area (`tests/helpers.mjs`,
+  `messaging-helpers.mjs`, `tickets-helpers.mjs`); wait on concrete elements or
+  responses (`openLive()` waits for the page's `/api/stream`), never fixed sleeps.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
   BlueOak-1.0.0 or OFL-1.1 (fonts). CI checks it (`backend/scripts/check_licenses.py`).
@@ -102,6 +117,7 @@ cd e2e && npm ci && npx playwright install chromium && npx playwright test
 docker build -t to-herd-cats-ai:local .                 # the image (SPA + API + collab, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
 SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api-a, api-b, worker; message A → SSE B
+                                                        # (both modes also: a ticket's system entries from the worker)
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 ```
 
@@ -150,7 +166,17 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   the worker knows only handlers whose module it imported. Handlers run at least once
   per event, in the delivery's transaction: idempotent, never commit themselves.
 - Message content never goes into logs, outbox payloads, `NOTIFY` payloads (< 4,000
-  bytes) or metric labels; live events carry ids only.
+  bytes) or metric labels; live events carry ids only. The same holds for ticket titles
+  and descriptions: ticket events carry ids, field names and old/new ids or enum values.
+- Tickets: logic reads a status's category, never its name. A ticket one may not see
+  answers exactly like a free number (404 `ticket.not_found`, same shape and time
+  class); lists, board, counts and search filter visible spaces in SQL. Nothing about a
+  ticket is ever written into a channel or DM (acceptance M4; `e2e/tests/tickets-quiet`).
+- Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, shared API helpers in
+  `demo_api.py`) goes through the public API only; extend it and its test with each
+  milestone.
+- e2e on the board: dnd-kit's keyboard sensor listens for keys only after a timer of its
+  own; after picking a card up, wait one turn of the page's timers before an arrow key.
 
 ## Definition of done (per task)
 

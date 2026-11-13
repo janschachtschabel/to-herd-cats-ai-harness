@@ -1,11 +1,12 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 3 (Nachrichten), 13.11.2026, Version 0.1.0. Der Steckbrief wird mit
+Stand: Meilenstein 4 (Tickets), 13.11.2026, Version 0.1.0. Der Steckbrief wird mit
 jedem Meilenstein aktualisiert (Spezifikation 12.7). Die Messwerte aus M2 (Image,
-Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3 sind ohne Docker
-gemessen, an Prozessen auf der Maschine (Abschnitt
-[Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker)). Was nicht gemessen ist,
-steht unter [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
+Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3 und die Tickets aus M4
+sind ohne Docker gemessen, an Prozessen auf der Maschine (Abschnitte
+[Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker) und
+[Tickets (M4)](#tickets-m4)). Was nicht gemessen ist, steht unter
+[Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
 
@@ -20,8 +21,11 @@ Volltextsuche, Markdown-Import und -Export. **Vorhanden (M3):** Kanäle je Berei
 Direktnachrichten, Threads, Erwähnungen, Reaktionen, Lesestand, Diskussion je Wiki-Seite
 mit Systemmeldungen, Aktivität „Für mich“, Suche in Nachrichten, Live-Zustellung über
 Server-Sent Events (auch über mehrere API-Knoten), Outbox mit Worker, Einsicht der
-Verwaltung in Direktnachrichten mit Begründung und Audit. Aufgaben (M4) und KI (ab M5)
-folgen.
+Verwaltung in Direktnachrichten mit Begründung und Audit. **Vorhanden (M4):** Tickets je
+Bereich (Epic, Story, Aufgabe, Fehler mit Hierarchie), Status-Workflow je Bereich nach
+Kategorien, Zuweisung, Liste und „Meine Tickets“, Board, Epic-Übersicht, Ticket-Diskussion
+mit Systemmeldungen, Ticket-Karten in Nachrichten, Verknüpfung mit Wiki-Seiten, Tags,
+Suche. KI folgt ab M5.
 
 | | |
 |---|---|
@@ -110,7 +114,56 @@ Schreiben P50 0,5–1,9 s) lag die Zustellung des neuen Stands bei P50 1,0–3,7
 bis 9,7 s; in zwei Läufen griff die 5-s-Grenze (zweimal bzw. einmal `resync`; 798
 bzw. 899 von 1.000 Ereignissen kamen einzeln an, der Rest über das Nachladen).
 
-**Kosten:** M2 und M3 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
+### Tickets (M4)
+
+Ohne Docker gemessen: ein Prozess mit `HERD_ROLE=all` (API und Worker, ohne Collab-Prozess
+in Benutzung) an einem lokalen PostgreSQL 16, **10.000 Tickets in einem Team-Bereich**
+(50 Epics, der Rest Aufgaben, Fehler und Stories, über die fünf Standardstatus verteilt,
+30 % der Admin-Person zugewiesen, 40 % mit Fälligkeit, die Hälfte unter einem Epic, je 30
+Wörter Beschreibung), alle über die API angelegt. Ein Client misst je Endpunkt 200
+Anfragen nacheinander nach 10 zum Aufwärmen, dann 10 Clients 20 s lang gleichzeitig.
+Lastmittel der Maschine 0,9–1,6 (4 Kerne). „Abfragen“ sind die SQL-Anweisungen je
+Aufruf, gezählt im Prozess an derselben Datenbank (davon 3 für Sitzung und Rechte, die
+jeder angemeldete Aufruf hat); sie hängen nicht von der Zahl der Tickets ab.
+
+| Funktion | Endpunkt | P50 / P95, 1 Client | Abfragen |
+|---|---|---|---|
+| Liste eines Bereichs, 50 je Seite (zuletzt geändert) | `GET /api/tickets?space_id=…&limit=50` | 30 / 44 ms | 4 |
+| dieselbe nach Priorität / Fälligkeit | `…&sort=priority`, `…&sort=due` | 31 / 42 ms, 29 / 39 ms | 4 |
+| dieselbe, 20. Seite über den Cursor | `…&cursor=…` | 28 / 38 ms | 4 |
+| nur offene | `…&status_category=open` | 19 / 25 ms | 4 |
+| Meine Tickets (der Admin-Person sind 30 % zugewiesen) | `GET /api/tickets?assignee=me&status_category=…` | 24 / 31 ms | 4 |
+| Kinder eines Epics | `GET /api/tickets?parent=…` | 14 / 18 ms | 4 |
+| Liste mit Volltext (ein Wort, das in fast jeder Beschreibung steht: 30 Wörter je Ticket aus 12) | `GET /api/tickets?space_id=…&q=…` | 34 / 62 ms | 4 |
+| Board (5 Spalten zu je 50 Karten mit Anzahl, 151 KB) | `GET /api/spaces/{id}/board?limit=50` | 41 / 58 ms | 7 |
+| Board, nächste 50 einer Spalte | `GET /api/spaces/{id}/board/{status_id}?cursor=…` | 19 / 25 ms | 6 |
+| Epic-Übersicht (50 Epics mit Fortschritt) | `GET /api/spaces/{id}/epics?limit=50` | 23 / 30 ms | 6 |
+| Zähler der Seitenleiste | `GET /api/tickets/counts` | 14 / 19 ms | 3 |
+| Suche, nur Tickets | `GET /api/search?q=…&types=ticket&limit=20` | 70 / 102 ms | 3 |
+
+Unter 10 gleichzeitigen Clients (eine Sitzung je Client, kein Fehler): Liste P50 117 ms,
+P95 236 ms, 75 Anfragen/s; Board P50 249 ms, P95 524 ms, 34 Anfragen/s. Der Prozess
+bediente dabei nur diese Anfragen; die Grenze ist ein Python-Prozess (ein Event-Loop),
+mehr Durchsatz gibt es über mehr API-Replikas.
+
+**Anlegen:** 300 Tickets nacheinander mit einem Client 41 je Sekunde (P50 23 ms, P95
+32 ms); 9.650 mit 8 Clients gleichzeitig 54 je Sekunde (P50 126 ms, P95 302 ms). Mit
+getrenntem API-Prozess und Worker (`HERD_ROLE=api` und `worker`, 3.000 Tickets) 49 je
+Sekunde nacheinander und 60 je Sekunde mit 8 Clients (P50 116 ms, P95 261 ms).
+
+**Worker unter Anlagelast:** Ein angelegtes Ticket ergibt 2 bis 3 Ereignisse
+(`ticket.created` und je Systemmeldung ein `message.created`), bei 10.000 Tickets 23.054.
+In `HERD_ROLE=all` stand die Outbox am Ende der Anlagen bei 9.681 offenen Ereignissen
+(der Worker im selben Prozess kam neben der Anlagelast kaum voran) und war 182 s danach
+leer. Mit eigenem Worker-Prozess stand sie bei 3.000 Tickets höchstens bei 1.396 und war
+32 s nach der letzten Anlage leer; der Worker schaffte also rund 90 Ereignisse je
+Sekunde, weniger als die gut 130 je Sekunde, die 60 Anlagen je Sekunde erzeugen.
+Folge: Systemmeldungen und Live-Ereignisse kommen bei Massenanlagen über die API später
+an; nichts geht verloren. Ein zweiter Worker oder langsameres Anlegen hilft; nicht
+gemessen. Platz: `work_item` mit 10.000 Tickets 9,5 MB (mit Indizes), die ganze
+Datenbank 53 MB (mit 13.054 Systemmeldungen und der Outbox).
+
+**Kosten:** M2 bis M4 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
 Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der Anhänge auf dem
 Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je Anhang).
 
@@ -224,6 +277,15 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
 - **Wiki-Endpunkte:** eigenes Compose-Projekt, ein Team-Bereich mit 100
   veröffentlichten Seiten (je rund 2 KB Text aus 15 Wörtern, Baum mit 10 Ästen), je
   Endpunkt `hey` 20 s mit 2 und mit 20 Clients und einer Sitzung.
+- **Tickets (M4), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen PostgreSQL 16,
+  daran ein Prozess `HERD_ROLE=all` aus dem Arbeitsstand nach Commit `2d277cb` (der
+  Anwendungscode ist seit `6cb34d7` unverändert), Python-Skript mit httpx auf derselben
+  Maschine (nicht eingecheckt; Ablauf oben unter [Tickets (M4)](#tickets-m4)). Die
+  Abfragezahl zählt ein Ereignis-Listener der Datenbankanbindung (`before_cursor_execute`)
+  an der öffentlichen App im selben Python-Prozess wie das Skript, an derselben
+  Datenbank, jeder Aufruf einmal nach einem Aufruf zum Aufwärmen. Zum Vergleich der
+  Anlagen ein zweiter Lauf mit getrennten Prozessen (`migrate`, `api`, `worker`) auf
+  einer zweiten Wegwerf-Datenbank.
 - **Nachrichten (M3), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
   PostgreSQL 16 (auf derselben Maschine, von anderen Prozessen mitbenutzt), daran
   `HERD_ROLE=migrate`, dann Knoten A und B (`HERD_ROLE=api`) und ein Worker
@@ -372,6 +434,16 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   nennt 544 MB, M2 hatte 537 MB ebenfalls ohne eingespielte Updates) und
   keinen Lauf von `deploy/compose/load.sh`. `docker build` geht in dieser Sandbox nicht
   unverändert, und das Docker der Sandbox war für diese Messung aus.
+- **Tickets (M4):** keine Messung mit `docker stats` und kein Lauf von `load.sh`;
+  CPU und Speicher von App und Datenbank während der Ticket-Messung nicht aufgezeichnet;
+  echte Browser mit einem Board von 10.000 Tickets (geladen werden je Spalte 50; die
+  Darstellung und das Ziehen bei vielen Karten sind nicht gemessen); viele Bereiche oder
+  Organisationen mit Tickets zugleich (die Messung hat einen Bereich); 20 Status je
+  Bereich; Epics mit sehr vielen Kindern; gleichzeitige Änderungen desselben Tickets unter
+  Last (Wettläufe sind nur als Tests mit echten Commits geprüft); die Suche über Seiten,
+  Nachrichten und Tickets zusammen bei großen Mengen; ein zweiter Worker unter
+  Anlagelast; Ticket-Ereignisse über zwei API-Knoten unter Last (die Demo
+  `docs/demo/m4.md` prüft den Weg A → B mit zwei Knoten, ohne Last).
 - Nachrichten: Speicher und CPU der Datenbank, echte Browser statt eines Skripts als
   Empfänger, mehr als ein Kanal oder viele Organisationen, Direktnachrichten und Threads
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
@@ -422,7 +494,11 @@ Aus den Messwerten mit 20–30 % Puffer:
 | Plattform | linux/amd64 |
 | Basis | `python:3.13-slim` per Digest; tini 0.19.0 mit Prüfsumme; Node 22 nur als Binärdatei aus `node:22-slim` (per Digest) für den Collab-Prozess |
 
-Gemessen am Image aus Commit `6fee158`. Den Zuwachs gegenüber M1 machen die
+Gemessen am Image aus Commit `6fee158`. **M4:** Das Image aus dem Stand nach `6687a74`
+(gebaut mit der Variante mit der CA der Sandbox, ohne `apt-get upgrade`, für `smoke.sh`
+und die Demo) ist entpackt 545 MB (545.020.933 Byte), komprimiert 126,5 MB; M4 bringt
+keine neue Laufzeitabhängigkeit im Backend, im Frontend `@dnd-kit/core` (im
+SPA-Bündel). Den Zuwachs gegenüber M1 machen die
 Node-Binärdatei (rund 120 MB) und `collab/` mit seinen Produktionsabhängigkeiten
 (26 MB) aus. Die Laufzeitstufe spielt Debian-Sicherheitsupdates ein (`apt-get
 upgrade`); hier mit 0 eingespielten Paketen, weil die Sandbox `deb.debian.org` nicht
@@ -483,10 +559,11 @@ ihres Releases, 5 Minuten, kritisch), dazu wie bisher `HerdNotReady` (deckt die
 Worker-Pods mit ab). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Stand M3)
+## Tests (Stand M4)
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL) | 833 | alle grün (13.11.2026, nach der Review-Welle 1: 6:18 min), dazu ruff, ruff format, mypy (strict) sauber |
-| Frontend (`vitest`) | 180 in 36 Dateien | alle grün (13.11.2026) |
-| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 17 in 5 Dateien, davon 5 zu Nachrichten | die 5 Nachrichten-Tests hier in 4 Läufen grün (zuletzt nach der Review-Welle 1); die 12 der Live-Bearbeitung hier nicht neu gelaufen |
+| Backend (`pytest`, echtes PostgreSQL) | 980 | alle grün (13.11.2026, 8:07 min), dazu ruff, ruff format, mypy (strict) sauber |
+| Frontend (`vitest`) | 246 in 48 Dateien | alle grün (13.11.2026) |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 31 in 10 Dateien: 18 Live-Bearbeitung, 5 Nachrichten, 8 Tickets | alle 31 in einem Lauf grün (4,4 min, davon gut 3 min die Öffnungsprobe der Live-Bearbeitung); die 8 Ticket-Tests zusätzlich in 3 Läufen grün (je rund 30 s mit Start der App, rund 24 s in den Tests) |
+| Compose (`smoke.sh`) | einfach und `SMOKE_NODES=1` | beide `SMOKE OK` mit dem Image der Demo (13.11.2026) |
