@@ -152,7 +152,9 @@ async def test_labels_name_a_version(wiki: Wiki) -> None:
     assert (await wiki.editor.patch(path, json={"label": "x" * 101})).status_code == 422
 
 
-async def test_viewer_reads_versions_of_published_page_only(wiki: Wiki) -> None:
+async def test_version_history_needs_page_edit(wiki: Wiki) -> None:
+    """Review M2 R16: viewers see the current published content only, not the history
+    (draft-time versions and their authors included), its diffs or restores."""
     draft = await new_page(wiki.editor, wiki.space_id, "Entwurf")
     for path in (
         f"/api/pages/{draft['id']}/versions",
@@ -162,15 +164,18 @@ async def test_viewer_reads_versions_of_published_page_only(wiki: Wiki) -> None:
         r = await wiki.viewer.get(path)
         assert r.status_code == 404 and r.json()["error"]["code"] == "page.not_found", path
     page = await publish(wiki.editor, draft)
-    assert [v["number"] for v in (await _versions(wiki.viewer, page))["items"]] == [1]
-    assert (await wiki.viewer.get(f"/api/pages/{page['id']}/versions/1")).status_code == 200
+    assert (await wiki.viewer.get(f"/api/pages/{page['id']}")).status_code == 200
     for r in (
+        await wiki.viewer.get(f"/api/pages/{page['id']}/versions"),
+        await wiki.viewer.get(f"/api/pages/{page['id']}/versions/1"),
+        await wiki.viewer.get(f"/api/pages/{page['id']}/diff?from=1&to=1"),
         await wiki.viewer.patch(f"/api/pages/{page['id']}/versions/1", json={"label": "x"}),
         await wiki.viewer.post(
             f"/api/pages/{page['id']}/versions/1/restore", json={"version": page["version"]}
         ),
     ):
         assert r.status_code == 403 and r.json()["error"]["code"] == "auth.permission_denied"
+    assert [v["number"] for v in (await _versions(wiki.editor, page))["items"]] == [1]
 
 
 async def test_purge_removes_versions(wiki: Wiki, session: AsyncSession) -> None:

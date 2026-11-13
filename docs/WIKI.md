@@ -15,8 +15,8 @@ Aktion noch einmal.
 
 | Rolle im Bereich | darf |
 |---|---|
-| Leser (`viewer`) | veröffentlichte Seiten lesen, Versionen ansehen, exportieren, suchen |
-| Autor (`editor`) | dazu Seiten anlegen, bearbeiten (Markdown und live), umbenennen, verschieben, Tags setzen, Anhänge hochladen; Entwürfe aller sehen, eigene veröffentlichen |
+| Leser (`viewer`) | veröffentlichte Seiten in ihrer aktuellen Fassung lesen, exportieren, suchen (keine Versionsgeschichte) |
+| Autor (`editor`) | dazu Seiten anlegen, bearbeiten (Markdown und live), umbenennen, verschieben, Tags setzen, Anhänge hochladen; Versionen ansehen, vergleichen, benennen und wiederherstellen; Entwürfe aller sehen, eigene veröffentlichen |
 | Moderator (`moderator`) | dazu fremde Entwürfe veröffentlichen, Seiten in den Papierkorb legen und wiederherstellen, Tags des Bereichs verwalten |
 | Verwalter (`admin`) | dazu Mitglieder, Einstellungen, Import |
 
@@ -72,7 +72,9 @@ zählt sie nicht mit.
 - **Versionen:** Jede Speicherung ist eine Version mit Person, Zeit und Quelle
   (`human`, `collab`, `import`, `restore`). Live-Speicherungen derselben Sitzung werden
   über 60 s zu einer Version zusammengefasst. Zwei Versionen lassen sich vergleichen
-  (bis 20.000 Zeilen), benennen und wiederherstellen (als neue Version).
+  (bis 20.000 Zeilen), benennen und wiederherstellen (als neue Version). Die
+  Versionsgeschichte sieht nur, wer die Seite bearbeiten darf; Leser sehen nur die
+  aktuelle veröffentlichte Fassung, nie Entwurfsstände oder deren Autoren.
 - **Papierkorb:** In den Papierkorb gelegte Seiten nehmen ihre Unterseiten mit;
   Wiederherstellen setzt sie ans Ende ihrer Geschwister.
 - **Tags:** Systemweite Tags (Verwaltung → Tags) gibt es in allen Bereichen,

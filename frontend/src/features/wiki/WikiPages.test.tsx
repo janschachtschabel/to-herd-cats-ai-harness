@@ -84,10 +84,17 @@ describe('wiki', () => {
     expect(screen.queryByRole('button', { name: 'Datei hochladen' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
     const menu = await screen.findByRole('menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Versionen' })).toBeInTheDocument()
-    for (const name of ['Umbenennen', 'Verschieben', 'Tags', 'In den Papierkorb']) {
+    // The history needs page.edit (review R16): viewers see the current page only.
+    for (const name of ['Versionen', 'Umbenennen', 'Verschieben', 'Tags', 'In den Papierkorb']) {
       expect(within(menu).queryByRole('menuitem', { name })).not.toBeInTheDocument()
     }
+  })
+
+  test('a viewer opening the history gets the page', async () => {
+    const api = wikiApi('viewer')
+    await renderApp(`/spaces/${space.id}/p/start/urlaub?view=versions`)
+    expect(await screen.findByRole('heading', { level: 2, name: 'Urlaub' })).toBeInTheDocument()
+    expect(api.calls.some((c) => c.path.endsWith('/versions'))).toBe(false)
   })
 
   test('an editor edits and publishes own drafts, a moderator also trashes', async () => {
@@ -106,6 +113,7 @@ describe('wiki', () => {
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
     const menu = await screen.findByRole('menu')
     expect(within(menu).getByRole('menuitem', { name: 'Verschieben' })).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Versionen' })).toBeInTheDocument()
     expect(within(menu).queryByRole('menuitem', { name: 'In den Papierkorb' })).toBeNull()
   })
 

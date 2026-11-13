@@ -77,12 +77,14 @@ export function PageActions({ page }: { page: WikiPage }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link to="/spaces/$spaceId/p/$" params={params} search={{ view: 'versions' }}>
-                <History aria-hidden />
-                {t('wiki.actions.versions')}
-              </Link>
-            </DropdownMenuItem>
+            {abilities.edit && (
+              <DropdownMenuItem asChild>
+                <Link to="/spaces/$spaceId/p/$" params={params} search={{ view: 'versions' }}>
+                  <History aria-hidden />
+                  {t('wiki.actions.versions')}
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild>
               <a href={pageExportUrl(page.id)} download>
                 <Download aria-hidden />

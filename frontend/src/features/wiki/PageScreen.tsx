@@ -22,7 +22,7 @@ const VersionsPanel = lazy(() =>
 )
 
 /** The page at `path`, as reader, Markdown editor, live editor or version history.
- *  Editing modes fall back to reading without page.edit. */
+ *  Editing modes and the history fall back to reading without page.edit. */
 export function PageScreen({ path, mode }: { path: string; mode?: PageMode }) {
   const { t } = useTranslation()
   const { space, abilities, createPage } = useWiki()
@@ -43,7 +43,7 @@ export function PageScreen({ path, mode }: { path: string; mode?: PageMode }) {
   const data = page.data
   return (
     <Suspense fallback={<LoadingState />}>
-      {mode === 'versions' ? (
+      {mode === 'versions' && abilities.edit ? (
         <VersionsPanel page={data} />
       ) : mode === 'edit' && abilities.edit ? (
         <MarkdownEditor key={data.id} page={data} />

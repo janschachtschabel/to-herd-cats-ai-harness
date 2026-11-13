@@ -15,7 +15,8 @@ import { useRestoreVersion, useVersions } from './queries'
 import { VersionLabelDialog } from './VersionLabelDialog'
 
 /** The page's versions, newest first: who, how (source), when; the diff of two chosen
- *  versions; restoring one (as a new version) and naming one need page.edit. */
+ *  versions; restoring one (as a new version) and naming one. The whole history needs
+ *  page.edit (PageScreen shows it only then; review M2 R16). */
 export function VersionsPanel({ page }: { page: WikiPage }) {
   const { t, i18n } = useTranslation()
   const { space, abilities } = useWiki()

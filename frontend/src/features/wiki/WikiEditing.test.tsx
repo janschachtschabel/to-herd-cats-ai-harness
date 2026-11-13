@@ -142,7 +142,7 @@ describe('wiki editing', () => {
 
   test('a diff too large to compare says so', async () => {
     const server = makePage({ space_id: space.id })
-    wikiApi('viewer', () => server, {
+    wikiApi('editor', () => server, {
       'GET /api/pages/:id/versions': page([makeVersion(2), makeVersion(1)]),
       'GET /api/pages/:id/diff': apiError(422, 'page.diff_too_large'),
     })
@@ -150,8 +150,6 @@ describe('wiki editing', () => {
     expect(
       await screen.findByText('Die Versionen sind zu lang für einen Vergleich.'),
     ).toBeInTheDocument()
-    // Viewers compare, but neither restore nor name versions.
-    expect(screen.queryByRole('button', { name: /wiederherstellen/ })).toBeNull()
   })
 
   test('uploading sends the raw file and translates a refused type', async () => {

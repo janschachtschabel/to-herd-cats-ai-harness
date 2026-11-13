@@ -1,8 +1,9 @@
 """Page versions: every save is one (spec 9), numbered per page; a restore brings an
 older state back as a new version and ends live sessions; labels name a version.
 
-Reading versions needs what reading the page needs (drafts: `page.edit`); labelling
-and restoring need `page.edit`. A diff compares at most `HERD_DIFF_MAX_LINES` lines
+The history (list, read, diff), labels and restores need `page.edit` on the page
+(review M2 R16): viewers see the current published content only, never the
+draft-time versions or their authors. A diff compares at most `HERD_DIFF_MAX_LINES` lines
 (both versions together; its cost grows with them): more is 422 `page.diff_too_large`.
 """
 
@@ -102,17 +103,23 @@ class VersionService:
         )
         return version, author
 
+    async def _editable(self, actor: Actor, page_id: uuid.UUID) -> Page:
+        """The page, if the actor may see it (404 otherwise) and edit it (403)."""
+        page = await self.reader.readable(actor, page_id)
+        await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
+        return page
+
     async def list(
         self, actor: Actor, page_id: uuid.UUID, params: PageParams
     ) -> pagination.Page[NamedVersion]:
         """Newest first."""
-        page = await self.reader.readable(actor, page_id)
+        page = await self._editable(actor, page_id)
         before = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.reader.versions(actor).page(page.id, before, params.limit + 1)
         return id_page(rows, params.limit, lambda row: row.version.id)
 
     async def get(self, actor: Actor, page_id: uuid.UUID, number: int) -> NamedVersion:
-        page = await self.reader.readable(actor, page_id)
+        page = await self._editable(actor, page_id)
         found = await self.reader.versions(actor).get(page.id, number)
         if found is None:
             raise _not_found()
@@ -122,8 +129,7 @@ class VersionService:
         self, actor: Actor, page_id: uuid.UUID, number: int, label: str | None
     ) -> NamedVersion:
         """Name a version (None: take the name away)."""
-        page = await self.reader.readable(actor, page_id)
-        await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
+        page = await self._editable(actor, page_id)
         found = await self.reader.versions(actor).get(page.id, number)
         if found is None:
             raise _not_found()
@@ -134,7 +140,7 @@ class VersionService:
     async def diff(
         self, actor: Actor, page_id: uuid.UUID, from_number: int, to_number: int
     ) -> diffing.Diff:
-        page = await self.reader.readable(actor, page_id)
+        page = await self._editable(actor, page_id)
         versions = self.reader.versions(actor)
         old, new = await versions.get(page.id, from_number), await versions.get(page.id, to_number)
         if old is None or new is None:
