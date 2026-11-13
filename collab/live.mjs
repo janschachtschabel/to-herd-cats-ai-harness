@@ -29,12 +29,10 @@
 //   bring them back on reconnecting: the API ends the generation (the check names the
 //   unsaved sessions), the document is dropped and everyone is closed with 4409. Until
 //   the API has confirmed it, the document takes no messages and no one joins it.
-import { randomUUID } from "node:crypto";
-import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
-import { MAX_TABLE_CELLS, markdownTableCells } from "./cells.mjs";
 import { documentRules } from "./documents.mjs";
-import { CheckFailed, inlineChecks } from "./checks.mjs";
+import { DENIAL, openRules } from "./opening.mjs";
+import { inlineChecks } from "./checks.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { sizeGuard } from "./size.mjs";
 import {
@@ -51,13 +49,6 @@ import {
 
 export { CLOSE, colorFor, readCookie } from "./protocol.mjs";
 
-const DENIAL = {
-  401: CLOSE.unauthorized,
-  403: CLOSE.forbidden,
-  404: CLOSE.notFound,
-  413: CLOSE.tooLarge,
-};
-
 /** `person(context, userId)`: false when the person holds too many connections.
  * `checks`: where the heavy checks run (`checks.mjs`). */
 export function liveExtension({
@@ -73,9 +64,11 @@ export function liveExtension({
   const presence = presenceGuard();
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
   const joined = new WeakSet(); // sockets that completed the handshake and joined a document
+  const loading = new Set(); // document names being opened (waiting for or in a check)
   const ending = new Set(); // document names whose generation must end before anyone joins
 
   const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending, checks });
+  const { load } = openRules({ api, log, checks, size, live });
 
   /** A browser's editor changed the document it had just loaded and stopped (once per
    * connection: a browser cannot inflate the count). */
@@ -94,6 +87,7 @@ export function liveExtension({
     extensionName: "herd-live",
     live,
     joined,
+    loading,
 
     async onAuthenticate({ documentName, requestHeaders, context }) {
       if (documentName !== `page:${context.pageId}`) throw deny(context, CLOSE.forbidden);
@@ -114,68 +108,12 @@ export function liveExtension({
     },
 
     async onLoadDocument({ document, documentName, context }) {
-      const answer = await api.load(context.pageId, context.sessionId, context.generation);
-      if (answer.status === 409) throw deny(context, CLOSE.generationEnded);
-      if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
-      const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
-      const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
-      Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
-      // Tables of more cells than the cap are too large for live editing: refused before
-      // a check worker is asked (review M2 U2).
-      const cells = markdownTableCells(contentMd);
-      if (cells > MAX_TABLE_CELLS) {
-        log("live page too large", { page_id: context.pageId, table_cells: cells });
-        throw deny(context, CLOSE.tooLarge);
+      loading.add(documentName);
+      try {
+        await load(document, documentName, context);
+      } finally {
+        loading.delete(documentName);
       }
-      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9), smaller pages
-      // first (U6). A page too heavy to check there is too large for live editing.
-      const check = (work) =>
-        work.catch((error) => {
-          if (!(error instanceof CheckFailed)) throw error;
-          const reason = error.cause?.code ?? "check_failed"; // no message: no page text
-          log("live check failed", { page_id: context.pageId, reason });
-          throw deny(context, CLOSE.tooLarge);
-        });
-      let opened;
-      if (stored) {
-        // A state the browser's editor would repair (and save repaired) is not opened;
-        // one it would only tidy without changing its meaning is tidied, so the browser
-        // has nothing left to change (review M2 T1, ruling A).
-        const bytes = Buffer.from(stored, "base64");
-        opened = await check(checks.tidy(bytes, contentMd.length));
-        if (opened.problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
-        Y.applyUpdate(document, bytes);
-      } else {
-        // Only a page the editor can show without changing its meaning is opened, as the
-        // browser's editor shows it once loaded.
-        opened = await check(checks.open(contentMd, contentMd.length));
-        if (!opened.safe) throw deny(context, CLOSE.notRoundTripSafe);
-      }
-      const tidied = opened.update !== null;
-      if (tidied) Y.applyUpdate(document, opened.update);
-      // A joining browser gets the whole state in one message: over the limit, it would
-      // never arrive (review M2 U3).
-      state.size = size.measure(document);
-      if (!size.fits(state.size)) {
-        log("live page too large", { page_id: context.pageId, state_bytes: state.size.bytes });
-        throw deny(context, CLOSE.tooLarge);
-      }
-      if (tidied) {
-        // Built or tidied here: saved at once (content unchanged, so no version), so a
-        // browser that reconnects later meets the same Yjs history.
-        const saved = await api.save(context.pageId, {
-          generation,
-          ydoc: Y.encodeStateAsUpdate(document),
-          contentMd,
-          editorSessionIds: [context.sessionId],
-          sessionKey: state.sessionKey,
-        });
-        if (saved.status === 409) throw deny(context, CLOSE.generationEnded);
-        if (saved.status !== 200) throw deny(context, DENIAL[saved.status] ?? CLOSE.forbidden);
-      }
-      state.source = contentMd;
-      state.baseline = opened.baseline;
-      live.set(documentName, state);
     },
 
     async connected({ connection, documentName, context, instance }) {

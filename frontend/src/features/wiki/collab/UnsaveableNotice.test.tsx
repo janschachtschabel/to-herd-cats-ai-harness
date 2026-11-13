@@ -75,3 +75,13 @@ test('code with a backslash in a table cell is the example only for that cause',
   )
   expect(screen.getByText(/Backslash direkt vor \|/)).toBeInTheDocument()
 })
+
+test('a check that took too long is named as the cause (review M4-1 P13)', () => {
+  render(
+    <UnsaveableNotice
+      notice={{ kind: 'timeout', block: null, through: null, detail: null }}
+      doc={docOf('Text')}
+    />,
+  )
+  expect(screen.getByText(/zu lange gedauert/)).toHaveTextContent('Markdown-Editor')
+})

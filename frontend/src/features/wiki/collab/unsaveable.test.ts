@@ -70,3 +70,12 @@ test('the kind of difference comes after the place (review M2 U12)', () => {
   expect(unsaveable('herd:unrepresentable:markdown::neu')?.detail).toBeNull()
   expect(unsaveable('herd:unrepresentable:markdown:2')?.detail).toBeNull()
 })
+
+test('a state whose check took too long says so (review M4-1 P13)', () => {
+  expect(unsaveable('herd:unrepresentable:timeout:')).toEqual({
+    kind: 'timeout',
+    block: null,
+    through: null,
+    detail: null,
+  })
+})

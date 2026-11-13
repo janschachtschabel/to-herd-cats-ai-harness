@@ -1,7 +1,7 @@
 import * as Y from 'yjs'
 
 const NOTICE = 'herd:unrepresentable'
-const KINDS = ['structure', 'reopen', 'markdown', 'tooLarge'] as const
+const KINDS = ['structure', 'reopen', 'markdown', 'tooLarge', 'timeout'] as const
 const DETAILS = ['tableCode', 'address', 'list'] as const
 const START_LENGTH = 40
 
@@ -9,7 +9,8 @@ const START_LENGTH = 40
  *  (collab/readback.mjs): `structure` (the editor cannot hold it), `reopen` (the
  *  Markdown would not open again unchanged), `markdown` (it reads back as something
  *  else), `tooLarge` (its tables hold more cells than live editing takes,
- *  collab/cells.mjs); `block` is the index of the top-level block, null when unknown; `through`
+ *  collab/cells.mjs), `timeout` (the save check ran past its time limit, collab/checks.mjs);
+ *  `block` is the index of the top-level block, null when unknown; `through`
  *  the second of two neighbours that fail only together (review M2 U1), else null. */
 export interface Unsaveable {
   kind: (typeof KINDS)[number] | 'unknown'

@@ -42,6 +42,10 @@ function collect(node, markdown, out) {
 
 /** The wiki links of the Markdown: `{ start, end, title }`, in order. */
 export function wikiLinks(markdown) {
+  // Without `[[` there is no wiki link, and the parse is skipped: it is the costliest
+  // step of reading a page (review M4-1 P13: micromark's emphasis resolution is
+  // quadratic in the emphasis runs of one paragraph, so every parse saved counts).
+  if (!markdown.includes("[[")) return [];
   const tree = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions });
   const out = [];
   collect(tree, markdown, out);

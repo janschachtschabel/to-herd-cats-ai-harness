@@ -57,6 +57,7 @@ export function tidy(stored) {
 
 export const WORK = { open, tidy, readBack };
 
+parentPort?.postMessage({ ready: true }); // modules loaded: checks can come
 parentPort?.on("message", ({ id, kind, payload }) => {
   try {
     parentPort.postMessage({ id, result: WORK[kind](payload) });

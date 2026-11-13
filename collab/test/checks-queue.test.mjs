@@ -37,6 +37,7 @@ test("a worker that dies fails only its own check; the waiting ones run on a fre
 test("waiting checks go smallest first", async () => {
   const checks = createChecks();
   try {
+    await checks.open("Start\n"); // the worker is ready: the first check runs at once
     const order = [];
     const track = (name, promise) => promise.then(() => order.push(name));
     const running = track("running", checks.open(page(3000)));
@@ -53,6 +54,7 @@ test("waiting checks go smallest first", async () => {
 test("a large check is overtaken only a bounded number of times", async () => {
   const checks = createChecks({ maxOvertakes: 2 });
   try {
+    await checks.open("Start\n"); // the worker is ready: the first check runs at once
     const order = [];
     const track = (name, promise) => promise.then(() => order.push(name));
     const all = [track("running", checks.open(page(3000))), track("big", checks.open(page(2000)))];

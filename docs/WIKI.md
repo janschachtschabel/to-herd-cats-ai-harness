@@ -231,6 +231,20 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   gespeichert und alle sehen den Hinweis (Ursache unbekannt). Der Thread wird ersetzt,
   und die Prüfungen, die auf ihn warteten, laufen auf dem neuen; andere Seiten merken
   davon nur die Wartezeit. Jeder weitere Thread braucht bis zu rund 250 MB mehr.
+- **Zeitlimit der Prüfung:** Eine Prüfung darf höchstens
+  `HERD_COLLAB_CHECK_TIMEOUT_SECONDS` dauern (Standard 10). Danach wird ihr Thread
+  beendet und ersetzt, wie beim Speichermangel: Beim Öffnen ist die Seite „zu groß oder
+  zu aufwendig“ für die Live-Bearbeitung (4413, Markdown-Editor, nichts gespeichert,
+  dieselbe Seite wird danach sofort abgelehnt, ohne neue Prüfung); beim Speichern wird
+  der Stand nicht gespeichert, und alle sehen den Hinweis „Prüfung hat zu lange
+  gedauert“. Die Prüfungen, die warteten, laufen auf dem neuen Thread; eine kleine Seite
+  wartet so höchstens das Zeitlimit und den Start eines Threads (gemessen: Limit + rund
+  0,3 s). Solange die Seite einer Verbindung noch geöffnet wird, schließt der
+  Collab-Prozess sie nicht wegen des Handshake-Timeouts (10 s), höchstens zwei Zeitlimits
+  länger. Aufwendig sind vor allem sehr viele Hervorhebungen in einem einzigen Absatz:
+  Der Markdown-Parser (micromark, wie in der Seitenansicht) braucht dafür Zeit, die mit
+  ihrer Zahl quadratisch wächst (40.000 `*a*` in einem Absatz: rund 8 s je Lesen, das
+  Öffnen liest die Seite mehrmals).
 - **Tabellenzellen:** Die Tabellen einer Seite dürfen live zusammen höchstens 10.000
   Zellen haben (jede Zelle kostet im Live-Zustand rund hundert Bytes, und die Prüfung
   sehr großer Tabellen sprengte den Thread). Gezählt wird vor jeder Prüfung, ohne

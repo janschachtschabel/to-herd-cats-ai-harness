@@ -17,6 +17,7 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       "token-b": ["session-b", "user-b", "Ben"],
       "token-a2": ["session-a2", "user-a", "Anna"], // Anna's second login
     },
+    pages: {}, // page id -> Markdown, for pages other than `markdown`
     saves: [],
     checks: [],
     unrepresentable: 0,
@@ -71,12 +72,13 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       return response.end();
     }
     if (request.method === "GET") {
+      const pageId = url.pathname.split("/")[4];
       return reply([
         200,
         {
           generation: state.generation,
           ydoc_b64: state.ydoc ?? null,
-          content_md: state.markdown,
+          content_md: state.pages[pageId] ?? state.markdown,
           title: "T",
         },
       ]);

@@ -10,7 +10,8 @@
 //   person across all their logins at most HERD_COLLAB_MAX_PER_PERSON (20), never more
 //   than a quarter of all; more are closed with 4429 `too_many_connections`. A socket
 //   that has not joined its document within 10 s is closed with 4408
-//   `handshake_timeout`, one that has sent nothing for HERD_COLLAB_IDLE_MINUTES (15)
+//   `handshake_timeout` (while its page is still being opened, up to two check time
+//   limits later), one that has sent nothing for HERD_COLLAB_IDLE_MINUTES (15)
 //   with 4408 `idle_timeout`, so idle sockets cannot hold the global limit (review M2
 //   R7, S6). An open editor sends its presence every 15 s.
 //
@@ -18,14 +19,16 @@
 // API's internal port, default http://127.0.0.1:9090), HERD_COLLAB_PORT (1234),
 // HERD_COLLAB_HOST (127.0.0.1 with HERD_ROLE=all, else 0.0.0.0), HERD_PUBLIC_URL,
 // HERD_SESSION_COOKIE_NAME (herd_session), HERD_COLLAB_CHECK_WORKERS (1: the threads
-// that open and check pages, `checks.mjs`, each with a heap of at most 192 MB).
+// that open and check pages, `checks.mjs`, each with a heap of at most 192 MB),
+// HERD_COLLAB_CHECK_TIMEOUT_SECONDS (10: the time limit of one check; past it the
+// worker is replaced, an open is "too large", a save is not stored).
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { Hocuspocus } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
-import { createChecks, inlineChecks } from "./checks.mjs";
+import { CHECK_TIMEOUT_MS, createChecks, inlineChecks } from "./checks.mjs";
 import { liveExtension } from "./live.mjs";
 import { CLOSE, readCookie } from "./protocol.mjs";
 import { MAX_MESSAGE_BYTES } from "./size.mjs";
@@ -101,6 +104,7 @@ export function createCollabServer({
   measureEveryMs,
   checkWorkers = 1,
   checkHeapMb = 192,
+  checkTimeoutMs = CHECK_TIMEOUT_MS,
   checks: givenChecks = null,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
@@ -110,7 +114,7 @@ export function createCollabServer({
   const checks =
     givenChecks ??
     (checkWorkers > 0
-      ? createChecks({ workers: checkWorkers, heapMb: checkHeapMb })
+      ? createChecks({ workers: checkWorkers, heapMb: checkHeapMb, timeoutMs: checkTimeoutMs })
       : inlineChecks());
   const held = counter();
   const people = new WeakMap(); // socket -> the person's key, once authenticated
@@ -178,10 +182,23 @@ export function createCollabServer({
         ws.on("close", () => sockets.delete(ws));
         return ws.close(...CLOSE.tooMany);
       }
-      const joining = setTimeout(() => {
-        if (!extension.joined.has(ws)) ws.close(...CLOSE.handshakeTimeout);
-      }, handshakeTimeoutMs);
-      joining.unref();
+      // Not joined in time: closed, unless its page is still being opened (waiting in the
+      // check queue behind checks of up to `checkTimeoutMs` each, review M4-1 P13), and
+      // then at the latest after two more check time limits.
+      const documentName = `page:${page[1]}`;
+      const giveUpAt = Date.now() + handshakeTimeoutMs + 2 * checkTimeoutMs;
+      let joining;
+      const waitForJoin = (ms) => {
+        joining = setTimeout(() => {
+          if (extension.joined.has(ws)) return;
+          if (extension.loading.has(documentName) && Date.now() < giveUpAt) {
+            return waitForJoin(Math.min(500, giveUpAt - Date.now()));
+          }
+          ws.close(...CLOSE.handshakeTimeout);
+        }, ms);
+        joining.unref();
+      };
+      waitForJoin(handshakeTimeoutMs);
       const headers = new Headers();
       for (const name of ["cookie", "origin"]) {
         if (request.headers[name]) headers.set(name, request.headers[name]);
@@ -270,6 +287,7 @@ async function main(env) {
     maxPerPage: positive(env.HERD_COLLAB_MAX_PER_PAGE, 3),
     maxPerPerson: positive(env.HERD_COLLAB_MAX_PER_PERSON, 20),
     checkWorkers: positive(env.HERD_COLLAB_CHECK_WORKERS, 1),
+    checkTimeoutMs: positive(env.HERD_COLLAB_CHECK_TIMEOUT_SECONDS, 10) * 1000,
     idleTimeoutMs: positive(env.HERD_COLLAB_IDLE_MINUTES, 15) * 60_000,
   });
   const host =

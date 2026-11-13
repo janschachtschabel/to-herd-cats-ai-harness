@@ -27,9 +27,10 @@ export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection
 // To every connection of a document: its latest state cannot be stored as Markdown
 // (nothing is stored until a later state can be), and that a later state was stored.
 // The first is followed by `:<kind>:<where>`: the kind of cause (`structure`, `reopen`,
-// `markdown`, `readback.mjs`; `tooLarge`, `unknown`) and the index of the top-level
-// block, `<first>-<second>` for two neighbours that fail only together, empty if
-// unknown; then `:<detail>` when the kind of difference is known (`cause.mjs`).
+// `markdown`, `readback.mjs`; `tooLarge`; `timeout`, the check took too long; `unknown`)
+// and the index of the top-level block, `<first>-<second>` for two neighbours that fail
+// only together, empty if unknown; then `:<detail>` when the kind of difference is known
+// (`cause.mjs`).
 export const UNREPRESENTABLE = "herd:unrepresentable";
 
 /** The notice for a state that cannot be stored (see UNREPRESENTABLE). */

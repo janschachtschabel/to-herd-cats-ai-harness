@@ -66,7 +66,8 @@ describe('live editor', () => {
     [4403, 'Dir fehlt das Schreibrecht'],
     [4401, 'Deine Sitzung ist abgelaufen'],
     [4404, 'nicht mehr sichtbar'],
-    [4413, 'zu groß für die Live-Bearbeitung'],
+    // Too large, or too heavy to check in time (review M4-1 P13).
+    [4413, 'zu groß oder zu aufwendig für die Live-Bearbeitung'],
   ])('%i stops reconnecting and leaves the text read-only', async (code, message) => {
     const current = makePage({ space_id: space.id, content_md: 'alt' })
     liveApi('editor', () => current)

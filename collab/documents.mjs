@@ -12,7 +12,7 @@
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { MAX_TABLE_CELLS, tableLoad } from "./cells.mjs";
-import { CheckFailed } from "./checks.mjs";
+import { CheckFailed, CheckTimedOut } from "./checks.mjs";
 import { yDocToJSON } from "./markdown.mjs";
 import { CLOSE, REPRESENTABLE, STORED, closeSocket, unrepresentableNotice } from "./protocol.mjs";
 
@@ -135,9 +135,10 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
         for (const sessionId of editors) state.dirty.set(sessionId, true);
         throw error;
       }
-      // Too heavy to check (the worker ran out of memory): not stored, as a state that
-      // cannot be written; the cause is not known.
-      written = { ok: false, problem: error.message, kind: "unknown", block: null };
+      // Too heavy to check (the worker ran out of memory, or the check ran past its time
+      // limit, review M4-1 P13): not stored, as a state that cannot be written.
+      const kind = error instanceof CheckTimedOut ? "timeout" : "unknown";
+      written = { ok: false, problem: error.message, kind, block: null };
     }
     if (!written.ok) {
       for (const sessionId of editors) state.dirty.set(sessionId, true);

@@ -6,6 +6,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import WebSocket from "ws";
+import { inlineChecks } from "../checks.mjs";
 import { createCollabServer } from "../server.mjs";
 import { ORIGIN, PAGE, liveFixture, synced, type, until } from "./helpers.mjs";
 
@@ -62,6 +63,22 @@ test("a socket that never completes the handshake is closed (4408)", async () =>
   await synced(c);
   await new Promise((resolve) => setTimeout(resolve, 400));
   assert.deepEqual(c.closes, []);
+});
+
+test("a socket whose page is still being opened is not closed as idle (M4-1 P13)", async () => {
+  // A page waits in the check queue behind a check that may run up to its time limit:
+  // closing its socket meanwhile only made the browser come back later.
+  const checks = inlineChecks();
+  const open = checks.open;
+  checks.open = async (markdown) => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return open(markdown);
+  };
+  live = await liveFixture({ createCollabServer, handshakeTimeoutMs: 200, checks });
+  const c = live.open(anna);
+  await until(() => c.provider.synced || c.closes.length > 0, 3000);
+  assert.deepEqual(c.closes, []);
+  assert.equal(c.provider.synced, true);
 });
 
 test("one person holds a limited number of connections across their logins", async () => {
