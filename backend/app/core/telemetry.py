@@ -18,8 +18,10 @@ from opentelemetry.propagators.textmap import TextMapPropagator
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
+from starlette.types import ASGIApp
 
 from app.core.config import Settings
+from app.core.request_context import FreshContext
 
 SERVICE_NAME = "to-herd-cats-ai"
 DEFAULT_PROPAGATORS = "tracecontext,baggage"
@@ -76,7 +78,15 @@ def _tracer_provider(settings: Settings) -> TracerProvider:
 
 
 def configure_tracing(app: FastAPI, settings: Settings) -> None:
+    """Every request gets a server span of its own, started in a fresh context
+    (`FreshContext` wraps the instrumented stack)."""
     propagate.set_global_textmap(propagator_from_env())
     FastAPIInstrumentor.instrument_app(
         app, tracer_provider=_tracer_provider(settings), exclude_spans=["receive", "send"]
     )
+    instrumented = app.build_middleware_stack
+
+    def build_middleware_stack() -> ASGIApp:
+        return FreshContext(instrumented())
+
+    app.build_middleware_stack = build_middleware_stack  # type: ignore[method-assign]

@@ -6,7 +6,8 @@ bootstrap, tests calling services directly) the values are None. Nothing here is
 logged.
 """
 
-from contextvars import ContextVar
+import asyncio
+from contextvars import Context, ContextVar
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -32,3 +33,26 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
         finally:
             _client_ip.reset(token)
+
+
+class FreshContext:
+    """Runs every request in an empty context (outermost, before tracing).
+
+    A server task for the next request on a keep-alive connection copies the context
+    of the connection's read callback, and that callback captures the context of
+    whichever request last resumed reading (uvicorn's flow control on bodies over
+    64 KiB). Without this, the next requests on the connection would continue the
+    upload's trace (one trace id for many requests) and carry its log fields (review
+    M2 R11)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        await asyncio.create_task(self._run(scope, receive, send), context=Context())
+
+    async def _run(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self.app(scope, receive, send)

@@ -21,6 +21,7 @@ from app.core.db import get_database
 from app.core.errors import AppError, Unauthorized, UnhandledErrorMiddleware, install_error_handlers
 from app.core.metrics import render_metrics
 from app.core.migrations import schema_is_compatible
+from app.core.request_context import FreshContext
 from app.modules.wiki.collab_router import router as collab_router
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def create_internal_app() -> FastAPI:
     app = FastAPI(title="to-herd-cats-ai internal", openapi_url=None, docs_url=None, redoc_url=None)
     app.add_middleware(BodyLimitMiddleware, max_bytes=INTERNAL_MAX_BODY_BYTES)
     app.add_middleware(UnhandledErrorMiddleware)
+    app.add_middleware(FreshContext)  # outermost: no context of an earlier request
     install_error_handlers(app)
     app.include_router(internal_router())
 
