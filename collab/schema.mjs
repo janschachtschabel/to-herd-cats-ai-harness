@@ -24,7 +24,8 @@ export const SYNC_META = ySyncPluginKey;
 
 const LINK_PROTOCOLS = new Set(["http", "https", "mailto"]);
 
-/** Links only to http, https, mailto and relative targets (as the page view renders). */
+/** Links and images only to http, https, mailto and relative targets (as the page view
+ * renders, `safeUrl` in the frontend). */
 export function allowedUri(url) {
   const value = String(url).trim();
   const colon = value.indexOf(":");
@@ -39,9 +40,19 @@ const LINE = "(text | image)*"; // inline content without hard breaks
 const TYPED_IMAGE = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
 
 /** Images as Markdown has them: source, alt text and title; no marks (the Y.Doc keeps
- * none on an image, so a linked image could not be shared; it stays a raw block). */
+ * none on an image, so a linked image could not be shared; it stays a raw block). An
+ * image whose source the page view does not show (`blob:`, `file:`, `data:`, ...) is
+ * not taken in, pasted or typed (review M2 T11). */
 const MarkdownImage = Image.extend({
   marks: "",
+  parseHTML() {
+    return [
+      {
+        tag: "img[src]",
+        getAttrs: (element) => (allowedUri(element.getAttribute("src") ?? "") ? null : false),
+      },
+    ];
+  },
   // Tiptap's own rule types the closing `)` again after the image; this one does not.
   addInputRules() {
     return [
@@ -49,6 +60,7 @@ const MarkdownImage = Image.extend({
         find: TYPED_IMAGE,
         handler: ({ state, range, match }) => {
           const [whole, image, alt, src, title] = match;
+          if (!allowedUri(src)) return null;
           const from = range.from + whole.lastIndexOf(image);
           state.tr.replaceWith(
             from,

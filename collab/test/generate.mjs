@@ -2,6 +2,7 @@
 // type, nested lists, tables, code blocks in lists, images wherever inline content may
 // stand, adjacent and overlapping marks, characters with a meaning in Markdown, and
 // whitespace at the edges. Seeded, so a failure can be replayed.
+import { allowedUri } from "../schema.mjs";
 
 /** A small seeded generator (mulberry32). */
 export function seeded(seed) {
@@ -119,7 +120,10 @@ function inline(r, { breaks }) {
     const kind = r.next();
     if (kind < 0.12) {
       const title = r.pick(TITLES);
-      const attrs = { src: r.pick(URLS) || "x.png", alt: r.chance(0.8) ? text(r) : null, title };
+      // The editor takes no image the page view does not show (review M2 T11).
+      const url = r.pick(URLS);
+      const src = url && allowedUri(url) ? url : "x.png";
+      const attrs = { src, alt: r.chance(0.8) ? text(r) : null, title };
       out.push({ type: "image", attrs }); // images carry no marks (schema.mjs)
     } else if (kind < 0.2 && breaks) {
       out.push({ type: "hardBreak" });

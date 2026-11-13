@@ -60,6 +60,10 @@ const UNSUPPORTED = {
   "reference link": "Siehe [die Seite][ref].\n\n[ref]: https://example.com",
   footnote: "Satz mit Fußnote[^1].\n\n[^1]: Die Fußnote.",
   "fence in raw": "<details>\n\n```\ncode\n```\n\n</details>",
+  // The page view does not show these images (review M2 T11): neither does the editor.
+  "image from a blob": "Screenshot: ![eins](blob:https://app.example/1) und mehr",
+  "image from a file": "![zwei](file:///C:/bild.png)",
+  "image from data": "![drei](data:image/png;base64,iVBORw0KGgo=)",
 };
 
 for (const [name, md] of Object.entries(UNSUPPORTED)) {

@@ -5,12 +5,12 @@
 // differently from the page view.
 //
 // A top-level block holding what the editor cannot show (raw HTML, reference links
-// and definitions, footnotes, ...) becomes a raw block (`raw-markdown` code block)
+// and definitions, footnotes, images the page view does not show, ...) becomes a raw block (`raw-markdown` code block)
 // with exactly its source text, written back unchanged.
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
-import { RAW_MARKDOWN } from "./schema.mjs";
+import { RAW_MARKDOWN, allowedUri } from "./schema.mjs";
 import { replaceWikiLinks } from "./wikilinks.mjs";
 
 // `[[Titel]]` while parsing: a link `[…]()` of the same length whose text is
@@ -30,9 +30,12 @@ const UNSUPPORTED = new Set([
   "yaml",
 ]);
 
-/** Whether the editor can represent the node and everything inside it. */
+/** Whether the editor can represent the node and everything inside it. An image the
+ * page view does not show (its source is not http, https, mailto or relative) is not
+ * shown as an image in the editor either (review M2 T11). */
 export function supported(node) {
   if (UNSUPPORTED.has(node.type)) return false;
+  if (node.type === "image" && !allowedUri(node.url)) return false;
   return (node.children ?? []).every(supported);
 }
 
