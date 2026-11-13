@@ -45,6 +45,14 @@ const ConversationScreen = lazyRouteComponent(
   () => import('@/features/messaging/conversation/ConversationScreen'),
   'ConversationScreen',
 )
+const BoardView = lazyRouteComponent(
+  () => import('@/features/tickets/board/BoardView'),
+  'BoardView',
+)
+const EpicsView = lazyRouteComponent(
+  () => import('@/features/tickets/epics/EpicsView'),
+  'EpicsView',
+)
 const TicketsPage = lazyRouteComponent(
   () => import('@/features/tickets/TicketsPage'),
   'TicketsPage',
@@ -158,6 +166,19 @@ const spaceSettingsRoute = createRoute({
     const { spaceId } = spaceSettingsRoute.useParams()
     return <SpacePage spaceId={spaceId} />
   },
+})
+
+/** A space's tickets as a board (its statuses as columns) and its epics. */
+const boardRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/board',
+  component: BoardView,
+})
+
+const epicsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/epics',
+  component: EpicsView,
 })
 
 /** A page by its id, for links into its discussion (search hits, the activity):
@@ -316,7 +337,14 @@ export const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     indexRoute,
     spacesRoute,
-    spaceRoute.addChildren([spaceIndexRoute, pageRoute, trashRoute, spaceSettingsRoute]),
+    spaceRoute.addChildren([
+      spaceIndexRoute,
+      pageRoute,
+      trashRoute,
+      spaceSettingsRoute,
+      boardRoute,
+      epicsRoute,
+    ]),
     pageByIdRoute,
     conversationRoute,
     ticketsRoute,

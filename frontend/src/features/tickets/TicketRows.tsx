@@ -28,7 +28,7 @@ export function TicketRows({
               params={{ number: String(ticket.number) }}
               className="flex min-w-0 items-baseline gap-2 rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <span className="shrink-0 font-mono text-xs text-muted-foreground">{ticket.key}</span>
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">{ticket.key}</span>{' '}
               <span className="truncate text-sm font-medium">{ticket.title}</span>
             </Link>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">

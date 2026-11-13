@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react'
 import { useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { errorMessage } from '@/lib/errors'
 import {
   Dialog,
   DialogContent,
@@ -26,12 +27,15 @@ export function PickDialog({
   onOpenChange,
   title,
   onPick,
+  error,
 }: {
   type: 'page' | 'ticket'
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   onPick: (hit: Hit) => void
+  /** Why the last pick was refused (shown in the dialog, which stays open). */
+  error?: unknown
 }) {
   const { t } = useTranslation()
   return (
@@ -42,6 +46,11 @@ export function PickDialog({
           <DialogDescription>{t(`tickets.pick.${type}`)}</DialogDescription>
         </DialogHeader>
         {open && <Picker type={type} onPick={onPick} />}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(t, error)}
+          </p>
+        ) : null}
       </DialogContent>
     </Dialog>
   )
@@ -109,7 +118,7 @@ function Picker({ type, onPick }: { type: 'page' | 'ticket'; onPick: (hit: Hit) 
             >
               {hit.type === 'ticket' ? (
                 <>
-                  <span className="font-mono text-xs text-muted-foreground">{hit.key}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{hit.key}</span>{' '}
                   <span className="min-w-0 flex-1 truncate">{hit.title}</span>
                   <StatusBadge status={hit.status} />
                 </>

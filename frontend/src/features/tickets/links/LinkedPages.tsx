@@ -28,7 +28,10 @@ export function LinkedPages({ ticket, editable }: { ticket: Ticket; editable: bo
             size="icon-xs"
             aria-label={t('tickets.links.addPage')}
             title={t('tickets.links.addPage')}
-            onClick={() => setPicking(true)}
+            onClick={() => {
+              link.reset()
+              setPicking(true)
+            }}
           >
             <Plus aria-hidden />
           </Button>
@@ -70,16 +73,20 @@ export function LinkedPages({ ticket, editable }: { ticket: Ticket; editable: bo
         </ul>
       )}
       <LoadMore hasMore={pages.hasMore} loading={pages.loadingMore} onLoad={pages.loadMore} />
-      {link.error ? (
+      {link.error && !picking ? (
         <p role="alert" className="text-xs text-destructive">
           {errorMessage(t, link.error)}
         </p>
       ) : null}
       {editable && (
         <PickDialog
+          error={picking ? link.error : undefined}
           type="page"
           open={picking}
-          onOpenChange={setPicking}
+          onOpenChange={(open) => {
+            setPicking(open)
+            if (!open) link.reset()
+          }}
           title={t('tickets.links.addPage')}
           onPick={(hit) =>
             link.mutate(

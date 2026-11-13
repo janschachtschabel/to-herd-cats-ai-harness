@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
+import { TicketCards } from '@/features/tickets/TicketCard'
 import type { Message } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { messageAbilities } from '../abilities'
@@ -68,7 +69,10 @@ function HumanMessage({ message }: { message: Message }) {
       ) : editing ? (
         <EditMessageForm message={message} onDone={() => setEditing(false)} />
       ) : (
-        <MessageMarkdown markdown={message.body_md} meId={meId} />
+        <>
+          <MessageMarkdown markdown={message.body_md} meId={meId} />
+          <TicketCards markdown={message.body_md} />
+        </>
       )}
       <Reactions message={message} canReact={can.react} toggle={toggle} />
       {replies && message.reply_count > 0 && (

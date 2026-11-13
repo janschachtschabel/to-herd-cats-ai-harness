@@ -4,13 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ErrorState, LoadingState } from '@/features/shared/states'
 import { SpaceTags } from '@/features/tags/SpaceTags'
+import { ticketAbilities } from '@/features/tickets/abilities'
+import { StatusSettings } from '@/features/tickets/statuses/StatusSettings'
 import { useWiki } from '@/features/wiki/WikiContext'
 import { canEditMembers, canEditSettings } from './display'
 import { useSpace } from './queries'
 import { SpaceMembers } from './SpaceMembers'
 import { SpaceSettingsDialog } from './SpaceSettingsDialog'
 
-/** Members, settings and tags of a space (inside the space's layout, which shows its
+/** Members, settings, tags and ticket statuses of a space (inside the space's layout, which shows its
  *  name and decides from `my_role` what one may do). */
 export function SpacePage({ spaceId }: { spaceId: string }) {
   const { t } = useTranslation()
@@ -48,6 +50,7 @@ export function SpacePage({ spaceId }: { spaceId: string }) {
         <SpaceMembers spaceId={spaceId} editable={canEditMembers(data)} />
       </section>
       {abilities.moderate && <SpaceTags spaceId={spaceId} />}
+      {ticketAbilities(data.my_role).manageStatuses && <StatusSettings spaceId={spaceId} />}
       {canEditSettings(data) && (
         <SpaceSettingsDialog space={data} open={editing} onOpenChange={setEditing} />
       )}

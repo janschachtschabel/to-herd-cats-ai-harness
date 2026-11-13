@@ -15,9 +15,10 @@ import {
   page,
 } from '@/test/api'
 import { renderApp } from '@/test/render'
+import { makeTicketSummary, STATUSES, statusRef } from '@/test/tickets'
 
 const KEY_LIKE =
-  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|profile|roles|systemRoles|principals|spaces|users|groups|audit|wiki|search)\.[\w.]+/
+  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|profile|roles|systemRoles|principals|spaces|users|groups|audit|wiki|search|tickets)\.[\w.]+/
 
 /** What a person reads, text node by text node, and the accessible labels; scripts
  *  (next-themes injects one) left out. */
@@ -79,6 +80,26 @@ function api(locale: Locale) {
         { kind: 'insert', lines: ['neu'] },
       ],
     },
+    'GET /api/pages/:id/tickets': page([makeTicketSummary()]),
+    'GET /api/spaces/:id/ticket-statuses': page(STATUSES),
+    'GET /api/tickets/counts': { assigned_open: 3 },
+    'GET /api/tickets': page([
+      makeTicketSummary({ assignee: { type: 'user', id: me.user.id, name: 'Mia Muster' } }),
+    ]),
+    'GET /api/spaces/:id/epics': page([
+      {
+        ...makeTicketSummary({ number: 7, kind: 'epic' }),
+        children: { open: 1, active: 0, review: 0, done: 1, cancelled: 0 },
+      },
+    ]),
+    'GET /api/spaces/:id/board': {
+      columns: STATUSES.map((status, i) => ({
+        status: statusRef(status),
+        count: i === 0 ? 1 : 0,
+        items: i === 0 ? [makeTicketSummary()] : [],
+        next_cursor: null,
+      })),
+    },
     'GET /api/admin/users': page([makeUser(), makeUser({ is_active: false, name: 'Jan' })]),
     'GET /api/admin/groups': page([group]),
     'GET /api/admin/groups/:id': group,
@@ -110,6 +131,9 @@ const PAGES = [
   `/spaces/${team.id}/p/handbuch`,
   `/spaces/${team.id}/p/handbuch?view=versions`,
   `/spaces/${team.id}/p/handbuch?view=edit`,
+  `/spaces/${team.id}/board`,
+  `/spaces/${team.id}/epics`,
+  '/tickets',
   '/admin/users',
   '/admin/groups',
   '/admin/groups/g1',

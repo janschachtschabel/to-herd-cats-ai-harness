@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingState } from '@/features/shared/states'
 import { formatDateTime } from '@/lib/format'
 import type { WikiPage } from '@/lib/api'
+import { PageTickets } from '@/features/tickets/links/PageTickets'
 import { Attachments } from './attachments/Attachments'
 import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
@@ -93,6 +94,7 @@ export function PageView({ page }: { page: WikiPage }) {
           </aside>
         )}
       </div>
+      <PageTickets page={page} editable={abilities.edit} />
       <Attachments page={page} />
     </article>
   )

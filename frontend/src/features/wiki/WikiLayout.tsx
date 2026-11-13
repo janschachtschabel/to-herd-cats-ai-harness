@@ -1,4 +1,4 @@
-import { Link, Outlet } from '@tanstack/react-router'
+import { Link, Outlet, useMatchRoute } from '@tanstack/react-router'
 import { Settings, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,11 +13,13 @@ import type { Space } from '@/lib/api'
 import { wikiAbilities } from './abilities'
 import { NewPageDialog } from './NewPageDialog'
 import { useTree } from './queries'
+import { type SpaceView, SpaceTabs } from './SpaceTabs'
 import { SpaceTransferMenu } from './transfer/SpaceTransferMenu'
 import { titleLookup, WikiContext, type Wiki } from './WikiContext'
 import { WikiTreePanel } from './WikiTreePanel'
 
-/** A space: its page tree on the left, the page (or trash, settings) on the right. */
+/** A space: its page tree on the left, the page (or trash, settings) on the right;
+ *  the board and the epics take the whole width. */
 export function WikiLayout({ spaceId }: { spaceId: string }) {
   const space = useSpace(spaceId)
   if (space.isPending) return <LoadingState />
@@ -48,10 +50,19 @@ function WikiFrame({ space }: { space: Space }) {
     [space, me, nodes, tagFilter],
   )
   const { abilities } = wiki
+  const matchRoute = useMatchRoute()
+  const view: SpaceView = matchRoute({
+    to: '/spaces/$spaceId/board',
+    params: { spaceId: space.id },
+  })
+    ? 'board'
+    : matchRoute({ to: '/spaces/$spaceId/epics', params: { spaceId: space.id } })
+      ? 'epics'
+      : 'wiki'
 
   return (
     <WikiContext.Provider value={wiki}>
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <SpaceIcon space={space} className="size-5" />
@@ -86,12 +97,17 @@ function WikiFrame({ space }: { space: Space }) {
           <SpaceTransferMenu />
         </div>
       </header>
-      <div className="grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
-        <WikiTreePanel />
-        <div className="min-w-0">
-          <Outlet />
+      <SpaceTabs space={space} current={view} />
+      {view === 'wiki' ? (
+        <div className="grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+          <WikiTreePanel />
+          <div className="min-w-0">
+            <Outlet />
+          </div>
         </div>
-      </div>
+      ) : (
+        <Outlet />
+      )}
       {abilities.create && (
         <NewPageDialog
           open={creating !== null}
