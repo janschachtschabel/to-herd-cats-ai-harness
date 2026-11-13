@@ -101,3 +101,45 @@ def test_type_detection_still_knows_large_zips_and_office_files() -> None:
     broken = _lying_zip(3, declared=5)
     with pytest.raises(filetypes.UnsupportedType):
         filetypes.detect(broken[:4096], False, io.BytesIO(broken), "x.zip")
+
+
+def _record(name: bytes, comment: bytes = b"") -> bytes:
+    return struct.pack(
+        "<4s4B4HL2L5H2L", b"PK\x01\x02", 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, len(name),
+        0, len(comment), 0, 0, 0, 0,
+    ) + name + comment  # fmt: skip
+
+
+def _zip64_bomb(records: int) -> bytes:
+    """The reviewer's shape (review M2 S4): the plain end record names a one-record
+    directory, the zip64 record before it (which `zipfile` always follows) a huge one."""
+    zip64_len = 56 + 20
+    a_head = _record(b"a.md", comment=b"\0" * zip64_len)[: 46 + 4]
+    b_dir = b"".join(_record(b"%07d" % i) for i in range(records - 1))
+    b_dir += _record(b"last", comment=a_head)  # its comment swallows A's header
+    eocd64 = struct.pack(
+        "<4sQ2H2L4Q", b"PK\x06\x06", 44, 45, 45, 0, 0, records, records, len(b_dir), 0
+    )
+    locator = struct.pack("<4sLQL", b"PK\x06\x07", 0, len(b_dir), 1)
+    a_start = len(b_dir) - len(a_head)
+    eocd = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, len(a_head) + zip64_len, a_start, 0)
+    return b_dir + eocd64 + locator + eocd
+
+
+def test_an_archive_with_a_zip64_record_is_refused_before_zipfile_reads_it() -> None:
+    # Imports are at most 100 MiB: no archive needs zip64 (ruling on S4).
+    data = _zip64_bomb(300_000)
+    with pytest.raises(Exception) as refused:
+        archive.open_archive(io.BytesIO(data))
+    assert getattr(refused.value, "code", None) == "import.invalid_zip"
+    assert _peak(lambda: archive.open_archive(io.BytesIO(data))) < FLAT
+    with pytest.raises(filetypes.UnsupportedType):
+        filetypes.detect(data[:4096], False, io.BytesIO(data), "x.zip")
+
+
+def test_an_end_record_that_asks_for_zip64_is_refused() -> None:
+    directory = _record(b"a.md")
+    end = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 0xFFFF, 0xFFFF, len(directory), 0, 0)
+    with pytest.raises(Exception) as refused:
+        archive.open_archive(io.BytesIO(_LOCAL + directory + end))
+    assert getattr(refused.value, "code", None) == "import.invalid_zip"

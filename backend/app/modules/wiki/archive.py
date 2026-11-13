@@ -1,10 +1,13 @@
 """Reading an uploaded ZIP without trusting it.
 
 - Directory: nothing the archive declares about itself is trusted. The central
-  directory is located from the end record (zip64 included) and walked record by
-  record with bounded memory (`entry_names`); the walk stops at the entry limit, and a
-  directory whose records disagree with the declared count or size is no ZIP. Only
-  then does `zipfile` parse it, and only up to `MAX_DIRECTORY_BYTES`.
+  directory is located from the end record and walked record by record with bounded
+  memory (`entry_names`); the walk stops at the entry limit, and a directory whose
+  records disagree with the declared count or size is no ZIP. Only then does `zipfile`
+  parse it, and only up to `MAX_DIRECTORY_BYTES`.
+- zip64: an import is at most 100 MiB, so no archive needs it. One that has a zip64
+  locator (which `zipfile` would follow to a directory of its own) or an end record
+  asking for zip64 is refused before `zipfile` sees it (review M2 S4).
 - Size: the sum of the declared sizes is checked up front; reads are bounded too, and
   `zipfile` never yields more than an entry declares (a lie fails its CRC check).
 - Names: no absolute paths, drive letters, `..`, symlinks or other special files; the
@@ -29,7 +32,6 @@ MAX_DIRECTORY_BYTES = MAX_ENTRIES * 2048
 
 _EOCD = b"PK\x05\x06"
 _EOCD64_LOCATOR = b"PK\x06\x07"
-_EOCD64 = b"PK\x06\x06"
 _RECORD = b"PK\x01\x02"
 _RECORD_BYTES = 46
 _TAIL = 22 + 0xFFFF  # the record plus the longest comment
@@ -55,8 +57,8 @@ class Directory:
 
 
 def directory(file: IO[bytes]) -> Directory:
-    """The central directory as the last end record states it (zip64 included);
-    `invalid_zip` when there is none or it points outside the file."""
+    """The central directory as the last end record states it; `invalid_zip` when there
+    is none, it points outside the file, or the archive uses zip64."""
     file.seek(0, io.SEEK_END)
     length = file.tell()
     base = max(0, length - _TAIL)
@@ -67,17 +69,11 @@ def directory(file: IO[bytes]) -> Directory:
         raise invalid_zip()
     entries, size, _ = struct.unpack("<HLL", tail[at + 10 : at + 20])
     end = base + at
-    if entries == 0xFFFF or size == 0xFFFFFFFF:
-        # zip64: the record sits right before its locator, which sits right before
-        # the end record (where `zipfile` looks for it as well).
-        if tail.rfind(_EOCD64_LOCATOR, 0, at) != at - 20 or end < 76:
-            raise invalid_zip()
-        file.seek(end - 76)
-        record = file.read(56)
-        if record[:4] != _EOCD64:
-            raise invalid_zip()
-        entries, size = struct.unpack("<QQ", record[32:48])
-        end -= 76
+    # `zipfile` looks for a zip64 locator right before the end record, whatever the end
+    # record says; read it there too, in case the tail does not reach back so far.
+    file.seek(max(0, end - 20))
+    if entries == 0xFFFF or size == 0xFFFFFFFF or file.read(4) == _EOCD64_LOCATOR:
+        raise invalid_zip()
     if size > end:
         raise invalid_zip()
     return Directory(start=end - size, size=size, entries=int(entries))
