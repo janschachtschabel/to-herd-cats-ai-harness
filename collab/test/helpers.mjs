@@ -98,6 +98,9 @@ function socketWith(headers) {
   return class extends WebSocket {
     constructor(url, protocols) {
       super(url, protocols, { headers });
+      // A browser closes a connecting socket quietly; `ws` emits an error the provider
+      // no longer listens to once destroyed, which Node raises as uncaught.
+      this.on("error", () => {});
     }
   };
 }
