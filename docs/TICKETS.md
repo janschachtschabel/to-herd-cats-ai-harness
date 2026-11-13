@@ -45,9 +45,12 @@ nur die Nummer (`/tickets/42`).
 | `bug` | Fehler | einem Epic oder einer Story |
 
 Damit ist die Tiefe höchstens drei (Epic → Story → Aufgabe) und ein Kreis unmöglich.
-Übergeordnetes und untergeordnetes Ticket liegen immer im selben Bereich (das sichert
-auch die Datenbank). Eine Art lässt sich nur ändern, wenn sie zu den über- und
-untergeordneten Tickets passt (sonst „Diese Art passt nicht …“, 422 `ticket.kind_invalid`).
+Übergeordnetes und untergeordnetes Ticket liegen immer im selben Bereich. Eine Art lässt
+sich nur ändern, wenn sie zu den über- und untergeordneten Tickets passt (sonst „Diese
+Art passt nicht …“, 422 `ticket.kind_invalid`). Diese Regeln hält auch die Datenbank
+(Trigger `work_item_hierarchy`, Review M4 P7), gleich wer schreibt: kein Ticket unter
+sich selbst, das übergeordnete im selben Bereich und von einer Art, die darüber stehen
+darf, und keine Änderung von Art oder Bereich, nach der die Kinder nicht mehr passen.
 Ein Epic zeigt, wie viele seiner direkten Kinder in jeder Kategorie stehen.
 
 ### Status je Bereich
@@ -73,6 +76,10 @@ Jeder Bereich hat seinen eigenen Workflow: eine geordnete Liste von Status mit N
   Rücksicht auf Groß- und Kleinschreibung.
 - Es gibt immer mindestens einen Status der Kategorie `open` und einen der Kategorie
   `done`; was das verletzen würde, lehnt die API ab (`ticket_status.category_required`).
+  Diese Regel hält nur der Dienst, nicht die Datenbank (sie gilt für die Menge der
+  Status eines Bereichs, nicht für eine Zeile; Review M4 P7): Wer an der API vorbei in
+  die Datenbank schreibt, kann den letzten `done`-Status löschen, solange kein Ticket ihn
+  nutzt. Bis ein Verwalter wieder einen anlegt, lässt sich dann kein Ticket erledigen.
 - Ein Status mit Tickets wird nur mit Ersatz gelöscht: Seine Tickets wechseln in den
   gewählten Status, jedes mit einer Systemmeldung in seiner Diskussion.
 - Die Standardnamen sind Deutsch (Organisationen haben noch keine Sprache) und danach
@@ -196,7 +203,8 @@ Tags ändern die Version des Tickets und stehen im Audit (`ticket.tags_set`).
   warum. Hat jemand das Ticket inzwischen geändert (409), lädt das Board neu: „Das
   Ticket wurde inzwischen geändert und ist wieder an seinem Platz …“.
 - Änderungen anderer erscheinen live auf dem Board, in Listen, am Ticket und an Karten
-  in Kanälen.
+  in Kanälen. Ein Ticket-Ereignis lädt nur die Ansichten seines Bereichs, das Ticket
+  selbst und Listen über alle Bereiche neu, gesammelt über 250 ms.
 
 ### Gleichzeitig ändern
 
@@ -228,6 +236,24 @@ SQL-Ausdruck. Die Ticket-Liste hat dazu ihr eigenes Textfeld.
 | Listen | `limit` höchstens 100, weiter mit `cursor`; Board je Spalte ebenso |
 | Hierarchie | höchstens drei Ebenen (Epic, Story, Aufgabe oder Fehler) |
 | Karten je Nachricht | höchstens drei |
+
+### Bekannte Grenzen
+
+- **Verknüpfte Seiten zählen auch unsichtbare** (Review M4 P6): Die Grenze von 50
+  Seiten je Ticket gilt für alle Verknüpfungen. Wer nur einen Teil der Seiten sehen
+  darf, bekommt beim Verknüpfen 422 `ticket.too_many_pages`, obwohl die Liste weniger
+  zeigt, und erfährt so, wie viele Verknüpfungen er nicht sieht. Das verrät keine Seite
+  (Titel und IDs unsichtbarer Seiten erscheinen nirgends, auch nicht in den
+  Systemmeldungen), nur ihre Anzahl; die Diskussion zeigt die unbenannten Einträge
+  „Seite verknüpft“ ohnehin.
+- **Liste und Board lesen alle sichtbaren Tickets des Bereichs** (Review M4 P8): Die
+  Standardsortierung der Liste (`updated`), `due` und `priority` sowie die Zähler und
+  die Spalten des Boards gehen je Aufruf über alle Tickets der sichtbaren Bereiche und
+  sortieren dann (gemessen bei 12.006 Tickets in einem Bereich: Liste 23–46 ms, Board
+  51–64 ms im Median, 3 bis 7 Abfragen je Aufruf). Nur `sort=number`, `parent`, die
+  Suche nach dem Schlüssel und die Volltextsuche nutzen einen Index für Reihenfolge oder
+  Treffer. Der Aufwand wächst linear; bei etwa zehnmal so vielen Tickets je Bereich
+  braucht die Liste einen Index je Sortierung und das Board eine günstigere erste Seite.
 
 ### Was es noch nicht gibt
 
@@ -267,12 +293,12 @@ Tickets verarbeitet; `smoke.sh` prüft genau das (Ticket anlegen, Status ändern
 Systemmeldungen in der Diskussion).
 
 **Kapazität** (gemessen, siehe [`docs/STECKBRIEF.md`](STECKBRIEF.md#tickets-m4)):
-Ein Worker schafft hier rund 90 Ereignisse je Sekunde. Wer dauerhaft mehr als etwa 40
-Tickets je Sekunde anlegt (zum Beispiel ein Import über die API), erzeugt mehr, als ein
-Worker abarbeitet: Die Outbox wächst, und Systemmeldungen und Live-Ereignisse kommen
-entsprechend später (`herd_outbox_pending`, Alarm `HerdOutboxBacklog`). Mehrere Worker
-sind sicher. In `HERD_ROLE=all` teilen sich API und Worker einen Prozess; dort holte
-der Worker unter Dauerlast erst nach dem Ende der Anlagen auf.
+Seit jeder Handler eine eigene Bahn hat (Review M4 P3), schafft ein eigener
+Worker-Prozess hier gut 400 Ereignisse je Sekunde (vorher rund 90), zwei rund 700. Das ist mehr, als die API an Anlagen erzeugt (60 Tickets je Sekunde ergeben gut
+130 Ereignisse). Hängt ein Handler (etwa an einer Sperre), arbeiten die anderen weiter.
+In `HERD_ROLE=all` teilen sich API und Worker einen Prozess und dessen CPU; dort holt
+der Worker unter Dauerlast langsamer auf (`herd_outbox_pending`, Alarm
+`HerdOutboxBacklog`).
 
 ### Daten und Migrationen
 
@@ -284,7 +310,13 @@ der Worker unter Dauerlast erst nach dem Ende der Anlagen auf.
   Die fünf Standardstatus legt ein Trigger beim Anlegen eines Bereichs an, auch wenn der
   Bereich von einer älteren Version angelegt wird; die Migration hat sie für bestehende
   Bereiche nachgetragen.
-- Ein Trigger hält übergeordnetes Ticket und Status im Bereich des Tickets.
+- Ein Trigger hält übergeordnetes Ticket und Status im Bereich des Tickets, ein zweiter
+  (`work_item_hierarchy`, Review M4 P7) die Hierarchie: kein Ticket unter sich selbst,
+  nur erlaubte Arten übereinander, keine Änderung von Art oder Bereich, zu der die
+  Kinder nicht passen (SQLSTATE `23514`, Meldungen `work_item_parent_self`,
+  `work_item_parent_other_space`, `work_item_parent_kind`,
+  `work_item_children_do_not_fit`). Er liest das übergeordnete Ticket `FOR SHARE`, wie
+  der Dienst.
 - Audit: `ticket.created`, `ticket.assigned`, `ticket.cancelled`, `ticket.tags_set`,
   `ticket_status.created`, `ticket_status.updated`, `ticket_status.deleted`. Andere
   Feldänderungen stehen in der Diskussion, nicht im Audit.
