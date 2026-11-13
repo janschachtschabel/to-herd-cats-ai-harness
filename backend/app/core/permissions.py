@@ -15,6 +15,8 @@ class Action(StrEnum):
     PAGE_PUBLISH = "page.publish"  # publish anyone's drafts
     PAGE_TRASH = "page.trash"  # put into and take out of the trash
     PAGE_MODERATE = "page.moderate"  # also: the space's tags
+    CHANNEL_POST = "channel.post"  # write and react in the space's channels and threads
+    CHANNEL_MANAGE = "channel.manage"  # create, rename, archive channels; delete others' posts
     # System-wide
     SPACE_CREATE = "space.create"
     DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
@@ -72,6 +74,8 @@ SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
     Action.PAGE_PUBLISH: SpaceRole.MODERATOR,
     Action.PAGE_TRASH: SpaceRole.MODERATOR,
     Action.PAGE_MODERATE: SpaceRole.MODERATOR,
+    Action.CHANNEL_POST: SpaceRole.VIEWER,
+    Action.CHANNEL_MANAGE: SpaceRole.MODERATOR,
 }
 
 # System roles that hold every right, in every space of their organisation (E4).

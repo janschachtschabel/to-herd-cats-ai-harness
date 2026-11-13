@@ -253,6 +253,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Channels
+         * @description The channels of every space the caller may read, by name.
+         */
+        get: operations["list_channels_api_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation */
+        get: operations["get_conversation_api_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Channel */
+        patch: operations["update_channel_api_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Channel */
+        post: operations["archive_channel_api_conversations__conversation_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Channel */
+        post: operations["unarchive_channel_api_conversations__conversation_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/directory": {
         parameters: {
             query?: never;
@@ -545,6 +617,24 @@ export interface paths {
         patch: operations["update_space_api_spaces__space_id__patch"];
         trace?: never;
     };
+    "/api/spaces/{space_id}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Space Channels */
+        get: operations["list_space_channels_api_spaces__space_id__channels_get"];
+        put?: never;
+        /** Create Channel */
+        post: operations["create_channel_api_spaces__space_id__channels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/export": {
         parameters: {
             query?: never;
@@ -736,7 +826,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage";
         /**
          * AttachmentOut
          * @description `url` downloads it (`?inline=1` shows raster images in the page). `mime` is what
@@ -810,6 +900,62 @@ export interface components {
             /** Target Type */
             target_type: string;
         };
+        /** ChannelCreate */
+        ChannelCreate: {
+            /** Name */
+            name: string;
+            /** Topic */
+            topic?: string | null;
+        };
+        /**
+         * ChannelUpdate
+         * @description Fields left out stay as they are; null clears the topic. A name cannot be null.
+         */
+        ChannelUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Topic */
+            topic?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConversationKind
+         * @enum {string}
+         */
+        ConversationKind: "channel";
+        /**
+         * ConversationOut
+         * @description `can_post`: whether the caller may write here now (the right in the space, and
+         *     the channel not archived). `created_by` is null for what the system set up.
+         *     `version` guards writes (send it back; stale → 409).
+         */
+        ConversationOut: {
+            /** Archived At */
+            archived_at: string | null;
+            /** Can Post */
+            can_post: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["PrincipalRef"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ConversationKind"];
+            /** Name */
+            name: string | null;
+            /** Space Id */
+            space_id: string | null;
+            /** Topic */
+            topic: string | null;
+            /** Version */
+            version: number;
+        };
         /**
          * DiffOut
          * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
@@ -846,14 +992,6 @@ export interface components {
              * @enum {string}
              */
             type: "user" | "group";
-        };
-        /**
-         * ExpectedVersion
-         * @description The page version the client read (stale → 409 `page.version_conflict`).
-         */
-        ExpectedVersion: {
-            /** Version */
-            version: number;
         };
         /** GroupCreate */
         GroupCreate: {
@@ -1078,6 +1216,13 @@ export interface components {
         Page_AuditOut_: {
             /** Items */
             items: components["schemas"]["AuditOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ConversationOut] */
+        Page_ConversationOut_: {
+            /** Items */
+            items: components["schemas"]["ConversationOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1570,6 +1715,19 @@ export interface components {
             source: components["schemas"]["VersionSource"];
             /** Title */
             title: string;
+        };
+        /** ExpectedVersion */
+        app__modules__messaging__schemas__ExpectedVersion: {
+            /** Version */
+            version: number;
+        };
+        /**
+         * ExpectedVersion
+         * @description The page version the client read (stale → 409 `page.version_conflict`).
+         */
+        app__modules__wiki__schemas__ExpectedVersion: {
+            /** Version */
+            version: number;
         };
     };
     responses: never;
@@ -2228,6 +2386,176 @@ export interface operations {
             };
         };
     };
+    list_channels_api_channels_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description true: archived channels too */
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ConversationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_api_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_channel_api_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_channel_api_conversations__conversation_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__messaging__schemas__ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_channel_api_conversations__conversation_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__messaging__schemas__ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_directory_api_directory_get: {
         parameters: {
             query?: {
@@ -2539,7 +2867,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExpectedVersion"];
+                "application/json": components["schemas"]["app__modules__wiki__schemas__ExpectedVersion"];
             };
         };
         responses: {
@@ -2640,7 +2968,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExpectedVersion"];
+                "application/json": components["schemas"]["app__modules__wiki__schemas__ExpectedVersion"];
             };
         };
         responses: {
@@ -2776,7 +3104,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExpectedVersion"];
+                "application/json": components["schemas"]["app__modules__wiki__schemas__ExpectedVersion"];
             };
         };
         responses: {
@@ -2957,6 +3285,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_space_channels_api_spaces__space_id__channels_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description true: archived channels too */
+                include_archived?: boolean;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ConversationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_channel_api_spaces__space_id__channels_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
                 };
             };
             /** @description Validation Error */

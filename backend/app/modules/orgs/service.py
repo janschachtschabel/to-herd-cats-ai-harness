@@ -8,6 +8,7 @@ from app.core.config import Settings
 from app.core.principal import SystemRole
 from app.core.repository import advisory_xact_lock
 from app.core.security import hash_password_async
+from app.modules.messaging.channels import ChannelService
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
@@ -19,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
     """Create the organisation, an owner from HERD_BOOTSTRAP_*, the owner's personal
-    space and the open space „Allgemein“, while nobody exists.
+    space and the open space „Allgemein“ with its channel `#allgemein`, while nobody
+    exists.
 
     Idempotent and safe when several replicas start at once: they queue on an advisory
     lock, and every one after the first finds a person and does nothing. The caller
@@ -51,5 +53,6 @@ async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
     )
     spaces = SpaceService(session)
     await spaces.create_personal(owner)
-    await spaces.create_general(org.id)
+    if (general := await spaces.create_general(org.id)) is not None:
+        await ChannelService(session).create_general(org.id, general.id)
     logger.info("bootstrap.created", extra={"org_id": str(org.id), "user_id": str(owner.id)})

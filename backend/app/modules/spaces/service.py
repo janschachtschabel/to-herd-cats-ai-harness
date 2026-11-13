@@ -58,10 +58,12 @@ class SpaceService:
         await self.spaces.set_member(space.id, Principal.user(user.id), SpaceRole.ADMIN)
         return space
 
-    async def create_general(self, org_id: uuid.UUID) -> None:
-        """The open space every installation starts with (bootstrap), unless it exists."""
-        if not await self.spaces.general_exists(org_id, GENERAL_SPACE_NAME):
-            await self._insert(org_id, SpaceKind.OPEN, GENERAL_SPACE_NAME)
+    async def create_general(self, org_id: uuid.UUID) -> Space | None:
+        """The open space every installation starts with (bootstrap), unless it exists;
+        the space it created."""
+        if await self.spaces.general_exists(org_id, GENERAL_SPACE_NAME):
+            return None
+        return await self._insert(org_id, SpaceKind.OPEN, GENERAL_SPACE_NAME)
 
     async def get(self, actor: Actor, space_id: uuid.UUID) -> Space:
         await require(self.session, actor, Action.SPACE_READ, space_id)

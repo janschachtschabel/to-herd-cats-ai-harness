@@ -17,6 +17,7 @@ from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
+from app.modules.messaging import router as messaging
 from app.modules.search.router import router as search_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
@@ -45,6 +46,9 @@ def api_router() -> APIRouter:
     api.include_router(space_transfer)
     api.include_router(page_export)
     api.include_router(tags_router)
+    api.include_router(messaging.space_channels)
+    api.include_router(messaging.channels)
+    api.include_router(messaging.conversations)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
