@@ -187,9 +187,10 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   (auch hier den Ingress anpassen), höchstens 2.000 Einträge und 200 MB entpackt
   enthalten; Einträge mit `..`, absolutem Pfad oder als Symlink werden übersprungen.
   Ein Import läuft in einer Transaktion; große Archive brauchen entsprechend lange.
-  Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`. Links im Markdown auf
-  `/api/attachments/<id>` zeigen nach einem Import in einen anderen Bereich weiter auf
-  die alten Anhänge.
+  Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`. Der Export listet in
+  `_attachments/manifest.json`, welcher Anhang jede Datei war; der Import lässt Links
+  `/api/attachments/<id>` auf mitgebrachte Anhänge auf die neuen zeigen. Links auf
+  andere Anhänge (nicht im Archiv, beim Import abgelehnt, anderer Host) bleiben.
 - **Wiki-Diff**: Ein Vergleich zweier Seitenversionen vergleicht höchstens
   `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
   antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den

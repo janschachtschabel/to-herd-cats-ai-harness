@@ -2,7 +2,8 @@
 
 The archive has one `<path>.md` per page the actor may read (drafts only with
 `page.edit`), with front matter `title`, `status` and `tags` (names), and each page's
-attachments under `_attachments/<path>/<file name>`. `transfer.py` reads it back.
+attachments under `_attachments/<path>/<file name>`, listed with their ids in
+`_attachments/manifest.json` (`attachment_links.py`). `transfer.py` reads it back.
 Pages are read in batches of the tree; the archive is written to a temporary file,
 not held in memory.
 """
@@ -24,6 +25,7 @@ from app.modules.spaces.service import SpaceService
 from app.modules.tags.models import SubjectType, Tag
 from app.modules.tags.repository import tag_repository
 from app.modules.wiki import frontmatter
+from app.modules.wiki.attachment_links import MANIFEST, manifest_json
 from app.modules.wiki.attachments_repository import AttachmentRepository
 from app.modules.wiki.models import Attachment, Page
 from app.modules.wiki.transfer import ATTACHMENTS
@@ -79,7 +81,10 @@ class PageExport:
         file = spooled_file(_SPOOL_BYTES)
         try:
             with zipfile.ZipFile(file, "w", zipfile.ZIP_DEFLATED) as zipped:
-                await self._write(actor, space_id, drafts, zipped)
+                listed: dict[str, uuid.UUID] = {}
+                await self._write(actor, space_id, drafts, zipped, listed)
+                if listed:
+                    zipped.writestr(MANIFEST, manifest_json(listed))
             size = file.tell()
         except BaseException:
             file.close()
@@ -87,7 +92,12 @@ class PageExport:
         return Export(f"{slugify(space.name)}.zip", file, size)
 
     async def _write(
-        self, actor: Actor, space_id: uuid.UUID, drafts: bool, zipped: zipfile.ZipFile
+        self,
+        actor: Actor,
+        space_id: uuid.UUID,
+        drafts: bool,
+        zipped: zipfile.ZipFile,
+        listed: dict[str, uuid.UUID],
     ) -> None:
         pages = self.reader.repo(actor)
         attachments = AttachmentRepository(self.session, self.reader.scope(actor))
@@ -105,19 +115,21 @@ class PageExport:
                 taken: set[str] = set()
                 for attachment in files.get(page.id, []):
                     name = f"{ATTACHMENTS}/{page.path}/{_archive_name(attachment.filename, taken)}"
-                    await self._copy(attachment, name, zipped)
+                    if await self._copy(attachment, name, zipped):
+                        listed[name] = attachment.id
             after = (batch[-1].path, batch[-1].id)
 
-    async def _copy(self, attachment: Attachment, name: str, zipped: zipfile.ZipFile) -> None:
+    async def _copy(self, attachment: Attachment, name: str, zipped: zipfile.ZipFile) -> bool:
         try:
             chunks = await self.storage.open(attachment.storage_key)
         except StoredFileMissing:
-            return  # gone from the storage: nothing to export
+            return False  # gone from the storage: nothing to export
         target = await asyncio.to_thread(zipped.open, name, "w")
         try:
             await _pump(chunks, target)
         finally:
             await asyncio.to_thread(target.close)
+        return True
 
 
 async def _pump(chunks: AsyncIterator[bytes], target: IO[bytes]) -> None:

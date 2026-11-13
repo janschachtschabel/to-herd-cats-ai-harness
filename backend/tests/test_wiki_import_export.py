@@ -2,6 +2,7 @@
 page in the path of the tree, with front matter; attachments under `_attachments/`."""
 
 import io
+import json
 import stat
 import struct
 import zipfile
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.models import AuditLog
 from app.modules.wiki import archive as archive_module
+from app.modules.wiki.attachment_links import MANIFEST
 from tests.factories_wiki import Wiki, new_page, publish
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -274,10 +276,14 @@ async def test_export_then_import_round_trips_tree_and_tags(
     assert space_tag["id"] not in copied["tags"]
     files = (await wiki.admin.get(f"/api/pages/{copied['id']}/attachments")).json()["items"]
     assert [(a["filename"], a["mime"]) for a in files] == [("logo.png", "image/png")]
-    # And exporting the copy gives the same archive.
-    assert _unzip((await wiki.admin.get(f"/api/spaces/{copy.id}/export")).content) == _unzip(
-        exported
-    )
+    # And exporting the copy gives the same archive (the manifest names the new ids).
+    again_files = _unzip((await wiki.admin.get(f"/api/spaces/{copy.id}/export")).content)
+    original = _unzip(exported)
+    assert json.loads(again_files.pop(MANIFEST)) == {
+        "attachments": {"_attachments/it/zugaenge/logo.png": files[0]["id"]}
+    }
+    original.pop(MANIFEST)
+    assert again_files == original
     actions = (await session.scalars(select(AuditLog.action))).all()
     assert "space.imported" in actions
 
@@ -293,13 +299,14 @@ async def test_export_only_includes_visible_pages(wiki: Wiki) -> None:
         )
         assert r.status_code == 201
     viewer = _unzip((await wiki.viewer.get(f"/api/spaces/{wiki.space_id}/export")).content)
-    assert set(viewer) == {"offen.md", "_attachments/offen/a.png"}
+    assert set(viewer) == {"offen.md", "_attachments/offen/a.png", MANIFEST}
     editor = _unzip((await wiki.editor.get(f"/api/spaces/{wiki.space_id}/export")).content)
     assert set(editor) == {
         "offen.md",
         "entwurf.md",
         "_attachments/offen/a.png",
         "_attachments/entwurf/a.png",
+        MANIFEST,
     }
     r = await wiki.outsider.get(f"/api/spaces/{wiki.space_id}/export")
     _error(r, 404, "space.not_found")

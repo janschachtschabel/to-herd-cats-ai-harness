@@ -115,9 +115,11 @@ class PageService:
         *,
         slug: str | None = None,
         source: VersionSource = VersionSource.HUMAN,
+        session_key: str | None = None,
     ) -> Page:
         """A new draft at the end of its siblings. Its slug comes from `slug` if given
-        (an imported file's name), else from the title; a sibling's slug gets a suffix."""
+        (an imported file's name), else from the title; a sibling's slug gets a suffix.
+        `session_key` lets later saves of the same session fold into its first version."""
         await require(self.session, actor, Action.PAGE_CREATE, space_id)
         pages = self.repo(actor)
         await pages.lock_tree(space_id)
@@ -148,7 +150,7 @@ class PageService:
                 updated_by_id=who.id,
             )
         )
-        await VersionService(self.session).record(page, actor, source)
+        await VersionService(self.session).record(page, actor, source, session_key=session_key)
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
         return page
@@ -162,8 +164,12 @@ class PageService:
         content_md: str | None = None,
         version: int,
         change_summary: str | None = None,
+        source: VersionSource = VersionSource.HUMAN,
+        session_key: str | None = None,
+        coalesce_seconds: int = 0,
     ) -> Page:
-        """Change title and/or content, saved as a new version; a request that changes
+        """Change title and/or content, saved as a new version (folded into the newest
+        one of the same session, see `VersionService.record`); a request that changes
         nothing changes nothing."""
         page = await self.readable(actor, page_id, lock=True)
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
@@ -177,7 +183,12 @@ class PageService:
             touch(page, actor)
             await self.session.flush()
             await VersionService(self.session).record(
-                page, actor, VersionSource.HUMAN, change_summary=change_summary
+                page,
+                actor,
+                source,
+                change_summary=change_summary,
+                session_key=session_key,
+                coalesce_seconds=coalesce_seconds,
             )
         return page
 

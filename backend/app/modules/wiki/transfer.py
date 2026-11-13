@@ -6,7 +6,9 @@ Folders without a file of their own become empty pages. Files under
 `_attachments/<page path>/` become attachments of the pages made here. Pages are made
 through `PageService` (versions with source `import`), tags and attachments through
 their services, so every rule holds: a page is published (front matter `status`,
-default `published`) only below a published parent, else it stays a draft.
+default `published`) only below a published parent, else it stays a draft. Links to
+attachments the archive brought (`_attachments/manifest.json`) are pointed at the new
+attachments afterwards, folded into the page's first version (`attachment_links.py`).
 
 What cannot be imported is skipped with a reason; the archive itself is read
 defensively (`archive.py`). The whole import is one transaction.
@@ -31,6 +33,12 @@ from app.modules.tags.repository import tag_repository
 from app.modules.tags.schemas import DEFAULT_COLOR
 from app.modules.tags.service import TagService
 from app.modules.wiki import archive, frontmatter
+from app.modules.wiki.attachment_links import (
+    MANIFEST,
+    InvalidManifest,
+    read_manifest,
+    rewrite_links,
+)
 from app.modules.wiki.attachments import AttachmentService
 from app.modules.wiki.models import MAX_CONTENT_CHARS, MAX_DEPTH, MAX_TITLE_CHARS, Page, PageStatus
 from app.modules.wiki.models import VersionSource as Source
@@ -40,6 +48,7 @@ ATTACHMENTS = "_attachments"
 _INDEX_NAMES = {"index", "readme"}
 _MARKDOWN = (".md", ".markdown")
 _SLUG_CHARS = 74
+_SESSION_SECONDS = 24 * 60 * 60  # the import's saves fold into each page's first version
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,15 +102,19 @@ class PageImport:
         self.result = ImportResult()
         self.made: dict[str, Page] = {}
         self.tag_ids: dict[str, uuid.UUID] = {}
+        self.session_key = f"import:{uuid.uuid4().hex}"
+        self.listed: dict[str, uuid.UUID] = {}  # archive entry → the attachment it was
+        self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
             with zipped:
-                files, attached = self._sort(zipped.infolist())
+                files, attached = self._sort(zipped)
                 for file in files:
                     await self._page(zipped, file)
                 for info, parts in attached:
                     await self._attachment(zipped, info, parts)
+        await self._relink()
         details = {
             "created": self.result.created,
             "attachments": self.result.attachments,
@@ -114,16 +127,22 @@ class PageImport:
         self.result.skipped.append(Skipped(info.filename, reason))
 
     def _sort(
-        self, infos: list[zipfile.ZipInfo]
+        self, zipped: zipfile.ZipFile
     ) -> tuple[list[_File], list[tuple[zipfile.ZipInfo, list[str]]]]:
         files: list[_File] = []
         attached: list[tuple[zipfile.ZipInfo, list[str]]] = []
-        for info in infos:
+        for info in zipped.infolist():
             parts = archive.segments(info)
             if parts is None:
                 self._skip(info, "unsafe_path")
                 continue
             if info.is_dir() or not parts or parts[0] == "__MACOSX" or parts[-1] == ".DS_Store":
+                continue
+            if "/".join(parts) == MANIFEST:
+                try:
+                    self.listed = read_manifest(zipped, info)
+                except InvalidManifest:
+                    self._skip(info, "invalid_manifest")
                 continue
             if parts[0] == ATTACHMENTS:
                 if len(parts) >= 3:
@@ -209,6 +228,7 @@ class PageImport:
             body,
             slug=slug,
             source=Source.IMPORT,
+            session_key=self.session_key,
         )
         wanted = status != PageStatus.DRAFT
         if wanted and (parent is None or parent.status == PageStatus.PUBLISHED):
@@ -240,7 +260,9 @@ class PageImport:
             self._skip(info, "no_page")
             return
         try:
-            await self.attachments.upload(self.actor, page.id, parts[-1], _entry(zipped, info))
+            attachment = await self.attachments.upload(
+                self.actor, page.id, parts[-1], _entry(zipped, info)
+            )
         except archive.UNREADABLE:
             self._skip(info, "unreadable")
             return
@@ -248,6 +270,24 @@ class PageImport:
             self._skip(info, error.code.rpartition(".")[2])
             return
         self.result.attachments += 1
+        old = self.listed.get("/".join([ATTACHMENTS, *parts]))
+        if old is not None:
+            self.new_ids[old] = attachment.id
+
+    async def _relink(self) -> None:
+        """Links to the attachments brought in point at the new ones."""
+        for page in self.made.values():
+            content = rewrite_links(page.content_md, self.new_ids)
+            if content != page.content_md:
+                await self.pages.update(
+                    self.actor,
+                    page.id,
+                    content_md=content,
+                    version=page.version,
+                    source=Source.IMPORT,
+                    session_key=self.session_key,
+                    coalesce_seconds=_SESSION_SECONDS,
+                )
 
 
 async def _entry(zipped: zipfile.ZipFile, info: zipfile.ZipInfo) -> AsyncIterator[bytes]:
