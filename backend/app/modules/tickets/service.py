@@ -22,7 +22,6 @@ from app.core.pagination import PageParams
 from app.core.principal import Principal
 from app.modules.audit.recorder import record
 from app.modules.messaging.models import Conversation
-from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets import hierarchy, listing
 from app.modules.tickets.assignment import check_assignment
 from app.modules.tickets.base import (
@@ -44,6 +43,7 @@ from app.modules.tickets.models import (
 )
 from app.modules.tickets.repository import TicketRepository, TicketView
 from app.modules.tickets.statuses import status_repository
+from app.modules.tickets.thread_repository import TicketThreadRepository
 
 __all__ = ["TicketService", "ticket_not_found", "ticket_repository"]
 

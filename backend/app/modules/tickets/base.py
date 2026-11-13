@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require, space_ids_with
 from app.core.errors import Conflict, NotFound
-from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.tickets.events import Changes, ticket_event
 from app.modules.tickets.models import WorkItem
 from app.modules.tickets.repository import TicketRepository, TicketScope, TicketView
+from app.modules.tickets.thread_repository import TicketThreadRepository
 
 
 def ticket_not_found() -> NotFound:

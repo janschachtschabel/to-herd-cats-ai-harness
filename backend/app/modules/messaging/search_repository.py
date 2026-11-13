@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.repository import ConversationScope, visible_conversations
-from app.modules.tickets.models import WorkItem
+from app.modules.messaging.ticket_hooks import ticket_hooks
 from app.modules.users.models import User
 
 START, STOP = "⟦", "⟧"
@@ -115,7 +115,7 @@ class MessageSearchRepository:
                 Conversation.name,
                 Conversation.space_id,
                 Conversation.page_id,
-                WorkItem.number,
+                ticket_hooks().number(Conversation.work_item_id),
                 Message.author_id,
                 User.name,
                 Message.created_at,
@@ -124,7 +124,6 @@ class MessageSearchRepository:
             )
             .join(top, top.c.id == Message.id)
             .join(Conversation, Conversation.id == Message.conversation_id)
-            .outerjoin(WorkItem, WorkItem.id == Conversation.work_item_id)
             .outerjoin(User, User.id == Message.author_id)
             .order_by(top.c.score.desc(), Message.id)
         )

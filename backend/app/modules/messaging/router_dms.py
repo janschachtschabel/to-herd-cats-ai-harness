@@ -18,8 +18,9 @@ from app.modules.messaging.dm_schemas import (
 )
 from app.modules.messaging.dms import DmService
 from app.modules.messaging.inspect import InspectService
+from app.modules.messaging.message_schemas import MessageOut
 from app.modules.messaging.router import message_page
-from app.modules.messaging.schemas import ConversationOut, MessageOut
+from app.modules.messaging.schemas import ConversationOut
 
 dms = APIRouter(prefix="/dms", tags=["messaging"])
 dm_inspect = APIRouter(prefix="/admin/dm-inspect", tags=["messaging"])

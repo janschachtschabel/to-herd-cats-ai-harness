@@ -8,6 +8,12 @@ from app.core.actor import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.messaging.channels import ChannelService
+from app.modules.messaging.message_schemas import (
+    MessageCreate,
+    MessageOut,
+    MessageUpdate,
+    MessageWriteOut,
+)
 from app.modules.messaging.models import Conversation, Message
 from app.modules.messaging.repository import ListedConversation
 from app.modules.messaging.schemas import (
@@ -15,23 +21,16 @@ from app.modules.messaging.schemas import (
     ChannelUpdate,
     ConversationOut,
     ExpectedVersion,
-    MessageCreate,
-    MessageOut,
-    MessageUpdate,
-    MessageWriteOut,
 )
 from app.modules.messaging.service import ConversationService, MessageService
 from app.modules.messaging.threads import ThreadService
 from app.modules.messaging.views import message_views
-from app.modules.tickets.router import ticket_number
-from app.modules.tickets.service import TicketService
 
 space_channels = APIRouter(prefix="/spaces/{space_id}/channels", tags=["messaging"])
 channels = APIRouter(prefix="/channels", tags=["messaging"])
 conversations = APIRouter(prefix="/conversations", tags=["messaging"])
 messages = APIRouter(prefix="/messages", tags=["messaging"])
 page_threads = APIRouter(prefix="/pages/{page_id}/thread", tags=["messaging"])
-ticket_threads = APIRouter(prefix="/tickets/{number}/thread", tags=["messaging"])
 
 ArchivedQuery = Annotated[bool, Query(description="true: archived channels too")]
 
@@ -43,7 +42,9 @@ def _page(page: Page[ListedConversation]) -> Page[ConversationOut]:
     )
 
 
-async def _out(session: AsyncSession, actor: Actor, conversation: Conversation) -> ConversationOut:
+async def conversation_out(
+    session: AsyncSession, actor: Actor, conversation: Conversation
+) -> ConversationOut:
     view = await ConversationService(session).view(actor, conversation)
     return ConversationOut.of(
         conversation,
@@ -72,7 +73,7 @@ async def create_channel(
     space_id: uuid.UUID, body: ChannelCreate, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
     channel = await ChannelService(session).create(actor, space_id, body.name, body.topic)
-    return await _out(session, actor, channel)
+    return await conversation_out(session, actor, channel)
 
 
 @channels.get("", response_model=Page[ConversationOut])
@@ -94,7 +95,7 @@ async def get_conversation(
     conversation_id: uuid.UUID, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
     conversation = await ConversationService(session).get(actor, conversation_id)
-    return await _out(session, actor, conversation)
+    return await conversation_out(session, actor, conversation)
 
 
 @conversations.patch("/{conversation_id}", response_model=ConversationOut)
@@ -102,7 +103,7 @@ async def update_channel(
     conversation_id: uuid.UUID, body: ChannelUpdate, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
     channel = await ChannelService(session).update(actor, conversation_id, body)
-    return await _out(session, actor, channel)
+    return await conversation_out(session, actor, channel)
 
 
 @conversations.post("/{conversation_id}/archive", response_model=ConversationOut)
@@ -110,7 +111,7 @@ async def archive_channel(
     conversation_id: uuid.UUID, body: ExpectedVersion, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
     channel = await ChannelService(session).archive(actor, conversation_id, body.version)
-    return await _out(session, actor, channel)
+    return await conversation_out(session, actor, channel)
 
 
 @conversations.post("/{conversation_id}/unarchive", response_model=ConversationOut)
@@ -118,7 +119,7 @@ async def unarchive_channel(
     conversation_id: uuid.UUID, body: ExpectedVersion, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
     channel = await ChannelService(session).unarchive(actor, conversation_id, body.version)
-    return await _out(session, actor, channel)
+    return await conversation_out(session, actor, channel)
 
 
 async def message_page(
@@ -225,13 +226,4 @@ async def get_page_thread(
     """The page's discussion (created on first access), for whoever sees the page;
     its messages come from `/conversations/{id}/messages`."""
     thread = await ThreadService(session).for_page(actor, page_id)
-    return await _out(session, actor, thread)
-
-
-@ticket_threads.get("", response_model=ConversationOut)
-async def get_ticket_thread(number: int, actor: ActorDep, session: SessionDep) -> ConversationOut:
-    """The ticket's thread (made with the ticket), for whoever sees the ticket; its
-    messages, the system timeline among them, come from
-    `/conversations/{id}/messages`."""
-    thread = await TicketService(session).thread_of(actor, ticket_number(number))
-    return await _out(session, actor, thread)
+    return await conversation_out(session, actor, thread)

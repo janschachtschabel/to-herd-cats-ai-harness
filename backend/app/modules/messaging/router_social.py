@@ -8,9 +8,9 @@ from fastapi import APIRouter, Path, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.messaging.message_schemas import ReactionOut, ReadPosition, UnreadOut
 from app.modules.messaging.reactions import ReactionService
 from app.modules.messaging.reads import ReadService
-from app.modules.messaging.schemas import ReactionOut, ReadPosition, UnreadOut
 
 unread = APIRouter(prefix="/conversations", tags=["messaging"])
 reads = APIRouter(prefix="/conversations", tags=["messaging"])

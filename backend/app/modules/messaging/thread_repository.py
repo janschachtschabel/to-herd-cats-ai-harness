@@ -1,4 +1,5 @@
-"""The SQL of page and ticket threads, for the services (after the caller's check of the
+"""The SQL of page and ticket threads (the ticket part is in tickets,
+`tickets/thread_repository.py`), for the services (after the caller's check of the
 page or ticket) and the timeline handlers (no actor: the event's organisation).
 
 - One thread per page (`conversation.page_id` is unique) and per ticket
@@ -17,7 +18,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, select, text
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +29,6 @@ from app.modules.messaging.models import (
     Message,
     MessageKind,
 )
-from app.modules.tickets.models import WorkItem
 from app.modules.wiki.models import Page
 
 
@@ -114,43 +114,6 @@ class PageThreadRepository(ThreadRepository):
             "page_id": page.id,
         }
         return await self._thread(values, "page_id")
-
-
-class TicketThreadRepository(ThreadRepository):
-    async def ticket_and_thread(self, ticket_id: uuid.UUID) -> tuple[WorkItem, Conversation] | None:
-        """The ticket and its thread (inserted if it has none yet), in one statement
-        when it has one; None if the ticket is gone."""
-        stmt = (
-            select(WorkItem, Conversation)
-            .outerjoin(
-                Conversation,
-                and_(Conversation.org_id == self.org_id, Conversation.work_item_id == WorkItem.id),
-            )
-            .where(WorkItem.org_id == self.org_id, WorkItem.id == ticket_id)
-        )
-        row = (await self.session.execute(stmt)).first()
-        if row is None:
-            return None
-        ticket, thread = row
-        return ticket, thread if thread is not None else await self.thread_for(ticket)
-
-    async def thread_for(self, ticket: WorkItem) -> Conversation:
-        """The ticket's thread, inserted if it has none yet."""
-        values = {
-            "kind": ConversationKind.THREAD_TICKET,
-            "space_id": ticket.space_id,
-            "work_item_id": ticket.id,
-        }
-        return await self._thread(values, "work_item_id")
-
-    async def thread_ids(self, ticket_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
-        """The threads of these tickets (ticket id → conversation id)."""
-        if not ticket_ids:
-            return {}
-        stmt = select(Conversation.work_item_id, Conversation.id).where(
-            Conversation.org_id == self.org_id, Conversation.work_item_id.in_(ticket_ids)
-        )
-        return {row[0]: row[1] for row in await self.session.execute(stmt) if row[0]}
 
 
 def _id_at(at: datetime) -> uuid.UUID:

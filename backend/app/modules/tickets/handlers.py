@@ -28,8 +28,8 @@ from app.modules.messaging.models import Message
 from app.modules.messaging.notification_models import NotificationReason
 from app.modules.messaging.notifications import announce
 from app.modules.messaging.repository import readers_of
-from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets.events import TICKET_CREATED, TICKET_EVENTS, Field
+from app.modules.tickets.thread_repository import TicketThreadRepository
 from app.worker.registry import handler
 
 ORDER = (

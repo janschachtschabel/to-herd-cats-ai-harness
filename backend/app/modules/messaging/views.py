@@ -22,8 +22,7 @@ from app.modules.messaging.social_repository import (
     ReactionRepository,
     ReactionSummary,
 )
-from app.modules.tickets.models import ticket_key
-from app.modules.tickets.name_repository import TicketNameRepository
+from app.modules.messaging.ticket_hooks import ticket_hooks
 from app.modules.users.repository import UserRepository
 from app.modules.wiki.visibility import PageReader
 
@@ -62,7 +61,7 @@ class SystemEntry:
 class _Names:
     people: dict[uuid.UUID, str]
     statuses: dict[uuid.UUID, str]
-    tickets: dict[uuid.UUID, int]
+    tickets: dict[uuid.UUID, str]  # keys (`HC-12`)
     pages: dict[uuid.UUID, str]  # these three: only those the reader sees
 
     def of(self, key: str, value: object) -> SystemValue | None:
@@ -81,8 +80,7 @@ class _Names:
             return self.pages.get(ref)
         if key in STATUS_KEYS:
             return self.statuses.get(ref)
-        number = self.tickets.get(ref)
-        return ticket_key(number) if number is not None else None
+        return self.tickets.get(ref)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,11 +146,13 @@ async def message_views(
     people = {m.author_id for m in messages if m.author_id is not None}
     people |= {a for b in present if (a := _uuid(b.get("actor"))) is not None}
     people |= _refs(present, PERSON_KEYS)
-    tickets = TicketNameRepository(session, actor.org_id, space_ids_with(actor, Action.TICKET_READ))
+    hooks = ticket_hooks()
+    tickets = hooks.names(session, actor.org_id, space_ids_with(actor, Action.TICKET_READ))
+    numbers = await tickets.numbers(_refs(present, TICKET_KEYS))
     names = _Names(
         people=await UserRepository(session).names(actor.org_id, people),
         statuses=await tickets.status_names(_refs(present, STATUS_KEYS)),
-        tickets=await tickets.numbers(_refs(present, TICKET_KEYS)),
+        tickets={ref: hooks.key(number) for ref, number in numbers.items()},
         pages=await PageReader(session).titles(actor, _refs(present, PAGE_KEYS)),
     )
     return [

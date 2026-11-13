@@ -27,7 +27,6 @@ from app.core.access import Action, Actor, require, space_ids_with
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
 from app.modules.audit.recorder import changes, record, snapshot
-from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets.events import TICKET_UPDATED, Field, ticket_event
 from app.modules.tickets.models import (
     MAX_STATUSES,
@@ -36,6 +35,7 @@ from app.modules.tickets.models import (
     TicketStatus,
 )
 from app.modules.tickets.status_repository import StatusRepository, StatusScope
+from app.modules.tickets.thread_repository import TicketThreadRepository
 
 
 def status_not_found() -> NotFound:

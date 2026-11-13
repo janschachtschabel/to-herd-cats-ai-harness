@@ -16,11 +16,10 @@ from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.core.principal import PrincipalType
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import ConversationScope, visible_conversations
-from app.modules.tickets.models import WorkItem
+from app.modules.messaging.ticket_hooks import ticket_hooks
 from app.modules.users.models import User
 
 SNIPPET_CHARS = 140
@@ -64,25 +63,6 @@ class NotificationRepository:
         if parent.author_type == "user" and parent.author_id is not None:
             people.add(parent.author_id)
         return people
-
-    async def ticket_people(self, conversation_id: uuid.UUID) -> set[uuid.UUID]:
-        """The people a ticket thread's ticket is assigned to and was reported by (none
-        for other conversations)."""
-        stmt = (
-            select(
-                WorkItem.assignee_type,
-                WorkItem.assignee_id,
-                WorkItem.reporter_type,
-                WorkItem.reporter_id,
-            )
-            .join(Conversation, Conversation.work_item_id == WorkItem.id)
-            .where(Conversation.org_id == self.org_id, Conversation.id == conversation_id)
-        )
-        row = (await self.session.execute(stmt)).first()
-        if row is None:
-            return set()
-        pairs = ((row[0], row[1]), (row[2], row[3]))
-        return {pid for ptype, pid in pairs if ptype == PrincipalType.USER and pid is not None}
 
     async def add(
         self, message: Message, wanted: Sequence[tuple[uuid.UUID, NotificationReason]]
@@ -165,7 +145,7 @@ class ActivityRepository:
                 Conversation.name,
                 Conversation.space_id,
                 Conversation.page_id,
-                WorkItem.number,
+                ticket_hooks().number(Conversation.work_item_id),
                 Message.parent_id,
                 author_id,
                 User.name,
@@ -173,7 +153,6 @@ class ActivityRepository:
             )
             .join(Conversation, Conversation.id == Notification.conversation_id)
             .join(Message, Message.id == Notification.message_id)
-            .outerjoin(WorkItem, WorkItem.id == Conversation.work_item_id)
             .outerjoin(User, and_(User.id == author_id, User.org_id == Notification.org_id))
             .where(self._mine())
             .order_by(Notification.id.desc())

@@ -32,6 +32,7 @@ from app.modules.messaging.activity_repository import NotificationRepository
 from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import readers_of
 from app.modules.messaging.social_repository import MentionRepository
+from app.modules.messaging.ticket_hooks import ticket_hooks
 
 
 async def notify_on_message(session: AsyncSession, event: Event) -> None:
@@ -58,7 +59,8 @@ async def notify_on_message(session: AsyncSession, event: Event) -> None:
             for user_id in await repo.thread_people(parent, message):
                 wanted.setdefault(user_id, NotificationReason.REPLY)
     if event.type == "message.created":
-        for user_id in await repo.ticket_people(message.conversation_id):
+        people = ticket_hooks().people(session, event.org_id, message.conversation_id)
+        for user_id in await people:
             wanted.setdefault(user_id, NotificationReason.TICKET_COMMENT)
     wanted.pop(message.author_id, None)
     readers = await readers_of(session, event.org_id, message.conversation_id, wanted)

@@ -10,6 +10,8 @@ from app.core.errors import ValidationFailed
 from app.core.pagination import Page, PageParams
 from app.core.principal import Principal
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.messaging.router import conversation_out
+from app.modules.messaging.schemas import ConversationOut
 from app.modules.tickets.listing import Filters, Sort
 from app.modules.tickets.models import MAX_TAGS, Priority, StatusCategory, TicketKind
 from app.modules.tickets.repository import TicketView
@@ -26,6 +28,7 @@ from app.modules.tickets.tagging import TicketTags
 
 space_tickets = APIRouter(prefix="/spaces/{space_id}/tickets", tags=["tickets"])
 tickets = APIRouter(prefix="/tickets", tags=["tickets"])
+ticket_threads = APIRouter(prefix="/tickets/{number}/thread", tags=["messaging"])
 
 PersonQuery = Annotated[str | None, Query(description="`me` or a person's id")]
 TagQuery = Annotated[
@@ -148,3 +151,12 @@ def ticket_number(number: int) -> int:
     if not 1 <= number < 2**31:
         raise ticket_not_found()
     return number
+
+
+@ticket_threads.get("", response_model=ConversationOut)
+async def get_ticket_thread(number: int, actor: ActorDep, session: SessionDep) -> ConversationOut:
+    """The ticket's thread (made with the ticket), for whoever sees the ticket; its
+    messages, the system timeline among them, come from
+    `/conversations/{id}/messages`."""
+    thread = await TicketService(session).thread_of(actor, ticket_number(number))
+    return await conversation_out(session, actor, thread)

@@ -67,7 +67,7 @@ def api_router() -> APIRouter:
     api.include_router(messaging.conversations)
     api.include_router(messaging.messages)
     api.include_router(messaging.page_threads)
-    api.include_router(messaging.ticket_threads)
+    api.include_router(tickets.ticket_threads)
     api.include_router(messaging_social.reads)
     api.include_router(messaging_social.reactions)
     api.include_router(messaging_activity.activity)
