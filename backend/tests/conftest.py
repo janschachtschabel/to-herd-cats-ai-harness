@@ -14,7 +14,12 @@ from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
-from app.core.db import get_session, make_engine  # noqa: E402
+from app.core.db import (  # noqa: E402
+    discard_after_commit,
+    get_session,
+    make_engine,
+    run_after_commit,
+)
 from app.core.logging import configure_logging  # noqa: E402
 from app.core.migrations import upgrade_head  # noqa: E402
 from app.web.internal import create_internal_app, get_engine  # noqa: E402
@@ -120,9 +125,11 @@ async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
             if nested.is_active:
                 await nested.commit()
         except Exception:
+            discard_after_commit(session)
             if nested.is_active:
                 await nested.rollback()
             raise
+        await run_after_commit(session)
 
     app.dependency_overrides[get_session] = _session_override
     # raise_app_exceptions=False: let the 500 handler's response reach the test.

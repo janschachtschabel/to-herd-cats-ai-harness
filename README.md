@@ -175,6 +175,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   darüber in einer temporären Datei unter `TMPDIR` (Compose: `tmpfs` `/tmp`)
   zwischengespeichert. Erlaubt sind PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV,
   JSON, DOCX, XLSX, PPTX und ZIP, erkannt am Inhalt; SVG und HTML werden abgelehnt.
+  Eine Datei wird erst gelöscht, nachdem die Transaktion, die ihren letzten Anhang
+  gelöscht hat, abgeschlossen ist; scheitert das Löschen danach, bleibt die Datei
+  ungenutzt liegen (nie ein Anhang ohne Datei).
 - **Import und Export**: Ein Bereich lässt sich als Markdown-ZIP exportieren (eine
   `.md` je Seite mit Front Matter `title`, `status`, `tags`, Anhänge unter
   `_attachments/`) und wieder importieren (Recht `space.manage`). Die ZIP-Datei darf

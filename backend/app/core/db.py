@@ -1,6 +1,7 @@
 """Async engine, session factory and the request-scoped session dependency."""
 
-from collections.abc import AsyncIterator
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from sqlalchemy.engine import URL
@@ -12,6 +13,11 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+AfterCommit = Callable[[AsyncSession], Awaitable[None]]
+_AFTER_COMMIT = "herd.after_commit"
 
 
 def make_engine(url: str | URL | None = None, **kwargs: Any) -> AsyncEngine:
@@ -57,5 +63,35 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             yield session
             await session.commit()
         except Exception:
+            discard_after_commit(session)
             await session.rollback()
             raise
+        await run_after_commit(session)
+
+
+def after_commit(session: AsyncSession, action: AfterCommit) -> None:
+    """Run `action` once the request's transaction has committed, in a transaction of
+    its own on the same session (for work that must not happen if the commit fails,
+    such as removing files whose rows were deleted). Dropped when the request fails."""
+    session.info.setdefault(_AFTER_COMMIT, []).append(action)
+
+
+def discard_after_commit(session: AsyncSession) -> None:
+    session.info.pop(_AFTER_COMMIT, None)
+
+
+async def run_after_commit(session: AsyncSession) -> None:
+    """The registered actions, each in its own transaction (a savepoint when the
+    session is still inside one, as in tests); a failing action is logged and rolled
+    back, never raised: the request's own work is already committed."""
+    actions: list[AfterCommit] = session.info.pop(_AFTER_COMMIT, [])
+    for action in actions:
+        try:
+            if session.in_transaction():
+                async with session.begin_nested():
+                    await action(session)
+            else:
+                async with session.begin():
+                    await action(session)
+        except Exception as exc:
+            logger.warning("after-commit action failed", extra={"error": type(exc).__name__})
