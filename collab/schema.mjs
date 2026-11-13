@@ -6,7 +6,7 @@
 // merged cells, one alignment per column); a heading has no hard breaks; code may carry a link or emphasis
 // (`` [`a`](b) ``, `` **`a`** ``). Markdown is read and written by `parse.mjs` and
 // `serialize.mjs`, not by Tiptap's Markdown support.
-import { InputRule } from "@tiptap/core";
+import { InputRule, mergeAttributes } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { ySyncPluginKey } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
@@ -42,7 +42,7 @@ const TYPED_IMAGE = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
 /** Images as Markdown has them: source, alt text and title; no marks (the Y.Doc keeps
  * none on an image, so a linked image could not be shared; it stays a raw block). An
  * image whose source the page view does not show (`blob:`, `file:`, `data:`, ...) is
- * not taken in, pasted or typed (review M2 T11). */
+ * not taken in, pasted or typed (review M2 T11), nor loaded when it arrives (U13). */
 const MarkdownImage = Image.extend({
   marks: "",
   parseHTML() {
@@ -70,6 +70,13 @@ const MarkdownImage = Image.extend({
         },
       }),
     ];
+  },
+  // An image with such a source can still come from another client: the editor does not
+  // load it either (review M2 U13), it shows the alt text's place only.
+  renderHTML({ HTMLAttributes }) {
+    const { src, ...rest } = HTMLAttributes;
+    const shown = src && allowedUri(src) ? HTMLAttributes : rest;
+    return ["img", mergeAttributes(this.options.HTMLAttributes, shown)];
   },
   addAttributes() {
     return {

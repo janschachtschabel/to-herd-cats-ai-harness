@@ -149,7 +149,9 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Wie Links nur mit `http`-, `https`- und relativen Adressen, wie die Seitenansicht sie
   zeigt: ein eingefügtes oder getipptes Bild aus `blob:`, `file:` oder `data:` nimmt der
   Editor nicht an, und ein solches Bild im gespeicherten Markdown erscheint als
-  Codeblock (die Seitenansicht zeigt es nicht).
+  Codeblock (die Seitenansicht zeigt es nicht). Schickt ein anderer Client trotzdem ein
+  solches Bild in den gemeinsamen Stand, lädt der Editor es nicht (er zeigt nur die
+  Stelle), und speichern lässt sich dieser Stand nicht.
 - **Speicherprüfung:** Vor jeder Live-Speicherung liest der Collab-Prozess das Markdown,
   das er schreiben will, wieder ein und vergleicht es mit dem Dokument im Editor;
   außerdem muss es die Prüfung beim Öffnen (unten) bestehen. Fällt eine der beiden

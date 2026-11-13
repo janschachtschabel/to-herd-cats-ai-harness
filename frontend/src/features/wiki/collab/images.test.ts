@@ -55,3 +55,31 @@ test('a typed image with a source the page view does not show stays text', () =>
   typed(e, ' ![bild](/x.png)')
   expect(images(e)).toEqual(['/x.png'])
 })
+
+// Review M2 U13: an image whose source the page view does not show can still arrive in
+// the shared document from another client; the editor does not load it either.
+test('an image with a source the page view does not show is drawn without it', () => {
+  const e = fresh()
+  e.commands.setContent({
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'image', attrs: { src: 'data:image/png;base64,AAAA', alt: 'eins' } },
+          { type: 'image', attrs: { src: 'javascript:alert(1)', alt: 'zwei' } },
+          { type: 'image', attrs: { src: '/bilder/b.png', alt: 'drei' } },
+        ],
+      },
+    ],
+  })
+  const drawn = [...e.view.dom.querySelectorAll('img:not(.ProseMirror-separator)')].map((img) => [
+    img.getAttribute('alt'),
+    img.getAttribute('src'),
+  ])
+  expect(drawn).toEqual([
+    ['eins', null],
+    ['zwei', null],
+    ['drei', '/bilder/b.png'],
+  ])
+})
