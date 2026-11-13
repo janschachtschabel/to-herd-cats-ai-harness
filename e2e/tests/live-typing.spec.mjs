@@ -27,7 +27,10 @@ async function typeAndSave(title, markdown, type) {
   await tab.goto(pageUrl(space, doc, "live"));
   const editor = tab.getByRole("textbox", { name: `Inhalt von „${title}“` });
   await expect(editor).toHaveAttribute("contenteditable", "true");
-  await expect(tab.getByRole("status")).toHaveText("Synchronisiert");
+  // The editor's own status (while the page loads, its skeletons are status regions too).
+  await expect(tab.getByRole("region", { name: title }).getByRole("status")).toHaveText(
+    "Synchronisiert",
+  );
   await type(tab, editor);
   await tab.getByRole("button", { name: "Fertig" }).click();
   await expect(tab).toHaveURL(new RegExp(`/p/${doc.path}$`));
@@ -130,9 +133,11 @@ test("a state that cannot be saved as Markdown is shown, and saved once it can",
   const tab = await context.newPage();
   await tab.goto(pageUrl(space, doc, "live"));
   const editor = tab.getByRole("textbox", { name: "Inhalt von „Unsagbar“" });
-  // Wait for the editor first: while the page loads, its skeletons are status regions too.
   await expect(editor).toHaveAttribute("contenteditable", "true");
-  await expect(tab.getByRole("status")).toHaveText("Synchronisiert");
+  // The editor's own status (while the page loads, its skeletons are status regions too).
+  await expect(tab.getByRole("region", { name: "Unsagbar" }).getByRole("status")).toHaveText(
+    "Synchronisiert",
+  );
   await editor.getByText("a|b").click();
   await tab.keyboard.press("Home");
   await tab.keyboard.press("ArrowRight");

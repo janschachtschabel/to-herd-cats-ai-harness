@@ -43,3 +43,45 @@ export async function publishedPage(context, spaceId, title, content_md) {
 
 export const pageUrl = (space, page, view) =>
   `/spaces/${space.id}/p/${page.path}${view ? `?view=${view}` : ""}`;
+
+/** Counts what the browser sends of the shared document (in the page): Yjs updates
+ * (`updates`) and the size of each sync step 2 (an empty one is 2 bytes). */
+export function countSentUpdates() {
+  window.__herdSent = { updates: 0, steps: [] };
+  const send = WebSocket.prototype.send;
+  WebSocket.prototype.send = function (data) {
+    try {
+      const bytes =
+        data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer ?? []);
+      let at = 0;
+      const uint = () => {
+        let value = 0;
+        let shift = 0;
+        for (;;) {
+          const byte = bytes[at++];
+          value += (byte & 0x7f) * 2 ** shift;
+          shift += 7;
+          if (byte < 0x80) return value;
+        }
+      };
+      const nameLength = uint();
+      at += nameLength; // the document's name
+      const type = uint();
+      if (type === 0 || type === 4) {
+        const step = uint();
+        if (step === 2) window.__herdSent.updates += 1;
+        if (step === 1) window.__herdSent.steps.push(uint());
+      }
+    } catch {
+      // not a message of the document
+    }
+    return send.call(this, data);
+  };
+}
+
+/** The value of a counter on the internal port's /metrics (0 when absent). */
+export async function metric(request, port, line) {
+  const text = await (await request.get(`http://127.0.0.1:${port}/metrics`)).text();
+  const found = text.split("\n").find((l) => l.startsWith(`${line} `));
+  return found ? Number(found.split(" ").at(-1)) : 0;
+}
