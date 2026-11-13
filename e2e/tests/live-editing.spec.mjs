@@ -4,6 +4,7 @@
 // change is not opened and points to the Markdown editor (R1, 4422).
 import { expect, test } from "@playwright/test";
 import { MEMBER, OWNER, call, pageUrl, publishedPage, signIn, teamSpace } from "./helpers.mjs";
+import { newLineAtEnd } from "./live-typing-helpers.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -26,12 +27,7 @@ const surface = (page, title) => page.getByRole("textbox", { name: `Inhalt von â
 async function typeAtEnd(page, title, text) {
   const editor = surface(page, title);
   await expect(editor).toHaveAttribute("contenteditable", "true");
-  await editor.click();
-  await page.keyboard.press("Control+End");
-  // The editor learns of the moved selection from an asynchronous selectionchange event;
-  // a key sent in the same instant would still act on the old one (the document start).
-  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  await page.keyboard.press("Enter");
+  await newLineAtEnd(page, editor); // waits for the editor's caret, not for a while (U8)
   await page.keyboard.type(text);
 }
 
