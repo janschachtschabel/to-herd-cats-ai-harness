@@ -60,6 +60,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/pages/{page_id}/versions/{number}/restore", "page"),
     ("GET", "/api/pages/{page_id}/diff", "page"),
     ("PUT", "/api/pages/{page_id}/tags", "page"),
+    ("POST", "/api/pages/{page_id}/attachments", "page"),
+    ("GET", "/api/pages/{page_id}/attachments", "page"),
+    ("GET", "/api/attachments/{attachment_id}", "session"),
+    ("DELETE", "/api/attachments/{attachment_id}", "session"),
     ("GET", "/api/tags", "session"),
     ("GET", "/api/search", "session"),
     ("POST", "/api/tags", "session"),  # system tags: tag.manage; space tags: page.moderate
@@ -102,10 +106,11 @@ def _concrete(template: str, space_id: object | None = None, page_id: object | N
         "{member_id}": str(uuid7()),
         "{number}": "1",
         "{tag_id}": str(uuid7()),
+        "{attachment_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
-    queries = {"/by-path": "?path=x", "/diff": "?from=1&to=1"}
+    queries = {"/by-path": "?path=x", "/diff": "?from=1&to=1", "/attachments": "?filename=x.txt"}
     return template + next((q for end, q in queries.items() if template.endswith(end)), "")
 
 

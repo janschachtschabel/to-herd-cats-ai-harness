@@ -157,6 +157,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Attachment */
+        get: operations["download_attachment_api_attachments__attachment_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Attachment
+         * @description `page.edit` on its page; the file goes when no other attachment uses it.
+         */
+        delete: operations["delete_attachment_api_attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -269,6 +290,29 @@ export interface paths {
         head?: never;
         /** Update Page */
         patch: operations["update_page_api_pages__page_id__patch"];
+        trace?: never;
+    };
+    "/api/pages/{page_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Attachments */
+        get: operations["list_attachments_api_pages__page_id__attachments_get"];
+        put?: never;
+        /**
+         * Upload Attachment
+         * @description Upload a file (`page.edit`): PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV, JSON,
+         *     DOCX, XLSX, PPTX or ZIP, decided by the content; 415 otherwise or when the name's
+         *     extension does not fit it; 413 over the size limit.
+         */
+        post: operations["upload_attachment_api_pages__page_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/pages/{page_id}/diff": {
@@ -636,6 +680,39 @@ export interface components {
          */
         Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage";
         /**
+         * AttachmentOut
+         * @description `url` downloads it (`?inline=1` shows raster images in the page). `mime` is what
+         *     the content is, whatever the upload declared.
+         */
+        AttachmentOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime */
+            mime: string;
+            /**
+             * Page Id
+             * Format: uuid
+             */
+            page_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+            uploaded_by: components["schemas"]["PrincipalRef"];
+            /** Url */
+            url: string;
+        };
+        /**
          * AuditOut
          * @description `actor_name`: the acting person's display name (None for other principals).
          */
@@ -919,6 +996,13 @@ export interface components {
             title?: string | null;
             /** Version */
             version: number;
+        };
+        /** Page[AttachmentOut] */
+        Page_AttachmentOut_: {
+            /** Items */
+            items: components["schemas"]["AttachmentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /** Page[AuditOut] */
         Page_AuditOut_: {
@@ -1864,6 +1948,69 @@ export interface operations {
             };
         };
     };
+    download_attachment_api_attachments__attachment_id__get: {
+        parameters: {
+            query?: {
+                /** @description show a raster image in the page */
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_attachment_api_attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_auth_login_post: {
         parameters: {
             query?: never;
@@ -2115,6 +2262,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attachments_api_pages__page_id__attachments_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AttachmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_pages__page_id__attachments_post: {
+        parameters: {
+            query: {
+                filename: string;
+            };
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
                 };
             };
             /** @description Validation Error */

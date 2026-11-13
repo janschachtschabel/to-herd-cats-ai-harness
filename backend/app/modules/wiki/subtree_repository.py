@@ -127,6 +127,14 @@ class SubtreeRepository(PageRepository):
             stmt = stmt.where(tuple_(Page.trashed_at, Page.id) < tuple_(*before))
         return list((await self.session.scalars(stmt)).all())
 
+    async def ids_at_or_below(self, root_id: uuid.UUID) -> list[uuid.UUID]:
+        """The page and every page below it by parent links, in the trash or not."""
+        stmt = select(Page.id).where(
+            self._scoped(),
+            or_(Page.id == root_id, Page.id.in_(_descendant_ids(root_id, None))),
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def delete_subtree(self, root_id: uuid.UUID) -> list[uuid.UUID]:
         """Delete the page and everything below it, for good; returns their ids."""
         stmt = (

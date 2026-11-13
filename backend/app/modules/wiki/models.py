@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Computed,
     DateTime,
@@ -35,6 +36,7 @@ MAX_TITLE_CHARS = 200
 MAX_SLUG_CHARS = 80
 MAX_SUMMARY_CHARS = 300
 MAX_LABEL_CHARS = 100
+MAX_FILENAME_CHARS = 255
 
 
 # Full-text search (spec 11): the title stemmed (German) and as written (simple), both
@@ -125,6 +127,37 @@ class PageVersion(UuidPk, OrgScoped, Base):
     change_summary: Mapped[str | None] = mapped_column(String(MAX_SUMMARY_CHARS))
     label: Mapped[str | None] = mapped_column(String(MAX_LABEL_CHARS))
     session_key: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Attachment(UuidPk, OrgScoped, Base):
+    """A file on a page, readable by whoever may read the page. The bytes live in the
+    storage under `storage_key` (`attachments/<org_id>/<sha256>`), shared by every
+    attachment of the organisation with the same content."""
+
+    __tablename__ = "attachment"
+    __table_args__ = (
+        Index("ix_attachment_page_id", "page_id"),
+        Index("ix_attachment_org_id_sha256", "org_id", "sha256"),
+    )
+
+    space_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("space.id", ondelete="CASCADE"), nullable=False
+    )
+    # Purging a page deletes its attachments (and unused files) first; the cascade
+    # only backs that up.
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(MAX_FILENAME_CHARS), nullable=False)
+    mime: Mapped[str] = mapped_column(String(100), nullable=False)
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    uploaded_by_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
+    uploaded_by_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

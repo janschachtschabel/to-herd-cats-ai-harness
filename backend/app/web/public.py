@@ -1,8 +1,10 @@
 """The public application (port HERD_PUBLIC_PORT)."""
 
+import re
+
 from fastapi import APIRouter, Depends, FastAPI
 
-from app.core.body_limit import BodyLimitMiddleware
+from app.core.body_limit import BodyLimitMiddleware, RouteLimit
 from app.core.config import Settings, get_settings
 from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from app.core.nul_guard import NulGuardMiddleware
@@ -20,6 +22,7 @@ from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
 from app.modules.users.router import router as users_router
 from app.modules.wiki import router as wiki
+from app.modules.wiki.attachments_router import attachments, page_attachments
 from app.modules.wiki.versions_router import page_versions
 from app.web.spa import mount_spa
 
@@ -35,11 +38,22 @@ def api_router() -> APIRouter:
     api.include_router(wiki.pages)
     api.include_router(wiki.space_trash)
     api.include_router(page_versions)
+    api.include_router(page_attachments)
+    api.include_router(attachments)
     api.include_router(tags_router)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
     return api
+
+
+def body_limits(settings: Settings) -> list[RouteLimit]:
+    """The routes that take files, with their own request body limit."""
+    return [
+        RouteLimit(
+            "POST", re.compile(r"/api/pages/[^/]+/attachments"), settings.attachment_max_bytes
+        ),
+    ]
 
 
 def create_public_app(settings: Settings | None = None) -> FastAPI:
@@ -54,7 +68,9 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     )
     # Added first is innermost: errors are answered before the request line is written.
     app.add_middleware(NulGuardMiddleware)
-    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(
+        BodyLimitMiddleware, max_bytes=settings.max_body_bytes, routes=body_limits(settings)
+    )
     app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)

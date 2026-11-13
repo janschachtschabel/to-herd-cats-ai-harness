@@ -3,9 +3,14 @@
 It runs before anything reads the body (the NUL guard, routing, CSRF, authentication),
 so an oversized body is never buffered: a declared `Content-Length` over the limit is
 refused unread, and a body without one (chunked) is counted while it is read and cut
-off at the first chunk over the limit. `limit_for` is where a route would get a limit
-of its own; so far every request has the same.
+off at the first chunk over the limit. Routes that take files (attachments, imports)
+get a limit of their own (`RouteLimit`, chosen by `limit_for` from method and path);
+every other request has the global one.
 """
+
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
@@ -15,6 +20,13 @@ from app.core.errors import error_body
 
 CODE = "request.too_large"
 MESSAGE = "Request body too large"
+
+
+@dataclass(frozen=True, slots=True)
+class RouteLimit:
+    method: str
+    path: re.Pattern[str]  # matched against the whole path
+    max_bytes: int
 
 
 class BodyTooLarge(HTTPException):
@@ -41,11 +53,16 @@ async def refuse(scope: Scope, receive: Receive, send: Send) -> None:
 
 
 class BodyLimitMiddleware:
-    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
+    def __init__(self, app: ASGIApp, *, max_bytes: int, routes: Sequence[RouteLimit] = ()) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.routes = tuple(routes)
 
     def limit_for(self, scope: Scope) -> int:
+        method, path = scope.get("method", ""), scope.get("path", "")
+        for route in self.routes:
+            if route.method == method and route.path.fullmatch(path):
+                return route.max_bytes
         return self.max_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

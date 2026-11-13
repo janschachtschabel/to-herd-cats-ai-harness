@@ -165,6 +165,16 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   beim Lesen ab dem ersten Teil über der Grenze. Ein Ingress davor darf größer oder
   gleich eingestellt sein (ingress-nginx: `proxy-body-size`, Standard 1m); im Chart über
   `api.env` setzbar.
+- **Anhänge**: Dateien liegen unter `HERD_DATA_DIR` (Standard `/data`; für die lokale
+  Entwicklung auf ein beschreibbares Verzeichnis setzen), je Organisation und Inhalt
+  einmal (`attachments/<org_id>/<sha256>`). Mehrere API-Replikas brauchen dasselbe
+  Volume (Compose und Helm bekommen es mit der Live-Bearbeitung). Ein Anhang hat
+  höchstens `HERD_ATTACHMENT_MAX_BYTES` (Standard 26214400, 25 MiB); nur die
+  Upload-Route nimmt so große Körper an, ein Ingress davor muss dort ebenso viel
+  zulassen (ingress-nginx: `proxy-body-size`). Ein Upload wird bis 1 MiB im Speicher,
+  darüber in einer temporären Datei unter `TMPDIR` (Compose: `tmpfs` `/tmp`)
+  zwischengespeichert. Erlaubt sind PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV,
+  JSON, DOCX, XLSX, PPTX und ZIP, erkannt am Inhalt; SVG und HTML werden abgelehnt.
 - **Wiki-Diff**: Ein Vergleich zweier Seitenversionen vergleicht höchstens
   `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
   antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den

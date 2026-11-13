@@ -42,17 +42,18 @@ class PageReader:
 
     def repo(self, actor: Actor) -> PageRepository:
         """The actor's view of the pages: its organisation, the spaces it may read."""
-        return PageRepository(self.session, self._scope(actor))
+        return PageRepository(self.session, self.scope(actor))
 
     def subtree(self, actor: Actor) -> SubtreeRepository:
         """`repo`, with the statements over whole subtrees."""
-        return SubtreeRepository(self.session, self._scope(actor))
+        return SubtreeRepository(self.session, self.scope(actor))
 
     def versions(self, actor: Actor) -> VersionRepository:
         """The versions of the pages in `repo`."""
-        return VersionRepository(self.session, self._scope(actor))
+        return VersionRepository(self.session, self.scope(actor))
 
-    def _scope(self, actor: Actor) -> PageScope:
+    def scope(self, actor: Actor) -> PageScope:
+        """The actor's organisation and the spaces it may read (SQL)."""
         return PageScope(actor.org_id, visible_space_ids(actor))
 
     async def readable(self, actor: Actor, page_id: uuid.UUID, *, lock: bool = False) -> Page:

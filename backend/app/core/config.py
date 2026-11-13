@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     max_body_bytes: int = Field(default=1024 * 1024, ge=1)
     # Most lines (both versions together) a page diff compares; more is answered 422.
     diff_max_lines: int = Field(default=20_000, ge=1)
+    # Where files live (attachments); a volume shared by all API replicas.
+    data_dir: Path = Path("/data")
+    # Largest attachment (bytes); its upload route takes bodies up to this size.
+    attachment_max_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

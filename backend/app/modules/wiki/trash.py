@@ -1,7 +1,7 @@
 """The trash instead of deleting (spec 9): a page goes into the trash with every page
 below it, at one time; a restore brings back the page and those that went with it.
 Deleting for good (`purge`) is for system admins only and takes a page from the trash
-with everything below it, its versions and tags included.
+with everything below it, its versions, tags and attachments included.
 
 Moderators trash and restore (`page.trash`); the trash lists the pages that went in
 on their own or as the top of a batch. Like moves, every change holds the space's
@@ -20,6 +20,7 @@ from app.core.pagination import PageParams, decode_cursor, encode_cursor
 from app.modules.audit.recorder import record
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
+from app.modules.wiki.attachments import AttachmentService
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.tree import child_path, depth_of
@@ -100,6 +101,9 @@ class PageTrash:
         await pages.lock_tree(page.space_id)
         if await pages.trashed(page_id) is None:  # restored or purged meanwhile
             raise page_not_found()
+        await AttachmentService(self.session).purge_pages(
+            actor, await pages.ids_at_or_below(page_id)
+        )
         purged = await pages.delete_subtree(page_id)
         await tag_repository(self.session, actor).delete_for(SubjectType.PAGE, purged)
         details = {"title": page.title, "path": page.path, "pages": len(purged)}

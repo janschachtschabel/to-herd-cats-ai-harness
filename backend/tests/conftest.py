@@ -66,6 +66,14 @@ def _drop_everything(connection: Connection) -> None:
     existing.drop_all(connection)
 
 
+@pytest.fixture(autouse=True)
+def data_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """Files (attachments) of each test go to a directory of its own."""
+    path = tmp_path / "data"
+    monkeypatch.setattr(get_settings(), "data_dir", path)
+    return path
+
+
 @pytest.fixture(scope="session")
 async def engine() -> AsyncIterator[AsyncEngine]:
     """The schema is built by the migrations, so the tests run against what production
