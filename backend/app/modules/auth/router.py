@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Request, Response
 
 from app.modules.auth.context import AuthContext
-from app.modules.auth.deps import AuthDep, SessionDep, SettingsDep
+from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
 from app.modules.auth.schemas import LoginRequest, MeOut
 from app.modules.auth.service import AuthService
 from app.modules.orgs.schemas import OrgOut
-from app.modules.users.schemas import UserOut
+from app.modules.users.profile import ProfileService
+from app.modules.users.schemas import ProfileUpdateIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -46,6 +47,19 @@ async def logout(
 @router.get("/me", response_model=MeOut)
 async def me(ctx: AuthDep, session: SessionDep, settings: SettingsDep) -> MeOut:
     return await _me(ctx, session, settings)
+
+
+@router.patch("/me", response_model=MeOut)
+async def update_me(
+    body: ProfileUpdateIn,
+    actor: ActorDep,
+    ctx: AuthDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> MeOut:
+    """The caller's own settings (the language)."""
+    user = await ProfileService(session).update(actor, body, body.version)
+    return await _me(AuthContext(user=user, session_id=ctx.session_id), session, settings)
 
 
 async def _me(ctx: AuthContext, session: SessionDep, settings: SettingsDep) -> MeOut:

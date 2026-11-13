@@ -5,7 +5,7 @@ import { ADMIN_PERMISSIONS, makeMe, makeSpace, makeUser, mockApi, page } from '@
 import { renderApp } from '@/test/render'
 
 const KEY_LIKE =
-  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|roles|systemRoles|principals|spaces|users|groups|audit)\.[\w.]+/
+  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|profile|roles|systemRoles|principals|spaces|users|groups|audit)\.[\w.]+/
 
 /** What a person reads, text node by text node, and the accessible labels; scripts
  *  (next-themes injects one) left out. */
@@ -26,9 +26,10 @@ const me = makeMe(ADMIN_PERMISSIONS)
 const team = makeSpace({ name: 'Team Dienste' })
 const group = { id: 'g1', name: 'Redaktion', description: null, version: 1 }
 
-function api() {
+function api(locale: Locale) {
   mockApi({
-    'GET /api/auth/me': me,
+    // The interface speaks the person's stored language.
+    'GET /api/auth/me': { ...me, user: { ...me.user, locale } },
     'GET /api/spaces': page([
       makeSpace({ kind: 'open', name: 'Handbuch', my_role: 'viewer' }),
       team,
@@ -69,6 +70,7 @@ const PAGES = [
   '/admin/groups',
   '/admin/groups/g1',
   '/admin/audit',
+  '/profile',
 ]
 
 describe('translations', () => {
@@ -85,7 +87,7 @@ describe('translations', () => {
 
   test.each<Locale>(['de', 'en'])('every user-facing string resolves in %s', async (locale) => {
     setLocale(locale)
-    api()
+    api(locale)
     for (const path of PAGES) {
       const { user } = await renderApp(path)
       await screen.findByRole('heading', { level: 1 })

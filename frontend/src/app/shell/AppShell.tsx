@@ -2,6 +2,7 @@ import { PanelLeft } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { useUserLocale } from '@/features/profile/queries'
 import { cn } from '@/lib/utils'
 import { Sidebar } from './Sidebar'
 import { UserMenu } from './UserMenu'
@@ -10,6 +11,7 @@ import { UserMenu } from './UserMenu'
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(true)
+  useUserLocale()
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
       <a

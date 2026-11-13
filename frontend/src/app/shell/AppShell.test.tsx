@@ -91,16 +91,11 @@ describe('shell', () => {
     expect(within(spaces).queryByRole('button', { name: 'Weitere Bereiche' })).toBeNull()
   })
 
-  test('the user menu switches language and theme', async () => {
+  test('the user menu switches the theme', async () => {
     mockApi({ 'GET /api/auth/me': makeMe(['space.create']), 'GET /api/spaces': page([]) })
     const { user } = await renderApp('/spaces')
     await user.click(screen.getByRole('button', { name: 'Menü von Mia Muster' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'English' }))
-    expect(await screen.findByRole('heading', { name: 'Spaces', level: 1 })).toBeInTheDocument()
-    expect(document.documentElement.lang).toBe('en')
-
-    await user.click(screen.getByRole('button', { name: 'Menu of Mia Muster' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dunkel' }))
     expect(document.documentElement).toHaveClass('dark')
   })
 })

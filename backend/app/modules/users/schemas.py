@@ -40,6 +40,18 @@ class UserUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=10, max_length=200)
 
 
+class ProfileUpdate(BaseModel):
+    """What a person sets about themselves (`PATCH /api/auth/me`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    locale: str = Field(pattern=r"^(de|en)$")
+
+
+class ProfileUpdateIn(ProfileUpdate):
+    version: int
+
+
 class UserUpdateIn(UserUpdate):
     """The PATCH body: the changes plus the version the client read."""
 

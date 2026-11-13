@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronDown, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react'
+import { ChevronDown, Languages, LogOut, Monitor, Moon, Sun, UserCog } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useTranslation } from 'react-i18next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -14,7 +14,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useLogout, useMe } from '@/features/auth/queries'
-import { setLocale, SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
+import { useChangeLocale } from '@/features/profile/queries'
+import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
 
 function initials(name: string): string {
   return name
@@ -35,6 +36,7 @@ export function UserMenu() {
   const { t, i18n } = useTranslation()
   const me = useMe()
   const logout = useLogout()
+  const changeLocale = useChangeLocale()
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   if (!me) return null
@@ -64,7 +66,7 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={i18n.language}
-          onValueChange={(value) => setLocale(value as Locale)}
+          onValueChange={(value) => changeLocale(value as Locale)}
         >
           {SUPPORTED_LOCALES.map((locale) => (
             <DropdownMenuRadioItem key={locale} value={locale}>
@@ -85,6 +87,10 @@ export function UserMenu() {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void navigate({ to: '/profile' })}>
+          <UserCog className="size-4" aria-hidden />
+          {t('userMenu.profile')}
+        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() =>
             logout.mutate(undefined, { onSettled: () => void navigate({ to: '/login' }) })

@@ -102,7 +102,13 @@
     "groups": "Gruppen",
     "audit": "Protokoll"
   },
+  "profile": {
+    "title": "Profil",
+    "description": "Deine Einstellungen für diese Anwendung.",
+    "language": "Sprache"
+  },
   "userMenu": {
+    "profile": "Profil und Einstellungen",
     "open": "Menü von {{name}}",
     "language": "Sprache",
     "locales": {

@@ -551,6 +551,26 @@
         "title": "PrincipalType",
         "type": "string"
       },
+      "ProfileUpdateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "pattern": "^(de|en)$",
+            "title": "Locale",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "locale",
+          "version"
+        ],
+        "title": "ProfileUpdateIn",
+        "type": "object"
+      },
       "SpaceCreate": {
         "description": "`personal` is a valid kind but not one the API creates (422 spaces.kind_not_allowed).",
         "properties": {
@@ -1810,6 +1830,46 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      },
+      "patch": {
+        "description": "The caller's own settings (the language).",
+        "operationId": "update_me_api_auth_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Me",
         "tags": [
           "auth"
         ]

@@ -205,7 +205,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Me
+         * @description The caller's own settings (the language).
+         */
+        patch: operations["update_me_api_auth_me_patch"];
         trace?: never;
     };
     "/api/directory": {
@@ -513,6 +517,13 @@ export interface components {
          * @enum {string}
          */
         PrincipalType: "user" | "agent" | "group";
+        /** ProfileUpdateIn */
+        ProfileUpdateIn: {
+            /** Locale */
+            locale: string;
+            /** Version */
+            version: number;
+        };
         /**
          * SpaceCreate
          * @description `personal` is a valid kind but not one the API creates (422 spaces.kind_not_allowed).
@@ -1201,6 +1212,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    update_me_api_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

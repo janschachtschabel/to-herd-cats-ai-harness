@@ -24,6 +24,10 @@ const GroupsPage = lazyRouteComponent(
   'GroupsPage',
 )
 const GroupPage = lazyRouteComponent(() => import('@/features/admin/groups/GroupPage'), 'GroupPage')
+const ProfilePage = lazyRouteComponent(
+  () => import('@/features/profile/ProfilePage'),
+  'ProfilePage',
+)
 const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
 
 export interface RouterContext {
@@ -98,6 +102,12 @@ const spaceRoute = createRoute({
   },
 })
 
+const profileRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/profile',
+  component: ProfilePage,
+})
+
 /** A page someone without the right must not even learn exists: not found. */
 function requirePermission(me: Me, permission: Permission): void {
   if (!hasPermission(me, permission)) throw notFound()
@@ -162,6 +172,7 @@ export const routeTree = rootRoute.addChildren([
     indexRoute,
     spacesRoute,
     spaceRoute,
+    profileRoute,
     adminRoute.addChildren([adminIndexRoute, usersRoute, groupsRoute, groupRoute, auditRoute]),
   ]),
 ])
