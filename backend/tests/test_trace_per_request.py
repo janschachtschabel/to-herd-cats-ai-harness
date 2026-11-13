@@ -38,9 +38,7 @@ async def _trace_ids(client: httpx.AsyncClient, count: int) -> list[str]:
     return ids
 
 
-async def test_a_trace_id_is_never_reused_on_one_connection(
-    base_url: str, real_db: RealDb
-) -> None:
+async def test_a_trace_id_is_never_reused_on_one_connection(base_url: str, real_db: RealDb) -> None:
     limits = httpx.Limits(max_connections=1)  # every request on the same connection
     headers = {"X-Requested-With": "herd"}
     async with httpx.AsyncClient(base_url=base_url, limits=limits, headers=headers) as client:
