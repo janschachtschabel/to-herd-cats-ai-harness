@@ -130,6 +130,8 @@ test("a state that cannot be saved as Markdown is shown, and saved once it can",
   const tab = await context.newPage();
   await tab.goto(pageUrl(space, doc, "live"));
   const editor = tab.getByRole("textbox", { name: "Inhalt von „Unsagbar“" });
+  // Wait for the editor first: while the page loads, its skeletons are status regions too.
+  await expect(editor).toHaveAttribute("contenteditable", "true");
   await expect(tab.getByRole("status")).toHaveText("Synchronisiert");
   await editor.getByText("a|b").click();
   await tab.keyboard.press("Home");
