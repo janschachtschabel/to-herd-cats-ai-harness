@@ -5,9 +5,10 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter
+from sqlalchemy import text
 
 from app.core.errors import NotFound
-from app.modules.auth.deps import AuthDep
+from app.modules.auth.deps import AuthDep, SessionDep
 
 router = APIRouter(prefix="/_test")
 logger = logging.getLogger("app.test_routes")
@@ -48,3 +49,10 @@ async def boom_post(payload: dict[str, Any]) -> None:
 async def whoami(ctx: AuthDep) -> dict[str, str]:
     logger.info("test.whoami")
     return {"actor": str(ctx.principal)}
+
+
+@router.post("/db-error")
+async def db_error(payload: dict[str, str], session: SessionDep) -> None:
+    # A statement the database rejects, with a value from the body as its parameter:
+    # neither the parameter nor the database's message (which quotes it) may be logged.
+    await session.execute(text("SELECT CAST(CAST(:v AS text) AS integer)"), {"v": payload["v"]})

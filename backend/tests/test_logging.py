@@ -9,6 +9,7 @@ from app.core.logging import configure_logging, log_context
 from app.core.telemetry import current_trace_ids, span_exporter_from_env
 from app.web.public import create_public_app
 from tests.conftest import json_lines, last_line
+from tests.factories import CSRF
 
 
 async def test_request_line_is_json_with_required_fields(client, capsys):
@@ -129,3 +130,28 @@ def test_otlp_exporter_only_when_endpoint_is_set():
 async def test_plain_starlette_routes_are_logged_by_template(client, capsys):
     await client.get("/api/openapi.json")
     assert json.loads(last_line(capsys, "http.request"))["path"] == "/api/openapi.json"
+
+
+async def test_database_errors_log_neither_parameters_nor_values(client, capsys):
+    """A failing statement's bound parameters and the database's message (which quotes
+    the value) stay out of the log; the statement's class and SQLSTATE are there."""
+    marker = "SECRET-MARKER-4711"
+    r = await client.post("/api/_test/db-error", json={"v": marker}, headers=CSRF)
+    assert r.status_code == 500 and marker not in r.text
+    captured = capsys.readouterr()
+    assert marker not in captured.out + captured.err
+    errors = [line for line in json_lines(captured.out) if line["message"] == "unhandled exception"]
+    assert len(errors) == 1
+    assert "sqlstate=22P02" in errors[0]["exc_info"] and "CAST($1 AS text)" in errors[0]["exc_info"]
+
+
+async def test_unhandled_error_is_answered_and_logged_once(capsys):
+    """The app answers the 500 itself and does not re-raise: the server (uvicorn) would
+    log the same exception a second time, with its message."""
+    app = create_public_app()
+    transport = ASGITransport(app=app, raise_app_exceptions=True)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/api/_test/boom")
+    assert r.status_code == 500 and r.json()["error"]["code"] == "internal"
+    lines = json_lines(capsys.readouterr().out)
+    assert [line["message"] for line in lines].count("unhandled exception") == 1

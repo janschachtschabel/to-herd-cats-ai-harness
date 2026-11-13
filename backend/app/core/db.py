@@ -1,6 +1,7 @@
 """Async engine, session factory and the request-scoped session dependency."""
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import (
@@ -13,8 +14,12 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import get_settings
 
 
-def make_engine(url: str | URL | None = None) -> AsyncEngine:
-    return create_async_engine(url or get_settings().database(), pool_pre_ping=True)
+def make_engine(url: str | URL | None = None, **kwargs: Any) -> AsyncEngine:
+    """hide_parameters: a failing statement's error carries no bound values (request
+    data, password hashes, token hashes), so nothing that logs it can leak them."""
+    return create_async_engine(
+        url or get_settings().database(), pool_pre_ping=True, hide_parameters=True, **kwargs
+    )
 
 
 class Database:

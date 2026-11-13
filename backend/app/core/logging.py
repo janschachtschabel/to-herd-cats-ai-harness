@@ -8,6 +8,7 @@ taken from headers, cookies or bodies here, so callers must not pass them either
 import json
 import logging
 import sys
+import traceback
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -75,7 +76,64 @@ def _fields(record: logging.LogRecord) -> dict[str, Any]:
     return fields
 
 
-class JsonFormatter(logging.Formatter):
+# Exceptions of these packages quote data in their message: SQLAlchemy appends the bound
+# parameters, PostgreSQL and asyncpg quote the value they rejected.
+_DATA_QUOTING_PACKAGES = frozenset({"sqlalchemy", "asyncpg"})
+_CAUSE = "\nThe above exception was the direct cause of the following exception:\n\n"
+_CONTEXT = "\nDuring handling of the above exception, another exception occurred:\n\n"
+
+
+def _describe(exc: BaseException) -> str:
+    """The exception's last line; for database errors only class, SQLSTATE and the
+    statement (placeholders, no values)."""
+    cls = type(exc)
+    if cls.__module__.split(".")[0] not in _DATA_QUOTING_PACKAGES:
+        return "".join(traceback.format_exception_only(exc)).rstrip("\n")
+    orig = getattr(exc, "orig", None)
+    sqlstate = getattr(exc, "sqlstate", None) or getattr(orig, "sqlstate", None)
+    line = f"{cls.__module__}.{cls.__qualname__}"
+    if orig is not None:
+        line += f" ({type(orig).__qualname__})"
+    if sqlstate:
+        line += f" sqlstate={sqlstate}"
+    if statement := getattr(exc, "statement", None):
+        line += f" statement={' '.join(str(statement).split())}"
+    return line + " [message withheld: it may quote data]"
+
+
+def format_exception(exc: BaseException) -> str:
+    """Like `traceback.format_exception`, chained exceptions included, but database
+    errors are described without their message (see `_describe`)."""
+    chain: list[tuple[BaseException, str]] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    link = ""
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        chain.append((current, link))
+        if current.__cause__ is not None:
+            current, link = current.__cause__, _CAUSE
+        elif current.__context__ is not None and not current.__suppress_context__:
+            current, link = current.__context__, _CONTEXT
+        else:
+            current = None
+    parts: list[str] = []
+    for item, item_link in reversed(chain):
+        frames = "".join(traceback.format_tb(item.__traceback__))
+        head = "Traceback (most recent call last):\n" if frames else ""
+        parts.append(f"{head}{frames}{_describe(item)}\n")
+        if item_link:
+            parts.append(item_link)
+    return "".join(parts).rstrip("\n")
+
+
+class _SafeExceptionMixin(logging.Formatter):
+    def formatException(self, ei: Any) -> str:  # noqa: N802 (logging's name)
+        exc = ei[1] if isinstance(ei, tuple) else None
+        return format_exception(exc) if exc is not None else ""
+
+
+class JsonFormatter(_SafeExceptionMixin):
     def format(self, record: logging.LogRecord) -> str:
         fields = _fields(record)
         if record.exc_info:
@@ -83,7 +141,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(fields, default=str, ensure_ascii=False)
 
 
-class TextFormatter(logging.Formatter):
+class TextFormatter(_SafeExceptionMixin):
     def format(self, record: logging.LogRecord) -> str:
         fields = _fields(record)
         head = f"{fields.pop('timestamp')} {fields.pop('level'):<8} {fields.pop('logger')}"

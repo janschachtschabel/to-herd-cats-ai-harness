@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.telemetry import current_trace_ids
 
@@ -81,8 +82,37 @@ def install_error_handlers(app: FastAPI) -> None:
         message = f"Invalid request: {fields}" if fields else "Invalid request"
         return JSONResponse(status_code=422, content=_body("validation_failed", message))
 
-    @app.exception_handler(Exception)
-    async def _handle_unhandled(request: Request, exc: Exception) -> JSONResponse:
-        # exc_info only: no body, no headers. The request line carries method and route.
-        logger.error("unhandled exception", exc_info=exc)
-        return JSONResponse(status_code=500, content=_body("internal", "Internal server error"))
+
+class UnhandledErrorMiddleware:
+    """Any other exception: logged once, answered with a 500 in the error shape.
+
+    It is not re-raised (Starlette's own handler would, and the server would log it a
+    second time, outside our formatting), and it is answered inside the middleware
+    stack, so the security headers and the request line see the 500. exc_info only:
+    no body, no headers; database errors are logged without their data (logging)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as exc:
+            logger.error("unhandled exception", exc_info=exc)
+            if started:  # too late for an answer; the server closes the connection
+                return
+            response = JSONResponse(
+                status_code=500, content=_body("internal", "Internal server error")
+            )
+            await response(scope, receive, send)

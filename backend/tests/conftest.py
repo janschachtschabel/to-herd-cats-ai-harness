@@ -11,10 +11,10 @@ import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import MetaData  # noqa: E402
 from sqlalchemy.engine import Connection  # noqa: E402
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
-from app.core.db import get_session  # noqa: E402
+from app.core.db import get_session, make_engine  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
 from app.core.migrations import upgrade_head  # noqa: E402
 from app.web.internal import create_internal_app, get_engine  # noqa: E402
@@ -68,7 +68,7 @@ def _drop_everything(connection: Connection) -> None:
 async def engine() -> AsyncIterator[AsyncEngine]:
     """The schema is built by the migrations, so the tests run against what production
     runs; test_migrations checks that the migrated schema matches the models."""
-    engine = create_async_engine(get_settings().test_database_url)
+    engine = make_engine(get_settings().test_database_url)
     async with engine.begin() as conn:
         await conn.run_sync(_drop_everything)
         await conn.run_sync(upgrade_head)

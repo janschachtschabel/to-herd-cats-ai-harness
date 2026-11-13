@@ -12,10 +12,10 @@ import logging
 
 from alembic import context
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
+from app.core.db import make_engine
 from app.core.logging import configure_logging
 from app.models_registry import Base
 
@@ -44,7 +44,7 @@ def _run(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(get_settings().database(), poolclass=NullPool)
+    engine = make_engine(get_settings().database(), poolclass=NullPool)
     async with engine.connect() as connection:
         await connection.run_sync(_run)
     await engine.dispose()

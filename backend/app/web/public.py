@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, FastAPI
 
 from app.core.config import Settings, get_settings
-from app.core.errors import install_error_handlers
+from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from app.core.request_context import RequestContextMiddleware
 from app.core.request_log import RequestLogMiddleware
 from app.core.telemetry import configure_tracing
@@ -37,6 +37,8 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/api/docs",
         redoc_url=None,
     )
+    # Added first is innermost: errors are answered before the request line is written.
+    app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RequestLogMiddleware)
     install_error_handlers(app)
