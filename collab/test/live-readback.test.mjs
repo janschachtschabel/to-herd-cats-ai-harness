@@ -17,6 +17,8 @@ afterEach(async () => {
 });
 
 const TABLE = "| `a` |\n| --- |";
+// The notice names the kind of cause and the block: the table, block 0.
+const NOTICE = `${UNREPRESENTABLE}:markdown:0`;
 
 /** The code text in the table's only cell. */
 function cellText(doc) {
@@ -43,7 +45,7 @@ test("a state that cannot be written as Markdown is not stored, and everyone is 
   const [{ attributes }] = text.toDelta();
   Y.transact(anna.doc, () => text.insert(text.length, "\\|", attributes));
 
-  await until(() => annaHears.includes(UNREPRESENTABLE) && benHears.includes(UNREPRESENTABLE));
+  await until(() => annaHears.includes(NOTICE) && benHears.includes(NOTICE));
   await until(() => live.api.unrepresentable >= 1);
   assert.equal(live.api.saves.length, stored, "nothing stored for that state");
   assert.deepEqual(anna.closes, [], "the session goes on");
@@ -68,7 +70,7 @@ test("someone joining a document that cannot be saved is told at once", async ()
   await until(() => live.api.unrepresentable >= 1);
   const ben = live.open({ cookie: "herd_session=token-b" });
   const benHears = listen(ben);
-  await until(() => benHears.includes(UNREPRESENTABLE));
+  await until(() => benHears.includes(NOTICE));
 });
 
 /** Whether the stored snapshot holds every change the client made (its own clock and
@@ -96,7 +98,7 @@ test("every stored state is acknowledged to everyone; a refused one is not (T5)"
   // A refused state: no acknowledgement holds it.
   const before = stored().length;
   Y.transact(anna.doc, () => text.insert(text.length, "\\|", attributes));
-  await until(() => annaHears.includes(UNREPRESENTABLE));
+  await until(() => annaHears.includes(NOTICE));
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.ok(
     stored()

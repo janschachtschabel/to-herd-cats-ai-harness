@@ -31,15 +31,33 @@ function splitRaw(node, sources) {
   return { ...node, content };
 }
 
-/** `{ ok: true, markdown }`, or `{ ok: false, markdown, problem }` when the Markdown
- * must not be stored for this document. */
+/** `{ ok: true, markdown }`, or `{ ok: false, markdown, problem, kind, block }` when the
+ * Markdown must not be stored for this document. `kind`: "structure" (the editor
+ * cannot hold the document), "reopen" (the live editor would not open the Markdown
+ * unchanged) or "markdown" (it reads back as something else). `block`: the index of
+ * the first top-level block that fails on its own, null when none does. */
 export function readBack(json) {
+  const result = check(json);
+  if (result.ok) return result;
+  return { ...result, block: firstFailing(json) };
+}
+
+/** The first top-level block that fails the check on its own (or null). Only run for
+ * a state that failed, so a save that passes costs nothing more. */
+function firstFailing(json) {
+  const blocks = json?.content ?? [];
+  if (blocks.length < 2) return blocks.length === 1 ? 0 : null;
+  const index = blocks.findIndex((block) => !check({ type: "doc", content: [block] }).ok);
+  return index === -1 ? null : index;
+}
+
+function check(json) {
   const problem = editorProblem(json);
-  if (problem !== null) return { ok: false, markdown: null, problem };
+  if (problem !== null) return { ok: false, markdown: null, problem, kind: "structure" };
   const markdown = jsonToMarkdown(json);
   const opened = liveDocument(markdown);
   if (!opened.safe) {
-    return { ok: false, markdown, problem: "the live editor would refuse it" };
+    return { ok: false, markdown, problem: "the live editor would refuse it", kind: "reopen" };
   }
   const sources = [];
   const expected = splitRaw(json, sources);
@@ -54,6 +72,8 @@ export function readBack(json) {
           return true;
         }).json;
   const where = difference(withAutolinks(canonical(expected)), withAutolinks(canonical(back)));
-  if (where !== null) return { ok: false, markdown, problem: `reads back differently at ${where}` };
+  if (where !== null) {
+    return { ok: false, markdown, problem: `reads back differently at ${where}`, kind: "markdown" };
+  }
   return { ok: true, markdown };
 }

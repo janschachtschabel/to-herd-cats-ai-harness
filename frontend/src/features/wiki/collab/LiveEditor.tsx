@@ -12,6 +12,7 @@ import { useWiki } from '../WikiContext'
 import type { Connect } from './connect'
 import { LiveSurface } from './LiveSurface'
 import { Presence } from './Presence'
+import { UnsaveableNotice } from './UnsaveableNotice'
 import { FINAL_STOPS, MARKDOWN_STOPS } from './liveSession'
 import { useLiveSession } from './useLiveSession'
 
@@ -48,7 +49,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   // stake (not the editor's own empty paragraph of a refused session).
   const unsaved =
     live.stopped === null
-      ? live.unsynced > 0 || live.unrepresentable || live.unconfirmed
+      ? live.unsynced > 0 || !!live.unrepresentable || live.unconfirmed
       : !!lost && !copied
   // "Fertig" leaves once the server confirmed everything is stored, before this renders
   // again: the guard reads the latest answer when leaving.
@@ -112,11 +113,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
         </Alert>
       )}
       {live.unrepresentable && !live.stopped && (
-        <Alert variant="destructive">
-          <AlertDescription className="text-foreground">
-            {t('wiki.live.unrepresentable')}
-          </AlertDescription>
-        </Alert>
+        <UnsaveableNotice notice={live.unrepresentable} doc={live.doc} />
       )}
       {(live.stopped || live.regenerated) && (
         <Alert variant={live.stopped ? 'destructive' : 'default'}>

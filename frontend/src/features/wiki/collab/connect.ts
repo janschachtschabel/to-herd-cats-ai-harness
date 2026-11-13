@@ -1,5 +1,6 @@
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider'
 import type * as Y from 'yjs'
+import { unsaveable, type Unsaveable } from './unsaveable'
 
 // Stateless messages of the collab process (collab/live.mjs): the browser asks for an
 // immediate save, the server answers whether everything is stored (review M2 R3).
@@ -7,8 +8,8 @@ export const FLUSH = 'herd:flush'
 export const SAVED = 'herd:saved'
 export const UNSAVED = 'herd:unsaved'
 // The document's latest state cannot be stored as Markdown (nothing is stored until a
-// later state can be), and that a later state was stored (review M2 S2/S3).
-export const UNREPRESENTABLE = 'herd:unrepresentable'
+// later state can be; `herd:unrepresentable:<kind>:<block>`, unsaveable.ts), and that
+// a later state was stored (review M2 S2/S3).
 export const REPRESENTABLE = 'herd:representable'
 // This browser's editor changed the document it had just loaded before the person did
 // anything; it stopped instead of sending the change (review M2 ruling B; counted).
@@ -28,8 +29,8 @@ export interface LiveHandlers {
   onSynced: () => void
   onUnsynced: (count: number) => void
   onPeers: (states: AwarenessState[]) => void
-  /** True while the latest state cannot be saved as Markdown. */
-  onUnrepresentable: (unrepresentable: boolean) => void
+  /** Why and where the latest state cannot be saved as Markdown; null once it can. */
+  onUnrepresentable: (unrepresentable: Unsaveable | null) => void
   /** The server stored this state (a Yjs snapshot). */
   onStored: (snapshot: Uint8Array) => void
 }
@@ -77,8 +78,11 @@ export const connectLive: Connect = ({ pageId, generation, doc, handlers }) => {
         handlers.onStored(
           Uint8Array.from(atob(payload.slice(STORED.length)), (c) => c.charCodeAt(0)),
         )
-      } else if (payload === UNREPRESENTABLE || payload === REPRESENTABLE) {
-        handlers.onUnrepresentable(payload === UNREPRESENTABLE)
+      } else if (payload === REPRESENTABLE) {
+        handlers.onUnrepresentable(null)
+      } else {
+        const notice = unsaveable(payload)
+        if (notice) handlers.onUnrepresentable(notice)
       }
     },
   })

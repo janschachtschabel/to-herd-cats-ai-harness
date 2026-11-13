@@ -42,7 +42,6 @@ import {
   FLUSH_INTERVAL_MS,
   LOAD_MUTATION,
   SAVED,
-  UNREPRESENTABLE,
   UNSAVED,
   closeSocket,
   deny,
@@ -161,7 +160,7 @@ export function liveExtension({
       const state = live.get(documentName);
       if (!state || state.discarded || state.holding) return closeSocket(context, CLOSE.retry);
       state.seen.add(context.sessionId);
-      if (state.unrepresentable) connection.sendStateless(UNREPRESENTABLE);
+      if (state.unrepresentable) connection.sendStateless(state.unrepresentable);
       if (context.generation < state.generation) return closeSocket(context, CLOSE.generationEnded);
       if (context.generation > state.generation) {
         // A newer generation is about: the document in memory is outdated.

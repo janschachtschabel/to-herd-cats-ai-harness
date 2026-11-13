@@ -194,8 +194,13 @@ describe('live editor', () => {
     const { router } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
     await waitFor(() => expect(connections).toHaveLength(1))
     join(connections[0]!)
-    act(() => connections[0]!.handlers.onUnrepresentable(true))
+    typeInto(connections[0]!.doc, 'Erster Absatz')
+    typeInto(connections[0]!.doc, 'Zweiter Absatz')
+    act(() => connections[0]!.handlers.onUnrepresentable({ kind: 'markdown', block: 1 }))
     expect(screen.getByText(/lässt sich so nicht als Markdown speichern/)).toBeInTheDocument()
+    // The notice names the cause and the block (fix wave 3).
+    expect(screen.getByText(/würde als Markdown anders gelesen/)).toBeInTheDocument()
+    expect(screen.getByText(/Block 2 \(„Zweiter Absatz“\)/)).toBeInTheDocument()
     expect(connections[0]!.destroyed).toBe(false)
     expect(await screen.findByRole('textbox', { name: 'Inhalt von „Handbuch“' })).toHaveAttribute(
       'contenteditable',
@@ -207,7 +212,7 @@ describe('live editor', () => {
     await waitFor(() => expect(confirm).toHaveBeenCalled())
     expect(router.state.location.search).toEqual({ view: 'live' })
     confirm.mockRestore()
-    act(() => connections[0]!.handlers.onUnrepresentable(false))
+    act(() => connections[0]!.handlers.onUnrepresentable(null))
     expect(screen.queryByText(/lässt sich so nicht als Markdown speichern/)).not.toBeInTheDocument()
   })
 

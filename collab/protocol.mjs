@@ -26,6 +26,8 @@ export const UNSAVED = "herd:unsaved";
 export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection per second
 // To every connection of a document: its latest state cannot be stored as Markdown
 // (nothing is stored until a later state can be), and that a later state was stored.
+// The first is followed by `:<kind>:<block>`: the kind of cause (`structure`, `reopen`,
+// `markdown`, `readback.mjs`) and the index of the top-level block, empty if unknown.
 export const UNREPRESENTABLE = "herd:unrepresentable";
 export const REPRESENTABLE = "herd:representable";
 // To every connection after each successful save: what is stored, as a Yjs snapshot

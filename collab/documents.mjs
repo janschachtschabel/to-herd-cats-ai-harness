@@ -5,7 +5,7 @@
 // the live editor again (`readback.mjs`, review M2 S2/S3). A state that cannot be
 // written so is not stored: the last good Markdown stays, the API counts it
 // (`herd_collab_saves_total{result="unrepresentable"}`), every connection is told
-// (`herd:unrepresentable`, the session goes on) and the edits stay unsaved until a
+// (`herd:unrepresentable:<kind>:<block>`, the session goes on) and the edits stay unsaved until a
 // later state saves (`herd:representable`). Every stored state is acknowledged to every
 // connection with its snapshot (`herd:stored:`), so a browser knows when its own changes
 // are stored.
@@ -91,11 +91,13 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     state.holding = false;
   }
 
-  /** The latest state cannot be stored: say so (the edits stay unsaved). */
-  async function unrepresentable(document, state, problem) {
+  /** The latest state cannot be stored: say so, with the kind of cause and the block
+   * (the edits stay unsaved). */
+  async function unrepresentable(document, state, { problem, kind, block }) {
     if (!state.unrepresentable) log("live save refused", { page_id: state.pageId, problem });
-    state.unrepresentable = true;
-    tell(document, UNREPRESENTABLE);
+    const notice = `${UNREPRESENTABLE}:${kind}:${block ?? ""}`;
+    if (state.unrepresentable !== notice) tell(document, notice);
+    state.unrepresentable = notice;
     try {
       await api.unrepresentable(state.pageId);
     } catch (error) {
@@ -121,7 +123,7 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     }
     if (!written.ok) {
       for (const sessionId of editors) state.dirty.set(sessionId, true);
-      return unrepresentable(document, state, written.problem);
+      return unrepresentable(document, state, written);
     }
     // Unchanged from what was loaded (an edit undone, or a browser tidying the
     // document's structure): the stored Markdown stays exactly as it was written.

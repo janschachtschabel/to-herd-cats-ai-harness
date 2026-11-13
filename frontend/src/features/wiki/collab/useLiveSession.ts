@@ -5,6 +5,7 @@ import { beforeLogout } from '@/lib/beforeLogout'
 import { trackConfirmation } from './confirmation'
 import { connectLive, type Connect, type LiveConnection } from './connect'
 import { liveMarkdown } from './liveMarkdown'
+import type { Unsaveable } from './unsaveable'
 import { closeOutcome, liveStatus, peersOf, type Peer, type StopReason } from './liveSession'
 
 export interface LiveSession {
@@ -21,8 +22,9 @@ export interface LiveSession {
    *  generation, so text that may not have been saved can be copied. */
   lost: string | null
   unsynced: number
-  /** The latest state cannot be saved as Markdown: the edits stay unsaved. */
-  unrepresentable: boolean
+  /** The latest state cannot be saved as Markdown (why and where): the edits stay
+   *  unsaved. */
+  unrepresentable: Unsaveable | null
   /** A change made here is not yet acknowledged as stored (review M2 T5). */
   unconfirmed: boolean
   retry: () => void
@@ -54,7 +56,7 @@ export function useLiveSession(
   const [connected, setConnected] = useState(false)
   const [synced, setSynced] = useState(false)
   const [unsynced, setUnsynced] = useState(0)
-  const [unrepresentable, setUnrepresentable] = useState(false)
+  const [unrepresentable, setUnrepresentable] = useState<Unsaveable | null>(null)
   const [unconfirmed, setUnconfirmed] = useState(false)
   const [peers, setPeers] = useState<Peer[]>([])
   const [stopped, setStopped] = useState<StopReason | null>(null)
@@ -138,7 +140,7 @@ export function useLiveSession(
     setConnection(live)
     setSynced(false)
     setUnsynced(0)
-    setUnrepresentable(false)
+    setUnrepresentable(null)
     setUnconfirmed(false)
     setStopped(null)
     return () => {
