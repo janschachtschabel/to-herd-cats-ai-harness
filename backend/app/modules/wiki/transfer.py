@@ -23,12 +23,13 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require
+from app.core.access_repository import remembered_facts
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.slug import slugify
 from app.core.uploads import spool
 from app.modules.audit.recorder import record
-from app.modules.tags.models import MAX_TAG_NAME_CHARS, SubjectType
+from app.modules.tags.models import MAX_TAG_NAME_CHARS
 from app.modules.tags.repository import tag_repository
 from app.modules.tags.schemas import DEFAULT_COLOR
 from app.modules.tags.service import TagService
@@ -42,7 +43,7 @@ from app.modules.wiki.attachment_links import (
 from app.modules.wiki.attachments import AttachmentService
 from app.modules.wiki.models import MAX_CONTENT_CHARS, MAX_DEPTH, MAX_TITLE_CHARS, Page, PageStatus
 from app.modules.wiki.models import VersionSource as Source
-from app.modules.wiki.service import PageService
+from app.modules.wiki.service import PageService, Siblings
 
 ATTACHMENTS = "_attachments"
 _INDEX_NAMES = {"index", "readme"}
@@ -110,19 +111,22 @@ class PageImport:
         self.made: dict[str, Page] = {}
         self.tag_ids: dict[str, uuid.UUID] = {}
         self.session_key = f"import:{uuid.uuid4().hex}"
+        self.siblings = Siblings()
         self.listed: dict[str, uuid.UUID] = {}  # archive entry → the attachment it was
         self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
             await require(self.session, actor, Action.SPACE_MANAGE, space_id)
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
-            with zipped:
+            # One operation in one transaction: rights as checked just now, slugs and
+            # order per parent read once (thousands of pages, review M2 R19).
+            with zipped, remembered_facts(self.session):
                 files, attached = self._sort(zipped)
                 for file in files:
                     await self._page(zipped, file)
                 for info, parts in attached:
                     await self._attachment(zipped, info, parts)
-        await self._relink()
+                await self._relink()
         details = {
             "created": self.result.created,
             "attachments": self.result.attachments,
@@ -240,10 +244,9 @@ class PageImport:
             slug=slug,
             source=Source.IMPORT,
             session_key=self.session_key,
+            siblings=self.siblings,
+            publish=status != PageStatus.DRAFT,  # if its parent is published
         )
-        wanted = status != PageStatus.DRAFT
-        if wanted and (parent is None or parent.status == PageStatus.PUBLISHED):
-            page = await self.pages.publish(self.actor, page.id, page.version)
         self.made[page.path] = page
         self.result.created += 1
         return page
@@ -261,7 +264,7 @@ class PageImport:
                 tag = await self.tags.create(self.actor, name, DEFAULT_COLOR, self.space_id)
                 self.tag_ids[name.lower()] = tag.id
         ids = [self.tag_ids[n.lower()] for n in clean]
-        await self.tags.set_for(self.actor, SubjectType.PAGE, page.id, ids, version=page.version)
+        await self.tags.set_on_new_page(self.actor, page, ids)
 
     async def _attachment(
         self, zipped: zipfile.ZipFile, info: zipfile.ZipInfo, parts: list[str]

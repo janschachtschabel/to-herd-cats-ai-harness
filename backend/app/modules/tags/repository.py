@@ -124,6 +124,11 @@ class TagRepository:
                 Tagging.subject_id == subject_id,
             )
         )
+        await self.add_for(subject_type, subject_id, tag_ids)
+
+    async def add_for(
+        self, subject_type: SubjectType, subject_id: uuid.UUID, tag_ids: list[uuid.UUID]
+    ) -> None:
         if tag_ids:
             rows = [
                 {

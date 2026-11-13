@@ -24,6 +24,7 @@ from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus, VersionSource
 from app.modules.wiki.moves import PageMoves
+from app.modules.wiki.repository import PageRepository
 from app.modules.wiki.trash import PageTrash
 from app.modules.wiki.tree import child_path, depth_of, unique_slug
 from app.modules.wiki.versions import VersionService
@@ -116,22 +117,32 @@ class PageService:
         slug: str | None = None,
         source: VersionSource = VersionSource.HUMAN,
         session_key: str | None = None,
+        siblings: "Siblings | None" = None,
+        publish: bool = False,
     ) -> Page:
         """A new draft at the end of its siblings. Its slug comes from `slug` if given
         (an imported file's name), else from the title; a sibling's slug gets a suffix.
-        `session_key` lets later saves of the same session fold into its first version."""
+        `session_key` lets later saves of the same session fold into its first version.
+        `siblings` remembers slugs and order per parent across many creations. With
+        `publish`, it is published at once if its parent is (or it has none): its
+        creator may publish an own draft, as `publish` allows."""
         await require(self.session, actor, Action.PAGE_CREATE, space_id)
         pages = self.repo(actor)
-        await pages.lock_tree(space_id)
+        siblings = siblings or Siblings()
+        await siblings.lock(pages, space_id)
         parent_path = None
         if parent_id is not None:
-            parent = await pages.live_in_space(space_id, parent_id)
+            parent = await siblings.parent(pages, space_id, parent_id)
             if parent is None:
                 raise ValidationFailed(code="page.parent_not_found")
             if depth_of(parent.path) >= MAX_DEPTH:
                 raise ValidationFailed(code="page.too_deep")
             parent_path = parent.path
-        slug = unique_slug(slug or title, await pages.sibling_slugs(space_id, parent_id))
+            publish = publish and parent.status == PageStatus.PUBLISHED
+        taken = await siblings.slugs(pages, space_id, parent_id)
+        slug = unique_slug(slug or title, taken)
+        sort_order = await siblings.next_order(pages, space_id, parent_id)
+        taken.add(slug)
         who = actor.principal
         page = await pages.add(
             Page(
@@ -141,18 +152,23 @@ class PageService:
                 title=title,
                 slug=slug,
                 path=child_path(parent_path, slug),
-                sort_order=await pages.next_sort_order(space_id, parent_id),
+                sort_order=sort_order,
                 content_md=content_md,
-                status=PageStatus.DRAFT,
+                status=PageStatus.PUBLISHED if publish else PageStatus.DRAFT,
+                published_at=utcnow() if publish else None,
                 created_by_type=who.type,
                 created_by_id=who.id,
                 updated_by_type=who.type,
                 updated_by_id=who.id,
             )
         )
-        await VersionService(self.session).record(page, actor, source, session_key=session_key)
+        await VersionService(self.session).record(
+            page, actor, source, session_key=session_key, first=True
+        )
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
+        if publish:
+            await record(self.session, actor, "page.published", "page", page.id)
         return page
 
     async def update(
@@ -231,3 +247,45 @@ class PageService:
         await self.session.flush()
         await record(self.session, actor, "page.published", "page", page.id)
         return page
+
+
+class Siblings:
+    """Each parent, the slugs and the next sort order under it, read once per parent.
+    For many creations in one transaction (an import): it holds the tree lock, so
+    nobody else adds, moves or publishes pages of the space meanwhile. Without one,
+    `create` reads them each time."""
+
+    def __init__(self) -> None:
+        self._locked: set[uuid.UUID] = set()
+        self._parents: dict[uuid.UUID, Page | None] = {}
+        self._slugs: dict[uuid.UUID | None, set[str]] = {}
+        self._orders: dict[uuid.UUID | None, int] = {}
+
+    async def lock(self, pages: PageRepository, space_id: uuid.UUID) -> None:
+        """The space's tree lock, taken once (it holds until the transaction ends)."""
+        if space_id not in self._locked:
+            await pages.lock_tree(space_id)
+            self._locked.add(space_id)
+
+    async def parent(
+        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID
+    ) -> Page | None:
+        if parent_id not in self._parents:
+            self._parents[parent_id] = await pages.live_in_space(space_id, parent_id)
+        return self._parents[parent_id]
+
+    async def slugs(
+        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID | None
+    ) -> set[str]:
+        if parent_id not in self._slugs:
+            self._slugs[parent_id] = await pages.sibling_slugs(space_id, parent_id)
+        return self._slugs[parent_id]
+
+    async def next_order(
+        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID | None
+    ) -> int:
+        if parent_id not in self._orders:
+            self._orders[parent_id] = await pages.next_sort_order(space_id, parent_id)
+        order = self._orders[parent_id]
+        self._orders[parent_id] = order + 1
+        return order

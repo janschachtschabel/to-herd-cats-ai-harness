@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access_repository import (
     AccessFacts,
     AccessRepository,
+    first_time,
     ids_with_role_stmt,
     visible_ids_stmt,
 )
@@ -38,6 +39,7 @@ from app.core.permissions import (
     Action,
     SpaceRole,
 )
+from app.modules.audit.models import ADMIN_ACCESS
 from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
 from app.modules.groups.repository import GroupRepository
@@ -125,7 +127,8 @@ async def require(
     if not _allows(facts, action):
         raise Forbidden(code="auth.permission_denied")
     if space_id is not None and facts.kind is not None and _by_admin_power(facts):
-        await record_admin_access(session, actor, space_id, facts.kind)
+        if first_time(session, (ADMIN_ACCESS, actor.principal, space_id)):
+            await record_admin_access(session, actor, space_id, facts.kind)
 
 
 def _by_admin_power(facts: AccessFacts) -> bool:

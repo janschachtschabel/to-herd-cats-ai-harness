@@ -47,6 +47,7 @@ class VersionService:
         change_summary: str | None = None,
         session_key: str | None = None,
         coalesce_seconds: int = 0,
+        first: bool = False,
     ) -> PageVersion:
         """The page's title and content as its next version, by the actor. The caller
         has checked the actor's rights and holds the page row (`readable(lock=True)`,
@@ -54,9 +55,10 @@ class VersionService:
 
         With `coalesce_seconds`, a save of the same author, source and `session_key`
         overwrites the newest version while that is younger than the window (counted
-        from when it was first written); without a session key nothing is folded."""
+        from when it was first written); without a session key nothing is folded.
+        `first`: the page has just been created and has no version yet."""
         versions = self.reader.versions(actor)
-        latest = await versions.latest(page.id)
+        latest = None if first else await versions.latest(page.id)
         if latest is not None and _folds_into(latest, actor, source, session_key, coalesce_seconds):
             latest.title, latest.content_md = page.title, page.content_md
             if change_summary is not None:

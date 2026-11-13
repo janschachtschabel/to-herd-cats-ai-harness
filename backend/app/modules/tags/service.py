@@ -22,6 +22,7 @@ from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.audit.recorder import record
 from app.modules.tags.models import SubjectType, Tag
 from app.modules.tags.repository import TagRepository, tag_repository
+from app.modules.wiki.models import Page
 from app.modules.wiki.visibility import PageReader, check_version, touch
 
 
@@ -135,6 +136,16 @@ class TagService:
         details = {"tag_ids": [str(t) for t in wanted]}
         await record(self.session, actor, "page.tags_set", "page", page.id, details)
         return sorted(tags, key=lambda t: (t.name.lower(), t.id))
+
+    async def set_on_new_page(self, actor: Actor, page: Page, tag_ids: Iterable[uuid.UUID]) -> None:
+        """Tags on a page the actor has created in this transaction (an import, many
+        pages at once, review M2 R19): nobody has read it, so no version to compare or
+        bump. The caller found or made the tags among those usable in the page's space."""
+        await require(self.session, actor, Action.PAGE_EDIT, page.space_id)
+        wanted = builtins.list(dict.fromkeys(tag_ids))
+        await self.repo(actor).add_for(SubjectType.PAGE, page.id, wanted)
+        details = {"tag_ids": [str(t) for t in wanted]}
+        await record(self.session, actor, "page.tags_set", "page", page.id, details)
 
     async def tags_for(
         self, actor: Actor, subject_type: SubjectType, ids: Iterable[uuid.UUID]
