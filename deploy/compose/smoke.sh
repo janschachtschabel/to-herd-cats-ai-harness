@@ -2,7 +2,8 @@
 # Smoke test of the compose reference: build, start, log in, check probes and user,
 # create a page with an attachment (the files volume), open its live-editing
 # WebSocket with and without the session cookie, receive a posted message over the
-# live stream (/api/stream: outbox, worker, NOTIFY, SSE), tear down. Runs as its own
+# live stream (/api/stream: outbox, worker, NOTIFY, SSE), create a ticket and change its
+# status and find the worker's two system entries in its thread, tear down. Runs as its own
 # compose project on its own ports, with throwaway volumes, so a running installation
 # next to it is not touched. Ends with "SMOKE OK".
 #
@@ -194,13 +195,42 @@ received || fail "message $message_id did not arrive on the live stream of $base
 kill "$stream_pid" 2>/dev/null || true
 stream_pid=""
 
-# The worker delivered it (with SMOKE_NODES the worker service is the only dispatcher).
+# Tickets: one created and moved on node A. The worker writes a system entry for each
+# change into the ticket's thread, read on node B; #allgemein still holds only "Smoke".
+json() { python3 -c "import json, sys; d = json.loads(sys.argv[1]); print($1)" "$2"; }
+ticket="$(api -X POST "$base/api/spaces/$space_id/tickets" --data '{"title": "Smoke"}')"
+read -r number version < <(json 'd["number"], d["version"]' "$ticket") \
+  || fail "creating a ticket answered $ticket"
+active="$(json 'next(s["id"] for s in d["items"] if s["category"] == "active")' \
+  "$(api "$base/api/spaces/$space_id/ticket-statuses")")" || fail "no status of category active"
+moved="$(api -X PATCH "$base/api/tickets/$number" \
+  --data "{\"status_id\": \"$active\", \"version\": $version}")"
+[[ "$(json 'd["status"]["category"]' "$moved" 2>/dev/null)" == active ]] \
+  || fail "changing the ticket's status answered $moved"
+thread_id="$(json 'd["id"]' "$(api "$base_b/api/tickets/$number/thread")")" \
+  || fail "no thread for ticket $number on $base_b"
+timeline() {
+  json '" ".join(sorted(m["system"]["key"] for m in d["items"] if m["kind"] == "system"))' \
+    "$(api "$base_b/api/conversations/$thread_id/messages?limit=100")"
+}
+for _ in $(seq 100); do
+  [[ "$(timeline)" == "ticket.created ticket.status_changed" ]] && break
+  sleep 0.2
+done
+[[ "$(timeline)" == "ticket.created ticket.status_changed" ]] \
+  || fail "ticket $number's thread holds \"$(timeline)\", not its two system entries"
+in_channel="$(json 'len(d["items"])' "$(api "$base/api/conversations/$channel_id/messages")")"
+[[ $in_channel == 1 ]] || fail "#allgemein holds $in_channel messages after the ticket changes"
+
+# The worker delivered both (with SMOKE_NODES the worker service is the only dispatcher).
 dispatched() {
   "${compose[@]}" exec -T "$worker" python -c \
     "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-    | grep -Eq '^herd_outbox_dispatch_total\{handler="publish_live",result="ok"\} [1-9]'
+    | grep -Eq "^herd_outbox_dispatch_total\\{handler=\"$1\",result=\"ok\"\\} [1-9]"
 }
-for _ in $(seq 10); do dispatched && break; sleep 0.5; done
-dispatched || fail "$worker reports no publish_live delivery"
+for handler in publish_live ticket_timeline; do
+  for _ in $(seq 10); do dispatched "$handler" && break; sleep 0.5; done
+  dispatched "$handler" || fail "$worker reports no $handler delivery"
+done
 
 echo "SMOKE OK"
