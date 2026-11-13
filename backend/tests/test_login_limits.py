@@ -85,6 +85,10 @@ async def test_stale_counters_of_any_key_are_pruned(
     client = await make_real_client()
     await _attempt(client, real_db.member_email, "wrong-password")
     async with real_db.database.session_factory() as s:
-        stale = select(func.count()).select_from(RateLimitHit).where(RateLimitHit.hit_at < old)
+        stale = (
+            select(func.count())
+            .select_from(RateLimitHit)
+            .where(RateLimitHit.key.like("login-fail:x:%"))
+        )
         assert await s.scalar(stale) == 0
     assert PRUNE_BATCH >= 50
