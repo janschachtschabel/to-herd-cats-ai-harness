@@ -67,12 +67,19 @@ class AttachmentService:
     async def upload(
         self, actor: Actor, page_id: uuid.UUID, filename: str, stream: AsyncIterator[bytes]
     ) -> Attachment:
-        """Rights first: nothing is read from someone who may not upload. The body is
-        read with no transaction open (no pooled connection held, however slowly it
-        arrives); the rights are checked again afterwards."""
-        name = clean_filename(filename)
+        """The upload route's: rights first, so nothing is read from someone who may
+        not upload. The request's body is then read with no transaction open (no
+        pooled connection held, however slowly it arrives), see `add`."""
         await self._editable(actor, page_id)
         await self.session.commit()
+        return await self.add(actor, page_id, filename, stream)
+
+    async def add(
+        self, actor: Actor, page_id: uuid.UUID, filename: str, stream: AsyncIterator[bytes]
+    ) -> Attachment:
+        """Read `stream`, check the rights (again), store the file, within the caller's
+        transaction (an import's entries stay part of the import's one transaction)."""
+        name = clean_filename(filename)
         limit = get_settings().attachment_max_bytes
         with await spool(stream, limit, code="attachment.too_large") as body:
             page = await self._editable(actor, page_id)

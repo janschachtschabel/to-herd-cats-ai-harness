@@ -264,7 +264,7 @@ class PageImport:
             self._skip(info, "no_page")
             return
         try:
-            attachment = await self.attachments.upload(
+            attachment = await self.attachments.add(
                 self.actor, page.id, parts[-1], _entry(zipped, info)
             )
         except archive.UNREADABLE:

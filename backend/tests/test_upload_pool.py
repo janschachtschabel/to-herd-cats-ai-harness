@@ -13,9 +13,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.core.db import Database, set_database
+from app.modules.wiki.models import Attachment
+from app.modules.wiki.transfer import PageImport
 from tests.factories import login
 from tests.real_db import MakeRealClient, RealDb
 
@@ -42,10 +45,11 @@ async def _stalled(release: asyncio.Event, data: bytes) -> AsyncIterator[bytes]:
     yield data[2:]
 
 
-def _zip() -> bytes:
+def _zip(files: dict[str, bytes] | None = None) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("Neu.md", "# Neu\n")
+        for name, data in (files or {"Neu.md": b"# Neu\n"}).items():
+            archive.writestr(name, data)
     return buffer.getvalue()
 
 
@@ -93,6 +97,28 @@ async def test_stalled_uploads_and_imports_hold_no_connection(
         uploaded, done = await asyncio.gather(upload, imported)
     assert uploaded.status_code == 201, uploaded.text
     assert done.status_code == 200 and done.json()["created"] == 1, done.text
+
+
+async def test_an_import_with_attachments_stays_one_transaction(
+    real_db: RealDb, make_real_client: MakeRealClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the route's own wait for the body ends a transaction: the attachments an
+    import stores are part of it, so a failure afterwards leaves nothing behind."""
+    owner = await make_real_client()
+    await login(owner, real_db.owner_email)
+    space_id, _ = await _space_and_page(owner)
+
+    async def failing_relink(self: PageImport) -> None:
+        raise RuntimeError("late failure")
+
+    monkeypatch.setattr(PageImport, "_relink", failing_relink)
+    data = _zip({"Neu.md": b"# Neu\n", "_attachments/Neu/notiz.txt": b"eine Notiz"})
+    response = await owner.post(f"/api/spaces/{space_id}/import", content=data)
+    assert response.status_code == 500
+    tree = (await owner.get(f"/api/spaces/{space_id}/pages/tree")).json()["items"]
+    assert [node["title"] for node in tree] == ["Seite"]
+    async with real_db.database.session_factory() as s:
+        assert await s.scalar(select(func.count()).select_from(Attachment)) == 0
 
 
 async def test_rights_lost_while_the_body_arrives_are_checked_again(
