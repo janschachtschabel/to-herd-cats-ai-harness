@@ -5,8 +5,8 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 2 (Wiki) ist gebaut.** Aus M1: Anmeldung, Personen, Gruppen,
-Bereiche (offen, Team, persönlich), Rollen, die eine Rechteprüfung, Audit, die
+**Stand: Meilenstein 3 (Nachrichten) ist gebaut.** Aus M1: Anmeldung, Personen,
+Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine Rechteprüfung, Audit, die
 Oberfläche mit Navigation und Verwaltung, Image, Compose, Helm-Chart und CI. Aus M2
 ein Wiki in jedem Bereich:
 
@@ -26,11 +26,27 @@ ein Wiki in jedem Bereich:
   Inhalt erkannt), **Volltextsuche** (Strg+K, findet nur, was man lesen darf),
   **Import und Export** als Markdown-ZIP, jede Seite einzeln als `.md`.
 
-Kanäle (M3), Aufgaben (M4) und KI-Agenten (ab M5) folgen. Bedienung und Betrieb des
-Wikis: [`docs/WIKI.md`](docs/WIKI.md).
+Aus M3 Nachrichten:
+
+- **Kanäle** je Bereich (lesen und schreiben, wer den Bereich lesen darf; anlegen ab
+  Moderator), **Direktnachrichten** mit 2 bis 9 Personen, **Threads**, **Erwähnungen**
+  mit Personenauswahl, **Reaktionen**, Ungelesen-Zähler und Lesestand.
+- **Seiten-Diskussion** an jeder Wiki-Seite, mit grauen Systemmeldungen (angelegt,
+  veröffentlicht, verschoben, Papierkorb, Version wiederhergestellt), ausblendbar.
+- **Aktivität „Für mich“** (Erwähnungen und Antworten) mit Zähler in Seitenleiste und
+  Fenstertitel; die **Suche** findet auch Nachrichten, nur aus sichtbaren Gesprächen.
+- **Live-Zustellung** über Server-Sent Events (`/api/stream`), auch über mehrere
+  API-Knoten; ein **Worker** (`HERD_ROLE=worker`, in `all` enthalten) verteilt die
+  Ereignisse der Outbox.
+- **Einsicht in Direktnachrichten** für Administratoren: nur lesend, mit Begründung,
+  60 Minuten, im Audit, und die Teilnehmenden sehen, dass eingesehen wurde.
+
+Aufgaben (M4) und KI-Agenten (ab M5) folgen. Bedienung und Betrieb des Wikis:
+[`docs/WIKI.md`](docs/WIKI.md), der Nachrichten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
+[Demo M3](docs/demo/m3.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
@@ -61,6 +77,13 @@ das Wiki:
   Browser die App öffnen. WebSocket-Verbindungen der Live-Bearbeitung werden nur von
   dieser Origin angenommen; leer muss die Origin zum angefragten Host passen. Hinter
   einem Reverse Proxy, der den Host umschreibt, also setzen.
+
+In Compose läuft alles in einem App-Container (`HERD_ROLE=all`: API, Worker der
+Outbox, Collab-Prozess). Zum Ausprobieren mehrerer API-Knoten gibt es die Überlagerung
+`compose.nodes.yml`: zwei API-Dienste (`api-a`, `api-b` auf `HERD_HOST_PORT` und
+`HERD_HOST_PORT_B`, Standard 8081), ein eigener `worker`, ein eigener `collab` und ein
+einmaliger `migrate` statt `app`
+(`docker compose -f compose.yml -f compose.nodes.yml up -d --wait`).
 
 Sicherung, Wiederherstellung, Reverse-Proxy und alle Variablen:
 [`deploy/compose/README.md`](deploy/compose/README.md).
@@ -106,6 +129,20 @@ das Upgrade durchreichen (ingress-nginx und Traefik tun es ohne Einstellung). Zu
 Leerlauf-Timeouts und Größenlimits am Ingress siehe
 [Betriebshinweise](#betriebshinweise).
 
+Seit M3 gehört dazu der Worker der Outbox: ein Deployment `<release>-worker`
+(`HERD_ROLE=worker`, nur Port 9090; `worker.replicas`, Standard 1, mehrere sind sicher;
+`worker.env` für eigene Variablen, `api.env` gilt dort nicht; `worker.resources`,
+voreingestellt Request 50m/192Mi, Limit 384Mi) mit einem headless Service
+`<release>-worker`, über den der ServiceMonitor seine Metriken holt. Mit
+`worker.replicas: 0` kommt nichts mehr live an und kein Alarm meldet das. Die
+PrometheusRule hat zwei neue Alarme: `HerdOutboxBacklog` (das älteste offene Ereignis
+ist älter als 5 Minuten, kritisch) und `HerdOutboxFailed` (ein Ereignis wurde nach allen
+Versuchen aufgegeben, Warnung). Die Live-Zustellung (`/api/stream`, Server-Sent Events)
+braucht am Ingress ungepufferte Antworten und ein Lese-Timeout von mindestens 1 h; das
+Chart setzt keine Annotation dafür (Controller unterscheiden sich), `values.yaml`
+beschreibt sie und `ci/production-values.yaml` setzt für ingress-nginx
+`proxy-read-timeout` und `proxy-send-timeout` auf 3600.
+
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
 - `api.cookieSecure` (Standard `true`): Das Sitzungs-Cookie trägt `Secure`, der Browser
@@ -146,6 +183,15 @@ Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. 
 Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Änderungen
 an der API `npm run generate:api` im Frontend ausführen.
 
+Demodaten für eine frische Test-Installation (drei Personen, der Bereich „Team Nord“
+mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht
+und eine Seiten-Diskussion mit Systemmeldungen; der Worker muss laufen):
+
+```bash
+cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
+  uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
+```
+
 Regeln für Beiträge: [`CLAUDE.md`](CLAUDE.md) (Schichten, `org_id`, Paginierung,
 Fehlerform, i18n, Lizenzen, Commit-Format). Neue Funktionen beginnen mit einem
 fehlschlagenden Test.
@@ -153,7 +199,10 @@ fehlschlagenden Test.
 ## Prüfbefehle
 
 Die Tests brauchen PostgreSQL (`HERD_TEST_DATABASE_URL`, Standard
-`postgresql+asyncpg://herd:herd@localhost:5433/herd_test`).
+`postgresql+asyncpg://herd:herd@localhost:5433/herd_test`). Der Zwei-Knoten-Test der
+Live-Zustellung (`backend/tests/test_live_two_nodes.py`) legt eine Wegwerf-Datenbank an
+und braucht dafür CREATEDB für die Rolle `herd` (einmal als Superuser:
+`ALTER ROLE herd CREATEDB`; in der CI ist `herd` Superuser).
 
 ```bash
 cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . \
@@ -163,11 +212,14 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
                                        # Wegwerf-Datenbank (psql, uv nötig), zwei Yjs-Clients
 cd e2e && npm ci && npx playwright install chromium && npx playwright test
-                                       # Browser: Live-Bearbeitung mit zwei Personen in der
-                                       # echten App (Rolle all, Wegwerf-Datenbank); vorher
+                                       # Browser: Live-Bearbeitung und Nachrichten mit zwei
+                                       # Personen in der echten App (Rolle all mit Worker,
+                                       # Wegwerf-Datenbank); vorher
                                        # `npm run build` in frontend/. Ein vorhandenes Chromium
                                        # nimmt PLAYWRIGHT_CHROMIUM_EXECUTABLE.
 docker build -t to-herd-cats-ai:local . && bash deploy/compose/smoke.sh   # endet mit SMOKE OK
+SMOKE_NODES=1 bash deploy/compose/smoke.sh   # zwei API-Knoten und Worker: Nachricht an A,
+                                       # live über /api/stream an B
 bash deploy/compose/load.sh            # Ressourcen und Laufzeiten für den Steckbrief
 ```
 
@@ -178,7 +230,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 und M2. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M3. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -363,6 +415,48 @@ kennen.
   /64), eine IPv4-Adresse für sich; das Audit-Log hält die volle Adresse fest. Die
   Client-Adresse stimmt nur, wenn der Reverse Proxy in `HERD_FORWARDED_ALLOW_IPS`
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
+- **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
+  ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
+  Systemmeldungen der Seiten-Diskussion und die Live-Zustellung. Bis M6 ohne DBOS (Plan
+  M3, Entscheidung 1). `HERD_ROLE=worker` hat nur den internen Port (`/ready` meldet, ob
+  seine Schleife die Datenbank erreicht); `HERD_ROLE=all` enthält den Worker und teilt
+  mit ihm den Datenbank-Pool. Mehrere Worker sind sicher (getrennte Stapel, Zustellung
+  mindestens einmal, idempotente Handler). Ohne laufenden Worker gehen keine Nachrichten
+  verloren, aber nichts kommt live an, Benachrichtigungen und Systemmeldungen bleiben aus,
+  bis ein Worker läuft. Scheiternde Handler werden mit Wartezeit (bis 5 Minuten)
+  wiederholt, nach 10 Durchläufen aufgegeben (`outbox.failed`). Metriken:
+  `herd_outbox_pending`, `herd_outbox_oldest_pending_seconds`,
+  `herd_outbox_dispatch_total{handler,result}`. Verteilte Ereignisse werden nach 7 Tagen
+  gelöscht. Einzelheiten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md#worker-und-outbox).
+- **Live-Zustellung (SSE) hinter Ingress oder Reverse Proxy:** `GET /api/stream` bleibt
+  offen, solange der Tab offen ist. Der Proxy darf die Antwort nicht puffern oder
+  komprimieren (die App sendet `X-Accel-Buffering: no`), sein Lese-Timeout muss über den
+  15 s des Heartbeats liegen (empfohlen 1 h, ingress-nginx
+  `nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"`). Zum Browser HTTP/2, sonst
+  belegt jeder Tab eine der 6 HTTP/1.1-Verbindungen je Host. Je Anmeldung höchstens 5
+  Verbindungen **je API-Prozess** (429 `live.too_many_streams`); hinter einem Load
+  Balancer gilt die Grenze je Pod. Sticky Sessions sind nicht nötig: Jeder API-Pod lauscht
+  mit einer eigenen Datenbankverbindung (außerhalb des Pools) auf `herd_live` und prüft
+  je Ereignis mit einer Abfrage, wer es sehen darf. Bei SIGTERM beendet die API ihre
+  Verbindungen zuerst, die Browser verbinden sich nach 5 s neu und laden nach; verpasste
+  Ereignisse werden nicht nachgespielt. Beispiele:
+  [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md#betrieb-hinter-einem-reverse-proxy).
+- **Datenbankverbindungen:** Zum Pool kommt je API-Prozess eine dauerhafte
+  LISTEN-Verbindung, je Worker eine weitere (Worker: zwei aus dem Pool während einer
+  Verteilung). `max_connections` der Datenbank danach bemessen.
+- **Bekannte Lücken der Live-Zustellung (M3):** Wer aus einem Bereich entfernt wird,
+  bekommt ab dem nächsten Ereignis nichts mehr, aber kein eigenes Ereignis; die offene
+  Ansicht merkt es spätestens nach 60 s. Der Hinweis auf eine Einsicht der Verwaltung
+  erscheint bei den Teilnehmenden beim nächsten Laden. Eine einzelne Nachricht lässt
+  sich nicht abrufen (der Anfang eines Threads steht nur dann über den Antworten, wenn
+  er im geladenen Verlauf ist).
+- **Einsicht in Direktnachrichten** (`dm.inspect`, nur Inhaber und Administratoren):
+  Begründung 10 bis 500 Zeichen, 60 Minuten, nur lesend, nur für die Person, die sie
+  begonnen hat; Audit `dm.admin_lookup` (Liste der Gespräche einer Person) und
+  `dm.admin_access` (mit Begründung). Sonst haben Administratoren in fremden
+  Direktnachrichten kein Recht, auch nicht in der Suche.
+- **Nachrichteninhalte** stehen nie im Log, in `NOTIFY`-Nutzlasten, in Ereignissen der
+  Outbox oder in Metrik-Labels; Live-Ereignisse tragen nur IDs.
 
 ## Lizenz
 

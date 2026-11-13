@@ -1,4 +1,4 @@
-# to-herd-cats-ai: one image for every role (HERD_ROLE=api|migrate|all|collab).
+# to-herd-cats-ai: one image for every role (HERD_ROLE=api|migrate|all|worker|collab).
 #
 # Stages: the frontend is built with node, the collab process (live editing) gets its
 # production node_modules, the Python environment is built with uv, and the runtime is

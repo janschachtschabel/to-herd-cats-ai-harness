@@ -3,15 +3,21 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 and M2
-(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`) are built;
-the next milestone is M3 (messages), plan `docs/superpowers/plans/2026-11-13-m3-nachrichten.md`.
-Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree,
-Markdown and live editor (`collab/` process, generations), versions, trash, tags,
-attachments (`HERD_DATA_DIR`), full-text search, import/export (M2). Planned, not
-present: messages, tickets, worker/outbox, AI and agents, embeddings, S3, collab with
-Redis. Operations: `README.md` (Betriebshinweise), `docs/STECKBRIEF.md` (update its
-measurements each milestone), `docs/WIKI.md` (wiki use and reverse-proxy operation).
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1, M2 and M3
+(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
+`2026-11-13-m3-nachrichten.md`) are built; the next milestone is M4 (tickets), its plan
+is not written yet. Present: identity, groups, spaces, roles, `can()`, audit (M1); the
+wiki: pages and tree, Markdown and live editor (`collab/` process, generations),
+versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text search, import/export
+(M2); messaging: event outbox and worker role, channels, direct messages (2–9 people),
+threads, mentions, reactions, read state, page threads with a system timeline,
+notifications and the activity view, message search, live delivery over SSE
+(LISTEN/NOTIFY, several API nodes), audited admin inspection of DMs (M3). Planned, not
+present: tickets, AI and agents, DBOS (M6: the outbox dispatcher is a plain loop until
+then), embeddings, S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
+`docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
+and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
+behind a proxy).
 
 ## Stack (present)
 
@@ -22,11 +28,17 @@ measurements each milestone), `docs/WIKI.md` (wiki use and reverse-proxy operati
   react-hook-form + zod (schemas derived from `openapi.json`), next-themes. Tooling:
   `npm`, `oxlint`, `prettier`, `vitest` + Testing Library. Wiki view: react-markdown +
   remark-gfm (never rehype-raw); live editor: Tiptap 3, Yjs, `@hocuspocus/provider`.
+- Messaging: outbox in `core/outbox.py` (`emit()` in the changing transaction, ids
+  only), dispatcher and role `worker` in `app/worker/`, handlers per module
+  (`modules/messaging/handlers.py`), live hub `modules/messaging/live.py` (asyncpg
+  LISTEN via `core/listen.py`, SSE `GET /api/stream`); frontend one `EventSource` per
+  tab (`src/lib/live.ts`), events only invalidate TanStack Query keys.
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
-- Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing in
-  the real app (role all) on a throwaway database; a CI job of its own.
+- Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing and
+  messaging in the real app (role all, worker included) on a throwaway database; a CI
+  job of its own.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
   BlueOak-1.0.0 or OFL-1.1 (fonts). CI checks it (`backend/scripts/check_licenses.py`).
@@ -78,8 +90,9 @@ cd collab && npm run test:integration             # real API on a throwaway data
 ```
 
 ```bash
-# Browser tests of live editing (Playwright; own package, `@playwright/test` only): the
-# built SPA and the real app in role all on a throwaway database (psql, uv).
+# Browser tests of live editing and messaging (Playwright; own package, `@playwright/test`
+# only): the built SPA and the real app in role all (worker included) on a throwaway
+# database (psql, uv). HERD_E2E_PORT moves the ports; `--output <dir>` keeps results apart.
 cd frontend && npm run build
 cd e2e && npm ci && npx playwright install chromium && npx playwright test
 # With a Chromium already installed: PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chrome
@@ -88,6 +101,7 @@ cd e2e && npm ci && npx playwright install chromium && npx playwright test
 ```bash
 docker build -t to-herd-cats-ai:local .                 # the image (SPA + API + collab, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
+SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api-a, api-b, worker; message A → SSE B
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 ```
 
@@ -100,8 +114,8 @@ promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
 ```
 
 CI (`.github/workflows/ci.yml`, pull requests and pushes to `main`; tags through
-`release.yml`) runs all of the above plus `pip-audit`,
-`npm audit --audit-level=high`, the image build, `smoke.sh` and Trivy. A tag `vX.Y.Z`
+`release.yml`) runs all of the above plus `pip-audit`, `npm audit --audit-level=high`,
+the image build, `smoke.sh` (single and `SMOKE_NODES=1`) and Trivy. A tag `vX.Y.Z`
 (`release.yml`) publishes `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z`/`:X.Y` and the chart
 as OCI under `ghcr.io/<owner>/charts`; tag, pyproject and chart versions must match.
 
@@ -110,7 +124,16 @@ The backend serves the built SPA when `HERD_STATIC_DIR` points at `frontend/dist
 
 Tests need Postgres; `HERD_TEST_DATABASE_URL` defaults to
 `postgresql+asyncpg://herd:herd@localhost:5433/herd_test`. Backend tests create a
-fresh schema per session and roll back per test.
+fresh schema per session and roll back per test. The two-node live test
+(`tests/test_live_two_nodes.py`) creates a scratch database with the test URL's role:
+locally the role `herd` needs CREATEDB (`ALTER ROLE herd CREATEDB` as a superuser; in
+CI it is the superuser).
+
+```bash
+# Demo data on a fresh test installation (worker must run; passwords from the env only)
+cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
+  uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
+```
 
 ## Conventions
 
@@ -122,6 +145,12 @@ fresh schema per session and roll back per test.
   first, contract in a later release). `/ready` stays ready when the database is at a
   revision this code does not know (a newer release migrated before its pods rolled
   out); it is not ready only with no revision or a known older one.
+- Outbox handlers: register with `@handler(...)` from `app.worker.registry` in the
+  module's `handlers.py`, and import that module in `backend/app/worker/handlers.py` —
+  the worker knows only handlers whose module it imported. Handlers run at least once
+  per event, in the delivery's transaction: idempotent, never commit themselves.
+- Message content never goes into logs, outbox payloads, `NOTIFY` payloads (< 4,000
+  bytes) or metric labels; live events carry ids only.
 
 ## Definition of done (per task)
 

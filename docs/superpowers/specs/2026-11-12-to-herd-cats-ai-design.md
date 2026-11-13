@@ -120,6 +120,8 @@ Ein Verteiler im Worker (DBOS-Workflow) holt Einträge mit `FOR UPDATE SKIP LOCK
 - Suchindex,
 - Live-Zustellung (`NOTIFY`).
 
+*Geändert in M3: Bis M6 ist der Verteiler kein DBOS-Workflow, sondern eine einfache Schleife in der Rolle `worker` (in `all` enthalten): Stapel mit `FOR NO KEY UPDATE SKIP LOCKED`, je Handler ein Zustellnachweis in derselben Transaktion wie seine Wirkung, Wiederholung mit wachsender Wartezeit, mindestens einmal zugestellt, Handler idempotent. DBOS kommt mit seinem ersten echten Leser, den dauerhaften Agenten-Läufen (M6) und Zeitplänen (M7); Plan M3, Entscheidung 1.*
+
 Das Audit-Protokoll wird **synchron** in derselben Transaktion geschrieben und nicht über die Outbox.
 
 Schutz vor Schleifen:
