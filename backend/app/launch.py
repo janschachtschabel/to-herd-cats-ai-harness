@@ -129,10 +129,21 @@ async def run_servers(servers: Sequence[Server]) -> int:
             loop.remove_signal_handler(sig)
 
 
+# What the collab process may see of this environment (review M2 R13): the system's
+# basics, Node's own settings and its own settings, never the database credentials or
+# any other secret of the API.
+_COLLAB_PASSED = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TZ"})
+_COLLAB_PREFIXES = ("NODE_", "HERD_COLLAB_")
+
+
 def collab_env(settings: Settings, *, host: str) -> dict[str, str]:
-    """The collab process's environment: this one, plus what it must agree on with
-    the API (values from a .env file reach it only this way)."""
-    env = dict(os.environ)
+    """The collab process's environment: an allow list of this one, plus what it must
+    agree on with the API (values from a .env file reach it only this way)."""
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if name in _COLLAB_PASSED or name.startswith(_COLLAB_PREFIXES)
+    }
     env.update(
         HERD_ROLE=settings.role,
         HERD_COLLAB_HOST=host,

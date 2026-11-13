@@ -1,4 +1,5 @@
 import asyncio
+import os
 import signal
 import sys
 
@@ -177,6 +178,43 @@ async def test_all_starts_the_collab_process_only_with_an_internal_token(monkeyp
     assert child.env["HERD_COLLAB_API_URL"] == "http://127.0.0.1:9191"
     assert child.env["HERD_INTERNAL_TOKEN"] == TOKEN
     assert child.env["HERD_COLLAB_PORT"] == "1234"
+
+
+def test_the_collab_process_gets_only_what_it_needs(monkeypatch):
+    """Review M2 R13: never the database credentials or unrelated secrets."""
+    for name in list(os.environ):
+        monkeypatch.delenv(name)
+    for name, value in {
+        "PATH": "/usr/bin",
+        "NODE_OPTIONS": "--max-old-space-size=256",
+        "NODE_EXTRA_CA_CERTS": "/etc/ca.pem",
+        "LANG": "C.UTF-8",
+        "HERD_COLLAB_MAX_PER_SESSION": "5",
+        "HERD_DATABASE_URL": "postgresql+asyncpg://herd:secret@db/herd",
+        "HERD_DATABASE_PASSWORD": "secret",
+        "HERD_BOOTSTRAP_ADMIN_PASSWORD": "admin-secret",
+        "HERD_STORAGE_SECRET": "x",
+        "AWS_SECRET_ACCESS_KEY": "y",
+        "OTEL_EXPORTER_OTLP_HEADERS": "authorization=z",
+    }.items():
+        monkeypatch.setenv(name, value)
+    settings = Settings(role="all", internal_token=TOKEN, public_url="https://wiki.example")
+    env = launch.collab_env(settings, host="127.0.0.1")
+    assert set(env) == {
+        "PATH",
+        "NODE_OPTIONS",
+        "NODE_EXTRA_CA_CERTS",
+        "LANG",
+        "HERD_COLLAB_MAX_PER_SESSION",
+        "HERD_ROLE",
+        "HERD_COLLAB_HOST",
+        "HERD_COLLAB_PORT",
+        "HERD_COLLAB_API_URL",
+        "HERD_SESSION_COOKIE_NAME",
+        "HERD_INTERNAL_TOKEN",
+        "HERD_PUBLIC_URL",
+    }
+    assert not any("secret" in value for value in env.values())
 
 
 async def test_collab_process_is_stopped_with_the_servers():

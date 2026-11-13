@@ -251,7 +251,10 @@ kennen.
   Fällt der Prozess aus, verbinden sich die Browser neu; Änderungen der letzten
   Sekunden (höchstens 10 s), die noch nicht gespeichert waren, spielt ein noch offener
   Browser beim Wiederverbinden erneut ein; ist er geschlossen, sind sie verloren. Mehrere Collab-Replikas (mit Redis/Valkey) sind für M9
-  geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API.
+  geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
+  er erbt von ihrer Umgebung nur `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`, `NODE_*` und
+  `HERD_COLLAB_*` und bekommt dazu Token, öffentliche URL und Cookie-Namen, nie die
+  Datenbank-Zugangsdaten oder andere Geheimnisse der API.
 - **WebSocket hinter Ingress oder Reverse Proxy.** Die Live-Bearbeitung ist ein
   WebSocket auf `/collab/<seiten-id>` am öffentlichen Port; er bleibt offen, solange
   jemand bearbeitet. Die API schickt alle 20 s einen Ping, deshalb reicht jedes
