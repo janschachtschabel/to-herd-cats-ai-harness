@@ -33,6 +33,7 @@ const ProfilePage = lazyRouteComponent(
   () => import('@/features/profile/ProfilePage'),
   'ProfilePage',
 )
+const TagsPage = lazyRouteComponent(() => import('@/features/admin/tags/TagsPage'), 'TagsPage')
 const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
 
 export interface RouterContext {
@@ -204,6 +205,13 @@ const groupRoute = createRoute({
   },
 })
 
+const tagsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/tags',
+  loader: ({ context }) => requirePermission(context.me, 'tag.manage'),
+  component: TagsPage,
+})
+
 const auditRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/audit',
@@ -218,6 +226,13 @@ export const routeTree = rootRoute.addChildren([
     spacesRoute,
     spaceRoute.addChildren([spaceIndexRoute, pageRoute, trashRoute, spaceSettingsRoute]),
     profileRoute,
-    adminRoute.addChildren([adminIndexRoute, usersRoute, groupsRoute, groupRoute, auditRoute]),
+    adminRoute.addChildren([
+      adminIndexRoute,
+      usersRoute,
+      groupsRoute,
+      groupRoute,
+      tagsRoute,
+      auditRoute,
+    ]),
   ]),
 ])

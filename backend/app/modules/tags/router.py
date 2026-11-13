@@ -19,8 +19,11 @@ async def list_tags(
     space_id: Annotated[
         uuid.UUID | None, Query(description="only system-wide tags and this space's")
     ] = None,
+    system: Annotated[
+        bool, Query(description="only system-wide tags; not together with space_id")
+    ] = False,
 ) -> Page[TagOut]:
-    page = await TagService(session).list(actor, params, space_id)
+    page = await TagService(session).list(actor, params, space_id, system_only=system)
     return Page[TagOut](items=[TagOut.of(t) for t in page.items], next_cursor=page.next_cursor)
 
 

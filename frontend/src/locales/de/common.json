@@ -104,6 +104,7 @@
     "admin": "Verwaltung",
     "users": "Personen",
     "groups": "Gruppen",
+    "tags": "Tags",
     "audit": "Protokoll"
   },
   "profile": {
@@ -280,6 +281,36 @@
       "choose": "Bitte wählen …",
       "addSubmit": "Hinzufügen",
       "morePeople": "Weitere Personen laden"
+    }
+  },
+  "tags": {
+    "title": "Tags",
+    "description": "Systemweite Tags lassen sich in allen Bereichen verwenden. Bereichs-Tags verwalten die Moderatoren eines Bereichs in seinen Einstellungen.",
+    "empty": "Noch keine systemweiten Tags.",
+    "create": {
+      "open": "Neuer Tag",
+      "title": "Neuer Tag",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "open": "Tag „{{name}}“ bearbeiten",
+      "title": "Tag bearbeiten"
+    },
+    "delete": {
+      "open": "Tag „{{name}}“ löschen",
+      "title": "Tag löschen?",
+      "text": "„{{name}}“ wird von allen Seiten entfernt, die ihn tragen. Das lässt sich nicht rückgängig machen."
+    },
+    "fields": {
+      "name": "Name",
+      "color": "Farbe",
+      "colorHint": "Als #rrggbb, z. B. #2563eb.",
+      "colorPicker": "Farbe auswählen"
+    },
+    "space": {
+      "title": "Tags dieses Bereichs",
+      "description": "Nur in diesem Bereich verwendbar. Systemweite Tags verwaltet die Administration.",
+      "empty": "Dieser Bereich hat noch keine eigenen Tags."
     }
   },
   "audit": {

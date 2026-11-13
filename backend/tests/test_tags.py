@@ -121,6 +121,21 @@ async def test_tags_of_another_organisation_are_invisible(
     _error(await _set(wiki.editor, page, {"id": str(foreign.id)}), 422, "tags.not_found")
 
 
+async def test_system_filter_lists_only_system_wide_tags(wiki: Wiki) -> None:
+    for name in ("Beta", "Alpha"):
+        await _made(wiki.admin, name)
+    await _made(wiki.moderator, "Team", wiki.space_id)
+    assert await _names(wiki.admin) == ["Alpha", "Beta", "Team"]
+    assert await _names(wiki.admin, system="true") == ["Alpha", "Beta"]
+    page = (await wiki.admin.get("/api/tags", params={"system": "true", "limit": 1})).json()
+    rest = await wiki.admin.get(
+        "/api/tags", params={"system": "true", "limit": 1, "cursor": page["next_cursor"]}
+    )
+    assert [t["name"] for t in rest.json()["items"]] == ["Beta"]
+    r = await wiki.admin.get("/api/tags", params={"system": "true", "space_id": wiki.space_id})
+    _error(r, 422, "validation_failed")
+
+
 async def test_tag_list_is_sorted_by_name_and_paginated(wiki: Wiki) -> None:
     for name in ("delta", "Alpha", "charlie", "Bravo"):
         await _made(wiki.admin, name)

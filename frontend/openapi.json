@@ -5005,6 +5005,18 @@
               "description": "only system-wide tags and this space's",
               "title": "Space Id"
             }
+          },
+          {
+            "description": "only system-wide tags; not together with space_id",
+            "in": "query",
+            "name": "system",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "only system-wide tags; not together with space_id",
+              "title": "System",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

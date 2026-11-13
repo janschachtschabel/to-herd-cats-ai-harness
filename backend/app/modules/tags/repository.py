@@ -91,12 +91,17 @@ class TagRepository:
         space_id: uuid.UUID | None,
         after: tuple[str, uuid.UUID] | None,
         limit: int,
+        *,
+        system_only: bool = False,
     ) -> list[Tag]:
         """By name (case ignored); with `space_id`, the system-wide tags and that
-        space's, else every tag the actor sees."""
+        space's; with `system_only`, the system-wide tags; else every tag the actor
+        sees."""
         key = func.lower(Tag.name)
         stmt = select(Tag).where(self._visible()).order_by(key, Tag.id).limit(limit)
-        if space_id is not None:
+        if system_only:
+            stmt = stmt.where(Tag.space_id.is_(None))
+        elif space_id is not None:
             stmt = stmt.where(or_(Tag.space_id.is_(None), Tag.space_id == space_id))
         if after is not None:
             stmt = stmt.where(tuple_(key, Tag.id) > tuple_(*after))

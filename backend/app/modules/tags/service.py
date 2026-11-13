@@ -49,14 +49,26 @@ class TagService:
         return tag
 
     async def list(
-        self, actor: Actor, params: PageParams, space_id: uuid.UUID | None = None
+        self,
+        actor: Actor,
+        params: PageParams,
+        space_id: uuid.UUID | None = None,
+        *,
+        system_only: bool = False,
     ) -> pagination.Page[Tag]:
         """The system-wide tags and those of the spaces the actor sees, by name; with
-        `space_id`, the system-wide tags and that space's."""
+        `space_id`, the system-wide tags and that space's; with `system_only`, only the
+        system-wide tags."""
+        if system_only and space_id is not None:
+            raise ValidationFailed(
+                "system and space_id exclude each other", code="validation_failed"
+            )
         if space_id is not None:
             await require(self.session, actor, Action.SPACE_READ, space_id)
         after = decode_key_cursor(params.cursor) if params.cursor else None
-        rows = await self.repo(actor).page(space_id, after, params.limit + 1)
+        rows = await self.repo(actor).page(
+            space_id, after, params.limit + 1, system_only=system_only
+        )
         items, more = rows[: params.limit], len(rows) > params.limit
         cursor = encode_key_cursor(items[-1].name.lower(), items[-1].id) if more else None
         return pagination.Page[Tag](items=items, next_cursor=cursor)

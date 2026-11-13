@@ -21,18 +21,23 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   { id: 'direct', milestone: 3 },
   { id: 'spaces', milestone: 1 },
   { id: 'work', milestone: 4 },
-  { id: 'admin', milestone: 1, anyOf: ['user.manage', 'group.manage', 'audit.read'] },
+  {
+    id: 'admin',
+    milestone: 1,
+    anyOf: ['user.manage', 'group.manage', 'tag.manage', 'audit.read'],
+  },
 ]
 
 export interface AdminLink {
-  to: '/admin/users' | '/admin/groups' | '/admin/audit'
-  labelKey: 'nav.users' | 'nav.groups' | 'nav.audit'
+  to: '/admin/users' | '/admin/groups' | '/admin/tags' | '/admin/audit'
+  labelKey: 'nav.users' | 'nav.groups' | 'nav.tags' | 'nav.audit'
   permission: Permission
 }
 
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/users', labelKey: 'nav.users', permission: 'user.manage' },
   { to: '/admin/groups', labelKey: 'nav.groups', permission: 'group.manage' },
+  { to: '/admin/tags', labelKey: 'nav.tags', permission: 'tag.manage' },
   { to: '/admin/audit', labelKey: 'nav.audit', permission: 'audit.read' },
 ]
 

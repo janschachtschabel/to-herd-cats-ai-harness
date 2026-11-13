@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { History, Search, Shield, UserRound, UsersRound } from 'lucide-react'
+import { History, Search, Shield, Tags, UserRound, UsersRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '@/features/auth/queries'
@@ -19,6 +19,7 @@ function SectionHeading({ children }: { children: ReactNode }) {
 const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/users': UserRound,
   '/admin/groups': UsersRound,
+  '/admin/tags': Tags,
   '/admin/audit': History,
 }
 

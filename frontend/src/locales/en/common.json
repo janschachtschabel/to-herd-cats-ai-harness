@@ -104,6 +104,7 @@
     "admin": "Administration",
     "users": "People",
     "groups": "Groups",
+    "tags": "Tags",
     "audit": "Audit log"
   },
   "profile": {
@@ -280,6 +281,36 @@
       "choose": "Please choose …",
       "addSubmit": "Add",
       "morePeople": "Load more people"
+    }
+  },
+  "tags": {
+    "title": "Tags",
+    "description": "System-wide tags can be used in every space. A space's own tags are managed by its moderators in the space settings.",
+    "empty": "No system-wide tags yet.",
+    "create": {
+      "open": "New tag",
+      "title": "New tag",
+      "submit": "Create"
+    },
+    "edit": {
+      "open": "Edit tag “{{name}}”",
+      "title": "Edit tag"
+    },
+    "delete": {
+      "open": "Delete tag “{{name}}”",
+      "title": "Delete tag?",
+      "text": "“{{name}}” will be removed from every page that carries it. This cannot be undone."
+    },
+    "fields": {
+      "name": "Name",
+      "color": "Colour",
+      "colorHint": "As #rrggbb, e.g. #2563eb.",
+      "colorPicker": "Pick a colour"
+    },
+    "space": {
+      "title": "Tags of this space",
+      "description": "Usable only in this space. System-wide tags are managed in the administration.",
+      "empty": "This space has no tags of its own yet."
     }
   },
   "audit": {

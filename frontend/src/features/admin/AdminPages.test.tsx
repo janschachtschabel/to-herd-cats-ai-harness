@@ -5,21 +5,23 @@ import { ADMIN_PERMISSIONS, apiError, type Call, makeMe, makeUser, mockApi, page
 import { renderApp } from '@/test/render'
 
 describe('administration', () => {
-  test.each(['/admin', '/admin/users', '/admin/groups', '/admin/groups/x', '/admin/audit'])(
-    'member sees no admin routes; direct navigation shows not-found (%s)',
-    async (path) => {
-      const api = mockApi({
-        'GET /api/auth/me': makeMe(['space.create']),
-        'GET /api/spaces': page([]),
-      })
-      await renderApp(path)
-      expect(
-        await screen.findByRole('heading', { name: 'Seite nicht gefunden' }),
-      ).toBeInTheDocument()
-      expect(screen.queryByText('Verwaltung')).not.toBeInTheDocument()
-      expect(api.calls.filter((c) => c.path.startsWith('/api/admin'))).toEqual([])
-    },
-  )
+  test.each([
+    '/admin',
+    '/admin/users',
+    '/admin/groups',
+    '/admin/groups/x',
+    '/admin/audit',
+    '/admin/tags',
+  ])('member sees no admin routes; direct navigation shows not-found (%s)', async (path) => {
+    const api = mockApi({
+      'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/spaces': page([]),
+    })
+    await renderApp(path)
+    expect(await screen.findByRole('heading', { name: 'Seite nicht gefunden' })).toBeInTheDocument()
+    expect(screen.queryByText('Verwaltung')).not.toBeInTheDocument()
+    expect(api.calls.filter((c) => c.path.startsWith('/api/admin'))).toEqual([])
+  })
 
   test('/admin opens the first administration page one may use', async () => {
     mockApi({

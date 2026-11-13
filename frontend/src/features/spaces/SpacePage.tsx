@@ -3,15 +3,19 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ErrorState, LoadingState } from '@/features/shared/states'
+import { SpaceTags } from '@/features/tags/SpaceTags'
+import { useWiki } from '@/features/wiki/WikiContext'
 import { canEditMembers, canEditSettings } from './display'
 import { useSpace } from './queries'
 import { SpaceMembers } from './SpaceMembers'
 import { SpaceSettingsDialog } from './SpaceSettingsDialog'
 
-/** Members and settings of a space (inside the space's layout, which shows its name). */
+/** Members, settings and tags of a space (inside the space's layout, which shows its
+ *  name and decides from `my_role` what one may do). */
 export function SpacePage({ spaceId }: { spaceId: string }) {
   const { t } = useTranslation()
   const space = useSpace(spaceId)
+  const { abilities } = useWiki()
   const [editing, setEditing] = useState(false)
 
   if (space.isPending) return <LoadingState />
@@ -43,6 +47,7 @@ export function SpacePage({ spaceId }: { spaceId: string }) {
         )}
         <SpaceMembers spaceId={spaceId} editable={canEditMembers(data)} />
       </section>
+      {abilities.moderate && <SpaceTags spaceId={spaceId} />}
       {canEditSettings(data) && (
         <SpaceSettingsDialog space={data} open={editing} onOpenChange={setEditing} />
       )}

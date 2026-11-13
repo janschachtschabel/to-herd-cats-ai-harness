@@ -3282,6 +3282,8 @@ export interface operations {
                 cursor?: string | null;
                 /** @description only system-wide tags and this space's */
                 space_id?: string | null;
+                /** @description only system-wide tags; not together with space_id */
+                system?: boolean;
             };
             header?: never;
             path?: never;
