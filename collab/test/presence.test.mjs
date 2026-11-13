@@ -55,3 +55,28 @@ test("each entry is the authenticated person's; another's cannot be written", as
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.ok(seen(third, annaId), "Anna is still present");
 });
+
+test("a client id stays its person's after the connection closes (review M2 S12)", async () => {
+  live = await liveFixture({ createCollabServer });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  const ben = live.open({ cookie: "herd_session=token-b" });
+  const viewer = live.open({ cookie: "herd_session=token-b" });
+  await Promise.all([anna, ben, viewer].map(synced));
+  anna.provider.setAwarenessField("cursor", null);
+  const annaId = anna.doc.clientID;
+  await until(() => seen(viewer, annaId)?.user);
+  anna.destroy();
+  await until(() => live.server.connections() === 2);
+  // Ben's second socket claims the free id at once: refused, it is Anna's.
+  const claim = live.open({ cookie: "herd_session=token-b" });
+  claim.provider.awareness.setLocalState(null); // it owns no id of its own yet
+  await synced(claim);
+  sendAs(claim, annaId, { cursor: null });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(seen(viewer, annaId), undefined);
+  // Anna comes back with the same id and is shown again.
+  const back = live.open({ cookie: "herd_session=token-a" });
+  await synced(back);
+  sendAs(back, annaId, { cursor: null });
+  await until(() => seen(viewer, annaId)?.user?.name === "Anna");
+});
