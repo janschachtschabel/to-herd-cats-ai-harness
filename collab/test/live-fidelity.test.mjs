@@ -113,3 +113,18 @@ test("a stored live state the browser would tidy is tidied by the server, not by
   await until(() => live.server.hocuspocus.getDocumentsCount() === 0);
   for (const save of live.api.saves) assert.equal(save.content_md, markdown);
 });
+
+test("an empty page always holds a paragraph, so undoing everything keeps it valid (T6)", async () => {
+  for (const stored of [null, Buffer.from(Y.encodeStateAsUpdate(new Y.Doc())).toString("base64")]) {
+    await start("");
+    live.api.ydoc = stored;
+    const c = live.open({ cookie: "herd_session=token-a" });
+    await synced(c);
+    const fragment = c.doc.getXmlFragment("default");
+    assert.equal(fragment.length, 1);
+    assert.equal(fragment.get(0).nodeName, "paragraph");
+    for (const save of live.api.saves) assert.equal(save.content_md, "");
+    await live.stop();
+    live = null;
+  }
+});

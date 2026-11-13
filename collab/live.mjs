@@ -34,6 +34,7 @@ import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
 import {
+  FIELD,
   editorProblem,
   jsonToMarkdown,
   jsonToYDoc,
@@ -140,6 +141,13 @@ export function liveExtension({
           const meaning = sameMeaning(yDocToMarkdown(document), jsonToMarkdown(shown.json));
           if (!meaning) throw deny(context, CLOSE.notRoundTripSafe);
           Y.applyUpdate(document, shown.update);
+          tidied = true;
+        }
+        // An empty shared document stops the browser once someone undoes their first
+        // paragraph (review M2 T6): it holds one empty paragraph, as a built one does.
+        const fragment = document.getXmlFragment(FIELD);
+        if (fragment.length === 0) {
+          fragment.insert(0, [new Y.XmlElement("paragraph")]);
           tidied = true;
         }
       } else {

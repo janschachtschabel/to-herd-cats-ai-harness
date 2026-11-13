@@ -112,18 +112,97 @@ test("an image inside a sentence", async () => {
   expect(stored).toBe("Anleitung\n\nKlicke auf ![Speichern](/icons/save.png) und dann auf Fertig.");
 });
 
-test("Enter in a table cell keeps the table", async () => {
+test("Enter and Shift+Enter in a table cell keep the table (review M2 T8)", async () => {
   const table = "| A | B |\n| --- | --- |\n| x | y |";
   const { article, stored } = await typeAndSave("Tabelle", table, async (tab, editor) => {
-    await editor.getByText("x", { exact: true }).click();
-    await tab.keyboard.press("End");
-    // A cell holds one line of Markdown: Enter adds nothing, the text goes on.
-    await tab.keyboard.press("Enter");
-    await tab.keyboard.type("z");
+    for (const [cell, keys] of [
+      ["x", ["Enter", "Shift+Enter"]],
+      ["A", ["Shift+Enter", "Enter"]],
+    ]) {
+      await editor.getByText(cell, { exact: true }).click();
+      await tab.keyboard.press("End");
+      // A cell holds one line of Markdown: these keys add nothing, the text goes on.
+      for (const key of keys) await tab.keyboard.press(key);
+      await tab.keyboard.type("z");
+    }
   });
+  await expect(article.locator("table")).toHaveCount(1);
+  await expect(article.locator("table thead th").first()).toHaveText("Az");
   await expect(article.locator("table tbody td").first()).toHaveText("xz");
   await expect(article.locator("table tbody td").nth(1)).toHaveText("y");
-  expect(stored).toBe("| A | B |\n| --- | --- |\n| xz | y |");
+  expect(stored).toBe("| Az | B |\n| --- | --- |\n| xz | y |");
+});
+
+test("a row added with Tab to a table with an aligned column is saved (review M2 T3)", async () => {
+  const table = "| Name | Wert |\n| --- | --: |\n| a | 1 |";
+  const { article, stored } = await typeAndSave("Inventar", table, async (tab, editor) => {
+    await editor.getByText("1", { exact: true }).click();
+    await tab.keyboard.press("End");
+    await tab.keyboard.press("Tab"); // a new row
+    await tab.keyboard.type("b");
+    await tab.keyboard.press("Tab");
+    await tab.keyboard.type("2");
+    await expect(tab.getByText("lässt sich so nicht als Markdown speichern")).toBeHidden();
+  });
+  await expect(article.locator("table tbody tr")).toHaveCount(2);
+  await expect(article.locator("table tbody tr").nth(1).locator("td").nth(1)).toHaveText("2");
+  expect(stored).toBe("| Name | Wert |\n| --- | --: |\n| a | 1 |\n| b | 2 |");
+});
+
+test("undoing everything typed on a new page keeps the session (review M2 T6)", async () => {
+  const doc = await publishedPage(context, space.id, "Neu", "");
+  const tab = await context.newPage();
+  await tab.goto(pageUrl(space, doc, "live"));
+  const editor = tab.getByRole("textbox", { name: "Inhalt von „Neu“" });
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  const status = tab.getByRole("region", { name: "Neu" }).getByRole("status");
+  await expect(status).toHaveText("Synchronisiert");
+  await editor.click();
+  await tab.keyboard.type("# Titel");
+  await tab.keyboard.press("Enter");
+  await tab.keyboard.type("abc");
+  for (let i = 0; i < 12; i++) await tab.keyboard.press("Control+z");
+  await expect(editor).toHaveText("");
+  await tab.waitForTimeout(500);
+  await expect(status).toHaveText("Synchronisiert");
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  await tab.keyboard.type("weiter");
+  await tab.getByRole("button", { name: "Fertig" }).click();
+  await expect(tab).toHaveURL(new RegExp(`/p/${doc.path}$`));
+  expect((await call(context, "GET", `/api/pages/${doc.id}`)).content_md).toBe("weiter");
+  await tab.close();
+});
+
+test("leaving right after a change asks first (review M2 T5)", async () => {
+  const doc = await publishedPage(context, space.id, "Eilig", "Alter Text");
+  const tab = await context.newPage();
+  await tab.goto(pageUrl(space, doc, "live"));
+  const editor = tab.getByRole("textbox", { name: "Inhalt von „Eilig“" });
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  await expect(tab.getByRole("region", { name: "Eilig" }).getByRole("status")).toHaveText(
+    "Synchronisiert",
+  );
+  await newLineAtEnd(tab, editor);
+  await tab.keyboard.type("neuer Satz");
+  const dialogs = [];
+  tab.on("dialog", (dialog) => {
+    dialogs.push(dialog.type());
+    dialog.dismiss().catch(() => {});
+  });
+  // A link of the app (in-app navigation) right away: the save is still seconds off.
+  await tab.getByRole("link", { name: space.name }).first().click();
+  await expect.poll(() => dialogs.length).toBeGreaterThan(0);
+  expect(tab.url()).toContain("view=live");
+  // Once stored and acknowledged, leaving asks nothing.
+  await expect
+    .poll(async () => (await call(context, "GET", `/api/pages/${doc.id}`)).content_md)
+    .toContain("neuer Satz");
+  await tab.waitForTimeout(300);
+  const asked = dialogs.length;
+  await tab.getByRole("link", { name: space.name }).first().click();
+  await expect(tab).not.toHaveURL(/view=live/);
+  expect(dialogs.length).toBe(asked);
+  await tab.close();
 });
 
 test("a state that cannot be saved as Markdown is shown, and saved once it can", async () => {
