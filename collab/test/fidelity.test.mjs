@@ -147,3 +147,18 @@ test("the comparison sees what the page view sees", () => {
   assert.ok(!sameMeaning("[a](<b c>)", "[a](b c)"));
   assert.ok(!sameMeaning("[![a](x.png)](https://example.org)", "![a](x.png)"));
 });
+
+test("common text is edited as rich text, not a raw block (review M2 S7)", () => {
+  for (const markdown of [
+    "Mail an anna@example.org bitte",
+    "Siehe www.example.org/info heute",
+    "**[a](b)** und [**a**](b)",
+    "| a | b |\n|---|---|\n| 1 |",
+    "Text\n\n \n\nMehr",
+  ]) {
+    assertKeepsMeaning(markdown, markdown);
+    assert.equal(rawBlocks(liveSave(markdown).json), 0, markdown);
+  }
+  // No ordered task list in the editor: kept as a raw block, unchanged.
+  assert.equal(rawBlocks(liveSave("1. [ ] erledigen\n2. [x] fertig").json), 1);
+});
