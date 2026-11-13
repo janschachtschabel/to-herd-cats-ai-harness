@@ -173,17 +173,22 @@ export function liveExtension({
     },
 
     async beforeHandleMessage({ context, document, documentName, update }) {
-      const state = live.get(documentName);
-      let close = null;
-      if (context.closing) close = context.closing;
-      else if (!state || state.discarded) close = CLOSE.generationEnded;
-      else if (state.holding)
-        close = CLOSE.retry; // the generation is being ended
-      else if (!size.admit(document, state, update)) {
-        close = CLOSE.tooLarge; // only this sender; the document stays as it was
-        closeSocket(context, close);
+      const refuse = (close) => {
+        throw Object.assign(new Error(close[1]), { code: close[0], reason: close[1] });
+      };
+      const settled = () => {
+        const state = live.get(documentName);
+        if (context.closing) refuse(context.closing);
+        if (!state || state.discarded) refuse(CLOSE.generationEnded);
+        if (state.holding) refuse(CLOSE.retry); // the generation is being ended
+        return state;
+      };
+      const admitted = await size.admit(document, settled(), update);
+      settled(); // the measurement may have waited (T12): still as it was?
+      if (!admitted) {
+        closeSocket(context, CLOSE.tooLarge); // only this sender; the document stays as it was
+        refuse(CLOSE.tooLarge);
       }
-      if (close) throw Object.assign(new Error(close[1]), { code: close[0], reason: close[1] });
     },
 
     /** "I am done": save now, then say whether everything is stored. */

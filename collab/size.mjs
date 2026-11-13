@@ -4,9 +4,10 @@
 // incoming update is checked before it is applied: a cheap estimate (the last
 // measurement plus what the updates since could add) and, only when that crosses a
 // limit, an exact measurement of the document as it would be with the update (at most
-// once a second per document). An update that would cross it, or that needs another
-// measurement within that second, is refused (its sender is closed with 4413); the
-// document and everyone else stay as they were.
+// once a second per document; an update that needs another measurement within that
+// second waits until the second is over, review M2 T12). An update that would cross
+// it is refused (its sender is closed with 4413); the document and everyone else stay
+// as they were.
 import * as Y from "yjs";
 import { yDocToMarkdown } from "./markdown.mjs";
 
@@ -80,25 +81,33 @@ export function sizeGuard({
 
   return {
     measure,
-    /** False when the raw message must be refused; keeps `state.size` current. */
-    admit(document, state, raw) {
+    /** False when the raw message must be refused; keeps `state.size` current. A
+     * message that needs a measurement waits for its turn (one per interval and
+     * document): Hocuspocus takes a connection's messages one after the other. */
+    async admit(document, state, raw) {
       const update = contentOf(raw);
       if (update === null) return true;
       if (over(state.size, update.length)) {
         // Measuring copies and writes out the whole document: at most once per
-        // interval and document (review M2 S10); an update needing more is refused.
-        const now = Date.now();
-        if (now - (state.measuredAt ?? -Infinity) < measureEveryMs) return false;
-        state.measuredAt = now;
-        let size;
-        try {
-          size = measureWith(document, update);
-        } catch {
-          return true; // not an update Yjs can apply: Hocuspocus deals with it
-        }
-        if (size.bytes > maxStateBytes || size.chars > maxMarkdownChars) return false;
-        state.size = size;
-        return true;
+        // interval and document (review M2 S10); an update needing more waits for the
+        // interval's end (T12).
+        const turn = (state.measuring ?? Promise.resolve()).then(async () => {
+          const wait = (state.measuredAt ?? -Infinity) + measureEveryMs - Date.now();
+          // Always a turn of the event loop: the update before is applied by then.
+          await new Promise((resolve) => setTimeout(resolve, Math.max(0, wait)));
+          state.measuredAt = Date.now();
+          let size;
+          try {
+            size = measureWith(document, update);
+          } catch {
+            return true; // not an update Yjs can apply: Hocuspocus deals with it
+          }
+          if (size.bytes > maxStateBytes || size.chars > maxMarkdownChars) return false;
+          state.size = size;
+          return true;
+        });
+        state.measuring = turn;
+        return turn;
       }
       state.size = {
         bytes: state.size.bytes + update.length,

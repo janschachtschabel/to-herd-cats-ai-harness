@@ -73,16 +73,24 @@ test("a long text in one cell of a long table keeps the session (review M2 S5)",
   assert.deepEqual(ben.closes, []);
 });
 
-test("a document is measured exactly at most once per interval (review M2 S10)", async () => {
-  // Near the limit every update would need a measurement of the whole document: within
-  // the interval a second one is not made, and the update is refused for its sender.
-  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 60_000 });
+test("a document is measured exactly at most once per interval (review M2 S10, T12)", async () => {
+  // Near the limit every update needs a measurement of the whole document: one within
+  // the interval waits for its end and is measured then, its sender stays (T12).
+  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 600 });
   const anna = live.open({ cookie: "herd_session=token-a" });
   const ben = live.open({ cookie: "herd_session=token-b" });
   await Promise.all([synced(anna), synced(ben)]);
   type(anna.doc, ` ${"a".repeat(300)}`);
   await until(() => text(ben).includes("a".repeat(300)));
+  const typed = Date.now();
   type(anna.doc, "b");
+  type(anna.doc, "c");
+  await until(() => text(ben).includes("bc"));
+  assert.ok(Date.now() - typed >= 300, `admitted after ${Date.now() - typed} ms`);
+  assert.deepEqual(anna.closes, []);
+  // Over the limit after the wait: refused as before.
+  type(anna.doc, "d".repeat(200));
   await until(() => anna.closes.includes(4413));
+  assert.ok(!text(ben).includes("ddd"));
   assert.deepEqual(ben.closes, []);
 });
