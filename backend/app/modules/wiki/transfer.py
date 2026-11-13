@@ -11,7 +11,8 @@ attachments the archive brought (`_attachments/manifest.json`) are pointed at th
 attachments afterwards, folded into the page's first version (`attachment_links.py`).
 
 What cannot be imported is skipped with a reason; the archive itself is read
-defensively (`archive.py`). The whole import is one transaction.
+defensively (`archive.py`), its layout in `import_layout.py`. The whole import is one
+transaction.
 """
 
 import asyncio
@@ -34,21 +35,21 @@ from app.modules.tags.repository import tag_repository
 from app.modules.tags.schemas import DEFAULT_COLOR
 from app.modules.tags.service import TagService
 from app.modules.wiki import archive, frontmatter
-from app.modules.wiki.attachment_links import (
-    MANIFEST,
-    InvalidManifest,
-    read_manifest,
-    rewrite_links,
-)
+from app.modules.wiki.attachment_links import rewrite_links
 from app.modules.wiki.attachments import AttachmentService
-from app.modules.wiki.models import MAX_CONTENT_CHARS, MAX_DEPTH, MAX_TITLE_CHARS, Page, PageStatus
+from app.modules.wiki.import_layout import (
+    ATTACHMENTS,
+    SLUG_CHARS,
+    ArchiveFile,
+    layout,
+    page_title,
+    strings,
+    title_of,
+)
+from app.modules.wiki.models import MAX_CONTENT_CHARS, Page, PageStatus
 from app.modules.wiki.models import VersionSource as Source
 from app.modules.wiki.service import PageService, Siblings
 
-ATTACHMENTS = "_attachments"
-_INDEX_NAMES = {"index", "readme"}
-_MARKDOWN = (".md", ".markdown")
-_SLUG_CHARS = 74
 _SESSION_SECONDS = 24 * 60 * 60  # the import's saves fold into each page's first version
 
 
@@ -63,32 +64,6 @@ class ImportResult:
     created: int = 0
     attachments: int = 0
     skipped: list[Skipped] = field(default_factory=list)
-
-
-@dataclass(frozen=True, slots=True)
-class _File:
-    info: zipfile.ZipInfo
-    folders: list[str]  # as written in the archive
-    slugs: list[str]  # the page path
-
-
-def title_of(name: str) -> str:
-    words = name.replace("-", " ").replace("_", " ").strip()
-    return (words[:1].upper() + words[1:])[:MAX_TITLE_CHARS] or "Seite"
-
-
-def _strings(value: str | list[str]) -> list[str]:
-    return [value] if isinstance(value, str) else value
-
-
-def _title(meta: frontmatter.Meta, body: str, stem: str) -> str:
-    given = meta.get("title")
-    if isinstance(given, str) and given.strip():
-        return given.strip()[:MAX_TITLE_CHARS]
-    for line in body.splitlines():
-        if line.startswith("# ") and line[2:].strip():
-            return line[2:].strip()[:MAX_TITLE_CHARS]
-    return title_of(stem)
 
 
 class PageImport:
@@ -112,7 +87,6 @@ class PageImport:
         self.tag_ids: dict[str, uuid.UUID] = {}
         self.session_key = f"import:{uuid.uuid4().hex}"
         self.siblings = Siblings()
-        self.listed: dict[str, uuid.UUID] = {}  # archive entry → the attachment it was
         self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
@@ -121,10 +95,11 @@ class PageImport:
             # One operation in one transaction: rights as checked just now, slugs and
             # order per parent read once (thousands of pages, review M2 R19).
             with zipped, remembered_facts(self.session):
-                files, attached = self._sort(zipped)
-                for file in files:
+                found = layout(zipped, self._skip)
+                self.listed = found.listed  # archive entry → the attachment it was
+                for file in found.files:
                     await self._page(zipped, file)
-                for info, parts in attached:
+                for info, parts in found.attached:
                     await self._attachment(zipped, info, parts)
                 await self._relink()
         details = {
@@ -138,48 +113,7 @@ class PageImport:
     def _skip(self, info: zipfile.ZipInfo, reason: str) -> None:
         self.result.skipped.append(Skipped(info.filename, reason))
 
-    def _sort(
-        self, zipped: zipfile.ZipFile
-    ) -> tuple[list[_File], list[tuple[zipfile.ZipInfo, list[str]]]]:
-        files: list[_File] = []
-        attached: list[tuple[zipfile.ZipInfo, list[str]]] = []
-        for info in zipped.infolist():
-            parts = archive.segments(info)
-            if parts is None:
-                self._skip(info, "unsafe_path")
-                continue
-            if info.is_dir() or not parts or parts[0] == "__MACOSX" or parts[-1] == ".DS_Store":
-                continue
-            if "/".join(parts) == MANIFEST:
-                try:
-                    self.listed = read_manifest(zipped, info)
-                except InvalidManifest:
-                    self._skip(info, "invalid_manifest")
-                continue
-            if parts[0] == ATTACHMENTS:
-                if len(parts) >= 3:
-                    attached.append((info, parts[1:]))
-                else:
-                    self._skip(info, "no_page")
-                continue
-            stem, dot, ext = parts[-1].rpartition(".")
-            if not dot or f".{ext.lower()}" not in _MARKDOWN or not stem:
-                self._skip(info, "not_markdown")
-                continue
-            names = (
-                parts[:-1]
-                if stem.lower() in _INDEX_NAMES and len(parts) > 1
-                else [*parts[:-1], stem]
-            )
-            if len(names) > MAX_DEPTH:
-                self._skip(info, "too_deep")
-                continue
-            slugs = [slugify(n, max_length=_SLUG_CHARS) for n in names]
-            files.append(_File(info, names, slugs))
-        files.sort(key=lambda f: len(f.slugs))  # parents first; stable otherwise
-        return files, attached
-
-    async def _page(self, zipped: zipfile.ZipFile, file: _File) -> None:
+    async def _page(self, zipped: zipfile.ZipFile, file: ArchiveFile) -> None:
         path = "/".join(file.slugs)
         if path in self.made:
             self._skip(file.info, "duplicate")
@@ -205,20 +139,20 @@ class PageImport:
             self._skip(file.info, "invalid_text")
             return
         meta, body = frontmatter.parse(text)
-        if any("\x00" in v for value in meta.values() for v in _strings(value)):
+        if any("\x00" in v for value in meta.values() for v in strings(value)):
             self._skip(file.info, "invalid_text")  # a NUL written as a JSON escape
             return
         if len(body) > MAX_CONTENT_CHARS:
             self._skip(file.info, "too_large")
             return
         parent = await self._parents(file)
-        title = _title(meta, body, file.folders[-1])
+        title = page_title(meta, body, file.folders[-1])
         page = await self._create(parent, file.slugs[-1], title, body, meta.get("status"))
         tags = meta.get("tags")
         if isinstance(tags, list) and tags:
             await self._tag(page, tags)
 
-    async def _parents(self, file: _File) -> Page | None:
+    async def _parents(self, file: ArchiveFile) -> Page | None:
         """The page above the file's, made empty where the archive has none."""
         parent: Page | None = None
         for depth in range(1, len(file.slugs)):
@@ -269,7 +203,7 @@ class PageImport:
     async def _attachment(
         self, zipped: zipfile.ZipFile, info: zipfile.ZipInfo, parts: list[str]
     ) -> None:
-        page = self.made.get("/".join(slugify(p, max_length=_SLUG_CHARS) for p in parts[:-1]))
+        page = self.made.get("/".join(slugify(p, max_length=SLUG_CHARS) for p in parts[:-1]))
         if page is None:
             self._skip(info, "no_page")
             return

@@ -27,8 +27,8 @@ from app.modules.tags.repository import tag_repository
 from app.modules.wiki import frontmatter
 from app.modules.wiki.attachment_links import MANIFEST, manifest_json
 from app.modules.wiki.attachments_repository import AttachmentRepository
+from app.modules.wiki.import_layout import ATTACHMENTS
 from app.modules.wiki.models import Attachment, Page
-from app.modules.wiki.transfer import ATTACHMENTS
 from app.modules.wiki.visibility import PageReader
 
 BATCH = 100
