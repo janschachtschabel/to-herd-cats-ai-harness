@@ -18,8 +18,26 @@ const NATIVE = new Set(['–', '·', '(', ')'])
 
 const problems = []
 
+function merge(a, b) {
+  const out = { ...a }
+  for (const [key, value] of Object.entries(b)) {
+    out[key] =
+      value && typeof value === 'object' && out[key] && typeof out[key] === 'object'
+        ? merge(out[key], value)
+        : value
+  }
+  return out
+}
+
+// Every JSON file of a locale is part of the one namespace (as in src/lib/i18n.ts).
 function load(locale) {
-  return JSON.parse(fs.readFileSync(path.join(root, `src/locales/${locale}/common.json`), 'utf8'))
+  const dir = path.join(root, `src/locales/${locale}`)
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')))
+    .reduce(merge, {})
 }
 
 function flatten(tree, prefix = '', out = {}) {

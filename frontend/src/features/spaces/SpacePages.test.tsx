@@ -26,6 +26,7 @@ describe('spaces', () => {
       'GET /api/spaces': () => page(listed),
       'POST /api/spaces': () => (listed.push(created), { status: 201, body: created }),
       'GET /api/spaces/:id': created,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': () => page(members),
       'PUT /api/spaces/:id/members': (call) => {
         const member = { ...(call.body as Omit<SpaceMember, 'name'>), name: 'Redaktion' }
@@ -48,6 +49,9 @@ describe('spaces', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/spaces/${created.id}`))
+    // A new space opens its (empty) wiki; members are one link away.
+    expect(await screen.findByText(/Lege die erste an/)).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Mitglieder' }))
     // The sidebar lists the new space without a reload.
     const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' })
     expect(await within(nav).findByRole('link', { name: 'Team Dienste' })).toBeInTheDocument()
@@ -84,6 +88,7 @@ describe('spaces', () => {
       'GET /api/auth/me': makeMe(['directory.read', 'space.create']),
       'GET /api/spaces': page([space]),
       'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([
         { member_type: 'user', member_id: present.id, role: 'viewer', name: present.name },
       ]),
@@ -91,7 +96,7 @@ describe('spaces', () => {
         call.query.get('q') ? page([present, lea]) : page([present, otto]),
       'PUT /api/spaces/:id/members': (call) => ({ ...(call.body as object), name: lea.name }),
     })
-    const { user } = await renderApp(`/spaces/${space.id}`)
+    const { user } = await renderApp(`/spaces/${space.id}/settings`)
     const form = await screen.findByRole('form', { name: 'Mitglied hinzufügen' })
     expect(screen.queryByText(/nur die Verwaltung/)).not.toBeInTheDocument()
 
@@ -131,10 +136,11 @@ describe('spaces', () => {
       'GET /api/auth/me': makeMe(['directory.read']),
       'GET /api/spaces': page([space]),
       'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([]),
       'GET /api/directory': page([]),
     })
-    const { user } = await renderApp(`/spaces/${space.id}`)
+    const { user } = await renderApp(`/spaces/${space.id}/settings`)
     const box = await screen.findByRole('combobox', { name: 'Person oder Gruppe' })
     await user.type(box, 'zzz')
     expect(await screen.findByText('Niemand gefunden.')).toBeInTheDocument()
@@ -149,9 +155,10 @@ describe('spaces', () => {
       'GET /api/auth/me': makeMe([]),
       'GET /api/spaces': page([space]),
       'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([]),
     })
-    await renderApp(`/spaces/${space.id}`)
+    await renderApp(`/spaces/${space.id}/settings`)
     expect(await screen.findByText(/Gäste können/)).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Person oder Gruppe' })).not.toBeInTheDocument()
     expect(api.find('GET', '/api/directory')).toEqual([])
@@ -174,6 +181,7 @@ describe('spaces', () => {
       'GET /api/auth/me': makeMe(['space.create']),
       'GET /api/spaces': page([current]),
       'GET /api/spaces/:id': () => current,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([]),
       'PATCH /api/spaces/:id': (call) => {
         const body = call.body as { name: string; version: number }
@@ -182,7 +190,7 @@ describe('spaces', () => {
         return current
       },
     })
-    const { user } = await renderApp(`/spaces/${current.id}`)
+    const { user } = await renderApp(`/spaces/${current.id}/settings`)
     await user.click(await screen.findByRole('button', { name: 'Einstellungen' }))
     const dialog = await screen.findByRole('dialog')
     current = { ...current, description: 'von jemand anderem', version: 4 } // someone else saved
@@ -215,11 +223,12 @@ describe('spaces', () => {
       'GET /api/auth/me': me,
       'GET /api/spaces': page([mine]),
       'GET /api/spaces/:id': mine,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([
         { member_type: 'user', member_id: me.user.id, role: 'admin', name: 'Mia Muster' },
       ]),
     })
-    await renderApp(`/spaces/${mine.id}`)
+    await renderApp(`/spaces/${mine.id}/settings`)
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Mein Bereich' }),
     ).toBeInTheDocument()
@@ -236,11 +245,12 @@ describe('spaces', () => {
       'GET /api/auth/me': makeMe(['space.create']),
       'GET /api/spaces': page([space]),
       'GET /api/spaces/:id': space,
+      'GET /api/spaces/:id/pages/tree': page([]),
       'GET /api/spaces/:id/members': page([
         { member_type: 'group', member_id: 'g', role: 'editor', name: 'Redaktion' },
       ]),
     })
-    await renderApp(`/spaces/${space.id}`)
+    await renderApp(`/spaces/${space.id}/settings`)
     expect(await screen.findByRole('cell', { name: 'Autor' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Einstellungen' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()

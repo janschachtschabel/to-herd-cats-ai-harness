@@ -10,6 +10,7 @@ import {
 import { AppShell } from '@/app/shell/AppShell'
 import { adminLinks } from '@/app/shell/nav'
 import { hasPermission, meQuery } from '@/features/auth/queries'
+import type { PageMode } from '@/features/wiki/PageScreen'
 import type { Me, Permission } from '@/lib/api'
 import { NotFoundPage } from './NotFoundPage'
 
@@ -18,6 +19,10 @@ import { NotFoundPage } from './NotFoundPage'
 const LoginPage = lazyRouteComponent(() => import('@/features/auth/LoginPage'), 'LoginPage')
 const SpacesPage = lazyRouteComponent(() => import('@/features/spaces/SpacesPage'), 'SpacesPage')
 const SpacePage = lazyRouteComponent(() => import('@/features/spaces/SpacePage'), 'SpacePage')
+const WikiLayout = lazyRouteComponent(() => import('@/features/wiki/WikiLayout'), 'WikiLayout')
+const WikiHome = lazyRouteComponent(() => import('@/features/wiki/WikiHome'), 'WikiHome')
+const PageScreen = lazyRouteComponent(() => import('@/features/wiki/PageScreen'), 'PageScreen')
+const TrashPage = lazyRouteComponent(() => import('@/features/wiki/trash/TrashPage'), 'TrashPage')
 const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
 const GroupsPage = lazyRouteComponent(
   () => import('@/features/admin/groups/GroupsPage'),
@@ -91,13 +96,53 @@ const spacesRoute = createRoute({
   component: SpacesPage,
 })
 
+/** A space: its wiki (tree on the left), with the pages, the trash and the settings. */
 const spaceRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/spaces/$spaceId',
-  // The page takes its id as a prop, so the route component wraps it; load it here.
-  loader: () => SpacePage.preload?.(),
+  // The layout takes the id as a prop, so the route component wraps it; load it here.
+  loader: () => WikiLayout.preload?.(),
   component: function SpaceRoute() {
     const { spaceId } = spaceRoute.useParams()
+    return <WikiLayout spaceId={spaceId} />
+  },
+})
+
+const spaceIndexRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/',
+  component: WikiHome,
+})
+
+const PAGE_MODES: readonly PageMode[] = ['edit', 'live', 'versions']
+
+/** A page by its path (`/spaces/<id>/p/handbuch/urlaub`); `?view=` opens an editor or
+ *  the version history. */
+const pageRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/p/$',
+  validateSearch: (search: Record<string, unknown>): { view?: PageMode } =>
+    PAGE_MODES.includes(search.view as PageMode) ? { view: search.view as PageMode } : {},
+  loader: () => PageScreen.preload?.(),
+  component: function PageRoute() {
+    const { _splat } = pageRoute.useParams()
+    const { view } = pageRoute.useSearch()
+    return <PageScreen path={_splat ?? ''} mode={view} />
+  },
+})
+
+const trashRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/trash',
+  component: TrashPage,
+})
+
+const spaceSettingsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/settings',
+  loader: () => SpacePage.preload?.(),
+  component: function SpaceSettingsRoute() {
+    const { spaceId } = spaceSettingsRoute.useParams()
     return <SpacePage spaceId={spaceId} />
   },
 })
@@ -171,7 +216,7 @@ export const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     indexRoute,
     spacesRoute,
-    spaceRoute,
+    spaceRoute.addChildren([spaceIndexRoute, pageRoute, trashRoute, spaceSettingsRoute]),
     profileRoute,
     adminRoute.addChildren([adminIndexRoute, usersRoute, groupsRoute, groupRoute, auditRoute]),
   ]),

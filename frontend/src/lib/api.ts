@@ -14,6 +14,16 @@ export type SystemRole = Schemas['SystemRole']
 export type AuditEntry = Schemas['AuditOut']
 export type Permission = Schemas['Action']
 export type DirectoryEntry = Schemas['DirectoryEntryOut']
+export type WikiPage = Schemas['PageOut']
+export type TreeNode = Schemas['TreeNodeOut']
+export type TrashedPage = Schemas['TrashedPageOut']
+export type Tag = Schemas['TagOut']
+export type Attachment = Schemas['AttachmentOut']
+export type VersionSummary = Schemas['VersionSummaryOut']
+export type Version = Schemas['VersionOut']
+export type Diff = Schemas['DiffOut']
+export type SearchHit = Schemas['SearchHitOut']
+export type ImportResult = Schemas['ImportResultOut']
 
 /** One page of a list endpoint: `next_cursor` is null on the last page. */
 export interface Page<T> {

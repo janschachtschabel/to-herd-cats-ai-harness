@@ -23,7 +23,7 @@ describe('shell', () => {
   test('a member sees no administration', async () => {
     mockApi({ 'GET /api/auth/me': makeMe(['space.create']), 'GET /api/spaces': page([]) })
     await renderApp('/spaces')
-    expect(sections()).toEqual(['spaces'])
+    expect(sections()).toEqual(['search', 'spaces'])
     expect(screen.queryByText('Verwaltung')).not.toBeInTheDocument()
   })
 
@@ -38,8 +38,8 @@ describe('shell', () => {
   test('shell hides sections of later milestones', async () => {
     mockApi({ 'GET /api/auth/me': makeMe(ADMIN_PERMISSIONS), 'GET /api/spaces': page([]) })
     await renderApp('/spaces')
-    expect(sections()).toEqual(['spaces', 'admin'])
-    for (const text of ['Aktivität', 'Suche', 'Kanäle', 'Direkt', 'Arbeit']) {
+    expect(sections()).toEqual(['search', 'spaces', 'admin'])
+    for (const text of ['Aktivität', 'Kanäle', 'Direkt', 'Arbeit']) {
       expect(screen.queryByText(text)).not.toBeInTheDocument()
     }
     // The filter, not the absence of renderers, decides: at M4 "work" is in.

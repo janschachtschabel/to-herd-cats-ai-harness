@@ -1,5 +1,17 @@
 import { vi } from 'vitest'
-import type { DirectoryEntry, Me, Page, Permission, Space, User } from '@/lib/api'
+import type {
+  Attachment,
+  DirectoryEntry,
+  Me,
+  Page,
+  Permission,
+  Space,
+  Tag,
+  TreeNode,
+  User,
+  VersionSummary,
+  WikiPage,
+} from '@/lib/api'
 
 export interface Call {
   method: string
@@ -41,7 +53,8 @@ export function mockApi(routes: Record<string, Handler | object>) {
       method: request.method,
       path: url.pathname,
       query: url.searchParams,
-      body: text ? JSON.parse(text) : undefined,
+      // JSON bodies parsed; raw uploads (files, archives) kept as text.
+      body: text && isJson(request) ? JSON.parse(text) : text || undefined,
       headers: request.headers,
     }
     calls.push(call)
@@ -61,6 +74,10 @@ export function mockApi(routes: Record<string, Handler | object>) {
     find: (method: string, path: string) =>
       calls.filter((c) => c.method === method && c.path === path),
   }
+}
+
+function isJson(request: Request): boolean {
+  return (request.headers.get('Content-Type') ?? 'application/json').includes('json')
 }
 
 function isReply(value: unknown): value is Reply {
@@ -138,6 +155,72 @@ export function makeSpace(overrides: Partial<Space> = {}): Space {
     owner_user_id: null,
     version: 1,
     my_role: 'admin',
+    ...overrides,
+  }
+}
+
+export function makePage(overrides: Partial<WikiPage> = {}): WikiPage {
+  const pageId = overrides.id ?? id()
+  return {
+    id: pageId,
+    space_id: 'space-1',
+    parent_id: null,
+    title: 'Handbuch',
+    slug: 'handbuch',
+    path: 'handbuch',
+    status: 'published',
+    sort_order: 0,
+    content_md: '# Handbuch\n\nWillkommen.',
+    tags: [],
+    version: 1,
+    collab_generation: 0,
+    created_at: '2026-11-12T10:00:00Z',
+    updated_at: '2026-11-12T10:00:00Z',
+    published_at: '2026-11-12T10:00:00Z',
+    created_by: { type: 'user', id: 'author' },
+    updated_by: { type: 'user', id: 'author' },
+    ...overrides,
+  }
+}
+
+/** The tree entry of a page. */
+export function nodeOf(page: WikiPage): TreeNode {
+  const { id, parent_id, title, slug, path, status, sort_order, tags } = page
+  return { id, parent_id, title, slug, path, status, sort_order, tags }
+}
+
+export function makeTag(overrides: Partial<Tag> = {}): Tag {
+  return { id: id(), name: 'Anleitung', color: '#2563eb', space_id: null, version: 1, ...overrides }
+}
+
+export function makeAttachment(overrides: Partial<Attachment> = {}): Attachment {
+  const attachmentId = overrides.id ?? id()
+  return {
+    id: attachmentId,
+    page_id: 'page-1',
+    filename: 'plan.pdf',
+    mime: 'application/pdf',
+    size: 2048,
+    sha256: 'a'.repeat(64),
+    url: `/api/attachments/${attachmentId}`,
+    created_at: '2026-11-12T10:00:00Z',
+    uploaded_by: { type: 'user', id: 'author' },
+    ...overrides,
+  }
+}
+
+export function makeVersion(
+  number: number,
+  overrides: Partial<VersionSummary> = {},
+): VersionSummary {
+  return {
+    number,
+    title: 'Handbuch',
+    label: null,
+    change_summary: null,
+    source: 'human',
+    author: { type: 'user', id: 'author', name: 'Lea Löwe' },
+    created_at: '2026-11-12T10:00:00Z',
     ...overrides,
   }
 }

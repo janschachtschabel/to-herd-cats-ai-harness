@@ -1,0 +1,223 @@
+{
+  "search": {
+    "title": "Search",
+    "description": "Searches every page you may read. Arrow keys choose, Enter opens.",
+    "input": "Search term",
+    "placeholder": "Search pages …",
+    "hint": "Type a term to find pages.",
+    "empty": "No results.",
+    "results": "Results",
+    "onlyHere": "Only in this space",
+    "shortcut": "Ctrl K"
+  },
+  "wiki": {
+    "space": { "settings": "Members" },
+    "tree": {
+      "title": "Pages",
+      "empty": "No pages yet.",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    },
+    "home": {
+      "title": "Pages in this space",
+      "empty": "This space has no pages yet.",
+      "emptyCreate": "This space has no pages yet. Create the first one.",
+      "createFirst": "Create the first page",
+      "children_one": "{{count}} subpage",
+      "children_other": "{{count}} subpages"
+    },
+    "fields": { "title": "Title", "parent": "Parent page" },
+    "parent": { "top": "None (top level)" },
+    "create": {
+      "open": "New page",
+      "title": "New page",
+      "description": "The page starts as a draft; once published, every reader of the space sees it.",
+      "submit": "Create"
+    },
+    "page": {
+      "draft": "Draft",
+      "empty": "This page has no content yet.",
+      "notFound": "This page does not exist (any more).",
+      "breadcrumbs": "Page path",
+      "toc": "Contents",
+      "updated": "Last changed {{when}}"
+    },
+    "links": {
+      "missing": "This page does not exist yet.",
+      "create": "create",
+      "createNamed": "Create page “{{title}}”"
+    },
+    "actions": {
+      "edit": "Edit",
+      "live": "Edit together",
+      "publish": "Publish",
+      "more": "More actions",
+      "versions": "Versions",
+      "exportPage": "Download as Markdown",
+      "createChild": "Create subpage",
+      "rename": "Rename",
+      "move": "Move",
+      "tags": "Tags",
+      "trash": "Move to trash"
+    },
+    "conflict": {
+      "reloaded": "Someone changed the page in the meantime. The current version is loaded – check it and try again."
+    },
+    "rename": { "title": "Rename page" },
+    "move": {
+      "title": "Move page",
+      "description": "Where should “{{title}}” go? Subpages move along.",
+      "position": "Position",
+      "first": "At the start",
+      "after": "After “{{title}}”",
+      "submit": "Move"
+    },
+    "tags": {
+      "title": "Page tags",
+      "description": "Tags apply to the whole organisation or only to this space.",
+      "none": "There are no tags yet.",
+      "new": "New tag",
+      "newName": "Name of the new tag",
+      "add": "Add"
+    },
+    "editor": {
+      "title": "Edit page",
+      "markdown": "Markdown",
+      "hint": "Save with Ctrl+S. Links to other pages: [[Title]].",
+      "preview": "Preview",
+      "summary": "What did you change? (optional)",
+      "leaveConfirm": "Your changes are not saved. Leave anyway?",
+      "conflictTitle": "The page was changed in the meantime",
+      "conflictText": "Someone saved the page while you were editing it. Keep your version to put it on top of the current one and save again; discard it to see the current version.",
+      "keepMine": "Keep my version",
+      "discardMine": "Discard my changes",
+      "rebased": "The current version is loaded; your text is kept. Saving overwrites the other person's change."
+    },
+    "versions": {
+      "title": "Versions of “{{title}}”",
+      "caption": "Versions of the page, newest first",
+      "back": "Back to the page",
+      "from": "From",
+      "to": "To",
+      "fromNamed": "Version {{number}} as the base",
+      "toNamed": "Version {{number}} to compare",
+      "version": "Version",
+      "who": "By whom, when",
+      "actions": "Actions",
+      "number": "Version {{number}}",
+      "unknownAuthor": "Unknown",
+      "source": {
+        "human": "Edited",
+        "import": "Imported",
+        "restore": "Restored",
+        "collab": "Live"
+      },
+      "kind": { "insert": "added:", "delete": "removed:", "equal": "" },
+      "pickTwo": "Choose two different versions to compare them.",
+      "diffLabel": "Differences from version {{from}} to version {{to}}",
+      "titleChanged": "Title: “{{from}}” → “{{to}}”",
+      "noChanges": "No difference in the content.",
+      "restore": "Restore",
+      "restoreNamed": "Restore version {{number}}",
+      "restoreTitle": "Restore this version?",
+      "restoreText": "The content of version {{number}} is saved as a new version. A live editing session on the page ends.",
+      "label": "Name",
+      "labelHint": "Leave empty to remove the name.",
+      "labelNamed": "Name version {{number}}",
+      "labelTitle": "Name version {{number}}"
+    },
+    "trash": {
+      "open": "Trash",
+      "title": "Trash",
+      "description": "Pages in the trash are hidden from everyone until they are restored.",
+      "empty": "The trash is empty.",
+      "trashedAt": "deleted {{when}}",
+      "restore": "Restore",
+      "restoreNamed": "Restore “{{title}}”",
+      "purge": "Delete for good",
+      "purgeNamed": "Delete “{{title}}” for good",
+      "purgeTitle": "Delete for good?",
+      "purgeText": "“{{title}}” is deleted with all subpages, versions and attachments. This cannot be undone.",
+      "confirmTitle": "Move to the trash?",
+      "confirmText": "“{{title}}” and all its subpages go to the trash. Moderators can restore them."
+    },
+    "attachments": {
+      "title": "Attachments",
+      "empty": "No attachments.",
+      "upload": "Upload file",
+      "uploading": "Uploading …",
+      "copyNamed": "Copy Markdown for {{name}}",
+      "copied": "Copied",
+      "deleteNamed": "Delete {{name}}",
+      "deleteTitle": "Delete the attachment?",
+      "deleteText": "“{{name}}” is deleted. Links to it stop working."
+    },
+    "transfer": {
+      "menu": "Import/Export",
+      "export": "Export space (ZIP)",
+      "import": "Import Markdown …",
+      "importTitle": "Import Markdown",
+      "importDescription": "A ZIP of Markdown files (folders become subpages, attachments under _attachments/). Existing pages stay unchanged.",
+      "file": "ZIP file",
+      "importSubmit": "Import",
+      "importing": "Importing …",
+      "created_one": "{{count}} page created.",
+      "created_other": "{{count}} pages created.",
+      "attachments_one": "{{count}} attachment taken over.",
+      "attachments_other": "{{count}} attachments taken over.",
+      "skipped_one": "{{count}} entry skipped:",
+      "skipped_other": "{{count}} entries skipped:",
+      "reasons": {
+        "unsafe_path": "unsafe path",
+        "not_markdown": "not a Markdown file",
+        "exists": "page exists already",
+        "duplicate": "twice in the archive",
+        "too_deep": "nested too deeply",
+        "too_large": "too large",
+        "invalid_text": "not valid UTF-8 text",
+        "unreadable": "unreadable",
+        "no_page": "no matching page",
+        "type_not_allowed": "file type not allowed",
+        "type_mismatch": "extension does not match the content",
+        "filename_invalid": "invalid file name",
+        "invalid_manifest": "invalid attachment list"
+      }
+    }
+  },
+  "errors": {
+    "tooLarge": "That is too large.",
+    "unsupportedType": "This kind of file is not accepted.",
+    "request": { "too_large": "That is too large for one request." },
+    "page": {
+      "not_found": "This page does not exist (any more).",
+      "version_conflict": "Someone changed the page in the meantime.",
+      "already_published": "The page is already published.",
+      "parent_draft": "The parent page is still a draft. Publish it first.",
+      "parent_not_found": "The parent page does not exist (any more).",
+      "too_deep": "Pages cannot be nested this deeply.",
+      "move_other_space": "Pages cannot move to another space.",
+      "move_cycle": "A page cannot move below itself or its subpages.",
+      "path_taken": "There already is a page of this name there.",
+      "not_trashed": "The page is not in the trash.",
+      "version_not_found": "This version does not exist.",
+      "diff_too_large": "The versions are too long to compare."
+    },
+    "tags": {
+      "not_found": "This tag does not exist.",
+      "name_taken": "A tag of this name exists already.",
+      "version_conflict": "Someone changed this tag in the meantime.",
+      "wrong_space": "This tag belongs to another space."
+    },
+    "attachment": {
+      "not_found": "This attachment does not exist (any more).",
+      "too_large": "The file is too large.",
+      "type_not_allowed": "This kind of file is not allowed as an attachment.",
+      "type_mismatch": "The file extension does not match the file's content.",
+      "filename_invalid": "The file name is invalid."
+    },
+    "import": {
+      "too_large": "The archive is too large or holds too many files.",
+      "invalid_zip": "This is not a valid ZIP file."
+    }
+  }
+}

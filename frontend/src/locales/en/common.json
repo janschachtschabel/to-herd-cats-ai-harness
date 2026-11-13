@@ -189,7 +189,8 @@
     },
     "settings": {
       "open": "Settings",
-      "title": "Space settings"
+      "title": "Space settings",
+      "page": "Members and settings"
     },
     "members": {
       "title": "Members",

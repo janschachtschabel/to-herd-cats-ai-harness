@@ -1,11 +1,23 @@
 import { cleanup, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import i18n, { setLocale, type Locale } from '@/lib/i18n'
-import { ADMIN_PERMISSIONS, makeMe, makeSpace, makeUser, mockApi, page } from '@/test/api'
+import {
+  ADMIN_PERMISSIONS,
+  makeAttachment,
+  makeMe,
+  makePage,
+  makeSpace,
+  makeTag,
+  makeUser,
+  makeVersion,
+  mockApi,
+  nodeOf,
+  page,
+} from '@/test/api'
 import { renderApp } from '@/test/render'
 
 const KEY_LIKE =
-  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|profile|roles|systemRoles|principals|spaces|users|groups|audit)\.[\w.]+/
+  /\b(app|common|actions|states|forms|validation|errors|notFound|auth|nav|userMenu|profile|roles|systemRoles|principals|spaces|users|groups|audit|wiki|search)\.[\w.]+/
 
 /** What a person reads, text node by text node, and the accessible labels; scripts
  *  (next-themes injects one) left out. */
@@ -25,6 +37,14 @@ function visibleTexts(): string[] {
 const me = makeMe(ADMIN_PERMISSIONS)
 const team = makeSpace({ name: 'Team Dienste' })
 const group = { id: 'g1', name: 'Redaktion', description: null, version: 1 }
+const tag = makeTag()
+const handbook = makePage({
+  space_id: team.id,
+  status: 'draft',
+  tags: [tag.id],
+  created_by: { type: 'user', id: me.user.id },
+  content_md: '# Handbuch\n\n## Urlaub\n\nSiehe [[Fehlt]].',
+})
 
 function api(locale: Locale) {
   mockApi({
@@ -40,6 +60,25 @@ function api(locale: Locale) {
       { member_type: 'user', member_id: me.user.id, role: 'admin', name: 'Mia Muster' },
       { member_type: 'group', member_id: 'g1', role: 'editor', name: 'Redaktion' },
     ]),
+    'GET /api/spaces/:id/pages/tree': page([nodeOf(handbook)]),
+    'GET /api/spaces/:id/pages/by-path': handbook,
+    'GET /api/spaces/:id/trash': page([
+      { ...nodeOf(makePage({ title: 'Alt' })), trashed_at: '2026-11-12T11:00:00Z' },
+    ]),
+    'GET /api/tags': page([tag]),
+    'GET /api/pages/:id/attachments': page([makeAttachment()]),
+    'GET /api/pages/:id/versions': page([makeVersion(2, { source: 'collab' }), makeVersion(1)]),
+    'GET /api/pages/:id/diff': {
+      from_number: 1,
+      to_number: 2,
+      from_title: 'Handbuch',
+      to_title: 'Handbuch',
+      title_changed: false,
+      hunks: [
+        { kind: 'equal', lines: ['# Handbuch'] },
+        { kind: 'insert', lines: ['neu'] },
+      ],
+    },
     'GET /api/admin/users': page([makeUser(), makeUser({ is_active: false, name: 'Jan' })]),
     'GET /api/admin/groups': page([group]),
     'GET /api/admin/groups/:id': group,
@@ -66,6 +105,11 @@ function api(locale: Locale) {
 const PAGES = [
   '/spaces',
   `/spaces/${team.id}`,
+  `/spaces/${team.id}/settings`,
+  `/spaces/${team.id}/trash`,
+  `/spaces/${team.id}/p/handbuch`,
+  `/spaces/${team.id}/p/handbuch?view=versions`,
+  `/spaces/${team.id}/p/handbuch?view=edit`,
   '/admin/users',
   '/admin/groups',
   '/admin/groups/g1',

@@ -8,6 +8,8 @@ export function errorMessage(t: TFunction, error: unknown): string {
     if (own) return own
     if (error.status === 403) return t('errors.forbidden')
     if (error.status === 404) return t('errors.notFound')
+    if (error.status === 413) return t('errors.tooLarge')
+    if (error.status === 415) return t('errors.unsupportedType')
     return t('errors.generic')
   }
   return t('errors.network')

@@ -189,7 +189,8 @@
     },
     "settings": {
       "open": "Einstellungen",
-      "title": "Einstellungen des Bereichs"
+      "title": "Einstellungen des Bereichs",
+      "page": "Mitglieder und Einstellungen"
     },
     "members": {
       "title": "Mitglieder",

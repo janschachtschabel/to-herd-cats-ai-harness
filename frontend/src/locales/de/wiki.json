@@ -1,0 +1,223 @@
+{
+  "search": {
+    "title": "Suche",
+    "description": "Durchsucht alle Seiten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",
+    "input": "Suchbegriff",
+    "placeholder": "Seiten durchsuchen …",
+    "hint": "Gib einen Begriff ein, um Seiten zu finden.",
+    "empty": "Keine Treffer.",
+    "results": "Treffer",
+    "onlyHere": "Nur in diesem Bereich",
+    "shortcut": "Strg K"
+  },
+  "wiki": {
+    "space": { "settings": "Mitglieder" },
+    "tree": {
+      "title": "Seiten",
+      "empty": "Noch keine Seiten.",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen"
+    },
+    "home": {
+      "title": "Seiten in diesem Bereich",
+      "empty": "In diesem Bereich gibt es noch keine Seiten.",
+      "emptyCreate": "In diesem Bereich gibt es noch keine Seiten. Lege die erste an.",
+      "createFirst": "Erste Seite anlegen",
+      "children_one": "{{count}} Unterseite",
+      "children_other": "{{count}} Unterseiten"
+    },
+    "fields": { "title": "Titel", "parent": "Übergeordnete Seite" },
+    "parent": { "top": "Keine (oberste Ebene)" },
+    "create": {
+      "open": "Neue Seite",
+      "title": "Neue Seite",
+      "description": "Die Seite beginnt als Entwurf; veröffentlicht sehen sie alle Leser des Bereichs.",
+      "submit": "Anlegen"
+    },
+    "page": {
+      "draft": "Entwurf",
+      "empty": "Diese Seite hat noch keinen Inhalt.",
+      "notFound": "Diese Seite gibt es nicht (mehr).",
+      "breadcrumbs": "Seitenpfad",
+      "toc": "Inhalt",
+      "updated": "Zuletzt geändert {{when}}"
+    },
+    "links": {
+      "missing": "Diese Seite gibt es noch nicht.",
+      "create": "anlegen",
+      "createNamed": "Seite „{{title}}“ anlegen"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "live": "Gemeinsam bearbeiten",
+      "publish": "Veröffentlichen",
+      "more": "Weitere Aktionen",
+      "versions": "Versionen",
+      "exportPage": "Als Markdown herunterladen",
+      "createChild": "Unterseite anlegen",
+      "rename": "Umbenennen",
+      "move": "Verschieben",
+      "tags": "Tags",
+      "trash": "In den Papierkorb"
+    },
+    "conflict": {
+      "reloaded": "Jemand hat die Seite inzwischen geändert. Die aktuelle Fassung ist geladen – prüfe sie und versuche es erneut."
+    },
+    "rename": { "title": "Seite umbenennen" },
+    "move": {
+      "title": "Seite verschieben",
+      "description": "Wohin soll „{{title}}“? Unterseiten wandern mit.",
+      "position": "Stelle",
+      "first": "An den Anfang",
+      "after": "Nach „{{title}}“",
+      "submit": "Verschieben"
+    },
+    "tags": {
+      "title": "Tags der Seite",
+      "description": "Tags gelten für die ganze Organisation oder nur für diesen Bereich.",
+      "none": "Es gibt noch keine Tags.",
+      "new": "Neuer Tag",
+      "newName": "Name des neuen Tags",
+      "add": "Hinzufügen"
+    },
+    "editor": {
+      "title": "Seite bearbeiten",
+      "markdown": "Markdown",
+      "hint": "Speichern mit Strg+S. Links auf andere Seiten: [[Titel]].",
+      "preview": "Vorschau",
+      "summary": "Was hast du geändert? (optional)",
+      "leaveConfirm": "Deine Änderungen sind nicht gespeichert. Trotzdem verlassen?",
+      "conflictTitle": "Die Seite wurde inzwischen geändert",
+      "conflictText": "Jemand hat die Seite gespeichert, während du sie bearbeitet hast. Behältst du deine Fassung, wird sie auf den aktuellen Stand gesetzt und du kannst erneut speichern; verwirfst du sie, siehst du die aktuelle Fassung.",
+      "keepMine": "Meine Fassung behalten",
+      "discardMine": "Meine Änderungen verwerfen",
+      "rebased": "Die aktuelle Fassung ist geladen; dein Text ist erhalten. Speichern überschreibt die Änderung der anderen Person."
+    },
+    "versions": {
+      "title": "Versionen von „{{title}}“",
+      "caption": "Versionen der Seite, neueste zuerst",
+      "back": "Zur Seite",
+      "from": "Von",
+      "to": "Bis",
+      "fromNamed": "Version {{number}} als Ausgangsstand",
+      "toNamed": "Version {{number}} als Vergleichsstand",
+      "version": "Version",
+      "who": "Von wem, wann",
+      "actions": "Aktionen",
+      "number": "Version {{number}}",
+      "unknownAuthor": "Unbekannt",
+      "source": {
+        "human": "Bearbeitet",
+        "import": "Importiert",
+        "restore": "Wiederhergestellt",
+        "collab": "Live"
+      },
+      "kind": { "insert": "hinzugefügt:", "delete": "entfernt:", "equal": "" },
+      "pickTwo": "Wähle zwei verschiedene Versionen, um sie zu vergleichen.",
+      "diffLabel": "Unterschiede von Version {{from}} zu Version {{to}}",
+      "titleChanged": "Titel: „{{from}}“ → „{{to}}“",
+      "noChanges": "Kein Unterschied im Inhalt.",
+      "restore": "Wiederherstellen",
+      "restoreNamed": "Version {{number}} wiederherstellen",
+      "restoreTitle": "Version wiederherstellen?",
+      "restoreText": "Der Inhalt von Version {{number}} wird als neue Version gespeichert. Eine laufende Live-Bearbeitung endet dabei.",
+      "label": "Name",
+      "labelHint": "Leer lassen, um den Namen zu entfernen.",
+      "labelNamed": "Version {{number}} benennen",
+      "labelTitle": "Version {{number}} benennen"
+    },
+    "trash": {
+      "open": "Papierkorb",
+      "title": "Papierkorb",
+      "description": "Seiten im Papierkorb sind für niemanden sichtbar, bis sie wiederhergestellt werden.",
+      "empty": "Der Papierkorb ist leer.",
+      "trashedAt": "gelöscht {{when}}",
+      "restore": "Wiederherstellen",
+      "restoreNamed": "„{{title}}“ wiederherstellen",
+      "purge": "Endgültig löschen",
+      "purgeNamed": "„{{title}}“ endgültig löschen",
+      "purgeTitle": "Endgültig löschen?",
+      "purgeText": "„{{title}}“ wird mit allen Unterseiten, Versionen und Anhängen gelöscht. Das lässt sich nicht rückgängig machen.",
+      "confirmTitle": "In den Papierkorb legen?",
+      "confirmText": "„{{title}}“ und alle Unterseiten kommen in den Papierkorb. Moderatoren können sie wiederherstellen."
+    },
+    "attachments": {
+      "title": "Anhänge",
+      "empty": "Keine Anhänge.",
+      "upload": "Datei hochladen",
+      "uploading": "Lädt hoch …",
+      "copyNamed": "Markdown für {{name}} kopieren",
+      "copied": "Kopiert",
+      "deleteNamed": "{{name}} löschen",
+      "deleteTitle": "Anhang löschen?",
+      "deleteText": "„{{name}}“ wird gelöscht. Links darauf funktionieren dann nicht mehr."
+    },
+    "transfer": {
+      "menu": "Import/Export",
+      "export": "Bereich exportieren (ZIP)",
+      "import": "Markdown importieren …",
+      "importTitle": "Markdown importieren",
+      "importDescription": "Ein ZIP mit Markdown-Dateien (Ordner werden zu Unterseiten, Anhänge unter _attachments/). Vorhandene Seiten bleiben unverändert.",
+      "file": "ZIP-Datei",
+      "importSubmit": "Importieren",
+      "importing": "Importiert …",
+      "created_one": "{{count}} Seite angelegt.",
+      "created_other": "{{count}} Seiten angelegt.",
+      "attachments_one": "{{count}} Anhang übernommen.",
+      "attachments_other": "{{count}} Anhänge übernommen.",
+      "skipped_one": "{{count}} Eintrag übersprungen:",
+      "skipped_other": "{{count}} Einträge übersprungen:",
+      "reasons": {
+        "unsafe_path": "unsicherer Pfad",
+        "not_markdown": "keine Markdown-Datei",
+        "exists": "Seite gibt es schon",
+        "duplicate": "doppelt im Archiv",
+        "too_deep": "zu tief verschachtelt",
+        "too_large": "zu groß",
+        "invalid_text": "kein gültiger UTF-8-Text",
+        "unreadable": "nicht lesbar",
+        "no_page": "keine passende Seite",
+        "type_not_allowed": "Dateityp nicht erlaubt",
+        "type_mismatch": "Endung passt nicht zum Inhalt",
+        "filename_invalid": "ungültiger Dateiname",
+        "invalid_manifest": "Verzeichnis der Anhänge ungültig"
+      }
+    }
+  },
+  "errors": {
+    "tooLarge": "Das ist zu groß.",
+    "unsupportedType": "Diese Art von Datei wird nicht angenommen.",
+    "request": { "too_large": "Das ist zu groß für eine Anfrage." },
+    "page": {
+      "not_found": "Diese Seite gibt es nicht (mehr).",
+      "version_conflict": "Jemand hat die Seite inzwischen geändert.",
+      "already_published": "Die Seite ist schon veröffentlicht.",
+      "parent_draft": "Die übergeordnete Seite ist noch ein Entwurf. Veröffentliche zuerst sie.",
+      "parent_not_found": "Die übergeordnete Seite gibt es nicht (mehr).",
+      "too_deep": "So tief lassen sich Seiten nicht verschachteln.",
+      "move_other_space": "Seiten lassen sich nicht in einen anderen Bereich verschieben.",
+      "move_cycle": "Eine Seite lässt sich nicht unter sich selbst oder ihre Unterseiten verschieben.",
+      "path_taken": "Dort gibt es schon eine Seite mit diesem Namen.",
+      "not_trashed": "Die Seite ist nicht im Papierkorb.",
+      "version_not_found": "Diese Version gibt es nicht.",
+      "diff_too_large": "Die Versionen sind zu lang für einen Vergleich."
+    },
+    "tags": {
+      "not_found": "Diesen Tag gibt es nicht.",
+      "name_taken": "Einen Tag mit diesem Namen gibt es schon.",
+      "version_conflict": "Jemand hat diesen Tag inzwischen geändert.",
+      "wrong_space": "Dieser Tag gehört zu einem anderen Bereich."
+    },
+    "attachment": {
+      "not_found": "Diesen Anhang gibt es nicht (mehr).",
+      "too_large": "Die Datei ist zu groß.",
+      "type_not_allowed": "Diese Art von Datei ist als Anhang nicht erlaubt.",
+      "type_mismatch": "Die Dateiendung passt nicht zum Inhalt der Datei.",
+      "filename_invalid": "Der Dateiname ist ungültig."
+    },
+    "import": {
+      "too_large": "Das Archiv ist zu groß oder enthält zu viele Dateien.",
+      "invalid_zip": "Das ist keine gültige ZIP-Datei."
+    }
+  }
+}

@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router'
-import { History, Shield, UserRound, UsersRound } from 'lucide-react'
+import { History, Search, Shield, UserRound, UsersRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '@/features/auth/queries'
+import { useOpenSearch } from '@/features/search/SearchContext'
 import { navLinkActive, navLinkClass } from './navStyles'
 import { adminLinks, visibleSections, type AdminLink, type SectionId } from './nav'
 import { SidebarSpaces } from './SidebarSpaces'
@@ -63,8 +64,25 @@ function SpacesSection() {
   )
 }
 
+function SearchSection() {
+  const { t } = useTranslation()
+  const openSearch = useOpenSearch()
+  return (
+    <div className="pt-3">
+      <button type="button" className={navLinkClass + ' w-full'} onClick={openSearch}>
+        <Search className="size-4 shrink-0" aria-hidden />
+        <span className="flex-1 text-left">{t('nav.search')}</span>
+        <kbd className="rounded border border-sidebar-border px-1 text-[10px] text-sidebar-muted-foreground">
+          {t('search.shortcut')}
+        </kbd>
+      </button>
+    </div>
+  )
+}
+
 // Sections of later milestones get their renderer when they arrive.
 const SECTIONS: Partial<Record<SectionId, () => ReactNode>> = {
+  search: SearchSection,
   spaces: SpacesSection,
   admin: AdminSection,
 }
