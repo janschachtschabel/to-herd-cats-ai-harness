@@ -6,6 +6,16 @@ export interface CardData {
   ticket: TicketSummary
 }
 
+/** Where the focus goes once a card moved by keyboard or menu shows in its column
+ *  (the card is drawn anew there): its grip or its menu button. */
+export interface CardFocus {
+  ticketId: string
+  statusId: string
+  on: 'grip' | 'menu'
+}
+
+export type MoveCard = (ticket: TicketSummary, statusId: string, on?: CardFocus['on']) => void
+
 /** A finished drag as a move: the card and the column (status) it was dropped on;
  *  null where it went nowhere or stayed in its column. */
 export function dropTarget(

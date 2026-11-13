@@ -13,13 +13,13 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ErrorState, LoadingState } from '@/features/shared/states'
 import { useWiki } from '@/features/wiki/WikiContext'
-import { ApiError, type TicketSummary } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { ticketAbilities } from '../abilities'
 import { CreateTicketDialog } from '../CreateTicketDialog'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilterBar } from './BoardFilterBar'
-import { columnCoordinates, dropTarget, type CardData } from './dnd'
+import { type CardData, type CardFocus, columnCoordinates, dropTarget, type MoveCard } from './dnd'
 import { type BoardFilters, useBoard, useMoveTicket } from './queries'
 
 /** A space's board (`/spaces/<id>/board`): its statuses as columns in their order.
@@ -37,12 +37,22 @@ export function BoardView() {
     useSensor(KeyboardSensor, { coordinateGetter: columnCoordinates }),
   )
 
-  const onMove = (ticket: TicketSummary, statusId: string) => {
-    if (statusId !== ticket.status.id) move.mutate({ ticket, statusId })
+  const [focus, setFocus] = useState<CardFocus | null>(null)
+
+  // One way for dragging and the menu. Moved by keyboard or menu, the card takes the
+  // focus along to its new column (and back, if the move is refused).
+  const onMove: MoveCard = (ticket, statusId, on) => {
+    if (statusId === ticket.status.id) return
+    if (on) setFocus({ ticketId: ticket.id, statusId, on })
+    move.mutate(
+      { ticket, statusId },
+      { onError: () => on && setFocus({ ticketId: ticket.id, statusId: ticket.status.id, on }) },
+    )
   }
   const onDragEnd = (event: DragEndEvent) => {
     const target = dropTarget(event)
-    if (target) onMove(target.ticket, target.statusId)
+    const keyboard = event.activatorEvent instanceof KeyboardEvent
+    if (target) onMove(target.ticket, target.statusId, keyboard ? 'grip' : undefined)
   }
 
   const nameOf = (id: string | number | undefined) =>
@@ -113,6 +123,8 @@ export function BoardView() {
                 filters={filters}
                 movable={abilities.edit}
                 onMove={onMove}
+                focus={focus}
+                onFocused={() => setFocus(null)}
               />
             ))}
           </div>

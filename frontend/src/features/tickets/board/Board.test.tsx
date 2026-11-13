@@ -79,6 +79,12 @@ describe('board', () => {
       expect(within(column('Zur Prüfung')).getByRole('link', { name: /HC-42/ })).toBeVisible(),
     )
     expect(within(column('Neu')).queryByRole('link', { name: /HC-42/ })).toBeNull()
+    // The card moved to another column: the focus goes with it, back to its menu button.
+    await waitFor(() =>
+      expect(
+        within(column('Zur Prüfung')).getByRole('button', { name: 'Status von HC-42 ändern' }),
+      ).toHaveFocus(),
+    )
     const sent = api.find('PATCH', '/api/tickets/42')[0]!
     expect(sent.body).toEqual({ status_id: STATUSES[2]!.id, version: 3 })
   })

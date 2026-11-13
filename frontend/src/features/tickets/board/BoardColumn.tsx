@@ -2,10 +2,11 @@ import { useDroppable } from '@dnd-kit/core'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import type { BoardColumn as Column, Schemas, TicketSummary } from '@/lib/api'
+import type { BoardColumn as Column, Schemas } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { CATEGORY_DOT } from '../display'
 import { BoardCard } from './BoardCard'
+import type { CardFocus, MoveCard } from './dnd'
 import { type BoardFilters, useColumnMore } from './queries'
 
 /** A status as a column: its name and how many tickets it holds, its cards in the fixed
@@ -17,13 +18,17 @@ export function BoardColumn({
   filters,
   movable,
   onMove,
+  focus,
+  onFocused,
 }: {
   spaceId: string
   column: Column
   statuses: Schemas['StatusRef'][]
   filters: BoardFilters
   movable: boolean
-  onMove: (ticket: TicketSummary, statusId: string) => void
+  onMove: MoveCard
+  focus: CardFocus | null
+  onFocused: () => void
 }) {
   const { t } = useTranslation()
   const { setNodeRef, isOver } = useDroppable({ id: column.status.id })
@@ -55,7 +60,18 @@ export function BoardColumn({
       <ul className="flex min-h-16 flex-col gap-2">
         {cards.map((ticket) => (
           <li key={ticket.id}>
-            <BoardCard ticket={ticket} statuses={statuses} movable={movable} onMove={onMove} />
+            <BoardCard
+              ticket={ticket}
+              statuses={statuses}
+              movable={movable}
+              onMove={onMove}
+              focus={
+                focus?.ticketId === ticket.id && focus.statusId === ticket.status.id
+                  ? focus.on
+                  : undefined
+              }
+              onFocused={onFocused}
+            />
           </li>
         ))}
         {cards.length === 0 && (
