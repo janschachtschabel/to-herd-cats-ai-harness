@@ -35,17 +35,23 @@ test('pasted images keep only sources the page view shows', () => {
   expect(images(e)).toEqual(['https://example.com/a.png', '/bilder/b.png'])
 })
 
-/** Input rules run on the next turn of the event loop after `insertContent`. */
-const typed = async (e: Editor, text: string) => {
-  e.commands.insertContent(text, { applyInputRules: true })
-  await new Promise((resolve) => setTimeout(resolve, 0))
+/** Typing as the view does: the text, then its last character through the view's text
+ *  input handler, where input rules run (as when a person types the closing `)`). */
+function typed(e: Editor, text: string) {
+  e.commands.insertContent(text.slice(0, -1))
+  const { from, to } = e.state.selection
+  const last = text.slice(-1)
+  const handled = e.view.someProp('handleTextInput', (handle) =>
+    handle(e.view, from, to, last, () => e.state.tr.insertText(last, from, to)),
+  )
+  if (!handled) e.view.dispatch(e.state.tr.insertText(last, from, to))
 }
 
-test('a typed image with a source the page view does not show stays text', async () => {
+test('a typed image with a source the page view does not show stays text', () => {
   const e = fresh()
-  await typed(e, '![bild](file:///tmp/x.png)')
+  typed(e, '![bild](file:///tmp/x.png)')
   expect(images(e)).toEqual([])
   expect(e.getText()).toBe('![bild](file:///tmp/x.png)')
-  await typed(e, ' ![bild](/x.png)')
+  typed(e, ' ![bild](/x.png)')
   expect(images(e)).toEqual(['/x.png'])
 })
