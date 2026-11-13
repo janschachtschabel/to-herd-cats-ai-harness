@@ -159,7 +159,10 @@ class SpaceService:
             if (user := await self.users.get(org_id, principal.id)) is None:
                 raise NotFound(code="users.not_found")
             return user.name
-        if (group := await self.groups.get(org_id, principal.id)) is None:
+        # Under the groups lock: a deletion running now finishes first (and then the
+        # group is gone), or waits until this membership is committed and deletes it.
+        await self.groups.lock_writes(org_id)
+        if (group := await self.groups.get_current(org_id, principal.id)) is None:
             raise NotFound(code="groups.not_found")
         return group.name
 
