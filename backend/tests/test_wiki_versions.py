@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import actor_for
+from app.core.config import Settings, get_settings
 from app.modules.audit.models import AuditLog
 from app.modules.auth.context import AuthContext
 from app.modules.users.models import User
@@ -238,3 +239,17 @@ async def test_coalesce_does_not_merge_different_authors_or_sessions(
     assert current is not None
     await service.update(actor, current.id, content_md="f", version=current.version)
     assert (await _versions(wiki.editor, page))["items"][0]["number"] == 7
+
+
+def test_the_diff_limit_defaults_to_20000_lines() -> None:
+    assert Settings().diff_max_lines == 20_000
+
+
+async def test_diff_over_the_line_limit_is_422(wiki: Wiki, monkeypatch) -> None:
+    monkeypatch.setattr(get_settings(), "diff_max_lines", 6)
+    page = await new_page(wiki.editor, wiki.space_id, "Lang", content_md="a\nb\nc")
+    page = await _patch(wiki.editor, page, content_md="a\nb\nc\nd")
+    diff = f"/api/pages/{page['id']}/diff"
+    assert (await wiki.editor.get(diff, params={"from": 1, "to": 1})).status_code == 200
+    r = await wiki.editor.get(diff, params={"from": 1, "to": 2})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "page.diff_too_large"

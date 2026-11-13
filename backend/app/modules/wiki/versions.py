@@ -2,7 +2,8 @@
 older state back as a new version and ends live sessions; labels name a version.
 
 Reading versions needs what reading the page needs (drafts: `page.edit`); labelling
-and restoring need `page.edit`.
+and restoring need `page.edit`. A diff compares at most `HERD_DIFF_MAX_LINES` lines
+(both versions together; its cost grows with them): more is 422 `page.diff_too_large`.
 """
 
 import asyncio
@@ -13,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
 from app.core.access import Action, Actor
-from app.core.errors import NotFound
+from app.core.config import get_settings
+from app.core.errors import NotFound, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
@@ -110,6 +112,8 @@ class VersionService:
         if old is None or new is None:
             raise _not_found()
         a, b = old.version, new.version
+        if _lines(a.content_md) + _lines(b.content_md) > get_settings().diff_max_lines:
+            raise ValidationFailed(code="page.diff_too_large")
         return await asyncio.to_thread(diffing.diff, a.title, a.content_md, b.title, b.content_md)
 
     async def restore(self, actor: Actor, page_id: uuid.UUID, number: int, version: int) -> Page:
@@ -129,6 +133,10 @@ class VersionService:
         details = {"number": number}
         await record(self.session, actor, "page.version_restored", "page", page.id, details)
         return page
+
+
+def _lines(text: str) -> int:
+    return text.count("\n") + 1
 
 
 def _folds_into(

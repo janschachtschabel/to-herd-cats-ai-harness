@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     password_hash_queue: int = Field(default=16, ge=0)
     # Largest request body accepted (bytes); larger ones are answered 413.
     max_body_bytes: int = Field(default=1024 * 1024, ge=1)
+    # Most lines (both versions together) a page diff compares; more is answered 422.
+    diff_max_lines: int = Field(default=20_000, ge=1)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

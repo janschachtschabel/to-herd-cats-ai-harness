@@ -165,6 +165,10 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   beim Lesen ab dem ersten Teil über der Grenze. Ein Ingress davor darf größer oder
   gleich eingestellt sein (ingress-nginx: `proxy-body-size`, Standard 1m); im Chart über
   `api.env` setzbar.
+- **Wiki-Diff**: Ein Vergleich zweier Seitenversionen vergleicht höchstens
+  `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
+  antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den
+  Zeilen und läuft in einem Worker-Thread.
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
   30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
   `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche; es zählen
