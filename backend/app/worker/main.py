@@ -1,25 +1,31 @@
-"""The worker: the outbox dispatcher in a loop, driven like the uvicorn servers by the
+"""The worker: the outbox dispatcher in loops, driven like the uvicorn servers by the
 launcher (`serve`, `should_exit`).
 
-It wakes on `NOTIFY herd_outbox` (sent when a transaction with events commits) and
-otherwise every POLL_SECONDS, which also picks up retries that have come due. Setting
-`should_exit` (SIGTERM) lets the batch in progress finish, then the loop ends.
+One loop routes new events into lanes (`Dispatcher.route`) and keeps the table clean;
+every handler has a loop of its own that works off its lane (`dispatch_lane`), so the
+handlers never wait for each other (review M4 P3). The router wakes on
+`NOTIFY herd_outbox` (sent when a transaction with events commits) and otherwise
+every POLL_SECONDS; it wakes the lanes it routed events into, and each lane also
+looks every POLL_SECONDS (for retries that have come due). Setting `should_exit`
+(SIGTERM) lets the batches in progress finish, then the loops end.
 
-`ready` is what the internal `/ready` reports for the worker: the loop runs, its last
-pass reached the database, and it finished a batch (or found nothing due) within
-STALL_FACTOR handler time limits; a worker stuck longer turns not ready. That moment
-is also the gauge `herd_worker_last_pass_timestamp_seconds` (alert HerdWorkerStalled).
-The backlog gauges are read from the database every METRICS_SECONDS by a task of
-their own, so they stay current while a pass hangs.
+`ready` is what the internal `/ready` reports for the worker: the loops run, the last
+pass of each reached the database, and each finished a batch (or found nothing due)
+within STALL_FACTOR handler time limits; a loop stuck longer turns the worker not
+ready. The oldest of those moments is also the gauge
+`herd_worker_last_pass_timestamp_seconds` (alert HerdWorkerStalled). The backlog
+gauges are read from the database every METRICS_SECONDS by a task of their own, so
+they stay current while a pass hangs.
 
-Several workers (replicas, or `all` next to a worker) are safe: they claim disjoint
-batches. The worker needs up to three database connections at a time (the batch, one
-handler's transaction and the metrics query).
+Several workers (replicas, or `all` next to a worker) are safe: they route and claim
+disjoint rows. The worker needs up to one database connection per handler, one for
+routing and one for the metrics query at a time.
 """
 
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
 import app.worker.handlers  # noqa: F401 -- registers every module's handlers
@@ -29,6 +35,7 @@ from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL
 from app.worker.dispatcher import Dispatcher
 from app.worker.metrics import worker_metrics
+from app.worker.registry import Handler
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +43,17 @@ POLL_SECONDS = 2.0
 MAX_ERROR_WAIT_SECONDS = 30.0
 METRICS_SECONDS = 10.0
 STALL_FACTOR = 4  # not ready after this many handler time limits without progress
+ROUTER = "route"  # the routing loop's name (handlers have theirs)
+
+
+class _Loop:
+    """One loop's state: woken by `wake`, last progress (monotonic and wall clock)."""
+
+    def __init__(self) -> None:
+        self.wake = asyncio.Event()
+        self.reached_database = False
+        self.progress_at: float | None = None
+        self.progress_wall = 0.0
 
 
 class Worker:
@@ -43,10 +61,8 @@ class Worker:
         self.dispatcher = dispatcher
         self.metrics = worker_metrics()  # only processes with a worker export these
         self._running = False
-        self._reached_database = False
-        self._progress_at: float | None = None  # time.monotonic() of the last progress
         self._stop = asyncio.Event()
-        self._wake = asyncio.Event()
+        self._loops = {ROUTER: _Loop()} | {h.name: _Loop() for h in dispatcher.handlers}
 
     @property
     def stall_seconds(self) -> float:
@@ -54,11 +70,12 @@ class Worker:
 
     @property
     def ready(self) -> bool:
-        return (
-            self._running
-            and self._reached_database
-            and self._progress_at is not None
-            and time.monotonic() - self._progress_at <= self.stall_seconds
+        now = time.monotonic()
+        return self._running and all(
+            loop.reached_database
+            and loop.progress_at is not None
+            and now - loop.progress_at <= self.stall_seconds
+            for loop in self._loops.values()
         )
 
     @property
@@ -69,58 +86,84 @@ class Worker:
     def should_exit(self, value: bool) -> None:
         if value:
             self._stop.set()
-            self._wake.set()
+            for loop in self._loops.values():
+                loop.wake.set()
 
     async def serve(self) -> None:
+        router = self._loops[ROUTER]
         listener = Listener(
             self.dispatcher.database.engine.url,
             OUTBOX_CHANNEL,
-            on_notify=lambda _payload: self._wake.set(),
-            on_connect=self._wake.set,  # catch up on what was missed while away
+            on_notify=lambda _payload: router.wake.set(),
+            on_connect=router.wake.set,  # catch up on what was missed while away
         )
         listening = asyncio.create_task(listener.run(self._stop))
         metering = asyncio.create_task(self._metrics_loop())
+        loops = [asyncio.create_task(self._loop(ROUTER, self._route_pass))]
+        for handler in self.dispatcher.handlers:
+            loops.append(asyncio.create_task(self._loop(handler.name, self._lane_pass(handler))))
         self._running = True
         try:
-            await self._loop()
+            await asyncio.gather(*loops)
         finally:
             self._running = False
             self._stop.set()
             metering.cancel()
-            with suppress(asyncio.CancelledError):
-                await listening
-            with suppress(asyncio.CancelledError):
-                await metering
+            for task in loops:
+                task.cancel()
+            for task in (listening, metering, *loops):
+                with suppress(asyncio.CancelledError):
+                    await task
 
-    async def _loop(self) -> None:
-        failures = 0
+    async def _loop(self, name: str, one_pass: Callable[[], Awaitable[None]]) -> None:
+        loop, failures = self._loops[name], 0
         while not self._stop.is_set():
-            self._wake.clear()
+            loop.wake.clear()
             try:
-                await self._pass()
+                await one_pass()
             except Exception as exc:
                 failures += 1
-                self._reached_database = False
-                logger.warning("outbox.pass_failed", extra={"error": type(exc).__name__})
+                loop.reached_database = False
+                logger.warning(
+                    "outbox.pass_failed", extra={"loop": name, "error": type(exc).__name__}
+                )
             else:
                 failures = 0
-                self._reached_database = True
+                loop.reached_database = True
             wait = min(2.0**failures, MAX_ERROR_WAIT_SECONDS) if failures else POLL_SECONDS
             with suppress(TimeoutError):
-                await asyncio.wait_for(self._wake.wait(), timeout=wait)
+                await asyncio.wait_for(loop.wake.wait(), timeout=wait)
 
-    async def _pass(self) -> None:
-        """Batches until one is short (nothing more is due) or the worker stops."""
+    async def _route_pass(self) -> None:
+        """Batches until one is short (nothing more is new) or the worker stops; then
+        the lanes that got rows are woken."""
+        woken: set[str] = set()
         while not self._stop.is_set():
-            count = await self.dispatcher.dispatch_batch()
-            self._progressed()
-            if count < self.dispatcher.batch_size:
+            routed = await self.dispatcher.route()
+            woken |= routed.lanes
+            self._progressed(ROUTER)
+            if routed.events < self.dispatcher.route_batch:
                 break
+        for name in woken:
+            self._loops[name].wake.set()
         await self.dispatcher.cleanup_if_due()
 
-    def _progressed(self) -> None:
-        self._progress_at = time.monotonic()
-        self.metrics.last_pass.set(time.time())
+    def _lane_pass(self, handler: Handler) -> Callable[[], Awaitable[None]]:
+        async def one_pass() -> None:
+            """Batches until one is short (nothing more is due) or the worker stops."""
+            while not self._stop.is_set():
+                count = await self.dispatcher.dispatch_lane(handler)
+                self._progressed(handler.name)
+                if count < self.dispatcher.batch_size:
+                    break
+
+        return one_pass
+
+    def _progressed(self, name: str) -> None:
+        loop = self._loops[name]
+        loop.progress_at, loop.progress_wall = time.monotonic(), time.time()
+        if all(other.progress_at is not None for other in self._loops.values()):
+            self.metrics.last_pass.set(min(other.progress_wall for other in self._loops.values()))
 
     async def _metrics_loop(self) -> None:
         while True:

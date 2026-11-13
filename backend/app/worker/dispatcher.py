@@ -1,64 +1,68 @@
-"""The outbox dispatcher (spec 4.3; without DBOS until M6, plan decision 1).
+"""The outbox dispatcher (spec 4.3; without DBOS until M6, plan decision 1), one lane per
+handler (review M4 P3, P10).
 
-A batch is claimed in one transaction (`FOR NO KEY UPDATE SKIP LOCKED`, so parallel
-dispatchers take disjoint batches). Each event goes to every matching handler that
-has no delivery record yet, each in a transaction of its own that also writes the
-record: the effect and the record are committed together or not at all. When every
-handler has the event, the batch's transaction marks it dispatched.
+Routing: new events are taken in batches (`FOR NO KEY UPDATE SKIP LOCKED`) and get one
+`event_lane` row per handler that wants them, in the transaction that marks them
+routed; an event no handler wants is dispatched at once.
 
-- A handler fails: the others keep their deliveries; the event waits 2^attempts
-  seconds (at most 5 minutes) and then goes only to the missing handlers. After
-  MAX_ATTEMPTS failed passes it is marked failed and logged, without its payload.
+Lanes: every handler works off its own rows, independently of the others (the worker
+runs each lane as a task of its own), so a backlog or a hang in one handler never
+delays another. A lane's batch is one transaction (`lane.py`): it claims up to
+`batch_size` rows (`FOR UPDATE SKIP LOCKED`), records the deliveries, runs the
+handler on each event (a failing event does not fail its neighbours), drops the
+delivered events' rows, counts a failure on the others and finishes the events whose
+lanes are all done (`OutboxRepository.finish`). An effect, its delivery record and its
+lane row are committed together or not at all.
+
+- A handler fails: the lane waits 2^attempts seconds (at most 5 minutes) for that
+  event. After MAX_ATTEMPTS failures the lane gives up: the row is kept with
+  `failed_at`, the event is logged without its payload and marked failed once no
+  other lane of it is left.
 - The dispatcher dies in the middle: the batch's transaction ends with the
-  connection, its locks go, and the next pass hands the event to the missing
-  handlers only.
-- Two dispatchers ever holding the same event (a claim whose connection was lost
-  while its handler ran on): the delivery record's primary key makes the second wait
-  for the first and then skip.
-- A handler hangs: every handler call has `handler_timeout` seconds
+  connection, and the next batch takes the same rows again.
+- Two workers take disjoint rows. Should two ever hold the same (event, handler) (a
+  worker of the previous release, which knows no lanes), the delivery record's primary
+  key makes the second wait for the first and then skip.
+- A handler hangs: every call has `handler_timeout` seconds
   (HERD_WORKER_HANDLER_TIMEOUT_SECONDS, default 30), enforced by an asyncio timeout
   and, for a lock or statement in the database, by the transaction's `lock_timeout`
-  and `statement_timeout`. A timeout is a failed attempt like any other. A handler
-  that timed out is not called again in the same batch (its other events stay due
-  for the next pass, without an attempt counted), so one hang delays the batch's
-  other handlers by at most the limit.
+  and `statement_timeout`. A timeout is a failed attempt like any other, and the lane
+  ends its batch there: its other events stay due for the next batch, without an
+  attempt counted. No other lane waits for it.
+
+Order: one worker hands a lane's events over in the order of their ids (the order
+they were written in), as before; after a retry, or with several workers, there is
+no order. Handlers of one event no longer run one after the other, and different
+handlers may be at different events; no handler relies on either.
 """
 
-import asyncio
-import logging
 import time
+from asyncio import TaskGroup
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
 
 import app.models_registry  # noqa: F401 -- every model: handlers write to any table
 from app.core.db import Database
-from app.core.metrics import OUTBOX_DISPATCHES
-from app.core.outbox import Event
 from app.worker import registry as handler_registry
+from app.worker.lane import MAX_ATTEMPTS, Claimed, LaneBatch, count_failure, log_failure
 from app.worker.metrics import worker_metrics
 from app.worker.registry import Handler, HandlerRegistry
 from app.worker.repository import OutboxRepository
 
-logger = logging.getLogger(__name__)
-
-BATCH_SIZE = 50
-MAX_ATTEMPTS = 10
-MAX_WAIT_SECONDS = 300
+BATCH_SIZE = 100  # a lane's events per transaction
+ROUTE_BATCH = 500  # new events routed per transaction
 RETENTION = timedelta(days=7)
 CLEANUP_BATCH = 1000
 CLEANUP_EVERY_SECONDS = 60.0
 HANDLER_TIMEOUT_SECONDS = 30.0  # default of HERD_WORKER_HANDLER_TIMEOUT_SECONDS
 
 
-class Outcome(Enum):
-    OK = "ok"
-    FAILED = "failed"
-    TIMED_OUT = "timed_out"
+@dataclass(frozen=True, slots=True)
+class Routed:
+    """What one routing batch did: how many events, and which handlers got rows."""
 
-
-def retry_wait(attempts: int) -> timedelta:
-    """The wait after the `attempts`-th failed pass: 2, 4, 8 … seconds, at most 5 min."""
-    return timedelta(seconds=min(2**attempts, MAX_WAIT_SECONDS))
+    events: int
+    lanes: frozenset[str]
 
 
 class Dispatcher:
@@ -68,87 +72,73 @@ class Dispatcher:
         registry: HandlerRegistry | None = None,
         *,
         batch_size: int = BATCH_SIZE,
+        route_batch: int = ROUTE_BATCH,
         cleanup_batch: int = CLEANUP_BATCH,
         handler_timeout: float = HANDLER_TIMEOUT_SECONDS,
     ) -> None:
         self.database = database
         self.registry = registry if registry is not None else handler_registry.REGISTRY
         self.batch_size = batch_size
+        self.route_batch = route_batch
         self.handler_timeout = handler_timeout
         self.cleanup_batch = cleanup_batch
         self._last_cleanup: float | None = None
 
-    async def dispatch_batch(self) -> int:
-        """Claim and dispatch one batch; how many events it held."""
+    @property
+    def handlers(self) -> list[Handler]:
+        return self.registry.handlers()
+
+    async def route(self) -> Routed:
+        """Route one batch of new events into their lanes."""
         async with self.database.session_factory() as session, session.begin():
             repo = OutboxRepository(session)
-            rows = await repo.claim(self.batch_size)
-            done = await repo.delivered([row.id for row in rows])
-            dispatched = []
-            stalled: set[str] = set()  # handlers that timed out in this batch
-            for row in rows:
-                event = Event.of(row)
-                failed, skipped = [], False
-                for handler in self.registry.for_type(event.type):
-                    if (event.id, handler.name) in done:
-                        continue
-                    if handler.name in stalled:
-                        skipped = True
-                        continue
-                    outcome = await self._try(event, handler)
-                    if outcome is Outcome.TIMED_OUT:
-                        stalled.add(handler.name)
-                    if outcome is not Outcome.OK:
-                        failed.append(handler.name)
-                if not failed:
-                    if not skipped:
-                        dispatched.append(event.id)
-                elif (attempts := row.attempts + 1) >= MAX_ATTEMPTS:
-                    await repo.mark_failed(event.id, attempts)
-                    _report_failed(event, failed, attempts)
-                else:
-                    await repo.retry_later(event.id, attempts, retry_wait(attempts))
-            await repo.mark_dispatched(dispatched)
-        return len(rows)
+            rows = await repo.unrouted(self.route_batch)
+            done = await repo.delivered([event_id for event_id, _ in rows])
+            lanes, unwanted = [], []
+            for event_id, event_type in rows:
+                names = [
+                    h.name
+                    for h in self.registry.for_type(event_type)
+                    if (event_id, h.name) not in done
+                ]
+                lanes += [(event_id, name) for name in names]
+                if not names:
+                    unwanted.append(event_id)
+            await repo.add_lanes(lanes)
+            await repo.mark_routed([event_id for event_id, _ in rows], unwanted)
+        return Routed(len(rows), frozenset(name for _, name in lanes))
+
+    async def dispatch_lane(self, handler: Handler) -> int:
+        """One batch of the handler's lane; how many events it held."""
+        broken: list[Claimed] = []  # the call during which the transaction broke
+        try:
+            async with self.database.session_factory() as session, session.begin():
+                batch = LaneBatch(session, handler, self.handler_timeout, broken)
+                return await batch.run(self.batch_size)
+        except Exception as exc:
+            if not broken:
+                raise
+            # The transaction itself broke during that call (a cancelled statement, a
+            # lost connection): its batch is rolled back, that event's try is counted
+            # alone so that it cannot hold the lane up for ever.
+            event, attempts = broken[0]
+            log_failure("outbox.handler_failed", event, handler, type(exc).__name__)
+            async with self.database.session_factory() as session, session.begin():
+                await count_failure(OutboxRepository(session), event, handler, attempts + 1)
+            return 1
+
+    async def dispatch_batch(self) -> int:
+        """Route one batch, then one batch of every lane at once; how many events and
+        lane rows that held (the worker runs these as loops of their own)."""
+        routed = await self.route()
+        async with TaskGroup() as group:
+            tasks = [group.create_task(self.dispatch_lane(h)) for h in self.handlers]
+        return routed.events + sum(task.result() for task in tasks)
 
     async def drain(self) -> None:
-        """Dispatch until no event is due."""
+        """Dispatch until nothing is due."""
         while await self.dispatch_batch():
             pass
-
-    async def deliver(self, event: Event, handler: Handler) -> bool:
-        """Run `handler` in its own transaction together with its delivery record;
-        False (and the handler does not run) when the event was delivered to it already."""
-        async with (
-            asyncio.timeout(self.handler_timeout),
-            self.database.session_factory() as session,
-            session.begin(),
-        ):
-            repo = OutboxRepository(session)
-            await repo.limit_time(max(1, int(self.handler_timeout * 1000)))
-            if not await repo.record_delivery(event.id, handler.name):
-                return False
-            await handler.func(session, event)
-        return True
-
-    async def _try(self, event: Event, handler: Handler) -> Outcome:
-        try:
-            first = await self.deliver(event, handler)
-        except TimeoutError:
-            OUTBOX_DISPATCHES.labels(handler=handler.name, result="timeout").inc()
-            _log_failure("outbox.handler_timeout", event, handler, "TimeoutError")
-            return Outcome.TIMED_OUT
-        except Exception as exc:
-            if _is_timeout(exc):  # the database ended a lock wait or a statement
-                OUTBOX_DISPATCHES.labels(handler=handler.name, result="timeout").inc()
-                _log_failure("outbox.handler_timeout", event, handler, type(exc).__name__)
-                return Outcome.TIMED_OUT
-            OUTBOX_DISPATCHES.labels(handler=handler.name, result="error").inc()
-            # Type only: a handler's error message may quote what it was handling.
-            _log_failure("outbox.handler_failed", event, handler, type(exc).__name__)
-            return Outcome.FAILED
-        OUTBOX_DISPATCHES.labels(handler=handler.name, result="ok" if first else "duplicate").inc()
-        return Outcome.OK
 
     async def cleanup(self) -> int:
         """Remove events dispatched more than RETENTION ago, batch by batch; how many."""
@@ -182,40 +172,4 @@ class Dispatcher:
         metrics.failed.set(failed)
 
 
-def _is_timeout(exc: BaseException) -> bool:
-    """Postgres' lock_timeout or statement_timeout (SQLSTATE 55P03, 57014), however
-    the driver and SQLAlchemy wrap it."""
-    seen: BaseException | None = exc
-    for _ in range(5):  # a few layers of wrapping at most
-        if seen is None:
-            break
-        if getattr(seen, "sqlstate", None) in ("55P03", "57014"):
-            return True
-        seen = seen.__cause__ or getattr(seen, "orig", None)
-    return False
-
-
-def _log_failure(message: str, event: Event, handler: Handler, error: str) -> None:
-    logger.warning(
-        message,
-        extra={
-            "event_id": str(event.id),
-            "type": event.type,
-            "handler": handler.name,
-            "error": error,
-        },
-    )
-
-
-def _report_failed(event: Event, handlers: list[str], attempts: int) -> None:
-    for name in handlers:
-        OUTBOX_DISPATCHES.labels(handler=name, result="failed").inc()
-    logger.error(
-        "outbox.failed",
-        extra={
-            "event_id": str(event.id),
-            "type": event.type,
-            "handlers": handlers,
-            "attempts": attempts,
-        },
-    )
+__all__ = ["MAX_ATTEMPTS", "Dispatcher"]

@@ -19,11 +19,11 @@ from app.core.listen import asyncpg_dsn
 from app.core.metrics import REGISTRY
 from app.core.outbox import Event, EventOutbox
 from app.worker import main as worker_main
-from app.worker.dispatcher import Dispatcher
+from app.worker.dispatcher import Dispatcher, Routed
 from app.worker.main import Worker
 from app.worker.registry import HandlerRegistry
 from tests.conftest import json_lines
-from tests.outbox_helpers import delivered, emit_committed, outbox_row
+from tests.outbox_helpers import delivered, emit_committed, lane_row, outbox_row
 from tests.real_db import RealDb
 
 BACKEND = Path(__file__).resolve().parent.parent
@@ -52,14 +52,16 @@ async def test_a_hanging_handler_times_out_and_does_not_hold_up_the_others(
     timeouts = _sample("herd_outbox_dispatch_total", handler="hangs", result="timeout")
     dispatcher = Dispatcher(real_db.database, registry, handler_timeout=0.3)
     started = time.monotonic()
-    assert await dispatcher.dispatch_batch() == 3
+    assert await dispatcher.dispatch_batch() == 3 + 3 + 3  # routed, each lane's batch
     assert time.monotonic() - started < 2.0  # one limit, not one per event
     assert calls == Counter({"hangs": 1, "fine": 3})  # tried once in this batch
-    row = await outbox_row(real_db.database, first)
-    assert row.attempts == 1 and row.dispatched_at is None and row.failed_at is None
+    lane = await lane_row(real_db.database, first, "hangs")
+    assert lane is not None and lane.attempts == 1 and lane.failed_at is None
+    assert (await outbox_row(real_db.database, first)).dispatched_at is None
     for later in (second, third):  # not tried yet: due again, no attempt counted
-        row = await outbox_row(real_db.database, later)
-        assert row.attempts == 0 and row.dispatched_at is None
+        lane = await lane_row(real_db.database, later, "hangs")
+        assert lane is not None and lane.attempts == 0
+        assert (await outbox_row(real_db.database, later)).dispatched_at is None
         assert await delivered(real_db.database, later) == {"fine"}
     assert _sample("herd_outbox_dispatch_total", handler="hangs", result="timeout") == (
         timeouts + 1
@@ -101,7 +103,8 @@ async def test_a_lock_wait_in_the_database_is_ended_by_the_limit(real_db: RealDb
     assert _sample("herd_outbox_dispatch_total", handler="locked", result="timeout") == (
         timeouts + 1
     )
-    assert (await outbox_row(real_db.database, event_id)).attempts == 1
+    lane = await lane_row(real_db.database, event_id, "locked")
+    assert lane is not None and lane.attempts == 1
 
 
 async def test_the_gauges_stay_current_while_a_pass_hangs(
@@ -146,12 +149,12 @@ async def test_a_worker_without_progress_is_not_ready(
 
         hang = asyncio.Event()
 
-        async def _stuck_batch() -> int:  # a pass that never finishes
+        async def _stuck_route() -> Routed:  # a pass that never finishes
             await hang.wait()
-            return 0
+            return Routed(0, frozenset())
 
-        monkeypatch.setattr(dispatcher, "dispatch_batch", _stuck_batch)
-        worker._wake.set()
+        monkeypatch.setattr(dispatcher, "route", _stuck_route)
+        worker._loops[worker_main.ROUTER].wake.set()
         async with asyncio.timeout(5):
             while worker.ready:  # noqa: ASYNC110 -- turns false after 0.4 s
                 await asyncio.sleep(0.02)

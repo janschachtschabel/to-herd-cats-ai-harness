@@ -4,6 +4,7 @@ assigned to or reported (not my own, not on top of a mention or a reply); only f
 people who may see the ticket when the handler runs. Handlers run here in the test's
 transaction, as the worker would, more than once where that matters."""
 
+from dataclasses import replace
 from typing import Any
 
 from httpx import AsyncClient
@@ -14,6 +15,7 @@ from app.core.outbox import Event, EventOutbox
 from app.core.principal import Principal
 from app.modules.messaging.live_events import of_event
 from app.modules.messaging.notification_models import Notification
+from app.modules.messaging.notifications import notify_on_message
 from app.modules.spaces.repository import SpaceRepository
 from tests.factories_messaging import post
 from tests.factories_tickets import Desk, new_ticket, patch
@@ -154,3 +156,39 @@ async def test_live_events_name_the_thread_and_the_ticket_only(
         frame: Any = live.frame().decode()
         assert "geheim" not in frame.lower()
         assert f'"ticket_id":"{ticket["id"]}"' in frame
+
+
+async def test_timeline_entries_are_flagged_and_never_loaded_for_notifications(
+    desk: Desk, session: AsyncSession
+) -> None:
+    """Review M4 P3: a timeline entry's `message.created` says it is a system message,
+    so `notify_on_message` returns at once (no query) instead of loading it."""
+    ticket = await new_ticket(desk.editor, desk.space_id)
+    await patch(desk.moderator, ticket, assignee=_ref(desk, "editor2"))
+    await ticket_handlers(session)
+    thread = await ticket_thread(desk.viewer, ticket)
+    rows = (
+        await session.scalars(select(EventOutbox).where(EventOutbox.type == "message.created"))
+    ).all()
+    entries = [r for r in rows if r.payload["conversation_id"] == thread["id"]]
+    assert len(entries) == 2 and all(r.payload["system"] is True for r in entries)
+    # Even an event pointing at a human message with a mention is skipped if flagged.
+    r = await desk.editor.post(
+        f"/api/conversations/{thread['id']}/messages",
+        json={"body_md": "Hallo @viewer", "mentions": [desk.id_of("viewer")]},
+    )
+    assert r.status_code == 201, r.text
+    human = r.json()
+    (row,) = (
+        await session.scalars(
+            select(EventOutbox).where(
+                EventOutbox.type == "message.created", EventOutbox.subject_id == human["id"]
+            )
+        )
+    ).all()
+    before = await _count(session)
+    flagged = Event.of(row)
+    await notify_on_message(session, replace(flagged, payload={**flagged.payload, "system": True}))
+    assert await _count(session) == before
+    await notify_on_message(session, flagged)
+    assert await _count(session) > before

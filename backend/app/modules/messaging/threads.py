@@ -97,5 +97,6 @@ async def page_timeline(session: AsyncSession, event: Event) -> None:
             "conversation_id": str(thread.id),
             "message_id": str(message.id),
             "parent_id": None,
+            "system": True,
         },
     )

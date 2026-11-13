@@ -12,9 +12,10 @@ handler `notify_on_message` (`handlers.py`) in the handler's transaction:
   assignee and reporter, unless they get a `mention` or a `reply` for it (plan M4
   decision 10).
 
-Never to the message's author. Whether a person may see the conversation is checked
-again here, at delivery time: someone who lost access since the message was written
-gets nothing. A deleted message notifies nobody.
+Never to the message's author, never for a system message (a timeline entry). Whether
+a person may see the conversation is checked again here, at delivery time: someone who
+lost access since the message was written gets nothing. A deleted message notifies
+nobody.
 
 Idempotent by construction: `(user_id, message_id, reason)` is unique, so a second
 delivery of the event inserts nothing and emits nothing. Each new notification is
@@ -34,7 +35,10 @@ from app.modules.messaging.social_repository import MentionRepository
 
 
 async def notify_on_message(session: AsyncSession, event: Event) -> None:
-    """Handler of `message.created` and `message.updated` (payload `message_id`)."""
+    """Handler of `message.created` and `message.updated` (payload `message_id`). A
+    timeline entry (payload `system`) notifies nobody: it is not even loaded."""
+    if event.payload.get("system"):
+        return
     repo = NotificationRepository(session, event.org_id)
     message = await repo.message(uuid.UUID(event.payload["message_id"]))
     if message is None or message.deleted_at is not None or message.author_id is None:

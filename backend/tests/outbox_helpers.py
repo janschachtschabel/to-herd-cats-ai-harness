@@ -15,7 +15,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import Database
-from app.core.outbox import Event, EventActor, EventDelivery, EventOutbox, emit
+from app.core.outbox import Event, EventActor, EventDelivery, EventLane, EventOutbox, emit
 from app.core.principal import Principal
 from app.worker.registry import HandlerRegistry
 
@@ -105,8 +105,14 @@ async def delivered(database: Database, event_id: uuid.UUID) -> set[str]:
         return set(rows)
 
 
+async def lane_row(database: Database, event_id: uuid.UUID, handler: str) -> EventLane | None:
+    """The event's row in the handler's lane (None once the handler has had it)."""
+    async with database.session_factory() as session:
+        return await session.get(EventLane, (event_id, handler))
+
+
 async def due_now(database: Database) -> None:
     """Bring every waiting retry forward, as if its wait were over."""
     async with database.session_factory() as session:
-        await session.execute(update(EventOutbox).values(next_attempt_at=func.now()))
+        await session.execute(update(EventLane).values(next_attempt_at=func.now()))
         await session.commit()

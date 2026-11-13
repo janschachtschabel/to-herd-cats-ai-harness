@@ -1,6 +1,6 @@
-"""A dispatcher to be killed (tests/test_dispatcher.py): handler `first` commits its
-effect; handler `second` writes its effect, says `in-second` on stdout and then waits
-inside its open transaction until the parent kills the process."""
+"""A dispatcher to be killed (tests/test_dispatcher_crash.py): lane `first` commits its
+batch; handler `second` writes its effect, says `in-second` on stdout and then waits
+inside its lane's open transaction until the parent kills the process."""
 
 import asyncio
 import sys
@@ -28,7 +28,11 @@ async def main() -> None:
         await asyncio.sleep(3600)
 
     database = Database(get_settings().test_database_url)
-    await Dispatcher(database, registry).dispatch_batch()
+    dispatcher = Dispatcher(database, registry)
+    await dispatcher.route()
+    first, second = dispatcher.handlers
+    await dispatcher.dispatch_lane(first)
+    await dispatcher.dispatch_lane(second)
 
 
 if __name__ == "__main__":

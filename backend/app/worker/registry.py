@@ -10,9 +10,10 @@ them followed by a dot (`message` matches `message.created`, not `messages.x`). 
 name is stored with each delivery and is a metric label: it never changes once an
 event has been delivered under it, and it is unique.
 
-Handlers run in their own transaction (with the delivery record) and must be
-idempotent: an event may reach a handler more than once, for example when an
-earlier pass failed after the handler's transaction had been rolled back.
+Each handler works off a lane of its own; it runs in its lane's transaction (in a
+savepoint per event, with the delivery record) and must be idempotent and never
+commit: an event may reach a handler more than once, for example when an earlier
+batch was rolled back.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
@@ -56,6 +57,10 @@ class HandlerRegistry:
             return func
 
         return _register
+
+    def handlers(self) -> list[Handler]:
+        """Every handler (each has a lane of its own), in the order registered."""
+        return list(self._handlers)
 
     def for_type(self, event_type: str) -> list[Handler]:
         """The handlers of `event_type`, in the order they were registered."""

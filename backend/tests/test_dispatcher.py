@@ -26,6 +26,7 @@ from tests.outbox_helpers import (
     due_now,
     effects,
     emit_committed,
+    lane_row,
     outbox_row,
     registry_of,
     write_effect,
@@ -45,7 +46,8 @@ async def test_each_handler_gets_each_event_once_when_all_succeed(real_db: RealD
         assert await effects(real_db.database, event_id) == Counter({"a": 1, "b": 1})
         assert await delivered(real_db.database, event_id) == {"a", "b"}
         row = await outbox_row(real_db.database, event_id)
-        assert row.dispatched_at is not None and row.attempts == 0
+        assert row.dispatched_at is not None and row.routed_at is not None
+        assert await lane_row(real_db.database, event_id, "a") is None  # nothing left
     await dispatcher.drain()  # nothing left: no handler runs again
     assert sum(calls.values()) == 6
 
@@ -80,10 +82,12 @@ async def test_failed_handler_is_retried_and_others_are_not_repeated(real_db: Re
     dispatcher = Dispatcher(real_db.database, registry)
 
     await dispatcher.drain()
-    row = await outbox_row(real_db.database, event_id)
-    assert row.dispatched_at is None and row.attempts == 1
-    wait = (row.next_attempt_at - datetime.now(UTC)).total_seconds()
+    assert (await outbox_row(real_db.database, event_id)).dispatched_at is None
+    lane = await lane_row(real_db.database, event_id, "b")
+    assert lane is not None and lane.attempts == 1 and lane.failed_at is None
+    wait = (lane.next_attempt_at - datetime.now(UTC)).total_seconds()
     assert 0 < wait <= 2.5  # 2^1 seconds
+    assert await lane_row(real_db.database, event_id, "a") is None
     assert await delivered(real_db.database, event_id) == {"a"}
     assert await effects(real_db.database, event_id) == Counter({"a": 1})  # b rolled back
 
@@ -107,8 +111,9 @@ async def test_the_wait_doubles_up_to_five_minutes(real_db: RealDb) -> None:
     for _ in range(MAX_ATTEMPTS - 1):
         await due_now(real_db.database)
         await dispatcher.dispatch_batch()
-        row = await outbox_row(real_db.database, event_id)
-        waits.append(round((row.next_attempt_at - datetime.now(UTC)).total_seconds()))
+        lane = await lane_row(real_db.database, event_id, "a")
+        assert lane is not None
+        waits.append(round((lane.next_attempt_at - datetime.now(UTC)).total_seconds()))
     assert waits == [2, 4, 8, 16, 32, 64, 128, 256, 300]
 
 
@@ -123,7 +128,8 @@ async def test_event_fails_after_ten_attempts_and_is_reported(
         await dispatcher.dispatch_batch()
     row = await outbox_row(real_db.database, event_id)
     assert row.failed_at is not None and row.dispatched_at is None
-    assert row.attempts == MAX_ATTEMPTS
+    lane = await lane_row(real_db.database, event_id, "bad")
+    assert lane is not None and lane.attempts == MAX_ATTEMPTS and lane.failed_at is not None
     assert calls == Counter({(event_id, "ok"): 1, (event_id, "bad"): MAX_ATTEMPTS})
 
     await due_now(real_db.database)

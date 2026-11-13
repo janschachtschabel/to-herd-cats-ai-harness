@@ -9,8 +9,8 @@
   (`{"key": "ticket.status_changed", "actor": "<id>", "from": "<id>", "to": "<id>"}`):
   ids, enumeration values and dates, never a title or a description. Each entry
   refers to the event and its own name (`client_id`), so a second delivery writes
-  nothing; each new one is emitted (`message.created`) for live delivery and notifies
-  nobody (`notify_on_message` skips system messages).
+  nothing; each new one is emitted (`message.created`, flagged `system`) for live
+  delivery and notifies nobody (`notify_on_message` skips system messages).
 - `notify_on_ticket`: `assignment` for the person a ticket was assigned to, unless
   they assigned it themselves, and only if they may see the ticket when the handler
   runs. It points at the timeline's assignment entry, written here if the timeline
@@ -90,10 +90,10 @@ async def write_timeline(session: AsyncSession, event: Event) -> dict[str, Messa
     if event.subject_type != "ticket" or event.type not in TICKET_EVENTS:
         return {}
     repo = TicketThreadRepository(session, event.org_id)
-    ticket = await repo.ticket(event.subject_id)
-    if ticket is None:
+    found = await repo.ticket_and_thread(event.subject_id)
+    if found is None:
         return {}
-    thread = await repo.thread_for(ticket)
+    ticket, thread = found
     written: dict[str, Message] = {}
     for offset, (name, body) in enumerate(entries(event)):
         client_id = uuid.uuid5(event.id, name)
@@ -112,6 +112,7 @@ async def write_timeline(session: AsyncSession, event: Event) -> dict[str, Messa
                     "conversation_id": str(thread.id),
                     "message_id": str(message.id),
                     "parent_id": None,
+                    "system": True,
                 },
             )
         else:

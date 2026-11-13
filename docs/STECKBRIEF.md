@@ -158,9 +158,27 @@ In `HERD_ROLE=all` stand die Outbox am Ende der Anlagen bei 9.681 offenen Ereign
 leer. Mit eigenem Worker-Prozess stand sie bei 3.000 Tickets höchstens bei 1.396 und war
 32 s nach der letzten Anlage leer; der Worker schaffte also rund 90 Ereignisse je
 Sekunde, weniger als die gut 130 je Sekunde, die 60 Anlagen je Sekunde erzeugen.
-Folge: Systemmeldungen und Live-Ereignisse kommen bei Massenanlagen über die API später
-an; nichts geht verloren. Ein zweiter Worker oder langsameres Anlegen hilft; nicht
-gemessen. Platz: `work_item` mit 10.000 Tickets 9,5 MB (mit Indizes), die ganze
+Folge: Systemmeldungen und Live-Ereignisse kamen bei Massenanlagen über die API später
+an; nichts ging verloren.
+
+**Worker mit Bahnen (Review M4 P3, nach M4):** Seit jeder Handler eine eigene Bahn hat
+und ein Stapel eine Transaktion ist, verteilt ein Worker deutlich mehr. Messung (ohne
+Docker, lokales PostgreSQL 17, Lastmittel 5–9 durch andere Prozesse auf der Maschine):
+1.200 Tickets ohne laufenden Worker angelegt (`HERD_ROLE=api`), dann eigene
+Worker-Prozesse gestartet und die Zeit gemessen, bis die Outbox leer war (2.401
+Ereignisse: die Tickets, ihre Systemmeldungen, ein `access.changed`).
+
+| Worker | vorher (M4) | nachher |
+|---|---|---|
+| 1 | 96–99 Ereignisse/s | 427–488 Ereignisse/s |
+| 2 | 572–613 Ereignisse/s¹ | 707 Ereignisse/s |
+
+¹ Hier gemessen; im Review waren es 226/s. Warum zwei alte Worker hier mehr als das
+Fünffache von einem schafften, ist nicht untersucht. Ein Worker braucht nun rund 2,8
+Datenbankanweisungen je Ereignis (vorher 8,8) und ist durch die CPU begrenzt (rund
+0,6 ms je Anweisung, überwiegend SQLAlchemy). Ein hängender Handler (Sperre auf
+`notification` für 45 s) hält die Live-Zustellung nicht mehr auf: Nachrichten kamen nach
+0,07–0,17 s im Stream an (vorher nach 30 s bzw. erst nach dem Ende der Sperre). Platz: `work_item` mit 10.000 Tickets 9,5 MB (mit Indizes), die ganze
 Datenbank 53 MB (mit 13.054 Systemmeldungen und der Outbox).
 
 **Kosten:** M2 bis M4 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
@@ -224,10 +242,12 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   `SMOKE_NODES=1 bash deploy/compose/smoke.sh`. Die Grenze von 5 Verbindungen je
   Anmeldung gilt je API-Prozess. Bei SIGTERM schließt die API ihre Verbindungen zuerst;
   die Browser verbinden sich nach 5 s mit einem anderen Pod und laden nach.
-- **Worker (M3):** beliebig viele Replikas (getrennte Stapel per `FOR NO KEY UPDATE SKIP
-  LOCKED`, Zustellung mindestens einmal, Handler idempotent; geprüft mit zwei
-  Verteilern und mit einem Verteiler, der mitten im Handler abgeschossen wird). Je
-  Worker drei Datenbankverbindungen (Stapel, Handler, LISTEN).
+- **Worker (M3, Bahnen seit Review M4 P3):** beliebig viele Replikas (getrennte Zeilen
+  per `SKIP LOCKED`, Zustellung mindestens einmal, Wirkung genau einmal, Handler
+  idempotent; geprüft mit zwei Verteilern, auch mit scheiternden Nachbarn im Stapel, und
+  mit einem Verteiler, der mitten im Handler abgeschossen wird). Je Worker bis zu eine
+  Datenbankverbindung je Handler (zurzeit fünf), eine fürs Verteilen, eine für die
+  Metriken und eine für LISTEN.
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -242,8 +262,9 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 ## Zeitpläne
 
 Keine Cronjobs. Seit M3 läuft der **Worker** als Schleife: Er wacht bei jedem Commit
-mit Ereignissen auf (`NOTIFY herd_outbox`), sonst alle 2 s, und verteilt höchstens 50
-Ereignisse je Durchlauf; einmal je Minute löscht er verteilte Ereignisse, die älter als
+mit Ereignissen auf (`NOTIFY herd_outbox`), sonst alle 2 s, verteilt neue Ereignisse
+auf die Bahnen der Handler (bis 500 je Durchlauf), und jede Bahn arbeitet bis 100
+Ereignisse je Stapel ab; einmal je Minute löscht er verteilte Ereignisse, die älter als
 7 Tage sind (höchstens 1.000 auf einmal). Jeder API-Prozess mit offenen SSE-Verbindungen
 prüft alle 30 s, ob deren Anmeldungen noch gelten, und schickt nach 15 s Ruhe einen
 Heartbeat. Der Collab-Prozess

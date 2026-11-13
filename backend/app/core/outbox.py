@@ -4,6 +4,9 @@ the handlers registered for its type (`app.worker`).
 
 - `emit` adds the row and calls `NOTIFY herd_outbox`, which Postgres delivers when the
   caller's transaction commits (never for a rolled-back one), waking the dispatchers.
+  Inside `one_notify` (a worker's lane batch) the NOTIFY is sent once at its end.
+- The worker routes each new event into one `event_lane` row per handler that wants
+  it (`routed_at`); each handler works off its own lane (`app/worker/dispatcher.py`).
 - `event_delivery` records which handler has had which event. A handler's effect and
   its record are written in one transaction, so an effect is committed exactly once
   even when the event is handed over again (at least once).
@@ -12,6 +15,9 @@ the handlers registered for its type (`app.worker`).
 """
 
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -31,9 +37,15 @@ MAX_HANDLER_CHARS = 100
 
 
 class EventOutbox(UuidPk, OrgScoped, Base):
-    """One event. Pending while neither `dispatched_at` nor `failed_at` is set; then
-    due at `next_attempt_at`, and `attempts` counts the passes in which a handler
-    failed."""
+    """One event. Pending while neither `dispatched_at` nor `failed_at` is set; routed
+    (`routed_at`) once its lanes are written; dispatched when no lane is left, failed
+    when only lanes that gave up are left.
+
+    `attempts` and `next_attempt_at` belong to the dispatcher of M4 (one pass over all
+    handlers): this release neither reads nor writes them (retries are counted per
+    lane), its predecessor's workers still do while both run during an update. They
+    and `ix_event_outbox_due` are dropped in the next release (expand, then
+    contract)."""
 
     __tablename__ = "event_outbox"
     __table_args__ = (
@@ -41,6 +53,13 @@ class EventOutbox(UuidPk, OrgScoped, Base):
             "ix_event_outbox_due",
             "next_attempt_at",
             postgresql_where=text("dispatched_at IS NULL AND failed_at IS NULL"),
+        ),
+        Index(
+            "ix_event_outbox_unrouted",
+            "id",
+            postgresql_where=text(
+                "routed_at IS NULL AND dispatched_at IS NULL AND failed_at IS NULL"
+            ),
         ),
         Index(
             "ix_event_outbox_dispatched_at",
@@ -67,6 +86,32 @@ class EventOutbox(UuidPk, OrgScoped, Base):
     )
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    routed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EventLane(Base):
+    """An event waiting for one handler: removed when the handler has had it, kept with
+    `failed_at` when the handler gave up. `attempts` counts the handler's failed tries
+    of it, and it is due again at `next_attempt_at`."""
+
+    __tablename__ = "event_lane"
+    __table_args__ = (
+        Index(
+            "ix_event_lane_due", "handler", "event_id", postgresql_where=text("failed_at IS NULL")
+        ),
+    )
+
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("event_outbox.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    handler: Mapped[str] = mapped_column(String(MAX_HANDLER_CHARS), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     next_attempt_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -137,6 +182,30 @@ class Event:
         )
 
 
+# Set inside `one_notify`: whether an event was written there (emit's NOTIFY waits).
+_deferred: ContextVar[list[bool] | None] = ContextVar("herd_outbox_deferred", default=None)
+
+
+async def _notify(session: AsyncSession) -> None:
+    await session.execute(select(func.pg_notify(OUTBOX_CHANNEL, "")))
+
+
+@asynccontextmanager
+async def one_notify(session: AsyncSession) -> AsyncIterator[None]:
+    """Within the block (one task, one transaction), `emit` sends no NOTIFY of its own;
+    one is sent at the end if an event was written. Postgres folds equal NOTIFYs of a
+    transaction into one anyway; this saves the statements (review M4 P3). Without an
+    error only: a failed block's transaction is rolled back, and its events with it."""
+    token = _deferred.set([])
+    try:
+        yield
+        emitted = bool(_deferred.get())
+    finally:
+        _deferred.reset(token)
+    if emitted:
+        await _notify(session)
+
+
 async def emit(
     session: AsyncSession,
     *,
@@ -160,5 +229,9 @@ async def emit(
     )
     session.add(event)
     await session.flush()
-    await session.execute(select(func.pg_notify(OUTBOX_CHANNEL, "")))
+    deferred = _deferred.get()
+    if deferred is None:
+        await _notify(session)
+    else:
+        deferred.append(True)
     return event

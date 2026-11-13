@@ -461,14 +461,19 @@ kennen.
   M3, Entscheidung 1). `HERD_ROLE=worker` hat nur den internen Port (`/ready` meldet, ob
   seine Schleife läuft, die Datenbank erreicht und innerhalb von vier Zeitgrenzen
   vorankommt); `HERD_ROLE=all` enthält den Worker und teilt
-  mit ihm den Datenbank-Pool. Mehrere Worker sind sicher (getrennte Stapel, Zustellung
-  mindestens einmal, idempotente Handler). Ohne laufenden Worker gehen keine Nachrichten
+  mit ihm den Datenbank-Pool. Jeder Handler arbeitet eine eigene Bahn ab (seit Review M4
+  P3): Ein hängender Handler hält die anderen nicht auf, ein Stapel ist eine Transaktion,
+  ein Worker schafft gut 400 Ereignisse je Sekunde. Er braucht dafür bis zu eine
+  Datenbankverbindung je Handler (zurzeit fünf) plus Verteilen, Metriken und LISTEN; ein
+  Datenbank-Limit `max_connections` muss das je Worker-Replika einplanen. Mehrere Worker
+  sind sicher (getrennte Zeilen, Zustellung mindestens einmal, Wirkung genau einmal,
+  idempotente Handler). Ohne laufenden Worker gehen keine Nachrichten
   verloren, aber nichts kommt live an, Benachrichtigungen und Systemmeldungen bleiben aus,
   bis ein Worker läuft. Jeder Handler-Aufruf hat eine Zeitgrenze
   (`HERD_WORKER_HANDLER_TIMEOUT_SECONDS`, Standard 30 s; auch als `lock_timeout` und
   `statement_timeout` der Transaktion); eine Überschreitung zählt als gescheiterter
-  Versuch. Scheiternde Handler werden mit Wartezeit (bis 5 Minuten) wiederholt, nach
-  10 Durchläufen aufgegeben (`outbox.failed`). Metriken (nur von Prozessen mit Worker,
+  Versuch. Scheiternde Handler werden je Ereignis mit Wartezeit (bis 5 Minuten)
+  wiederholt, nach 10 Versuchen aufgegeben (`outbox.failed`). Metriken (nur von Prozessen mit Worker,
   alle 10 s aus der Datenbank): `herd_outbox_pending`,
   `herd_outbox_oldest_pending_seconds`, `herd_outbox_failed`,
   `herd_worker_last_pass_timestamp_seconds`, dazu

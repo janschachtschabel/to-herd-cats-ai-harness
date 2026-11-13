@@ -17,7 +17,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,7 +76,15 @@ class ThreadRepository:
         return await self.session.scalar(stmt)
 
     async def _thread(self, values: dict[str, object], key: str) -> Conversation:
-        """The thread with `values`, inserted unless one with the same `key` exists."""
+        """The thread with `values`, inserted unless one with the same `key` exists
+        (looked up first: it exists nearly always, review M4 P3)."""
+        column = getattr(Conversation, key)
+        found = select(Conversation).where(
+            Conversation.org_id == self.org_id, column == values[key]
+        )
+        existing = await self.session.scalar(found)
+        if existing is not None:
+            return existing
         stmt = (
             insert(Conversation)
             .values(org_id=self.org_id, **values)
@@ -87,10 +95,7 @@ class ThreadRepository:
         created = (await self.session.scalars(stmt)).one_or_none()
         if created is not None:
             return created
-        column = getattr(Conversation, key)
-        existing = await self.session.scalar(
-            select(Conversation).where(Conversation.org_id == self.org_id, column == values[key])
-        )
+        existing = await self.session.scalar(found)
         assert existing is not None  # the row that won the conflict
         return existing
 
@@ -112,9 +117,22 @@ class PageThreadRepository(ThreadRepository):
 
 
 class TicketThreadRepository(ThreadRepository):
-    async def ticket(self, ticket_id: uuid.UUID) -> WorkItem | None:
-        stmt = select(WorkItem).where(WorkItem.org_id == self.org_id, WorkItem.id == ticket_id)
-        return await self.session.scalar(stmt)
+    async def ticket_and_thread(self, ticket_id: uuid.UUID) -> tuple[WorkItem, Conversation] | None:
+        """The ticket and its thread (inserted if it has none yet), in one statement
+        when it has one; None if the ticket is gone."""
+        stmt = (
+            select(WorkItem, Conversation)
+            .outerjoin(
+                Conversation,
+                and_(Conversation.org_id == self.org_id, Conversation.work_item_id == WorkItem.id),
+            )
+            .where(WorkItem.org_id == self.org_id, WorkItem.id == ticket_id)
+        )
+        row = (await self.session.execute(stmt)).first()
+        if row is None:
+            return None
+        ticket, thread = row
+        return ticket, thread if thread is not None else await self.thread_for(ticket)
 
     async def thread_for(self, ticket: WorkItem) -> Conversation:
         """The ticket's thread, inserted if it has none yet."""

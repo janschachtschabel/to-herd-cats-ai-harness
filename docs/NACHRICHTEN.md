@@ -134,7 +134,10 @@ Live (ohne Neuladen, über `/api/stream`): neue, geänderte und gelöschte Nachr
 und Thread-Antworten, Reaktionen, Lesestand aus anderen Tabs, neue Kanäle und
 Kanaländerungen, Aktivität und ihr Zähler, Systemmeldungen der Seiten- und
 Aufgaben-Diskussion, neue und geänderte Aufgaben (`ticket.created`, `ticket.updated`,
-an alle, die Aufgaben im Bereich sehen dürfen; nur Kennungen),
+an alle, die Aufgaben im Bereich sehen dürfen; nur Kennungen des Tickets und seines
+Bereichs: Der Browser lädt nur, was das Ticket betreffen kann, also seine Ansicht, die
+Ansichten seines Bereichs und Listen ohne Bereichsfilter, nicht die anderer Bereiche;
+Review M4 P4),
 der Hinweis auf eine Einsicht (an die Teilnehmenden, `dm.inspected`) und geänderter
 Zugang: Wer in einen Bereich aufgenommen, daraus entfernt oder in der Rolle geändert
 wird (direkt oder über eine Gruppe), oder wessen Gruppenmitgliedschaft sich ändert,
@@ -178,19 +181,35 @@ Entscheidung 1).
 - **Rollen:** `HERD_ROLE=worker` ist ein eigener Prozess nur mit dem internen Port
   (`/health`, `/ready`, `/metrics` auf 9090). `HERD_ROLE=all` (Compose) startet den
   Worker im API-Prozess mit; er teilt sich dort den Datenbank-Pool der API (bewusst so).
-  Mehrere Worker sind sicher: Sie holen getrennte Stapel (`FOR NO KEY UPDATE SKIP
-  LOCKED`). Der Worker braucht bis zu drei Datenbankverbindungen gleichzeitig (Stapel,
-  Handler, Metriken) und eine weitere zum Lauschen auf `herd_outbox`.
-- **Zustellung mindestens einmal:** Jeder Handler läuft je Ereignis in einer eigenen
-  Transaktion, die zugleich einen Zustellnachweis (`event_delivery`) schreibt. Stirbt der
-  Worker mitten drin, bekommt beim nächsten Durchlauf nur der fehlende Handler das
-  Ereignis noch einmal. Die Handler sind idempotent: keine doppelte Benachrichtigung,
-  keine doppelte Systemmeldung.
+  Mehrere Worker sind sicher: Sie holen getrennte Zeilen (`SKIP LOCKED`), jede Wirkung
+  wird genau einmal sichtbar. Ein Worker braucht bis zu eine Datenbankverbindung je
+  Handler (zurzeit fünf), eine fürs Verteilen, eine für die Metriken und eine weitere
+  zum Lauschen auf `herd_outbox` (zurzeit also bis zu acht; der Standard-Pool erlaubt
+  15). In Rolle `all` kommen sie aus dem Pool der API.
+- **Bahnen (Review M4 P3, P10):** Neue Ereignisse werden in Stapeln (bis 500) auf
+  Bahnen verteilt, eine Zeile `event_lane` je Handler, der sie haben will. Jeder Handler
+  arbeitet seine Bahn in einer eigenen Schleife ab, unabhängig von den anderen: Ein
+  Rückstau oder ein Hänger in einem Handler verzögert keinen anderen (die
+  Live-Zustellung kommt an, während `notify_on_message` an einer Sperre hängt).
+- **Zustellung mindestens einmal, Wirkung genau einmal:** Ein Stapel einer Bahn (bis
+  100 Ereignisse) ist eine Transaktion: Zustellnachweise (`event_delivery`), die
+  Wirkungen des Handlers und das Abhaken der Bahnzeilen werden zusammen festgeschrieben
+  oder gar nicht. Scheitert ein Ereignis, wird nur seine Wirkung zurückgerollt
+  (Savepoint), die Nachbarn im Stapel gehen durch. Stirbt der Worker mitten drin, holt
+  der nächste Stapel dieselben Zeilen. Die Handler sind idempotent: keine doppelte
+  Benachrichtigung, keine doppelte Systemmeldung. Ein Ereignis ist verteilt, sobald
+  keine seiner Bahnen mehr offen ist.
+- **Reihenfolge:** Ein Worker gibt die Ereignisse einer Bahn in der Reihenfolge ihrer
+  Entstehung an den Handler (wie bisher). Nach einem Wiederholversuch oder mit mehreren
+  Workern gibt es keine Reihenfolge; verschiedene Handler können an verschiedenen
+  Ereignissen stehen. Kein Handler verlässt sich darauf (Systemmeldungen tragen ihre
+  Zeit aus dem Ereignis).
 - **Takt:** Der Worker wacht bei jedem Commit mit Ereignissen auf (`NOTIFY
-  herd_outbox`), sonst alle 2 s; je Durchlauf höchstens 50 Ereignisse. Scheitert ein
-  Handler, wartet das Ereignis 2^Versuche Sekunden (höchstens 5 Minuten) und geht dann
-  nur an die fehlenden Handler; nach 10 gescheiterten Durchläufen ist es
-  „fehlgeschlagen“ (Log `outbox.failed`, ohne Nutzlast). Verteilte Ereignisse werden
+  herd_outbox`), sonst alle 2 s; jede Bahn sieht ebenfalls alle 2 s nach fällig
+  gewordenen Wiederholungen. Scheitert ein Handler an einem Ereignis, wartet seine Bahn
+  dafür 2^Versuche Sekunden (höchstens 5 Minuten); nach 10 gescheiterten Versuchen gibt
+  die Bahn es auf (Log `outbox.failed`, ohne Nutzlast). Das Ereignis gilt als
+  „fehlgeschlagen“, sobald seine übrigen Bahnen fertig sind. Verteilte Ereignisse werden
   nach 7 Tagen gelöscht (je Minute höchstens 1.000); fehlgeschlagene bleiben in der
   Tabelle (Gauge `herd_outbox_failed`).
 - **Zeitgrenze je Handler:** Jeder Handler-Aufruf hat höchstens
@@ -198,12 +217,19 @@ Entscheidung 1).
   der Datenbank (`lock_timeout` und `statement_timeout` der Transaktion): Ein Handler,
   der an einer Sperre hängt, wird abgebrochen. Das zählt als gescheiterter Versuch
   (Log `outbox.handler_timeout`, Metrik `result="timeout"`), mit der üblichen Wartezeit.
-  Ein Handler, der im Stapel einmal in die Zeitgrenze lief, wird für den Rest des
-  Stapels übersprungen (dessen Ereignisse bleiben ohne gezählten Versuch fällig): Ein
-  Hänger hält die anderen Handler höchstens eine Zeitgrenze lang auf.
-- **Bereit (`/ready`)** ist der Worker, solange seine Schleife läuft, der letzte
-  Durchlauf die Datenbank erreichte und er innerhalb von vier Zeitgrenzen (Standard
-  120 s) einen Stapel abgeschlossen oder nichts Fälliges gefunden hat.
+  Der Stapel dieser Bahn endet dort; ihre übrigen Ereignisse bleiben ohne gezählten
+  Versuch für den nächsten Stapel fällig. Andere Bahnen warten nicht.
+- **Durchsatz:** Ein Worker verteilt bei einem Schwall neuer Aufgaben gut 400 Ereignisse
+  je Sekunde, zwei etwa 700 (Messung in `docs/STECKBRIEF.md`).
+- **Bereit (`/ready`)** ist der Worker, solange seine Schleifen laufen, der letzte
+  Durchlauf jeder Schleife die Datenbank erreichte und jede innerhalb von vier
+  Zeitgrenzen (Standard 120 s) einen Stapel abgeschlossen oder nichts Fälliges gefunden
+  hat.
+- **Aktualisierung:** Die Bahnen kommen mit einer Migration (`event_lane`,
+  `event_outbox.routed_at`). Ein Worker der Vorversion kennt keine Bahnen und stellt
+  noch selbst zu; der Zustellnachweis verhindert doppelte Wirkungen, bis er ersetzt ist.
+  Die Spalten `event_outbox.attempts` und `next_attempt_at` liest nur noch die
+  Vorversion; sie fallen in einem späteren Release weg.
 - **Ohne Worker** entstehen Nachrichten weiter, aber niemand bekommt sie live,
   Benachrichtigungen und Systemmeldungen bleiben aus; die Ereignisse warten und werden
   nachgeholt, sobald ein Worker läuft. Ein Browser sieht neue Nachrichten dann erst beim
@@ -289,6 +315,18 @@ Browser lädt nach, was er zeigen will, mit seinen normalen Rechten.
   13–22 ms bei 239, 187–237 ms bei 200.239 Ungelesenen in einem Kanal). Live-Ereignisse
   lösen den Abruf aus; der Browser bündelt sie (ein Abruf je 250 ms), die Zählung selbst
   ist noch nicht begrenzt.
+- **Bekannte Grenze (für M6 vorgemerkt, Review M3 N13, Review M4 P11): IDs als
+  Position.** Lesestand und `after`-Cursor sind Nachrichten-IDs (UUIDv7, also Zeit).
+  Eine Systemmeldung bekommt die ID zur Zeit ihrer Änderung, nicht ihres Eintrags; der
+  Worker schreibt sie erst danach. Das Fenster ist so groß wie der Rückstand der Outbox:
+  gewöhnlich Millisekunden, bei einem Rückstau Sekunden bis Minuten. Eine Meldung, die in
+  diesem Fenster hinter dem Lesestand einer Person landet, zählt für sie nie als
+  ungelesen (das tun Systemmeldungen ohnehin nicht), und ein Abruf mit `after` überspringt
+  sie; der Browser lädt Seiten ganz neu und sieht sie also. Gelöst wird das mit der
+  Überarbeitung der Zähler in M6 (eine Sequenz in Commit-Reihenfolge oder ein Fenster).
+  Ebenfalls zurückgestellt: ein eigener Endpunkt für die Leseposition (N9) und ein
+  `NOTIFY` je Schreibvorgang (Review M3 N17; der Worker sendet seit den Bahnen eines je
+  Stapel).
 
 ### Betrieb hinter einem Reverse Proxy
 

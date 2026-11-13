@@ -1,7 +1,7 @@
-"""Review focus 2, the hard cases: a dispatcher dies in the middle of a batch (in
-process, and a real process killed with SIGKILL), and two dispatchers hold the same
-event. Each handler's effect is committed exactly once; only missing deliveries are
-made again. Real commits, separate connections.
+"""Review focus 2, the hard cases: a dispatcher dies in the middle of a lane's batch
+(in process, and a real process killed with SIGKILL), and another connection holds the
+same delivery. Each handler's effect is committed exactly once; only missing
+deliveries are made again. Real commits, separate connections.
 """
 
 import asyncio
@@ -15,14 +15,14 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.db import Database
-from app.core.outbox import Event, EventOutbox
+from app.core.outbox import Event, EventDelivery, EventOutbox
 from app.worker.dispatcher import Dispatcher
-from app.worker.registry import HandlerRegistry
 from tests.outbox_helpers import (
     Calls,
     delivered,
     effects,
     emit_committed,
+    lane_row,
     outbox_row,
     registry_of,
     write_effect,
@@ -32,43 +32,38 @@ from tests.real_db import RealDb
 BACKEND = Path(__file__).resolve().parent.parent
 
 
-async def test_the_same_delivery_on_two_connections_has_one_effect(real_db: RealDb) -> None:
-    """Should two dispatchers ever hold the same event (a claim whose connection was
-    lost while its handler still ran), the delivery record decides: the second waits
-    for the first and then finds the handler delivered."""
+async def test_a_delivery_another_connection_holds_has_one_effect(real_db: RealDb) -> None:
+    """Should another connection hold the same delivery (a worker of the previous
+    release, which knows no lanes), the delivery record decides: the lane waits for it
+    and then finds the handler delivered."""
     calls: Calls = Counter()
     (event_id,) = await emit_committed(real_db.database, real_db.org_id)
-    registry = HandlerRegistry()
-    started = asyncio.Event()
-
-    async def slow(session, event: Event) -> None:
-        calls[(event.id, "slow")] += 1
-        started.set()
-        await asyncio.sleep(0.3)
-        await write_effect(session, event, "slow")
-
-    registry.handler("test", "slow")(slow)
-    (handler,) = registry.for_type("test.happened")
-    async with real_db.database.session_factory() as session:
-        event = Event.of(await session.get_one(EventOutbox, event_id))
     url = get_settings().test_database_url
-    first, second = Database(url), Database(url)
+    other = Database(url)
     try:
-        d1, d2 = Dispatcher(first, registry), Dispatcher(second, registry)
-        task = asyncio.create_task(d1.deliver(event, handler))
-        await started.wait()
-        results = [await d2.deliver(event, handler), await task]
+        async with other.session_factory() as held:
+            row = await held.get_one(EventOutbox, event_id)
+            held.add(EventDelivery(event_id=event_id, handler="slow"))
+            await write_effect(held, Event.of(row), "slow")
+            await held.flush()  # written, not committed: the lane must wait
+            dispatching = asyncio.create_task(
+                Dispatcher(real_db.database, registry_of(calls, ["slow"])).drain()
+            )
+            await asyncio.sleep(0.3)
+            assert not dispatching.done()
+            await held.commit()
+        await asyncio.wait_for(dispatching, timeout=10)
     finally:
-        await first.dispose()
-        await second.dispose()
-    assert sorted(results) == [False, True]
-    assert calls[(event_id, "slow")] == 1
+        await other.dispose()
+    assert calls[(event_id, "slow")] == 0
     assert await effects(real_db.database, event_id) == Counter({"slow": 1})
+    assert (await outbox_row(real_db.database, event_id)).dispatched_at is not None
 
 
-async def test_crash_between_handler_and_mark_redelivers_only_missing(real_db: RealDb) -> None:
-    """In process: the dispatcher dies after its first handler committed; the batch's
-    transaction (which would mark the event dispatched) never commits."""
+async def test_crash_in_one_lane_redelivers_only_missing(real_db: RealDb) -> None:
+    """In process: lane `a` committed its batch, then lane `b`'s batch dies (the
+    process is going down); its transaction, which holds b's effect, record and lane
+    change, never commits."""
 
     class Crash(BaseException):
         pass
@@ -79,13 +74,22 @@ async def test_crash_between_handler_and_mark_redelivers_only_missing(real_db: R
 
     @crashing.handler("test", "b")
     async def _dies(session, event: Event) -> None:
+        await write_effect(session, event, "b")
         raise Crash()
 
+    dispatcher = Dispatcher(real_db.database, crashing)
+    assert (await dispatcher.route()).events == 1
+    (a, b) = dispatcher.handlers
+    assert await dispatcher.dispatch_lane(a) == 1
     with pytest.raises(Crash):
-        await Dispatcher(real_db.database, crashing).dispatch_batch()
+        await dispatcher.dispatch_lane(b)
     row = await outbox_row(real_db.database, event_id)
-    assert row.dispatched_at is None and row.attempts == 0
+    assert row.dispatched_at is None
+    lane = await lane_row(real_db.database, event_id, "b")
+    assert lane is not None and lane.attempts == 0
+    assert await lane_row(real_db.database, event_id, "a") is None
     assert await delivered(real_db.database, event_id) == {"a"}
+    assert await effects(real_db.database, event_id) == Counter({"a": 1})
 
     await Dispatcher(real_db.database, registry_of(calls, ["a", "b"])).drain()
     assert calls == Counter({(event_id, "a"): 1, (event_id, "b"): 1})
@@ -94,8 +98,8 @@ async def test_crash_between_handler_and_mark_redelivers_only_missing(real_db: R
 
 
 async def test_killed_worker_process_redelivers_only_missing(real_db: RealDb) -> None:
-    """A real crash: a dispatcher in another process is killed (SIGKILL) while its
-    second handler's transaction is open; its first handler had committed. Postgres
+    """A real crash: a dispatcher in another process is killed (SIGKILL) while the
+    second handler's lane transaction is open; the first handler's lane had committed. Postgres
     drops the dead connections' locks and uncommitted work, and a new dispatcher
     delivers only what is missing."""
     (event_id,) = await emit_committed(real_db.database, real_db.org_id)
