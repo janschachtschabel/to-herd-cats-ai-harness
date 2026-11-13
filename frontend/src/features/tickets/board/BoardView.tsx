@@ -110,7 +110,7 @@ export function BoardView() {
           }}
         >
           <div
-            className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-3"
+            className="relative -mx-1 flex gap-3 overflow-x-auto px-1 pb-3"
             role="group"
             aria-label={t('tickets.board.columns')}
           >

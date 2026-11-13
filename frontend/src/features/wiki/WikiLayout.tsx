@@ -106,7 +106,11 @@ function WikiFrame({ space }: { space: Space }) {
           </div>
         </div>
       ) : (
-        <Outlet />
+        // A one-column grid keeps the board's width (its columns scroll inside) out of
+        // the page's: without it the whole page scrolls sideways on a phone.
+        <div className="grid grid-cols-[minmax(0,1fr)]">
+          <Outlet />
+        </div>
       )}
       {abilities.create && (
         <NewPageDialog
