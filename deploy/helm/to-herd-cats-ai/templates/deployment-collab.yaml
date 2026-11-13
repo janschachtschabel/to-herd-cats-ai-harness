@@ -1,0 +1,111 @@
+{{- if .Values.collab.enabled }}
+# The collab process (live editing, HERD_ROLE=collab: node collab/server.mjs).
+# Exactly one replica, replaced with Recreate: a page's live document lives in this
+# process's memory while people edit it, so two processes would each hold their own
+# copy and split the page's editors (spec 12.4, stage 1). Its state is saved to
+# PostgreSQL through the API (at the latest 10 s after a change, and on SIGTERM
+# before it exits); the browsers reconnect by themselves after a restart.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "herd.fullname" . }}-collab
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collab
+  template:
+    metadata:
+      labels:
+        {{- include "herd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: collab
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "herd.podSecurityContext" . | nindent 8 }}
+      # SIGTERM: the process saves every open document (up to 10 s), then exits.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: collab
+          image: {{ include "herd.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: HERD_ROLE
+              value: collab
+            - name: HERD_COLLAB_PORT
+              value: "1234"
+            # The API's internal port (/internal/collab/*), guarded by the token.
+            - name: HERD_COLLAB_API_URL
+              value: {{ printf "http://%s-internal:9090" (include "herd.fullname" .) | quote }}
+            {{- include "herd.internalTokenEnv" . | nindent 12 }}
+            {{- if include "herd.publicUrl" . }}
+            {{- include "herd.publicUrlEnv" . | nindent 12 }}
+            {{- end }}
+            {{- range $name, $value := .Values.collab.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: collab
+              containerPort: 1234
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: collab
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: collab
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: collab
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.collab.resources | nindent 12 }}
+          securityContext:
+            {{- include "herd.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Only the API pods dial it (the relay of /collab/); never behind the Ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}-collab
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+  ports:
+    - name: collab
+      port: 1234
+      targetPort: collab
+      protocol: TCP
+{{- end }}

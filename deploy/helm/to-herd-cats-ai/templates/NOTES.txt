@@ -2,6 +2,11 @@ to-herd-cats-ai {{ .Chart.AppVersion }} is installed as {{ include "herd.fullnam
 
 Public port 8080: service {{ include "herd.fullname" . }}{{ if .Values.ingress.enabled }} (Ingress: {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}){{ end }}.
 Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal.
+{{- if .Values.collab.enabled }}
+Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab (one replica, by design).
+{{- with include "herd.publicUrl" . }} Browsers must open the app at {{ . }}.{{ else }} No publicUrl: WebSocket Origins must match the host the request came to.{{ end }}
+{{- end }}
+Files (attachments): {{ if .Values.persistence.enabled }}{{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }} on /data (kept on uninstall){{ else }}an emptyDir per API pod: files are lost with the pod (persistence.enabled=false){{ end }}.
 {{- if .Values.postgresql.enabled }}
 
 The bundled PostgreSQL is for test and staging only (no replication, no backups).

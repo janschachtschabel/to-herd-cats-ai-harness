@@ -1,10 +1,16 @@
 # to-herd-cats-ai with Docker Compose
 
 The reference deployment: PostgreSQL (`db`) and the app (`app`, `HERD_ROLE=all`:
-migrate, then serve) in one container. The app runs as user 10001 with a read-only
-filesystem (only `/tmp` is writable) and no capabilities. Only port 8080 is
-published; port 9090 (`/health`, `/ready`, `/metrics`) stays inside the compose
-network.
+migrate, then serve, with the live-editing process as a child) in one container. The
+app runs as user 10001 with a read-only filesystem (writable: `/tmp` and the volume
+`app-data` on `/data`, the attachments) and no capabilities. Only port 8080 is
+published; port 9090 (`/health`, `/ready`, `/metrics`, the collab process's internal
+API) stays inside the compose network.
+
+Live editing needs `HERD_INTERNAL_TOKEN` (at least 32 characters, `openssl rand -hex
+32`). Set `HERD_PUBLIC_URL` to the address browsers use (e.g. `https://wiki.example`
+behind a reverse proxy); empty, a WebSocket's Origin must match the host it was sent
+to. The reverse proxy must pass WebSocket upgrades on `/collab/`.
 
 ## Start
 
@@ -27,27 +33,33 @@ for the login limits) and `HERD_COOKIE_SECURE=true`.
 ## Stop
 
 ```bash
-docker compose down         # keeps the data (volume db-data)
+docker compose down         # keeps the data (volumes db-data and app-data)
 docker compose down -v      # deletes the data as well
 ```
 
 ## Backup
 
-The data is the PostgreSQL database; back it up with `pg_dump`, for example:
+The data is the PostgreSQL database and the attachments on `app-data`; back up both,
+for example:
 
 ```bash
 docker compose exec -T db pg_dump -U herd -Fc herd > herd-$(date +%F).dump
+docker compose exec -T app tar -C /data -c attachments > herd-files-$(date +%F).tar
 ```
 
 Restore only into an empty database (a fresh installation, before its first start:
 `docker compose up -d --wait db`, then `docker compose exec -T db pg_restore -U herd
--d herd < herd.dump`). Test the restore regularly.
+-d herd < herd.dump`). The attachments go back with `docker compose exec -T app tar -C
+/data -x < herd-files.tar`. Test the restore regularly.
 
 ## Smoke test
 
 `bash smoke.sh` builds the image, starts its own compose project on port 18080 with
 throwaway volumes (and a throwaway `.env` if there is none), logs in, checks
-`/ready`, the user id and the published ports, and tears everything down again. It
+`/ready`, the user id and the published ports, creates a page with an attachment (the
+files volume), opens the page's live-editing WebSocket with the owner's cookie (the
+collab process authenticates it) and without one (closed with 4401), and tears
+everything down again. It
 ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built beforehand.
 
 ## Load measurement

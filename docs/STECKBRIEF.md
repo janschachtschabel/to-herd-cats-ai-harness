@@ -14,9 +14,9 @@ Verwaltung. Wiki (M2), Aufgaben, Kanäle und Agenten folgen.
 | | |
 |---|---|
 | Dienst-ID | `to-herd-cats-ai` (Log-Feld `service`, `OTEL_SERVICE_NAME`, Image, Chart) |
-| Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all`) |
+| Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
-| Ports | 8080 öffentlich (API, SPA); 9090 intern (`/health`, `/ready`, `/metrics`) |
+| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
 | Lizenz | Apache-2.0 |
 
 ## Funktionen mit Laufzeit und Kosten
@@ -84,7 +84,14 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 ## Clusterfähigkeit
 
 - **Zustandslos:** Sitzungen, Login-Ratenlimit und Sperren liegen in PostgreSQL; jede
-  Replika kann jede Anfrage bedienen. Chart-Standard: 2 API-Replikas.
+  Replika kann jede Anfrage bedienen. Chart-Standard: 2 API-Replikas. Anhänge liegen
+  auf einem Volume (`/data`), das alle API-Replikas teilen (Chart: PVC mit
+  `ReadWriteMany`).
+- **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
+  (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
+  zwei Prozesse würden die Bearbeitenden einer Seite aufteilen. Der Zustand wird über
+  die API in PostgreSQL gespeichert (spätestens 10 s nach einer Änderung und beim
+  Beenden); nach einem Neustart verbinden sich die Browser selbst neu.
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -172,7 +179,12 @@ Aus den Messwerten mit 20–30 % Puffer:
 | entpackt | 333 MB (333.170.294 Byte) |
 | komprimiert | 76,4 MB (Docker „content size“); `docker save \| gzip`: 76,0 MB |
 | Plattform | linux/amd64 |
-| Basis | `python:3.13-slim` per Digest; tini 0.19.0 mit Prüfsumme; kein Node zur Laufzeit |
+| Basis | `python:3.13-slim` per Digest; tini 0.19.0 mit Prüfsumme; Node nur als Binärdatei für den Collab-Prozess (seit M2) |
+
+Mit der Live-Bearbeitung (M2: Node-22-Binärdatei und `collab/` mit seinen
+Produktionsabhängigkeiten, 26 MB) ergab ein Build hier 537 MB (537.110.062 Byte,
+entpackt, ohne Debian-Updates aus demselben Grund wie unten); die Neumessung folgt mit
+dem M2-Abschluss.
 
 Gemessen am Image aus Commit `ac8433f`. Der spätere Commit `e3ac0b1` spielt in der
 Laufzeitstufe Debian-Sicherheitsupdates ein (`apt-get upgrade`). Hier gebaut ergab das

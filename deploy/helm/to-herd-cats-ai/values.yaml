@@ -3,7 +3,7 @@
 
 ## @section Image
 
-## @param image.repository Image repository (one image for every role: api, migrate)
+## @param image.repository Image repository (one image for every role: api, migrate, collab)
 ## @param image.tag Image tag; empty means the chart's appVersion
 ## @param image.digest Image digest (sha256:...); when set it pins the image, the tag stays for readability
 ## @param image.pullPolicy Image pull policy
@@ -34,6 +34,42 @@ api:
   cookieSecure: true
   forwardedAllowIps: ""
   env: {}
+
+## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
+publicUrl: ""
+
+## @section Files (HERD_DATA_DIR=/data)
+
+## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only)
+## @param persistence.existingClaim Name of an existing PersistentVolumeClaim to use; empty: the chart creates one (kept on uninstall)
+## @param persistence.size Size of the claim the chart creates
+## @param persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
+## @param persistence.accessModes Access modes of the claim the chart creates; more than one API replica needs ReadWriteMany (every replica reads and writes the files), with one replica ReadWriteOnce is enough
+persistence:
+  enabled: true
+  existingClaim: ""
+  size: 10Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteMany
+
+## @section Live editing (HERD_ROLE=collab)
+
+## @param collab.enabled Run the collab process (Hocuspocus, live editing) as its own Deployment; the API relays /collab/ WebSockets to it. Off: the live editor reports that live editing is off
+## @param collab.resources Resource requests and limits of the collab container
+## @param collab.env Extra environment variables of the collab process (name: value)
+## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
+collab:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  env: {}
+  internalToken:
+    existingSecret: ""
 
 ## @section Secrets
 
@@ -89,7 +125,7 @@ ingress:
 
 ## @section NetworkPolicy
 
-## @param networkPolicy.enabled Restrict traffic of the app pods (and of the bundled PostgreSQL to the app)
+## @param networkPolicy.enabled Restrict traffic of the app pods (and of the collab process and the bundled PostgreSQL to the app)
 ## @param networkPolicy.publicFrom Peers allowed on the public port 8080 (NetworkPolicyPeer list, e.g. the ingress controller's namespace); empty: everyone
 ## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
 ## @param networkPolicy.egress Extra egress rules (NetworkPolicyEgressRule list), e.g. to an external database or OTLP collector; DNS and the bundled PostgreSQL are always allowed

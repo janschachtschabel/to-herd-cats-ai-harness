@@ -68,6 +68,67 @@
       "required": ["replicas", "resources", "cookieSecure", "forwardedAllowIps", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
     },
+    "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "PersistentVolumeClaim on /data; off: emptyDir"},
+        "existingClaim": {"type": "string", "description": "Existing PersistentVolumeClaim; empty: the chart creates one"},
+        "size": {"type": "string", "minLength": 1, "description": "Size of the created claim"},
+        "storageClass": {"type": "string", "description": "Storage class; empty: cluster default"},
+        "accessModes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadWriteOncePod"]},
+          "description": "Access modes of the created claim; more than one API replica needs ReadWriteMany"
+        }
+      },
+      "required": ["enabled", "existingClaim", "size", "storageClass", "accessModes"],
+      "description": "The files volume (attachments) of the API pods"
+    },
+    "collab": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Run the collab process (live editing)"},
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra environment variables (name: value)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "additionalProperties": {"type": "string"}
+        },
+        "internalToken": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {"type": "string", "description": "Existing Secret with the key \"token\"; empty: generated"}
+          },
+          "required": ["existingSecret"]
+        }
+      },
+      "required": ["enabled", "resources", "env", "internalToken"],
+      "description": "The collab Deployment (HERD_ROLE=collab), always one replica"
+    },
     "secrets": {
       "type": "object",
       "additionalProperties": false,
@@ -255,5 +316,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

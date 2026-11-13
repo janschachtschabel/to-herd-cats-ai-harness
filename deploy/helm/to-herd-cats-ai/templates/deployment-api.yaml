@@ -35,6 +35,16 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
+            {{- if include "herd.publicUrl" . }}
+            {{- include "herd.publicUrlEnv" . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.collab.enabled }}
+            # Live editing: /collab/ WebSockets are checked here and relayed to the
+            # collab process, which calls back on the internal port with the token.
+            {{- include "herd.internalTokenEnv" . | nindent 12 }}
+            - name: HERD_COLLAB_URL
+              value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
+            {{- end }}
           {{- with .Values.secrets.existingSecret }}
           envFrom:
             - secretRef:
@@ -77,5 +87,15 @@ spec:
             {{- include "herd.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             {{- include "herd.volumeMounts" . | nindent 12 }}
+            - name: data
+              mountPath: /data
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
+        # The files (attachments); fsGroup 10001 makes the volume writable.
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

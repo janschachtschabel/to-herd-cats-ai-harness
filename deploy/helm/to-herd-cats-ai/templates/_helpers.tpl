@@ -105,7 +105,8 @@ seccompProfile:
 {{- end }}
 {{- end -}}
 
-{{/* Volumes of the app pods: a writable /tmp and the database password file. */}}
+{{/* Volumes of the app pods: a writable /tmp and the database password file
+(the files volume /data is the API's alone, see deployment-api.yaml). */}}
 {{- define "herd.volumes" -}}
 - name: tmp
   emptyDir: {}
@@ -128,4 +129,35 @@ seccompProfile:
   mountPath: /var/run/secrets/herd/database
   readOnly: true
 {{- end }}
+{{- end -}}
+
+{{/* HERD_PUBLIC_URL: publicUrl, else the first Ingress host (https with TLS), else "". */}}
+{{- define "herd.publicUrl" -}}
+{{- if .Values.publicUrl -}}
+{{- .Values.publicUrl -}}
+{{- else if and .Values.ingress.enabled .Values.ingress.hosts -}}
+{{- printf "%s://%s" (ternary "https" "http" (not (empty .Values.ingress.tls))) (first .Values.ingress.hosts).host -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The Secret holding the token API and collab process share (key "token"). */}}
+{{- define "herd.internalTokenSecret" -}}
+{{- .Values.collab.internalToken.existingSecret | default (printf "%s-internal-token" (include "herd.fullname" .)) -}}
+{{- end -}}
+
+{{/* HERD_PUBLIC_URL, when there is one (API and collab process). */}}
+{{- define "herd.publicUrlEnv" -}}
+{{- with include "herd.publicUrl" . }}
+- name: HERD_PUBLIC_URL
+  value: {{ . | quote }}
+{{- end }}
+{{- end -}}
+
+{{/* HERD_INTERNAL_TOKEN from its Secret (API and collab process). */}}
+{{- define "herd.internalTokenEnv" -}}
+- name: HERD_INTERNAL_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "herd.internalTokenSecret" . }}
+      key: token
 {{- end -}}

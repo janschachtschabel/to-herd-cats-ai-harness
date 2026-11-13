@@ -49,7 +49,8 @@ cd backend && uv sync
 cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy app scripts
 cd backend && uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/runtime.txt \
   && uv run python scripts/check_licenses.py python /tmp/runtime.txt \
-  && uv run python scripts/check_licenses.py npm ../frontend/package-lock.json
+  && uv run python scripts/check_licenses.py npm ../frontend/package-lock.json \
+  && uv run python scripts/check_licenses.py npm ../collab/package-lock.json
 ```
 
 ```bash
@@ -57,11 +58,16 @@ cd frontend && npm ci
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build && node scripts/check-i18n.mjs
 cd frontend && npm run generate:api   # after API changes: openapi.json + src/lib/api-types.ts
 cd frontend && npm run check:api      # fails if those files are stale
-cd frontend && npm run dev            # proxies /api to http://localhost:8080
+cd frontend && npm run dev            # proxies /api and /collab to http://localhost:8080
 ```
 
 ```bash
-docker build -t to-herd-cats-ai:local .                 # the image (SPA + API, uid 10001)
+cd collab && npm ci && npm run lint && npm test   # live-editing process (Hocuspocus, node 22)
+cd collab && npm run test:integration             # real API on a throwaway database (psql, uv)
+```
+
+```bash
+docker build -t to-herd-cats-ai:local .                 # the image (SPA + API + collab, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 ```

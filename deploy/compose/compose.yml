@@ -1,6 +1,8 @@
 # Reference deployment: PostgreSQL and the app in one container (HERD_ROLE=all:
-# migrate, then serve). Secrets come from .env next to this file (see .env.example).
-# Only the public port 8080 is published; 9090 (probes, metrics) stays inside.
+# migrate, then serve, with the live-editing process as a child on 127.0.0.1).
+# Secrets come from .env next to this file (see .env.example). Only the public port
+# 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
+# the collab port stay inside. Attachments live on the volume app-data (/data).
 name: to-herd-cats-ai
 
 services:
@@ -34,6 +36,11 @@ services:
       HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      # Shared by the API and the collab process (live editing); at least 32 characters.
+      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+      # The address browsers use, e.g. https://wiki.example; WebSocket Origins must
+      # match it. Empty: they must match the host the request came to.
+      HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
       HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
       HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
@@ -42,6 +49,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - app-data:/data
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
@@ -50,3 +59,4 @@ services:
 
 volumes:
   db-data:
+  app-data:

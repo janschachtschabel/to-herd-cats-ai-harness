@@ -48,6 +48,7 @@ password="$(openssl rand -hex 24)"
   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
   echo "HERD_BOOTSTRAP_ADMIN_EMAIL=$email"
   echo "HERD_BOOTSTRAP_ADMIN_PASSWORD=$password"
+  echo "HERD_INTERNAL_TOKEN=$(openssl rand -hex 32)"
 } >"$work/env"
 cat >"$work/override.yml" <<'EOF'
 services:

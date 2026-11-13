@@ -13,7 +13,9 @@
 !frontend/tsconfig*.json
 !frontend/vite.config.ts
 !frontend/components.json
-!collab/schema.mjs
+!collab/package.json
+!collab/package-lock.json
+!collab/*.mjs
 **/__pycache__
 **/*.pyc
 **/node_modules

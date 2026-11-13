@@ -31,7 +31,11 @@ entsteht nur beim allerersten Start; das Passwort danach in der App ändern (Men
 rechts → „Profil und Einstellungen“; dort ändert jede Person ihr eigenes Passwort und
 ihre Sprache).
 
-`docker compose down` hält die Daten (Volume `db-data`), `down -v` löscht sie.
+`docker compose down` hält die Daten (Volumes `db-data` für die Datenbank, `app-data`
+für die Anhänge unter `/data`), `down -v` löscht sie. `HERD_INTERNAL_TOKEN` in `.env`
+schaltet die Live-Bearbeitung ein (der Collab-Prozess läuft im selben Container);
+`HERD_PUBLIC_URL` ist die Adresse, unter der Browser die App öffnen (leer: der
+angefragte Host).
 Sicherung, Wiederherstellung, Reverse-Proxy und alle Variablen:
 [`deploy/compose/README.md`](deploy/compose/README.md).
 
@@ -52,7 +56,20 @@ Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `passw
 mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
 [Betriebshinweise](#betriebshinweise) lesen.
 
-Zwei Werte betreffen jeden Betrieb hinter einem Ingress:
+Das Chart legt außerdem an: den Collab-Prozess (`<release>-collab`, Live-Bearbeitung)
+mit genau einer Replika und `strategy: Recreate` (die Dokumente einer Live-Sitzung
+liegen im Speicher dieses einen Prozesses; zwei Prozesse würden die Bearbeitenden einer
+Seite aufteilen), ein erzeugtes Secret `<release>-internal-token` mit dem Token, das API
+und Collab-Prozess teilen (bleibt bei Upgrades und Deinstallation erhalten; mit `helm
+template`/GitOps stattdessen `collab.internalToken.existingSecret` setzen), und einen
+PersistentVolumeClaim `<release>-data` für die Anhänge unter `/data`. Ihn lesen und
+schreiben alle API-Replikas, deshalb ist `ReadWriteMany` voreingestellt; ohne solche
+Speicherklasse `api.replicas=1` und `persistence.accessModes={ReadWriteOnce}` setzen
+(mehr Replikas mit `ReadWriteOnce` lehnt das Chart ab). Live-Bearbeitung ist ein
+WebSocket unter `/collab/` am selben Service wie die API; der Ingress-Controller muss
+das Upgrade durchreichen (ingress-nginx und Traefik tun es ohne Einstellung).
+
+Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
 - `api.cookieSecure` (Standard `true`): Das Sitzungs-Cookie trägt `Secure`, der Browser
   schickt es nur über https (und an `localhost`, etwa bei `kubectl port-forward`). Nur
@@ -63,6 +80,9 @@ Zwei Werte betreffen jeden Betrieb hinter einem Ingress:
   Adresse des Ingress-Pods (im Audit und für die Anmeldelimits, die dann für alle
   zusammen gälten). Mit `ingress.enabled` ist der Wert Pflicht; das Chart bricht sonst
   mit einer Meldung ab.
+- `publicUrl` (`HERD_PUBLIC_URL`): die Adresse, unter der Browser die App öffnen;
+  WebSocket-Verbindungen der Live-Bearbeitung müssen von ihr kommen. Leer nimmt das
+  Chart den ersten Ingress-Host (mit TLS als https).
 
 ## Entwicklung
 
@@ -168,8 +188,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   5 MiB. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
-  `networkPolicy.internalFrom` niemanden an Port 9090, also auch Prometheus nicht:
-  Prometheus dort eintragen. Mit externer Datenbank braucht es eine Egress-Regel zu
+  `networkPolicy.internalFrom` niemanden an Port 9090 außer dem Collab-Prozess, also
+  auch Prometheus nicht: Prometheus dort eintragen. Den Collab-Prozess (Port 1234)
+  erreichen nur die API-Pods; er selbst darf nur zu DNS und Port 9090 der API. Mit externer Datenbank braucht es eine Egress-Regel zu
   ihr (`networkPolicy.egress`).
 - **Image nur für linux/amd64.** arm64 würde Cross-Builds der Node- und uv-Stufen
   brauchen.
@@ -178,7 +199,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
 - **Werkzeugversionen der CI** (helm, kubeconform, promtool, pip-audit, uv) sind mit
   Prüfsummen festgelegt und werden von Hand angehoben; Renovate erfasst sie nicht.
 - **CSP** erlaubt `style-src 'unsafe-inline'`, weil Radix (react-remove-scroll) ein
-  `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt.
+  `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt. Die
+  WebSocket-Verbindung der Live-Bearbeitung geht an denselben Host und fällt unter
+  `default-src 'self'` (in Chromium ohne Verletzung geprüft); die CSP bleibt unverändert.
 - **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft in
   Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig
   je Prozess; jede braucht 64 MiB. Höchstens `HERD_PASSWORD_HASH_QUEUE` (Standard 16)
@@ -196,7 +219,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
 - **Anhänge**: Dateien liegen unter `HERD_DATA_DIR` (Standard `/data`; für die lokale
   Entwicklung auf ein beschreibbares Verzeichnis setzen), je Organisation und Inhalt
   einmal (`attachments/<org_id>/<sha256>`). Mehrere API-Replikas brauchen dasselbe
-  Volume (Compose und Helm bekommen es mit der Live-Bearbeitung). Ein Anhang hat
+  Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Das Image legt
+  `/data` mit dem Besitzer 10001 an, damit ein neues benanntes Volume dort beschreibbar
+  ist; das Wurzeldateisystem bleibt nur lesbar. Ein Anhang hat
   höchstens `HERD_ATTACHMENT_MAX_BYTES` (Standard 26214400, 25 MiB); nur die
   Upload-Route nimmt so große Körper an, ein Ingress davor muss dort ebenso viel
   zulassen (ingress-nginx: `proxy-body-size`). Ein Upload wird bis 1 MiB im Speicher,

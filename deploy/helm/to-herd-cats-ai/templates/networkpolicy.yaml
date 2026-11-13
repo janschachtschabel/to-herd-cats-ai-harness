@@ -1,7 +1,8 @@
 {{- if .Values.networkPolicy.enabled }}
 # App pods (API and migration job): 8080 from publicFrom (empty: everyone), 9090 only
-# from internalFrom; out only DNS, the bundled PostgreSQL and networkPolicy.egress.
-# Kubelet probes come from the node, which common CNIs let through.
+# from internalFrom and the collab process; out only DNS, the bundled PostgreSQL, the
+# collab process and networkPolicy.egress. Kubelet probes come from the node, which
+# common CNIs let through.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -32,6 +33,17 @@ spec:
       from:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+    {{- if .Values.collab.enabled }}
+    # The collab process calls /internal/collab/* (auth, load, save, check).
+    - ports:
+        - port: 9090
+          protocol: TCP
+      from:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: collab
+    {{- end }}
   egress:
     - ports:
         - port: 53
@@ -48,9 +60,61 @@ spec:
         - port: 5432
           protocol: TCP
     {{- end }}
+    {{- if .Values.collab.enabled }}
+    # The relay of /collab/ WebSockets.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: collab
+      ports:
+        - port: 1234
+          protocol: TCP
+    {{- end }}
     {{- with .Values.networkPolicy.egress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+{{- if .Values.collab.enabled }}
+---
+# The collab process: WebSockets only from the API pods (the relay), out only DNS and
+# the API's internal port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" . }}-collab
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collab
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      ports:
+        - port: 1234
+          protocol: TCP
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      ports:
+        - port: 9090
+          protocol: TCP
+{{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
 # The bundled PostgreSQL: reachable only from the app pods, no egress at all.

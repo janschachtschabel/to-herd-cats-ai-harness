@@ -151,6 +151,20 @@ def test_internal_token_is_hidden_and_never_echoed(monkeypatch: pytest.MonkeyPat
     assert "at least 32" in str(caught.value)
 
 
+def test_public_url_must_be_an_origin_and_empty_means_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Compose passes `HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}`: empty is "not set"
+    (Origins are then compared with the request's host)."""
+    monkeypatch.setenv("HERD_PUBLIC_URL", "")
+    assert Settings().public_url is None
+    monkeypatch.setenv("HERD_PUBLIC_URL", "https://wiki.example")
+    assert Settings().public_url == "https://wiki.example"
+    monkeypatch.setenv("HERD_PUBLIC_URL", "wiki.example")
+    with pytest.raises(ValidationError, match="HERD_PUBLIC_URL must be"):
+        Settings()
+
+
 def test_bootstrap_password_is_hidden(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
