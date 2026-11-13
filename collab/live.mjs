@@ -132,7 +132,8 @@ export function liveExtension({
       const check = (work) =>
         work.catch((error) => {
           if (!(error instanceof CheckFailed)) throw error;
-          log("live check failed", { page_id: context.pageId, error: error.message });
+          const reason = error.cause?.code ?? "check_failed"; // no message: no page text
+          log("live check failed", { page_id: context.pageId, reason });
           throw deny(context, CLOSE.tooLarge);
         });
       let opened;

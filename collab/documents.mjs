@@ -96,8 +96,11 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
   /** The latest state cannot be stored: say so, with the kind of cause and the block
    * (the edits stay unsaved). */
   async function unrepresentable(document, state, written) {
-    const { problem } = written;
-    if (!state.unrepresentable) log("live save refused", { page_id: state.pageId, problem });
+    // Kind, block and the check's problem (a path or a node type, never page text, U10).
+    const { problem, kind, block = null } = written;
+    if (!state.unrepresentable) {
+      log("live save refused", { page_id: state.pageId, kind, block, problem });
+    }
     const notice = unrepresentableNotice(written);
     if (state.unrepresentable !== notice) tell(document, notice);
     state.unrepresentable = notice;

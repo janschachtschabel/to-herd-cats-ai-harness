@@ -31,6 +31,16 @@ export const schema = getSchema(extensions());
 
 export const normalized = (markdown) => markdown.replace(/\r\n?/g, "\n");
 
+/** A schema error without the content it quotes (review M2 U10: ProseMirror's message
+ * holds the node's text, and the problem is logged): the kind and the node type. */
+function schemaError(error) {
+  const message = String(error?.message);
+  const kind = /^Invalid content/.test(message) ? "content" : "schema";
+  // Only a node type of the schema: an unknown one is a name a client chose.
+  const name = /\bnode(?: type)?:?\s+"?([A-Za-z][\w-]*)/.exec(message)?.[1];
+  return name && schema.nodes[name] ? `${kind} of ${name}` : kind;
+}
+
 /** Why the browser's editor would not show the document as it is, or null (review M2
  * S1): it must be valid for the editor's schema (the browser drops what is not, and
  * that deletion would be saved), and it must come back unchanged from the Y.Doc. */
@@ -42,7 +52,7 @@ export function editorProblem(json) {
     node = schema.nodeFromJSON(json);
     node.check();
   } catch (error) {
-    return `invalid: ${error.message}`;
+    return `invalid: ${schemaError(error)}`;
   }
   const back = yDocToProsemirrorJSON(prosemirrorJSONToYDoc(schema, json, FIELD), FIELD);
   return schema.nodeFromJSON(back).eq(node) ? null : "changed by the Y.Doc";
