@@ -11,6 +11,7 @@
 // are stored.
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
+import { CheckFailed } from "./checks.mjs";
 import { yDocToJSON } from "./markdown.mjs";
 import { CLOSE, REPRESENTABLE, STORED, UNREPRESENTABLE, closeSocket } from "./protocol.mjs";
 
@@ -118,8 +119,13 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     try {
       written = await checks.readBack(json);
     } catch (error) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true);
-      throw error;
+      if (!(error instanceof CheckFailed)) {
+        for (const sessionId of editors) state.dirty.set(sessionId, true);
+        throw error;
+      }
+      // Too heavy to check (the worker ran out of memory): not stored, as a state that
+      // cannot be written; the cause is not known.
+      written = { ok: false, problem: error.message, kind: "unknown", block: null };
     }
     if (!written.ok) {
       for (const sessionId of editors) state.dirty.set(sessionId, true);

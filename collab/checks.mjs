@@ -1,20 +1,27 @@
-// The heavy checks of live editing off the event loop (review M2 T9): a few worker
-// threads (`check-worker.mjs`) take the work, each request goes to the one with the
-// fewest waiting. The answers are those of the functions in `check-worker.mjs`.
-// A worker that dies fails its waiting requests and is replaced. `inlineChecks` does
-// the same work on the calling thread (for tools and tests that want no threads).
+// The heavy checks of live editing off the event loop (review M2 T9): worker threads
+// (`check-worker.mjs`) take the work, each request goes to the one with the fewest
+// waiting. The answers are those of the functions in `check-worker.mjs`.
+//
+// A worker's heap is capped (`heapMb`): a page that needs more to be checked fails
+// with `CheckFailed` instead of taking the whole collab process (and every open live
+// document with it) over its memory limit. A worker that dies fails its waiting
+// requests and is replaced. `inlineChecks` does the same work on the calling thread
+// (for tools and tests that want no threads).
 import { Worker } from "node:worker_threads";
 import { WORK } from "./check-worker.mjs";
 
 const SCRIPT = new URL("./check-worker.mjs", import.meta.url);
 
-export function createChecks({ workers = 2 } = {}) {
+/** A check that could not run to its end (its worker ran out of memory or died). */
+export class CheckFailed extends Error {}
+
+export function createChecks({ workers = 1, heapMb = 192 } = {}) {
   let next = 0;
   let closed = false;
   const pool = [];
 
   function start(slot) {
-    const worker = new Worker(SCRIPT);
+    const worker = new Worker(SCRIPT, { resourceLimits: { maxOldGenerationSizeMb: heapMb } });
     const entry = { worker, waiting: new Map() };
     worker.unref();
     worker.on("message", ({ id, result, error }) => {
@@ -24,8 +31,13 @@ export function createChecks({ workers = 2 } = {}) {
       if (error) request.reject(Object.assign(new Error(error.message), { stack: error.stack }));
       else request.resolve(result);
     });
+    let failed = false;
     const fail = (error) => {
-      for (const request of entry.waiting.values()) request.reject(error);
+      if (failed) return;
+      failed = true;
+      for (const request of entry.waiting.values()) {
+        request.reject(new CheckFailed(error.message, { cause: error }));
+      }
       entry.waiting.clear();
       if (!closed && pool[slot] === entry) start(slot);
     };
@@ -37,7 +49,7 @@ export function createChecks({ workers = 2 } = {}) {
   for (let slot = 0; slot < Math.max(1, workers); slot++) start(slot);
 
   function run(kind, payload) {
-    if (closed) return Promise.reject(new Error("checks closed"));
+    if (closed) return Promise.reject(new CheckFailed("checks closed"));
     const entry = pool.reduce((best, e) => (e.waiting.size < best.waiting.size ? e : best));
     const id = next++;
     return new Promise((resolve, reject) => {

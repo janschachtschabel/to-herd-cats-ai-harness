@@ -33,7 +33,7 @@ import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
-import { inlineChecks } from "./checks.mjs";
+import { CheckFailed, inlineChecks } from "./checks.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { sizeGuard } from "./size.mjs";
 import {
@@ -119,20 +119,27 @@ export function liveExtension({
       const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
       const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
       Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
-      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9).
+      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9). A page too
+      // heavy to check there is too large for live editing.
+      const check = (work) =>
+        work.catch((error) => {
+          if (!(error instanceof CheckFailed)) throw error;
+          log("live check failed", { page_id: context.pageId, error: error.message });
+          throw deny(context, CLOSE.tooLarge);
+        });
       let opened;
       if (stored) {
         // A state the browser's editor would repair (and save repaired) is not opened;
         // one it would only tidy without changing its meaning is tidied, so the browser
         // has nothing left to change (review M2 T1, ruling A).
         const bytes = Buffer.from(stored, "base64");
-        opened = await checks.tidy(bytes);
+        opened = await check(checks.tidy(bytes));
         if (opened.problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
         Y.applyUpdate(document, bytes);
       } else {
         // Only a page the editor can show without changing its meaning is opened, as the
         // browser's editor shows it once loaded.
-        opened = await checks.open(contentMd);
+        opened = await check(checks.open(contentMd));
         if (!opened.safe) throw deny(context, CLOSE.notRoundTripSafe);
       }
       const tidied = opened.update !== null;

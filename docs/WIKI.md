@@ -196,8 +196,14 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Markdown-Editor; der Live-Editor sagt das dann.
 - **Große Seiten:** Das Öffnen und die Speicherprüfung einer Seite von 200.000 Zeichen
   dauern einige Sekunden. Sie laufen in eigenen Threads des Collab-Prozesses
-  (`HERD_COLLAB_CHECK_WORKERS`, Standard 2), damit alle anderen Live-Seiten
+  (`HERD_COLLAB_CHECK_WORKERS`, Standard 1), damit alle anderen Live-Seiten
   währenddessen flüssig bleiben; bereits geprüfte Blöcke werden nicht erneut geprüft.
+  Jeder dieser Threads hat höchstens 192 MB Heap (so bleibt der Prozess mit einem
+  Thread unter dem Limit des Charts von 512 MiB). Braucht die Prüfung einer Seite mehr
+  (etwa tausende kleine Tabellen), endet nur diese Prüfung: Die Seite ist dann zu groß
+  für die Live-Bearbeitung (4413, Markdown-Editor), bzw. ein solcher Stand wird nicht
+  gespeichert und alle sehen den Hinweis (Ursache unbekannt). Jeder weitere Thread
+  braucht bis zu rund 250 MB mehr.
 - **Abmelden:** Eine offene Live-Verbindung endet mit der nächsten Prüfung, also bis zu
   5 s nach dem Abmelden; was in diesen Sekunden noch ankommt, wird unter dem Namen der
   Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und

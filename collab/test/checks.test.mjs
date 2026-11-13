@@ -3,7 +3,7 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import * as Y from "yjs";
-import { createChecks, inlineChecks } from "../checks.mjs";
+import { CheckFailed, createChecks, inlineChecks } from "../checks.mjs";
 import { jsonToYDoc, markdownToJSON, yDocToJSON } from "../markdown.mjs";
 
 const checks = createChecks({ workers: 2 });
@@ -105,4 +105,24 @@ test("the event loop goes on while a page of 200,000 characters is checked", asy
     longest < 100,
     `the event loop stalled ${Math.round(longest)} ms of ${Math.round(took)}`,
   );
+});
+
+/** A page of tables, heavy to check. */
+function tablePage(chars) {
+  const blocks = [];
+  for (let i = 0; blocks.join("\n\n").length < chars; i++) {
+    blocks.push(`## Abschnitt ${i}`, `| Spalte | Wert |\n| --- | ---: |\n| ${i} | ${i * 2} |`);
+  }
+  return blocks.join("\n\n") + "\n";
+}
+
+test("a check that needs more than the worker's heap fails alone", async () => {
+  const small = createChecks({ heapMb: 32 });
+  try {
+    assert.equal((await small.open("Text\n")).safe, true);
+    await assert.rejects(small.open(tablePage(195_000)), CheckFailed);
+    assert.equal((await small.open("Weiter\n")).safe, true, "a fresh worker answers");
+  } finally {
+    await small.close();
+  }
 });
