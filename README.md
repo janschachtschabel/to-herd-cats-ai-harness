@@ -160,6 +160,11 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
   && node scripts/check-i18n.mjs && npm run check:api
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
                                        # Wegwerf-Datenbank (psql, uv nötig), zwei Yjs-Clients
+cd e2e && npm ci && npx playwright install chromium && npx playwright test
+                                       # Browser: Live-Bearbeitung mit zwei Personen in der
+                                       # echten App (Rolle all, Wegwerf-Datenbank); vorher
+                                       # `npm run build` in frontend/. Ein vorhandenes Chromium
+                                       # nimmt PLAYWRIGHT_CHROMIUM_EXECUTABLE.
 docker build -t to-herd-cats-ai:local . && bash deploy/compose/smoke.sh   # endet mit SMOKE OK
 bash deploy/compose/load.sh            # Ressourcen und Laufzeiten für den Steckbrief
 ```

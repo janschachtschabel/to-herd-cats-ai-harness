@@ -1,8 +1,9 @@
-# Checks for pull requests and for pushes to main: backend, frontend, collab, chart,
-# image and licenses. A tag runs them once, called by the release workflow before anything is
-# published (no push trigger for tags here, so nothing runs twice). A pull request's
-# own pushes run as `pull_request` only (no branch push trigger besides main). Actions are pinned by commit;
-# Renovate keeps the pins current. Only the default GITHUB_TOKEN (read) is used.
+# Checks for pull requests and for pushes to main: backend, frontend, collab, the
+# browser tests (e2e), chart, image and licenses. A tag runs them once, called by the
+# release workflow before anything is published (no push trigger for tags here, so
+# nothing runs twice). A pull request's own pushes run as `pull_request` only (no branch
+# push trigger besides main). Actions are pinned by commit; Renovate keeps the pins
+# current. Only the default GITHUB_TOKEN (read) is used.
 name: CI
 
 on:
@@ -136,6 +137,55 @@ jobs:
           HERD_IT_ADMIN_URL: postgresql://herd:herd@localhost:5433/herd_test
       - run: npm audit --audit-level=high
 
+  # The browser tests of live editing (e2e/, Playwright): the built SPA and the real app
+  # (role all: API and collab process) on a scratch database, two browser contexts.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            collab/package-lock.json
+            e2e/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: npm ci
+        working-directory: collab
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: npx playwright test
+        working-directory: e2e
+        env:
+          HERD_E2E_ADMIN_URL: postgresql://herd:herd@localhost:5433/herd_test
+      - run: npm audit --audit-level=high
+        working-directory: e2e
+
   chart:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -218,3 +268,5 @@ jobs:
         run: uv run python scripts/check_licenses.py npm ../frontend/package-lock.json
       - name: Collab runtime dependencies (package-lock.json without dev)
         run: uv run python scripts/check_licenses.py npm ../collab/package-lock.json
+      - name: Browser test dependencies (e2e/package-lock.json)
+        run: uv run python scripts/check_licenses.py npm ../e2e/package-lock.json

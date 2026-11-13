@@ -25,6 +25,8 @@ measurements each milestone), `docs/WIKI.md` (wiki use and reverse-proxy operati
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
+- Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing in
+  the real app (role all) on a throwaway database; a CI job of its own.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
   BlueOak-1.0.0 or OFL-1.1 (fonts). CI checks it (`backend/scripts/check_licenses.py`).
@@ -58,7 +60,8 @@ cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check
 cd backend && uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/runtime.txt \
   && uv run python scripts/check_licenses.py python /tmp/runtime.txt \
   && uv run python scripts/check_licenses.py npm ../frontend/package-lock.json \
-  && uv run python scripts/check_licenses.py npm ../collab/package-lock.json
+  && uv run python scripts/check_licenses.py npm ../collab/package-lock.json \
+  && uv run python scripts/check_licenses.py npm ../e2e/package-lock.json
 ```
 
 ```bash
@@ -72,6 +75,14 @@ cd frontend && npm run dev            # proxies /api and /collab to http://local
 ```bash
 cd collab && npm ci && npm run lint && npm test   # live-editing process (Hocuspocus, node 22)
 cd collab && npm run test:integration             # real API on a throwaway database (psql, uv)
+```
+
+```bash
+# Browser tests of live editing (Playwright; own package, `@playwright/test` only): the
+# built SPA and the real app in role all on a throwaway database (psql, uv).
+cd frontend && npm run build
+cd e2e && npm ci && npx playwright install chromium && npx playwright test
+# With a Chromium already installed: PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chrome
 ```
 
 ```bash
