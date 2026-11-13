@@ -158,7 +158,9 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   [Steckbrief](docs/STECKBRIEF.md)); neu gemessen ist das nicht.
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
   30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
-  `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche. Die
+  `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche. Eine
+  IPv6-Adresse zählt dabei mit ihrem /64-Präfix (ein Anschluss hat meist ein ganzes
+  /64), eine IPv4-Adresse für sich; das Audit-Log hält die volle Adresse fest. Die
   Client-Adresse stimmt nur, wenn der Reverse Proxy in `HERD_FORWARDED_ALLOW_IPS`
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
 

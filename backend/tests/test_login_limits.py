@@ -9,12 +9,14 @@
 import asyncio
 from datetime import timedelta
 
+import pytest
 from fastapi import FastAPI
 from sqlalchemy import func, select
 
 from app.core.config import Settings, get_settings
 from app.core.models_base import utcnow
-from app.core.ratelimit import PRUNE_BATCH, WINDOW, RateLimitHit
+from app.core.ratelimit import PRUNE_BATCH, WINDOW, RateLimitHit, limit_key
+from app.modules.audit.models import AuditLog
 from tests.factories import CSRF, PASSWORD
 from tests.real_db import MakeRealClient, RealDb
 
@@ -92,3 +94,49 @@ async def test_stale_counters_of_any_key_are_pruned(
         )
         assert await s.scalar(stale) == 0
     assert PRUNE_BATCH >= 50
+
+
+async def test_an_ipv6_prefix_counts_as_one_address(
+    real_db: RealDb, real_app: FastAPI, make_real_client: MakeRealClient
+) -> None:
+    """One IPv6 host controls a whole /64: rotating within it does not reset a limit."""
+    _limits(real_app, per_ip=3)
+    codes = []
+    for host in range(1, 5):
+        client = await make_real_client(client_ip=f"2001:db8:1:2::{host}")
+        codes.append(await _attempt(client, f"nobody{host}@example.com", "wrong-password"))
+    assert codes == [401, 401, 401, 429]
+    neighbour = await make_real_client(client_ip="2001:db8:1:3::1")
+    assert await _attempt(neighbour, real_db.member_email, PASSWORD) == 200
+    # The audit log keeps the full address, not the prefix.
+    me = (await neighbour.get("/api/auth/me")).json()["user"]
+    body = {"locale": "en", "version": me["version"]}
+    assert (await neighbour.patch("/api/auth/me", json=body)).status_code == 200
+    async with real_db.database.session_factory() as s:
+        assert await s.scalar(select(AuditLog.ip)) == "2001:db8:1:3::1"
+
+
+async def test_failures_from_one_ipv6_prefix_lock_the_account_for_the_prefix(
+    real_db: RealDb, real_app: FastAPI, make_real_client: MakeRealClient
+) -> None:
+    _limits(real_app, account=2)
+    for host in ("a", "b"):
+        client = await make_real_client(client_ip=f"2001:db8:5:6::{host}")
+        assert await _attempt(client, real_db.member_email, "wrong-password") == 401
+    rotated = await make_real_client(client_ip="2001:db8:5:6:ffff::1")
+    assert await _attempt(rotated, real_db.member_email, PASSWORD) == 429
+
+
+@pytest.mark.parametrize(
+    ("address", "key"),
+    [
+        ("203.0.113.7", "203.0.113.7"),
+        ("2001:db8:1:2:3:4:5:6", "2001:db8:1:2::/64"),
+        ("2001:DB8:1:2::1", "2001:db8:1:2::/64"),
+        ("::ffff:203.0.113.7", "203.0.113.7"),
+        (None, "unknown"),
+        ("not-an-address", "not-an-address"),
+    ],
+)
+def test_limit_key_of_an_address(address: str | None, key: str) -> None:
+    assert limit_key(address) == key

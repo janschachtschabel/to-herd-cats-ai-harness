@@ -8,7 +8,7 @@ from app.core.access import Action, actor_for, system_permissions
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
 from app.core.models_base import utcnow
-from app.core.ratelimit import RateLimiter
+from app.core.ratelimit import RateLimiter, limit_key
 from app.core.security import (
     hash_token,
     new_session_token,
@@ -41,10 +41,11 @@ class AuthService:
         address, whatever the email (bounds the hashing one client can cause), and
         failed attempts per client address and email (guessing one account). Only
         failures count for the second, and only from that address, so nobody at
-        another address can lock the person out. Without a usable account a dummy
-        hash is verified, so the answer takes as long either way. Single organisation
+        another address can lock the person out. An IPv6 address counts by its /64.
+        Without a usable account a dummy hash is verified, so the answer takes as long
+        either way. Single organisation
         per installation: the person is looked up in it."""
-        address = ip or "unknown"
+        address = limit_key(ip)
         per_ip = RateLimiter(self.session, limit=self.settings.login_ip_rate_limit_per_minute)
         if await per_ip.acquire(f"login-ip:{address}") is None:
             raise RateLimited(code="auth.too_many_attempts")

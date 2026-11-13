@@ -10,8 +10,12 @@ tenant data (a login attempt has no organisation yet), so the table has no org_i
   `PRUNE_BATCH` rows older than it, of any key, so keys that are never used again do
   not stay (index on `hit_at`).
 - A hit can be released again (`release`): the login limit counts only failures.
+- Limits per client address use `limit_key`: an IPv4 address as it is, an IPv6 address
+  by its /64 (one host normally controls a whole /64). The audit log keeps the full
+  address.
 """
 
+import ipaddress
 import uuid
 from datetime import datetime, timedelta
 
@@ -24,6 +28,21 @@ from app.core.repository import advisory_xact_lock
 
 WINDOW = timedelta(seconds=60)
 PRUNE_BATCH = 500
+
+
+def limit_key(address: str | None) -> str:
+    """The part of a client address a per-address limit counts by."""
+    if address is None:
+        return "unknown"
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.IPv6Network((ip, 64), strict=False))
+    return str(ip)
 
 
 class RateLimitHit(UuidPk, Base):
