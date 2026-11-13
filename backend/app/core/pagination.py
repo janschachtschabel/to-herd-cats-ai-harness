@@ -6,11 +6,10 @@ page by id. Lists sorted by name page by (key, id).
 """
 
 import base64
-import binascii
 import json
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,18 +29,45 @@ class Page[T](BaseModel):
     next_cursor: str | None = None
 
 
+def _invalid(exc: Exception | None = None) -> ValidationFailed:
+    error = ValidationFailed("Invalid cursor", code="validation_failed")
+    error.__cause__ = exc
+    return error
+
+
+def _b64(cursor: str) -> bytes:
+    return base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+
+
+def _storable(text: str) -> str:
+    """Text the database can take: valid UTF-8 (no lone surrogate), no NUL."""
+    text.encode("utf-8")
+    if "\x00" in text:
+        raise ValueError("NUL in cursor text")
+    return text
+
+
+# A cursor is untrusted input: any failure while decoding it (bad base64, bad UTF-8,
+# wrong JSON types, out-of-range dates, absurd numbers, deep nesting) means "invalid
+# cursor", answered with 422, never a 500.
+
+
 def encode_cursor(created_at: datetime, id_: uuid.UUID) -> str:
     raw = f"{created_at.isoformat()}|{id_}".encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
 def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    """An aware timestamp, normalised to UTC (an offset that leaves the date range
+    fails here, not in the database), and an id."""
     try:
-        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
-        ts, id_ = raw.split("|")
-        return datetime.fromisoformat(ts), uuid.UUID(id_)
-    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
-        raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+        ts, id_ = _b64(cursor).decode().split("|")
+        created_at = datetime.fromisoformat(ts)
+        if created_at.tzinfo is None:
+            raise ValueError("naive timestamp")
+        return created_at.astimezone(UTC), uuid.UUID(id_)
+    except Exception as exc:
+        raise _invalid(exc) from exc
 
 
 def encode_id_cursor(id_: uuid.UUID) -> str:
@@ -49,10 +75,11 @@ def encode_id_cursor(id_: uuid.UUID) -> str:
 
 
 def decode_id_cursor(cursor: str) -> uuid.UUID:
+    """Any 16 bytes are a position (ids are opaque); anything else is invalid."""
     try:
-        return uuid.UUID(bytes=base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
-    except (binascii.Error, ValueError) as exc:
-        raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+        return uuid.UUID(bytes=_b64(cursor))
+    except Exception as exc:
+        raise _invalid(exc) from exc
 
 
 def encode_key_cursor(key: str, id_: uuid.UUID) -> str:
@@ -62,13 +89,12 @@ def encode_key_cursor(key: str, id_: uuid.UUID) -> str:
 
 def decode_key_cursor(cursor: str) -> tuple[str, uuid.UUID]:
     try:
-        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
-        key, id_ = json.loads(raw)
-        if not isinstance(key, str) or "\x00" in key:
-            raise ValueError("key is not storable text")
-        return key, uuid.UUID(id_)
-    except (binascii.Error, ValueError, TypeError, UnicodeDecodeError) as exc:
-        raise ValidationFailed("Invalid cursor", code="validation_failed") from exc
+        key, id_ = json.loads(_b64(cursor).decode())
+        if not isinstance(key, str) or not isinstance(id_, str):
+            raise TypeError("cursor parts are not text")
+        return _storable(key), uuid.UUID(id_)
+    except Exception as exc:
+        raise _invalid(exc) from exc
 
 
 def id_page[T](rows: list[T], limit: int, key: Callable[[T], uuid.UUID]) -> Page[T]:
