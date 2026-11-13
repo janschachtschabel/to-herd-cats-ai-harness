@@ -158,3 +158,22 @@ def test_bootstrap_password_is_hidden(
         assert "boot-pw-7e21" not in text_
     # The reader still gets the value.
     assert settings.bootstrap_admin_password.get_secret_value() == "boot-pw-7e21"
+
+
+@pytest.mark.parametrize("password", ["short-pw1", "x" * 201])
+def test_bootstrap_password_follows_the_password_rule(
+    monkeypatch: pytest.MonkeyPatch, password: str
+) -> None:
+    """The first owner's password meets the same rule as any other (10–200 characters);
+    the start fails with a message that does not echo the value."""
+    monkeypatch.setenv("HERD_BOOTSTRAP_ADMIN_PASSWORD", password)
+    with pytest.raises(ValidationError) as caught:
+        Settings()
+    message = str(caught.value)
+    assert "HERD_BOOTSTRAP_ADMIN_PASSWORD" in message and "10" in message
+    assert password not in message
+
+
+def test_no_bootstrap_password_is_allowed() -> None:
+    """Without one, bootstrap is skipped (and says so in the log)."""
+    assert Settings(bootstrap_admin_password="").bootstrap_admin_password.get_secret_value() == ""

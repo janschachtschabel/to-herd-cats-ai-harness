@@ -8,6 +8,8 @@ from pydantic import Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
+from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
+
 
 class Settings(BaseSettings):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
@@ -52,6 +54,16 @@ class Settings(BaseSettings):
     static_dir: Path | None = None
 
     _database_password: SecretStr | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _bootstrap_password_follows_the_rule(self) -> Self:
+        length = len(self.bootstrap_admin_password.get_secret_value())
+        if length and not PASSWORD_MIN_LENGTH <= length <= PASSWORD_MAX_LENGTH:
+            raise ValueError(
+                "HERD_BOOTSTRAP_ADMIN_PASSWORD must be "
+                f"{PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters long"
+            )
+        return self
 
     @model_validator(mode="after")
     def _resolve_database_password(self) -> Self:
