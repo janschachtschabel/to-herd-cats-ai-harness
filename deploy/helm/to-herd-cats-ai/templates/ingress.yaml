@@ -1,4 +1,7 @@
 {{- if .Values.ingress.enabled }}
+{{- if not .Values.api.forwardedAllowIps }}
+{{- fail "api.forwardedAllowIps is required with ingress.enabled: set it to the address range of the ingress controller's pods (e.g. 10.0.0.0/8), otherwise every client appears with the ingress pod's address and the scheme stays http" }}
+{{- end }}
 # Only the public service; the internal port 9090 is never exposed.
 apiVersion: networking.k8s.io/v1
 kind: Ingress

@@ -56,6 +56,8 @@
             }
           }
         },
+        "cookieSecure": {"type": "boolean", "description": "Session cookie with Secure (HERD_COOKIE_SECURE)"},
+        "forwardedAllowIps": {"type": "string", "description": "Trusted reverse proxies (HERD_FORWARDED_ALLOW_IPS); required when ingress.enabled"},
         "env": {
           "type": "object",
           "description": "Extra environment variables (name: value)",
@@ -63,7 +65,7 @@
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "resources", "env"],
+      "required": ["replicas", "resources", "cookieSecure", "forwardedAllowIps", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
     },
     "secrets": {

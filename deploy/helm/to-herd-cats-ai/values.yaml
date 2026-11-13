@@ -20,7 +20,9 @@ imagePullSecrets: []
 
 ## @param api.replicas Number of API pods; the processes are stateless
 ## @param api.resources Resource requests and limits of the API container
-## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL, HERD_COOKIE_SECURE, HERD_FORWARDED_ALLOW_IPS
+## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
+## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
+## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL
 api:
   replicas: 2
   resources:
@@ -29,6 +31,8 @@ api:
       memory: 256Mi
     limits:
       memory: 512Mi
+  cookieSecure: true
+  forwardedAllowIps: ""
   env: {}
 
 ## @section Secrets

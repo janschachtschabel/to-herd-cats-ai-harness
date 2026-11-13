@@ -89,6 +89,12 @@ seccompProfile:
 - name: HERD_DATABASE_PASSWORD_FILE
   value: /var/run/secrets/herd/database/password
 {{- end }}
+- name: HERD_COOKIE_SECURE
+  value: {{ $root.Values.api.cookieSecure | quote }}
+{{- with $root.Values.api.forwardedAllowIps }}
+- name: HERD_FORWARDED_ALLOW_IPS
+  value: {{ . | quote }}
+{{- end }}
 {{- with $root.Values.tracing.otlpEndpoint }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ . | quote }}

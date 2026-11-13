@@ -68,6 +68,7 @@ bash deploy/compose/load.sh                             # docker stats idle/warm
 
 ```bash
 bash deploy/helm/scripts/check-chart-version.sh         # chart version = appVersion = pyproject version
+bash deploy/helm/scripts/check-chart-rules.sh           # chart behaviour (HELM="docker run ... alpine/helm" works too)
 helm lint --strict deploy/helm/to-herd-cats-ai          # also with -f deploy/helm/to-herd-cats-ai/ci/*-values.yaml
 helm template t deploy/helm/to-herd-cats-ai | kubeconform -strict -summary
 promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml

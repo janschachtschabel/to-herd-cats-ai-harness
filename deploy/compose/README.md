@@ -18,9 +18,11 @@ Open <http://127.0.0.1:8080> and log in with `HERD_BOOTSTRAP_ADMIN_EMAIL` and
 `HERD_BOOTSTRAP_ADMIN_PASSWORD`. The first owner is created on the first start
 only; change the password afterwards in the app.
 
-Behind a TLS reverse proxy, set `HERD_BIND_ADDRESS` / `HERD_HOST_PORT` to where
-the proxy connects, `HERD_FORWARDED_ALLOW_IPS` to the proxy's address and
-`HERD_COOKIE_SECURE=true`.
+This reference serves plain http for local trials, so the session cookie is not
+`Secure` by default. Behind a TLS reverse proxy, set `HERD_BIND_ADDRESS` /
+`HERD_HOST_PORT` to where the proxy connects, `HERD_FORWARDED_ALLOW_IPS` to the
+proxy's address (otherwise every client has the proxy's address, in the audit and
+for the login limits) and `HERD_COOKIE_SECURE=true`.
 
 ## Stop
 

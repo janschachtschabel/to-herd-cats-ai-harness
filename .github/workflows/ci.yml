@@ -116,6 +116,7 @@ jobs:
           tar -xzf prometheus.tgz --strip-components=1 -C bin "${prom}/promtool"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - run: bash deploy/helm/scripts/check-chart-version.sh
+      - run: bash deploy/helm/scripts/check-chart-rules.sh
       - name: helm lint --strict (defaults and every ci/*-values.yaml)
         run: |
           helm lint --strict "$CHART"

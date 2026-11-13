@@ -8,9 +8,9 @@ imagePullSecrets:
   - name: regcred
 api:
   replicas: 3
+  forwardedAllowIps: 10.0.0.0/8
   env:
-    HERD_COOKIE_SECURE: "true"
-    HERD_FORWARDED_ALLOW_IPS: 10.0.0.0/8
+    HERD_LOG_LEVEL: INFO
 secrets:
   existingSecret: herd-app
 database:

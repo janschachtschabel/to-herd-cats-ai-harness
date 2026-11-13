@@ -50,6 +50,18 @@ Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `passw
 mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
 [Betriebshinweise](#betriebshinweise) lesen.
 
+Zwei Werte betreffen jeden Betrieb hinter einem Ingress:
+
+- `api.cookieSecure` (Standard `true`): Das Sitzungs-Cookie trägt `Secure`, der Browser
+  schickt es nur über https (und an `localhost`, etwa bei `kubectl port-forward`). Nur
+  auf `false` setzen, wenn die App absichtlich über reines http erreicht wird.
+- `api.forwardedAllowIps` (`HERD_FORWARDED_ALLOW_IPS`): die Adressen der
+  Ingress-Controller-Pods, z. B. das Pod-Netz `10.0.0.0/8`. Nur deren
+  `X-Forwarded-For`/`-Proto` glaubt die App. Ohne den Wert hätte jeder Client die
+  Adresse des Ingress-Pods (im Audit und für die Anmeldelimits, die dann für alle
+  zusammen gälten). Mit `ingress.enabled` ist der Wert Pflicht; das Chart bricht sonst
+  mit einer Meldung ab.
+
 ## Entwicklung
 
 Voraussetzungen: Python 3.13 mit [`uv`](https://docs.astral.sh/uv/), Node 22 mit npm,
