@@ -1,7 +1,7 @@
 import { MarkdownManager } from '@tiptap/markdown'
 import { yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import type * as Y from 'yjs'
-import { extensions } from '@collab/schema.mjs'
+import { extensions, keepWikiLinks } from '@collab/schema.mjs'
 
 const FIELD = 'default' // the fragment the collab process converts (collab/markdown.mjs)
 
@@ -12,5 +12,5 @@ let manager: MarkdownManager | null = null
 export function liveMarkdown(doc: Y.Doc): string {
   manager ??= new MarkdownManager({ extensions: extensions() })
   const json = yXmlFragmentToProsemirrorJSON(doc.getXmlFragment(FIELD))
-  return manager.serialize(json).replace(/^\n+|\n+$/g, '')
+  return keepWikiLinks(manager.serialize(json).replace(/^\n+|\n+$/g, ''))
 }

@@ -8,7 +8,7 @@ import { getSchema } from "@tiptap/core";
 import { MarkdownManager } from "@tiptap/markdown";
 import { Lexer } from "marked";
 import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "y-prosemirror";
-import { RAW_MARKDOWN, extensions } from "./schema.mjs";
+import { RAW_MARKDOWN, extensions, keepWikiLinks } from "./schema.mjs";
 
 export const FIELD = "default"; // the Y.XmlFragment the browser's Collaboration extension uses
 export const RAW_LANGUAGE = RAW_MARKDOWN;
@@ -72,7 +72,8 @@ export function markdownToJSON(markdown) {
 }
 
 export function jsonToMarkdown(json) {
-  return manager.serialize(json).replace(/^\n+|\n+$/g, ""); // tables bring their own blank lines
+  // tables bring their own blank lines
+  return keepWikiLinks(manager.serialize(json).replace(/^\n+|\n+$/g, ""));
 }
 
 export function markdownToYDoc(markdown) {

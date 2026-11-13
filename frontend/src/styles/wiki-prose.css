@@ -44,7 +44,41 @@
   }
   .wiki-editor .ProseMirror ul[data-type='taskList'] li {
     display: flex;
+    align-items: flex-start;
     gap: 0.5em;
+  }
+  .wiki-editor .ProseMirror ul[data-type='taskList'] li > label {
+    margin-top: 0.2em;
+  }
+  .wiki-editor .ProseMirror ul[data-type='taskList'] li > div {
+    flex: 1;
+  }
+  :is(.wiki-prose, .wiki-editor .ProseMirror) :is(li, li > div, th, td) > p {
+    margin: 0;
+  }
+  /* The other people's cursors: a thin line in their colour, their name above it
+     (white on the collab process's colours, which carry it at 4.5:1). */
+  .wiki-editor .collaboration-carets__caret {
+    position: relative;
+    margin: 0 -1px;
+    border-left: 1px solid;
+    border-right: 1px solid;
+    word-break: normal;
+    pointer-events: none;
+  }
+  .wiki-editor .collaboration-carets__label {
+    position: absolute;
+    top: -1.5em;
+    left: -1px;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px 4px 4px 0;
+    color: #fff;
+    font-size: 0.75rem;
+    font-style: normal;
+    font-weight: 600;
+    line-height: normal;
+    white-space: nowrap;
+    user-select: none;
   }
   :is(.wiki-prose, .wiki-editor .ProseMirror) a {
     color: var(--primary);

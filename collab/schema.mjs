@@ -9,7 +9,16 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 
 export const RAW_MARKDOWN = "raw-markdown";
 
-const LINK_PROTOCOLS = ["http", "https", "mailto"];
+const LINK_PROTOCOLS = new Set(["http", "https", "mailto"]);
+
+/** Links only to http, https, mailto and relative targets (as the page view renders). */
+export function allowedUri(url) {
+  const value = String(url).trim();
+  const colon = value.indexOf(":");
+  const stop = value.search(/[/?#]/);
+  if (colon === -1 || (stop !== -1 && stop < colon)) return true;
+  return LINK_PROTOCOLS.has(value.slice(0, colon).toLowerCase());
+}
 
 function text(node) {
   return (node.content ?? []).map((child) => child.text ?? "").join("");
@@ -39,7 +48,10 @@ export function extensions() {
       codeBlock: false,
       undoRedo: false, // the browser uses Yjs' undo
       underline: false, // no Markdown for it
-      link: { openOnClick: false, protocols: LINK_PROTOCOLS },
+      // Each browser that joins would add its own empty last paragraph to the shared
+      // document (saved as `&nbsp;`); the gap cursor reaches the end without one.
+      trailingNode: false,
+      link: { openOnClick: false, isAllowedUri: (url) => allowedUri(url) },
     }),
     SafeCodeBlock,
     Image,
@@ -47,4 +59,22 @@ export function extensions() {
     TaskList,
     TaskItem.configure({ nested: true }),
   ];
+}
+
+const ESCAPED_WIKI_LINK = /\\\[\\\[([^\n]+?)\\\]\\\]/g; // `\[\[Titel\]\]`
+const FENCE = /^\s*(```|~~~)/;
+
+/** The serializer escapes brackets, which would turn `[[Titel]]` (a link to another
+ * page, resolved by the browser) into literal text: wiki links are written back as
+ * they came, outside fenced code. */
+export function keepWikiLinks(markdown) {
+  let inFence = false;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (FENCE.test(line)) inFence = !inFence;
+      else if (!inFence) return line.replace(ESCAPED_WIKI_LINK, "[[$1]]");
+      return line;
+    })
+    .join("\n");
 }

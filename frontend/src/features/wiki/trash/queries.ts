@@ -28,7 +28,12 @@ export function useTrashPage(page: WikiPage) {
       ),
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: wikiKeys.page(page.id) })
-      void queryClient.invalidateQueries({ queryKey: ['wiki', 'path', page.space_id] })
+      // Not refetched while the trashed page is still on screen (it would be a 404);
+      // the next visit of any path loads it fresh.
+      void queryClient.invalidateQueries({
+        queryKey: ['wiki', 'path', page.space_id],
+        refetchType: 'none',
+      })
       void queryClient.invalidateQueries({ queryKey: trashQuery(page.space_id).queryKey })
       void invalidateTree(queryClient, page.space_id)
     },

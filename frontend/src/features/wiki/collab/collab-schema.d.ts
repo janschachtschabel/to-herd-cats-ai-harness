@@ -5,4 +5,6 @@ declare module '@collab/schema.mjs' {
 
   export const RAW_MARKDOWN: string
   export function extensions(): AnyExtension[]
+  export function allowedUri(url: string): boolean
+  export function keepWikiLinks(markdown: string): string
 }

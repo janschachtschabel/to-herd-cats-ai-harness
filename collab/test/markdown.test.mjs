@@ -41,6 +41,13 @@ test("simple constructs come back as written", () => {
   }
 });
 
+test("wiki links come back as written, and code is left alone", () => {
+  const md = "Siehe [[Urlaub]] und [[Neue Seite]], aber \\[nicht\\].";
+  assert.equal(roundTrip(md), md);
+  const code = "```\n\\[\\[bleibt\\]\\]\n```";
+  assert.equal(roundTrip(code), code);
+});
+
 test("the document lives in the editor's field", () => {
   const doc = markdownToYDoc("# Hallo");
   assert.ok(doc.getXmlFragment(FIELD).length > 0);
