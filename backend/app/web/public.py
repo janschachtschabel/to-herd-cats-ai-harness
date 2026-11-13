@@ -18,6 +18,7 @@ from app.modules.groups.router import router as groups_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.users.router import router as users_router
 from app.modules.wiki import router as wiki
+from app.modules.wiki.versions_router import page_versions
 from app.web.spa import mount_spa
 
 
@@ -31,6 +32,7 @@ def api_router() -> APIRouter:
     api.include_router(wiki.space_pages)
     api.include_router(wiki.pages)
     api.include_router(wiki.space_trash)
+    api.include_router(page_versions)
     api.include_router(directory_router)
     api.include_router(audit_router)
     return api

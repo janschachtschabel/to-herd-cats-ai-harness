@@ -64,8 +64,12 @@ async def test_hostile_cursors_answer_422_everywhere(
     name: str, owner: AsyncClient, group: Group
 ) -> None:
     space_id = (await owner.get("/api/spaces")).json()["items"][0]["id"]
+    page = await owner.post(f"/api/spaces/{space_id}/pages", json={"title": "Seite"})
+    ids = {"{space_id}": space_id, "{group_id}": str(group.id), "{page_id}": page.json()["id"]}
     for template in _list_endpoints():
-        path = template.replace("{space_id}", space_id).replace("{group_id}", str(group.id))
+        path = template
+        for placeholder, value in ids.items():
+            path = path.replace(placeholder, value)
         response = await owner.get(path, params={"cursor": HOSTILE[name]})
         if name == "empty":
             # An empty cursor means "first page".

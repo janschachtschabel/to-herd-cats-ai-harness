@@ -54,6 +54,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/pages/{page_id}/restore", "page"),
     ("GET", "/api/spaces/{space_id}/trash", "space"),
     ("DELETE", "/api/pages/{page_id}", "admin"),  # purge: page.purge (system admins)
+    ("GET", "/api/pages/{page_id}/versions", "page"),
+    ("GET", "/api/pages/{page_id}/versions/{number}", "page"),
+    ("PATCH", "/api/pages/{page_id}/versions/{number}", "page"),
+    ("POST", "/api/pages/{page_id}/versions/{number}/restore", "page"),
+    ("GET", "/api/pages/{page_id}/diff", "page"),
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -89,10 +94,12 @@ def _concrete(template: str, space_id: object | None = None, page_id: object | N
         "{group_id}": str(uuid7()),
         "{member_type}": "user",
         "{member_id}": str(uuid7()),
+        "{number}": "1",
     }
     for name, value in ids.items():
         template = template.replace(name, value)
-    return template + ("?path=x" if template.endswith("/by-path") else "")
+    queries = {"/by-path": "?path=x", "/diff": "?from=1&to=1"}
+    return template + next((q for end, q in queries.items() if template.endswith(end)), "")
 
 
 def test_every_api_route_is_listed() -> None:
@@ -130,6 +137,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/pages/{page_id}/publish"): {"version": 1},
     ("POST", "/api/pages/{page_id}/move"): {"parent_id": None, "version": 1},
     ("POST", "/api/pages/{page_id}/trash"): {"version": 1},
+    ("PATCH", "/api/pages/{page_id}/versions/{number}"): {"label": "X"},
+    ("POST", "/api/pages/{page_id}/versions/{number}/restore"): {"version": 1},
 }
 
 

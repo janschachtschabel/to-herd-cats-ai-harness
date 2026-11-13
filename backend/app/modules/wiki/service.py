@@ -16,10 +16,11 @@ from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.audit.recorder import record
-from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
+from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus, VersionSource
 from app.modules.wiki.moves import PageMoves
 from app.modules.wiki.trash import PageTrash
 from app.modules.wiki.tree import child_path, depth_of, unique_slug
+from app.modules.wiki.versions import VersionService
 from app.modules.wiki.visibility import PageReader, check_version, page_not_found, touch
 
 
@@ -128,6 +129,7 @@ class PageService:
                 updated_by_id=who.id,
             )
         )
+        await VersionService(self.session).record(page, actor, VersionSource.HUMAN)
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
         return page
@@ -140,8 +142,10 @@ class PageService:
         title: str | None = None,
         content_md: str | None = None,
         version: int,
+        change_summary: str | None = None,
     ) -> Page:
-        """Change title and/or content; a request that changes nothing changes nothing."""
+        """Change title and/or content, saved as a new version; a request that changes
+        nothing changes nothing."""
         page = await self.readable(actor, page_id, lock=True)
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
         check_version(page, version)
@@ -153,6 +157,9 @@ class PageService:
         if changed:
             touch(page, actor)
             await self.session.flush()
+            await VersionService(self.session).record(
+                page, actor, VersionSource.HUMAN, change_summary=change_summary
+            )
         return page
 
     async def publish(self, actor: Actor, page_id: uuid.UUID, version: int) -> Page:

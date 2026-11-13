@@ -1,4 +1,5 @@
-"""Wiki pages (spec 9). Markdown in `content_md` is the only stored form of a page.
+"""Wiki pages and their versions (spec 9). Markdown in `content_md` is the only stored
+form of a page.
 
 `path` is the slugs from the root down, joined by `/`; it is unique in a space among
 the pages that are not in the trash, and rewritten for a whole subtree when a page
@@ -9,17 +10,29 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
+from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
 from app.core.principal import PrincipalType
 
 MAX_DEPTH = 16  # path segments
 MAX_CONTENT_CHARS = 200_000
 MAX_TITLE_CHARS = 200
 MAX_SLUG_CHARS = 80
+MAX_SUMMARY_CHARS = 300
+MAX_LABEL_CHARS = 100
 
 
 class PageStatus(StrEnum):
@@ -64,3 +77,38 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
     updated_by_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     updated_by_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VersionSource(StrEnum):
+    HUMAN = "human"  # saved by someone through the API
+    IMPORT = "import"
+    RESTORE = "restore"  # an older state brought back as a new version
+    COLLAB = "collab"  # saved from a live-editing session
+
+
+class PageVersion(UuidPk, OrgScoped, Base):
+    """A saved state of a page, numbered 1, 2, … per page. Versions of one author in
+    one live session are folded into one within a short window (`session_key`)."""
+
+    __tablename__ = "page_version"
+    __table_args__ = (
+        UniqueConstraint("page_id", "number"),
+        CheckConstraint("source IN ('human', 'import', 'restore', 'collab')", name="source"),
+    )
+
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE"), nullable=False
+    )
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(MAX_TITLE_CHARS), nullable=False)
+    content_md: Mapped[str] = mapped_column(Text, nullable=False)
+    author_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
+    author_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    source: Mapped[VersionSource] = mapped_column(String(16), nullable=False)
+    # Free text, or `restore:<n>` for a restore (the client words it).
+    change_summary: Mapped[str | None] = mapped_column(String(MAX_SUMMARY_CHARS))
+    label: Mapped[str | None] = mapped_column(String(MAX_LABEL_CHARS))
+    session_key: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

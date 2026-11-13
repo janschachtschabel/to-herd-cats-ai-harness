@@ -105,6 +105,48 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "DiffOut": {
+        "description": "Line by line from `from_number` to `to_number`; a changed line is a `delete`\nfollowed by an `insert`.",
+        "properties": {
+          "from_number": {
+            "title": "From Number",
+            "type": "integer"
+          },
+          "from_title": {
+            "title": "From Title",
+            "type": "string"
+          },
+          "hunks": {
+            "items": {
+              "$ref": "#/components/schemas/HunkOut"
+            },
+            "title": "Hunks",
+            "type": "array"
+          },
+          "title_changed": {
+            "title": "Title Changed",
+            "type": "boolean"
+          },
+          "to_number": {
+            "title": "To Number",
+            "type": "integer"
+          },
+          "to_title": {
+            "title": "To Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_number",
+          "to_number",
+          "title_changed",
+          "from_title",
+          "to_title",
+          "hunks"
+        ],
+        "title": "DiffOut",
+        "type": "object"
+      },
       "DirectoryEntryOut": {
         "description": "Who can be added to a space. Deliberately no email or role: any member may read it.",
         "properties": {
@@ -307,6 +349,32 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HunkOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "equal",
+              "insert",
+              "delete"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "lines"
+        ],
+        "title": "HunkOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -567,6 +635,18 @@
         "additionalProperties": false,
         "description": "Fields left out stay as they are; neither may be null.",
         "properties": {
+          "change_summary": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Summary"
+          },
           "content_md": {
             "anyOf": [
               {
@@ -844,6 +924,33 @@
           "items"
         ],
         "title": "Page[UserOut]",
+        "type": "object"
+      },
+      "Page_VersionSummaryOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VersionSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[VersionSummaryOut]",
         "type": "object"
       },
       "PasswordChangeIn": {
@@ -1476,6 +1583,189 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VersionAuthor": {
+        "description": "`name` is None for an author that is not a person.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "title": "VersionAuthor",
+        "type": "object"
+      },
+      "VersionLabelIn": {
+        "additionalProperties": false,
+        "description": "null takes the label away.",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "VersionLabelIn",
+        "type": "object"
+      },
+      "VersionOut": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/VersionAuthor"
+          },
+          "change_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Summary"
+          },
+          "content_md": {
+            "title": "Content Md",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VersionSource"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "author",
+          "source",
+          "change_summary",
+          "label",
+          "created_at",
+          "content_md"
+        ],
+        "title": "VersionOut",
+        "type": "object"
+      },
+      "VersionSource": {
+        "enum": [
+          "human",
+          "import",
+          "restore",
+          "collab"
+        ],
+        "title": "VersionSource",
+        "type": "string"
+      },
+      "VersionSummaryOut": {
+        "description": "`change_summary` is free text, or `restore:<n>` for a version that brought\nversion n back (the client words it).",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/VersionAuthor"
+          },
+          "change_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Summary"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VersionSource"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "author",
+          "source",
+          "change_summary",
+          "label",
+          "created_at"
+        ],
+        "title": "VersionSummaryOut",
         "type": "object"
       }
     }
@@ -2577,6 +2867,71 @@
         ]
       }
     },
+    "/api/pages/{page_id}/diff": {
+      "get": {
+        "operationId": "diff_versions_api_pages__page_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "From",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "To",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Diff Versions",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/pages/{page_id}/move": {
       "post": {
         "operationId": "move_page_api_pages__page_id__move_post",
@@ -2767,6 +3122,257 @@
           }
         },
         "summary": "Trash Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/versions": {
+      "get": {
+        "operationId": "list_versions_api_pages__page_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_VersionSummaryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Versions",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/versions/{number}": {
+      "get": {
+        "operationId": "get_version_api_pages__page_id__versions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version",
+        "tags": [
+          "wiki"
+        ]
+      },
+      "patch": {
+        "operationId": "label_version_api_pages__page_id__versions__number__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionLabelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Label Version",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/versions/{number}/restore": {
+      "post": {
+        "operationId": "restore_version_api_pages__page_id__versions__number__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Version",
         "tags": [
           "wiki"
         ]

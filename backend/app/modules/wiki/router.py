@@ -63,7 +63,12 @@ async def update_page(
     page_id: uuid.UUID, body: PageUpdate, actor: ActorDep, session: SessionDep
 ) -> PageOut:
     page = await PageService(session).update(
-        actor, page_id, title=body.title, content_md=body.content_md, version=body.version
+        actor,
+        page_id,
+        title=body.title,
+        content_md=body.content_md,
+        version=body.version,
+        change_summary=body.change_summary,
     )
     return PageOut.of(page)
 

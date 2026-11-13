@@ -5,12 +5,19 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.core.principal import PrincipalType
-from app.modules.wiki.models import MAX_CONTENT_CHARS, MAX_TITLE_CHARS, Page, PageStatus
+from app.modules.wiki.models import (
+    MAX_CONTENT_CHARS,
+    MAX_SUMMARY_CHARS,
+    MAX_TITLE_CHARS,
+    Page,
+    PageStatus,
+)
 
 Title = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE_CHARS)
 ]
 Markdown = Annotated[str, Field(max_length=MAX_CONTENT_CHARS)]
+Summary = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_SUMMARY_CHARS)]
 
 
 class PrincipalRef(BaseModel):
@@ -100,6 +107,7 @@ class PageUpdate(BaseModel):
 
     title: Title | None = None
     content_md: Markdown | None = None
+    change_summary: Summary | None = None
     version: int
 
     @field_validator("title", "content_md")

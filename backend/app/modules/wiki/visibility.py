@@ -17,6 +17,7 @@ from app.core.errors import Conflict, NotFound
 from app.modules.wiki.models import Page, PageStatus
 from app.modules.wiki.repository import PageRepository, PageScope
 from app.modules.wiki.subtree_repository import SubtreeRepository
+from app.modules.wiki.versions_repository import VersionRepository
 
 
 def page_not_found() -> NotFound:
@@ -46,6 +47,10 @@ class PageReader:
     def subtree(self, actor: Actor) -> SubtreeRepository:
         """`repo`, with the statements over whole subtrees."""
         return SubtreeRepository(self.session, self._scope(actor))
+
+    def versions(self, actor: Actor) -> VersionRepository:
+        """The versions of the pages in `repo`."""
+        return VersionRepository(self.session, self._scope(actor))
 
     def _scope(self, actor: Actor) -> PageScope:
         return PageScope(actor.org_id, visible_space_ids(actor))

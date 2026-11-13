@@ -271,6 +271,23 @@ export interface paths {
         patch: operations["update_page_api_pages__page_id__patch"];
         trace?: never;
     };
+    "/api/pages/{page_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diff Versions */
+        get: operations["diff_versions_api_pages__page_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/move": {
         parameters: {
             query?: never;
@@ -333,6 +350,58 @@ export interface paths {
         put?: never;
         /** Trash Page */
         post: operations["trash_page_api_pages__page_id__trash_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pages/{page_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions */
+        get: operations["list_versions_api_pages__page_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pages/{page_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_pages__page_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Label Version */
+        patch: operations["label_version_api_pages__page_id__versions__number__patch"];
+        trace?: never;
+    };
+    "/api/pages/{page_id}/versions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Version */
+        post: operations["restore_version_api_pages__page_id__versions__number__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -528,6 +597,25 @@ export interface components {
             target_type: string;
         };
         /**
+         * DiffOut
+         * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
+         *     followed by an `insert`.
+         */
+        DiffOut: {
+            /** From Number */
+            from_number: number;
+            /** From Title */
+            from_title: string;
+            /** Hunks */
+            hunks: components["schemas"]["HunkOut"][];
+            /** Title Changed */
+            title_changed: boolean;
+            /** To Number */
+            to_number: number;
+            /** To Title */
+            to_title: string;
+        };
+        /**
          * DirectoryEntryOut
          * @description Who can be added to a space. Deliberately no email or role: any member may read it.
          */
@@ -617,6 +705,16 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HunkOut */
+        HunkOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "equal" | "insert" | "delete";
+            /** Lines */
+            lines: string[];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -732,6 +830,8 @@ export interface components {
          * @description Fields left out stay as they are; neither may be null.
          */
         PageUpdate: {
+            /** Change Summary */
+            change_summary?: string | null;
             /** Content Md */
             content_md?: string | null;
             /** Title */
@@ -799,6 +899,13 @@ export interface components {
         Page_UserOut_: {
             /** Items */
             items: components["schemas"]["UserOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[VersionSummaryOut] */
+        Page_VersionSummaryOut_: {
+            /** Items */
+            items: components["schemas"]["VersionSummaryOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1040,6 +1147,75 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VersionAuthor
+         * @description `name` is None for an author that is not a person.
+         */
+        VersionAuthor: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            type: components["schemas"]["PrincipalType"];
+        };
+        /**
+         * VersionLabelIn
+         * @description null takes the label away.
+         */
+        VersionLabelIn: {
+            /** Label */
+            label: string | null;
+        };
+        /** VersionOut */
+        VersionOut: {
+            author: components["schemas"]["VersionAuthor"];
+            /** Change Summary */
+            change_summary: string | null;
+            /** Content Md */
+            content_md: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Label */
+            label: string | null;
+            /** Number */
+            number: number;
+            source: components["schemas"]["VersionSource"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * VersionSource
+         * @enum {string}
+         */
+        VersionSource: "human" | "import" | "restore" | "collab";
+        /**
+         * VersionSummaryOut
+         * @description `change_summary` is free text, or `restore:<n>` for a version that brought
+         *     version n back (the client words it).
+         */
+        VersionSummaryOut: {
+            author: components["schemas"]["VersionAuthor"];
+            /** Change Summary */
+            change_summary: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Label */
+            label: string | null;
+            /** Number */
+            number: number;
+            source: components["schemas"]["VersionSource"];
+            /** Title */
+            title: string;
         };
     };
     responses: never;
@@ -1764,6 +1940,40 @@ export interface operations {
             };
         };
     };
+    diff_versions_api_pages__page_id__diff_get: {
+        parameters: {
+            query: {
+                from: number;
+                to: number;
+            };
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     move_page_api_pages__page_id__move_post: {
         parameters: {
             query?: never;
@@ -1886,6 +2096,144 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_pages__page_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_VersionSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_pages__page_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    label_version_api_pages__page_id__versions__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionLabelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_version_api_pages__page_id__versions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
             };
             /** @description Validation Error */
             422: {
