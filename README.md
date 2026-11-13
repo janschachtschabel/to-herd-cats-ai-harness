@@ -317,7 +317,9 @@ kennen.
   Anmeldung oder Person: höchstens 3 je Seite und 10 insgesamt je Anmeldung, 20 je
   Person über alle ihre Anmeldungen und nie mehr als ein Viertel aller 200, im
   Collab-Prozess einstellbar mit `HERD_COLLAB_MAX_PER_PAGE`,
-  `HERD_COLLAB_MAX_PER_SESSION` und `HERD_COLLAB_MAX_PER_PERSON`), 4502/4503
+  `HERD_COLLAB_MAX_PER_SESSION` und `HERD_COLLAB_MAX_PER_PERSON`), 4507 (der
+  Collab-Prozess hält sein Speicherbudget: später erneut oder im Markdown-Editor; der
+  Browser verbindet sich nicht selbst neu), 4502/4503
   (Collab-Prozess nicht erreichbar bzw. aus), 4504 (Prüfen und Verbinden dauerten
   länger als 10 s), 4408 (der Browser ist dem Dokument nicht binnen 10 s
   beigetreten, oder die Verbindung hat 15 Minuten lang nichts gesendet,
@@ -353,7 +355,23 @@ kennen.
   geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
   er erbt von ihrer Umgebung nur `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`, `NODE_*` und
   `HERD_COLLAB_*` und bekommt dazu Token, öffentliche URL und Cookie-Namen, nie die
-  Datenbank-Zugangsdaten oder andere Geheimnisse der API.
+  Datenbank-Zugangsdaten oder andere Geheimnisse der API. Endet dieser Kindprozess (etwa
+  weil der Kernel ihn wegen Speichermangels beendet), beendet sich die ganze App mit
+  Code 3, und der Orchestrator (`restart: unless-stopped`, Kubernetes) startet sie neu;
+  so ist die Live-Bearbeitung nie still aus.
+- **Speicher des Collab-Prozesses.** Eine live geöffnete große Seite kostet ihn ein
+  Vielfaches ihres gespeicherten Umfangs (gemessen: 190.000 Zeichen Text rund 18 MB,
+  5.000 Tabellenzellen rund 25 MB). Er lädt deshalb keine weitere Seite, wenn seine
+  Schätzung der geladenen Dokumente `HERD_COLLAB_MEMORY_BUDGET_MB` (Standard 400)
+  überschritte; wer sie öffnet, liest „Der Live-Editor ist gerade ausgelastet“ (4507)
+  und kann neu laden oder den Markdown-Editor nehmen. Tabellen einer Seite haben live
+  höchstens 5.000 Zellen. Jede Prüfung (Öffnen, Speichern) darf höchstens
+  `HERD_COLLAB_CHECK_TIMEOUT_SECONDS` (10) dauern. Faustregel für das Speicherlimit:
+  (130 MB + 250 MB je Prüf-Thread + Budget) / 0,8, mit den Standards 975 MB; Chart und
+  `compose.nodes.yml` setzen 1Gi. Metriken: `herd_collab_memory_estimate_bytes`,
+  `…_budget_bytes`, `…_refusals_total`, `herd_collab_documents` am Port des
+  Collab-Prozesses (`/metrics`; in Rolle `all` mit auf 9090). Einzelheiten:
+  [`docs/WIKI.md`](docs/WIKI.md).
 - **WebSocket hinter Ingress oder Reverse Proxy.** Die Live-Bearbeitung ist ein
   WebSocket auf `/collab/<seiten-id>` am öffentlichen Port; er bleibt offen, solange
   jemand bearbeitet. Die API schickt alle 20 s einen Ping, deshalb reicht jedes
@@ -367,10 +385,13 @@ kennen.
   und `Connection`. Beispiele: [`docs/WIKI.md`](docs/WIKI.md#betrieb-hinter-einem-reverse-proxy).
   Diese Hinweise folgen den Dokumentationen der Controller; ausprobiert ist hier nur
   der direkte Zugriff und Compose.
-- **Keep-Alive.** Die App schließt leerlaufende HTTP-Verbindungen erst nach 150 s
-  (Uvicorn ab Werk: 5 s), länger als die Verbindungspools üblicher Proxys (nginx und
-  ALB 60 s, Traefik 90 s, Caddy 120 s). So schließt immer der Proxy zuerst, und keine
-  Anfrage trifft eine Verbindung, die die App gerade schließt (sonst gelegentlich 502).
+- **Keep-Alive.** Die App schließt leerlaufende HTTP-Verbindungen erst nach
+  `HERD_KEEP_ALIVE_SECONDS` (Standard 150, erlaubt 5 bis 3600; Uvicorn ab Werk: 5 s).
+  Regel: **länger als das Leerlauf-Timeout des Proxys zu seinen Upstreams.** Mit 150 s
+  passen nginx und ALB (60 s), Traefik (90 s) und Caddy (120 s); Google-Load-Balancer
+  halten Backend-Verbindungen 600 s (dort etwa 620), ein hochgesetztes ALB-Timeout
+  braucht einen Wert darüber. So schließt immer der Proxy zuerst, und keine Anfrage
+  trifft eine Verbindung, die die App gerade schließt (sonst gelegentlich 502).
 - **Größenlimits am Ingress:** Die App nimmt je Anfrage höchstens 1 MiB an
   (`HERD_MAX_BODY_BYTES`), Anhänge bis 25 MiB (`HERD_ATTACHMENT_MAX_BYTES`, nur
   `POST /api/pages/<id>/attachments`) und Importe bis 100 MiB (`HERD_IMPORT_MAX_BYTES`,
