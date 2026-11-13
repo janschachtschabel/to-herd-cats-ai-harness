@@ -28,6 +28,9 @@ async function typeAtEnd(page, title, text) {
   await expect(editor).toHaveAttribute("contenteditable", "true");
   await editor.click();
   await page.keyboard.press("Control+End");
+  // The editor learns of the moved selection from an asynchronous selectionchange event;
+  // a key sent in the same instant would still act on the old one (the document start).
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
   await page.keyboard.press("Enter");
   await page.keyboard.type(text);
 }
@@ -51,6 +54,9 @@ test("two people edit one page live; Fertig shows the saved text", async () => {
   await expect(surface(b, "Handbuch")).toContainText("Satz von Anna.");
   await typeAtEnd(b, "Handbuch", "Satz von Ben.");
   await expect(surface(a, "Handbuch")).toContainText("Satz von Ben.");
+  await expect(surface(a, "Handbuch")).toHaveText(
+    /Erster Absatz\.\s*Satz von Anna\.\s*Satz von Ben\./,
+  );
 
   // "Fertig": saved now, and the page shows it (not the text from before the session).
   await a.getByRole("button", { name: "Fertig" }).click();
@@ -59,7 +65,7 @@ test("two people edit one page live; Fertig shows the saved text", async () => {
   await expect(article).toContainText("Satz von Anna.");
   await expect(article).toContainText("Satz von Ben.");
   const stored = await call(anna, "GET", `/api/pages/${doc.id}`);
-  expect(stored.content_md).toContain("Satz von Ben.");
+  expect(stored.content_md).toBe("# Handbuch\n\nErster Absatz.\n\nSatz von Anna.\n\nSatz von Ben.");
 });
 
 test("a Markdown save ends the live session; the live editor shows the new text", async () => {
