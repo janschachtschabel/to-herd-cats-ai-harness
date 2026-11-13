@@ -59,6 +59,11 @@ export class InternalApi {
     });
   }
 
+  /** The latest state of the page could not be stored as Markdown (counted). */
+  unrepresentable(pageId) {
+    return this.call("POST", `/pages/${pageId}/unrepresentable`);
+  }
+
   check(pageId, sessionIds, generation, unsavedSessionIds = []) {
     return this.call("POST", `/pages/${pageId}/check`, {
       session_ids: sessionIds,

@@ -141,6 +141,12 @@ class CollabService:
         COLLAB_SAVES.labels(result="saved").inc()
         return page
 
+    @staticmethod
+    def unrepresentable() -> None:
+        """A save the collab process refused itself (its Markdown would not read back
+        as the document): counted with the other save results."""
+        COLLAB_SAVES.labels(result="unrepresentable").inc()
+
     async def check(
         self,
         page_id: uuid.UUID,

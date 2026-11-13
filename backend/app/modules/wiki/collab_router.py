@@ -6,7 +6,7 @@ import binascii
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 
 from app.core.errors import ValidationFailed
 from app.modules.auth.deps import SessionDep
@@ -79,3 +79,11 @@ async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> Check
         revoked_user_ids=result.revoked.user_ids,
         ended_session_ids=result.ended_session_ids,
     )
+
+
+@router.post("/pages/{page_id}/unrepresentable", status_code=204)
+async def unrepresentable(page_id: uuid.UUID) -> Response:
+    """The collab process stored nothing for the latest state of the page: it cannot be
+    written as Markdown that reads back as what the editors see (counted only)."""
+    CollabService.unrepresentable()
+    return Response(status_code=204)

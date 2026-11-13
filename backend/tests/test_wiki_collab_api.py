@@ -235,3 +235,12 @@ async def test_saves_are_counted(wiki: Wiki, collab: AsyncClient) -> None:
     text = (await collab.get("/metrics")).text
     assert 'herd_collab_saves_total{result="saved"}' in text
     assert 'herd_collab_saves_total{result="generation_ended"}' in text
+
+
+async def test_unrepresentable_saves_are_counted(wiki: Wiki, collab: AsyncClient) -> None:
+    # The collab process stored nothing: the document cannot be written as Markdown.
+    page = await new_page(wiki.editor, wiki.space_id, "Live")
+    r = await collab.post(f"/internal/collab/pages/{page['id']}/unrepresentable")
+    assert r.status_code == 204
+    text = (await collab.get("/metrics")).text
+    assert 'herd_collab_saves_total{result="unrepresentable"}' in text

@@ -23,6 +23,10 @@ export const FLUSH = "herd:flush";
 export const SAVED = "herd:saved";
 export const UNSAVED = "herd:unsaved";
 export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection per second
+// To every connection of a document: its latest state cannot be stored as Markdown
+// (nothing is stored until a later state can be), and that a later state was stored.
+export const UNREPRESENTABLE = "herd:unrepresentable";
+export const REPRESENTABLE = "herd:representable";
 
 // Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
 // browser shows initials in white on them.

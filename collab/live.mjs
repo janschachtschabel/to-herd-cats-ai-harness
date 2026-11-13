@@ -7,7 +7,8 @@
 //
 // A page is opened only if the editor can show it without changing what it means
 // (`liveDocument` in markdown.mjs); otherwise 4422 `collab.not_roundtrip_safe`. A save
-// whose Markdown equals what was loaded keeps the stored Markdown as it was written.
+// stores only Markdown that reads back as the document (`documents.mjs`); one whose
+// Markdown equals what was loaded keeps the stored Markdown as it was written.
 //
 // Saves (debounced 2 s, at the latest after 10 s) send the Markdown and the Yjs
 // state together with the sessions that edited since the last save. Every 5 s each
@@ -28,8 +29,14 @@
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
-import { yDocToProsemirrorJSON } from "y-prosemirror";
-import { FIELD, editorProblem, jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
+import { documentRules } from "./documents.mjs";
+import {
+  editorProblem,
+  jsonToYDoc,
+  liveDocument,
+  yDocToJSON,
+  yDocToMarkdown,
+} from "./markdown.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { carriesContent, sizeGuard } from "./size.mjs";
 import {
@@ -37,6 +44,7 @@ import {
   FLUSH,
   FLUSH_INTERVAL_MS,
   SAVED,
+  UNREPRESENTABLE,
   UNSAVED,
   closeSocket,
   deny,
@@ -59,110 +67,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
   const joined = new WeakSet(); // sockets that completed the handshake and joined a document
   const ending = new Set(); // document names whose generation must end before anyone joins
 
-  function discard(document, state, close) {
-    state.discarded = true;
-    for (const connection of document.getConnections()) closeSocket(connection.context, close);
-    log("live document dropped", { page_id: state.pageId, reason: close[1] });
-  }
-
-  function revoke(document, sessionIds, userIds) {
-    for (const connection of document.getConnections()) {
-      const { context } = connection;
-      if (sessionIds.has(context.sessionId) || userIds.has(context.user?.id)) {
-        closeSocket(context, CLOSE.revoked);
-      }
-    }
-  }
-
-  /** Ask the API whether the generation and the people still hold; true when the
-   * document was dropped. The unsaved sessions go along: one of them revoked ends the
-   * generation. Throws `ApiUnavailable`. */
-  async function checkDocument(document, documentName, state) {
-    const connected = document.getConnections().map((c) => c.context.sessionId);
-    // Sessions that left are checked too (the API takes the organisation from the page).
-    const sessionIds = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
-    const unsaved = [...state.dirty.keys()];
-    if (sessionIds.length === 0 && unsaved.length === 0) return false;
-    const answer = await api.check(state.pageId, sessionIds, state.generation, unsaved);
-    if (answer.status !== 200) return false;
-    const { revoked_session_ids: sessions, revoked_user_ids: users } = answer.body;
-    revoke(document, new Set(sessions), new Set(users));
-    if (!answer.body.generation_ok) {
-      discard(document, state, CLOSE.generationEnded);
-      return true;
-    }
-    const ended = new Set(answer.body.ended_session_ids ?? []);
-    if (ended.size > 0) await endSessions(document, documentName, state, ended);
-    return false;
-  }
-
-  /** Sessions that ended (logout, expiry) of people who may still edit: their edits
-   * are saved first, then their connections close with 4401. */
-  async function endSessions(document, documentName, state, ended) {
-    const unsaved = [...ended].some((sessionId) => state.dirty.has(sessionId));
-    if (unsaved && !state.holding && !state.discarded) {
-      try {
-        await document.saveMutex.runExclusive(() => store(document, documentName, state));
-      } catch (error) {
-        if (!(error instanceof ApiUnavailable)) throw error; // still dirty: saved later
-      }
-    }
-    for (const connection of document.getConnections()) {
-      if (ended.has(connection.context.sessionId)) {
-        closeSocket(connection.context, CLOSE.unauthorized);
-      }
-    }
-  }
-
-  /** A save was refused for revoked editors: hold the document until the API has
-   * ended the generation (or the rights are back), retrying while it is away. */
-  async function endGeneration(document, documentName, state) {
-    state.holding = true;
-    ending.add(documentName);
-    try {
-      await checkDocument(document, documentName, state);
-    } catch (error) {
-      if (!(error instanceof ApiUnavailable)) throw error;
-      log("live check failed, retrying", { page_id: state.pageId });
-      setTimeout(() => endGeneration(document, documentName, state), retryMs).unref();
-      return;
-    }
-    ending.delete(documentName);
-    state.holding = false;
-  }
-
-  async function store(document, documentName, state) {
-    const editors = [...state.dirty.keys()];
-    if (editors.length === 0) return;
-    const ydoc = Y.encodeStateAsUpdate(document);
-    let contentMd = yDocToMarkdown(document);
-    // Unchanged from what was loaded (an edit undone, or a browser tidying the
-    // document's structure): the stored Markdown stays exactly as it was written.
-    if (contentMd === state.baseline) contentMd = state.source;
-    for (const sessionId of editors) state.dirty.delete(sessionId);
-    let answer;
-    try {
-      answer = await api.save(state.pageId, {
-        generation: state.generation,
-        ydoc,
-        contentMd,
-        editorSessionIds: editors,
-        sessionKey: state.sessionKey,
-      });
-    } catch (error) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true);
-      throw error;
-    }
-    if (answer.status === 200) return;
-    if (answer.status === 409) return discard(document, state, CLOSE.generationEnded);
-    if (answer.status === 403) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true); // still unsaved
-      return endGeneration(document, documentName, state);
-    }
-    if (answer.status === 413) return discard(document, state, CLOSE.tooLarge);
-    if (answer.status === 404) return discard(document, state, CLOSE.notFound);
-    return discard(document, state, CLOSE.saveRefused);
-  }
+  const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending });
 
   return {
     extensionName: "herd-live",
@@ -196,7 +101,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       if (stored) {
         Y.applyUpdate(document, Buffer.from(stored, "base64"));
         // A state the browser's editor would repair (and save repaired) is not opened.
-        const problem = editorProblem(yDocToProsemirrorJSON(document, FIELD));
+        const problem = editorProblem(yDocToJSON(document));
         if (problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
       } else {
         // Only a page the editor can show without changing its meaning is opened.
@@ -221,10 +126,11 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       live.set(documentName, state);
     },
 
-    async connected({ documentName, context, instance }) {
+    async connected({ connection, documentName, context, instance }) {
       const state = live.get(documentName);
       if (!state || state.discarded || state.holding) return closeSocket(context, CLOSE.retry);
       state.seen.add(context.sessionId);
+      if (state.unrepresentable) connection.sendStateless(UNREPRESENTABLE);
       if (context.generation < state.generation) return closeSocket(context, CLOSE.generationEnded);
       if (context.generation > state.generation) {
         // A newer generation is about: the document in memory is outdated.
