@@ -5,10 +5,13 @@
 //   Origin (HERD_PUBLIC_URL, or the request's own host), with the session cookie, at
 //   most 200 at a time, messages up to 1 MB. The live rules are in `live.mjs`.
 // - One login session (its cookie) holds at most HERD_COLLAB_MAX_PER_SESSION (10)
-//   connections, at most HERD_COLLAB_MAX_PER_PAGE (3) of them on one page; more are
-//   closed with 4429 `too_many_connections`. A socket that has not joined its document
-//   within 10 s is closed with 4408 `handshake_timeout`, so idle sockets cannot hold
-//   the global limit (review M2 R7).
+//   connections, at most HERD_COLLAB_MAX_PER_PAGE (3) of them on one page, and one
+//   person across all their logins at most HERD_COLLAB_MAX_PER_PERSON (20), never more
+//   than a quarter of all; more are closed with 4429 `too_many_connections`. A socket
+//   that has not joined its document within 10 s is closed with 4408
+//   `handshake_timeout`, one that has sent nothing for HERD_COLLAB_IDLE_MINUTES (15)
+//   with 4408 `idle_timeout`, so idle sockets cannot hold the global limit (review M2
+//   R7, S6). An open editor sends its presence every 15 s.
 //
 // Settings (environment): HERD_INTERNAL_TOKEN (required), HERD_COLLAB_API_URL (the
 // API's internal port, default http://127.0.0.1:9090), HERD_COLLAB_PORT (1234),
@@ -82,7 +85,9 @@ export function createCollabServer({
   maxConnections = 200,
   maxPerSession = 10,
   maxPerPage = 3,
+  maxPerPerson = 20,
   handshakeTimeoutMs = 10_000,
+  idleTimeoutMs = 15 * 60_000,
   checkIntervalMs = 5000,
   debounceMs = 2000,
   maxDebounceMs = 10000,
@@ -92,11 +97,21 @@ export function createCollabServer({
   maxMarkdownChars,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
+  const held = counter();
+  const people = new WeakMap(); // socket -> the person's key, once authenticated
+  const perPerson = Math.max(1, Math.min(maxPerPerson, Math.floor(maxConnections / 4)));
   const extension = liveExtension({
     api,
     cookieName,
     retryMs,
     log,
+    person(context, userId) {
+      if (people.has(context.socket)) return true;
+      const key = `u:${userId}`;
+      if (!held.take(key, perPerson)) return false;
+      people.set(context.socket, key);
+      return true;
+    },
     maxStateBytes,
     maxMarkdownChars,
   });
@@ -108,7 +123,7 @@ export function createCollabServer({
     extensions: [extension],
   });
   const sockets = new Set();
-  const held = counter();
+  const lastHeard = new WeakMap(); // socket -> when its last message came
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   let closing = null;
 
@@ -157,12 +172,18 @@ export function createCollabServer({
         new Request(`http://collab${url.pathname}`, { headers }),
         context,
       );
-      ws.on("message", (data) => client.handleMessage(new Uint8Array(data)));
+      lastHeard.set(ws, Date.now());
+      ws.on("message", (data) => {
+        lastHeard.set(ws, Date.now());
+        client.handleMessage(new Uint8Array(data));
+      });
       ws.on("pong", () => client.touch?.());
       ws.on("error", () => ws.terminate());
       ws.on("close", (code, reason) => {
         clearTimeout(joining);
         release();
+        if (people.has(ws)) held.give(people.get(ws));
+        people.delete(ws);
         sockets.delete(ws);
         client.handleClose({ code, reason: reason.toString() });
       });
@@ -173,7 +194,11 @@ export function createCollabServer({
     extension
       .checkAll(hocuspocus)
       .catch((error) => log("live check failed", { error: error.name }));
-    for (const ws of sockets) ws.ping();
+    const quietSince = Date.now() - idleTimeoutMs;
+    for (const ws of sockets) {
+      if ((lastHeard.get(ws) ?? Infinity) < quietSince) ws.close(...CLOSE.idle);
+      else ws.ping();
+    }
   }, checkIntervalMs);
   timer.unref();
 
@@ -222,6 +247,8 @@ async function main(env) {
     cookieName: env.HERD_SESSION_COOKIE_NAME || "herd_session",
     maxPerSession: positive(env.HERD_COLLAB_MAX_PER_SESSION, 10),
     maxPerPage: positive(env.HERD_COLLAB_MAX_PER_PAGE, 3),
+    maxPerPerson: positive(env.HERD_COLLAB_MAX_PER_PERSON, 20),
+    idleTimeoutMs: positive(env.HERD_COLLAB_IDLE_MINUTES, 15) * 60_000,
   });
   const host =
     env.HERD_COLLAB_HOST || ((env.HERD_ROLE || "all") === "all" ? "127.0.0.1" : "0.0.0.0");

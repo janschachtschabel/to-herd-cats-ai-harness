@@ -60,7 +60,15 @@ const DENIAL = {
   413: CLOSE.tooLarge,
 };
 
-export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {}, ...limits }) {
+/** `person(context, userId)`: false when the person holds too many connections. */
+export function liveExtension({
+  api,
+  cookieName,
+  retryMs = 5000,
+  log = () => {},
+  person = () => true,
+  ...limits
+}) {
   const size = sizeGuard(limits);
   const presence = presenceGuard();
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
@@ -88,6 +96,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       }
       if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
       if (answer.body.generation !== context.generation) throw deny(context, CLOSE.generationEnded);
+      if (!person(context, answer.body.user.id)) throw deny(context, CLOSE.tooMany);
       return { user: answer.body.user, sessionId: answer.body.session_id };
     },
 

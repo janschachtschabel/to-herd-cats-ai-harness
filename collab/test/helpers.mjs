@@ -15,6 +15,7 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
     users: {
       "token-a": ["session-a", "user-a", "Anna"],
       "token-b": ["session-b", "user-b", "Ben"],
+      "token-a2": ["session-a2", "user-a", "Anna"], // Anna's second login
     },
     saves: [],
     checks: [],

@@ -10,10 +10,11 @@ export const CLOSE = {
   tooLarge: [4413, "too_large"],
   saveRefused: [4400, "save_refused"], // the API refused a save for another reason
   notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
-  // At the socket (server.mjs): too many connections of one login session, no
-  // document joined in time.
+  // At the socket (server.mjs): too many connections of one login session or person,
+  // no document joined in time, nothing sent for too long (the browser reconnects).
   tooMany: [4429, "too_many_connections"],
   handshakeTimeout: [4408, "handshake_timeout"],
+  idle: [4408, "idle_timeout"],
   retry: [1013, "retry"],
 };
 
