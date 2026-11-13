@@ -30,6 +30,14 @@ from tests.factories import (  # noqa: E402, F401
     owner,
     owner_user,
 )
+from tests.factories_ai import (  # noqa: E402, F401
+    _plain_stub,
+    _tls_stub,
+    openai_stub,
+    openai_tls_stub,
+    stub_egress,
+    stub_network,
+)
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_dms import people  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401

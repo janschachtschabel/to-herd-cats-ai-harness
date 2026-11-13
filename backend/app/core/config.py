@@ -12,6 +12,7 @@ from sqlalchemy.engine import URL, make_url
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
 INTERNAL_TOKEN_MIN_LENGTH = 32
+SECRET_KEY_MIN_LENGTH = 32
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -> repo
 
 
@@ -86,6 +87,15 @@ class Settings(BaseSettings):
     # failed attempt. A worker without progress for 4 times this is not ready.
     worker_handler_timeout_seconds: float = Field(default=30.0, gt=0)
 
+    # AI connections (M5). The key for `enc:` secret references (API keys), at least 32
+    # characters (`openssl rand -hex 32`); unset, only `env:HERD_AI_*` references are
+    # possible. During a rotation the old key goes to HERD_SECRET_KEY_PREVIOUS: it still
+    # decrypts, never encrypts (`scripts/rotate_secrets.py`, docs/KI.md).
+    secret_key: SecretStr | None = None
+    secret_key_previous: SecretStr | None = None
+    # Longest wait (seconds) for a provider when testing a connection or listing models.
+    ai_check_timeout_seconds: float = Field(default=20.0, gt=0)
+
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")
     bootstrap_org_name: str = "Meine Organisation"
@@ -116,6 +126,18 @@ class Settings(BaseSettings):
             elif length < INTERNAL_TOKEN_MIN_LENGTH:
                 raise ValueError(
                     f"HERD_INTERNAL_TOKEN must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _secret_keys_are_long_enough(self) -> Self:
+        for name in ("secret_key", "secret_key_previous"):
+            value: SecretStr | None = getattr(self, name)
+            if value is not None and not value.get_secret_value():
+                setattr(self, name, None)  # compose: `${HERD_SECRET_KEY:-}`
+            elif value is not None and len(value.get_secret_value()) < SECRET_KEY_MIN_LENGTH:
+                raise ValueError(
+                    f"HERD_{name.upper()} must be at least {SECRET_KEY_MIN_LENGTH} characters"
                 )
         return self
 

@@ -30,6 +30,7 @@ class Action(StrEnum):
     PAGE_PURGE = "page.purge"  # delete a trashed page for good (system admins)
     TAG_MANAGE = "tag.manage"  # system-wide tags (space tags: `page.moderate`)
     DM_INSPECT = "dm.inspect"  # read others' direct messages: audited, with a reason, 60 min
+    AI_MANAGE = "ai.manage"  # AI connections, assignments and usage (spec 7)
 
 
 class SpaceRole(StrEnum):

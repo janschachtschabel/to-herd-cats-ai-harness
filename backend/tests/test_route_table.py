@@ -19,6 +19,8 @@ ship without a decision on who may call it. Guards:
   number nobody has.
 - `ticket_status`: a role in the status's space; otherwise 404
   `ticket_status.not_found`.
+- `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
+  without it learn nothing about the AI set-up (plan M5).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -146,6 +148,13 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/admin/groups/{group_id}/members", "admin"),
     ("POST", "/api/admin/groups/{group_id}/members", "admin"),
     ("DELETE", "/api/admin/groups/{group_id}/members/{member_type}/{member_id}", "admin"),
+    ("GET", "/api/ai/connections", "ai"),
+    ("POST", "/api/ai/connections", "ai"),
+    ("GET", "/api/ai/connections/{connection_id}", "ai"),
+    ("PATCH", "/api/ai/connections/{connection_id}", "ai"),
+    ("DELETE", "/api/ai/connections/{connection_id}", "ai"),
+    ("POST", "/api/ai/connections/{connection_id}/test", "ai"),
+    ("POST", "/api/ai/connections/{connection_id}/models", "ai"),
 ]
 
 
@@ -167,6 +176,7 @@ def _concrete(
     message_id: object | None = None,
     status_id: object | None = None,
 ) -> str:
+    versioned_delete = template == "/api/ai/connections/{connection_id}"
     ids = {
         "{message_id}": str(message_id or uuid7()),
         "{conversation_id}": str(conversation_id or uuid7()),
@@ -183,6 +193,7 @@ def _concrete(
         "{emoji}": "%F0%9F%91%8D",
         "{notification_id}": str(uuid7()),
         "{status_id}": str(status_id or uuid7()),
+        "{connection_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -192,7 +203,7 @@ def _concrete(
         "/attachments": "?filename=x.txt",
         "/dm-inspect": f"?user_id={uuid7()}",
     }
-    if "/ticket-statuses/" in template:
+    if "/ticket-statuses/" in template or versioned_delete:
         return template + "?version=1"
     return template + next((q for end, q in queries.items() if template.endswith(end)), "")
 
@@ -247,7 +258,22 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PUT", "/api/tickets/{number}/tags"): {"tag_ids": [], "version": 1},
     ("POST", "/api/spaces/{space_id}/ticket-statuses"): {"name": "X", "category": "open"},
     ("PATCH", "/api/ticket-statuses/{status_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/ai/connections"): {"name": "X"},
+    ("PATCH", "/api/ai/connections/{connection_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/ai/connections/{connection_id}/models"): {"version": 1},
 }
+
+
+async def test_ai_routes_do_not_exist_for_people_without_the_right(
+    member_client: AsyncClient, guest_client: AsyncClient
+) -> None:
+    for client in (member_client, guest_client):
+        for method, template, guard in ROUTES:
+            if guard == "ai":
+                body = BODIES.get((method, template), {})
+                response = await client.request(method, _concrete(template), json=body)
+                assert response.status_code == 404, (method, template, response.text)
+                assert response.json()["error"]["code"] == "ai.not_found"
 
 
 async def test_space_routes_hide_spaces_without_a_role(

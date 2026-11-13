@@ -291,6 +291,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connections */
+        get: operations["list_connections_api_ai_connections_get"];
+        put?: never;
+        /** Create Connection */
+        post: operations["create_connection_api_ai_connections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Connection */
+        get: operations["get_connection_api_ai_connections__connection_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Connection
+         * @description 409 `ai.connection_in_use` while an assignment uses it.
+         */
+        delete: operations["delete_connection_api_ai_connections__connection_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Connection */
+        patch: operations["update_connection_api_ai_connections__connection_id__patch"];
+        trace?: never;
+    };
+    "/api/ai/connections/{connection_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Models
+         * @description Read the models from the provider's `/models`; 502 `ai.provider_failed` with
+         *     `details.status` when it does not answer with a list.
+         */
+        post: operations["fetch_models_api_ai_connections__connection_id__models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/connections/{connection_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Connection
+         * @description One small call to the provider; the outcome as a state, never its answer.
+         */
+        post: operations["test_connection_api_ai_connections__connection_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -1431,7 +1512,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -1642,6 +1723,30 @@ export interface components {
             version: number;
         };
         /**
+         * CheckIn
+         * @description `model`: which model (route) to try; left out, the connection's standard model.
+         */
+        CheckIn: {
+            /** Model */
+            model?: string | null;
+        };
+        /**
+         * CheckOut
+         * @description The outcome as a state, never with the provider's own words.
+         */
+        CheckOut: {
+            /** Duration Ms */
+            duration_ms: number;
+            /** Model */
+            model: string | null;
+            status: components["schemas"]["CheckStatus"];
+        };
+        /**
+         * CheckStatus
+         * @enum {string}
+         */
+        CheckStatus: "ok" | "unauthorized" | "payment_required" | "forbidden" | "not_found" | "rate_limited" | "provider_error" | "redirect" | "timeout" | "unreachable" | "blocked" | "invalid_response" | "secret_unavailable" | "no_model";
+        /**
          * ChildCounts
          * @description How many children the ticket has, per status category.
          */
@@ -1656,6 +1761,136 @@ export interface components {
             open: number;
             /** Review */
             review: number;
+        };
+        /**
+         * ConnectionCreate
+         * @description Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else
+         *     empty; `param_family` is `max_completion_tokens` for `openai`, else `max_tokens`;
+         *     `data_location` is `local` for `local`, else `external`. The first model is the
+         *     connection's standard model.
+         */
+        ConnectionCreate: {
+            /** Base Url */
+            base_url?: string | null;
+            data_location?: components["schemas"]["DataLocation"] | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled?: boolean;
+            /** Extra Body */
+            extra_body?: {
+                [key: string]: unknown;
+            } | null;
+            /** @default openai */
+            kind?: components["schemas"]["ConnectionKind"];
+            /**
+             * Max Concurrency
+             * @default 4
+             */
+            max_concurrency?: number;
+            /** Models */
+            models?: string[] | null;
+            /** Name */
+            name: string;
+            param_family?: components["schemas"]["ParamFamily"] | null;
+            /** @default chat */
+            purpose?: components["schemas"]["Purpose"];
+            /**
+             * Requests Per Minute
+             * @default 60
+             */
+            requests_per_minute?: number;
+            secret?: components["schemas"]["SecretIn"] | null;
+            /**
+             * Supports Tools
+             * @default true
+             */
+            supports_tools?: boolean;
+        };
+        /**
+         * ConnectionKind
+         * @enum {string}
+         */
+        ConnectionKind: "openai" | "openai_compatible" | "b_api" | "local";
+        /**
+         * ConnectionOut
+         * @description `streaming`: whether calls to it may stream (never for `b_api`).
+         */
+        ConnectionOut: {
+            /** Base Url */
+            base_url: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            data_location: components["schemas"]["DataLocation"];
+            /** Enabled */
+            enabled: boolean;
+            /** Extra Body */
+            extra_body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ConnectionKind"];
+            /** Max Concurrency */
+            max_concurrency: number;
+            /** Models */
+            models: string[];
+            /** Name */
+            name: string;
+            param_family: components["schemas"]["ParamFamily"];
+            purpose: components["schemas"]["Purpose"];
+            /** Requests Per Minute */
+            requests_per_minute: number;
+            secret: components["schemas"]["SecretOut"];
+            /** Streaming */
+            streaming: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConnectionUpdate
+         * @description Fields left out stay as they are; `secret: null` removes the secret. The kind
+         *     never changes (sending it is 422).
+         */
+        ConnectionUpdate: {
+            /** Base Url */
+            base_url?: string | null;
+            data_location?: components["schemas"]["DataLocation"] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Extra Body */
+            extra_body?: {
+                [key: string]: unknown;
+            } | null;
+            /** Max Concurrency */
+            max_concurrency?: number | null;
+            /** Models */
+            models?: string[] | null;
+            /** Name */
+            name?: string | null;
+            param_family?: components["schemas"]["ParamFamily"] | null;
+            purpose?: components["schemas"]["Purpose"] | null;
+            /** Requests Per Minute */
+            requests_per_minute?: number | null;
+            secret?: components["schemas"]["SecretIn"] | null;
+            /** Supports Tools */
+            supports_tools?: boolean | null;
+            /** Version */
+            version: number;
         };
         /**
          * ConversationKind
@@ -1703,6 +1938,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * DataLocation
+         * @enum {string}
+         */
+        DataLocation: "local" | "eu" | "external";
         /**
          * DiffOut
          * @description Line by line from `from_number` to `to_number`; a changed line is a `delete`
@@ -2409,6 +2649,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[ConnectionOut] */
+        Page_ConnectionOut_: {
+            /** Items */
+            items: components["schemas"]["ConnectionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[ConversationOut] */
         Page_ConversationOut_: {
             /** Items */
@@ -2542,6 +2789,11 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /**
+         * ParamFamily
+         * @enum {string}
+         */
+        ParamFamily: "max_completion_tokens" | "max_tokens";
         /** ParentOut */
         ParentOut: {
             /**
@@ -2633,6 +2885,11 @@ export interface components {
             version: number;
         };
         /**
+         * Purpose
+         * @enum {string}
+         */
+        Purpose: "chat" | "embedding" | "both";
+        /**
          * ReactionOut
          * @description People who reacted with `emoji`; `mine`: the caller among them.
          */
@@ -2661,6 +2918,28 @@ export interface components {
             items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"] | components["schemas"]["TicketHitOut"])[];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * SecretIn
+         * @description Either the key itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or
+         *     the name of an environment variable `HERD_AI_*` (`env`).
+         */
+        SecretIn: {
+            /** Env */
+            env?: string | null;
+            /** Value */
+            value?: string | null;
+        };
+        /**
+         * SecretKind
+         * @enum {string}
+         */
+        SecretKind: "env" | "enc";
+        /** SecretOut */
+        SecretOut: {
+            kind: components["schemas"]["SecretKind"] | null;
+            /** Set */
+            set: boolean;
         };
         /**
          * SkippedOut
@@ -3273,6 +3552,11 @@ export interface components {
             /** Name */
             name: string | null;
             type: components["schemas"]["PrincipalType"];
+        };
+        /** VersionIn */
+        VersionIn: {
+            /** Version */
+            version: number;
         };
         /**
          * VersionLabelIn
@@ -4020,6 +4304,238 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connections_api_ai_connections_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ConnectionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_connection_api_ai_connections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_connection_api_ai_connections__connection_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_connection_api_ai_connections__connection_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_connection_api_ai_connections__connection_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_models_api_ai_connections__connection_id__models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_connection_api_ai_connections__connection_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOut"];
+                };
             };
             /** @description Validation Error */
             422: {

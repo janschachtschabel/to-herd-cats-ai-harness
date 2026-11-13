@@ -3,6 +3,7 @@
 from app.core.models_base import Base
 from app.core.outbox import EventDelivery, EventOutbox
 from app.core.ratelimit import RateLimitHit
+from app.modules.ai.models import AiConnection
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
 from app.modules.groups.models import Group, GroupMember
@@ -23,6 +24,7 @@ from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
+    "AiConnection",
     "Attachment",
     "AuditLog",
     "Base",

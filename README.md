@@ -263,6 +263,16 @@ kennen.
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
+- **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,
+  sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix) oder
+  verschlüsselt als `enc:` unter `HERD_SECRET_KEY` (mindestens 32 Zeichen, etwa
+  `openssl rand -hex 32`; ohne ihn sind nur `env:`-Verweise möglich). Schlüsselwechsel:
+  neuen Wert in `HERD_SECRET_KEY`, alten in `HERD_SECRET_KEY_PREVIOUS`, dann
+  `uv run python -m scripts.rotate_secrets`, danach `HERD_SECRET_KEY_PREVIOUS`
+  entfernen. Ausgehende Aufrufe an Anbieter gehen nur über die SSRF-Sperre
+  (`backend/app/core/egress.py`: nur https, für die Art `local` auch http und private
+  Adressen; Link-Local und Metadaten nie; keine Weiterleitungen; Proxy-Variablen der
+  Umgebung werden nicht beachtet). Einzelheiten: `docs/KI.md`.
 - **Mitgeliefertes PostgreSQL im Chart** (`postgresql.enabled`, Standard `true`) ist
   zum Ausprobieren gedacht: ein Pod, keine Replikation, keine Sicherung. In Produktion
   `postgresql.enabled=false` und eine externe Datenbank setzen.

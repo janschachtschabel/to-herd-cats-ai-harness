@@ -23,7 +23,8 @@
           "audit.read",
           "page.purge",
           "tag.manage",
-          "dm.inspect"
+          "dm.inspect",
+          "ai.manage"
         ],
         "title": "Action",
         "type": "string"
@@ -515,6 +516,77 @@
         "title": "ChannelUpdate",
         "type": "object"
       },
+      "CheckIn": {
+        "additionalProperties": false,
+        "description": "`model`: which model (route) to try; left out, the connection's standard model.",
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "title": "CheckIn",
+        "type": "object"
+      },
+      "CheckOut": {
+        "description": "The outcome as a state, never with the provider's own words.",
+        "properties": {
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        },
+        "required": [
+          "status",
+          "model",
+          "duration_ms"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "CheckStatus": {
+        "enum": [
+          "ok",
+          "unauthorized",
+          "payment_required",
+          "forbidden",
+          "not_found",
+          "rate_limited",
+          "provider_error",
+          "redirect",
+          "timeout",
+          "unreachable",
+          "blocked",
+          "invalid_response",
+          "secret_unavailable",
+          "no_model"
+        ],
+        "title": "CheckStatus",
+        "type": "string"
+      },
       "ChildCounts": {
         "description": "How many children the ticket has, per status category.",
         "properties": {
@@ -547,6 +619,392 @@
           "cancelled"
         ],
         "title": "ChildCounts",
+        "type": "object"
+      },
+      "ConnectionCreate": {
+        "additionalProperties": false,
+        "description": "Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else\nempty; `param_family` is `max_completion_tokens` for `openai`, else `max_tokens`;\n`data_location` is `local` for `local`, else `external`. The first model is the\nconnection's standard model.",
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "data_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "extra_body": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Body"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConnectionKind",
+            "default": "openai"
+          },
+          "max_concurrency": {
+            "default": 4,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Concurrency",
+            "type": "integer"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "param_family": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParamFamily"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/Purpose",
+            "default": "chat"
+          },
+          "requests_per_minute": {
+            "default": 60,
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Requests Per Minute",
+            "type": "integer"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supports_tools": {
+            "default": true,
+            "title": "Supports Tools",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ConnectionCreate",
+        "type": "object"
+      },
+      "ConnectionKind": {
+        "enum": [
+          "openai",
+          "openai_compatible",
+          "b_api",
+          "local"
+        ],
+        "title": "ConnectionKind",
+        "type": "string"
+      },
+      "ConnectionOut": {
+        "description": "`streaming`: whether calls to it may stream (never for `b_api`).",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "extra_body": {
+            "additionalProperties": true,
+            "title": "Extra Body",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConnectionKind"
+          },
+          "max_concurrency": {
+            "title": "Max Concurrency",
+            "type": "integer"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "param_family": {
+            "$ref": "#/components/schemas/ParamFamily"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/Purpose"
+          },
+          "requests_per_minute": {
+            "title": "Requests Per Minute",
+            "type": "integer"
+          },
+          "secret": {
+            "$ref": "#/components/schemas/SecretOut"
+          },
+          "streaming": {
+            "title": "Streaming",
+            "type": "boolean"
+          },
+          "supports_tools": {
+            "title": "Supports Tools",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "base_url",
+          "secret",
+          "models",
+          "param_family",
+          "extra_body",
+          "supports_tools",
+          "data_location",
+          "max_concurrency",
+          "requests_per_minute",
+          "purpose",
+          "enabled",
+          "streaming",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConnectionOut",
+        "type": "object"
+      },
+      "ConnectionUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; `secret: null` removes the secret. The kind\nnever changes (sending it is 422).",
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "data_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "extra_body": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Body"
+          },
+          "max_concurrency": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Concurrency"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "param_family": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParamFamily"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Purpose"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requests_per_minute": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requests Per Minute"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supports_tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tools"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ConnectionUpdate",
         "type": "object"
       },
       "ConversationKind": {
@@ -681,6 +1139,15 @@
         ],
         "title": "ConversationOut",
         "type": "object"
+      },
+      "DataLocation": {
+        "enum": [
+          "local",
+          "eu",
+          "external"
+        ],
+        "title": "DataLocation",
+        "type": "string"
       },
       "DiffOut": {
         "description": "Line by line from `from_number` to `to_number`; a changed line is a `delete`\nfollowed by an `insert`.",
@@ -2443,6 +2910,33 @@
         "title": "Page[AuditOut]",
         "type": "object"
       },
+      "Page_ConnectionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ConnectionOut]",
+        "type": "object"
+      },
       "Page_ConversationOut_": {
         "properties": {
           "items": {
@@ -2956,6 +3450,14 @@
         "title": "Page[VersionSummaryOut]",
         "type": "object"
       },
+      "ParamFamily": {
+        "enum": [
+          "max_completion_tokens",
+          "max_tokens"
+        ],
+        "title": "ParamFamily",
+        "type": "string"
+      },
       "ParentOut": {
         "properties": {
           "id": {
@@ -3145,6 +3647,15 @@
         "title": "ProfileUpdateIn",
         "type": "object"
       },
+      "Purpose": {
+        "enum": [
+          "chat",
+          "embedding",
+          "both"
+        ],
+        "title": "Purpose",
+        "type": "string"
+      },
       "ReactionOut": {
         "description": "People who reacted with `emoji`; `mine`: the caller among them.",
         "properties": {
@@ -3228,6 +3739,71 @@
           "items"
         ],
         "title": "SearchResults",
+        "type": "object"
+      },
+      "SecretIn": {
+        "additionalProperties": false,
+        "description": "Either the key itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or\nthe name of an environment variable `HERD_AI_*` (`env`).",
+        "properties": {
+          "env": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "format": "password",
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "title": "SecretIn",
+        "type": "object"
+      },
+      "SecretKind": {
+        "enum": [
+          "env",
+          "enc"
+        ],
+        "title": "SecretKind",
+        "type": "string"
+      },
+      "SecretOut": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "set": {
+            "title": "Set",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "set",
+          "kind"
+        ],
+        "title": "SecretOut",
         "type": "object"
       },
       "SkippedOut": {
@@ -4805,6 +5381,20 @@
         "title": "VersionAuthor",
         "type": "object"
       },
+      "VersionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "VersionIn",
+        "type": "object"
+      },
       "VersionLabelIn": {
         "additionalProperties": false,
         "description": "null takes the label away.",
@@ -6076,6 +6666,352 @@
         "summary": "Reactivate User",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/ai/connections": {
+      "get": {
+        "operationId": "list_connections_api_ai_connections_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ConnectionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Connections",
+        "tags": [
+          "ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_connection_api_ai_connections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Connection",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/connections/{connection_id}": {
+      "delete": {
+        "description": "409 `ai.connection_in_use` while an assignment uses it.",
+        "operationId": "delete_connection_api_ai_connections__connection_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Connection",
+        "tags": [
+          "ai"
+        ]
+      },
+      "get": {
+        "operationId": "get_connection_api_ai_connections__connection_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Connection",
+        "tags": [
+          "ai"
+        ]
+      },
+      "patch": {
+        "operationId": "update_connection_api_ai_connections__connection_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Connection",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/connections/{connection_id}/models": {
+      "post": {
+        "description": "Read the models from the provider's `/models`; 502 `ai.provider_failed` with\n`details.status` when it does not answer with a list.",
+        "operationId": "fetch_models_api_ai_connections__connection_id__models_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fetch Models",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/connections/{connection_id}/test": {
+      "post": {
+        "description": "One small call to the provider; the outcome as a state, never its answer.",
+        "operationId": "test_connection_api_ai_connections__connection_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Connection",
+        "tags": [
+          "ai"
         ]
       }
     },
