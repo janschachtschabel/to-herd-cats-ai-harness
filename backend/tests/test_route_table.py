@@ -9,14 +9,21 @@ ship without a decision on who may call it. Guards:
   (`test_route_guards.py` checks every one of these).
 - `space`: a role in the space; anonymous → 401, a member without a role in a team
   space → 404 (the space's existence is not revealed).
+- `page`: a role in the page's space; a member without a role in a team space gets
+  404 `page.not_found`, as for an unknown page.
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
 from fastapi.routing import APIRoute, iter_route_contexts
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
+from app.core.actor import Actor
+from app.core.principal import Principal, SystemRole
 from app.modules.spaces.models import Space
+from app.modules.users.models import User
+from app.modules.wiki.service import PageService
 from app.web.public import create_public_app
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
@@ -36,6 +43,12 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/spaces/{space_id}/members", "space"),
     ("PUT", "/api/spaces/{space_id}/members", "space"),
     ("DELETE", "/api/spaces/{space_id}/members/{member_type}/{member_id}", "space"),
+    ("GET", "/api/spaces/{space_id}/pages/tree", "space"),
+    ("POST", "/api/spaces/{space_id}/pages", "space"),
+    ("GET", "/api/spaces/{space_id}/pages/by-path", "space"),
+    ("GET", "/api/pages/{page_id}", "page"),
+    ("PATCH", "/api/pages/{page_id}", "page"),
+    ("POST", "/api/pages/{page_id}/publish", "page"),
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -63,9 +76,10 @@ def _api_routes() -> set[tuple[str, str]]:
     return found
 
 
-def _concrete(template: str, space_id: object | None = None) -> str:
+def _concrete(template: str, space_id: object | None = None, page_id: object | None = None) -> str:
     ids = {
         "{space_id}": str(space_id or uuid7()),
+        "{page_id}": str(page_id or uuid7()),
         "{user_id}": str(uuid7()),
         "{group_id}": str(uuid7()),
         "{member_type}": "user",
@@ -73,7 +87,7 @@ def _concrete(template: str, space_id: object | None = None) -> str:
     }
     for name, value in ids.items():
         template = template.replace(name, value)
-    return template
+    return template + ("?path=x" if template.endswith("/by-path") else "")
 
 
 def test_every_api_route_is_listed() -> None:
@@ -98,15 +112,41 @@ async def test_every_unsafe_route_needs_the_csrf_header(make_client) -> None:
             assert response.json()["error"]["code"] == "auth.csrf"
 
 
+# A valid body for every route that takes one, so the guard is what answers.
+BODIES: dict[tuple[str, str], dict[str, object]] = {
+    ("PATCH", "/api/spaces/{space_id}"): {"name": "X", "version": 1},
+    ("PUT", "/api/spaces/{space_id}/members"): {
+        "member_type": "user",
+        "member_id": str(uuid7()),
+        "role": "viewer",
+    },
+    ("POST", "/api/spaces/{space_id}/pages"): {"title": "X"},
+    ("PATCH", "/api/pages/{page_id}"): {"title": "X", "version": 1},
+    ("POST", "/api/pages/{page_id}/publish"): {"version": 1},
+}
+
+
 async def test_space_routes_hide_spaces_without_a_role(
     member_client: AsyncClient, team_space: Space
 ) -> None:
-    bodies = {
-        "PATCH": {"name": "X", "version": team_space.version},
-        "PUT": {"member_type": "user", "member_id": str(uuid7()), "role": "viewer"},
-    }
     for method, template, guard in ROUTES:
         if guard == "space":
             path = _concrete(template, team_space.id)
-            response = await member_client.request(method, path, json=bodies.get(method))
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "space.not_found"
+
+
+async def test_page_routes_hide_pages_without_a_role(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    page = await PageService(session).create(actor, team_space.id, None, "Geheim")
+    for method, template, guard in ROUTES:
+        if guard == "page":
+            path = _concrete(template, team_space.id, page.id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "page.not_found"

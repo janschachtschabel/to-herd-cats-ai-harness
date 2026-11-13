@@ -1,6 +1,9 @@
-"""Application errors and their JSON shape: {"error": {"code", "message", "trace_id"}}."""
+"""Application errors and their JSON shape: {"error": {"code", "message", "trace_id"}},
+plus `details` where an error carries data the client acts on (the current version
+after a conflict)."""
 
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,11 +20,18 @@ class AppError(Exception):
     status_code = 400
     code = "error"
 
-    def __init__(self, message: str | None = None, *, code: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        code: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         # The specific code first: a message-less error should say its specific code.
         if code:
             self.code = code
         self.message = message or self.code
+        self.details = details
         super().__init__(self.message)
 
 
@@ -59,9 +69,14 @@ class RateLimited(AppError):
 _HTTP_CODES = {404: "not_found", 405: "method_not_allowed", 413: "request.too_large"}
 
 
-def error_body(code: str, message: str) -> dict[str, dict[str, str]]:
+def error_body(
+    code: str, message: str, details: dict[str, Any] | None = None
+) -> dict[str, dict[str, Any]]:
     # The active span's trace id: the same one the log lines of this request carry.
-    return {"error": {"code": code, "message": message, "trace_id": current_trace_ids()[0]}}
+    error: dict[str, Any] = {"code": code, "message": message, "trace_id": current_trace_ids()[0]}
+    if details is not None:
+        error["details"] = details
+    return {"error": error}
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -71,7 +86,7 @@ def install_error_handlers(app: FastAPI) -> None:
         headers = {"Retry-After": str(retry_after)} if retry_after is not None else None
         return JSONResponse(
             status_code=exc.status_code,
-            content=error_body(exc.code, exc.message),
+            content=error_body(exc.code, exc.message, exc.details),
             headers=headers,
         )
 

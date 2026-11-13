@@ -249,6 +249,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Page */
+        get: operations["get_page_api_pages__page_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Page */
+        patch: operations["update_page_api_pages__page_id__patch"];
+        trace?: never;
+    };
+    "/api/pages/{page_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Page */
+        post: operations["publish_page_api_pages__page_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces": {
         parameters: {
             query?: never;
@@ -320,6 +355,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Page */
+        post: operations["create_page_api_spaces__space_id__pages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/pages/by-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page By Path */
+        get: operations["page_by_path_api_spaces__space_id__pages_by_path_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/pages/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page Tree */
+        get: operations["page_tree_api_spaces__space_id__pages_tree_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -328,7 +414,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read";
         /**
          * AuditOut
          * @description `actor_name`: the acting person's display name (None for other principals).
@@ -386,6 +472,14 @@ export interface components {
              * @enum {string}
              */
             type: "user" | "group";
+        };
+        /**
+         * ExpectedVersion
+         * @description The page version the client read (stale → 409 `page.version_conflict`).
+         */
+        ExpectedVersion: {
+            /** Version */
+            version: number;
         };
         /** GroupCreate */
         GroupCreate: {
@@ -483,6 +577,83 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** PageCreate */
+        PageCreate: {
+            /**
+             * Content Md
+             * @default
+             */
+            content_md?: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * PageOut
+         * @description `version` guards writes (send it back; stale → 409). `collab_generation` changes
+         *     whenever open live-editing sessions of the page end.
+         */
+        PageOut: {
+            /** Collab Generation */
+            collab_generation: number;
+            /** Content Md */
+            content_md: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["PrincipalRef"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Path */
+            path: string;
+            /** Published At */
+            published_at: string | null;
+            /** Slug */
+            slug: string;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            status: components["schemas"]["PageStatus"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            updated_by: components["schemas"]["PrincipalRef"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * PageStatus
+         * @enum {string}
+         */
+        PageStatus: "draft" | "published";
+        /**
+         * PageUpdate
+         * @description Fields left out stay as they are; neither may be null.
+         */
+        PageUpdate: {
+            /** Content Md */
+            content_md?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Version */
+            version: number;
+        };
         /** Page[AuditOut] */
         Page_AuditOut_: {
             /** Items */
@@ -525,6 +696,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[TreeNodeOut] */
+        Page_TreeNodeOut_: {
+            /** Items */
+            items: components["schemas"]["TreeNodeOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[UserOut] */
         Page_UserOut_: {
             /** Items */
@@ -541,6 +719,15 @@ export interface components {
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /** PrincipalRef */
+        PrincipalRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["PrincipalType"];
         };
         /**
          * PrincipalType
@@ -648,6 +835,28 @@ export interface components {
          * @enum {string}
          */
         SystemRole: "owner" | "admin" | "member" | "guest";
+        /**
+         * TreeNodeOut
+         * @description A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
+         */
+        TreeNodeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Path */
+            path: string;
+            /** Slug */
+            slug: string;
+            /** Sort Order */
+            sort_order: number;
+            status: components["schemas"]["PageStatus"];
+            /** Title */
+            title: string;
+        };
         /** UserCreate */
         UserCreate: {
             /**
@@ -1344,6 +1553,107 @@ export interface operations {
             };
         };
     };
+    get_page_api_pages__page_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_page_api_pages__page_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_page_api_pages__page_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_spaces_api_spaces_get: {
         parameters: {
             query?: {
@@ -1565,6 +1875,109 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_page_api_spaces__space_id__pages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    page_by_path_api_spaces__space_id__pages_by_path_get: {
+        parameters: {
+            query: {
+                /** @description e.g. `it/zugaenge` */
+                path: string;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    page_tree_api_spaces__space_id__pages_tree_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TreeNodeOut_"];
+                };
             };
             /** @description Validation Error */
             422: {

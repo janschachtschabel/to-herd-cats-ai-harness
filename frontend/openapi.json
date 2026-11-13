@@ -5,6 +5,11 @@
         "enum": [
           "space.read",
           "space.manage",
+          "page.create",
+          "page.edit",
+          "page.publish",
+          "page.trash",
+          "page.moderate",
           "space.create",
           "directory.read",
           "user.manage",
@@ -126,6 +131,21 @@
           "name"
         ],
         "title": "DirectoryEntryOut",
+        "type": "object"
+      },
+      "ExpectedVersion": {
+        "additionalProperties": false,
+        "description": "The page version the client read (stale \u2192 409 `page.version_conflict`).",
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ExpectedVersion",
         "type": "object"
       },
       "GroupCreate": {
@@ -353,6 +373,194 @@
         "title": "OrgOut",
         "type": "object"
       },
+      "PageCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "content_md": {
+            "default": "",
+            "maxLength": 200000,
+            "title": "Content Md",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "PageCreate",
+        "type": "object"
+      },
+      "PageOut": {
+        "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end.",
+        "properties": {
+          "collab_generation": {
+            "title": "Collab Generation",
+            "type": "integer"
+          },
+          "content_md": {
+            "title": "Content Md",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/PrincipalRef"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/PrincipalRef"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "parent_id",
+          "title",
+          "slug",
+          "path",
+          "sort_order",
+          "content_md",
+          "status",
+          "version",
+          "collab_generation",
+          "created_by",
+          "updated_by",
+          "created_at",
+          "updated_at",
+          "published_at"
+        ],
+        "title": "PageOut",
+        "type": "object"
+      },
+      "PageStatus": {
+        "enum": [
+          "draft",
+          "published"
+        ],
+        "title": "PageStatus",
+        "type": "string"
+      },
+      "PageUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; neither may be null.",
+        "properties": {
+          "content_md": {
+            "anyOf": [
+              {
+                "maxLength": 200000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Md"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "PageUpdate",
+        "type": "object"
+      },
       "Page_AuditOut_": {
         "properties": {
           "items": {
@@ -515,6 +723,33 @@
         "title": "Page[SpaceOut]",
         "type": "object"
       },
+      "Page_TreeNodeOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TreeNodeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TreeNodeOut]",
+        "type": "object"
+      },
       "Page_UserOut_": {
         "properties": {
           "items": {
@@ -564,6 +799,24 @@
           "new_password"
         ],
         "title": "PasswordChangeIn",
+        "type": "object"
+      },
+      "PrincipalRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "PrincipalRef",
         "type": "object"
       },
       "PrincipalType": {
@@ -852,6 +1105,58 @@
         ],
         "title": "SystemRole",
         "type": "string"
+      },
+      "TreeNodeOut": {
+        "description": "A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parent_id",
+          "title",
+          "slug",
+          "path",
+          "status",
+          "sort_order"
+        ],
+        "title": "TreeNodeOut",
+        "type": "object"
       },
       "UserCreate": {
         "properties": {
@@ -2026,6 +2331,153 @@
         ]
       }
     },
+    "/api/pages/{page_id}": {
+      "get": {
+        "operationId": "get_page_api_pages__page_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page",
+        "tags": [
+          "wiki"
+        ]
+      },
+      "patch": {
+        "operationId": "update_page_api_pages__page_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/publish": {
+      "post": {
+        "operationId": "publish_page_api_pages__page_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/spaces": {
       "get": {
         "operationId": "list_spaces_api_spaces_get",
@@ -2410,6 +2862,186 @@
         "summary": "Remove Space Member",
         "tags": [
           "spaces"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/pages": {
+      "post": {
+        "operationId": "create_page_api_spaces__space_id__pages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/pages/by-path": {
+      "get": {
+        "operationId": "page_by_path_api_spaces__space_id__pages_by_path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "e.g. `it/zugaenge`",
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "description": "e.g. `it/zugaenge`",
+              "maxLength": 2000,
+              "minLength": 1,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page By Path",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/pages/tree": {
+      "get": {
+        "operationId": "page_tree_api_spaces__space_id__pages_tree_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TreeNodeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page Tree",
+        "tags": [
+          "wiki"
         ]
       }
     }

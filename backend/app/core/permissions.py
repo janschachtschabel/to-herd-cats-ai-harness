@@ -10,6 +10,11 @@ class Action(StrEnum):
     # Space-scoped
     SPACE_READ = "space.read"
     SPACE_MANAGE = "space.manage"
+    PAGE_CREATE = "page.create"
+    PAGE_EDIT = "page.edit"  # also: see drafts; publish one's own drafts
+    PAGE_PUBLISH = "page.publish"  # publish anyone's drafts
+    PAGE_TRASH = "page.trash"  # put into and take out of the trash
+    PAGE_MODERATE = "page.moderate"
     # System-wide
     SPACE_CREATE = "space.create"
     DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
@@ -60,6 +65,11 @@ class SpaceRole(StrEnum):
 SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
     Action.SPACE_READ: SpaceRole.VIEWER,
     Action.SPACE_MANAGE: SpaceRole.ADMIN,
+    Action.PAGE_CREATE: SpaceRole.EDITOR,
+    Action.PAGE_EDIT: SpaceRole.EDITOR,
+    Action.PAGE_PUBLISH: SpaceRole.MODERATOR,
+    Action.PAGE_TRASH: SpaceRole.MODERATOR,
+    Action.PAGE_MODERATE: SpaceRole.MODERATOR,
 }
 
 # System roles that hold every right, in every space of their organisation (E4).

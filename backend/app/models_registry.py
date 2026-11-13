@@ -8,6 +8,7 @@ from app.modules.groups.models import Group, GroupMember
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import Space, SpaceMember
 from app.modules.users.models import User
+from app.modules.wiki.models import Page
 
 __all__ = [
     "AuditLog",
@@ -15,6 +16,7 @@ __all__ = [
     "Group",
     "GroupMember",
     "Organization",
+    "Page",
     "RateLimitHit",
     "Space",
     "SpaceMember",
