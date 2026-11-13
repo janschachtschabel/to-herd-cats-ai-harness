@@ -434,6 +434,33 @@
         "title": "HunkOut",
         "type": "object"
       },
+      "ImportResultOut": {
+        "description": "`created`: pages, folders without a file of their own included.",
+        "properties": {
+          "attachments": {
+            "title": "Attachments",
+            "type": "integer"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedOut"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "created",
+          "attachments",
+          "skipped"
+        ],
+        "title": "ImportResultOut",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -1221,6 +1248,25 @@
           "score"
         ],
         "title": "SearchHitOut",
+        "type": "object"
+      },
+      "SkippedOut": {
+        "description": "`path`: the entry's name in the archive. `reason`: unsafe_path, not_markdown,\nexists, duplicate, too_deep, too_large, invalid_text, unreadable, no_page, or why an\nattachment was refused (type_not_allowed, type_mismatch, filename_invalid).",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "SkippedOut",
         "type": "object"
       },
       "SpaceCreate": {
@@ -3504,6 +3550,45 @@
         ]
       }
     },
+    "/api/pages/{page_id}/export": {
+      "get": {
+        "operationId": "export_page_api_pages__page_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/markdown": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/pages/{page_id}/move": {
       "post": {
         "operationId": "move_page_api_pages__page_id__move_post",
@@ -4321,6 +4406,101 @@
         "summary": "Update Space",
         "tags": [
           "spaces"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/export": {
+      "get": {
+        "description": "The pages the caller may read (drafts with `page.edit`) and their attachments.",
+        "operationId": "export_space_api_spaces__space_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Space",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/import": {
+      "post": {
+        "description": "Pages from a Markdown ZIP (`space.manage`); 413 `import.too_large` over 2,000\nentries or 200 MB unpacked, 422 `import.invalid_zip` for anything else.",
+        "operationId": "import_space_api_spaces__space_id__import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/zip": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Space",
+        "tags": [
+          "wiki"
         ]
       }
     },

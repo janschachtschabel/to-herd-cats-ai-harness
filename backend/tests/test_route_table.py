@@ -64,6 +64,9 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/pages/{page_id}/attachments", "page"),
     ("GET", "/api/attachments/{attachment_id}", "session"),
     ("DELETE", "/api/attachments/{attachment_id}", "session"),
+    ("POST", "/api/spaces/{space_id}/import", "space"),
+    ("GET", "/api/spaces/{space_id}/export", "space"),
+    ("GET", "/api/pages/{page_id}/export", "page"),
     ("GET", "/api/tags", "session"),
     ("GET", "/api/search", "session"),
     ("POST", "/api/tags", "session"),  # system tags: tag.manage; space tags: page.moderate

@@ -74,6 +74,18 @@ class TagRepository:
             stmt = stmt.where(Tag.id != other_than)
         return await self.session.scalar(stmt.limit(1)) is not None
 
+    async def usable_in(self, space_id: uuid.UUID, names: Iterable[str]) -> list[Tag]:
+        """The system-wide tags and the space's tags with these names (case ignored)."""
+        lowered = [n.lower() for n in names]
+        if not lowered:
+            return []
+        stmt = select(Tag).where(
+            self._visible(),
+            or_(Tag.space_id.is_(None), Tag.space_id == space_id),
+            func.lower(Tag.name).in_(lowered),
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def page(
         self,
         space_id: uuid.UUID | None,

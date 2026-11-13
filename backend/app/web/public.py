@@ -23,6 +23,7 @@ from app.modules.tags.router import router as tags_router
 from app.modules.users.router import router as users_router
 from app.modules.wiki import router as wiki
 from app.modules.wiki.attachments_router import attachments, page_attachments
+from app.modules.wiki.transfer_router import page_export, space_transfer
 from app.modules.wiki.versions_router import page_versions
 from app.web.spa import mount_spa
 
@@ -40,6 +41,8 @@ def api_router() -> APIRouter:
     api.include_router(page_versions)
     api.include_router(page_attachments)
     api.include_router(attachments)
+    api.include_router(space_transfer)
+    api.include_router(page_export)
     api.include_router(tags_router)
     api.include_router(search_router)
     api.include_router(directory_router)
@@ -53,6 +56,7 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
         RouteLimit(
             "POST", re.compile(r"/api/pages/[^/]+/attachments"), settings.attachment_max_bytes
         ),
+        RouteLimit("POST", re.compile(r"/api/spaces/[^/]+/import"), settings.import_max_bytes),
     ]
 
 

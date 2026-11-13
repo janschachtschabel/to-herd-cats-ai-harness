@@ -332,6 +332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Page */
+        get: operations["export_page_api_pages__page_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/move": {
         parameters: {
             query?: never;
@@ -526,6 +543,47 @@ export interface paths {
         head?: never;
         /** Update Space */
         patch: operations["update_space_api_spaces__space_id__patch"];
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Space
+         * @description The pages the caller may read (drafts with `page.edit`) and their attachments.
+         */
+        get: operations["export_space_api_spaces__space_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Space
+         * @description Pages from a Markdown ZIP (`space.manage`); 413 `import.too_large` over 2,000
+         *     entries or 200 MB unpacked, 422 `import.invalid_zip` for anything else.
+         */
+        post: operations["import_space_api_spaces__space_id__import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/spaces/{space_id}/members": {
@@ -872,6 +930,18 @@ export interface components {
             /** Lines */
             lines: string[];
         };
+        /**
+         * ImportResultOut
+         * @description `created`: pages, folders without a file of their own included.
+         */
+        ImportResultOut: {
+            /** Attachments */
+            attachments: number;
+            /** Created */
+            created: number;
+            /** Skipped */
+            skipped: components["schemas"]["SkippedOut"][];
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -1150,6 +1220,18 @@ export interface components {
              * @constant
              */
             type: "page";
+        };
+        /**
+         * SkippedOut
+         * @description `path`: the entry's name in the archive. `reason`: unsafe_path, not_markdown,
+         *     exists, duplicate, too_deep, too_large, invalid_text, unreadable, no_page, or why an
+         *     attachment was refused (type_not_allowed, type_mismatch, filename_invalid).
+         */
+        SkippedOut: {
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * SpaceCreate
@@ -2380,6 +2462,37 @@ export interface operations {
             };
         };
     };
+    export_page_api_pages__page_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     move_page_api_pages__page_id__move_post: {
         parameters: {
             query?: never;
@@ -2844,6 +2957,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_space_api_spaces__space_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_space_api_spaces__space_id__import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/zip": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResultOut"];
                 };
             };
             /** @description Validation Error */

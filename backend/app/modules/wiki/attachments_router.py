@@ -2,14 +2,13 @@
 the type is decided by the content), the name in `?filename=`; their body limit is
 `HERD_ATTACHMENT_MAX_BYTES` (`web/public.body_limits`)."""
 
-import re
 import uuid
 from typing import Annotated
-from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
+from app.core.downloads import content_disposition
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.wiki import filetypes
@@ -20,7 +19,6 @@ from app.modules.wiki.models import Attachment
 page_attachments = APIRouter(prefix="/pages/{page_id}/attachments", tags=["wiki"])
 attachments = APIRouter(prefix="/attachments", tags=["wiki"])
 
-_UNSAFE_IN_QUOTES = re.compile(r"[^A-Za-z0-9 ._()-]")
 _INLINE_MIMES = {t.mime for t in (filetypes.PNG, filetypes.JPEG, filetypes.GIF, filetypes.WEBP)}
 _TEXT_MIMES = {t.mime for t in filetypes.TEXT_TYPES}
 _UPLOAD_BODY = {
@@ -29,13 +27,6 @@ _UPLOAD_BODY = {
         "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
     }
 }
-
-
-def content_disposition(kind: str, filename: str) -> str:
-    """RFC 6266/5987: an ASCII fallback without quotes, backslashes or control
-    characters, and the exact name percent-encoded as UTF-8."""
-    fallback = _UNSAFE_IN_QUOTES.sub("_", filename)
-    return f"{kind}; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
 def download_headers(attachment: Attachment, inline: bool) -> dict[str, str]:

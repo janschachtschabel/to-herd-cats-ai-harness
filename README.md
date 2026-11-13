@@ -175,6 +175,16 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   darüber in einer temporären Datei unter `TMPDIR` (Compose: `tmpfs` `/tmp`)
   zwischengespeichert. Erlaubt sind PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV,
   JSON, DOCX, XLSX, PPTX und ZIP, erkannt am Inhalt; SVG und HTML werden abgelehnt.
+- **Import und Export**: Ein Bereich lässt sich als Markdown-ZIP exportieren (eine
+  `.md` je Seite mit Front Matter `title`, `status`, `tags`, Anhänge unter
+  `_attachments/`) und wieder importieren (Recht `space.manage`). Die ZIP-Datei darf
+  gepackt höchstens `HERD_IMPORT_MAX_BYTES` (Standard 104857600, 100 MiB) groß sein
+  (auch hier den Ingress anpassen), höchstens 2.000 Einträge und 200 MB entpackt
+  enthalten; Einträge mit `..`, absolutem Pfad oder als Symlink werden übersprungen.
+  Ein Import läuft in einer Transaktion; große Archive brauchen entsprechend lange.
+  Der Export entsteht in einer temporären Datei (`TMPDIR`). Links im Markdown auf
+  `/api/attachments/<id>` zeigen nach einem Import in einen anderen Bereich weiter auf
+  die alten Anhänge.
 - **Wiki-Diff**: Ein Vergleich zweier Seitenversionen vergleicht höchstens
   `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
   antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den
