@@ -47,7 +47,9 @@ zählt sie nicht mit.
   ein Dialog: die eigene Fassung auf den aktuellen Stand setzen und erneut speichern,
   oder verwerfen.
 - **Gemeinsam bearbeiten** öffnet den Live-Editor: Alle, die die Seite so geöffnet
-  haben, sehen die Änderungen der anderen sofort, dazu Namen und Cursor. Gespeichert
+  haben, sehen die Änderungen der anderen sofort, dazu Namen und Cursor (Name und
+  Farbe setzt der Server aus der Anmeldung; niemand kann sich als jemand anderes
+  ausgeben oder den Eintrag eines anderen überschreiben). Gespeichert
   wird automatisch (höchstens alle 2 s, spätestens nach 10 s); die Statusanzeige zeigt
   „Synchronisiert“, „Speichert …“ oder „Getrennt“. **Fertig** speichert sofort und
   zeigt danach die Seite so, wie der Server sie hat; kann der Server das nicht

@@ -29,6 +29,7 @@ import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
+import { presenceGuard } from "./presence.mjs";
 import { carriesContent, sizeGuard } from "./size.mjs";
 import {
   CLOSE,
@@ -37,7 +38,6 @@ import {
   SAVED,
   UNSAVED,
   closeSocket,
-  colorFor,
   deny,
   readCookie,
 } from "./protocol.mjs";
@@ -53,6 +53,7 @@ const DENIAL = {
 
 export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {}, ...limits }) {
   const size = sizeGuard(limits);
+  const presence = presenceGuard();
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
   const joined = new WeakSet(); // sockets that completed the handshake and joined a document
   const ending = new Set(); // document names whose generation must end before anyone joins
@@ -265,7 +266,8 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
 
     /** A connection that leaves with unsaved edits is saved at once, while its
      * session is surely still valid (logging out right after leaving loses nothing). */
-    async onDisconnect({ context, document, documentName, instance }) {
+    async onDisconnect({ context, document, documentName, instance, socketId }) {
+      presence.forget(socketId);
       const state = live.get(documentName);
       if (!state || state.discarded || state.holding || !state.dirty.has(context?.sessionId)) {
         return;
@@ -278,11 +280,8 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {},
       if (connection && state && context?.sessionId) state.dirty.set(context.sessionId, true);
     },
 
-    async beforeHandleAwareness({ context, states }) {
-      if (!context?.user) return;
-      for (const awareness of states.values()) {
-        awareness.user = { name: context.user.name, color: colorFor(context.user.id) };
-      }
+    async beforeHandleAwareness(payload) {
+      presence.filter(payload);
     },
 
     async onStoreDocument({ document, documentName, instance }) {
