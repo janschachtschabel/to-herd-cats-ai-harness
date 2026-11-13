@@ -99,3 +99,18 @@ class OutboxRepository:
         stmt = select(func.count(), func.min(EventOutbox.created_at)).where(*_pending())
         count, oldest = (await self.session.execute(stmt)).one()
         return int(count), oldest
+
+    async def failed_count(self) -> int:
+        """How many events gave up and are still in the table."""
+        stmt = select(func.count()).where(EventOutbox.failed_at.is_not(None))
+        return int(await self.session.scalar(stmt) or 0)
+
+    async def limit_time(self, milliseconds: int) -> None:
+        """Lock waits and statements of this transaction end after `milliseconds`."""
+        value = f"{milliseconds}ms"
+        await self.session.execute(
+            select(
+                func.set_config("lock_timeout", value, True),
+                func.set_config("statement_timeout", value, True),
+            )
+        )

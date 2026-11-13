@@ -34,10 +34,10 @@ groups:
           summary: "More than 5 % of the requests to {{ $labels.namespace }}/{{ $labels.job }} failed with 5xx for 10 minutes"
           description: "Look at the error logs of to-herd-cats-ai (level ERROR, with trace_id) for the cause."
       # The oldest outbox event (spec 4.3) has waited more than 5 minutes. Every worker
-      # reads the age from the database on each pass (herd_outbox_oldest_pending_seconds),
-      # API pods report 0, so the maximum per job is the backlog. Events waiting for a
-      # retry count as pending. A worker that is down or cannot reach the database shows
-      # as HerdNotReady instead (its gauge is not updated then).
+      # reads the age from the database every 10 s (herd_outbox_oldest_pending_seconds),
+      # also while a pass hangs, so the maximum per job is the backlog. API pods do not
+      # export it (with no worker at all, HerdWorkerAbsent fires instead). Events waiting
+      # for a retry count as pending.
       - alert: HerdOutboxBacklog
         expr: |
           max by (namespace, job) (herd_outbox_oldest_pending_seconds) > 300
@@ -45,23 +45,61 @@ groups:
           severity: critical
         annotations:
           summary: "The oldest outbox event of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes"
-          description: "No worker runs, the workers cannot keep up, or a handler keeps failing (it is retried for up to about 14 minutes; log entries outbox.handler_failed). Notifications, page timelines and live updates are late."
-      # An event gave up on a handler after its last attempt (result="failed") within the
-      # last 15 minutes. A process creates the series with its first failure, so a series
-      # that did not exist 15 minutes earlier counts as well as one that rose. (A Prometheus
-      # that starts scraping a pod with earlier failures alerts once, for 15 minutes.)
+          description: "The workers cannot keep up, or a handler keeps failing or timing out (it is retried for up to about 14 minutes; log entries outbox.handler_failed, outbox.handler_timeout). Notifications, page timelines and live updates are late."
+      # Outbox events gave up on a handler after their last attempt. herd_outbox_failed is
+      # the number of such events in the table, read from the database by every worker, so
+      # it survives restarts and new pods: the alert fires when it rose within the last
+      # 15 minutes, or when it first appears above 0 (a fresh Prometheus or release).
       - alert: HerdOutboxFailed
         expr: |
           (
-            sum by (namespace, job, handler) (increase(herd_outbox_dispatch_total{result="failed"}[15m])) > 0
+            max by (namespace, job) (herd_outbox_failed)
+              > max by (namespace, job) (herd_outbox_failed offset 15m)
           )
           or
-          count by (namespace, job, handler) (
-            herd_outbox_dispatch_total{result="failed"}
-              unless herd_outbox_dispatch_total{result="failed"} offset 15m
+          (
+            max by (namespace, job) (herd_outbox_failed) > 0
+              unless max by (namespace, job) (herd_outbox_failed offset 15m)
           )
         labels:
           severity: warning
         annotations:
-          summary: "Outbox events gave up on handler {{ $labels.handler }} in {{ $labels.namespace }}/{{ $labels.job }}"
-          description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
+          summary: "Outbox events gave up in {{ $labels.namespace }}/{{ $labels.job }} ({{ $value }} in all)"
+          description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
+      # A worker has not finished a batch (or found nothing due) for 3 minutes, sustained
+      # for 2 more: a handler or the database hangs beyond the handler time limit
+      # (HERD_WORKER_HANDLER_TIMEOUT_SECONDS, 30 s; its /ready turns not ready after four
+      # times that). Per pod; a worker that is gone shows as HerdWorkerAbsent or
+      # HerdNotReady instead.
+      - alert: HerdWorkerStalled
+        expr: |
+          time() - max by (namespace, job, pod) (herd_worker_last_pass_timestamp_seconds) > 180
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker {{ $labels.namespace }}/{{ $labels.pod }} has made no progress for 5 minutes"
+          description: "Its dispatcher has not finished a batch; notifications, page timelines and live updates wait. Look for outbox.handler_timeout and outbox.pass_failed in its log and for locks held in the database."
+      # API pods run while no worker reports at all (worker.replicas 0, every worker pod
+      # gone or not scraped): nothing works off the outbox, and the backlog gauges, which
+      # only workers export, are absent. API pods are those that export
+      # herd_sse_connections without herd_worker_last_pass_timestamp_seconds (role all
+      # exports both); a release's worker job is its API job with "-worker" for
+      # "-internal" (the chart's Service names), so releases sharing a namespace are told
+      # apart.
+      - alert: HerdWorkerAbsent
+        expr: |
+          count by (namespace, job) (
+            herd_sse_connections
+              unless on (namespace, pod) herd_worker_last_pass_timestamp_seconds
+          )
+          unless on (namespace, job)
+          count by (namespace, job) (
+            label_replace(herd_worker_last_pass_timestamp_seconds, "job", "$1-internal", "job", "(.+)-worker")
+          )
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No worker reports for {{ $labels.namespace }}/{{ $labels.job }} while its API runs"
+          description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."

@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     # than this (seconds), the hub drops what waits and tells its streams to reload.
     live_max_lag_seconds: float = Field(default=5.0, gt=0)
 
+    # The worker: longest time (seconds) one outbox handler may take for one event
+    # (asyncio and the transaction's lock_timeout/statement_timeout); a timeout is a
+    # failed attempt. A worker without progress for 4 times this is not ready.
+    worker_handler_timeout_seconds: float = Field(default=30.0, gt=0)
+
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")
     bootstrap_org_name: str = "Meine Organisation"

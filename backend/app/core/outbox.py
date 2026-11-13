@@ -47,6 +47,11 @@ class EventOutbox(UuidPk, OrgScoped, Base):
             "dispatched_at",
             postgresql_where=text("dispatched_at IS NOT NULL"),
         ),
+        Index(
+            "ix_event_outbox_failed",
+            "failed_at",
+            postgresql_where=text("failed_at IS NOT NULL"),
+        ),
     )
 
     type: Mapped[str] = mapped_column(String(MAX_TYPE_CHARS), nullable=False)

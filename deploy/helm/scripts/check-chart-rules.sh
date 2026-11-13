@@ -143,4 +143,21 @@ out=$(render --set networkPolicy.enabled=true \
 policy=$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")
 grep -B6 "team: monitoring" <<<"$policy" | grep -q "port: 9090" || fail "internalFrom does not reach the worker's 9090"
 
+# The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
+# API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
+# are the names of the Services the ServiceMonitor selects, so both must keep them.
+out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMonitor.enabled=true)
+rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
+for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent; do
+  grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
+done
+grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \
+  || fail "HerdWorkerAbsent does not pair the worker job with the API job"
+for name in t-to-herd-cats-ai-internal t-to-herd-cats-ai-worker; do
+  service=$(doc Service "$name" "$out")
+  [[ -n $service ]] || fail "no Service $name (a scrape job the alerts name)"
+  grep -q "app.kubernetes.io/endpoint: internal" <<<"$service" || fail "the ServiceMonitor does not scrape $name"
+done
+grep -q "HERD_ROLE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" || fail "no worker to report"
+
 echo "chart rules OK"

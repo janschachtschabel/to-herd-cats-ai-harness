@@ -106,7 +106,7 @@ tests:
         exp_alerts: []
 
   # HerdOutboxBacklog: the oldest pending outbox event is older than 5 minutes. Every
-  # worker reports the same age (read from the database); API pods report 0.
+  # worker reports the same age (read from the database); API pods do not report it.
   - name: HerdOutboxBacklog fires once per job when the oldest event passes 5 minutes
     interval: 1m
     input_series:
@@ -114,8 +114,6 @@ tests:
         values: "0 0 60 120 180 240 300 360 420 480"
       - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
         values: "0 0 60 120 180 240 300 360 420 480"
-      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-internal", pod="herd-api-a"}'
-        values: "0x9"
     alert_rule_test:
       - eval_time: 6m
         alertname: HerdOutboxBacklog
@@ -129,7 +127,7 @@ tests:
               job: herd-worker
             exp_annotations:
               summary: "The oldest outbox event of herd/herd-worker has waited more than 5 minutes"
-              description: "No worker runs, the workers cannot keep up, or a handler keeps failing (it is retried for up to about 14 minutes; log entries outbox.handler_failed). Notifications, page timelines and live updates are late."
+              description: "The workers cannot keep up, or a handler keeps failing or timing out (it is retried for up to about 14 minutes; log entries outbox.handler_failed, outbox.handler_timeout). Notifications, page timelines and live updates are late."
 
   - name: HerdOutboxBacklog stays quiet when the backlog drains within 5 minutes
     interval: 1m
@@ -144,17 +142,16 @@ tests:
         alertname: HerdOutboxBacklog
         exp_alerts: []
 
-  # HerdOutboxFailed: an event gave up on a handler (result="failed"), within the last
-  # 15 minutes. The counter's series appears with its first failure in a process, so a
-  # new series counts as well as a rising one.
-  - name: HerdOutboxFailed fires when a known series rises, then clears
+  # HerdOutboxFailed: the number of given-up events in the table (herd_outbox_failed,
+  # read from the database by every worker) rose within 15 minutes, or first appears
+  # above 0. A restart or a new pod with the same count stays quiet.
+  - name: HerdOutboxFailed fires once per job when the count rises, then clears
     interval: 1m
     input_series:
-      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-a", handler="notify_on_message", result="failed"}'
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
         values: "2x19 3x20"
-      # Retries (error) never alert by themselves.
-      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-a", handler="notify_on_message", result="error"}'
-        values: "0+5x40"
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "2x19 3x20"
     alert_rule_test:
       - eval_time: 18m
         alertname: HerdOutboxFailed
@@ -166,20 +163,17 @@ tests:
               severity: warning
               namespace: herd
               job: herd-worker
-              handler: notify_on_message
             exp_annotations:
-              summary: "Outbox events gave up on handler notify_on_message in herd/herd-worker"
-              description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
+              summary: "Outbox events gave up in herd/herd-worker (3 in all)"
+              description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
       - eval_time: 40m
         alertname: HerdOutboxFailed
         exp_alerts: []
 
-  - name: HerdOutboxFailed fires for the first failure of a process
+  - name: HerdOutboxFailed fires when failures first show
     interval: 1m
     input_series:
-      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-b", handler="publish_live", result="ok"}'
-        values: "0+3x40"
-      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-b", handler="publish_live", result="failed"}'
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
         values: "_x20 1x20"
     alert_rule_test:
       - eval_time: 19m
@@ -192,10 +186,115 @@ tests:
               severity: warning
               namespace: herd
               job: herd-worker
-              handler: publish_live
             exp_annotations:
-              summary: "Outbox events gave up on handler publish_live in herd/herd-worker"
-              description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
+              summary: "Outbox events gave up in herd/herd-worker (1 in all)"
+              description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
       - eval_time: 40m
         alertname: HerdOutboxFailed
         exp_alerts: []
+
+  - name: HerdOutboxFailed stays quiet for a new worker pod with the same count, and at 0
+    interval: 1m
+    input_series:
+      # (Prometheus first sees the 4 at 0m and alerts until 15m: covered above.)
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "4x27"
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-c"}'
+        values: "_x25 4x20"
+      - series: 'herd_outbox_failed{namespace="other", job="other-worker", pod="other-worker-a"}'
+        values: "0x45"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 26m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+
+  # HerdWorkerStalled: a worker's last finished batch is more than 3 minutes old, for 2
+  # minutes. A worker that keeps passing (every few seconds) stays quiet.
+  - name: HerdWorkerStalled fires for the worker that stopped making progress
+    interval: 1m
+    input_series:
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0+60x5 300x20"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0+60x25"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdWorkerStalled
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: HerdWorkerStalled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+              pod: herd-worker-a
+            exp_annotations:
+              summary: "Worker herd/herd-worker-a has made no progress for 5 minutes"
+              description: "Its dispatcher has not finished a batch; notifications, page timelines and live updates wait. Look for outbox.handler_timeout and outbox.pass_failed in its log and for locks held in the database."
+
+  # HerdWorkerAbsent: API pods (herd_sse_connections without a worker gauge on the same
+  # pod) run and no worker of their release reports, for 5 minutes.
+  - name: HerdWorkerAbsent fires for the release whose worker is missing
+    interval: 1m
+    input_series:
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "3x20"
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-b"}'
+        values: "1x20"
+      # The other release in the namespace has its worker (which exports both gauges).
+      - series: 'herd_sse_connections{namespace="herd", job="other-internal", pod="other-api-a"}'
+        values: "0x20"
+      - series: 'herd_sse_connections{namespace="herd", job="other-worker", pod="other-worker-a"}'
+        values: "0x20"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="other-worker", pod="other-worker-a"}'
+        values: "0+60x20"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdWorkerAbsent
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: HerdWorkerAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "No worker reports for herd/herd-internal while its API runs"
+              description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+
+  - name: HerdWorkerAbsent fires when the last worker goes, and not for role all
+    interval: 1m
+    input_series:
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "2x40"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0+60x10 _x30"
+      - series: 'herd_sse_connections{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x10 _x30"
+      # A single process in role all (API and worker in one pod) never alerts.
+      - series: 'herd_sse_connections{namespace="solo", job="solo-internal", pod="solo-a"}'
+        values: "1x40"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="solo", job="solo-internal", pod="solo-a"}'
+        values: "0+60x40"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: HerdWorkerAbsent
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HerdWorkerAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "No worker reports for herd/herd-internal while its API runs"
+              description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
