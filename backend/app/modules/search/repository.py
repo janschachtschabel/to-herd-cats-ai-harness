@@ -50,6 +50,13 @@ def _escape_like(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def title_starts_with(q: str) -> ColumnElement[bool]:
+    """Case-insensitive title prefix, in the form `ix_page_title_prefix` serves
+    (`lower(title) text_pattern_ops`, review M2 R19)."""
+    pattern = func.lower(literal(f"{_escape_like(q)}%"))
+    return func.lower(Page.title).like(pattern, escape="\\")
+
+
 class SearchRepository:
     def __init__(self, session: AsyncSession, scope: SearchScope) -> None:
         self.session = session
@@ -79,7 +86,7 @@ class SearchRepository:
         matches: ColumnElement[bool] = Page.search_tsv.op("@@")(query)
         score: ColumnElement[float] = cast(func.ts_rank_cd(Page.search_tsv, query), Float)
         if len(q) <= PREFIX_MAX_CHARS:
-            prefix = Page.title.ilike(f"{_escape_like(q)}%", escape="\\")
+            prefix = title_starts_with(q)
             matches = or_(matches, prefix)
             score = score + case((prefix, 1.0), else_=0.0)
         ranked = select(Page.id.label("id"), score.label("score")).where(self._allowed(), matches)

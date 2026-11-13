@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
     text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
@@ -66,6 +67,7 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
         ),
         Index("ix_page_space_id_parent_id", "space_id", "parent_id"),
         Index("ix_page_search_tsv", "search_tsv", postgresql_using="gin"),
+        Index("ix_page_parent_id", "parent_id"),
     )
 
     space_id: Mapped[uuid.UUID] = mapped_column(
@@ -95,6 +97,14 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
     search_tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed(SEARCH_TSV_SQL, persisted=True), deferred=True
     )
+
+
+# The search's title prefix, `lower(title) LIKE 'q%'` (review M2 R19).
+Index(
+    "ix_page_title_prefix",
+    func.lower(Page.title).label("title_lower"),
+    postgresql_ops={"title_lower": "text_pattern_ops"},
+)
 
 
 class VersionSource(StrEnum):
