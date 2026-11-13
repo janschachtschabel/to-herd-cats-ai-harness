@@ -63,12 +63,19 @@ export function markdownToJSON(markdown) {
  * edited live). */
 export function liveDocument(markdown) {
   const source = normalized(markdown);
-  const meaning = meaningOf(source);
+  let meaning = null;
   const attempts = [() => false, (_, block) => !survives(block)];
-  for (const keepRaw of attempts) {
+  for (const [attempt, keepRaw] of attempts.entries()) {
     const { json } = parseMarkdown(source, keepRaw);
     if (editorProblem(json) !== null) continue;
-    if (difference(meaning, meaningOf(jsonToMarkdown(json))) === null) return { safe: true, json };
+    const written = jsonToMarkdown(json);
+    // The same text means the same: no need to read both (the usual case for a page
+    // the live editor wrote).
+    if (written === source) return { safe: true, json, plain: attempt === 0 };
+    meaning ??= meaningOf(source);
+    if (difference(meaning, meaningOf(written)) === null) {
+      return { safe: true, json, plain: attempt === 0 };
+    }
   }
   return { safe: false, json: null };
 }

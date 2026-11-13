@@ -8,7 +8,7 @@
 // top-level blocks must come back as a raw block with the same text.
 import { withAutolinks } from "./autolink.mjs";
 import { canonical } from "./canonical.mjs";
-import { editorProblem, liveDocument } from "./markdown.mjs";
+import { editorProblem, liveDocument, normalized } from "./markdown.mjs";
 import { difference } from "./meaning.mjs";
 import { parseMarkdown, rawBlock } from "./parse.mjs";
 import { RAW_MARKDOWN } from "./schema.mjs";
@@ -37,17 +37,22 @@ export function readBack(json) {
   const problem = editorProblem(json);
   if (problem !== null) return { ok: false, markdown: null, problem };
   const markdown = jsonToMarkdown(json);
-  if (!liveDocument(markdown).safe) {
+  const opened = liveDocument(markdown);
+  if (!opened.safe) {
     return { ok: false, markdown, problem: "the live editor would refuse it" };
   }
   const sources = [];
   const expected = splitRaw(json, sources);
-  const back = parseMarkdown(markdown, (_, source) => {
-    const index = sources.indexOf(source);
-    if (index === -1) return false;
-    sources.splice(index, 1);
-    return true;
-  }).json;
+  // Without raw blocks, the live editor's own reading (nothing kept raw) is the one.
+  const back =
+    sources.length === 0 && opened.plain && markdown === normalized(markdown)
+      ? opened.json
+      : parseMarkdown(markdown, (_, source) => {
+          const index = sources.indexOf(source);
+          if (index === -1) return false;
+          sources.splice(index, 1);
+          return true;
+        }).json;
   const where = difference(withAutolinks(canonical(expected)), withAutolinks(canonical(back)));
   if (where !== null) return { ok: false, markdown, problem: `reads back differently at ${where}` };
   return { ok: true, markdown };
