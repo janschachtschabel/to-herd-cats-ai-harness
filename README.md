@@ -103,7 +103,8 @@ bash deploy/compose/load.sh            # Ressourcen und Laufzeiten für den Stec
 ```
 
 Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
-(`.github/workflows/ci.yml`) führt bei jedem Push alles davon aus, dazu `pip-audit`,
+(`.github/workflows/ci.yml`) führt für jeden Pull Request, jeden Push auf `main` und
+(über `release.yml`) jedes Release-Tag alles davon aus, dazu `pip-audit`,
 `npm audit`, `kubeconform`, `promtool` und Trivy.
 
 ## Betriebshinweise

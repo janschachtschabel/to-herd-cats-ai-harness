@@ -1,11 +1,14 @@
-# Checks on every push: backend, frontend, chart, image and licenses. Also called by
-# the release workflow before anything is published. Actions are pinned by commit;
+# Checks for pull requests and for pushes to main: backend, frontend, chart, image and
+# licenses. A tag runs them once, called by the release workflow before anything is
+# published (no push trigger for tags here, so nothing runs twice). A pull request's
+# own pushes run as `pull_request` only (no branch push trigger besides main). Actions are pinned by commit;
 # Renovate keeps the pins current. Only the default GITHUB_TOKEN (read) is used.
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
   workflow_call:
 
@@ -14,7 +17,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 env:
   UV_VERSION: "0.11.32"

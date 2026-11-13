@@ -74,7 +74,8 @@ helm template t deploy/helm/to-herd-cats-ai | kubeconform -strict -summary
 promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
 ```
 
-CI (`.github/workflows/ci.yml`, every push) runs all of the above plus `pip-audit`,
+CI (`.github/workflows/ci.yml`, pull requests and pushes to `main`; tags through
+`release.yml`) runs all of the above plus `pip-audit`,
 `npm audit --audit-level=high`, the image build, `smoke.sh` and Trivy. A tag `vX.Y.Z`
 (`release.yml`) publishes `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z`/`:X.Y` and the chart
 as OCI under `ghcr.io/<owner>/charts`; tag, pyproject and chart versions must match.
