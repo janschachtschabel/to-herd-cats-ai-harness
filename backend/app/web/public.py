@@ -117,7 +117,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestLogMiddleware)
     install_error_handlers(app)
     configure_tracing(app, settings)
-    app.state.live = LiveHub()
+    app.state.live = LiveHub(max_lag_seconds=settings.live_max_lag_seconds)
     app.include_router(api_router())
     app.include_router(collab_relay)  # WebSocket /collab/{page_id}
 

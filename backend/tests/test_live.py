@@ -316,7 +316,7 @@ async def test_sixth_connection_is_429(
 async def test_heartbeat_and_retry_hint(
     real_db: RealDb, live: LiveServer, pair: tuple[Person, Person], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.modules.messaging import live as live_module
+    from app.modules.messaging import live_connection as live_module
 
     monkeypatch.setattr(live_module, "HEARTBEAT_SECONDS", 0.1)
     _, member = pair

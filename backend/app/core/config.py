@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     # Longest time (seconds) a whole upload or import body may take: 408 after.
     body_total_timeout_seconds: float = Field(default=900.0, gt=0)
 
+    # Live delivery: when the oldest event waiting in an API process's hub is older
+    # than this (seconds), the hub drops what waits and tells its streams to reload.
+    live_max_lag_seconds: float = Field(default=5.0, gt=0)
+
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")
     bootstrap_org_name: str = "Meine Organisation"

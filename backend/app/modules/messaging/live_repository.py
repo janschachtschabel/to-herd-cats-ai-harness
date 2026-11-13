@@ -1,5 +1,6 @@
-"""The SQL of live delivery: which of the open streams' login sessions may get an event
-now, for all of them in one statement, and which are still valid at all.
+"""The SQL of live delivery: which of the open streams' login sessions may get the
+events of a batch now, for all of them in one statement, and which are still valid at
+all.
 
 A session counts while it has not ended (logout sets `expires_at`, deactivation and an
 administrator's sign-out delete it) and its person is active. Whether that person may
@@ -10,7 +11,7 @@ person's side, with groups and memberships as they are when the statement runs.
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import ColumnElement, and_, exists, func, select
+from sqlalchemy import ColumnElement, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import UserSession
@@ -27,33 +28,29 @@ def _valid() -> ColumnElement[bool]:
     )
 
 
-async def receiving_sessions(
+async def receiving_pairs(
     session: AsyncSession,
-    org_id: uuid.UUID,
     session_ids: Collection[uuid.UUID],
-    *,
-    conversation_id: uuid.UUID | None,
-    user_id: uuid.UUID | None,
-) -> set[uuid.UUID]:
-    """Those of `session_ids` (of the organisation) whose person may get the event:
-    the person `user_id` if given, and one who may see `conversation_id` if given."""
-    if not session_ids or (conversation_id is None and user_id is None):
+    conversation_ids: Collection[uuid.UUID],
+) -> set[tuple[uuid.UUID, uuid.UUID]]:
+    """Every (login session, conversation) of `session_ids` × `conversation_ids` where
+    the session is valid and its person may see the conversation now, in one statement
+    for a whole batch of events (any organisations: a session only ever pairs with a
+    conversation of its own organisation)."""
+    if not session_ids or not conversation_ids:
         return set()
     stmt = (
-        select(UserSession.id)
+        select(UserSession.id, Conversation.id)
         .join(User, User.id == UserSession.user_id)
-        .where(UserSession.id.in_(session_ids), UserSession.org_id == org_id, _valid())
-    )
-    if user_id is not None:
-        stmt = stmt.where(User.id == user_id)
-    if conversation_id is not None:
-        sees = (
-            exists()
-            .where(Conversation.id == conversation_id, seen_by_person())
-            .correlate_except(Conversation)
+        .join(Conversation, Conversation.org_id == UserSession.org_id)
+        .where(
+            UserSession.id.in_(session_ids),
+            Conversation.id.in_(conversation_ids),
+            _valid(),
+            seen_by_person(),
         )
-        stmt = stmt.where(sees)
-    return set(await session.scalars(stmt))
+    )
+    return {(row[0], row[1]) for row in await session.execute(stmt)}
 
 
 async def valid_sessions(

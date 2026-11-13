@@ -17,7 +17,8 @@ from starlette.types import Receive, Scope, Send
 
 from app.core.errors import Unauthorized
 from app.modules.auth.deps import AuthDep
-from app.modules.messaging.live import Connection, LiveHub, LiveUnavailable
+from app.modules.messaging.live import LiveHub, LiveUnavailable
+from app.modules.messaging.live_connection import Connection
 
 live = APIRouter(tags=["live"])
 

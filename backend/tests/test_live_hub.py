@@ -1,6 +1,5 @@
-"""The live hub's parts on their own: the slow client's queue, one query per event for
-every connected person, no pool connection held by open streams, and the handler's
-NOTIFY payload."""
+"""The live hub's parts on their own: the slow client's queue, no pool connection held
+by open streams, and the handler's NOTIFY payload (batches: `test_live_batch.py`)."""
 
 import asyncio
 import json
@@ -10,17 +9,13 @@ from collections.abc import AsyncIterator
 
 import asyncpg
 import pytest
-from sqlalchemy import event as sa_event
-from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import Database, set_database
 from app.core.listen import asyncpg_dsn
-from app.modules.auth.models import UserSession
-from app.modules.messaging import live as live_module
-from app.modules.messaging.live import Connection, LiveHub
+from app.modules.messaging import live_connection as live_module
+from app.modules.messaging.live_connection import Connection
 from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode
-from app.modules.users.models import User
 from app.web.public import create_public_app
 from tests.factories import login
 from tests.live_helpers import LiveServer, drain, open_stream
@@ -65,60 +60,6 @@ def test_slow_client_gets_resync_instead_of_growing_queue() -> None:
 )
 def test_a_payload_the_hub_cannot_use_is_dropped(raw: str) -> None:
     assert decode(raw) is None
-
-
-async def _sessions(real_db: RealDb, emails: list[str]) -> list[tuple[uuid.UUID, uuid.UUID]]:
-    async with real_db.database.session_factory() as session:
-        rows = await session.execute(
-            select(UserSession.id, User.id)
-            .join(User, User.id == UserSession.user_id)
-            .where(User.email.in_(emails))
-        )
-        return [(row[0], row[1]) for row in rows]
-
-
-async def test_one_query_per_event_for_all_connected_people(
-    real_db: RealDb, make_real_client: MakeRealClient
-) -> None:
-    owner, member = await make_real_client(), await make_real_client()
-    await login(owner, real_db.owner_email)
-    await login(member, real_db.member_email)
-    await login(await make_real_client(), real_db.member_email)  # a second session
-    space = (await owner.post("/api/spaces", json={"name": "T", "kind": "open"})).json()
-    channel = (await owner.post(f"/api/spaces/{space['id']}/channels", json={"name": "k"})).json()
-    hub = LiveHub()
-    hub.database = real_db.database
-    connections = [
-        hub.connect(real_db.org_id, user_id, session_id)  # type: ignore[arg-type]
-        for session_id, user_id in await _sessions(
-            real_db, [real_db.owner_email, real_db.member_email]
-        )
-        for _ in range(2)
-    ]
-    assert len(connections) == 6
-    statements: list[str] = []
-
-    def count(*args: object) -> None:
-        statements.append(str(args[2]))
-
-    engine = real_db.database.engine.sync_engine
-    sa_event.listen(engine, "before_cursor_execute", count)
-    try:
-        for _ in range(3):
-            await hub.deliver(
-                LiveEvent(
-                    "message.created",
-                    real_db.org_id,  # type: ignore[arg-type]
-                    uuid.UUID(channel["id"]),
-                    uuid.uuid4(),
-                    None,
-                    None,
-                )
-            )
-    finally:
-        sa_event.remove(engine, "before_cursor_execute", count)
-    assert len(statements) == 3, statements  # one per event, not one per connection
-    assert all(c.queue.qsize() == 3 for c in connections)  # an open space: everyone
 
 
 @pytest.fixture
@@ -198,3 +139,20 @@ async def test_publish_live_notifies_ids_only(
         "u": None,
     }
     assert len(received[0].encode()) < 4000
+
+
+async def test_frames_waiting_together_are_written_together() -> None:
+    connection = Connection(uuid.uuid4(), uuid.uuid4(), uuid.uuid4())
+    frames = connection.frames()
+    assert await anext(frames) == live_module.OPENING
+    events = [
+        LiveEvent("message.created", uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), None, None)
+        for _ in range(3)
+    ]
+    for event in events:
+        connection.push(event.frame())
+    assert await anext(frames) == b"".join(e.frame() for e in events)  # one write
+    connection.push(events[0].frame())
+    connection.close()  # what was queued is dropped; the stream ends
+    with pytest.raises(StopAsyncIteration):
+        await anext(frames)

@@ -2,51 +2,55 @@
 `herd_live` over a connection of its own, outside the pool (`core/listen.py`), and
 hands each event to the open streams (`GET /api/stream`) that may have it.
 
-- Who gets an event is decided per event, in one query for all streams of the
-  event's organisation (`live_repository.receiving_sessions`): the login session is
-  still valid, the person is active, and either it is the person the event names or
-  the person may see the conversation now. Nothing is remembered between events, so
-  a membership removed while a stream is open stops the next event already.
+- The hub works in batches (`live_batch.py`): it takes whatever has arrived (at most
+  BATCH_SIZE events) and decides who may get them in at most two statements for the
+  whole batch: the login session is still valid, the person is active, and either it
+  is the person the event names or the person may see the conversation now. Nothing
+  is remembered between batches, so a membership removed while a stream is open
+  stops the next batch already.
+- Falling behind is bounded: when the oldest event waiting is older than
+  `max_lag_seconds` (HERD_LIVE_MAX_LAG_SECONDS, default 5), the hub drops everything
+  waiting and sends every stream `resync` (the clients reload what they show) instead
+  of delivering ever later. Gauge `herd_live_queue_depth`, histogram
+  `herd_live_delivery_lag_seconds`, counter `herd_live_resyncs_total{reason}`.
 - Every SESSION_CHECK_SECONDS one query finds the streams whose session has ended
   (logout, expiry, deactivation); they are closed.
 - A stream holds no database connection: the hub borrows one from the pool for each
-  event and each check and gives it back at once.
-- A stream's queue holds QUEUE_SIZE frames; a client that falls further behind gets
-  its queue emptied and one `resync` instead. After the LISTEN connection was lost and
-  is back, every stream gets `resync` (what was sent meanwhile is lost); so does every
-  stream of an organisation whose event could not be checked (database error).
-- At most MAX_STREAMS_PER_SESSION streams per login session in this process; the next
-  is refused (429).
-
-Frames are bytes ready to send: `event: <name>` + `data: {ids}`, or a comment line as
-heartbeat every HEARTBEAT_SECONDS. A closed stream gets `None` and ends.
+  batch and each check and gives it back at once.
+- A stream's queue holds QUEUE_SIZE frames (`live_connection.py`); a client that falls
+  further behind gets its queue emptied and one `resync` instead. After the LISTEN
+  connection was lost and is back, every stream gets `resync` (what was sent
+  meanwhile is lost); so does every stream a batch was for whose check failed.
+- At most MAX_STREAMS_PER_SESSION streams per login session in this process; the
+  next is refused (429).
 """
 
 import asyncio
 import logging
+import time
 import uuid
-from collections.abc import AsyncIterator
 from contextlib import suppress
 
 from app.core.db import Database
 from app.core.errors import AppError, RateLimited
 from app.core.listen import Listener
-from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode, sse_frame
-from app.modules.messaging.live_repository import receiving_sessions, valid_sessions
-from app.modules.messaging.metrics import LIVE_EVENTS, SSE_CONNECTIONS
+from app.modules.messaging.live_batch import BATCH_SIZE, Received, deliver_batch
+from app.modules.messaging.live_connection import RESYNC, Connection
+from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode
+from app.modules.messaging.live_repository import valid_sessions
+from app.modules.messaging.metrics import (
+    LIVE_EVENTS,
+    LIVE_QUEUE_DEPTH,
+    LIVE_RESYNCS,
+    SSE_CONNECTIONS,
+)
 
 logger = logging.getLogger(__name__)
 
-HEARTBEAT_SECONDS = 15.0
 SESSION_CHECK_SECONDS = 30.0
-QUEUE_SIZE = 100
 MAX_STREAMS_PER_SESSION = 5
+MAX_LAG_SECONDS = 5.0  # default of HERD_LIVE_MAX_LAG_SECONDS
 INCOMING_LIMIT = 10_000  # notifications waiting for the hub; more means resync for all
-RETRY_MS = 5000  # how long a browser waits before it connects again
-
-OPENING = f"retry: {RETRY_MS}\n\n".encode()
-HEARTBEAT = b": ping\n\n"
-RESYNC = sse_frame("resync", {})
 
 
 class TooManyStreams(RateLimited):
@@ -58,54 +62,13 @@ class LiveUnavailable(AppError):
     code = "live.unavailable"
 
 
-class Connection:
-    """One open stream."""
-
-    def __init__(self, org_id: uuid.UUID, user_id: uuid.UUID, session_id: uuid.UUID) -> None:
-        self.org_id = org_id
-        self.user_id = user_id
-        self.session_id = session_id
-        self.queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=QUEUE_SIZE)
-        self.closed = False
-
-    def push(self, frame: bytes) -> None:
-        if self.closed:
-            return
-        try:
-            self.queue.put_nowait(frame)
-        except asyncio.QueueFull:
-            self._empty()
-            self.queue.put_nowait(RESYNC)
-
-    def close(self) -> None:
-        """End the stream; frames not yet sent are dropped."""
-        if not self.closed:
-            self.closed = True
-            self._empty()
-            self.queue.put_nowait(None)
-
-    def _empty(self) -> None:
-        while not self.queue.empty():
-            self.queue.get_nowait()
-
-    async def frames(self) -> AsyncIterator[bytes]:
-        yield OPENING
-        while True:
-            try:
-                frame = await asyncio.wait_for(self.queue.get(), timeout=HEARTBEAT_SECONDS)
-            except TimeoutError:
-                yield HEARTBEAT
-                continue
-            if frame is None:
-                return
-            yield frame
-
-
 class LiveHub:
-    def __init__(self) -> None:
+    def __init__(self, max_lag_seconds: float = MAX_LAG_SECONDS) -> None:
         self.database: Database | None = None
+        self.max_lag_seconds = max_lag_seconds
         self._streams: dict[uuid.UUID, list[Connection]] = {}  # by login session
-        self._incoming: asyncio.Queue[str] = asyncio.Queue(maxsize=INCOMING_LIMIT)
+        # (payload, time.monotonic() of arrival)
+        self._incoming: asyncio.Queue[tuple[str, float]] = asyncio.Queue(maxsize=INCOMING_LIMIT)
         self._overflowed = False
         self._listener: Listener | None = None
         self._stop = asyncio.Event()
@@ -126,7 +89,7 @@ class LiveHub:
         self.database = database
         self._stop.clear()
         self._listener = Listener(
-            database.engine.url, LIVE_CHANNEL, self._received, on_connect=self.resync_all
+            database.engine.url, LIVE_CHANNEL, self._received, on_connect=self._reconnected
         )
         self._tasks = [
             asyncio.create_task(self._listener.run(self._stop)),
@@ -171,58 +134,73 @@ class LiveHub:
         for connection in self._all():
             connection.push(RESYNC)
 
+    def _reconnected(self) -> None:
+        LIVE_RESYNCS.labels(reason="reconnect").inc()
+        self.resync_all()
+
     def _all(self) -> list[Connection]:
         return [c for streams in self._streams.values() for c in streams]
 
     def _received(self, payload: str) -> None:
         try:
-            self._incoming.put_nowait(payload)
+            self._incoming.put_nowait((payload, time.monotonic()))
         except asyncio.QueueFull:
             self._overflowed = True
+        LIVE_QUEUE_DEPTH.set(self._incoming.qsize())
 
     async def _deliver_loop(self) -> None:
         while True:
-            payload = await self._incoming.get()
-            if self._overflowed:
-                self._overflowed = False
-                self.resync_all()
+            batch = [await self._incoming.get()]
+            try:
+                await self.handle(batch)
+            except Exception as exc:  # the loop must outlive any one batch
+                logger.warning("live.deliver_failed", extra={"error": type(exc).__name__})
+
+    async def handle(self, batch: list[tuple[str, float]]) -> None:
+        """`batch` and whatever else has arrived meanwhile (up to BATCH_SIZE)."""
+        while len(batch) < BATCH_SIZE:
+            try:
+                batch.append(self._incoming.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        LIVE_QUEUE_DEPTH.set(self._incoming.qsize())
+        if self._overflowed:
+            self._overflowed = False
+            LIVE_RESYNCS.labels(reason="overflow").inc()
+            self.resync_all()
+        behind = time.monotonic() - batch[0][1]
+        if behind > self.max_lag_seconds:
+            dropped = len(batch) + self._drop_incoming()
+            logger.warning(
+                "live.fell_behind", extra={"dropped": dropped, "seconds": round(behind, 1)}
+            )
+            LIVE_RESYNCS.labels(reason="lag").inc()
+            self.resync_all()
+            return
+        received: list[Received] = []
+        for payload, at in batch:
             event = decode(payload)
             if event is None:
                 logger.warning("live.payload_dropped")
                 continue
             LIVE_EVENTS.labels(type=event.name).inc()
+            received.append(Received(event, at))
+        await deliver_batch(self.database, self._all(), received)
+
+    def _drop_incoming(self) -> int:
+        dropped = 0
+        while True:
             try:
-                await self.deliver(event)
-            except Exception as exc:  # the loop must outlive any one event
-                logger.warning("live.deliver_failed", extra={"error": type(exc).__name__})
+                self._incoming.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            dropped += 1
+        LIVE_QUEUE_DEPTH.set(0)
+        return dropped
 
     async def deliver(self, event: LiveEvent) -> None:
-        """The event to every stream that may have it, after one query."""
-        targets = [
-            c
-            for c in self._all()
-            if c.org_id == event.org_id and event.user_id in (None, c.user_id)
-        ]
-        if not targets or self.database is None:
-            return
-        try:
-            async with self.database.session_factory() as session:
-                allowed = await receiving_sessions(
-                    session,
-                    event.org_id,
-                    {c.session_id for c in targets},
-                    conversation_id=event.conversation_id,
-                    user_id=event.user_id,
-                )
-        except Exception as exc:
-            logger.warning("live.check_failed", extra={"error": type(exc).__name__})
-            for connection in targets:
-                connection.push(RESYNC)
-            return
-        frame = event.frame()
-        for connection in targets:
-            if connection.session_id in allowed:
-                connection.push(frame)
+        """One event on its own (as a batch of one)."""
+        await deliver_batch(self.database, self._all(), [Received(event, time.monotonic())])
 
     async def check_sessions(self) -> None:
         """Close the streams whose login session has ended."""
