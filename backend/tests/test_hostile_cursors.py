@@ -65,6 +65,7 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/conversations/{conversation_id}/messages",
         "/api/messages/{message_id}/replies",
         "/api/dms",
+        "/api/conversations/unread",
         "/api/admin/dm-inspect",
         "/api/admin/dm-inspect/{inspection_id}/messages",
     } <= set(endpoints)

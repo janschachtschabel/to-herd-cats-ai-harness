@@ -83,4 +83,5 @@ async def inspected_messages(
 ) -> Page[MessageOut]:
     """The inspected DM's messages, replies included, newest first; 404 once the
     inspection has expired."""
-    return message_page(await InspectService(session).messages(actor, inspection_id, params))
+    page = await InspectService(session).messages(actor, inspection_id, params)
+    return await message_page(session, actor, page)

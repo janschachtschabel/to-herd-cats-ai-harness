@@ -7,15 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 from app.core.principal import PrincipalType
 from app.modules.messaging.dm_repository import InspectionNote, Participant
+from app.modules.messaging.mentions import MAX_MENTIONS
 from app.modules.messaging.models import (
     MAX_BODY_CHARS,
     MAX_CHANNEL_NAME_CHARS,
     MAX_TOPIC_CHARS,
     Conversation,
     ConversationKind,
-    Message,
     MessageKind,
 )
+from app.modules.messaging.social_repository import ReactionSummary
+from app.modules.messaging.views import MessageView
 
 # No line breaks or other control characters: a name is one line in the sidebar.
 ChannelName = Annotated[
@@ -135,32 +137,56 @@ def _not_blank(value: str) -> str:
     return value
 
 
+Mentions = Annotated[
+    list[uuid.UUID],
+    Field(max_length=MAX_MENTIONS, description="the people the message mentions (user ids)"),
+]
+
+
 class MessageCreate(BaseModel):
     """`parent_id`: a top-level message of the same conversation, to reply in its
     thread. `client_id`: the client's key for this message; sending again with the
-    same key returns the first message (200) instead of a second one."""
+    same key returns the first message (200) instead of a second one. `mentions`:
+    whom the text mentions (`@[Name](user:<id>)`); at most 50."""
 
     model_config = ConfigDict(extra="forbid")
 
     body_md: Body
     parent_id: uuid.UUID | None = None
     client_id: uuid.UUID | None = None
+    mentions: Mentions = Field(default_factory=list)
 
     _body = field_validator("body_md")(_not_blank)
 
 
 class MessageUpdate(BaseModel):
+    """`mentions` left out: the message keeps whom it mentions; given: replaces it."""
+
     model_config = ConfigDict(extra="forbid")
 
     body_md: Body
+    mentions: Mentions | None = None
 
     _body = field_validator("body_md")(_not_blank)
+
+
+class ReactionOut(BaseModel):
+    """People who reacted with `emoji`; `mine`: the caller among them."""
+
+    emoji: str
+    count: int
+    mine: bool
+
+    @classmethod
+    def of(cls, summary: ReactionSummary) -> "ReactionOut":
+        return cls(emoji=summary.emoji, count=summary.count, mine=summary.mine)
 
 
 class MessageOut(BaseModel):
     """`author` is null for system messages. A deleted message keeps its place with
     `deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong
-    to top-level messages (their thread)."""
+    to top-level messages (their thread). `mentions`: the people mentioned who may see
+    the conversation; `reactions`: by emoji, the first reacted with first."""
 
     id: uuid.UUID
     conversation_id: uuid.UUID
@@ -174,9 +200,12 @@ class MessageOut(BaseModel):
     deleted_at: datetime | None
     reply_count: int
     last_reply_at: datetime | None
+    mentions: list[uuid.UUID]
+    reactions: list[ReactionOut]
 
     @classmethod
-    def of(cls, message: Message) -> "MessageOut":
+    def of(cls, view: MessageView) -> "MessageOut":
+        message = view.message
         author = None
         if message.author_id is not None:
             author = PrincipalRef(type=PrincipalType(message.author_type), id=message.author_id)
@@ -193,4 +222,28 @@ class MessageOut(BaseModel):
             deleted_at=message.deleted_at,
             reply_count=message.reply_count,
             last_reply_at=message.last_reply_at,
+            mentions=view.mentions,
+            reactions=[ReactionOut.of(r) for r in view.reactions],
         )
+
+
+class MessageWriteOut(MessageOut):
+    """`not_notified`: the mentioned ids that were not stored: people who may not see
+    the conversation, and ids of nobody (indistinguishable on purpose)."""
+
+    not_notified: list[uuid.UUID]
+
+
+class ReadPosition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: uuid.UUID
+
+
+class UnreadOut(BaseModel):
+    """`unread`: others' top-level messages after the read position (not deleted);
+    `mentions`: mentions of the caller after it, in threads too."""
+
+    conversation_id: uuid.UUID
+    unread: int
+    mentions: int

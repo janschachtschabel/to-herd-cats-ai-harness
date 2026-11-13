@@ -18,8 +18,10 @@ from app.modules.messaging.schemas import (
     MessageCreate,
     MessageOut,
     MessageUpdate,
+    MessageWriteOut,
 )
 from app.modules.messaging.service import ConversationService, MessageService
+from app.modules.messaging.views import message_views
 
 space_channels = APIRouter(prefix="/spaces/{space_id}/channels", tags=["messaging"])
 channels = APIRouter(prefix="/channels", tags=["messaging"])
@@ -114,10 +116,18 @@ async def unarchive_channel(
     return await _out(session, actor, channel)
 
 
-def message_page(page: Page[Message]) -> Page[MessageOut]:
-    return Page[MessageOut](
-        items=[MessageOut.of(m) for m in page.items], next_cursor=page.next_cursor
-    )
+async def message_page(
+    session: AsyncSession, actor: Actor, page: Page[Message]
+) -> Page[MessageOut]:
+    views = await message_views(session, actor, page.items)
+    return Page[MessageOut](items=[MessageOut.of(v) for v in views], next_cursor=page.next_cursor)
+
+
+async def _written(
+    session: AsyncSession, actor: Actor, message: Message, not_notified: list[uuid.UUID]
+) -> MessageWriteOut:
+    (view,) = await message_views(session, actor, [message])
+    return MessageWriteOut(**MessageOut.of(view).model_dump(), not_notified=not_notified)
 
 
 @conversations.get("/{conversation_id}/messages", response_model=Page[MessageOut])
@@ -137,14 +147,14 @@ async def list_messages(
     page = await MessageService(session).list(
         actor, conversation_id, params, before=before, after=after
     )
-    return message_page(page)
+    return await message_page(session, actor, page)
 
 
 @conversations.post(
     "/{conversation_id}/messages",
-    response_model=MessageOut,
+    response_model=MessageWriteOut,
     status_code=201,
-    responses={200: {"model": MessageOut, "description": "sent before with this client_id"}},
+    responses={200: {"model": MessageWriteOut, "description": "sent before with this client_id"}},
 )
 async def post_message(
     conversation_id: uuid.UUID,
@@ -152,13 +162,18 @@ async def post_message(
     response: Response,
     actor: ActorDep,
     session: SessionDep,
-) -> MessageOut:
+) -> MessageWriteOut:
     posted = await MessageService(session).post(
-        actor, conversation_id, body.body_md, parent_id=body.parent_id, client_id=body.client_id
+        actor,
+        conversation_id,
+        body.body_md,
+        parent_id=body.parent_id,
+        client_id=body.client_id,
+        mentions=body.mentions,
     )
     if not posted.created:
         response.status_code = 200
-    return MessageOut.of(posted.message)
+    return await _written(session, actor, posted.message, posted.not_notified)
 
 
 @messages.get("/{message_id}/replies", response_model=Page[MessageOut])
@@ -169,14 +184,16 @@ async def list_replies(
     session: SessionDep,
 ) -> Page[MessageOut]:
     """The message's thread, oldest first."""
-    return message_page(await MessageService(session).replies(actor, message_id, params))
+    page = await MessageService(session).replies(actor, message_id, params)
+    return await message_page(session, actor, page)
 
 
-@messages.patch("/{message_id}", response_model=MessageOut)
+@messages.patch("/{message_id}", response_model=MessageWriteOut)
 async def edit_message(
     message_id: uuid.UUID, body: MessageUpdate, actor: ActorDep, session: SessionDep
-) -> MessageOut:
-    return MessageOut.of(await MessageService(session).edit(actor, message_id, body.body_md))
+) -> MessageWriteOut:
+    edited = await MessageService(session).edit(actor, message_id, body.body_md, body.mentions)
+    return await _written(session, actor, edited.message, edited.not_notified)
 
 
 @messages.delete("/{message_id}", status_code=204)

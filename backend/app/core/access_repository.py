@@ -12,12 +12,24 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 
-from sqlalchemy import ColumnElement, ScalarSelect, Select, and_, case, exists, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    ScalarSelect,
+    Select,
+    SQLColumnExpression,
+    and_,
+    case,
+    exists,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.permissions import ADMIN_ROLES, OPEN_SPACE_READERS, SpaceRole
-from app.core.principal import SystemRole
+from app.core.principal import PrincipalType, SystemRole
+from app.modules.groups.models import GroupMember
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.spaces.repository import held_by
 from app.modules.users.models import User
@@ -140,6 +152,47 @@ def visible_ids_stmt(actor: Actor) -> Select[uuid.UUID]:
         role.is_not(None),
         or_(role.in_(ADMIN_ROLES), member, open_to_role),
     )
+
+
+def person_reads_space(space_id: SQLColumnExpression[uuid.UUID | None]) -> ColumnElement[bool]:
+    """The rule of `visible_ids_stmt` seen from the other side: whether the (correlated)
+    `User` row may read the space `space_id`, with the person's groups as they are now.
+    For questions about many people at once ("who of these may see it?", review M3
+    focus 4 and 5) in one statement; `tests/test_conversation_readers.py` holds both
+    forms to the same answers."""
+    # Every table but the subquery's own is the caller's (correlated), however deep.
+    groups = (
+        select(GroupMember.group_id)
+        .where(GroupMember.member_type == PrincipalType.USER, GroupMember.member_id == User.id)
+        .correlate_except(GroupMember)
+    )
+    member = (
+        exists()
+        .where(
+            SpaceMember.space_id == Space.id,
+            or_(
+                and_(
+                    SpaceMember.member_type == PrincipalType.USER, SpaceMember.member_id == User.id
+                ),
+                and_(
+                    SpaceMember.member_type == PrincipalType.GROUP,
+                    SpaceMember.member_id.in_(groups),
+                ),
+            ),
+        )
+        .correlate_except(SpaceMember)
+    )
+    open_to_role = and_(Space.kind == SpaceKind.OPEN, User.system_role.in_(OPEN_SPACE_READERS))
+    readable = (
+        exists()
+        .where(
+            Space.id == space_id,
+            Space.org_id == User.org_id,
+            or_(User.system_role.in_(ADMIN_ROLES), member, open_to_role),
+        )
+        .correlate_except(Space)
+    )
+    return and_(User.is_active.is_(True), readable)
 
 
 def ids_with_role_stmt(actor: Actor, min_role: SpaceRole) -> Select[uuid.UUID]:

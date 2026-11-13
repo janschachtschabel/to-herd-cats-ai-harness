@@ -319,6 +319,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Unread
+         * @description Every conversation the caller sees with something unread, by id.
+         */
+        get: operations["list_unread_api_conversations_unread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}": {
         parameters: {
             query?: never;
@@ -369,6 +389,26 @@ export interface paths {
         put?: never;
         /** Post Message */
         post: operations["post_message_api_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversation_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read
+         * @description Read up to a message of the conversation (never backwards).
+         */
+        post: operations["mark_read_api_conversations__conversation_id__read_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -449,6 +489,30 @@ export interface paths {
         head?: never;
         /** Edit Message */
         patch: operations["edit_message_api_messages__message_id__patch"];
+        trace?: never;
+    };
+    "/api/messages/{message_id}/reactions/{emoji}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * React
+         * @description Add the caller's reaction (again: no change); the message's reactions.
+         */
+        put: operations["react_api_messages__message_id__reactions__emoji__put"];
+        post?: never;
+        /**
+         * Unreact
+         * @description Take the caller's reaction back (none: no change); the message's reactions.
+         */
+        delete: operations["unreact_api_messages__message_id__reactions__emoji__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/messages/{message_id}/replies": {
@@ -1356,7 +1420,8 @@ export interface components {
          * MessageCreate
          * @description `parent_id`: a top-level message of the same conversation, to reply in its
          *     thread. `client_id`: the client's key for this message; sending again with the
-         *     same key returns the first message (200) instead of a second one.
+         *     same key returns the first message (200) instead of a second one. `mentions`:
+         *     whom the text mentions (`@[Name](user:<id>)`); at most 50.
          */
         MessageCreate: {
             /**
@@ -1366,6 +1431,11 @@ export interface components {
             body_md: string;
             /** Client Id */
             client_id?: string | null;
+            /**
+             * Mentions
+             * @description the people the message mentions (user ids)
+             */
+            mentions?: string[];
             /** Parent Id */
             parent_id?: string | null;
         };
@@ -1378,7 +1448,8 @@ export interface components {
          * MessageOut
          * @description `author` is null for system messages. A deleted message keeps its place with
          *     `deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong
-         *     to top-level messages (their thread).
+         *     to top-level messages (their thread). `mentions`: the people mentioned who may see
+         *     the conversation; `reactions`: by emoji, the first reacted with first.
          */
         MessageOut: {
             author: components["schemas"]["PrincipalRef"] | null;
@@ -1408,18 +1479,71 @@ export interface components {
             kind: components["schemas"]["MessageKind"];
             /** Last Reply At */
             last_reply_at: string | null;
+            /** Mentions */
+            mentions: string[];
             /** Parent Id */
             parent_id: string | null;
+            /** Reactions */
+            reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
             reply_count: number;
         };
-        /** MessageUpdate */
+        /**
+         * MessageUpdate
+         * @description `mentions` left out: the message keeps whom it mentions; given: replaces it.
+         */
         MessageUpdate: {
             /**
              * Body Md
              * @description Markdown
              */
             body_md: string;
+            /** Mentions */
+            mentions?: string[] | null;
+        };
+        /**
+         * MessageWriteOut
+         * @description `not_notified`: the mentioned ids that were not stored: people who may not see
+         *     the conversation, and ids of nobody (indistinguishable on purpose).
+         */
+        MessageWriteOut: {
+            author: components["schemas"]["PrincipalRef"] | null;
+            /** Body Md */
+            body_md: string;
+            /** Client Id */
+            client_id: string | null;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deleted At */
+            deleted_at: string | null;
+            /** Edited At */
+            edited_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["MessageKind"];
+            /** Last Reply At */
+            last_reply_at: string | null;
+            /** Mentions */
+            mentions: string[];
+            /** Not Notified */
+            not_notified: string[];
+            /** Parent Id */
+            parent_id: string | null;
+            /** Reactions */
+            reactions: components["schemas"]["ReactionOut"][];
+            /** Reply Count */
+            reply_count: number;
         };
         /** OrgOut */
         OrgOut: {
@@ -1630,6 +1754,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[UnreadOut] */
+        Page_UnreadOut_: {
+            /** Items */
+            items: components["schemas"]["UnreadOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[UserOut] */
         Page_UserOut_: {
             /** Items */
@@ -1689,6 +1820,26 @@ export interface components {
             locale: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ReactionOut
+         * @description People who reacted with `emoji`; `mine`: the caller among them.
+         */
+        ReactionOut: {
+            /** Count */
+            count: number;
+            /** Emoji */
+            emoji: string;
+            /** Mine */
+            mine: boolean;
+        };
+        /** ReadPosition */
+        ReadPosition: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
         };
         /**
          * SearchHitOut
@@ -1934,6 +2085,22 @@ export interface components {
             tags: string[];
             /** Title */
             title: string;
+        };
+        /**
+         * UnreadOut
+         * @description `unread`: others' top-level messages after the read position (not deleted);
+         *     `mentions`: mentions of the caller after it, in threads too.
+         */
+        UnreadOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Mentions */
+            mentions: number;
+            /** Unread */
+            unread: number;
         };
         /** UserCreate */
         UserCreate: {
@@ -2877,6 +3044,38 @@ export interface operations {
             };
         };
     };
+    list_unread_api_conversations_unread_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_UnreadOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_conversation_api_conversations__conversation_id__get: {
         parameters: {
             query?: never;
@@ -3037,7 +3236,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MessageOut"];
+                    "application/json": components["schemas"]["MessageWriteOut"];
                 };
             };
             /** @description Successful Response */
@@ -3046,8 +3245,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MessageOut"];
+                    "application/json": components["schemas"]["MessageWriteOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_conversations__conversation_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadPosition"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3253,7 +3485,73 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MessageOut"];
+                    "application/json": components["schemas"]["MessageWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    react_api_messages__message_id__reactions__emoji__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+                /** @description exactly one emoji (URL-encoded) */
+                emoji: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unreact_api_messages__message_id__reactions__emoji__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+                /** @description exactly one emoji (URL-encoded) */
+                emoji: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionOut"][];
                 };
             };
             /** @description Validation Error */

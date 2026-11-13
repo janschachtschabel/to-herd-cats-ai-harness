@@ -90,6 +90,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/messages/{message_id}/replies", "message"),
     ("PATCH", "/api/messages/{message_id}", "message"),
     ("DELETE", "/api/messages/{message_id}", "message"),
+    ("GET", "/api/conversations/unread", "session"),
+    ("POST", "/api/conversations/{conversation_id}/read", "conversation"),
+    ("PUT", "/api/messages/{message_id}/reactions/{emoji}", "message"),
+    ("DELETE", "/api/messages/{message_id}/reactions/{emoji}", "message"),
     ("POST", "/api/dms", "session"),
     ("GET", "/api/dms", "session"),
     ("GET", "/api/admin/dm-inspect", "admin"),
@@ -142,6 +146,7 @@ def _concrete(
         "{tag_id}": str(uuid7()),
         "{attachment_id}": str(uuid7()),
         "{inspection_id}": str(uuid7()),
+        "{emoji}": "%F0%9F%91%8D",
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -198,6 +203,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/conversations/{conversation_id}/unarchive"): {"version": 1},
     ("POST", "/api/conversations/{conversation_id}/messages"): {"body_md": "x"},
     ("PATCH", "/api/messages/{message_id}"): {"body_md": "x"},
+    ("POST", "/api/conversations/{conversation_id}/read"): {"message_id": str(uuid7())},
 }
 
 
@@ -232,7 +238,7 @@ async def test_conversation_routes_hide_conversations_without_a_role(
 ) -> None:
     actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
     channel = await ChannelService(session).create(actor, team_space.id, "geheim", None)
-    message, _ = await MessageService(session).post(actor, channel.id, "Geheim")
+    message = (await MessageService(session).post(actor, channel.id, "Geheim")).message
     for method, template, guard in ROUTES:
         if guard in ("conversation", "message"):
             path = _concrete(

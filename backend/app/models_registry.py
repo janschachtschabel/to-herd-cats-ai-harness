@@ -12,6 +12,7 @@ from app.modules.messaging.models import (
     DmInspection,
     Message,
 )
+from app.modules.messaging.social_models import ConversationRead, MessageMention, Reaction
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import Space, SpaceMember
 from app.modules.tags.models import Tag, Tagging
@@ -24,6 +25,7 @@ __all__ = [
     "AuditLog",
     "Base",
     "Conversation",
+    "ConversationRead",
     "ConversationParticipant",
     "DmInspection",
     "EventDelivery",
@@ -31,11 +33,13 @@ __all__ = [
     "Group",
     "GroupMember",
     "Message",
+    "MessageMention",
     "Organization",
     "Page",
     "PageCollabState",
     "PageVersion",
     "RateLimitHit",
+    "Reaction",
     "Space",
     "SpaceMember",
     "Tag",

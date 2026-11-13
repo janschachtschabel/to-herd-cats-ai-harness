@@ -6,12 +6,15 @@ require_post`); editing only one's own message; deleting one's own or, with
 A message whose conversation the actor cannot see is 404 `message.not_found`.
 
 Posting is idempotent per author and `client_id`: a resend returns the first message
-(`Posted.created` false), and nothing else happens. Every change is emitted
+(`Posted.created` false), and nothing else happens. Posting and editing take the
+ids the message mentions (`mentions.py`); those who may not see the conversation
+come back in `not_notified`. Every change is emitted
 (`message.created|updated|deleted`, payload ids only) in its transaction; message
 text never goes into events or logs.
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -23,6 +26,7 @@ from app.core.models_base import utcnow
 from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
+from app.modules.messaging import mentions as mentioning
 from app.modules.messaging import threads
 from app.modules.messaging.dm_repository import DmRepository, InspectionNote, Participant
 from app.modules.messaging.message_repository import MessageRepository
@@ -39,6 +43,12 @@ from app.modules.messaging.visibility import ConversationReader
 class Posted(NamedTuple):
     message: Message
     created: bool  # False: a resend with a known `client_id`
+    not_notified: list[uuid.UUID]  # mentioned ids that were not stored (see mentions.py)
+
+
+class Edited(NamedTuple):
+    message: Message
+    not_notified: list[uuid.UUID]
 
 
 def message_not_found() -> NotFound:
@@ -103,10 +113,12 @@ class MessageService:
         body_md: str,
         parent_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
+        mentions: Iterable[uuid.UUID] = (),
     ) -> Posted:
         conversation = await self.reader.readable(actor, conversation_id)
         await self.reader.require_post(actor, conversation)
         body_md = checked_body(body_md)
+        asked = mentioning.asked(mentions)
         repo = self.repo(actor)
         parent = await threads.lock_parent(repo, conversation, parent_id) if parent_id else None
         message = await repo.insert(
@@ -129,28 +141,46 @@ class MessageService:
                 parent_id,
             ):
                 raise Conflict(code="message.client_id_conflict")
-            return Posted(first, created=False)
+            missed = await mentioning.not_mentioned(self.session, actor.org_id, first.id, asked)
+            return Posted(first, False, missed)
         if parent is not None:
             threads.count_reply(parent, message)
             await self.session.flush()
+        missed = await mentioning.mention(
+            self.session, actor.org_id, conversation, message.id, asked
+        )
         await self._emit(actor, conversation, message, "message.created")
-        return Posted(message, created=True)
+        return Posted(message, True, missed)
 
-    async def edit(self, actor: Actor, message_id: uuid.UUID, body_md: str) -> Message:
-        message, conversation = await self._readable(actor, message_id, lock=True)
+    async def edit(
+        self,
+        actor: Actor,
+        message_id: uuid.UUID,
+        body_md: str,
+        mentions: Iterable[uuid.UUID] | None = None,
+    ) -> Edited:
+        """A new text; with `mentions`, also whom the message mentions (else it keeps
+        its mentions)."""
+        message, conversation = await self.readable(actor, message_id, lock=True)
         await self.reader.require_post(actor, conversation)
         if not _by(message, actor):
             raise Forbidden(code="message.not_author")
         if message.deleted_at is not None:
             raise Conflict(code="message.deleted")
         message.body_md = checked_body(body_md)
+        asked = mentioning.asked(mentions) if mentions is not None else None
         message.edited_at = utcnow()
         await self.session.flush()
+        missed: list[uuid.UUID] = []
+        if asked is not None:
+            missed = await mentioning.mention(
+                self.session, actor.org_id, conversation, message.id, asked
+            )
         await self._emit(actor, conversation, message, "message.updated")
-        return message
+        return Edited(message, missed)
 
     async def delete(self, actor: Actor, message_id: uuid.UUID) -> None:
-        message, conversation = await self._readable(actor, message_id, lock=True)
+        message, conversation = await self.readable(actor, message_id, lock=True)
         await self.reader.require_post(actor, conversation)
         own = _by(message, actor)
         if not own and not await self._may_manage(actor, conversation):
@@ -192,14 +222,16 @@ class MessageService:
         self, actor: Actor, message_id: uuid.UUID, params: PageParams
     ) -> Page[Message]:
         """The replies to a message, oldest first."""
-        message, _ = await self._readable(actor, message_id)
+        message, _ = await self.readable(actor, message_id)
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.repo(actor).reply_page(message.id, after, params.limit + 1)
         return id_page(rows, params.limit, lambda m: m.id)
 
-    async def _readable(
+    async def readable(
         self, actor: Actor, message_id: uuid.UUID, *, lock: bool = False
     ) -> tuple[Message, Conversation]:
+        """The message and its conversation, if the actor may see them (else 404
+        `message.not_found`); with `lock`, the message row locked."""
         message = await self.repo(actor).get(message_id, lock=lock)
         if message is None:
             raise message_not_found()

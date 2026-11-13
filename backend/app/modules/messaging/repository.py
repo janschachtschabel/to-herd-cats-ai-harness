@@ -11,12 +11,14 @@ Page threads (the page's visibility) add their clause to `visible_conversations`
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from sqlalchemy import ColumnElement, Select, and_, exists, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.principal import Principal
+from app.core.access_repository import person_reads_space
+from app.core.principal import Principal, PrincipalType
 from app.core.repository import advisory_xact_lock
 from app.modules.messaging.models import Conversation, ConversationKind, ConversationParticipant
 from app.modules.users.models import User
@@ -50,6 +52,50 @@ def visible_conversations(scope: ConversationScope) -> ColumnElement[bool]:
     )
     dm = and_(Conversation.kind == ConversationKind.DM, takes_part(scope.principal), active)
     return and_(Conversation.org_id == scope.org_id, or_(false(), channel, dm))
+
+
+def seen_by_person() -> ColumnElement[bool]:
+    """`visible_conversations` from the other side: whether the (correlated) `User`
+    row may see the (correlated) conversation now. Keep both in step; Task 8 adds
+    page threads to both (`tests/test_conversation_readers.py` compares them)."""
+    channel = and_(
+        Conversation.kind == ConversationKind.CHANNEL,
+        person_reads_space(Conversation.space_id),
+    )
+    takes_part = (
+        exists()
+        .where(
+            ConversationParticipant.conversation_id == Conversation.id,
+            ConversationParticipant.principal_type == PrincipalType.USER,
+            ConversationParticipant.principal_id == User.id,
+        )
+        .correlate_except(ConversationParticipant)
+    )
+    dm = and_(Conversation.kind == ConversationKind.DM, takes_part)
+    return and_(
+        Conversation.org_id == User.org_id, User.is_active.is_(True), or_(false(), channel, dm)
+    )
+
+
+async def readers_of(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    user_ids: Iterable[uuid.UUID],
+) -> set[uuid.UUID]:
+    """Those of `user_ids` who may see the conversation now, in one statement. An id
+    of nobody, of someone elsewhere or of someone without access is simply not in
+    the answer: callers cannot tell these apart, and must not."""
+    ids = list(user_ids)
+    if not ids:
+        return set()
+    sees = (
+        exists()
+        .where(Conversation.id == conversation_id, seen_by_person())
+        .correlate_except(Conversation)
+    )
+    stmt = select(User.id).where(User.org_id == org_id, User.id.in_(ids), sees)
+    return set(await session.scalars(stmt))
 
 
 @dataclass(frozen=True, slots=True)

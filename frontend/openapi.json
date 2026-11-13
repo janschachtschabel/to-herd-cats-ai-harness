@@ -950,7 +950,7 @@
       },
       "MessageCreate": {
         "additionalProperties": false,
-        "description": "`parent_id`: a top-level message of the same conversation, to reply in its\nthread. `client_id`: the client's key for this message; sending again with the\nsame key returns the first message (200) instead of a second one.",
+        "description": "`parent_id`: a top-level message of the same conversation, to reply in its\nthread. `client_id`: the client's key for this message; sending again with the\nsame key returns the first message (200) instead of a second one. `mentions`:\nwhom the text mentions (`@[Name](user:<id>)`); at most 50.",
         "properties": {
           "body_md": {
             "description": "Markdown",
@@ -970,6 +970,16 @@
               }
             ],
             "title": "Client Id"
+          },
+          "mentions": {
+            "description": "the people the message mentions (user ids)",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Mentions",
+            "type": "array"
           },
           "parent_id": {
             "anyOf": [
@@ -999,7 +1009,7 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages. A deleted message keeps its place with\n`deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong\nto top-level messages (their thread).",
+        "description": "`author` is null for system messages. A deleted message keeps its place with\n`deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong\nto top-level messages (their thread). `mentions`: the people mentioned who may see\nthe conversation; `reactions`: by emoji, the first reacted with first.",
         "properties": {
           "author": {
             "anyOf": [
@@ -1081,6 +1091,14 @@
             ],
             "title": "Last Reply At"
           },
+          "mentions": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Mentions",
+            "type": "array"
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -1092,6 +1110,13 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "reactions": {
+            "items": {
+              "$ref": "#/components/schemas/ReactionOut"
+            },
+            "title": "Reactions",
+            "type": "array"
           },
           "reply_count": {
             "title": "Reply Count",
@@ -1110,13 +1135,16 @@
           "edited_at",
           "deleted_at",
           "reply_count",
-          "last_reply_at"
+          "last_reply_at",
+          "mentions",
+          "reactions"
         ],
         "title": "MessageOut",
         "type": "object"
       },
       "MessageUpdate": {
         "additionalProperties": false,
+        "description": "`mentions` left out: the message keeps whom it mentions; given: replaces it.",
         "properties": {
           "body_md": {
             "description": "Markdown",
@@ -1124,12 +1152,172 @@
             "minLength": 1,
             "title": "Body Md",
             "type": "string"
+          },
+          "mentions": {
+            "anyOf": [
+              {
+                "description": "the people the message mentions (user ids)",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentions"
           }
         },
         "required": [
           "body_md"
         ],
         "title": "MessageUpdate",
+        "type": "object"
+      },
+      "MessageWriteOut": {
+        "description": "`not_notified`: the mentioned ids that were not stored: people who may not see\nthe conversation, and ids of nobody (indistinguishable on purpose).",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrincipalRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body_md": {
+            "title": "Body Md",
+            "type": "string"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "last_reply_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reply At"
+          },
+          "mentions": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Mentions",
+            "type": "array"
+          },
+          "not_notified": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Not Notified",
+            "type": "array"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "reactions": {
+            "items": {
+              "$ref": "#/components/schemas/ReactionOut"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "reply_count": {
+            "title": "Reply Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "parent_id",
+          "author",
+          "kind",
+          "body_md",
+          "client_id",
+          "created_at",
+          "edited_at",
+          "deleted_at",
+          "reply_count",
+          "last_reply_at",
+          "mentions",
+          "reactions",
+          "not_notified"
+        ],
+        "title": "MessageWriteOut",
         "type": "object"
       },
       "OrgOut": {
@@ -1806,6 +1994,33 @@
         "title": "Page[TreeNodeOut]",
         "type": "object"
       },
+      "Page_UnreadOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnreadOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[UnreadOut]",
+        "type": "object"
+      },
       "Page_UserOut_": {
         "properties": {
           "items": {
@@ -1954,6 +2169,45 @@
           "version"
         ],
         "title": "ProfileUpdateIn",
+        "type": "object"
+      },
+      "ReactionOut": {
+        "description": "People who reacted with `emoji`; `mine`: the caller among them.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "emoji": {
+            "title": "Emoji",
+            "type": "string"
+          },
+          "mine": {
+            "title": "Mine",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "emoji",
+          "count",
+          "mine"
+        ],
+        "title": "ReactionOut",
+        "type": "object"
+      },
+      "ReadPosition": {
+        "additionalProperties": false,
+        "properties": {
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "title": "ReadPosition",
         "type": "object"
       },
       "SearchHitOut": {
@@ -2535,6 +2789,31 @@
           "tags"
         ],
         "title": "TreeNodeOut",
+        "type": "object"
+      },
+      "UnreadOut": {
+        "description": "`unread`: others' top-level messages after the read position (not deleted);\n`mentions`: mentions of the caller after it, in threads too.",
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "mentions": {
+            "title": "Mentions",
+            "type": "integer"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "unread",
+          "mentions"
+        ],
+        "title": "UnreadOut",
         "type": "object"
       },
       "UserCreate": {
@@ -4175,6 +4454,68 @@
         ]
       }
     },
+    "/api/conversations/unread": {
+      "get": {
+        "description": "Every conversation the caller sees with something unread, by id.",
+        "operationId": "list_unread_api_conversations_unread_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_UnreadOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Unread",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
     "/api/conversations/{conversation_id}": {
       "get": {
         "operationId": "get_conversation_api_conversations__conversation_id__get",
@@ -4460,7 +4801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageOut"
+                  "$ref": "#/components/schemas/MessageWriteOut"
                 }
               }
             },
@@ -4470,7 +4811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageOut"
+                  "$ref": "#/components/schemas/MessageWriteOut"
                 }
               }
             },
@@ -4488,6 +4829,53 @@
           }
         },
         "summary": "Post Message",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/conversations/{conversation_id}/read": {
+      "post": {
+        "description": "Read up to a message of the conversation (never backwards).",
+        "operationId": "mark_read_api_conversations__conversation_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadPosition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Read",
         "tags": [
           "messaging"
         ]
@@ -4814,7 +5202,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageOut"
+                  "$ref": "#/components/schemas/MessageWriteOut"
                 }
               }
             },
@@ -4832,6 +5220,122 @@
           }
         },
         "summary": "Edit Message",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/messages/{message_id}/reactions/{emoji}": {
+      "delete": {
+        "description": "Take the caller's reaction back (none: no change); the message's reactions.",
+        "operationId": "unreact_api_messages__message_id__reactions__emoji__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "exactly one emoji (URL-encoded)",
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "description": "exactly one emoji (URL-encoded)",
+              "title": "Emoji",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReactionOut"
+                  },
+                  "title": "Response Unreact Api Messages  Message Id  Reactions  Emoji  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unreact",
+        "tags": [
+          "messaging"
+        ]
+      },
+      "put": {
+        "description": "Add the caller's reaction (again: no change); the message's reactions.",
+        "operationId": "react_api_messages__message_id__reactions__emoji__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "exactly one emoji (URL-encoded)",
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "description": "exactly one emoji (URL-encoded)",
+              "title": "Emoji",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReactionOut"
+                  },
+                  "title": "Response React Api Messages  Message Id  Reactions  Emoji  Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "React",
         "tags": [
           "messaging"
         ]
