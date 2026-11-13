@@ -13,6 +13,22 @@ describe('ticket references', () => {
     expect(ticketRefs('XHC-42 HC-42a HC-0 /api/tickets/5 abc/tickets/6')).toEqual([])
   })
 
+  test('no key in any kind of code (review M4 P5)', () => {
+    expect(ticketRefs('Davor\n\n    HC-130 eingerückt\n\nDanach')).toEqual([])
+    expect(ticketRefs('~~~\nHC-131\n~~~')).toEqual([])
+    expect(ticketRefs('~~~~text\nHC-132\n~~~~\nHC-5')).toEqual([5])
+    expect(ticketRefs('```\nHC-133\n```\n\n`` a `HC-134` b ``')).toEqual([])
+    expect(ticketRefs('- Liste\n\n      HC-135 im Codeblock der Liste')).toEqual([])
+  })
+
+  test('link text and other links name no ticket; a ticket link does', () => {
+    expect(ticketRefs('[HC-140](https://example.org/x)')).toEqual([])
+    expect(ticketRefs('<https://example.org/HC-141>')).toEqual([])
+    expect(ticketRefs('https://example.org/wiki/HC-142')).toEqual([])
+    expect(ticketRefs('[siehe hier](/tickets/143) und [HC-144](/tickets/145)')).toEqual([143, 145])
+    expect(ticketRefs('![HC-146](/bild.png) HC-7')).toEqual([7])
+  })
+
   test('a key typed into the search', () => {
     expect(keyNumber(' HC-42 ')).toBe(42)
     expect(keyNumber('hc-7')).toBe(7)
