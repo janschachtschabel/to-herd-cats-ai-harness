@@ -17,6 +17,10 @@ class Action(StrEnum):
     PAGE_MODERATE = "page.moderate"  # also: the space's tags
     CHANNEL_POST = "channel.post"  # write and react in the space's channels and threads
     CHANNEL_MANAGE = "channel.manage"  # create, rename, archive channels; delete others' posts
+    TICKET_READ = "ticket.read"  # see the space's tickets, their threads and statuses
+    TICKET_CREATE = "ticket.create"
+    TICKET_EDIT = "ticket.edit"  # also: assign oneself an unassigned ticket, or let go of it
+    TICKET_ASSIGN = "ticket.assign"  # assign anyone who may read tickets in the space
     # System-wide
     SPACE_CREATE = "space.create"
     DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
@@ -77,6 +81,10 @@ SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
     Action.PAGE_MODERATE: SpaceRole.MODERATOR,
     Action.CHANNEL_POST: SpaceRole.VIEWER,
     Action.CHANNEL_MANAGE: SpaceRole.MODERATOR,
+    Action.TICKET_READ: SpaceRole.VIEWER,
+    Action.TICKET_CREATE: SpaceRole.EDITOR,
+    Action.TICKET_EDIT: SpaceRole.EDITOR,
+    Action.TICKET_ASSIGN: SpaceRole.MODERATOR,
 }
 
 # System roles that hold every right, in every space of their organisation (E4).

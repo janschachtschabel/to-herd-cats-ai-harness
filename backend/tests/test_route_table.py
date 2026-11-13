@@ -15,11 +15,16 @@ ship without a decision on who may call it. Guards:
   without a role in a team space gets 404 `conversation.not_found`.
 - `message`: whoever may see the message's conversation; otherwise 404
   `message.not_found`.
+- `ticket`: a role in the ticket's space; otherwise 404 `ticket.not_found`, as for a
+  number nobody has.
+- `ticket_status`: a role in the status's space; otherwise 404
+  `ticket_status.not_found`.
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
 from fastapi.routing import APIRoute, iter_route_contexts
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
@@ -28,6 +33,8 @@ from app.core.principal import Principal, SystemRole
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
 from app.modules.spaces.models import Space
+from app.modules.tickets.models import TicketStatus
+from app.modules.tickets.service import TicketService
 from app.modules.users.models import User
 from app.modules.wiki.service import PageService
 from app.web.public import create_public_app
@@ -106,6 +113,14 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/admin/dm-inspect", "admin"),
     ("POST", "/api/admin/dm-inspect", "admin"),
     ("GET", "/api/admin/dm-inspect/{inspection_id}/messages", "admin"),
+    ("POST", "/api/spaces/{space_id}/tickets", "space"),
+    ("GET", "/api/tickets", "session"),
+    ("GET", "/api/tickets/{number}", "ticket"),
+    ("PATCH", "/api/tickets/{number}", "ticket"),
+    ("GET", "/api/spaces/{space_id}/ticket-statuses", "space"),
+    ("POST", "/api/spaces/{space_id}/ticket-statuses", "space"),
+    ("PATCH", "/api/ticket-statuses/{status_id}", "ticket_status"),
+    ("DELETE", "/api/ticket-statuses/{status_id}", "ticket_status"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
@@ -140,6 +155,7 @@ def _concrete(
     page_id: object | None = None,
     conversation_id: object | None = None,
     message_id: object | None = None,
+    status_id: object | None = None,
 ) -> str:
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -156,6 +172,7 @@ def _concrete(
         "{inspection_id}": str(uuid7()),
         "{emoji}": "%F0%9F%91%8D",
         "{notification_id}": str(uuid7()),
+        "{status_id}": str(status_id or uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -165,6 +182,8 @@ def _concrete(
         "/attachments": "?filename=x.txt",
         "/dm-inspect": f"?user_id={uuid7()}",
     }
+    if "/ticket-statuses/" in template:
+        return template + "?version=1"
     return template + next((q for end, q in queries.items() if template.endswith(end)), "")
 
 
@@ -213,6 +232,10 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/conversations/{conversation_id}/messages"): {"body_md": "x"},
     ("PATCH", "/api/messages/{message_id}"): {"body_md": "x"},
     ("POST", "/api/conversations/{conversation_id}/read"): {"message_id": str(uuid7())},
+    ("POST", "/api/spaces/{space_id}/tickets"): {"title": "X"},
+    ("PATCH", "/api/tickets/{number}"): {"title": "X", "version": 1},
+    ("POST", "/api/spaces/{space_id}/ticket-statuses"): {"name": "X", "category": "open"},
+    ("PATCH", "/api/ticket-statuses/{status_id}"): {"name": "X", "version": 1},
 }
 
 
@@ -257,3 +280,32 @@ async def test_conversation_routes_hide_conversations_without_a_role(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == f"{guard}.not_found"
+
+
+async def test_status_routes_hide_statuses_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession
+) -> None:
+    status_id = await session.scalar(
+        select(TicketStatus.id).where(TicketStatus.space_id == team_space.id).limit(1)
+    )
+    for method, template, guard in ROUTES:
+        if guard == "ticket_status":
+            path = _concrete(template, status_id=status_id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "ticket_status.not_found"
+
+
+async def test_ticket_routes_hide_tickets_without_a_role(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    ticket = await TicketService(session).create(actor, team_space.id, title="Geheim")
+    for method, template, guard in ROUTES:
+        if guard == "ticket":
+            path = template.replace("{number}", str(ticket.ticket.number))
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "ticket.not_found"

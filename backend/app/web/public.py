@@ -29,6 +29,8 @@ from app.modules.messaging.live import LiveHub
 from app.modules.search.router import router as search_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
+from app.modules.tickets import router as tickets
+from app.modules.tickets import status_router as ticket_statuses
 from app.modules.users.router import router as users_router
 from app.modules.wiki import router as wiki
 from app.modules.wiki.attachments_router import attachments, page_attachments
@@ -66,6 +68,10 @@ def api_router() -> APIRouter:
     api.include_router(messaging_dms.dms)
     api.include_router(messaging_dms.dm_inspect)
     api.include_router(messaging_live.live)
+    api.include_router(tickets.space_tickets)
+    api.include_router(tickets.tickets)
+    api.include_router(ticket_statuses.space_statuses)
+    api.include_router(ticket_statuses.statuses)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)

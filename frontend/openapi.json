@@ -12,6 +12,10 @@
           "page.moderate",
           "channel.post",
           "channel.manage",
+          "ticket.read",
+          "ticket.create",
+          "ticket.edit",
+          "ticket.assign",
           "space.create",
           "directory.read",
           "user.manage",
@@ -211,6 +215,27 @@
           "snippet"
         ],
         "title": "ActivityOut",
+        "type": "object"
+      },
+      "AssigneeIn": {
+        "description": "M4 assigns people only.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "user",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "AssigneeIn",
         "type": "object"
       },
       "AttachmentOut": {
@@ -421,6 +446,40 @@
           "version"
         ],
         "title": "ChannelUpdate",
+        "type": "object"
+      },
+      "ChildCounts": {
+        "description": "How many children the ticket has, per status category.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "integer"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          },
+          "review": {
+            "title": "Review",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open",
+          "active",
+          "review",
+          "done",
+          "cancelled"
+        ],
+        "title": "ChildCounts",
         "type": "object"
       },
       "ConversationKind": {
@@ -2387,6 +2446,33 @@
         "title": "Page[SpaceOut]",
         "type": "object"
       },
+      "Page_StatusOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StatusOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[StatusOut]",
+        "type": "object"
+      },
       "Page_TagOut_": {
         "properties": {
           "items": {
@@ -2412,6 +2498,33 @@
           "items"
         ],
         "title": "Page[TagOut]",
+        "type": "object"
+      },
+      "Page_TicketSummaryOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TicketSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TicketSummaryOut]",
         "type": "object"
       },
       "Page_TrashedPageOut_": {
@@ -2549,6 +2662,39 @@
         "title": "Page[VersionSummaryOut]",
         "type": "object"
       },
+      "ParentOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "key",
+          "title",
+          "kind"
+        ],
+        "title": "ParentOut",
+        "type": "object"
+      },
       "ParticipantOut": {
         "description": "A person in a direct message; one who was deactivated stays listed.",
         "properties": {
@@ -2617,6 +2763,37 @@
         "title": "PersonNameOut",
         "type": "object"
       },
+      "PersonOut": {
+        "description": "`name` is null only for someone the organisation does not know (any more).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "title": "PersonOut",
+        "type": "object"
+      },
       "PrincipalRef": {
         "properties": {
           "id": {
@@ -2642,6 +2819,16 @@
           "group"
         ],
         "title": "PrincipalType",
+        "type": "string"
+      },
+      "Priority": {
+        "enum": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ],
+        "title": "Priority",
         "type": "string"
       },
       "ProfileUpdateIn": {
@@ -2763,6 +2950,16 @@
         ],
         "title": "SkippedOut",
         "type": "object"
+      },
+      "Sort": {
+        "enum": [
+          "updated",
+          "due",
+          "priority",
+          "number"
+        ],
+        "title": "Sort",
+        "type": "string"
       },
       "SpaceCreate": {
         "description": "`personal` is a valid kind but not one the API creates (422 spaces.kind_not_allowed).",
@@ -3011,6 +3208,166 @@
         "title": "SpaceUpdateIn",
         "type": "object"
       },
+      "StatusCategory": {
+        "enum": [
+          "open",
+          "active",
+          "review",
+          "done",
+          "cancelled"
+        ],
+        "title": "StatusCategory",
+        "type": "string"
+      },
+      "StatusCreate": {
+        "description": "Without `position`, the new status comes last.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/StatusCategory"
+          },
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 19.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "title": "StatusCreate",
+        "type": "object"
+      },
+      "StatusOut": {
+        "description": "A status of a space's workflow; `position` orders a space's statuses (0 first);\nthe logic reads only `category`.",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/StatusCategory"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "name",
+          "position",
+          "category",
+          "version"
+        ],
+        "title": "StatusOut",
+        "type": "object"
+      },
+      "StatusRef": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/StatusCategory"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category"
+        ],
+        "title": "StatusRef",
+        "type": "object"
+      },
+      "StatusUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; none of them can be null. `position` moves\nthe status there, the others close up.",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatusCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 19.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "StatusUpdate",
+        "type": "object"
+      },
       "SystemEntryOut": {
         "description": "A system message's timeline entry, for the client to word: `key` is the page\nevent (`page.published`, ...), `actor` who caused it (null if unknown), `number`\nthe restored version (only for `page.version_restored`).",
         "properties": {
@@ -3200,6 +3557,418 @@
           "version"
         ],
         "title": "TagsSet",
+        "type": "object"
+      },
+      "TicketCreate": {
+        "additionalProperties": false,
+        "description": "Without `status_id`, the space's first status of category `open`. An assignee\nother than oneself needs `ticket.assign`.",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description_md": {
+            "default": "",
+            "description": "Markdown",
+            "maxLength": 100000,
+            "title": "Description Md",
+            "type": "string"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind",
+            "default": "task"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "default": "normal"
+          },
+          "status_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Id"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TicketCreate",
+        "type": "object"
+      },
+      "TicketKind": {
+        "enum": [
+          "epic",
+          "story",
+          "task",
+          "bug"
+        ],
+        "title": "TicketKind",
+        "type": "string"
+      },
+      "TicketOut": {
+        "description": "A ticket with its description and how many children it has per category.",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description_md": {
+            "title": "Description Md",
+            "type": "string"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/PersonOut"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusRef"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "key",
+          "space_id",
+          "kind",
+          "title",
+          "status",
+          "priority",
+          "assignee",
+          "reporter",
+          "due_on",
+          "parent",
+          "version",
+          "created_at",
+          "updated_at",
+          "description_md",
+          "children"
+        ],
+        "title": "TicketOut",
+        "type": "object"
+      },
+      "TicketSummaryOut": {
+        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409).",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/PersonOut"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusRef"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "key",
+          "space_id",
+          "kind",
+          "title",
+          "status",
+          "priority",
+          "assignee",
+          "reporter",
+          "due_on",
+          "parent",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TicketSummaryOut",
+        "type": "object"
+      },
+      "TicketUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; null clears `due_on`, `parent_id` and\n`assignee` (the others cannot be null). Taking an unassigned ticket or letting go\nof one's own needs `ticket.edit`; any other assignment `ticket.assign`.",
+        "properties": {
+          "assignee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description_md": {
+            "anyOf": [
+              {
+                "description": "Markdown",
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Md"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Priority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "TicketUpdate",
         "type": "object"
       },
       "TrashedPageOut": {
@@ -8022,6 +8791,182 @@
         ]
       }
     },
+    "/api/spaces/{space_id}/ticket-statuses": {
+      "get": {
+        "description": "The space's statuses in order.",
+        "operationId": "list_statuses_api_spaces__space_id__ticket_statuses_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StatusOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Statuses",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "post": {
+        "operationId": "create_status_api_spaces__space_id__ticket_statuses_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Status",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/tickets": {
+      "post": {
+        "operationId": "create_ticket_api_spaces__space_id__tickets_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/spaces/{space_id}/trash": {
       "get": {
         "operationId": "list_trash_api_spaces__space_id__trash_get",
@@ -8329,6 +9274,461 @@
         "summary": "Update Tag",
         "tags": [
           "tags"
+        ]
+      }
+    },
+    "/api/ticket-statuses/{status_id}": {
+      "delete": {
+        "operationId": "delete_status_api_ticket_statuses__status_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "status_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Status Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "the version read",
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "description": "the version read",
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "another status of the space, for its tickets",
+            "in": "query",
+            "name": "replace_with",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "another status of the space, for its tickets",
+              "title": "Replace With"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Status",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "patch": {
+        "operationId": "update_status_api_ticket_statuses__status_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "status_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Status Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Status",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets": {
+      "get": {
+        "description": "The tickets of every space where the caller may read them.",
+        "operationId": "list_tickets_api_tickets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Space Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status_category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/StatusCategory"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Id"
+            }
+          },
+          {
+            "description": "`me` or a person's id",
+            "in": "query",
+            "name": "assignee",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`me` or a person's id",
+              "title": "Assignee"
+            }
+          },
+          {
+            "description": "`me` or a person's id",
+            "in": "query",
+            "name": "reporter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`me` or a person's id",
+              "title": "Reporter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TicketKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Priority"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "description": "the parent's id",
+            "in": "query",
+            "name": "parent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the parent's id",
+              "title": "Parent"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Sort",
+              "default": "updated"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TicketSummaryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tickets",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets/{number}": {
+      "get": {
+        "operationId": "get_ticket_api_tickets__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "patch": {
+        "operationId": "update_ticket_api_tickets__number__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Ticket",
+        "tags": [
+          "tickets"
         ]
       }
     }

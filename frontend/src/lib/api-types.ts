@@ -1070,6 +1070,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/ticket-statuses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Statuses
+         * @description The space's statuses in order.
+         */
+        get: operations["list_statuses_api_spaces__space_id__ticket_statuses_get"];
+        put?: never;
+        /** Create Status */
+        post: operations["create_status_api_spaces__space_id__ticket_statuses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Ticket */
+        post: operations["create_ticket_api_spaces__space_id__tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/trash": {
         parameters: {
             query?: never;
@@ -1143,6 +1181,62 @@ export interface paths {
         patch: operations["update_tag_api_tags__tag_id__patch"];
         trace?: never;
     };
+    "/api/ticket-statuses/{status_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Status */
+        delete: operations["delete_status_api_ticket_statuses__status_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Status */
+        patch: operations["update_status_api_ticket_statuses__status_id__patch"];
+        trace?: never;
+    };
+    "/api/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tickets
+         * @description The tickets of every space where the caller may read them.
+         */
+        get: operations["list_tickets_api_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ticket */
+        get: operations["get_ticket_api_tickets__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Ticket */
+        patch: operations["update_ticket_api_tickets__number__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1151,7 +1245,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -1225,6 +1319,22 @@ export interface components {
             reason: components["schemas"]["NotificationReason"];
             /** Snippet */
             snippet: string;
+        };
+        /**
+         * AssigneeIn
+         * @description M4 assigns people only.
+         */
+        AssigneeIn: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "user";
         };
         /**
          * AttachmentOut
@@ -1317,6 +1427,22 @@ export interface components {
             topic?: string | null;
             /** Version */
             version: number;
+        };
+        /**
+         * ChildCounts
+         * @description How many children the ticket has, per status category.
+         */
+        ChildCounts: {
+            /** Active */
+            active: number;
+            /** Cancelled */
+            cancelled: number;
+            /** Done */
+            done: number;
+            /** Open */
+            open: number;
+            /** Review */
+            review: number;
         };
         /**
          * ConversationKind
@@ -2058,10 +2184,24 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[StatusOut] */
+        Page_StatusOut_: {
+            /** Items */
+            items: components["schemas"]["StatusOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[TagOut] */
         Page_TagOut_: {
             /** Items */
             items: components["schemas"]["TagOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[TicketSummaryOut] */
+        Page_TicketSummaryOut_: {
+            /** Items */
+            items: components["schemas"]["TicketSummaryOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -2100,6 +2240,21 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** ParentOut */
+        ParentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+        };
         /**
          * ParticipantOut
          * @description A person in a direct message; one who was deactivated stays listed.
@@ -2135,6 +2290,20 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * PersonOut
+         * @description `name` is null only for someone the organisation does not know (any more).
+         */
+        PersonOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            type: components["schemas"]["PrincipalType"];
+        };
         /** PrincipalRef */
         PrincipalRef: {
             /**
@@ -2149,6 +2318,11 @@ export interface components {
          * @enum {string}
          */
         PrincipalType: "user" | "agent" | "group";
+        /**
+         * Priority
+         * @enum {string}
+         */
+        Priority: "low" | "normal" | "high" | "urgent";
         /** ProfileUpdateIn */
         ProfileUpdateIn: {
             /** Locale */
@@ -2198,6 +2372,11 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * Sort
+         * @enum {string}
+         */
+        Sort: "updated" | "due" | "priority" | "number";
         /**
          * SpaceCreate
          * @description `personal` is a valid kind but not one the API creates (422 spaces.kind_not_allowed).
@@ -2287,6 +2466,71 @@ export interface components {
             version: number;
         };
         /**
+         * StatusCategory
+         * @enum {string}
+         */
+        StatusCategory: "open" | "active" | "review" | "done" | "cancelled";
+        /**
+         * StatusCreate
+         * @description Without `position`, the new status comes last.
+         */
+        StatusCreate: {
+            category: components["schemas"]["StatusCategory"];
+            /** Name */
+            name: string;
+            /** Position */
+            position?: number | null;
+        };
+        /**
+         * StatusOut
+         * @description A status of a space's workflow; `position` orders a space's statuses (0 first);
+         *     the logic reads only `category`.
+         */
+        StatusOut: {
+            category: components["schemas"]["StatusCategory"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Version */
+            version: number;
+        };
+        /** StatusRef */
+        StatusRef: {
+            category: components["schemas"]["StatusCategory"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * StatusUpdate
+         * @description Fields left out stay as they are; none of them can be null. `position` moves
+         *     the status there, the others close up.
+         */
+        StatusUpdate: {
+            category?: components["schemas"]["StatusCategory"] | null;
+            /** Name */
+            name?: string | null;
+            /** Position */
+            position?: number | null;
+            /** Version */
+            version: number;
+        };
+        /**
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page
          *     event (`page.published`, ...), `actor` who caused it (null if unknown), `number`
@@ -2360,6 +2604,148 @@ export interface components {
         TagsSet: {
             /** Tag Ids */
             tag_ids: string[];
+            /** Version */
+            version: number;
+        };
+        /**
+         * TicketCreate
+         * @description Without `status_id`, the space's first status of category `open`. An assignee
+         *     other than oneself needs `ticket.assign`.
+         */
+        TicketCreate: {
+            assignee?: components["schemas"]["AssigneeIn"] | null;
+            /**
+             * Description Md
+             * @description Markdown
+             * @default
+             */
+            description_md?: string;
+            /** Due On */
+            due_on?: string | null;
+            /** @default task */
+            kind?: components["schemas"]["TicketKind"];
+            /** Parent Id */
+            parent_id?: string | null;
+            /** @default normal */
+            priority?: components["schemas"]["Priority"];
+            /** Status Id */
+            status_id?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * TicketKind
+         * @enum {string}
+         */
+        TicketKind: "epic" | "story" | "task" | "bug";
+        /**
+         * TicketOut
+         * @description A ticket with its description and how many children it has per category.
+         */
+        TicketOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            children: components["schemas"]["ChildCounts"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description Md */
+            description_md: string;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            parent: components["schemas"]["ParentOut"] | null;
+            priority: components["schemas"]["Priority"];
+            reporter: components["schemas"]["PersonOut"];
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            status: components["schemas"]["StatusRef"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TicketSummaryOut
+         * @description A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
+         *     number. `version` guards writes (send it back; stale → 409).
+         */
+        TicketSummaryOut: {
+            assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due On */
+            due_on: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            parent: components["schemas"]["ParentOut"] | null;
+            priority: components["schemas"]["Priority"];
+            reporter: components["schemas"]["PersonOut"];
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            status: components["schemas"]["StatusRef"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TicketUpdate
+         * @description Fields left out stay as they are; null clears `due_on`, `parent_id` and
+         *     `assignee` (the others cannot be null). Taking an unassigned ticket or letting go
+         *     of one's own needs `ticket.edit`; any other assignment `ticket.assign`.
+         */
+        TicketUpdate: {
+            assignee?: components["schemas"]["AssigneeIn"] | null;
+            /** Description Md */
+            description_md?: string | null;
+            /** Due On */
+            due_on?: string | null;
+            kind?: components["schemas"]["TicketKind"] | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            priority?: components["schemas"]["Priority"] | null;
+            /** Status Id */
+            status_id?: string | null;
+            /** Title */
+            title?: string | null;
             /** Version */
             version: number;
         };
@@ -5171,6 +5557,110 @@ export interface operations {
             };
         };
     };
+    list_statuses_api_spaces__space_id__ticket_statuses_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StatusOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_status_api_spaces__space_id__ticket_statuses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ticket_api_spaces__space_id__tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_trash_api_spaces__space_id__trash_get: {
         parameters: {
             query?: {
@@ -5352,6 +5842,187 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_status_api_ticket_statuses__status_id__delete: {
+        parameters: {
+            query: {
+                /** @description the version read */
+                version: number;
+                /** @description another status of the space, for its tickets */
+                replace_with?: string | null;
+            };
+            header?: never;
+            path: {
+                status_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_status_api_ticket_statuses__status_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                status_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tickets_api_tickets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                space_id?: string | null;
+                status_category?: components["schemas"]["StatusCategory"][] | null;
+                status_id?: string | null;
+                /** @description `me` or a person's id */
+                assignee?: string | null;
+                /** @description `me` or a person's id */
+                reporter?: string | null;
+                kind?: components["schemas"]["TicketKind"] | null;
+                priority?: components["schemas"]["Priority"] | null;
+                /** @description the parent's id */
+                parent?: string | null;
+                q?: string | null;
+                due_before?: string | null;
+                sort?: components["schemas"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TicketSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_api_tickets__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ticket_api_tickets__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
                 };
             };
             /** @description Validation Error */
