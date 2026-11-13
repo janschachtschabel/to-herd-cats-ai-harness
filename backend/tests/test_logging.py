@@ -3,8 +3,11 @@ import logging
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
+from app.core.db import Database
 from app.core.logging import configure_logging, log_context
 from app.core.telemetry import current_trace_ids, span_exporter_from_env
 from app.web.public import create_public_app
@@ -155,3 +158,18 @@ async def test_unhandled_error_is_answered_and_logged_once(capsys):
     assert r.status_code == 500 and r.json()["error"]["code"] == "internal"
     lines = json_lines(capsys.readouterr().out)
     assert [line["message"] for line in lines].count("unhandled exception") == 1
+
+
+async def test_engine_errors_carry_no_bound_parameters():
+    """Pinned without the log formatter: the raw exception text of a failing statement
+    names neither the bound value nor a parameter list (`hide_parameters=True`)."""
+    marker = "SECRET-MARKER-0815"
+    database = Database(get_settings().test_database_url)
+    try:
+        async with database.engine.connect() as conn:
+            with pytest.raises(DBAPIError) as caught:
+                await conn.execute(text("SELECT CAST(:v AS text), 1 / 0"), {"v": marker})
+    finally:
+        await database.dispose()
+    assert "division by zero" in str(caught.value)
+    assert marker not in str(caught.value) and "[parameters:" not in str(caught.value)
