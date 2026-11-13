@@ -29,27 +29,19 @@ import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { jsonToYDoc, liveDocument, yDocToMarkdown } from "./markdown.mjs";
+import {
+  CLOSE,
+  FLUSH,
+  FLUSH_INTERVAL_MS,
+  SAVED,
+  UNSAVED,
+  closeSocket,
+  colorFor,
+  deny,
+  readCookie,
+} from "./protocol.mjs";
 
-export const CLOSE = {
-  generationEnded: [4409, "generation_ended"],
-  revoked: [4403, "revoked"],
-  forbidden: [4403, "forbidden"],
-  unauthorized: [4401, "unauthorized"],
-  notFound: [4404, "not_found"],
-  tooLarge: [4413, "too_large"],
-  saveRefused: [4400, "save_refused"], // the API refused a save for another reason
-  notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
-  // Set by server.mjs at the socket: too many connections of one login session (4429),
-  // no document joined in time (4408).
-  retry: [1013, "retry"],
-};
-
-// Stateless messages: a browser that is done asks for an immediate save (`flush`) and
-// is told whether everything it sent is stored (review M2 R3).
-export const FLUSH = "herd:flush";
-export const SAVED = "herd:saved";
-export const UNSAVED = "herd:unsaved";
-const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection per second
+export { CLOSE, colorFor, readCookie } from "./protocol.mjs";
 
 const DENIAL = {
   401: CLOSE.unauthorized,
@@ -57,26 +49,6 @@ const DENIAL = {
   404: CLOSE.notFound,
   413: CLOSE.tooLarge,
 };
-// Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
-// browser shows initials in white on them.
-const COLORS = ["#1d4ed8", "#be185d", "#15803d", "#b45309", "#6d28d9", "#0e7490", "#b91c1c"];
-
-export function colorFor(id) {
-  let hash = 0;
-  for (const char of String(id)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return COLORS[hash % COLORS.length];
-}
-
-/** Close the connection's socket (after the protocol message just sent). */
-function closeSocket(context, close) {
-  context.closing ??= close; // the first reason stands
-  setTimeout(() => context.socket?.close(...context.closing), 0);
-}
-
-function deny(context, close) {
-  closeSocket(context, close);
-  return Object.assign(new Error(close[1]), { reason: close[1] });
-}
 
 export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} }) {
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
@@ -339,12 +311,4 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       }
     },
   };
-}
-
-export function readCookie(header, name) {
-  for (const part of (header ?? "").split(";")) {
-    const index = part.indexOf("=");
-    if (index > 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
-  }
-  return null;
 }

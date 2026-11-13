@@ -20,7 +20,8 @@ import { fileURLToPath } from "node:url";
 import { Hocuspocus } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
-import { liveExtension, readCookie } from "./live.mjs";
+import { liveExtension } from "./live.mjs";
+import { CLOSE, readCookie } from "./protocol.mjs";
 
 const PAGE_PATH = /^\/collab\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const MAX_MESSAGE_BYTES = 1024 * 1024;
@@ -131,10 +132,10 @@ export function createCollabServer({
       if (taken.length !== keys.length) {
         release();
         ws.on("close", () => sockets.delete(ws));
-        return ws.close(4429, "too_many_connections");
+        return ws.close(...CLOSE.tooMany);
       }
       const joining = setTimeout(() => {
-        if (!extension.joined.has(ws)) ws.close(4408, "handshake_timeout");
+        if (!extension.joined.has(ws)) ws.close(...CLOSE.handshakeTimeout);
       }, handshakeTimeoutMs);
       joining.unref();
       const headers = new Headers();
