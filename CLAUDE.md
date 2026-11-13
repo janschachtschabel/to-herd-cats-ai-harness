@@ -5,7 +5,7 @@ Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brain
 Knowledge & agent cockpit for companies. The authority is the design spec
 `docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 and M2
 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`) are built;
-the next milestone is M3 (messages), its plan is not written yet.
+the next milestone is M3 (messages), plan `docs/superpowers/plans/2026-11-13-m3-nachrichten.md`.
 Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree,
 Markdown and live editor (`collab/` process, generations), versions, trash, tags,
 attachments (`HERD_DATA_DIR`), full-text search, import/export (M2). Planned, not
