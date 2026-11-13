@@ -47,6 +47,17 @@ def test_uvicorn_configs_disable_access_log_and_keep_our_logging():
         assert config.access_log is False and config.log_config is None
 
 
+def test_idle_connections_outlast_the_connection_pools_of_proxies_and_clients():
+    """A server that closes an idle keep-alive connection while a client (a reverse
+    proxy's upstream pool, a test's API client) sends the next request on it resets
+    that request (ECONNRESET, a 502 from the proxy). Uvicorn's 5 s are shorter than
+    every common pool: nginx and ALB 60 s, Traefik 90 s, Caddy 120 s."""
+    public, internal = launch.server_configs(Settings())
+    for config in (public, internal):
+        assert config.timeout_keep_alive == launch.KEEP_ALIVE_SECONDS
+    assert launch.KEEP_ALIVE_SECONDS > 120
+
+
 def test_websocket_messages_are_limited_to_what_the_collab_process_takes():
     """Review M2 U3: one cap with the collab process, a whole live state plus envelope."""
     from app.modules.wiki.collab_models import MAX_YDOC_BYTES

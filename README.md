@@ -333,6 +333,10 @@ kennen.
   und `Connection`. Beispiele: [`docs/WIKI.md`](docs/WIKI.md#betrieb-hinter-einem-reverse-proxy).
   Diese Hinweise folgen den Dokumentationen der Controller; ausprobiert ist hier nur
   der direkte Zugriff und Compose.
+- **Keep-Alive.** Die App schließt leerlaufende HTTP-Verbindungen erst nach 150 s
+  (Uvicorn ab Werk: 5 s), länger als die Verbindungspools üblicher Proxys (nginx und
+  ALB 60 s, Traefik 90 s, Caddy 120 s). So schließt immer der Proxy zuerst, und keine
+  Anfrage trifft eine Verbindung, die die App gerade schließt (sonst gelegentlich 502).
 - **Größenlimits am Ingress:** Die App nimmt je Anfrage höchstens 1 MiB an
   (`HERD_MAX_BODY_BYTES`), Anhänge bis 25 MiB (`HERD_ATTACHMENT_MAX_BYTES`, nur
   `POST /api/pages/<id>/attachments`) und Importe bis 100 MiB (`HERD_IMPORT_MAX_BYTES`,

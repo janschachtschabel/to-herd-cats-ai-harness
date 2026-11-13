@@ -54,6 +54,12 @@ _STEPS: dict[str, tuple[Step, ...]] = {
 
 COLLAB_EXIT_CODE = 3
 COLLAB_STOP_SECONDS = 15.0
+# How long an idle keep-alive connection stays open. A client that reuses a pooled
+# connection at the moment the server closes it gets the request reset (ECONNRESET; a
+# reverse proxy answers 502 to a POST). Uvicorn's 5 s are shorter than the pools in
+# front of it (nginx upstream and ALB 60 s, Traefik 90 s, Caddy 120 s): the server
+# must be the side that outlasts them, so that the client always closes first.
+KEEP_ALIVE_SECONDS = 150
 
 
 class Server(Protocol):
@@ -113,6 +119,7 @@ def _config(app: FastAPI, port: int, forwarded_allow_ips: str | None) -> uvicorn
         server_header=False,
         proxy_headers=forwarded_allow_ips is not None,
         forwarded_allow_ips=forwarded_allow_ips,
+        timeout_keep_alive=KEEP_ALIVE_SECONDS,
         ws_max_size=MAX_MESSAGE_BYTES,  # live editing (/collab): what the collab process takes
     )
 
