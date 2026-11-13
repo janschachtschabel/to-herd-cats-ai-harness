@@ -1,16 +1,17 @@
 """Reading an uploaded body once, with a size limit: kept in memory up to 1 MiB, in a
-temporary file beyond, hashed (SHA-256) and checked for UTF-8 on the way. Callers
-decide on the content afterwards and read it again from the spool."""
+temporary file under HERD_DATA_DIR/tmp beyond (`core/spool.py`), hashed (SHA-256) and
+checked for UTF-8 on the way. Callers decide on the content afterwards and read it again
+from the spool."""
 
 import asyncio
 import codecs
 import hashlib
-import tempfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import IO
 
 from app.core.errors import AppError
+from app.core.spool import spooled_file
 
 MEMORY_BYTES = 1024 * 1024
 HEAD_BYTES = 4096
@@ -50,7 +51,7 @@ class Spooled:
 async def spool(stream: AsyncIterator[bytes], max_bytes: int, *, code: str) -> Spooled:
     """Read `stream` to the end; more than `max_bytes` is 413 with `code` (read no
     further than one chunk past the limit)."""
-    spooled = Spooled(tempfile.SpooledTemporaryFile(max_size=MEMORY_BYTES))  # noqa: SIM115
+    spooled = Spooled(spooled_file(MEMORY_BYTES))
     decoder = codecs.getincrementaldecoder("utf-8")()
     try:
         async for chunk in stream:

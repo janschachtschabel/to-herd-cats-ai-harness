@@ -172,8 +172,10 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   höchstens `HERD_ATTACHMENT_MAX_BYTES` (Standard 26214400, 25 MiB); nur die
   Upload-Route nimmt so große Körper an, ein Ingress davor muss dort ebenso viel
   zulassen (ingress-nginx: `proxy-body-size`). Ein Upload wird bis 1 MiB im Speicher,
-  darüber in einer temporären Datei unter `TMPDIR` (Compose: `tmpfs` `/tmp`)
-  zwischengespeichert. Erlaubt sind PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV,
+  darüber in einer temporären Datei unter `HERD_DATA_DIR/tmp` zwischengespeichert
+  (nicht `TMPDIR`, das in Compose ein `tmpfs` im Arbeitsspeicher ist). Die Dateien sind
+  namenlos oder sofort gelöscht; was trotzdem liegen bleibt, entfernt der Start, sobald
+  es älter als 24 Stunden ist. Erlaubt sind PNG, JPEG, GIF, WebP, PDF, TXT, Markdown, CSV,
   JSON, DOCX, XLSX, PPTX und ZIP, erkannt am Inhalt; SVG und HTML werden abgelehnt.
   Eine Datei wird erst gelöscht, nachdem die Transaktion, die ihren letzten Anhang
   gelöscht hat, abgeschlossen ist; scheitert das Löschen danach, bleibt die Datei
@@ -185,7 +187,7 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   (auch hier den Ingress anpassen), höchstens 2.000 Einträge und 200 MB entpackt
   enthalten; Einträge mit `..`, absolutem Pfad oder als Symlink werden übersprungen.
   Ein Import läuft in einer Transaktion; große Archive brauchen entsprechend lange.
-  Der Export entsteht in einer temporären Datei (`TMPDIR`). Links im Markdown auf
+  Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`. Links im Markdown auf
   `/api/attachments/<id>` zeigen nach einem Import in einen anderen Bereich weiter auf
   die alten Anhänge.
 - **Wiki-Diff**: Ein Vergleich zweier Seitenversionen vergleicht höchstens

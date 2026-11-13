@@ -8,7 +8,6 @@ not held in memory.
 """
 
 import asyncio
-import tempfile
 import uuid
 import zipfile
 from collections.abc import AsyncIterator
@@ -19,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can
 from app.core.slug import slugify
+from app.core.spool import spooled_file
 from app.core.storage import Storage, StoredFileMissing, get_storage
 from app.modules.spaces.service import SpaceService
 from app.modules.tags.models import SubjectType, Tag
@@ -76,7 +76,7 @@ class PageExport:
     async def export_space(self, actor: Actor, space_id: uuid.UUID) -> Export:
         space = await SpaceService(self.session).get(actor, space_id)
         drafts = await can(self.session, actor, Action.PAGE_EDIT, space_id)
-        file = tempfile.SpooledTemporaryFile(max_size=_SPOOL_BYTES)  # noqa: SIM115
+        file = spooled_file(_SPOOL_BYTES)
         try:
             with zipfile.ZipFile(file, "w", zipfile.ZIP_DEFLATED) as zipped:
                 await self._write(actor, space_id, drafts, zipped)

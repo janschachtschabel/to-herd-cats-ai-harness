@@ -23,6 +23,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_database
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
+from app.core.spool import remove_stale_spools
 from app.modules.orgs.service import ensure_bootstrap
 from app.web.internal import create_internal_app
 from app.web.public import create_public_app
@@ -123,6 +124,7 @@ async def bootstrap(settings: Settings) -> None:
 
 
 async def serve(settings: Settings) -> int:
+    remove_stale_spools(settings.data_dir)
     await bootstrap(settings)
     return await run_servers([_Server(config) for config in server_configs(settings)])
 
