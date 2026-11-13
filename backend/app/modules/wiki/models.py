@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Computed,
     DateTime,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
     text,
 )
@@ -93,6 +95,10 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
     updated_by_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     updated_by_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Locked for AI (spec 11): no tool returns it, no embeddings (`ai/policy_filters.py`).
+    no_ai: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
     # Read only by the search's SQL; deferred, so loading a page does not load it.
     search_tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed(SEARCH_TSV_SQL, persisted=True), deferred=True
@@ -171,3 +177,9 @@ class Attachment(UuidPk, OrgScoped, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+    # Locked for AI (spec 11), like a page; a file on a locked page counts as locked.
+    no_ai: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    # Bumped by the lock (the attachment's only write); a write names the version it read.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)

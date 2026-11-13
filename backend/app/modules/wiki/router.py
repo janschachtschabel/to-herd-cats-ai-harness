@@ -8,8 +8,10 @@ from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.tags.models import SubjectType
 from app.modules.tags.schemas import TagsSet
 from app.modules.tags.service import TagService
+from app.modules.wiki.ai_lock import AiLockService
 from app.modules.wiki.present import page_out, tree_out
 from app.modules.wiki.schemas import (
+    AiLockIn,
     ExpectedVersion,
     PageCreate,
     PageMove,
@@ -85,6 +87,15 @@ async def publish_page(
     return await page_out(
         session, actor, await PageService(session).publish(actor, page_id, body.version)
     )
+
+
+@pages.put("/{page_id}/ai-lock", response_model=PageOut)
+async def set_page_ai_lock(
+    page_id: uuid.UUID, body: AiLockIn, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    """`page.moderate` in its space; the page's `version` (stale → 409)."""
+    page = await AiLockService(session).set_page(actor, page_id, body.no_ai, body.version)
+    return await page_out(session, actor, page)
 
 
 @pages.post("/{page_id}/move", response_model=PageOut)

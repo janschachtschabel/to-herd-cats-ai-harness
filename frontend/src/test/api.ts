@@ -156,6 +156,8 @@ export function makeSpace(overrides: Partial<Space> = {}): Space {
     owner_user_id: null,
     version: 1,
     my_role: 'admin',
+    ai_policy: 'any',
+    allowed_locations: [],
     ...overrides,
   }
 }
@@ -175,6 +177,7 @@ export function makePage(overrides: Partial<WikiPage> = {}): WikiPage {
     tags: [],
     version: 1,
     collab_generation: 0,
+    no_ai: false,
     created_at: '2026-11-12T10:00:00Z',
     updated_at: '2026-11-12T10:00:00Z',
     published_at: '2026-11-12T10:00:00Z',
@@ -206,6 +209,8 @@ export function makeAttachment(overrides: Partial<Attachment> = {}): Attachment 
     url: `/api/attachments/${attachmentId}`,
     created_at: '2026-11-12T10:00:00Z',
     uploaded_by: { type: 'user', id: 'author' },
+    no_ai: false,
+    version: 1,
     ...overrides,
   }
 }

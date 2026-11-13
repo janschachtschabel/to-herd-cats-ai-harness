@@ -1,13 +1,17 @@
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped, UuidPk
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
+from app.modules.ai.models import AiPolicy, DataLocation
+
+_LOCATIONS = ", ".join(f"'{loc.value}'" for loc in DataLocation)
 
 
 class SpaceKind(StrEnum):
@@ -24,6 +28,12 @@ class Space(UuidPk, OrgScoped, Base):
         UniqueConstraint("org_id", "owner_user_id"),
         CheckConstraint("kind IN ('open', 'team', 'personal')", name="kind"),
         CheckConstraint("(kind = 'personal') = (owner_user_id IS NOT NULL)", name="personal_owner"),
+        CheckConstraint("ai_policy IN ('any', 'restricted', 'none')", name="ai_policy"),
+        CheckConstraint(
+            f"allowed_locations <@ ARRAY[{_LOCATIONS}]::varchar[] "
+            "AND (ai_policy = 'restricted') = (cardinality(allowed_locations) > 0)",
+            name="allowed_locations",
+        ),
     )
 
     kind: Mapped[SpaceKind] = mapped_column(String(16), nullable=False)
@@ -35,6 +45,14 @@ class Space(UuidPk, OrgScoped, Base):
         PG_UUID(as_uuid=True), ForeignKey("app_user.id")
     )
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # What AI may receive of the space's content (spec 7.3, `modules/ai/policy.py`);
+    # `allowed_locations` (sorted, no repeats) is set exactly for `restricted`.
+    ai_policy: Mapped[AiPolicy] = mapped_column(
+        String(16), default=AiPolicy.ANY, server_default=AiPolicy.ANY.value, nullable=False
+    )
+    allowed_locations: Mapped[list[str]] = mapped_column(
+        ARRAY(String(16)), default=list, server_default=text("'{}'::varchar[]"), nullable=False
+    )
 
 
 class SpaceMember(Base):

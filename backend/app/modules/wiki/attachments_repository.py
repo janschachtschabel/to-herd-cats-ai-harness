@@ -32,8 +32,11 @@ class AttachmentRepository:
         await self.session.flush()
         return attachment
 
-    async def get(self, attachment_id: uuid.UUID) -> Attachment | None:
+    async def get(self, attachment_id: uuid.UUID, *, lock: bool = False) -> Attachment | None:
+        """With `lock`, as committed now and locked until the transaction ends."""
         stmt = select(Attachment).where(self._scoped(), Attachment.id == attachment_id)
+        if lock:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         return await self.session.scalar(stmt)
 
     async def page(

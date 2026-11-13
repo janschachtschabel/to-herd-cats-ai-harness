@@ -59,6 +59,14 @@ class DataLocation(StrEnum):
     EXTERNAL = "external"
 
 
+class AiPolicy(StrEnum):
+    """A space's AI policy (spec 7.3), stored on `space` (`modules/ai/policy.py`)."""
+
+    ANY = "any"
+    RESTRICTED = "restricted"  # only connections at one of `allowed_locations`
+    NONE = "none"  # AI does not see the space
+
+
 class Purpose(StrEnum):
     CHAT = "chat"
     EMBEDDING = "embedding"

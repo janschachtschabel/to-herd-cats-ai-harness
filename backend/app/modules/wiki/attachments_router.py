@@ -12,9 +12,11 @@ from app.core.downloads import content_disposition
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.wiki import filetypes
+from app.modules.wiki.ai_lock import AiLockService
 from app.modules.wiki.attachment_schemas import AttachmentOut
 from app.modules.wiki.attachments import AttachmentService
 from app.modules.wiki.models import Attachment
+from app.modules.wiki.schemas import AiLockIn
 
 page_attachments = APIRouter(prefix="/pages/{page_id}/attachments", tags=["wiki"])
 attachments = APIRouter(prefix="/attachments", tags=["wiki"])
@@ -97,3 +99,14 @@ async def download_attachment(
 async def delete_attachment(attachment_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
     """`page.edit` on its page; the file goes when no other attachment uses it."""
     await AttachmentService(session).delete(actor, attachment_id)
+
+
+@attachments.put("/{attachment_id}/ai-lock", response_model=AttachmentOut)
+async def set_attachment_ai_lock(
+    attachment_id: uuid.UUID, body: AiLockIn, actor: ActorDep, session: SessionDep
+) -> AttachmentOut:
+    """`page.moderate` in its page's space; the attachment's `version` (stale → 409)."""
+    attachment = await AiLockService(session).set_attachment(
+        actor, attachment_id, body.no_ai, body.version
+    )
+    return AttachmentOut.of(attachment)

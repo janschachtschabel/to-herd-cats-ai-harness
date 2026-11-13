@@ -523,6 +523,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/attachments/{attachment_id}/ai-lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Attachment Ai Lock
+         * @description `page.moderate` in its page's space; the attachment's `version` (stale → 409).
+         */
+        put: operations["set_attachment_ai_lock_api_attachments__attachment_id__ai_lock_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -859,6 +879,26 @@ export interface paths {
         head?: never;
         /** Update Page */
         patch: operations["update_page_api_pages__page_id__patch"];
+        trace?: never;
+    };
+    "/api/pages/{page_id}/ai-lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Page Ai Lock
+         * @description `page.moderate` in its space; the page's `version` (stale → 409).
+         */
+        put: operations["set_page_ai_lock_api_pages__page_id__ai_lock_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/pages/{page_id}/attachments": {
@@ -1722,6 +1762,22 @@ export interface components {
             snippet: string;
         };
         /**
+         * AiLockIn
+         * @description Lock a page or a file for AI, or lift the lock; `version` as read (stale → 409).
+         */
+        AiLockIn: {
+            /** No Ai */
+            no_ai: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AiPolicy
+         * @description A space's AI policy (spec 7.3), stored on `space` (`modules/ai/policy.py`).
+         * @enum {string}
+         */
+        AiPolicy: "any" | "restricted" | "none";
+        /**
          * AssigneeIn
          * @description M4 assigns people only.
          */
@@ -1749,7 +1805,8 @@ export interface components {
         /**
          * AttachmentOut
          * @description `url` downloads it (`?inline=1` shows raster images in the page). `mime` is what
-         *     the content is, whatever the upload declared.
+         *     the content is, whatever the upload declared. `no_ai`: locked for AI (spec 11);
+         *     `version` guards that lock.
          */
         AttachmentOut: {
             /**
@@ -1766,6 +1823,8 @@ export interface components {
             id: string;
             /** Mime */
             mime: string;
+            /** No Ai */
+            no_ai: boolean;
             /**
              * Page Id
              * Format: uuid
@@ -1778,6 +1837,8 @@ export interface components {
             uploaded_by: components["schemas"]["PrincipalRef"];
             /** Url */
             url: string;
+            /** Version */
+            version: number;
         };
         /**
          * AuditOut
@@ -2803,6 +2864,7 @@ export interface components {
          * PageOut
          * @description `version` guards writes (send it back; stale → 409). `collab_generation` changes
          *     whenever open live-editing sessions of the page end. `tags`: tag ids, by name.
+         *     `no_ai`: locked for AI (spec 11).
          */
         PageOut: {
             /** Collab Generation */
@@ -2820,6 +2882,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** No Ai */
+            no_ai: boolean;
             /** Parent Id */
             parent_id: string | null;
             /** Path */
@@ -3289,8 +3353,12 @@ export interface components {
         /**
          * SpaceOut
          * @description `my_role` is the caller's role there, for display (system admins: `admin`).
+         *     `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).
          */
         SpaceOut: {
+            ai_policy: components["schemas"]["AiPolicy"];
+            /** Allowed Locations */
+            allowed_locations: components["schemas"]["DataLocation"][];
             /** Description */
             description: string | null;
             /** Icon */
@@ -3318,6 +3386,9 @@ export interface components {
         SpaceRole: "viewer" | "editor" | "moderator" | "admin";
         /** SpaceUpdateIn */
         SpaceUpdateIn: {
+            ai_policy?: components["schemas"]["AiPolicy"] | null;
+            /** Allowed Locations */
+            allowed_locations?: components["schemas"]["DataLocation"][] | null;
             /** Description */
             description?: string | null;
             /** Icon */
@@ -5268,6 +5339,41 @@ export interface operations {
             };
         };
     };
+    set_attachment_ai_lock_api_attachments__attachment_id__ai_lock_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiLockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_auth_login_post: {
         parameters: {
             query?: never;
@@ -6099,6 +6205,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_page_ai_lock_api_pages__page_id__ai_lock_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiLockIn"];
             };
         };
         responses: {

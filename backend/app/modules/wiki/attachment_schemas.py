@@ -9,7 +9,8 @@ from app.modules.wiki.schemas import PrincipalRef
 
 class AttachmentOut(BaseModel):
     """`url` downloads it (`?inline=1` shows raster images in the page). `mime` is what
-    the content is, whatever the upload declared."""
+    the content is, whatever the upload declared. `no_ai`: locked for AI (spec 11);
+    `version` guards that lock."""
 
     id: uuid.UUID
     page_id: uuid.UUID
@@ -20,6 +21,8 @@ class AttachmentOut(BaseModel):
     uploaded_by: PrincipalRef
     created_at: datetime
     url: str
+    no_ai: bool
+    version: int
 
     @classmethod
     def of(cls, attachment: Attachment) -> "AttachmentOut":
@@ -35,4 +38,6 @@ class AttachmentOut(BaseModel):
             ),
             created_at=attachment.created_at,
             url=f"/api/attachments/{attachment.id}",
+            no_ai=attachment.no_ai,
+            version=attachment.version,
         )

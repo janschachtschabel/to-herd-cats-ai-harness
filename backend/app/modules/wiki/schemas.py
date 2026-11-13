@@ -27,7 +27,8 @@ class PrincipalRef(BaseModel):
 
 class PageOut(BaseModel):
     """`version` guards writes (send it back; stale → 409). `collab_generation` changes
-    whenever open live-editing sessions of the page end. `tags`: tag ids, by name."""
+    whenever open live-editing sessions of the page end. `tags`: tag ids, by name.
+    `no_ai`: locked for AI (spec 11)."""
 
     id: uuid.UUID
     space_id: uuid.UUID
@@ -46,6 +47,7 @@ class PageOut(BaseModel):
     updated_at: datetime
     published_at: datetime | None
     tags: list[uuid.UUID]
+    no_ai: bool
 
     @classmethod
     def of(cls, page: Page, *, tags: list[uuid.UUID]) -> "PageOut":
@@ -67,6 +69,7 @@ class PageOut(BaseModel):
             updated_at=page.updated_at,
             published_at=page.published_at,
             tags=tags,
+            no_ai=page.no_ai,
         )
 
 
@@ -122,6 +125,15 @@ class PageUpdate(BaseModel):
         if value is None:
             raise ValueError("cannot be null")
         return value
+
+
+class AiLockIn(BaseModel):
+    """Lock a page or a file for AI, or lift the lock; `version` as read (stale → 409)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_ai: bool
+    version: int
 
 
 class ExpectedVersion(BaseModel):

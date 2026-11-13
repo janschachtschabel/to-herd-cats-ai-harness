@@ -231,6 +231,36 @@
         "title": "ActivityOut",
         "type": "object"
       },
+      "AiLockIn": {
+        "additionalProperties": false,
+        "description": "Lock a page or a file for AI, or lift the lock; `version` as read (stale \u2192 409).",
+        "properties": {
+          "no_ai": {
+            "title": "No Ai",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "no_ai",
+          "version"
+        ],
+        "title": "AiLockIn",
+        "type": "object"
+      },
+      "AiPolicy": {
+        "description": "A space's AI policy (spec 7.3), stored on `space` (`modules/ai/policy.py`).",
+        "enum": [
+          "any",
+          "restricted",
+          "none"
+        ],
+        "title": "AiPolicy",
+        "type": "string"
+      },
       "AssigneeIn": {
         "description": "M4 assigns people only.",
         "properties": {
@@ -278,7 +308,7 @@
         "type": "object"
       },
       "AttachmentOut": {
-        "description": "`url` downloads it (`?inline=1` shows raster images in the page). `mime` is what\nthe content is, whatever the upload declared.",
+        "description": "`url` downloads it (`?inline=1` shows raster images in the page). `mime` is what\nthe content is, whatever the upload declared. `no_ai`: locked for AI (spec 11);\n`version` guards that lock.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -297,6 +327,10 @@
           "mime": {
             "title": "Mime",
             "type": "string"
+          },
+          "no_ai": {
+            "title": "No Ai",
+            "type": "boolean"
           },
           "page_id": {
             "format": "uuid",
@@ -317,6 +351,10 @@
           "url": {
             "title": "Url",
             "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
         "required": [
@@ -328,7 +366,9 @@
           "sha256",
           "uploaded_by",
           "created_at",
-          "url"
+          "url",
+          "no_ai",
+          "version"
         ],
         "title": "AttachmentOut",
         "type": "object"
@@ -2918,7 +2958,7 @@
         "type": "object"
       },
       "PageOut": {
-        "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end. `tags`: tag ids, by name.",
+        "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end. `tags`: tag ids, by name.\n`no_ai`: locked for AI (spec 11).",
         "properties": {
           "collab_generation": {
             "title": "Collab Generation",
@@ -2940,6 +2980,10 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "no_ai": {
+            "title": "No Ai",
+            "type": "boolean"
           },
           "parent_id": {
             "anyOf": [
@@ -3027,7 +3071,8 @@
           "created_at",
           "updated_at",
           "published_at",
-          "tags"
+          "tags",
+          "no_ai"
         ],
         "title": "PageOut",
         "type": "object"
@@ -4346,8 +4391,18 @@
         "type": "object"
       },
       "SpaceOut": {
-        "description": "`my_role` is the caller's role there, for display (system admins: `admin`).",
+        "description": "`my_role` is the caller's role there, for display (system admins: `admin`).\n`ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).",
         "properties": {
+          "ai_policy": {
+            "$ref": "#/components/schemas/AiPolicy"
+          },
+          "allowed_locations": {
+            "items": {
+              "$ref": "#/components/schemas/DataLocation"
+            },
+            "title": "Allowed Locations",
+            "type": "array"
+          },
           "description": {
             "anyOf": [
               {
@@ -4417,7 +4472,9 @@
           "icon",
           "owner_user_id",
           "version",
-          "my_role"
+          "my_role",
+          "ai_policy",
+          "allowed_locations"
         ],
         "title": "SpaceOut",
         "type": "object"
@@ -4436,6 +4493,31 @@
       "SpaceUpdateIn": {
         "additionalProperties": false,
         "properties": {
+          "ai_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowed_locations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DataLocation"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Locations"
+          },
           "description": {
             "anyOf": [
               {
@@ -8238,6 +8320,60 @@
         ]
       }
     },
+    "/api/attachments/{attachment_id}/ai-lock": {
+      "put": {
+        "description": "`page.moderate` in its page's space; the attachment's `version` (stale \u2192 409).",
+        "operationId": "set_attachment_ai_lock_api_attachments__attachment_id__ai_lock_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attachment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiLockIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Attachment Ai Lock",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login_api_auth_login_post",
@@ -9619,6 +9755,60 @@
           }
         },
         "summary": "Update Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/ai-lock": {
+      "put": {
+        "description": "`page.moderate` in its space; the page's `version` (stale \u2192 409).",
+        "operationId": "set_page_ai_lock_api_pages__page_id__ai_lock_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiLockIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Page Ai Lock",
         "tags": [
           "wiki"
         ]
