@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 from app.core.principal import SystemRole
 
 
@@ -24,7 +25,9 @@ class UserOut(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=120)
-    password: str | None = Field(default=None, min_length=10, max_length=200)
+    password: str | None = Field(
+        default=None, min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH
+    )
     system_role: SystemRole = SystemRole.MEMBER
     locale: str = Field(default="de", pattern=r"^(de|en)$")
 
@@ -37,7 +40,9 @@ class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     system_role: SystemRole | None = None
     locale: str | None = Field(default=None, pattern=r"^(de|en)$")
-    password: str | None = Field(default=None, min_length=10, max_length=200)
+    password: str | None = Field(
+        default=None, min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH
+    )
 
 
 class ProfileUpdate(BaseModel):
@@ -50,6 +55,15 @@ class ProfileUpdate(BaseModel):
 
 class ProfileUpdateIn(ProfileUpdate):
     version: int
+
+
+class PasswordChangeIn(BaseModel):
+    """A person's own new password; the current one proves it is them."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+    new_password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
 
 
 class UserUpdateIn(UserUpdate):

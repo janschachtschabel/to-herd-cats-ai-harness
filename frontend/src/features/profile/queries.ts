@@ -36,3 +36,11 @@ export function useUserLocale() {
     if (locale === 'de' || locale === 'en') setLocale(locale)
   }, [locale])
 }
+
+/** Changes the caller's own password; the server ends every other session. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (body: Schemas['PasswordChangeIn']) =>
+      unwrap(await api.POST('/api/auth/me/password', { body })),
+  })
+}

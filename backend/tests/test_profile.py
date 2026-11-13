@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.models import AuditLog
+from app.modules.users.models import User
+from tests.factories import PASSWORD, login
 
 ME = "/api/auth/me"
 
@@ -45,3 +47,46 @@ async def test_language_change_is_audited(
     entry = (await session.scalars(select(AuditLog).where(AuditLog.action == "user.updated"))).one()
     assert entry.target_id == member.id
     assert entry.details == {"changes": {"locale": {"from": "de", "to": "en"}}}
+
+
+PASSWORD_URL = "/api/auth/me/password"
+
+
+async def test_person_changes_own_password_and_other_sessions_end(
+    member: User, make_client, session: AsyncSession
+) -> None:
+    here = await make_client(csrf=True)
+    await login(here, member.email)
+    elsewhere = await make_client(csrf=True)
+    await login(elsewhere, member.email)
+    body = {"current_password": PASSWORD, "new_password": "a-brand-new-password"}
+    r = await here.post(PASSWORD_URL, json=body)
+    assert r.status_code == 204, r.text
+    assert (await here.get(ME)).status_code == 200  # this session stays
+    assert (await elsewhere.get(ME)).status_code == 401  # every other one ends
+    fresh = await make_client(csrf=True)
+    await login(fresh, member.email, "a-brand-new-password")
+    entry = (
+        await session.scalars(select(AuditLog).where(AuditLog.action == "user.password_changed"))
+    ).one()
+    assert (entry.actor_id, entry.target_id, entry.details) == (member.id, member.id, None)
+
+
+async def test_the_current_password_is_required(member_client: AsyncClient) -> None:
+    body = {"current_password": "not-my-password", "new_password": "a-brand-new-password"}
+    r = await member_client.post(PASSWORD_URL, json=body)
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "auth.wrong_password"
+    assert (await member_client.get(ME)).status_code == 200  # no logout on a typo
+
+
+async def test_the_new_password_follows_the_rule(member_client: AsyncClient) -> None:
+    for new in ("short", "x" * 201):
+        body = {"current_password": PASSWORD, "new_password": new}
+        assert (await member_client.post(PASSWORD_URL, json=body)).status_code == 422
+
+
+async def test_guessing_the_current_password_is_limited(member_client: AsyncClient) -> None:
+    body = {"current_password": "not-my-password", "new_password": "a-brand-new-password"}
+    codes = [(await member_client.post(PASSWORD_URL, json=body)).status_code for _ in range(6)]
+    assert codes == [422] * 5 + [429]

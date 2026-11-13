@@ -46,7 +46,8 @@
       "permission_denied": "You lack the permission for this.",
       "required": "Please log in.",
       "session_invalid": "Your session has expired. Please log in again.",
-      "csrf": "The request was refused for security reasons."
+      "csrf": "The request was refused for security reasons.",
+      "wrong_password": "The current password is not correct."
     },
     "users": {
       "email_taken": "This email address is already taken.",
@@ -105,7 +106,15 @@
   "profile": {
     "title": "Profile",
     "description": "Your settings for this application.",
-    "language": "Language"
+    "language": "Language",
+    "password": {
+      "title": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "hint": "At least 10 characters. Other signed-in devices are signed out.",
+      "submit": "Change password",
+      "changed": "Password changed. Other sessions are signed out."
+    }
   },
   "userMenu": {
     "profile": "Profile and settings",

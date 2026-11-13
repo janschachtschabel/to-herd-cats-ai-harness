@@ -27,7 +27,9 @@ docker compose up -d --build --wait
 
 Dann <http://127.0.0.1:8080> öffnen und mit `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD` aus `.env` anmelden. Diese erste Person (Inhaberin)
-entsteht nur beim allerersten Start; das Passwort danach in der App ändern.
+entsteht nur beim allerersten Start; das Passwort danach in der App ändern (Menü oben
+rechts → „Profil und Einstellungen“; dort ändert jede Person ihr eigenes Passwort und
+ihre Sprache).
 
 `docker compose down` hält die Daten (Volume `db-data`), `down -v` löscht sie.
 Sicherung, Wiederherstellung, Reverse-Proxy und alle Variablen:

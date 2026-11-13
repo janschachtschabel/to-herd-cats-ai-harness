@@ -6,7 +6,7 @@ from app.modules.auth.schemas import LoginRequest, MeOut
 from app.modules.auth.service import AuthService
 from app.modules.orgs.schemas import OrgOut
 from app.modules.users.profile import ProfileService
-from app.modules.users.schemas import ProfileUpdateIn, UserOut
+from app.modules.users.schemas import PasswordChangeIn, ProfileUpdateIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -60,6 +60,24 @@ async def update_me(
     """The caller's own settings (the language)."""
     user = await ProfileService(session).update(actor, body, body.version)
     return await _me(AuthContext(user=user, session_id=ctx.session_id), session, settings)
+
+
+@router.post("/me/password", status_code=204)
+async def change_my_password(
+    body: PasswordChangeIn,
+    actor: ActorDep,
+    ctx: AuthDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> None:
+    """The caller's own password; this session stays, every other one ends."""
+    await ProfileService(session).change_password(
+        actor,
+        body.current_password,
+        body.new_password,
+        keep_session=ctx.session_id,
+        failures_per_minute=settings.login_rate_limit_per_minute,
+    )
 
 
 async def _me(ctx: AuthContext, session: SessionDep, settings: SettingsDep) -> MeOut:

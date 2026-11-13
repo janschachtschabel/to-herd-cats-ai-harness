@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { PageHeader } from '@/features/shared/states'
 import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
+import { PasswordForm } from './PasswordForm'
 import { useChangeLocale } from './queries'
 
 /** The person's own settings. */
@@ -27,6 +28,9 @@ export function ProfilePage() {
             </option>
           ))}
         </NativeSelect>
+      </section>
+      <section className="mt-8 border-t pt-6">
+        <PasswordForm />
       </section>
     </div>
   )
