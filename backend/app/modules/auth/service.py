@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, actor_for, system_permissions
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
+from app.core.failure_limit import FailureLimiter
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.security import (
@@ -40,27 +41,33 @@ class AuthService:
         Two limits, both checked before any password is hashed: attempts per client
         address, whatever the email (bounds the hashing one client can cause), and
         failed attempts per client address and email (guessing one account). Only
-        failures count for the second, and only from that address, so nobody at
-        another address can lock the person out. An IPv6 address counts by its /64.
-        Without a usable account a dummy hash is verified, so the answer takes as long
-        either way. Single organisation
-        per installation: the person is looked up in it."""
+        completed failures count for the second (`FailureLimiter`: correct logins in
+        flight never use it up), and only from that address, so nobody at another
+        address can lock the person out. An IPv6 address counts by its /64. Without a
+        usable account a dummy hash is verified, so the answer takes as long either
+        way. Single organisation per installation: the person is looked up in it."""
         address = limit_key(ip)
         per_ip = RateLimiter(self.session, limit=self.settings.login_ip_rate_limit_per_minute)
         if await per_ip.acquire(f"login-ip:{address}") is None:
             raise RateLimited(code="auth.too_many_attempts")
-        per_account = RateLimiter(self.session, limit=self.settings.login_rate_limit_per_minute)
-        attempt = await per_account.acquire(f"login-fail:{address}:{email.lower()}")
+        per_account = FailureLimiter(
+            self.session,
+            f"login-fail:{address}:{email.lower()}",
+            limit=self.settings.login_rate_limit_per_minute,
+        )
+        attempt = await per_account.begin()
         if attempt is None:
             raise RateLimited(code="auth.too_many_attempts")
         org = await self.orgs.get_default()
         user = await self.users.get_by_email(org.id, email) if org else None
         if user is None or not user.is_active or user.password_hash is None:
             await verify_against_dummy(password)
+            await per_account.fail(attempt)
             raise Unauthorized(code="auth.invalid_credentials")
         if not await verify_password_async(user.password_hash, password):
+            await per_account.fail(attempt)
             raise Unauthorized(code="auth.invalid_credentials")
-        await per_account.release(attempt)  # a success is not a failed attempt
+        await per_account.end(attempt)  # a success is not a failed attempt
         token = new_session_token()
         now = utcnow()
         # Housekeeping without a background task: every login removes a bounded batch

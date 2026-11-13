@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import time
 from datetime import timedelta
 
 import pytest
@@ -14,6 +15,7 @@ from fastapi import FastAPI
 from sqlalchemy import func, select
 
 from app.core.config import Settings, get_settings
+from app.core.failure_limit import PENDING, FailureLimiter
 from app.core.models_base import utcnow
 from app.core.ratelimit import PRUNE_BATCH, WINDOW, RateLimitHit, limit_key
 from app.modules.audit.models import AuditLog
@@ -61,6 +63,18 @@ async def test_successful_logins_do_not_count_against_the_account(
     client = await make_real_client()
     for _ in range(5):
         assert await _attempt(client, real_db.member_email, PASSWORD) == 200
+
+
+async def test_concurrent_correct_logins_all_succeed(
+    real_db: RealDb, real_app: FastAPI, make_real_client: MakeRealClient
+) -> None:
+    """Only completed failures count: correct logins in flight do not use up the limit."""
+    _limits(real_app, account=5)
+    client = await make_real_client()
+    codes = await asyncio.gather(
+        *(_attempt(client, real_db.member_email, PASSWORD) for _ in range(8))
+    )
+    assert codes == [200] * 8
 
 
 async def test_one_address_is_limited_whatever_the_email(
@@ -140,3 +154,16 @@ async def test_failures_from_one_ipv6_prefix_lock_the_account_for_the_prefix(
 )
 def test_limit_key_of_an_address(address: str | None, key: str) -> None:
     assert limit_key(address) == key
+
+
+async def test_attempts_in_flight_are_waited_for_then_decided(real_db: RealDb) -> None:
+    """Reservations that never end (their request died) count once the wait is over."""
+    key = "login-fail:x:wait@example.com"
+    async with real_db.database.session_factory() as s:
+        s.add_all(RateLimitHit(key=PENDING + key, hit_at=utcnow()) for _ in range(2))
+        await s.commit()
+        assert await FailureLimiter(s, key, limit=3).begin() is not None
+        started = time.monotonic()
+        assert await FailureLimiter(s, key, limit=3, max_wait=0.2).begin() is None
+        assert time.monotonic() - started >= 0.2
+        assert not s.in_transaction()  # nothing held after deciding

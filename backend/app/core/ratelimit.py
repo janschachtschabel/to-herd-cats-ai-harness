@@ -9,7 +9,8 @@ tenant data (a login attempt has no organisation yet), so the table has no org_i
 - Every limiter uses the same window (`WINDOW`); each check also deletes up to
   `PRUNE_BATCH` rows older than it, of any key, so keys that are never used again do
   not stay (index on `hit_at`).
-- A hit can be released again (`release`): the login limit counts only failures.
+- A hit can be released again (`release`). Limits on failures only, which must not
+  count attempts in flight, use `failure_limit.FailureLimiter` (same table).
 - Limits per client address use `limit_key`: an IPv4 address as it is, an IPv6 address
   by its /64 (one host normally controls a whole /64). The audit log keeps the full
   address.
@@ -65,7 +66,7 @@ class RateLimiter:
         now = now or utcnow()
         cutoff = now - WINDOW
         await advisory_xact_lock(self.session, f"ratelimit:{key}")
-        await self._prune(cutoff)
+        await prune_stale(self.session, cutoff)
         count_stmt = (
             select(func.count())
             .select_from(RateLimitHit)
@@ -84,11 +85,14 @@ class RateLimiter:
         """Take a hit back (it did not count); part of the caller's transaction."""
         await self.session.execute(delete(RateLimitHit).where(RateLimitHit.id == hit_id))
 
-    async def _prune(self, cutoff: datetime) -> None:
-        stale = (
-            select(RateLimitHit.id)
-            .where(RateLimitHit.hit_at < cutoff)
-            .limit(PRUNE_BATCH)
-            .with_for_update(skip_locked=True)
-        )
-        await self.session.execute(delete(RateLimitHit).where(RateLimitHit.id.in_(stale)))
+
+async def prune_stale(session: AsyncSession, cutoff: datetime) -> None:
+    """Delete up to `PRUNE_BATCH` rows older than `cutoff`, of any key; rows another
+    transaction is pruning are skipped."""
+    stale = (
+        select(RateLimitHit.id)
+        .where(RateLimitHit.hit_at < cutoff)
+        .limit(PRUNE_BATCH)
+        .with_for_update(skip_locked=True)
+    )
+    await session.execute(delete(RateLimitHit).where(RateLimitHit.id.in_(stale)))
