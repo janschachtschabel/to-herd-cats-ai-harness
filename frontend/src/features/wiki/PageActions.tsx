@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   Pencil,
   Send,
-  Tags,
   TextCursorInput,
   Trash2,
   Users,
@@ -28,13 +27,12 @@ import { canPublish } from './abilities'
 import { MovePageDialog } from './MovePageDialog'
 import { usePublishPage } from './queries'
 import { RenamePageDialog } from './RenamePageDialog'
-import { TagsDialog } from './tags/TagsDialog'
 import { pageExportUrl } from './transfer/queries'
 import { useTrashPage } from './trash/queries'
 import { useWiki } from './WikiContext'
 import { WikiError } from './WikiError'
 
-type Open = 'rename' | 'move' | 'tags' | 'trash' | null
+type Open = 'rename' | 'move' | 'trash' | null
 
 /** What one may do with the page; each action shown only with the right for it. */
 export function PageActions({ page }: { page: WikiPage }) {
@@ -108,10 +106,6 @@ export function PageActions({ page }: { page: WikiPage }) {
                   <FolderInput aria-hidden />
                   {t('wiki.actions.move')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setOpen('tags')}>
-                  <Tags aria-hidden />
-                  {t('wiki.actions.tags')}
-                </DropdownMenuItem>
               </>
             )}
             {abilities.trash && (
@@ -131,7 +125,6 @@ export function PageActions({ page }: { page: WikiPage }) {
         <>
           <RenamePageDialog page={page} open={open === 'rename'} onOpenChange={close} />
           <MovePageDialog page={page} open={open === 'move'} onOpenChange={close} />
-          <TagsDialog page={page} open={open === 'tags'} onOpenChange={close} />
         </>
       )}
       {abilities.trash && (

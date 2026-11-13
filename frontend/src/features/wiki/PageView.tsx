@@ -8,7 +8,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
 import { PageActions } from './PageActions'
 import { Breadcrumbs, TableOfContents } from './PageNav'
-import { TagChips } from './tags/TagChips'
+import { PageTags } from './tags/PageTags'
 import { useWiki } from './WikiContext'
 
 /** A page as everyone reads it (viewers get exactly this: no live connection). */
@@ -26,7 +26,7 @@ export function PageView({ page }: { page: WikiPage }) {
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {page.status === 'draft' && <Badge variant="secondary">{t('wiki.page.draft')}</Badge>}
-            <TagChips spaceId={space.id} tagIds={page.tags} />
+            <PageTags page={page} />
             <span>
               {t('wiki.page.updated', { when: formatDateTime(page.updated_at, i18n.language) })}
             </span>

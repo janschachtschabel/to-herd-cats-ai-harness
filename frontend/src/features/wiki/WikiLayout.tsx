@@ -1,5 +1,5 @@
 import { Link, Outlet } from '@tanstack/react-router'
-import { FilePlus, Settings, Trash2 } from 'lucide-react'
+import { Settings, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -12,10 +12,10 @@ import { SpaceIcon } from '@/features/spaces/SpaceIcon'
 import type { Space } from '@/lib/api'
 import { wikiAbilities } from './abilities'
 import { NewPageDialog } from './NewPageDialog'
-import { PageTree } from './PageTree'
 import { useTree } from './queries'
 import { SpaceTransferMenu } from './transfer/SpaceTransferMenu'
 import { titleLookup, WikiContext, type Wiki } from './WikiContext'
+import { WikiTreePanel } from './WikiTreePanel'
 
 /** A space: its page tree on the left, the page (or trash, settings) on the right. */
 export function WikiLayout({ spaceId }: { spaceId: string }) {
@@ -32,6 +32,7 @@ function WikiFrame({ space }: { space: Space }) {
   const [creating, setCreating] = useState<{ title?: string; parentId?: string | null } | null>(
     null,
   )
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
   const nodes = useMemo(() => tree.data ?? [], [tree.data])
   const wiki: Wiki = useMemo(
     () => ({
@@ -41,8 +42,10 @@ function WikiFrame({ space }: { space: Space }) {
       nodes,
       titles: titleLookup(nodes),
       createPage: (initial) => setCreating(initial ?? {}),
+      tagFilter,
+      filterByTag: setTagFilter,
     }),
-    [space, me, nodes],
+    [space, me, nodes, tagFilter],
   )
   const { abilities } = wiki
 
@@ -84,28 +87,7 @@ function WikiFrame({ space }: { space: Space }) {
         </div>
       </header>
       <div className="grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
-        <aside aria-labelledby="wiki-tree-heading" className="min-w-0">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 id="wiki-tree-heading" className="text-sm font-semibold">
-              {t('wiki.tree.title')}
-            </h2>
-            {abilities.create && (
-              <Button size="sm" variant="ghost" onClick={() => setCreating({})}>
-                <FilePlus aria-hidden />
-                {t('wiki.create.open')}
-              </Button>
-            )}
-          </div>
-          {tree.isPending ? (
-            <LoadingState rows={3} />
-          ) : tree.isError ? (
-            <ErrorState error={tree.error} onRetry={() => void tree.refetch()} />
-          ) : nodes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('wiki.tree.empty')}</p>
-          ) : (
-            <PageTree spaceId={space.id} nodes={nodes} />
-          )}
-        </aside>
+        <WikiTreePanel />
         <div className="min-w-0">
           <Outlet />
         </div>

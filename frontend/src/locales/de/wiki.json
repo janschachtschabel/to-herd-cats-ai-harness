@@ -64,7 +64,6 @@
       "createChild": "Unterseite anlegen",
       "rename": "Umbenennen",
       "move": "Verschieben",
-      "tags": "Tags",
       "trash": "In den Papierkorb"
     },
     "conflict": {
@@ -87,7 +86,18 @@
       "none": "Es gibt noch keine Tags.",
       "new": "Neuer Tag",
       "newName": "Name des neuen Tags",
-      "add": "Hinzufügen"
+      "add": "Hinzufügen",
+      "edit": "Tags bearbeiten",
+      "list": "Tags"
+    },
+    "tagFilter": {
+      "label": "Nach Tag filtern",
+      "all": "Alle Seiten",
+      "clear": "Filter aufheben",
+      "empty": "Keine Seite trägt diesen Tag.",
+      "treeLabel": "Seiten mit dem Tag „{{name}}“",
+      "treeLabelAny": "Seiten mit dem gewählten Tag",
+      "showTagged": "Seiten mit dem Tag „{{name}}“"
     },
     "editor": {
       "title": "Seite bearbeiten",

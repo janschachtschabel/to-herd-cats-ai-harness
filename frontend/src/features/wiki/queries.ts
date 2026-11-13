@@ -15,28 +15,37 @@ const MAX_TREE_REQUESTS = 50
 export const wikiKeys = {
   all: ['wiki'] as const,
   tree: (spaceId: string) => ['wiki', 'tree', spaceId] as const,
+  tagged: (spaceId: string, tagId: string) => ['wiki', 'tree', spaceId, 'tag', tagId] as const,
   page: (pageId: string) => ['wiki', 'page', pageId] as const,
   byPath: (spaceId: string, path: string) => ['wiki', 'path', spaceId, path] as const,
 }
 
+/** Every page of the tree, or (with `tag`) the pages carrying that tag: the server
+ *  filters, the parents of a tagged page are not in the list. */
+async function fetchTree(spaceId: string, tag?: string): Promise<TreeNode[]> {
+  const nodes: TreeNode[] = []
+  let cursor: string | undefined
+  for (let i = 0; i < MAX_TREE_REQUESTS; i++) {
+    const batch = unwrap(
+      await api.GET('/api/spaces/{space_id}/pages/tree', {
+        params: { path: { space_id: spaceId }, query: { cursor, limit: TREE_PAGE_SIZE, tag } },
+      }),
+    )
+    nodes.push(...batch.items)
+    cursor = batch.next_cursor ?? undefined
+    if (!cursor) break
+  }
+  return nodes
+}
+
 export const treeQuery = (spaceId: string) =>
+  queryOptions({ queryKey: wikiKeys.tree(spaceId), queryFn: () => fetchTree(spaceId) })
+
+/** Under the tree's key, so whatever refreshes the tree refreshes this too. */
+export const taggedTreeQuery = (spaceId: string, tagId: string) =>
   queryOptions({
-    queryKey: wikiKeys.tree(spaceId),
-    queryFn: async (): Promise<TreeNode[]> => {
-      const nodes: TreeNode[] = []
-      let cursor: string | undefined
-      for (let i = 0; i < MAX_TREE_REQUESTS; i++) {
-        const batch = unwrap(
-          await api.GET('/api/spaces/{space_id}/pages/tree', {
-            params: { path: { space_id: spaceId }, query: { cursor, limit: TREE_PAGE_SIZE } },
-          }),
-        )
-        nodes.push(...batch.items)
-        cursor = batch.next_cursor ?? undefined
-        if (!cursor) break
-      }
-      return nodes
-    },
+    queryKey: wikiKeys.tagged(spaceId, tagId),
+    queryFn: () => fetchTree(spaceId, tagId),
   })
 
 export const pageByPathQuery = (spaceId: string, path: string) =>
@@ -59,6 +68,10 @@ export const pageQuery = (pageId: string) =>
 
 export function useTree(spaceId: string) {
   return useQuery(treeQuery(spaceId))
+}
+
+export function useTaggedTree(spaceId: string, tagId: string | null) {
+  return useQuery({ ...taggedTreeQuery(spaceId, tagId ?? ''), enabled: tagId !== null })
 }
 
 export function usePageByPath(spaceId: string, path: string) {

@@ -11,7 +11,16 @@ const ITEM = '[role="treeitem"]'
 
 /** The space's pages as an ARIA tree: Up/Down move, Right/Left open/close or step
  *  in/out, Home/End jump, Enter opens the page. One item is in the tab order. */
-export function PageTree({ spaceId, nodes }: { spaceId: string; nodes: TreeNode[] }) {
+export function PageTree({
+  spaceId,
+  nodes,
+  label,
+}: {
+  spaceId: string
+  nodes: TreeNode[]
+  /** The tree's accessible name (default: "Seiten"). */
+  label?: string
+}) {
   const { t } = useTranslation()
   const tree = useMemo(() => buildTree(nodes), [nodes])
   const activePath = useParams({ strict: false, select: (p) => p._splat ?? null })
@@ -76,7 +85,7 @@ export function PageTree({ spaceId, nodes }: { spaceId: string; nodes: TreeNode[
   return (
     <ul
       role="tree"
-      aria-label={t('wiki.tree.title')}
+      aria-label={label ?? t('wiki.tree.title')}
       className="flex flex-col gap-0.5"
       onKeyDown={onKeyDown}
     >

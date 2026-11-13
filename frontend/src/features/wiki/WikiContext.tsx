@@ -13,6 +13,9 @@ export interface Wiki {
   titles: Map<string, string>
   /** Opens the new-page dialog (optionally with a title and a parent). */
   createPage: (initial?: { title?: string; parentId?: string | null }) => void
+  /** The tag the tree is filtered by, if any. */
+  tagFilter: string | null
+  filterByTag: (tagId: string | null) => void
 }
 
 export const WikiContext = createContext<Wiki | null>(null)

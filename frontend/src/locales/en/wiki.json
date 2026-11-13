@@ -64,7 +64,6 @@
       "createChild": "Create subpage",
       "rename": "Rename",
       "move": "Move",
-      "tags": "Tags",
       "trash": "Move to trash"
     },
     "conflict": {
@@ -87,7 +86,18 @@
       "none": "There are no tags yet.",
       "new": "New tag",
       "newName": "Name of the new tag",
-      "add": "Add"
+      "add": "Add",
+      "edit": "Edit tags",
+      "list": "Tags"
+    },
+    "tagFilter": {
+      "label": "Filter by tag",
+      "all": "All pages",
+      "clear": "Clear filter",
+      "empty": "No page carries this tag.",
+      "treeLabel": "Pages tagged “{{name}}”",
+      "treeLabelAny": "Pages with the chosen tag",
+      "showTagged": "Pages tagged “{{name}}”"
     },
     "editor": {
       "title": "Edit page",
