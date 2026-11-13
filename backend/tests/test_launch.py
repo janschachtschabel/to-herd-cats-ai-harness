@@ -47,9 +47,12 @@ def test_uvicorn_configs_disable_access_log_and_keep_our_logging():
         assert config.access_log is False and config.log_config is None
 
 
-def test_websocket_messages_are_limited_to_1_mib():
+def test_websocket_messages_are_limited_to_what_the_collab_process_takes():
+    """Review M2 U3: one cap with the collab process, a whole live state plus envelope."""
+    from app.modules.wiki.collab_models import MAX_YDOC_BYTES
+
     public, _ = launch.server_configs(Settings())
-    assert public.ws_max_size == 1024 * 1024
+    assert public.ws_max_size == MAX_YDOC_BYTES + 64 * 1024
 
 
 def test_public_server_trusts_forwarded_headers_only_from_configured_proxies():
