@@ -1,8 +1,11 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 2 (Wiki), 13.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem
-Meilenstein aktualisiert (Spezifikation 12.7). Die Messwerte aus M1 sind durch neue
-ersetzt (Abschnitt [Ressourcen](#ressourcen)).
+Stand: Meilenstein 3 (Nachrichten), 13.11.2026, Version 0.1.0. Der Steckbrief wird mit
+jedem Meilenstein aktualisiert (Spezifikation 12.7). Die Messwerte aus M2 (Image,
+Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3 sind ohne Docker
+gemessen, an Prozessen auf der Maschine (Abschnitt
+[Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker)). Was nicht gemessen ist,
+steht unter [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
 
@@ -13,16 +16,20 @@ Rollen und Rechteprüfung, Audit, Verzeichnissuche, Oberfläche mit Navigation u
 Verwaltung. **Vorhanden (M2):** Wiki je Bereich mit Seitenbaum, Markdown-Editor,
 Live-Bearbeitung (Collab-Prozess, Generationen), Versionen mit Diff und
 Wiederherstellung, Papierkorb, Tags (systemweit und je Bereich), Anhänge,
-Volltextsuche, Markdown-Import und -Export. Kanäle (M3), Aufgaben (M4) und KI (ab M5)
+Volltextsuche, Markdown-Import und -Export. **Vorhanden (M3):** Kanäle je Bereich,
+Direktnachrichten, Threads, Erwähnungen, Reaktionen, Lesestand, Diskussion je Wiki-Seite
+mit Systemmeldungen, Aktivität „Für mich“, Suche in Nachrichten, Live-Zustellung über
+Server-Sent Events (auch über mehrere API-Knoten), Outbox mit Worker, Einsicht der
+Verwaltung in Direktnachrichten mit Begründung und Audit. Aufgaben (M4) und KI (ab M5)
 folgen.
 
 | | |
 |---|---|
 | Dienst-ID | `to-herd-cats-ai` (Log-Feld `service`, `OTEL_SERVICE_NAME`, Image, Chart) |
-| Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|collab`) |
+| Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|worker\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
-| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika) |
-| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
+| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
+| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
 | Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export |
 | Lizenz | Apache-2.0 |
 
@@ -50,7 +57,36 @@ Python); die CPU der Container wurde in diesen Läufen nicht aufgezeichnet. Mehr
 Durchsatz gibt es über mehr API-Replikas. Die zweite Zeit beim Beenden der Live-Sitzung hängt davon ab, wann
 der Collab-Prozess das nächste Mal prüft (alle 5 s) oder speichert.
 
-**Kosten:** M2 ruft keine kostenpflichtigen Dienste auf (keine KI, kein externer
+### Nachrichten (M3)
+
+Ohne Docker gemessen: zwei API-Prozesse (`HERD_ROLE=api`) und ein Worker an einem
+lokalen PostgreSQL, 200 offene SSE-Verbindungen (40 Personen mit je 5, je zur Hälfte an
+Knoten A und B), 20 Nachrichten je Sekunde über 60 s an Knoten A, alle in einem Kanal,
+den alle 40 sehen (Ablauf unter [Messung](#messung)). Zahlen aus Lauf 3 (Lauf 2 in
+Klammern).
+
+| Funktion | Endpunkt | P50 / P90 / P99 | Durchsatz |
+|---|---|---|---|
+| Nachricht schreiben | `POST /api/conversations/{id}/messages` | 29 / 40 / 55 ms (23 / 36 / 61 ms) | 20/s, 0 Fehler |
+| Zustellung: Senden bis Ereignis in jeder offenen Verbindung | `GET /api/stream` (`message.created`) | 55 / 72 / 111 ms, höchstens 216 ms (48 / 67 / 100, höchstens 191 ms) | 4.000 Ereignisse/s an 200 Verbindungen, keines fehlte |
+| davon an Knoten A (schreibt) / Knoten B (nur liest) | | 56 / 74 / 106 ms und 54 / 69 / 112 ms | |
+| 200 Verbindungen öffnen | `GET /api/stream` | alle offen nach 0,67 s (0,52 s) | |
+
+Die Zustellzeit enthält den ganzen Weg: Commit, Worker (`publish_live`), `NOTIFY`, je
+API-Prozess eine Abfrage, wer das Ereignis sehen darf, und das Schreiben in die
+Verbindungen; gemessen vom Absenden der POST-Anfrage bis zur Zeile `event:` im Client.
+Die Outbox stand dabei nie über 0 offenen Ereignissen bei den Abfragen alle 2 s
+(`herd_outbox_pending`; in Lauf 1 höchstens 12, das älteste 0,75 s alt: der Worker war
+auch dort nicht der Engpass). **Unter fremder Last:** Lauf 1 lief, während andere Prozesse die
+Maschine auslasteten (Lastmittel 8–10 bei 4 Kernen): Alle 240.000 Ereignisse kamen an,
+aber Knoten A (der zugleich die Schreibanfragen bediente) fiel zurück: P50 7,6 s, P90
+16,0 s, höchstens 19 s; Knoten B blieb bei P50 0,47 s, P90 1,2 s; Schreiben P50 295 ms,
+P90 933 ms. Die Ursache ist nicht gesondert gemessen; naheliegend ist, dass die
+Zustellung eines Prozesses Ereignis für Ereignis nacheinander prüft und dafür mit den
+Schreibanfragen um den Datenbank-Pool und die CPU konkurriert. Ein Knoten, der viele
+Schreibanfragen und viele Verbindungen zugleich bedient, ist damit der erste Engpass.
+
+**Kosten:** M2 und M3 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
 Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der Anhänge auf dem
 Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je Anhang).
 
@@ -78,6 +114,7 @@ worden.
 |---|---|---|
 | PostgreSQL ≥ 16 | ja | Zustandsablage (Daten, Sitzungen, Ratenlimits, Sperren, Volltextindex, Yjs-Stände der Live-Bearbeitung). Compose und Chart nutzen `pgvector/pgvector:pg17` per Digest; M2 braucht pgvector noch nicht |
 | Volume für `/data` | ja (mit Anhängen) | Anhänge und temporäre Dateien von Upload, Import und Export. Compose: Volume `app-data`; Chart: PVC `<release>-data`, voreingestellt **ReadWriteMany** (alle API-Replikas schreiben); ohne RWX-Speicherklasse `api.replicas=1` und `persistence.accessModes={ReadWriteOnce}` |
+| Worker | für Live-Zustellung, Benachrichtigungen, Systemmeldungen | im selben Image (`HERD_ROLE=worker`, in `all` enthalten); nur Datenbank, keine eingehenden Anfragen außer 9090. Ohne Worker gehen keine Nachrichten verloren, aber nichts kommt live an, bis einer läuft |
 | Collab-Prozess | für Live-Bearbeitung | im selben Image (Node 22, Hocuspocus); spricht nur mit der API (`/internal/collab/*` auf 9090, Token `HERD_INTERNAL_TOKEN`), speichert nie selbst in die Datenbank. Ohne Token ist die Live-Bearbeitung aus, der Markdown-Editor geht weiter |
 | OTLP-Collector | nein | Tracing nur, wenn `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist (Chart: `tracing.otlpEndpoint`) |
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
@@ -102,6 +139,18 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Änderungen der letzten Sekunden (höchstens 10 s) im Speicher des Prozesses gehen dabei
   verloren, sofern kein Browser sie wieder einspielt. Mehrere Collab-Replikas
   (Spezifikation 12.4, Stufe 2 mit Redis/Valkey) kommen mit M9.
+- **Mehrere API-Knoten und Live-Zustellung (M3):** Eine Nachricht, die an einem Knoten
+  geschrieben wird, kommt an den SSE-Verbindungen jedes Knotens an (`NOTIFY herd_live`,
+  jeder API-Prozess lauscht mit einer eigenen Datenbankverbindung außerhalb des Pools);
+  Sticky Sessions sind nicht nötig. Geprüft mit zwei echten Prozessen
+  (`tests/test_live_two_nodes.py`, `docs/demo/m3.md`) und in der CI mit
+  `SMOKE_NODES=1 bash deploy/compose/smoke.sh`. Die Grenze von 5 Verbindungen je
+  Anmeldung gilt je API-Prozess. Bei SIGTERM schließt die API ihre Verbindungen zuerst;
+  die Browser verbinden sich nach 5 s mit einem anderen Pod und laden nach.
+- **Worker (M3):** beliebig viele Replikas (getrennte Stapel per `FOR NO KEY UPDATE SKIP
+  LOCKED`, Zustellung mindestens einmal, Handler idempotent; geprüft mit zwei
+  Verteilern und mit einem Verteiler, der mitten im Handler abgeschossen wird). Je
+  Worker drei Datenbankverbindungen (Stapel, Handler, LISTEN).
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -115,7 +164,12 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 
 ## Zeitpläne
 
-Keine. M1 und M2 haben weder Cronjobs noch Hintergrundaufträge. Der Collab-Prozess
+Keine Cronjobs. Seit M3 läuft der **Worker** als Schleife: Er wacht bei jedem Commit
+mit Ereignissen auf (`NOTIFY herd_outbox`), sonst alle 2 s, und verteilt höchstens 50
+Ereignisse je Durchlauf; einmal je Minute löscht er verteilte Ereignisse, die älter als
+7 Tage sind (höchstens 1.000 auf einmal). Jeder API-Prozess mit offenen SSE-Verbindungen
+prüft alle 30 s, ob deren Anmeldungen noch gelten, und schickt nach 15 s Ruhe einen
+Heartbeat. Der Collab-Prozess
 prüft alle 5 s für jedes offene Dokument Generation und Rechte über die API (kein
 Zeitplan, nur solange jemand live bearbeitet). Beim Start entfernt die API liegen
 gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene und beendete Sitzungen (jeder
@@ -146,6 +200,21 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
 - **Wiki-Endpunkte:** eigenes Compose-Projekt, ein Team-Bereich mit 100
   veröffentlichten Seiten (je rund 2 KB Text aus 15 Wörtern, Baum mit 10 Ästen), je
   Endpunkt `hey` 20 s mit 2 und mit 20 Clients und einer Sitzung.
+- **Nachrichten (M3), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
+  PostgreSQL 16 (auf derselben Maschine, von anderen Prozessen mitbenutzt), daran
+  `HERD_ROLE=migrate`, dann Knoten A und B (`HERD_ROLE=api`) und ein Worker
+  (`HERD_ROLE=worker`), Code-Stand von Commit `d24ad9b` (der Anwendungscode ist seit
+  `7c99087` unverändert), ohne Collab-Prozess. Ein
+  Python-Skript (httpx, ein Prozess) legt 40 Personen (Rolle `editor`) in einem
+  Team-Bereich mit einem Kanal an, öffnet je Person 5 Verbindungen `/api/stream`
+  (gerade Personen an A, ungerade an B), wartet 20 s und schickt dann 60 s lang 20
+  Nachrichten je Sekunde von 4 Personen an Knoten A (Lauf 2: an Knoten B). Gemessen:
+  Zeit vom Absenden jeder POST-Anfrage bis zum Ereignis `message.created` mit ihrer ID
+  in jeder der 200 Verbindungen; CPU (aus `/proc/<pid>/stat`) und RSS (`VmRSS`) der drei
+  Prozesse alle 2 s; `herd_outbox_pending` und `herd_outbox_oldest_pending_seconds` am
+  Worker. Drei Läufe; Lastmittel der Maschine durch andere Prozesse 8–10 (Lauf 1)
+  bzw. 3–4 (Läufe 2 und 3). Das Leerlauf-RSS von `HERD_ROLE=all` (ohne Collab-Prozess)
+  ist ein eigener Start, 30 s nach `/ready`.
 - **Live-Bearbeitung:** eigenes Compose-Projekt, eine Seite, 10 Personen (Rolle
   `editor`, je eigene Sitzung). Statt 10 Browsern 10 Yjs-Clients
   (`@hocuspocus/provider` wie im Browser, Node-Skript auf derselben Maschine) über
@@ -207,6 +276,33 @@ argon2-Prüfungen (je 64 MiB) gleichzeitig laufen.
   Im Cluster läuft der Collab-Prozess als eigener Pod; ihn allein hat hier niemand
   gemessen, sein RSS ist der beste Anhaltspunkt.
 
+### Gemessen: Nachrichten (M3, ohne Docker)
+
+Lauf 3 (Schreiben an Knoten A, Lastmittel der Maschine 3):
+
+| Phase | Prozess | CPU Ø | CPU max | RSS Ø | RSS max |
+|---|---|---|---|---|---|
+| Leerlauf | API A / API B | 0,1 % / 0,4 % | 0,5 % | 109 / 107 MiB | 109 / 107 MiB |
+| Leerlauf | Worker | 0,6 % | 1,0 % | 104 MiB | 104 MiB |
+| 200 Verbindungen offen, Ruhe (20 s) | API A / API B | 1,6 % / 2,1 % | 14 % / 20 % | 122 / 122 MiB | 122 / 122 MiB |
+| 20 Nachrichten/s an 200 Verbindungen (60 s) | API A (schreibt und liefert 100 Verbindungen) | 45 % | 50 % | 123 MiB | 124 MiB |
+| 20 Nachrichten/s | API B (liefert 100 Verbindungen) | 16 % | 18 % | 122 MiB | 122 MiB |
+| 20 Nachrichten/s | Worker | 20 % | 24 % | 106 MiB | 107 MiB |
+| danach (15 s) | API A / API B / Worker | 0,8 / 0,4 / 0,6 % | 4,5 % | 124 / 122 / 107 MiB | |
+
+100 % CPU = ein Kern. Lauf 2 (Schreiben an Knoten B) spiegelbildlich: schreibender
+Knoten 44 % Ø, nur liefernder 15 %, Worker 20 %, RSS gleich. Lauf 1 unter fremder Last:
+API A 42 % Ø / 76 % max, 130 / 132 MiB; B 14 %; Worker 16 %.
+
+- **Leerlauf je Rolle** (RSS 30 s nach `/ready`, ohne Verbindungen): API 107–109 MiB,
+  Worker 104 MiB, `HERD_ROLE=all` (API und Worker in einem Prozess, ohne
+  Collab-Prozess) 107 MiB. Ein eigener Worker-Prozess kostet also gut 100 MiB, im
+  Prozess der API fast nichts.
+- **Je offene SSE-Verbindung** rund 0,14 MiB im API-Prozess (100 Verbindungen: +14 MiB).
+- **Datenbank:** nicht getrennt gemessen (die PostgreSQL-Instanz teilten sich andere
+  Prozesse). Je Ereignis eine Abfrage je API-Prozess mit Verbindungen dieser
+  Organisation, dazu die Arbeit des Workers (Zustellnachweis je Handler).
+
 ### Gemessen: Speicherprüfung und Größenmessung der Live-Bearbeitung
 
 Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki-Seite
@@ -244,6 +340,17 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   PostgreSQL, 2.000 Seiten in einem Ordner mit Tags): vorher 80 s, jetzt 11 s
   (6,7 statt 28,6 SQL-Anweisungen je Seite).
 - Das Image mit Debian-Updates (siehe unten), Trivy.
+- **M3 ohne Image:** Für die Nachrichten gibt es keine Messung mit `docker stats`,
+  keine eigene Image-Größe von M3 (keine neuen Abhängigkeiten; Task 11 baute für seine
+  Compose-Prüfung eine Variante mit der CA der Sandbox und ohne `apt-get upgrade` und
+  nennt 544 MB, M2 hatte 537 MB ebenfalls ohne eingespielte Updates) und
+  keinen Lauf von `deploy/compose/load.sh`. `docker build` geht in dieser Sandbox nicht
+  unverändert, und das Docker der Sandbox war für diese Messung aus.
+- Nachrichten: Speicher und CPU der Datenbank, echte Browser statt eines Skripts als
+  Empfänger, mehr als ein Kanal oder viele Organisationen, Direktnachrichten und Threads
+  unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
+  `/api/stream`, der Verlust der LISTEN-Verbindung unter Last (`resync`) und ein
+  Neustart eines API-Pods mit 100 offenen Verbindungen.
 
 ### Empfehlung Request und Limit
 
@@ -253,6 +360,7 @@ Aus den Messwerten mit 20–30 % Puffer:
 |---|---|---|---|---|---|
 | api (je Pod, ohne Collab-Prozess) | 250m | 3500m oder keins | 256Mi | 330Mi | Request 100m / 256Mi, Limit 512Mi |
 | collab (eine Replika) | 50m | 500m | 128Mi | 256Mi | Request 50m / 128Mi, Limit 512Mi |
+| worker (je Replika) | 50m | 300m | 128Mi | 140Mi | Request 50m / 192Mi, Limit 384Mi |
 | db (mitgeliefert) | 100m | keins | 100Mi | 105Mi | Request 100m / 256Mi, Limit 1Gi |
 
 - **api CPU:** Limit = Lastspitze 3,2 Kerne + 10 %. Ein kleineres Limit bricht nichts,
@@ -266,6 +374,13 @@ Aus den Messwerten mit 20–30 % Puffer:
   (API, Weiterleitung und Collab-Prozess zusammen), Speicher (RSS) 92 MiB mit einem
   Dokument. Mehr gleichzeitige Seiten brauchen mehr Speicher (je Dokument der Yjs-Zustand,
   höchstens 5 MiB, nicht gemessen). Das Chart behält 128Mi/512Mi.
+- **worker:** RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU 20–24 %
+  (ohne Image gemessen). Request = 106 MiB + 20 %, Limit = 107 MiB + 30 %, CPU-Limit =
+  24 % + Reserve. Das Chart setzt mehr (192Mi/384Mi); das bleibt, bis eine Messung im
+  Container vorliegt.
+- **api mit SSE:** 200 offene Verbindungen und 20 Nachrichten je Sekunde kosteten je
+  Prozess +15 MiB und bis 50 % eines Kerns (ohne Anmeldelast); das bleibt im Rahmen der
+  Empfehlung oben.
 - **db:** Die Formel ergibt 100Mi/105Mi, aber nur für eine fast leere Datenbank.
   PostgreSQLs `shared_buffers` ist ab Werk schon 128 MB; mit echten Daten wächst der
   Bedarf. Das Chart behält 256Mi/1Gi. Produktiv ist die Datenbank ohnehin extern.
@@ -316,4 +431,28 @@ Datenbank-Passwort, Anmeldelast, seit M2: internes Token, Live-Bearbeitung und
 WebSocket hinter einem Ingress, `/data` und ReadWriteMany, Größen von Anfragen,
 Anhängen und Importen) stehen im README unter
 [Betriebshinweise](../README.md#betriebshinweise), die Bedienung und der Betrieb des
-Wikis in [`WIKI.md`](WIKI.md).
+Wikis in [`WIKI.md`](WIKI.md), der Nachrichten (Worker, Outbox, SSE hinter einem Proxy)
+in [`NACHRICHTEN.md`](NACHRICHTEN.md).
+
+## Metriken und Alarme (seit M3)
+
+| Metrik | Art | Bedeutung |
+|---|---|---|
+| `herd_outbox_pending` | Gauge (Worker) | offene Ereignisse der Outbox |
+| `herd_outbox_oldest_pending_seconds` | Gauge (Worker) | Alter des ältesten offenen Ereignisses |
+| `herd_outbox_dispatch_total{handler,result}` | Zähler | Zustellungen je Handler: `ok`, `duplicate`, `error`, `failed` (aufgegeben) |
+| `herd_sse_connections` | Gauge (API) | offene SSE-Verbindungen |
+| `herd_live_events_total{type}` | Zähler (API) | zugestellte Live-Ereignisse je Typ |
+
+Alarme in der PrometheusRule des Charts: `HerdOutboxBacklog` (ältestes offenes
+Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (ein Ereignis aufgegeben,
+Warnung), dazu wie bisher `HerdNotReady` (deckt die Worker-Pods mit ab). Ein Worker mit
+0 Replikas löst keinen Alarm aus. Nachrichteninhalte stehen nie in Labels.
+
+## Tests (Stand M3)
+
+| Paket | Tests | Stand |
+|---|---|---|
+| Backend (`pytest`, echtes PostgreSQL) | 812 | alle grün (13.11.2026, 6:26 min), dazu ruff, ruff format, mypy (strict) sauber |
+| Frontend (`vitest`) | 175 in 35 Dateien | alle grün (13.11.2026) |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 17 in 5 Dateien, davon 5 zu Nachrichten | die 5 Nachrichten-Tests hier in 3 Läufen grün; die 12 der Live-Bearbeitung hier nicht neu gelaufen |
