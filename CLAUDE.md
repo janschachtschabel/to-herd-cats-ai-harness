@@ -3,11 +3,15 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1
-(`docs/superpowers/plans/2026-11-12-m1-fundament.md`) is built; the next plan is
-`docs/superpowers/plans/2026-11-12-m2-wiki.md`. Parts named in the spec but not yet
-built (wiki, tickets, agents) are planned, not present. Operations: `README.md`
-(Betriebshinweise), `docs/STECKBRIEF.md` (update its measurements each milestone).
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 and M2
+(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`) are built;
+the next milestone is M3 (messages), its plan is not written yet.
+Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree,
+Markdown and live editor (`collab/` process, generations), versions, trash, tags,
+attachments (`HERD_DATA_DIR`), full-text search, import/export (M2). Planned, not
+present: messages, tickets, worker/outbox, AI and agents, embeddings, S3, collab with
+Redis. Operations: `README.md` (Betriebshinweise), `docs/STECKBRIEF.md` (update its
+measurements each milestone), `docs/WIKI.md` (wiki use and reverse-proxy operation).
 
 ## Stack (present)
 
@@ -16,7 +20,11 @@ built (wiki, tickets, agents) are planned, not present. Operations: `README.md`
 - Frontend (`frontend/`): React 19, TypeScript strict, Vite, Tailwind 4, shadcn/ui
   (Radix), TanStack Router (code-based routes in `src/app/router`) and Query, i18next,
   react-hook-form + zod (schemas derived from `openapi.json`), next-themes. Tooling:
-  `npm`, `oxlint`, `prettier`, `vitest` + Testing Library.
+  `npm`, `oxlint`, `prettier`, `vitest` + Testing Library. Wiki view: react-markdown +
+  remark-gfm (never rehype-raw); live editor: Tiptap 3, Yjs, `@hocuspocus/provider`.
+- Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
+  `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
+  the frontend.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
   BlueOak-1.0.0 or OFL-1.1 (fonts). CI checks it (`backend/scripts/check_licenses.py`).

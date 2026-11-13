@@ -5,14 +5,33 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 1 (Fundament) ist gebaut.** Anmeldung, Personen, Gruppen,
+**Stand: Meilenstein 2 (Wiki) ist gebaut.** Aus M1: Anmeldung, Personen, Gruppen,
 Bereiche (offen, Team, persönlich), Rollen, die eine Rechteprüfung, Audit, die
-Oberfläche mit Navigation und Verwaltung, Image, Compose, Helm-Chart und CI. Wiki,
-Aufgaben, Kanäle und Agenten folgen; als Nächstes M2 Wiki
-([Plan](docs/superpowers/plans/2026-11-12-m2-wiki.md)).
+Oberfläche mit Navigation und Verwaltung, Image, Compose, Helm-Chart und CI. Aus M2
+ein Wiki in jedem Bereich:
+
+- **Seiten** in einem Baum (verschieben und sortieren per Dialog, per Tastatur
+  bedienbar), Entwurf oder veröffentlicht, Wiki-Links `[[Titel]]`, Inhaltsverzeichnis.
+  Markdown ist das gespeicherte Format; rohes HTML wird nie ausgeführt.
+- **Zwei Editoren:** Markdown mit Vorschau (mit Konfliktdialog, wenn jemand
+  dazwischen gespeichert hat) und „Gemeinsam bearbeiten“ (live, mit Anwesenheit und
+  Cursorn der anderen). Speichern im Markdown-Modus, Wiederherstellen, Verschieben und
+  Papierkorb beenden eine laufende Live-Sitzung sauber (Generationen).
+- **Versionen** jeder Speicherung mit Quelle, Diff zweier Versionen, Benennen,
+  Wiederherstellen als neue Version. **Papierkorb** statt Löschen; endgültig löschen
+  nur Admins.
+- **Tags** systemweit (Verwaltung → Tags, Recht `tag.manage`) und je Bereich
+  (Moderatoren, in den Einstellungen des Bereichs); der Seitenbaum filtert danach.
+- **Anhänge** (Bilder inline, alles andere als Download; SVG und HTML abgelehnt, am
+  Inhalt erkannt), **Volltextsuche** (Strg+K, findet nur, was man lesen darf),
+  **Import und Export** als Markdown-ZIP, jede Seite einzeln als `.md`.
+
+Kanäle (M3), Aufgaben (M4) und KI-Agenten (ab M5) folgen. Bedienung und Betrieb des
+Wikis: [`docs/WIKI.md`](docs/WIKI.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
-Ressourcen), [Demo M1](docs/demo/m1.md), [Compose-Referenz](deploy/compose/README.md),
+Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
+[Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
 ## Schnellstart mit Docker Compose
@@ -32,10 +51,17 @@ rechts → „Profil und Einstellungen“; dort ändert jede Person ihr eigenes 
 ihre Sprache).
 
 `docker compose down` hält die Daten (Volumes `db-data` für die Datenbank, `app-data`
-für die Anhänge unter `/data`), `down -v` löscht sie. `HERD_INTERNAL_TOKEN` in `.env`
-schaltet die Live-Bearbeitung ein (der Collab-Prozess läuft im selben Container);
-`HERD_PUBLIC_URL` ist die Adresse, unter der Browser die App öffnen (leer: der
-angefragte Host).
+für die Anhänge unter `/data`), `down -v` löscht sie. Zwei Werte in `.env` betreffen
+das Wiki:
+
+- `HERD_INTERNAL_TOKEN` (Pflicht in Compose, mindestens 32 Zeichen, `openssl rand -hex
+  32`): das gemeinsame Geheimnis von API und Collab-Prozess; es schaltet die
+  Live-Bearbeitung ein (der Collab-Prozess läuft im selben Container).
+- `HERD_PUBLIC_URL` (optional, z. B. `https://wiki.example`): die Adresse, unter der
+  Browser die App öffnen. WebSocket-Verbindungen der Live-Bearbeitung werden nur von
+  dieser Origin angenommen; leer muss die Origin zum angefragten Host passen. Hinter
+  einem Reverse Proxy, der den Host umschreibt, also setzen.
+
 Sicherung, Wiederherstellung, Reverse-Proxy und alle Variablen:
 [`deploy/compose/README.md`](deploy/compose/README.md).
 
@@ -56,6 +82,15 @@ Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `passw
 mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
 [Betriebshinweise](#betriebshinweise) lesen.
 
+> **Wichtig – Volume für Anhänge:** Das Chart legt den PersistentVolumeClaim
+> `<release>-data` (10Gi, `/data`) mit **`ReadWriteMany`** an, weil alle API-Replikas
+> (Standard 2) dieselben Dateien lesen und schreiben. Gibt es im Cluster keine
+> Speicherklasse mit ReadWriteMany (etwa NFS, CephFS, Azure Files, EFS), bleibt der
+> Claim `Pending` und die API-Pods starten nicht. Dann
+> `--set api.replicas=1 --set 'persistence.accessModes={ReadWriteOnce}'` setzen (mehr
+> Replikas mit ReadWriteOnce lehnt das Chart ab) oder mit `persistence.existingClaim`
+> einen eigenen Claim nutzen. Der Claim bleibt bei `helm uninstall` erhalten.
+
 Das Chart legt außerdem an: den Collab-Prozess (`<release>-collab`, Live-Bearbeitung)
 mit genau einer Replika und `strategy: Recreate` (die Dokumente einer Live-Sitzung
 liegen im Speicher dieses einen Prozesses; zwei Prozesse würden die Bearbeitenden einer
@@ -67,7 +102,9 @@ schreiben alle API-Replikas, deshalb ist `ReadWriteMany` voreingestellt; ohne so
 Speicherklasse `api.replicas=1` und `persistence.accessModes={ReadWriteOnce}` setzen
 (mehr Replikas mit `ReadWriteOnce` lehnt das Chart ab). Live-Bearbeitung ist ein
 WebSocket unter `/collab/` am selben Service wie die API; der Ingress-Controller muss
-das Upgrade durchreichen (ingress-nginx und Traefik tun es ohne Einstellung).
+das Upgrade durchreichen (ingress-nginx und Traefik tun es ohne Einstellung). Zu
+Leerlauf-Timeouts und Größenlimits am Ingress siehe
+[Betriebshinweise](#betriebshinweise).
 
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
@@ -96,7 +133,7 @@ cd backend && HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
   HERD_BOOTSTRAP_ADMIN_PASSWORD=admin-password-123 HERD_LOG_FORMAT=text \
   uv run python -m app.launch          # migriert, dann API auf :8080, Proben auf :9090
 
-cd frontend && npm ci && npm run dev   # Vite; leitet /api an http://localhost:8080 weiter
+cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http://localhost:8080 weiter
 ```
 
 `HERD_ROLE` wählt, was der Prozess tut: `all` (Standard: migrieren, dann bedienen),
@@ -134,7 +171,8 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie kennen.
+Bekannte Grenzen und bewusste Entscheidungen aus M1 und M2. Wer betreibt, sollte sie
+kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
@@ -187,6 +225,36 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
   5 MiB. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen.
+- **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen
+  Prozesses; zwei Prozesse würden die Bearbeitenden einer Seite aufteilen, und keiner
+  sähe die Änderungen des anderen. Das Chart setzt deshalb `replicas: 1` und
+  `strategy: Recreate` (beim Update erst den alten Pod beenden, der dabei speichert).
+  Fällt der Prozess aus, verbinden sich die Browser neu; Änderungen der letzten
+  Sekunden (höchstens 10 s), die noch nicht gespeichert waren, spielt ein noch offener
+  Browser beim Wiederverbinden erneut ein; ist er geschlossen, sind sie verloren. Mehrere Collab-Replikas (mit Redis/Valkey) sind für M9
+  geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API.
+- **WebSocket hinter Ingress oder Reverse Proxy.** Die Live-Bearbeitung ist ein
+  WebSocket auf `/collab/<seiten-id>` am öffentlichen Port; er bleibt offen, solange
+  jemand bearbeitet. Die API schickt alle 20 s einen Ping, deshalb reicht jedes
+  Leerlauf-Timeout ab 30 s. ingress-nginx und Traefik reichen das Upgrade ohne
+  Einstellung durch (ingress-nginx: `proxy-read-timeout` Standard 60 s, passt);
+  AWS ALB: Leerlauf 60 s, passt; HAProxy: `timeout tunnel` gilt, nicht `timeout
+  client`. **GKE-Ingress** begrenzt über die BackendConfig (`timeoutSec`, Standard
+  30 s) die gesamte Dauer einer WebSocket-Verbindung, nicht nur den Leerlauf: dort
+  `timeoutSec` etwa auf 3600 setzen, sonst verbindet sich der Editor alle 30 s neu.
+  Ein eigener nginx davor braucht `proxy_http_version 1.1` und die Header `Upgrade`
+  und `Connection`. Beispiele: [`docs/WIKI.md`](docs/WIKI.md#betrieb-hinter-einem-reverse-proxy).
+  Diese Hinweise folgen den Dokumentationen der Controller; ausprobiert ist hier nur
+  der direkte Zugriff und Compose.
+- **Größenlimits am Ingress:** Die App nimmt je Anfrage höchstens 1 MiB an
+  (`HERD_MAX_BODY_BYTES`), Anhänge bis 25 MiB (`HERD_ATTACHMENT_MAX_BYTES`, nur
+  `POST /api/pages/<id>/attachments`) und Importe bis 100 MiB (`HERD_IMPORT_MAX_BYTES`,
+  nur `POST /api/spaces/<id>/import`). Ein Ingress davor muss mindestens das größte
+  davon durchlassen, sonst antwortet er vor der App mit 413: ingress-nginx
+  `nginx.ingress.kubernetes.io/proxy-body-size: 100m` (Standard 1m; so in
+  `ci/production-values.yaml`), nginx `client_max_body_size 100m`. Die App prüft ihre
+  Grenzen je Route selbst. Ein WebSocket-Frame der Live-Bearbeitung hat höchstens
+  1 MiB.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
   `networkPolicy.internalFrom` niemanden an Port 9090 außer dem Collab-Prozess, also
   auch Prometheus nicht: Prometheus dort eintragen. Den Collab-Prozess (Port 1234)
