@@ -4,7 +4,8 @@ import { api, unwrap, type SearchHit } from '@/lib/api'
 const PAGE_SIZE = 20
 
 /** Full-text search over the pages one may read (the server filters by rights);
- *  nothing is asked while `q` is blank. */
+ *  nothing is asked while `q` is blank. Messages are found too, but not shown here
+ *  yet: this palette asks for pages only. */
 export function useSearch(q: string, spaceId: string | null) {
   const query = useInfiniteQuery({
     queryKey: ['search', q, spaceId],
@@ -12,7 +13,13 @@ export function useSearch(q: string, spaceId: string | null) {
       unwrap(
         await api.GET('/api/search', {
           params: {
-            query: { q, space_id: spaceId ?? undefined, cursor: pageParam, limit: PAGE_SIZE },
+            query: {
+              q,
+              space_id: spaceId ?? undefined,
+              types: 'page',
+              cursor: pageParam,
+              limit: PAGE_SIZE,
+            },
           },
         }),
       ),
@@ -20,7 +27,10 @@ export function useSearch(q: string, spaceId: string | null) {
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: q.trim() !== '',
   })
-  const items: SearchHit[] = query.data?.pages.flatMap((page) => page.items) ?? []
+  const items: SearchHit[] =
+    query.data?.pages.flatMap((page) =>
+      page.items.filter((hit): hit is SearchHit => hit.type === 'page'),
+    ) ?? []
   return {
     items,
     isFetching: query.isFetching,

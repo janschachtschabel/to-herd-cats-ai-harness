@@ -22,7 +22,8 @@ export type Attachment = Schemas['AttachmentOut']
 export type VersionSummary = Schemas['VersionSummaryOut']
 export type Version = Schemas['VersionOut']
 export type Diff = Schemas['DiffOut']
-export type SearchHit = Schemas['SearchHitOut']
+export type SearchHit = Schemas['PageHitOut']
+export type MessageHit = Schemas['MessageHitOut']
 export type ImportResult = Schemas['ImportResultOut']
 
 /** One page of a list endpoint: `next_cursor` is null on the last page. */

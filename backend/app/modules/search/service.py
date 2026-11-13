@@ -1,9 +1,16 @@
-"""Full-text search (spec 11, full text only in M2) over what the actor may see.
+"""Full-text search (spec 11, full text only) over what the actor may see: pages and,
+since M3, messages (`messaging/search.py`), in one ranking with one cursor.
 
 Visibility is decided in SQL by the same rules as everywhere else (`core/access.py`):
-spaces the actor may read, drafts only where it holds `page.edit`. A space filter
-the actor may not read is 404 `space.not_found`, as for an unknown id. Empty input
-is an empty result, not an error.
+spaces the actor may read, drafts only where it holds `page.edit`; messages where
+their conversation is visible. A space filter the actor may not read is 404
+`space.not_found`, as for an unknown id; with a space, messages come from its
+channels and page threads only. Tags narrow to pages (messages carry none). Empty
+input is an empty result, not an error.
+
+Both kinds are fetched best first below the cursor, `limit + 1` each, and merged by
+(score descending, id): every hit of the merged page is ranked before every hit left
+out, so the (score, id) cursor of its last hit continues both lists.
 """
 
 import uuid
@@ -16,11 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import pagination
 from app.core.access import Action, Actor, require, space_ids_with, visible_space_ids
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
+from app.modules.messaging.search import MessageHit, MessageSearch
 from app.modules.search.repository import SearchRepository, SearchScope
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 
-HitType = Literal["page"]  # tickets and more join in later milestones
+HitType = Literal["page", "message"]  # tickets and more join in later milestones
+HIT_TYPES: tuple[HitType, ...] = ("page", "message")
 MAX_QUERY_CHARS = 1000
 
 
@@ -49,31 +58,55 @@ class SearchService:
         *,
         space_id: uuid.UUID | None = None,
         tag_ids: Iterable[uuid.UUID] | None = None,
-        types: Sequence[HitType] = ("page",),
+        types: Sequence[HitType] = HIT_TYPES,
         params: PageParams,
-    ) -> pagination.Page[SearchHit]:
+    ) -> pagination.Page[SearchHit | MessageHit]:
         """Best first. With `space_id`, only that space; with `tag_ids`, only what
         carries every one of the tags."""
         after = decode_score_cursor(params.cursor) if params.cursor else None
         if space_id is not None:
             await require(self.session, actor, Action.SPACE_READ, space_id)
         q = q.strip()[:MAX_QUERY_CHARS]
-        if not q or "page" not in types:
-            return pagination.Page[SearchHit](items=[])
+        tag_ids = list(dict.fromkeys(tag_ids or ()))
+        hits: list[SearchHit | MessageHit] = []
+        if q and "page" in types:
+            hits.extend(await self._pages(actor, q, space_id, tag_ids, after, params.limit + 1))
+        if q and "message" in types and not tag_ids:
+            hits.extend(
+                await MessageSearch(self.session).find(
+                    actor, q, space_id=space_id, after=after, limit=params.limit + 1
+                )
+            )
+        hits.sort(key=lambda hit: (-hit.score, _id(hit)))
+        items = hits[: params.limit]
+        more = len(hits) > params.limit
+        cursor = encode_score_cursor(items[-1].score, _id(items[-1])) if more else None
+        return pagination.Page[SearchHit | MessageHit](items=items, next_cursor=cursor)
+
+    async def _pages(
+        self,
+        actor: Actor,
+        q: str,
+        space_id: uuid.UUID | None,
+        tag_ids: list[uuid.UUID],
+        after: tuple[float, uuid.UUID] | None,
+        limit: int,
+    ) -> list[SearchHit]:
         tags = tag_repository(self.session, actor)
-        among = [tags.subject_ids(SubjectType.PAGE, [t]) for t in dict.fromkeys(tag_ids or ())]
+        among = [tags.subject_ids(SubjectType.PAGE, [t]) for t in tag_ids]
         scope = SearchScope(
             actor.org_id, visible_space_ids(actor), space_ids_with(actor, Action.PAGE_EDIT)
         )
         rows = await SearchRepository(self.session, scope).pages(
-            q, space_id=space_id, among=among, after=after, limit=params.limit + 1
+            q, space_id=space_id, among=among, after=after, limit=limit
         )
-        items = [
+        return [
             SearchHit(
                 "page", r.page_id, r.space_id, r.space_name, r.title, r.path, r.snippet, r.score
             )
-            for r in rows[: params.limit]
+            for r in rows
         ]
-        more = len(rows) > params.limit
-        cursor = encode_score_cursor(items[-1].score, items[-1].id) if more else None
-        return pagination.Page[SearchHit](items=items, next_cursor=cursor)
+
+
+def _id(hit: SearchHit | MessageHit) -> uuid.UUID:
+    return hit.id if isinstance(hit, SearchHit) else hit.message_id

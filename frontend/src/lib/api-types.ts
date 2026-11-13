@@ -872,7 +872,8 @@ export interface paths {
         };
         /**
          * Search
-         * @description Pages the caller may see, best first; empty `q` gives an empty list.
+         * @description Pages and messages the caller may see, best first; empty `q` gives an empty
+         *     list. Tags narrow to pages.
          */
         get: operations["search_api_search_get"];
         put?: never;
@@ -1507,6 +1508,36 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HitAuthor */
+        HitAuthor: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            type: components["schemas"]["PrincipalType"];
+        };
+        /**
+         * HitConversation
+         * @description Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page
+         *     thread's page (null otherwise); `space_id`: null for a direct message.
+         */
+        HitConversation: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ConversationKind"];
+            /** Name */
+            name: string | null;
+            /** Page Id */
+            page_id: string | null;
+            /** Space Id */
+            space_id: string | null;
+        };
         /** HunkOut */
         HunkOut: {
             /**
@@ -1645,6 +1676,36 @@ export interface components {
             parent_id?: string | null;
         };
         /**
+         * MessageHitOut
+         * @description A message (`id`); `parent_id`: the thread it is a reply in (null: top level).
+         *     `snippet` and `score` as for pages.
+         */
+        MessageHitOut: {
+            author: components["schemas"]["HitAuthor"] | null;
+            conversation: components["schemas"]["HitConversation"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Score */
+            score: number;
+            /** Snippet */
+            snippet: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "message";
+        };
+        /**
          * MessageKind
          * @enum {string}
          */
@@ -1776,6 +1837,38 @@ export interface components {
             parent_id?: string | null;
             /** Title */
             title: string;
+        };
+        /**
+         * PageHitOut
+         * @description A page. `snippet` is plain text: render it as text and highlight what stands
+         *     between `⟦` and `⟧`. `score` orders the hits (higher is better); it has no unit.
+         */
+        PageHitOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Path */
+            path: string;
+            /** Score */
+            score: number;
+            /** Snippet */
+            snippet: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Space Name */
+            space_name: string;
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "page";
         };
         /**
          * PageMove
@@ -1929,13 +2022,6 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
-        /** Page[SearchHitOut] */
-        Page_SearchHitOut_: {
-            /** Items */
-            items: components["schemas"]["SearchHitOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** Page[SpaceMemberOut] */
         Page_SpaceMemberOut_: {
             /** Items */
@@ -2059,36 +2145,14 @@ export interface components {
             message_id: string;
         };
         /**
-         * SearchHitOut
-         * @description `snippet` is plain text: render it as text and highlight what stands between
-         *     `⟦` and `⟧`. `score` orders the hits (higher is better); it has no unit.
+         * SearchResults
+         * @description A page of hits of both kinds, told apart by `type`.
          */
-        SearchHitOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Path */
-            path: string;
-            /** Score */
-            score: number;
-            /** Snippet */
-            snippet: string;
-            /**
-             * Space Id
-             * Format: uuid
-             */
-            space_id: string;
-            /** Space Name */
-            space_name: string;
-            /** Title */
-            title: string;
-            /**
-             * Type
-             * @constant
-             */
-            type: "page";
+        SearchResults: {
+            /** Items */
+            items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"])[];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /**
          * SkippedOut
@@ -4527,6 +4591,8 @@ export interface operations {
                 space_id?: string | null;
                 /** @description only with every tag */
                 tag?: string[] | null;
+                /** @description what to find: page, message (comma-separated) */
+                types?: string;
             };
             header?: never;
             path?: never;
@@ -4540,7 +4606,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_SearchHitOut_"];
+                    "application/json": components["schemas"]["SearchResults"];
                 };
             };
             /** @description Validation Error */

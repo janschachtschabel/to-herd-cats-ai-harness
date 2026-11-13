@@ -28,6 +28,7 @@ from enum import StrEnum
 
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -38,6 +39,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -158,6 +160,12 @@ class DmInspection(UuidPk, OrgScoped, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+# Full-text search (plan M3 task 9): configured like a page's content (German stems).
+MESSAGE_TSV_SQL = "to_tsvector('german'::regconfig, body_md)"
+# The messages search finds: written by people and not deleted (the index predicate).
+SEARCHABLE_SQL = "kind = 'human' AND deleted_at IS NULL"
+
+
 class MessageKind(StrEnum):
     HUMAN = "human"
     SYSTEM = "system"  # page threads only (database triggers)
@@ -194,6 +202,12 @@ class Message(UuidPk, OrgScoped, Base):
             postgresql_where=text("parent_id IS NULL"),
         ),
         Index("ix_message_parent_id", "parent_id", "id"),
+        Index(
+            "ix_message_search_tsv",
+            "search_tsv",
+            postgresql_using="gin",
+            postgresql_where=text(SEARCHABLE_SQL),
+        ),
     )
 
     conversation_id: Mapped[uuid.UUID] = mapped_column(
@@ -214,3 +228,7 @@ class Message(UuidPk, OrgScoped, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reply_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Read only by the search's SQL; deferred, so loading a message does not load it.
+    search_tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed(MESSAGE_TSV_SQL, persisted=True), deferred=True
+    )

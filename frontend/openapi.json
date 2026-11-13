@@ -943,6 +943,86 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HitAuthor": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "title": "HitAuthor",
+        "type": "object"
+      },
+      "HitConversation": {
+        "description": "Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page\nthread's page (null otherwise); `space_id`: null for a direct message.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "space_id",
+          "page_id"
+        ],
+        "title": "HitConversation",
+        "type": "object"
+      },
       "HunkOut": {
         "properties": {
           "kind": {
@@ -1214,6 +1294,71 @@
           "body_md"
         ],
         "title": "MessageCreate",
+        "type": "object"
+      },
+      "MessageHitOut": {
+        "description": "A message (`id`); `parent_id`: the thread it is a reply in (null: top level).\n`snippet` and `score` as for pages.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HitAuthor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/HitConversation"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "type": {
+            "const": "message",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "parent_id",
+          "conversation",
+          "author",
+          "created_at",
+          "snippet",
+          "score"
+        ],
+        "title": "MessageHitOut",
         "type": "object"
       },
       "MessageKind": {
@@ -1595,6 +1740,58 @@
           "title"
         ],
         "title": "PageCreate",
+        "type": "object"
+      },
+      "PageHitOut": {
+        "description": "A page. `snippet` is plain text: render it as text and highlight what stands\nbetween `\u27e6` and `\u27e7`. `score` orders the hits (higher is better); it has no unit.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "space_name": {
+            "title": "Space Name",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "page",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "space_id",
+          "space_name",
+          "title",
+          "path",
+          "snippet",
+          "score"
+        ],
+        "title": "PageHitOut",
         "type": "object"
       },
       "PageMove": {
@@ -2083,33 +2280,6 @@
         "title": "Page[MessageOut]",
         "type": "object"
       },
-      "Page_SearchHitOut_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/SearchHitOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "Page[SearchHitOut]",
-        "type": "object"
-      },
       "Page_SpaceMemberOut_": {
         "properties": {
           "items": {
@@ -2461,56 +2631,46 @@
         "title": "ReadPosition",
         "type": "object"
       },
-      "SearchHitOut": {
-        "description": "`snippet` is plain text: render it as text and highlight what stands between\n`\u27e6` and `\u27e7`. `score` orders the hits (higher is better); it has no unit.",
+      "SearchResults": {
+        "description": "A page of hits of both kinds, told apart by `type`.",
         "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "message": "#/components/schemas/MessageHitOut",
+                  "page": "#/components/schemas/PageHitOut"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PageHitOut"
+                },
+                {
+                  "$ref": "#/components/schemas/MessageHitOut"
+                }
+              ]
+            },
+            "title": "Items",
+            "type": "array"
           },
-          "path": {
-            "title": "Path",
-            "type": "string"
-          },
-          "score": {
-            "title": "Score",
-            "type": "number"
-          },
-          "snippet": {
-            "title": "Snippet",
-            "type": "string"
-          },
-          "space_id": {
-            "format": "uuid",
-            "title": "Space Id",
-            "type": "string"
-          },
-          "space_name": {
-            "title": "Space Name",
-            "type": "string"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "type": {
-            "const": "page",
-            "title": "Type",
-            "type": "string"
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           }
         },
         "required": [
-          "type",
-          "id",
-          "space_id",
-          "space_name",
-          "title",
-          "path",
-          "snippet",
-          "score"
+          "items"
         ],
-        "title": "SearchHitOut",
+        "title": "SearchResults",
         "type": "object"
       },
       "SkippedOut": {
@@ -6771,7 +6931,7 @@
     },
     "/api/search": {
       "get": {
-        "description": "Pages the caller may see, best first; empty `q` gives an empty list.",
+        "description": "Pages and messages the caller may see, best first; empty `q` gives an empty\nlist. Tags narrow to pages.",
         "operationId": "search_api_search_get",
         "parameters": [
           {
@@ -6853,6 +7013,19 @@
               "description": "only with every tag",
               "title": "Tag"
             }
+          },
+          {
+            "description": "what to find: page, message (comma-separated)",
+            "in": "query",
+            "name": "types",
+            "required": false,
+            "schema": {
+              "default": "page,message",
+              "description": "what to find: page, message (comma-separated)",
+              "maxLength": 100,
+              "title": "Types",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6860,7 +7033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SearchHitOut_"
+                  "$ref": "#/components/schemas/SearchResults"
                 }
               }
             },
