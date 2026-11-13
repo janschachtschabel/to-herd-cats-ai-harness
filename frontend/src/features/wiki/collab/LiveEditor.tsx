@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import type { WikiPage } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { leaveReason, unsavedWork, type LeaveState } from './leaveRisk'
 import { useLeaveGuard } from '../editor/useLeaveGuard'
 import { useFetchLatestPage, useRefreshPage } from '../queries'
 import { useWiki } from '../WikiContext'
@@ -45,13 +46,18 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   useEffect(() => () => refreshPage(latest.current), [refreshPage])
   const editable = live.stopped === null && live.status !== 'connecting'
   const lost = live.lost && live.lost !== page.content_md.trim() ? live.lost : null
-  // Unsaved while a change made here is not acknowledged as stored (review M2 T5). Once
-  // stopped, nothing more reaches the server: only text that differs from the page is at
-  // stake (not the editor's own empty paragraph of a refused session).
-  const unsaved =
-    live.stopped === null
-      ? live.unsynced > 0 || !!live.unrepresentable || live.unconfirmed
-      : !!lost && !copied
+  // Unsaved while a change made here is not acknowledged as stored (review M2 T5), never
+  // for the sync handshake of an untouched page (M4-1 P15). Once stopped, nothing more
+  // reaches the server: only text that differs from the page is at stake (not the
+  // editor's own empty paragraph of a refused session).
+  const leaveState: LeaveState = {
+    stopped: live.stopped,
+    unsynced: live.unsynced,
+    unrepresentable: !!live.unrepresentable,
+    unconfirmed: live.unconfirmed,
+    lostText: !!lost && !copied,
+  }
+  const unsaved = unsavedWork(leaveState)
   // "Fertig" leaves once the server confirmed everything is stored, before this renders
   // again: the guard reads the latest answer when leaving.
   const leave = useRef({ unsaved, confirmed: false })
@@ -62,10 +68,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   // question says why (review M2 U9).
   const reason = useRef('')
   useEffect(() => {
-    if (live.stopped !== null) reason.current = 'lost'
-    else if (live.unrepresentable) reason.current = 'unsaveable'
-    else if (live.unsynced > 0) reason.current = 'unsent'
-    else reason.current = 'unconfirmed'
+    reason.current = leaveReason(leaveState)
   })
   useLeaveGuard(
     () => leave.current.unsaved && !leave.current.confirmed,

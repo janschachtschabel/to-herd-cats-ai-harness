@@ -63,7 +63,8 @@ zählt sie nicht mit.
   (Hinweis), oder Speichern nicht bestätigt. Neu laden und Tab schließen können nicht
   warten; der Browser fragt dann mit seiner eigenen Meldung, solange eine Änderung
   nicht bestätigt ist (was beim Server angekommen ist, speichert er beim Trennen
-  trotzdem). „Fertig“ wartet auf die Bestätigung.
+  trotzdem). Ohne eigene Änderung fragt nichts, auch nicht während „Verbindet …“ oder
+  des ersten Abgleichs. „Fertig“ wartet auf die Bestätigung.
 - **Generationen:** Speichern im Markdown-Editor, Wiederherstellen einer Version,
   Verschieben und Papierkorb beenden eine laufende Live-Sitzung. Die offenen
   Live-Editoren melden „Die Seite wurde außerhalb der Live-Sitzung geändert“, laden den

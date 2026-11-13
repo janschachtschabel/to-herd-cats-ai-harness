@@ -11,6 +11,9 @@
 // - a page the server refuses (4422) is one the collab process's own check refuses,
 //   and is counted and listed.
 // At the end the API has counted no load mutation (`herd_collab_load_mutations_total`).
+// The leave guard is never armed on these untouched pages (review M4-1 P15): neither
+// while the editor connects nor once synced, before it is left (`watchLeaveGuard`), and
+// Chromium logs no blocked "beforeunload" prompt.
 // A summary goes to test-results/opening-summary.json. HERD_E2E_TABS sets how many tabs
 // open pages at once (4).
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -22,6 +25,7 @@ import {
   call,
   countSentUpdates,
   metric,
+  watchLeaveGuard,
   pageUrl,
   publishedPage,
   signIn,
@@ -74,6 +78,14 @@ async function openAndLeave(context, tab, space, page, index) {
   result.agrees = JSON.stringify(shown) === JSON.stringify(served);
   if (!result.agrees) result.shown = JSON.stringify(shown).slice(0, 400);
   const sentBefore = await tab.evaluate(() => window.__herdSent);
+  // Untouched: reloading or closing the tab would not ask, now or at any moment since
+  // the page was opened.
+  result.armed = await tab.evaluate(() => {
+    const armed = window.__herdArmed;
+    if (armed.length === 0) return [];
+    const statuses = [...new Set(armed.map(({ status }) => status))];
+    return [{ times: armed.length, from: armed[0].at, to: armed.at(-1).at, statuses }];
+  });
   if (index % 3 === 2) {
     await tab.goto(pageUrl(space, doc));
     result.left = "navigated";
@@ -105,6 +117,7 @@ test("opening a page in the live editor and leaving it changes nothing", async (
   if (!process.env.HERD_E2E_GROUPS) expect(all.length).toBeGreaterThanOrEqual(300);
   const context = await browser.newContext();
   await context.addInitScript(countSentUpdates);
+  await context.addInitScript(watchLeaveGuard);
   await signIn(context, OWNER);
   const space = await teamSpace(context, "Öffnen");
   const results = [];
@@ -113,8 +126,11 @@ test("opening a page in the live editor and leaving it changes nothing", async (
   async function worker() {
     const tab = await context.newPage();
     tab.on("dialog", (dialog) => {
-      dialogs.push(dialog.message());
+      dialogs.push(`${dialog.type()}: ${dialog.message()}`);
       dialog.accept().catch(() => {});
+    });
+    tab.on("console", (message) => {
+      if (message.text().includes("beforeunload")) dialogs.push(message.text().slice(0, 200));
     });
     for (let index = next++; index < all.length; index = next++) {
       try {
@@ -138,6 +154,9 @@ test("opening a page in the live editor and leaving it changes nothing", async (
     else if (result.outcome !== result.expected) {
       problems.push(`${where}: ${result.outcome}, expected ${result.expected}`);
     } else if (result.outcome === "opened") {
+      if (result.armed?.length) {
+        problems.push(`${where}: the leave guard was armed ${JSON.stringify(result.armed)}`);
+      }
       if (!result.agrees) problems.push(`${where}: the browser shows ${result.shown}`);
       const { updates, steps } = result.sent ?? { updates: -1, steps: [] };
       if (updates !== 0 || steps.some((size) => size > 2)) {
@@ -168,6 +187,7 @@ test("opening a page in the live editor and leaving it changes nothing", async (
     leftWithDone: results.filter((r) => r.left === "done").length,
     leftByNavigating: results.filter((r) => r.left === "navigated").length,
     dialogs,
+    guardArmed: results.filter((r) => r.armed?.length).map((r) => `${r.group}: ${r.name}`),
     loadMutations,
     problems,
   };

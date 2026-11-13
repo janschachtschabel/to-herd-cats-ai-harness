@@ -85,3 +85,20 @@ export async function metric(request, port, line) {
   const found = text.split("\n").find((l) => l.startsWith(`${line} `));
   return found ? Number(found.split(" ").at(-1)) : 0;
 }
+
+/** Watches the leave guard (in the page, review M4-1 P15): every 20 ms a synthetic
+ * `beforeunload` is dispatched; one that a handler cancels means reloading or closing
+ * the tab would ask now. Each armed moment is recorded with the editor's status
+ * (`window.__herdArmed`). Headless Chromium does not show the prompt itself (it logs
+ * "Blocked attempt to show a 'beforeunload' confirmation panel"), so this is the way
+ * to see it. */
+export function watchLeaveGuard() {
+  window.__herdArmed = [];
+  setInterval(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    if (!event.defaultPrevented) return;
+    const status = document.querySelector("[role=status]")?.textContent ?? null;
+    window.__herdArmed.push({ at: Math.round(performance.now()), status });
+  }, 20);
+}
