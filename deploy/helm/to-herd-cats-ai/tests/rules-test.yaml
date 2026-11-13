@@ -15,6 +15,11 @@ tests:
         values: "0x15"
       - series: 'kube_pod_container_info{namespace="herd", pod="herd-api-a", container="to-herd-cats-ai"}'
         values: "1x15"
+      # The worker's container has the same name: a worker that is not ready alerts too.
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-worker-a", condition="true"}'
+        values: "0x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-worker-a", container="to-herd-cats-ai"}'
+        values: "1x15"
       # Ready: never alerts.
       - series: 'kube_pod_status_ready{namespace="herd", pod="herd-api-b", condition="true"}'
         values: "1x15"
@@ -42,7 +47,14 @@ tests:
               pod: herd-api-a
             exp_annotations:
               summary: "to-herd-cats-ai pod herd/herd-api-a has not been ready for 5 minutes"
-              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable or its schema is older than this release."
+              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              pod: herd-worker-a
+            exp_annotations:
+              summary: "to-herd-cats-ai pod herd/herd-worker-a has not been ready for 5 minutes"
+              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
 
   - name: HerdNotReady stays quiet when a pod recovers within 5 minutes
     interval: 1m
@@ -91,4 +103,99 @@ tests:
     alert_rule_test:
       - eval_time: 20m
         alertname: HerdHigh5xx
+        exp_alerts: []
+
+  # HerdOutboxBacklog: the oldest pending outbox event is older than 5 minutes. Every
+  # worker reports the same age (read from the database); API pods report 0.
+  - name: HerdOutboxBacklog fires once per job when the oldest event passes 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 60 120 180 240 300 360 420 480"
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 60 120 180 240 300 360 420 480"
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "0x9"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: HerdOutboxBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "The oldest outbox event of herd/herd-worker has waited more than 5 minutes"
+              description: "No worker runs, the workers cannot keep up, or a handler keeps failing (it is retried for up to about 14 minutes; log entries outbox.handler_failed). Notifications, page timelines and live updates are late."
+
+  - name: HerdOutboxBacklog stays quiet when the backlog drains within 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 60 120 180 240 0 0 60 120 0 0 0"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+
+  # HerdOutboxFailed: an event gave up on a handler (result="failed"), within the last
+  # 15 minutes. The counter's series appears with its first failure in a process, so a
+  # new series counts as well as a rising one.
+  - name: HerdOutboxFailed fires when a known series rises, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-a", handler="notify_on_message", result="failed"}'
+        values: "2x19 3x20"
+      # Retries (error) never alert by themselves.
+      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-a", handler="notify_on_message", result="error"}'
+        values: "0+5x40"
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 22m
+        alertname: HerdOutboxFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+              handler: notify_on_message
+            exp_annotations:
+              summary: "Outbox events gave up on handler notify_on_message in herd/herd-worker"
+              description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+
+  - name: HerdOutboxFailed fires for the first failure of a process
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-b", handler="publish_live", result="ok"}'
+        values: "0+3x40"
+      - series: 'herd_outbox_dispatch_total{namespace="herd", job="herd-worker", pod="herd-worker-b", handler="publish_live", result="failed"}'
+        values: "_x20 1x20"
+    alert_rule_test:
+      - eval_time: 19m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 22m
+        alertname: HerdOutboxFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+              handler: publish_live
+            exp_annotations:
+              summary: "Outbox events gave up on handler publish_live in herd/herd-worker"
+              description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
         exp_alerts: []

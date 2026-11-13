@@ -4,9 +4,10 @@
 groups:
   - name: to-herd-cats-ai
     rules:
-      # The readiness probe (/ready: database reachable, schema at this release's head or newer) has failed
-      # for 5 minutes. Needs kube-state-metrics. Our pods are those with a container
-      # named to-herd-cats-ai (the API Deployment; the migration job's is "migrate").
+      # The readiness probe (/ready: database reachable, schema at this release's head or newer;
+      # on worker pods also the outbox loop running) has failed for 5 minutes. Needs
+      # kube-state-metrics. Our pods are those with a container named to-herd-cats-ai (the
+      # API and worker Deployments; the migration job's is "migrate", collab's "collab").
       - alert: HerdNotReady
         expr: |
           (max by (namespace, pod) (kube_pod_status_ready{condition="true"}) == 0)
@@ -17,7 +18,7 @@ groups:
           severity: warning
         annotations:
           summary: "to-herd-cats-ai pod {{ $labels.namespace }}/{{ $labels.pod }} has not been ready for 5 minutes"
-          description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable or its schema is older than this release."
+          description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
       # More than 5 % of the public requests answered 5xx, sustained for 10 minutes
       # (share over a 5-minute window). Per namespace and scrape job, so several
       # releases in one cluster alert separately. No traffic, no alert.
@@ -32,3 +33,35 @@ groups:
         annotations:
           summary: "More than 5 % of the requests to {{ $labels.namespace }}/{{ $labels.job }} failed with 5xx for 10 minutes"
           description: "Look at the error logs of to-herd-cats-ai (level ERROR, with trace_id) for the cause."
+      # The oldest outbox event (spec 4.3) has waited more than 5 minutes. Every worker
+      # reads the age from the database on each pass (herd_outbox_oldest_pending_seconds),
+      # API pods report 0, so the maximum per job is the backlog. Events waiting for a
+      # retry count as pending. A worker that is down or cannot reach the database shows
+      # as HerdNotReady instead (its gauge is not updated then).
+      - alert: HerdOutboxBacklog
+        expr: |
+          max by (namespace, job) (herd_outbox_oldest_pending_seconds) > 300
+        labels:
+          severity: critical
+        annotations:
+          summary: "The oldest outbox event of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes"
+          description: "No worker runs, the workers cannot keep up, or a handler keeps failing (it is retried for up to about 14 minutes; log entries outbox.handler_failed). Notifications, page timelines and live updates are late."
+      # An event gave up on a handler after its last attempt (result="failed") within the
+      # last 15 minutes. A process creates the series with its first failure, so a series
+      # that did not exist 15 minutes earlier counts as well as one that rose. (A Prometheus
+      # that starts scraping a pod with earlier failures alerts once, for 15 minutes.)
+      - alert: HerdOutboxFailed
+        expr: |
+          (
+            sum by (namespace, job, handler) (increase(herd_outbox_dispatch_total{result="failed"}[15m])) > 0
+          )
+          or
+          count by (namespace, job, handler) (
+            herd_outbox_dispatch_total{result="failed"}
+              unless herd_outbox_dispatch_total{result="failed"} offset 15m
+          )
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox events gave up on handler {{ $labels.handler }} in {{ $labels.namespace }}/{{ $labels.job }}"
+          description: "An event failed in this handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entry outbox.failed names the event."
