@@ -15,6 +15,9 @@ export const AUDIT_ACTIONS = [
   'space.member_set',
   'space.member_removed',
   'space.admin_access',
+  'dm.admin_lookup',
+  'dm.admin_access',
+  'message.moderated',
 ] as const
 
 /** How names and values of details are shown; the identity by default. */

@@ -1,10 +1,10 @@
 {
   "search": {
     "title": "Suche",
-    "description": "Durchsucht alle Seiten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",
+    "description": "Durchsucht alle Seiten und Nachrichten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",
     "input": "Suchbegriff",
-    "placeholder": "Seiten durchsuchen …",
-    "hint": "Gib einen Begriff ein, um Seiten zu finden.",
+    "placeholder": "Seiten und Nachrichten durchsuchen …",
+    "hint": "Gib einen Begriff ein, um Seiten und Nachrichten zu finden.",
     "empty": "Keine Treffer.",
     "results": "Treffer",
     "onlyHere": "Nur in diesem Bereich",

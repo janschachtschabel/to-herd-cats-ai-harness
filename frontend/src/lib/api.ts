@@ -25,6 +25,17 @@ export type Diff = Schemas['DiffOut']
 export type SearchHit = Schemas['PageHitOut']
 export type MessageHit = Schemas['MessageHitOut']
 export type ImportResult = Schemas['ImportResultOut']
+export type Conversation = Schemas['ConversationOut']
+export type DmConversation = Schemas['DmOut']
+export type Message = Schemas['MessageOut']
+export type MessageWrite = Schemas['MessageWriteOut']
+export type Reaction = Schemas['ReactionOut']
+export type Unread = Schemas['UnreadOut']
+export type SystemEntry = Schemas['SystemEntryOut']
+export type ActivityEntry = Schemas['ActivityOut']
+export type ActivityCount = Schemas['ActivityCountOut']
+export type InspectableDm = Schemas['InspectableDmOut']
+export type Inspection = Schemas['InspectionOut']
 
 /** One page of a list endpoint: `next_cursor` is null on the last page. */
 export interface Page<T> {

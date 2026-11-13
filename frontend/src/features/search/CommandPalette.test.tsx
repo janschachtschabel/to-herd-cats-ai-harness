@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import type { SearchHit } from '@/lib/api'
+import type { MessageHit, SearchHit } from '@/lib/api'
 import { makeMe, makePage, makeSpace, mockApi, nodeOf, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 
@@ -72,10 +72,53 @@ describe('search', () => {
     const { user } = await renderApp('/spaces')
     await user.keyboard('{Control>}k{/Control}')
     expect(
-      await screen.findByText('Gib einen Begriff ein, um Seiten zu finden.'),
+      await screen.findByText('Gib einen Begriff ein, um Seiten und Nachrichten zu finden.'),
     ).toBeInTheDocument()
     await user.type(screen.getByRole('combobox', { name: 'Suchbegriff' }), 'nix')
     expect(await screen.findByText('Keine Treffer.')).toBeInTheDocument()
     expect(api.find('GET', '/api/search').map((c) => c.query.get('q'))).toEqual(['nix'])
+  })
+
+  test('message hits show where and who, and open the conversation at the message', async () => {
+    const message: MessageHit = {
+      type: 'message',
+      id: '00000000-0000-7000-b000-000000000001',
+      parent_id: '00000000-0000-7000-b000-000000000002',
+      conversation: {
+        id: 'chan-1',
+        kind: 'channel',
+        name: 'allgemein',
+        space_id: space.id,
+        page_id: null,
+      },
+      author: { type: 'user', id: 'jan', name: 'Jan Jansen' },
+      created_at: '2026-11-13T09:00:00Z',
+      snippet: 'Wann ist ⟦Urlaub⟧?',
+      score: 2,
+    }
+    mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([space]),
+      'GET /api/search': (call) => {
+        expect(call.query.get('types')).toBeNull() // pages and messages
+        return page([message, hit()])
+      },
+      'GET /api/conversations/:id': {
+        status: 404,
+        body: { error: { code: 'conversation.not_found' } },
+      },
+    })
+    const { router, user } = await renderApp('/spaces')
+    await user.keyboard('{Control>}k{/Control}')
+    await user.type(await screen.findByRole('combobox', { name: 'Suchbegriff' }), 'urlaub')
+    const first = (await screen.findAllByRole('option'))[0]!
+    expect(first).toHaveTextContent('allgemeinvon Jan Jansen')
+    expect(within(first).getByText('Urlaub', { selector: 'mark' })).toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/c/chan-1'))
+    expect(router.state.location.search).toEqual({
+      thread: message.parent_id,
+      message: message.id,
+    })
   })
 })

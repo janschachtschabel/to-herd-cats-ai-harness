@@ -1,7 +1,7 @@
 import type { Me, Permission } from '@/lib/api'
 
 /** The milestone this build is at; sections of later milestones stay hidden. */
-export const CURRENT_MILESTONE = 2
+export const CURRENT_MILESTONE = 3
 
 export type SectionId = 'activity' | 'search' | 'channels' | 'direct' | 'spaces' | 'work' | 'admin'
 
@@ -24,13 +24,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'admin',
     milestone: 1,
-    anyOf: ['user.manage', 'group.manage', 'tag.manage', 'audit.read'],
+    anyOf: ['user.manage', 'group.manage', 'tag.manage', 'audit.read', 'dm.inspect'],
   },
 ]
 
 export interface AdminLink {
-  to: '/admin/users' | '/admin/groups' | '/admin/tags' | '/admin/audit'
-  labelKey: 'nav.users' | 'nav.groups' | 'nav.tags' | 'nav.audit'
+  to: '/admin/users' | '/admin/groups' | '/admin/tags' | '/admin/audit' | '/admin/dm-inspect'
+  labelKey: 'nav.users' | 'nav.groups' | 'nav.tags' | 'nav.audit' | 'nav.dmInspect'
   permission: Permission
 }
 
@@ -39,6 +39,7 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/groups', labelKey: 'nav.groups', permission: 'group.manage' },
   { to: '/admin/tags', labelKey: 'nav.tags', permission: 'tag.manage' },
   { to: '/admin/audit', labelKey: 'nav.audit', permission: 'audit.read' },
+  { to: '/admin/dm-inspect', labelKey: 'nav.dmInspect', permission: 'dm.inspect' },
 ]
 
 function holds(me: Me | null, permission: Permission): boolean {

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
-import { principalKey, useDirectory } from './queries'
+import { principalKey, useDirectory, type DirectoryType } from './queries'
 
 interface ControlProps {
   id: string
@@ -24,11 +24,14 @@ export function DirectoryCombobox({
   selected,
   onSelect,
   exclude,
+  type,
 }: {
   control: ControlProps
   selected: DirectoryEntry | null
   onSelect: (entry: DirectoryEntry | null) => void
   exclude: Set<string>
+  /** Only people (`user`) or only groups; both when left out. */
+  type?: DirectoryType
 }) {
   const { t } = useTranslation()
   const listId = useId()
@@ -36,7 +39,7 @@ export function DirectoryCombobox({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const q = useDebouncedValue(text.trim())
-  const directory = useDirectory(q, exclude, open)
+  const directory = useDirectory(q, exclude, open, type)
   // While the typed text has not reached the search yet, older results are not offered.
   const settled = q === text.trim()
   const options = settled ? directory.items : []

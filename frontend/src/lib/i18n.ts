@@ -1,8 +1,10 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import de from '@/locales/de/common.json'
+import deMessaging from '@/locales/de/messaging.json'
 import deWiki from '@/locales/de/wiki.json'
 import en from '@/locales/en/common.json'
+import enMessaging from '@/locales/en/messaging.json'
 import enWiki from '@/locales/en/wiki.json'
 
 export const SUPPORTED_LOCALES = ['de', 'en'] as const
@@ -22,7 +24,7 @@ function storedLocale(): Locale {
 
 type Tree = { [key: string]: string | Tree }
 
-/** One namespace from several files (`common.json`, `wiki.json`): groups such as
+/** One namespace from several files (`common.json`, `wiki.json`, `messaging.json`): groups such as
  *  `errors` are merged key by key. */
 export function mergeResources(...trees: Tree[]): Tree {
   const out: Tree = {}
@@ -38,8 +40,8 @@ export function mergeResources(...trees: Tree[]): Tree {
 
 void i18n.use(initReactI18next).init({
   resources: {
-    de: { common: mergeResources(de, deWiki) },
-    en: { common: mergeResources(en, enWiki) },
+    de: { common: mergeResources(de, deWiki, deMessaging) },
+    en: { common: mergeResources(en, enWiki, enMessaging) },
   },
   ns: ['common'],
   defaultNS: 'common',

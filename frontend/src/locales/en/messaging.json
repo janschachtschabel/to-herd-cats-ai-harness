@@ -1,0 +1,238 @@
+{
+  "app": {
+    "titleWithCount": "({{count}}) {{name}}"
+  },
+  "nav": {
+    "dmInspect": "Direct message inspection"
+  },
+  "live": {
+    "retrying": "Live updates interrupted – trying again …",
+    "limited": "Too many windows open: live updates paused"
+  },
+  "messaging": {
+    "sidebar": {
+      "failed": "Could not be loaded.",
+      "noChannels": "No channels yet.",
+      "noDms": "No direct messages yet.",
+      "moreChannels": "More channels",
+      "moreDms": "More direct messages"
+    },
+    "unread": {
+      "messages_one": "{{count}} unread message",
+      "messages_other": "{{count}} unread messages",
+      "mentions_one": "{{count}} mention of you",
+      "mentions_other": "{{count}} mentions of you"
+    },
+    "channel": {
+      "create": "Create channel",
+      "createTitle": "Create channel",
+      "createDescription": "A channel belongs to a space; everyone who sees the space reads along.",
+      "createSubmit": "Create",
+      "space": "Space",
+      "name": "Name",
+      "topic": "Topic",
+      "topicHint": "Optional: what this channel is about.",
+      "archived": "Archived",
+      "inSpace": "in the space {{space}}"
+    },
+    "dm": {
+      "short": "Direct message",
+      "onlyMe": "Only me",
+      "inactive": "{{name}} (deactivated)",
+      "open": "Start a direct message",
+      "openTitle": "Direct message",
+      "openDescription": "Choose up to {{count}} people. If the conversation exists already, it continues there.",
+      "people": "People",
+      "chosen": "Chosen people",
+      "removePerson": "Remove {{name}}",
+      "full": "No more than {{count}} other people.",
+      "openSubmit": "Open",
+      "inspectionsLabel": "Inspections by the administration",
+      "inspected": "Inspected by the administration on {{when}} ({{admin}})"
+    },
+    "conversation": {
+      "gone": "This conversation does not exist (any more), or you no longer have access.",
+      "toActivity": "Go to activity"
+    },
+    "list": {
+      "label": "Message history",
+      "section": "Conversation",
+      "older": "Load older messages",
+      "empty": "No messages yet. Write the first one!",
+      "new": "New",
+      "arrived": "New message from {{author}}"
+    },
+    "days": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "message": {
+      "label": "Message from {{author}}",
+      "unknownAuthor": "Unknown",
+      "edited": "(edited)",
+      "deleted": "This message was deleted.",
+      "edit": "Edit message",
+      "editLabel": "Edit message",
+      "delete": "Delete message",
+      "deleteTitle": "Delete message?",
+      "deleteText": "The text disappears for everyone. Replies in the thread stay."
+    },
+    "pending": {
+      "sending": "Sending …",
+      "failed": "Not sent: {{reason}}",
+      "retry": "Send again",
+      "discard": "Discard"
+    },
+    "composer": {
+      "label": "Message to {{name}}",
+      "send": "Send",
+      "hint": "Enter sends, Shift+Enter starts a new line, @ mentions someone. Markdown works.",
+      "tooLong_one": "At most {{count}} character.",
+      "tooLong_other": "At most {{count}} characters.",
+      "notNotified_one": "Not notified: {{names}} – cannot see this conversation.",
+      "notNotified_other": "Not notified: {{names}} – cannot see this conversation.",
+      "archived": "This channel is archived. Nobody can write here any more.",
+      "readOnly": "You can only read here."
+    },
+    "mention": {
+      "label": "Mention someone"
+    },
+    "reactions": {
+      "add": "Add reaction",
+      "with": "React with {{emoji}}",
+      "chip_one": "{{emoji}}: {{count}} reaction",
+      "chip_other": "{{emoji}}: {{count}} reactions",
+      "chipMine_one": "{{emoji}}: {{count}} reaction, yours too",
+      "chipMine_other": "{{emoji}}: {{count}} reactions, yours too"
+    },
+    "thread": {
+      "title": "Thread",
+      "reply": "Reply in thread",
+      "replies_one": "{{count}} reply",
+      "replies_other": "{{count}} replies",
+      "openWithCount_one": "Open {{author}}'s thread, {{count}} reply",
+      "openWithCount_other": "Open {{author}}'s thread, {{count}} replies",
+      "composer": "Reply in thread"
+    },
+    "discussion": {
+      "title": "Discussion",
+      "open": "Discussion",
+      "close": "Close discussion",
+      "hideSystem": "Hide system messages",
+      "empty": "No comments on this page yet.",
+      "composer": "Write about this page"
+    },
+    "system": {
+      "someone": "Someone",
+      "page_created": "{{actor}} created the page.",
+      "page_published": "{{actor}} published the page.",
+      "page_moved": "{{actor}} moved the page.",
+      "page_trashed": "{{actor}} moved the page to the trash.",
+      "page_restored": "{{actor}} restored the page from the trash.",
+      "page_version_restored": "{{actor}} restored version {{number}}.",
+      "unknown": "{{actor}} changed the page."
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "description": "What concerns you: mentions and replies, newest first.",
+    "tabs": "Views",
+    "forMe": "For me",
+    "showDone": "Show done",
+    "readAll": "Mark all as read",
+    "empty": "Nothing new for you.",
+    "unread": "Unread:",
+    "open": "Open",
+    "doneAction": "Done",
+    "markDone": "Mark the entry from {{author}} as done",
+    "done": "Done",
+    "unreadCount_one": "{{count}} unread entry",
+    "unreadCount_other": "{{count}} unread entries",
+    "reasons": {
+      "mention": "mentioned you in {{where}}",
+      "reply": "replied to a thread in {{where}}"
+    }
+  },
+  "dmInspect": {
+    "title": "Direct message inspection",
+    "description": "Read only, with a reason, for 60 minutes.",
+    "rules": "Every inspection is written to the audit log with its reason, and the participants see in the conversation that and when the administration looked into it.",
+    "person": "Person",
+    "dms": "This person's direct messages",
+    "none": "This person has no direct messages.",
+    "lastMessage": "Last written on {{when}}",
+    "noMessages": "No message yet",
+    "request": "Request inspection",
+    "chosen": "Conversation: {{people}}",
+    "reason": "Reason",
+    "reasonHint": "10 to 500 characters. It is logged.",
+    "start": "Start inspection",
+    "viewTitle": "Inspection: {{people}}",
+    "viewReason": "Reason: {{reason}}",
+    "until_one": "Inspection until {{when}} ({{count}} minute left).",
+    "until_other": "Inspection until {{when}} ({{count}} minutes left).",
+    "expired": "The inspection has expired. Another one needs a new reason.",
+    "end": "End inspection",
+    "messages": "Messages, newest first",
+    "empty": "There is nothing in this conversation.",
+    "inThread": "Reply in a thread"
+  },
+  "audit": {
+    "targets": {
+      "conversation": "Conversation",
+      "message": "Message"
+    },
+    "actions": {
+      "dm": {
+        "admin_lookup": "Listed a person's direct messages",
+        "admin_access": "Inspected a direct message"
+      },
+      "message": {
+        "moderated": "Deleted someone else's message"
+      }
+    },
+    "detailKeys": {
+      "reason": "Reason",
+      "inspection_id": "Inspection"
+    }
+  },
+  "search": {
+    "messageBy": "by {{author}}"
+  },
+  "errors": {
+    "conversation": {
+      "not_found": "This conversation does not exist (any more), or you no longer have access.",
+      "archived": "This channel is archived. Nobody can write here any more.",
+      "version_conflict": "Someone has changed this channel in the meantime."
+    },
+    "channel": {
+      "name_taken": "This space already has a channel with this name.",
+      "not_allowed": "Personal spaces have no channels."
+    },
+    "message": {
+      "not_found": "This message does not exist (any more).",
+      "not_author": "Only whoever wrote the message can change it.",
+      "deleted": "This message was deleted.",
+      "system": "System messages cannot be deleted.",
+      "bad_parent": "You cannot reply to this message in a thread.",
+      "body_invalid": "The message is empty or too long.",
+      "client_id_conflict": "This message was already sent elsewhere."
+    },
+    "reaction": {
+      "invalid_emoji": "That is not an emoji."
+    },
+    "dm": {
+      "guest_cannot_open": "Guests cannot start direct messages.",
+      "participants_invalid": "At least one of the people does not exist or is deactivated."
+    },
+    "dm_inspection": {
+      "not_found": "The inspection has expired or belongs to someone else."
+    },
+    "notification": {
+      "not_found": "This entry no longer exists."
+    },
+    "live": {
+      "too_many_streams": "Too many windows open: live updates paused."
+    }
+  }
+}

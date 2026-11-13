@@ -5,15 +5,16 @@ import { useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { messageTarget, useOpenMessage } from '@/features/messaging/targets'
 import { ErrorState } from '@/features/shared/states'
-import type { SearchHit } from '@/lib/api'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cn } from '@/lib/utils'
-import { Highlight } from './Highlight'
-import { useSearch } from './queries'
+import { type AnyHit, useSearch } from './queries'
+import { SearchHitRow } from './SearchHitRow'
 
-/** Search over every page one may read: Up/Down choose, Enter opens, Escape closes.
- *  Inside a space, "only this space" narrows the search to it. */
+/** Search over every page and message one may read: Up/Down choose, Enter opens,
+ *  Escape closes. Inside a space, "only this space" narrows the search to it (its
+ *  pages, channels and page discussions). */
 export function CommandPalette({
   open,
   onOpenChange,
@@ -23,6 +24,7 @@ export function CommandPalette({
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const openMessage = useOpenMessage()
   const currentSpace = useParams({ strict: false, select: (p) => p.spaceId ?? null })
   const [text, setText] = useState('')
   const [onlyHere, setOnlyHere] = useState(false)
@@ -33,8 +35,12 @@ export function CommandPalette({
   const listId = useId()
   const optionId = (i: number) => `${listId}-${i}`
 
-  function openHit(hit: SearchHit) {
+  function openHit(hit: AnyHit) {
     onOpenChange(false)
+    if (hit.type === 'message') {
+      openMessage(messageTarget(hit.conversation, hit.id, hit.parent_id))
+      return
+    }
     void navigate({
       to: '/spaces/$spaceId/p/$',
       params: { spaceId: hit.space_id, _splat: hit.path },
@@ -107,7 +113,7 @@ export function CommandPalette({
             >
               {results.items.map((hit, i) => (
                 <li
-                  key={hit.id}
+                  key={`${hit.type}-${hit.id}`}
                   id={optionId(i)}
                   role="option"
                   aria-selected={i === active}
@@ -118,15 +124,7 @@ export function CommandPalette({
                   onMouseEnter={() => setActive(i)}
                   onClick={() => openHit(hit)}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-medium">{hit.title}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{hit.space_name}</span>
-                  </div>
-                  {hit.snippet && (
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                      <Highlight snippet={hit.snippet} />
-                    </p>
-                  )}
+                  <SearchHitRow hit={hit} />
                 </li>
               ))}
             </ul>

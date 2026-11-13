@@ -6,7 +6,9 @@ import { LocaleError } from '@/features/profile/LocaleError'
 import { useUserLocale } from '@/features/profile/queries'
 import { SearchProvider } from '@/features/search/SearchProvider'
 import { cn } from '@/lib/utils'
+import { LiveHint } from './LiveStatus'
 import { Sidebar } from './Sidebar'
+import { useShellLive } from './useShellLive'
 import { UserMenu } from './UserMenu'
 
 /** Sidebar on the left, header with the user menu, the page in the middle. */
@@ -14,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(true)
   useUserLocale()
+  useShellLive()
   return (
     <SearchProvider>
       <div className="flex h-dvh w-full bg-background text-foreground">
@@ -44,7 +47,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <PanelLeft aria-hidden />
             </Button>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-3">
+              <LiveHint />
               <UserMenu />
             </div>
           </header>

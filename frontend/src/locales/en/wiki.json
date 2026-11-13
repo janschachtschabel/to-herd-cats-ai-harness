@@ -1,10 +1,10 @@
 {
   "search": {
     "title": "Search",
-    "description": "Searches every page you may read. Arrow keys choose, Enter opens.",
+    "description": "Searches every page and message you may read. Arrow keys choose, Enter opens.",
     "input": "Search term",
-    "placeholder": "Search pages …",
-    "hint": "Type a term to find pages.",
+    "placeholder": "Search pages and messages …",
+    "hint": "Type a term to find pages and messages.",
     "empty": "No results.",
     "results": "Results",
     "onlyHere": "Only in this space",

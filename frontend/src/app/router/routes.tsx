@@ -10,9 +10,10 @@ import {
 import { AppShell } from '@/app/shell/AppShell'
 import { adminLinks } from '@/app/shell/nav'
 import { hasPermission, meQuery } from '@/features/auth/queries'
-import type { PageMode } from '@/features/wiki/PageScreen'
+import { pageQuery } from '@/features/wiki/queries'
 import type { Me, Permission } from '@/lib/api'
 import { NotFoundPage } from './NotFoundPage'
+import { messageSearch, pageSearch, safeRedirect } from './search'
 
 // Every page is its own chunk, loaded when its route is entered or hovered (intent
 // preload), so the first load carries only the shell and the page in view.
@@ -35,6 +36,18 @@ const ProfilePage = lazyRouteComponent(
 )
 const TagsPage = lazyRouteComponent(() => import('@/features/admin/tags/TagsPage'), 'TagsPage')
 const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
+const DmInspectPage = lazyRouteComponent(
+  () => import('@/features/admin/dm-inspect/DmInspectPage'),
+  'DmInspectPage',
+)
+const ConversationScreen = lazyRouteComponent(
+  () => import('@/features/messaging/conversation/ConversationScreen'),
+  'ConversationScreen',
+)
+const ActivityPage = lazyRouteComponent(
+  () => import('@/features/activity/ActivityPage'),
+  'ActivityPage',
+)
 
 export interface RouterContext {
   queryClient: QueryClient
@@ -44,13 +57,6 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Outlet,
   notFoundComponent: NotFoundPage,
 })
-
-/** Where to go after logging in: only paths inside this app. */
-function safeRedirect(value: unknown): string | undefined {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
-    ? value
-    : undefined
-}
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -115,15 +121,12 @@ const spaceIndexRoute = createRoute({
   component: WikiHome,
 })
 
-const PAGE_MODES: readonly PageMode[] = ['edit', 'live', 'versions']
-
 /** A page by its path (`/spaces/<id>/p/handbuch/urlaub`); `?view=` opens an editor or
- *  the version history. */
+ *  the version history, `?discussion=true` the discussion (at `thread`, `message`). */
 const pageRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/p/$',
-  validateSearch: (search: Record<string, unknown>): { view?: PageMode } =>
-    PAGE_MODES.includes(search.view as PageMode) ? { view: search.view as PageMode } : {},
+  validateSearch: pageSearch,
   loader: () => PageScreen.preload?.(),
   component: function PageRoute() {
     const { _splat } = pageRoute.useParams()
@@ -146,6 +149,45 @@ const spaceSettingsRoute = createRoute({
     const { spaceId } = spaceSettingsRoute.useParams()
     return <SpacePage spaceId={spaceId} />
   },
+})
+
+/** A page by its id, for links into its discussion (search hits, the activity):
+ *  looks the page up and goes to its path with the discussion open. */
+const pageByIdRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/go/page/$pageId',
+  validateSearch: messageSearch,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ context, params, deps }) => {
+    const page = await context.queryClient.fetchQuery(pageQuery(params.pageId)).catch(() => {
+      throw notFound()
+    })
+    throw redirect({
+      to: '/spaces/$spaceId/p/$',
+      params: { spaceId: page.space_id, _splat: page.path },
+      search: { discussion: true, ...deps },
+      replace: true,
+    })
+  },
+})
+
+/** A channel or direct message; `thread` opens a thread beside it. */
+const conversationRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/c/$conversationId',
+  validateSearch: messageSearch,
+  loader: () => ConversationScreen.preload?.(),
+  component: function ConversationRoute() {
+    const { conversationId } = conversationRoute.useParams()
+    const { thread, message } = conversationRoute.useSearch()
+    return <ConversationScreen conversationId={conversationId} thread={thread} message={message} />
+  },
+})
+
+const activityRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/activity',
+  component: ActivityPage,
 })
 
 const profileRoute = createRoute({
@@ -219,12 +261,22 @@ const auditRoute = createRoute({
   component: AuditPage,
 })
 
+const dmInspectRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/dm-inspect',
+  loader: ({ context }) => requirePermission(context.me, 'dm.inspect'),
+  component: DmInspectPage,
+})
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
     indexRoute,
     spacesRoute,
     spaceRoute.addChildren([spaceIndexRoute, pageRoute, trashRoute, spaceSettingsRoute]),
+    pageByIdRoute,
+    conversationRoute,
+    activityRoute,
     profileRoute,
     adminRoute.addChildren([
       adminIndexRoute,
@@ -233,6 +285,7 @@ export const routeTree = rootRoute.addChildren([
       groupRoute,
       tagsRoute,
       auditRoute,
+      dmInspectRoute,
     ]),
   ]),
 ])

@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import './styles/shadcn-variants.css';
 @import './styles/wiki-prose.css';
+@import './styles/message-prose.css';
 @import '@fontsource-variable/inter';
 
 @custom-variant dark (&:is(.dark *));

@@ -1,26 +1,21 @@
 import { Link } from '@tanstack/react-router'
-import { History, Search, Shield, Tags, UserRound, UsersRound } from 'lucide-react'
+import { Eye, History, Search, Shield, Tags, UserRound, UsersRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '@/features/auth/queries'
 import { useOpenSearch } from '@/features/search/SearchContext'
 import { navLinkActive, navLinkClass } from './navStyles'
 import { adminLinks, visibleSections, type AdminLink, type SectionId } from './nav'
+import { SectionHeading } from './SectionHeading'
+import { ActivitySection, ChannelsSection, DirectSection } from './SidebarMessaging'
 import { SidebarSpaces } from './SidebarSpaces'
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="px-2 pt-4 pb-1 text-xs font-medium tracking-wide text-sidebar-muted-foreground uppercase">
-      {children}
-    </h2>
-  )
-}
 
 const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/users': UserRound,
   '/admin/groups': UsersRound,
   '/admin/tags': Tags,
   '/admin/audit': History,
+  '/admin/dm-inspect': Eye,
 }
 
 function AdminSection() {
@@ -83,7 +78,10 @@ function SearchSection() {
 
 // Sections of later milestones get their renderer when they arrive.
 const SECTIONS: Partial<Record<SectionId, () => ReactNode>> = {
+  activity: ActivitySection,
   search: SearchSection,
+  channels: ChannelsSection,
+  direct: DirectSection,
   spaces: SpacesSection,
   admin: AdminSection,
 }
