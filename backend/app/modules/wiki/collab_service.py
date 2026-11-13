@@ -27,7 +27,7 @@ from app.core.metrics import COLLAB_SAVES
 from app.modules.auth.service import AuthService
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
-from app.modules.wiki.collab_repository import CollabRepository
+from app.modules.wiki.collab_repository import CollabRepository, page_by_id
 from app.modules.wiki.models import Page
 from app.modules.wiki.service import PageService
 from app.modules.wiki.visibility import PageReader, page_not_found
@@ -151,13 +151,13 @@ class CollabService:
         no one may save, and every browser that saw them would bring them back on
         reconnecting: the generation ends here (the stored state goes with it)."""
         unsaved = unsaved or []
-        editors, revoked = await self._editors([*session_ids, *unsaved])
-        page = None
-        if editors:
-            live = CollabRepository(self.session, editors[0].actor.org_id)
-            page = await live.page(page_id, lock=bool(unsaved))
+        # The organisation comes from the page row (the internal API is trusted), so
+        # the generation can end even when no session that joined is valid any more.
+        page = await page_by_id(self.session, page_id, lock=bool(unsaved))
         if page is None:
-            return Check(False, generation, _revoked(revoked, []))
+            gone = sorted(set([*session_ids, *unsaved]))
+            return Check(False, generation, Revoked(gone, []))
+        editors, revoked = await self._editors([*session_ids, *unsaved], org_id=page.org_id)
         lost = await self._lost(editors, page)
         result = _revoked(revoked, lost)
         ok = page.trashed_at is None and page.collab_generation == generation
@@ -207,14 +207,17 @@ class CollabService:
             return None
         return _Editor(session_id, ctx.user.id, await actor_for(self.session, ctx))
 
-    async def _editors(self, session_ids: list[uuid.UUID]) -> tuple[list[_Editor], list[uuid.UUID]]:
-        """The sessions still valid (in the order given, all of one organisation) and
-        the ones that are not."""
+    async def _editors(
+        self, session_ids: list[uuid.UUID], *, org_id: uuid.UUID | None = None
+    ) -> tuple[list[_Editor], list[uuid.UUID]]:
+        """The sessions still valid (in the order given, all of one organisation: the
+        given one, else the first valid session's) and the ones that are not."""
         editors: list[_Editor] = []
         revoked: list[uuid.UUID] = []
         for session_id in dict.fromkeys(session_ids):
             editor = await self._editor(session_id)
-            if editor is None or (editors and editor.actor.org_id != editors[0].actor.org_id):
+            org = org_id or (editors[0].actor.org_id if editors else None)
+            if editor is None or (org is not None and editor.actor.org_id != org):
                 revoked.append(session_id)
             else:
                 editors.append(editor)

@@ -75,7 +75,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
    * generation. Throws `ApiUnavailable`. */
   async function checkDocument(document, state) {
     const connected = document.getConnections().map((c) => c.context.sessionId);
-    // Sessions that left still name the page's organisation for the API.
+    // Sessions that left are checked too (the API takes the organisation from the page).
     const sessionIds = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
     const unsaved = [...state.dirty.keys()];
     if (sessionIds.length === 0 && unsaved.length === 0) return false;

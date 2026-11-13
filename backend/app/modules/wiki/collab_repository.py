@@ -1,6 +1,10 @@
 """The SQL of live editing: the page row (in or out of the trash, so an ended session
 is told so) and its live state, scoped by the editors' organisation. Who may see and
-edit the page is the service's check, per editor."""
+edit the page is the service's check, per editor.
+
+`page_by_id` is the one unscoped read: the internal API is trusted, and a check that
+must end a generation takes the organisation from the page row when no session that
+joined is valid any more."""
 
 import uuid
 
@@ -11,6 +15,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models_base import utcnow
 from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Page
+
+
+async def page_by_id(
+    session: AsyncSession, page_id: uuid.UUID, *, lock: bool = False
+) -> Page | None:
+    """The page row by id alone (in or out of the trash); only for the trusted
+    internal API, which then scopes everything else by `page.org_id`."""
+    stmt = select(Page).where(Page.id == page_id).execution_options(populate_existing=True)
+    if lock:
+        stmt = stmt.with_for_update()
+    return await session.scalar(stmt)
 
 
 class CollabRepository:

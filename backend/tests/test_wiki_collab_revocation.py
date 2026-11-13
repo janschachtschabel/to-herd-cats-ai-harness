@@ -182,3 +182,37 @@ async def test_check_reports_an_ended_generation(wiki: Wiki, collab: AsyncClient
     )
     r = await collab.post(url, json={"session_ids": [sid], "generation": 2})
     assert r.json()["generation_ok"] is False  # in the trash: no live session
+
+
+async def test_unsaved_edits_end_the_generation_when_no_session_is_valid(
+    wiki: Wiki, collab: AsyncClient
+) -> None:
+    """The internal API is trusted: the page row names the organisation, so the
+    generation ends even when every session that ever joined has ended."""
+    page = await new_page(wiki.editor, wiki.space_id, "Live", content_md="a")
+    editor = await session_id_of(collab, wiki.editor, page)
+    editor2 = await session_id_of(collab, wiki.editor2, page)
+    assert (await wiki.editor.post("/api/auth/logout")).status_code == 204
+    assert (await wiki.editor2.post("/api/auth/logout")).status_code == 204
+    url = f"/internal/collab/pages/{page['id']}/check"
+    body = {"session_ids": [editor], "unsaved_session_ids": [editor2], "generation": 0}
+    r = await collab.post(url, json=body)
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "generation_ok": False,
+        "generation": 1,
+        "revoked_session_ids": sorted([editor, editor2]),
+        "revoked_user_ids": [],
+    }
+    after = await get_page(wiki.moderator, page)
+    assert (after["content_md"], after["collab_generation"]) == ("a", 1)
+    # Without unsaved edits nothing ends; the ended sessions are named.
+    body = {"session_ids": [editor, editor2], "generation": 1}
+    r = await collab.post(url, json=body)
+    assert (r.json()["generation_ok"], r.json()["generation"]) == (True, 1)
+    assert r.json()["revoked_session_ids"] == sorted([editor, editor2])
+    # An unknown page is not live.
+    unknown = "01a1d2d9-2de5-75db-9dc6-a6fa1307273d"
+    r = await collab.post(f"/internal/collab/pages/{unknown}/check", json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["generation_ok"] is False
