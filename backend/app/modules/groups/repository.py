@@ -84,6 +84,13 @@ class GroupRepository(BaseRepository[Group]):
         )
         return (await self.session.execute(stmt)).first() is not None
 
+    async def user_ids(self, group_id: uuid.UUID) -> list[uuid.UUID]:
+        """The people in the group."""
+        stmt = select(GroupMember.member_id).where(
+            GroupMember.group_id == group_id, GroupMember.member_type == PrincipalType.USER
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def group_ids_for(self, principal: Principal) -> frozenset[uuid.UUID]:
         stmt = select(GroupMember.group_id).where(
             GroupMember.member_type == principal.type, GroupMember.member_id == principal.id

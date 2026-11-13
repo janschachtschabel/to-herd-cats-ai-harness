@@ -8,8 +8,9 @@ only, never content:
      "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>}
 
 `u` names the one person an event is for (`notification.created`,
-`conversation.read`, `activity.changed`); without it, whoever may see conversation
-`c` gets it. Every API process's hub (`live.py`) decodes it again; anything it cannot
+`conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
+see conversation `c` gets it (`dm.inspected`: a DM's participants, not the inspecting
+administrator). Every API process's hub (`live.py`) decodes it again; anything it cannot
 use is dropped. Payloads stay far below Postgres' 8000-byte limit (about 230 bytes).
 """
 
@@ -39,10 +40,14 @@ LIVE_TYPES: dict[str, str] = {
     "channel.updated": "channel.changed",
     "channel.archived": "channel.changed",
     "channel.unarchived": "channel.changed",
+    "access.changed": "access.changed",
+    "dm.inspected": "dm.inspected",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 # Events for one person: the payload's `user_id` is who gets them.
-FOR_ONE_PERSON = frozenset({"notification.created", "conversation.read", "activity.changed"})
+FOR_ONE_PERSON = frozenset(
+    {"notification.created", "conversation.read", "activity.changed", "access.changed"}
+)
 
 
 @dataclass(frozen=True, slots=True)

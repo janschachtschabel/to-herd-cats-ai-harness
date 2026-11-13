@@ -3,7 +3,8 @@
 Kinds: `open` and `team` are created through the API by anyone with `space.create`, who
 becomes the space's admin; `personal` is created only here, once per person, with that
 person as its one fixed member. Names need not be unique; URLs use ids. Changes made
-by someone are audited in their transaction; the personal space of a new person and the general
+by someone are audited in their transaction, and a membership change is announced to the
+people concerned (`access.changed`); the personal space of a new person and the general
 space of a new installation come with `user.created` and bootstrap.
 """
 
@@ -14,6 +15,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, my_roles, require, visible_space_ids
+from app.core.access_events import access_changed
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
@@ -130,6 +132,7 @@ class SpaceService:
         name = await self._name_of(actor.org_id, principal)
         member = await self.spaces.set_member(space_id, principal, role)
         await self._audit(actor, "space.member_set", space_id, {**_member(principal), "role": role})
+        await self._access_changed(actor, space_id, principal)
         return NamedMember(member, name)
 
     async def remove_member(
@@ -140,6 +143,17 @@ class SpaceService:
         if not await self.spaces.remove_member(space_id, principal):
             raise NotFound(code="spaces.member_not_found")
         await self._audit(actor, "space.member_removed", space_id, _member(principal))
+        await self._access_changed(actor, space_id, principal)
+
+    async def _access_changed(
+        self, actor: Actor, space_id: uuid.UUID, principal: Principal
+    ) -> None:
+        """The person, or the group's people, may see more or less now."""
+        if principal.type == PrincipalType.GROUP:
+            people = await self.groups.user_ids(principal.id)
+        else:
+            people = [principal.id]
+        await access_changed(self.session, actor, people, space_id=space_id)
 
     async def _audit(
         self, actor: Actor, action: str, space_id: uuid.UUID, details: dict[str, Any]

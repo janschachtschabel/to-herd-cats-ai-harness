@@ -2,7 +2,8 @@
 
 Changes to one organisation's groups are serialised (`lock_writes`), so the name and
 version checks hold under concurrent requests. Every method needs `group.manage`;
-every change is audited in its transaction.
+every change is audited in its transaction. A change of who is in a group is announced
+to the people concerned (`access.changed`).
 """
 
 import uuid
@@ -11,6 +12,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require
+from app.core.access_events import access_changed
 from app.core.errors import Conflict, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import Principal
@@ -68,8 +70,10 @@ class GroupService:
         group = await self._current(actor, group_id)
         await SpaceRepository(self.session).delete_memberships_of(Principal.group(group.id))
         details = {"name": group.name}
+        people = await self.groups.user_ids(group.id)
         await self.groups.delete(group)
         await self._audit(actor, "group.deleted", group, details)
+        await access_changed(self.session, actor, people, space_id=None)
 
     async def list(self, actor: Actor, params: PageParams) -> Page[Group]:
         await require(self.session, actor, Action.GROUP_MANAGE)
@@ -92,12 +96,14 @@ class GroupService:
             raise NotFound(code="users.not_found")
         if await self.groups.add_member(group.id, principal):
             await self._audit(actor, "group.member_added", group, _member(principal))
+            await access_changed(self.session, actor, [principal.id], space_id=None)
 
     async def remove_member(self, actor: Actor, group_id: uuid.UUID, principal: Principal) -> None:
         group = await self.get(actor, group_id)
         if not await self.groups.remove_member(group.id, principal):
             raise NotFound(code="groups.member_not_found")
         await self._audit(actor, "group.member_removed", group, _member(principal))
+        await access_changed(self.session, actor, [principal.id], space_id=None)
 
     async def _audit(
         self, actor: Actor, action: str, group: Group, details: dict[str, Any]

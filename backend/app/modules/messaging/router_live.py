@@ -6,7 +6,9 @@ connection of the pool. Then the hub of this process (`live.py`) feeds the strea
 until the client goes, the login session ends, or the process stops.
 
 Events: `message.created|updated|deleted`, `reaction.changed`, `notification.created`,
-`conversation.read`, `channel.changed`, `activity.changed`, `resync`; their data is
+`conversation.read`, `channel.changed`, `activity.changed`, `access.changed` (the
+person's access changed: reload everything shown), `dm.inspected` (an administrator
+inspected this DM), `resync`; their data is
 `{"conversation_id", "message_id", "parent_id"}` (ids or null), never content: the
 client reloads what it shows through the API, which checks again.
 """

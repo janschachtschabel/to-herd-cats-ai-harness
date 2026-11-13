@@ -72,6 +72,7 @@ async def test_revoked_member_stops_receiving_without_reconnect(
     assert removed.status_code == 204, removed.text
     await say(owner, channel)
     await drain(real_db.database)
+    assert (await stream.next()).name == "access.changed"  # (test_live_access.py)
     await stream.expect_nothing()
     assert not stream.ended.is_set()  # the same connection, still open
     await stream.close()
