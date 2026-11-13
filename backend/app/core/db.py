@@ -49,7 +49,9 @@ def set_database(database: Database | None) -> None:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one session per request, committed on success."""
+    """FastAPI dependency: one session per request, committed on success, before the
+    response is sent (`SessionDep` declares it with scope="function"); a failed commit
+    becomes the request's error response."""
     async with get_database().session_factory() as session:
         try:
             yield session

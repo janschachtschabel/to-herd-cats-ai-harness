@@ -18,7 +18,13 @@ CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "herd"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# scope="function": the session's exit (commit or rollback) runs when the endpoint
+# returns, before the response is sent. With the default scope it would run after the
+# response, so a client could be told 201 for a write that is not yet visible, or that
+# then fails to commit. Every route takes the session through SessionDep, so all
+# requests share this boundary; dependencies that yield and need the session must use
+# the same scope (FastAPI refuses the narrower one inside a wider one).
+SessionDep = Annotated[AsyncSession, Depends(get_session, scope="function")]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
@@ -39,7 +45,7 @@ async def current_auth(
         yield ctx
 
 
-AuthDep = Annotated[AuthContext, Depends(current_auth)]
+AuthDep = Annotated[AuthContext, Depends(current_auth, scope="function")]
 
 
 async def current_actor(ctx: AuthDep, session: SessionDep) -> Actor:

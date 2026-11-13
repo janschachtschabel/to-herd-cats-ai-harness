@@ -31,6 +31,7 @@ from tests.factories import (  # noqa: E402, F401
 )
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
+from tests.real_db import make_real_client, real_db  # noqa: E402, F401
 
 configure_logging(get_settings())
 
