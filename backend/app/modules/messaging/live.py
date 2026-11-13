@@ -21,14 +21,16 @@ hands each event to the open streams (`GET /api/stream`) that may have it.
   further behind gets its queue emptied and one `resync` instead. After the LISTEN
   connection was lost and is back, every stream gets `resync` (what was sent
   meanwhile is lost); so does every stream a batch was for whose check failed.
-- At most MAX_STREAMS_PER_SESSION streams per login session in this process; the
-  next is refused (429).
+- At most MAX_STREAMS_PER_SESSION streams per login session and
+  MAX_STREAMS_PER_PERSON per person (whatever the sessions) in this process; the next
+  is refused (429).
 """
 
 import asyncio
 import logging
 import time
 import uuid
+from collections import Counter
 from contextlib import suppress
 
 from app.core.db import Database
@@ -49,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_CHECK_SECONDS = 30.0
 MAX_STREAMS_PER_SESSION = 5
+MAX_STREAMS_PER_PERSON = 10
 MAX_LAG_SECONDS = 5.0  # default of HERD_LIVE_MAX_LAG_SECONDS
 INCOMING_LIMIT = 10_000  # notifications waiting for the hub; more means resync for all
 
@@ -67,6 +70,7 @@ class LiveHub:
         self.database: Database | None = None
         self.max_lag_seconds = max_lag_seconds
         self._streams: dict[uuid.UUID, list[Connection]] = {}  # by login session
+        self._per_person: Counter[uuid.UUID] = Counter()  # open streams by person
         # (payload, time.monotonic() of arrival)
         self._incoming: asyncio.Queue[tuple[str, float]] = asyncio.Queue(maxsize=INCOMING_LIMIT)
         self._overflowed = False
@@ -108,11 +112,15 @@ class LiveHub:
         self._tasks = []
 
     def connect(self, org_id: uuid.UUID, user_id: uuid.UUID, session_id: uuid.UUID) -> Connection:
-        streams = self._streams.setdefault(session_id, [])
-        if len(streams) >= MAX_STREAMS_PER_SESSION:
+        streams = self._streams.get(session_id, [])
+        if (
+            len(streams) >= MAX_STREAMS_PER_SESSION
+            or self._per_person[user_id] >= MAX_STREAMS_PER_PERSON
+        ):
             raise TooManyStreams()
         connection = Connection(org_id, user_id, session_id)
-        streams.append(connection)
+        self._streams.setdefault(session_id, streams).append(connection)
+        self._per_person[user_id] += 1
         SSE_CONNECTIONS.inc()
         return connection
 
@@ -121,6 +129,9 @@ class LiveHub:
         streams = self._streams.get(connection.session_id, [])
         if connection in streams:
             streams.remove(connection)
+            self._per_person[connection.user_id] -= 1
+            if not self._per_person[connection.user_id]:
+                del self._per_person[connection.user_id]
             SSE_CONNECTIONS.dec()
         if not streams:
             self._streams.pop(connection.session_id, None)

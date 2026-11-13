@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.db import Database, set_database
 from app.core.listen import asyncpg_dsn
 from app.modules.messaging import live_connection as live_module
+from app.modules.messaging.live import LiveHub, TooManyStreams
 from app.modules.messaging.live_connection import Connection
 from app.modules.messaging.live_events import LIVE_CHANNEL, LiveEvent, decode
 from app.web.public import create_public_app
@@ -156,3 +157,17 @@ async def test_frames_waiting_together_are_written_together() -> None:
     connection.close()  # what was queued is dropped; the stream ends
     with pytest.raises(StopAsyncIteration):
         await anext(frames)
+
+
+def test_a_person_has_at_most_ten_streams_in_a_process_whatever_the_sessions() -> None:
+    hub, org, person = LiveHub(), uuid.uuid4(), uuid.uuid4()
+    sessions = [uuid.uuid4() for _ in range(3)]
+    streams = [hub.connect(org, person, s) for s in sessions[:2] for _ in range(5)]
+    with pytest.raises(TooManyStreams):
+        hub.connect(org, person, sessions[2])  # a third login gets no more
+    hub.connect(org, uuid.uuid4(), uuid.uuid4())  # someone else is not affected
+    hub.disconnect(streams[0])
+    hub.connect(org, person, sessions[2])
+    with pytest.raises(TooManyStreams) as refused:
+        hub.connect(org, person, sessions[2])
+    assert refused.value.status_code == 429 and refused.value.code == "live.too_many_streams"
