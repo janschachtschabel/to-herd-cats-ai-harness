@@ -49,3 +49,11 @@ test('a block is named by the start of its text', () => {
   expect(blockStart(doc, 1)).toBe('a\\| und dann noch ein sehr langer Text …')
   expect(blockStart(doc, 5)).toBe('')
 })
+
+test('a state over the table cell cap is too large (review M2 U2)', () => {
+  expect(unsaveable('herd:unrepresentable:tooLarge:4')).toEqual({
+    kind: 'tooLarge',
+    block: 4,
+    through: null,
+  })
+})

@@ -2,6 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { MAX_TABLE_CELLS } from '@collab/cells.mjs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import type { WikiPage } from '@/lib/api'
@@ -27,7 +28,7 @@ const STATUS_STYLE = {
  *  in it and the connection state. When the session ends for good the text stays
  *  read-only and can be copied as Markdown. */
 export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connect }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { space, me } = useWiki()
   const fetchLatest = useFetchLatestPage()
   const live = useLiveSession(page, () => fetchLatest(page), connect)
@@ -120,7 +121,13 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
       {(live.stopped || live.regenerated) && (
         <Alert variant={live.stopped ? 'destructive' : 'default'}>
           <AlertDescription className="flex flex-col gap-2 text-foreground">
-            <p>{live.stopped ? t(`wiki.live.stop.${live.stopped}`) : t('wiki.live.regenerated')}</p>
+            <p>
+              {live.stopped
+                ? t(`wiki.live.stop.${live.stopped}`, {
+                    cells: MAX_TABLE_CELLS.toLocaleString(i18n.language),
+                  })
+                : t('wiki.live.regenerated')}
+            </p>
             <div className="flex flex-wrap gap-2">
               {lost && (
                 <Button size="sm" variant="outline" onClick={() => void copy()}>

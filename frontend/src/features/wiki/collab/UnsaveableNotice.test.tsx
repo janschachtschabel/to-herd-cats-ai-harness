@@ -35,3 +35,13 @@ test('one block is named with its start', () => {
   )
   expect(screen.getByText(/Block 1/)).toHaveTextContent('„Eins“')
 })
+
+test('tables over the cell cap are named too large, with the cap (review M2 U2)', () => {
+  render(
+    <UnsaveableNotice
+      notice={{ kind: 'tooLarge', block: 0, through: null }}
+      doc={docOf('Inventar')}
+    />,
+  )
+  expect(screen.getByText(/zu groß/)).toHaveTextContent('10.000 Tabellenzellen')
+})

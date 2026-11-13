@@ -198,12 +198,24 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   dauern einige Sekunden. Sie laufen in eigenen Threads des Collab-Prozesses
   (`HERD_COLLAB_CHECK_WORKERS`, Standard 1), damit alle anderen Live-Seiten
   währenddessen flüssig bleiben; bereits geprüfte Blöcke werden nicht erneut geprüft.
-  Jeder dieser Threads hat höchstens 192 MB Heap (so bleibt der Prozess mit einem
-  Thread unter dem Limit des Charts von 512 MiB). Braucht die Prüfung einer Seite mehr
-  (etwa tausende kleine Tabellen), endet nur diese Prüfung: Die Seite ist dann zu groß
-  für die Live-Bearbeitung (4413, Markdown-Editor), bzw. ein solcher Stand wird nicht
-  gespeichert und alle sehen den Hinweis (Ursache unbekannt). Jeder weitere Thread
-  braucht bis zu rund 250 MB mehr.
+  Ein Thread prüft eine Seite nach der anderen; wartende Prüfungen kommen nach Größe
+  dran, die kleinste zuerst, damit eine kleine Seite nicht hinter großen wartet. Eine
+  große Prüfung wird höchstens viermal überholt, dann ist sie dran (sie wartet also nie
+  endlos). Jeder dieser Threads hat höchstens 192 MB Heap (so bleibt der Prozess mit
+  einem Thread unter dem Limit des Charts von 512 MiB). Braucht eine Prüfung mehr, endet
+  nur diese Prüfung, und sie wird nicht wiederholt: Die Seite ist dann zu groß für die
+  Live-Bearbeitung (4413, Markdown-Editor), bzw. ein solcher Stand wird nicht
+  gespeichert und alle sehen den Hinweis (Ursache unbekannt). Der Thread wird ersetzt,
+  und die Prüfungen, die auf ihn warteten, laufen auf dem neuen; andere Seiten merken
+  davon nur die Wartezeit. Jeder weitere Thread braucht bis zu rund 250 MB mehr.
+- **Tabellenzellen:** Die Tabellen einer Seite dürfen live zusammen höchstens 10.000
+  Zellen haben (jede Zelle kostet im Live-Zustand rund hundert Bytes, und die Prüfung
+  sehr großer Tabellen sprengte den Thread). Gezählt wird vor jeder Prüfung, ohne
+  Thread: Eine Seite darüber öffnet der Live-Editor nicht (4413, „zu groß“, mit dem
+  Angebot des Markdown-Editors); ein Stand darüber wird nicht gespeichert, alle sehen
+  „zu groß für die Live-Bearbeitung“ mit dem betroffenen Block, und die Sitzung läuft
+  weiter, damit man Zeilen wieder herausnehmen kann. Im Markdown-Editor gilt nur die
+  Grenze von 200.000 Zeichen.
 - **Abmelden:** Eine offene Live-Verbindung endet mit der nächsten Prüfung, also bis zu
   5 s nach dem Abmelden; was in diesen Sekunden noch ankommt, wird unter dem Namen der
   Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und

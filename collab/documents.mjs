@@ -11,6 +11,7 @@
 // are stored.
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
+import { MAX_TABLE_CELLS, tableLoad } from "./cells.mjs";
 import { CheckFailed } from "./checks.mjs";
 import { yDocToJSON } from "./markdown.mjs";
 import { CLOSE, REPRESENTABLE, STORED, closeSocket, unrepresentableNotice } from "./protocol.mjs";
@@ -115,10 +116,17 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     const json = yDocToJSON(document);
     const ydoc = Y.encodeStateAsUpdate(document);
     const snapshot = Buffer.from(Y.encodeSnapshot(Y.snapshot(document))).toString("base64");
+    // Tables over the cell cap: too large, refused before a check worker is asked
+    // (review M2 U2); the session goes on, so rows can be taken out again.
+    const tables = tableLoad(json);
+    if (tables.cells > MAX_TABLE_CELLS) {
+      const problem = `${tables.cells} table cells`;
+      return unrepresentable(document, state, { problem, kind: "tooLarge", block: tables.block });
+    }
     for (const sessionId of editors) state.dirty.delete(sessionId);
     let written;
     try {
-      written = await checks.readBack(json);
+      written = await checks.readBack(json, state.size?.chars ?? 0);
     } catch (error) {
       if (!(error instanceof CheckFailed)) {
         for (const sessionId of editors) state.dirty.set(sessionId, true);

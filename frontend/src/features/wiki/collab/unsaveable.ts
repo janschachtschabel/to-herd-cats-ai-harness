@@ -1,13 +1,14 @@
 import * as Y from 'yjs'
 
 const NOTICE = 'herd:unrepresentable'
-const KINDS = ['structure', 'reopen', 'markdown'] as const
+const KINDS = ['structure', 'reopen', 'markdown', 'tooLarge'] as const
 const START_LENGTH = 40
 
 /** Why the latest state cannot be saved, and where, as far as the save check knows it
  *  (collab/readback.mjs): `structure` (the editor cannot hold it), `reopen` (the
  *  Markdown would not open again unchanged), `markdown` (it reads back as something
- *  else); `block` is the index of the top-level block, null when unknown; `through`
+ *  else), `tooLarge` (its tables hold more cells than live editing takes,
+ *  collab/cells.mjs); `block` is the index of the top-level block, null when unknown; `through`
  *  the second of two neighbours that fail only together (review M2 U1), else null. */
 export interface Unsaveable {
   kind: (typeof KINDS)[number] | 'unknown'

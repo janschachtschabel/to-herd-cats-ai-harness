@@ -43,3 +43,7 @@ declare module '@collab/editor.mjs' {
 declare module '@collab/tables.mjs' {
   export function flattenTableSpans<T extends ParentNode>(root: T): T
 }
+
+declare module '@collab/cells.mjs' {
+  export const MAX_TABLE_CELLS: number
+}

@@ -32,6 +32,7 @@
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
+import { MAX_TABLE_CELLS, markdownTableCells } from "./cells.mjs";
 import { documentRules } from "./documents.mjs";
 import { CheckFailed, inlineChecks } from "./checks.mjs";
 import { presenceGuard } from "./presence.mjs";
@@ -119,8 +120,15 @@ export function liveExtension({
       const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
       const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
       Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
-      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9). A page too
-      // heavy to check there is too large for live editing.
+      // Tables of more cells than the cap are too large for live editing: refused before
+      // a check worker is asked (review M2 U2).
+      const cells = markdownTableCells(contentMd);
+      if (cells > MAX_TABLE_CELLS) {
+        log("live page too large", { page_id: context.pageId, table_cells: cells });
+        throw deny(context, CLOSE.tooLarge);
+      }
+      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9), smaller pages
+      // first (U6). A page too heavy to check there is too large for live editing.
       const check = (work) =>
         work.catch((error) => {
           if (!(error instanceof CheckFailed)) throw error;
@@ -133,13 +141,13 @@ export function liveExtension({
         // one it would only tidy without changing its meaning is tidied, so the browser
         // has nothing left to change (review M2 T1, ruling A).
         const bytes = Buffer.from(stored, "base64");
-        opened = await check(checks.tidy(bytes));
+        opened = await check(checks.tidy(bytes, contentMd.length));
         if (opened.problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
         Y.applyUpdate(document, bytes);
       } else {
         // Only a page the editor can show without changing its meaning is opened, as the
         // browser's editor shows it once loaded.
-        opened = await check(checks.open(contentMd));
+        opened = await check(checks.open(contentMd, contentMd.length));
         if (!opened.safe) throw deny(context, CLOSE.notRoundTripSafe);
       }
       const tidied = opened.update !== null;
