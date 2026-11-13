@@ -43,7 +43,7 @@ test('tables over the cell cap are named too large, with the cap (review M2 U2)'
       doc={docOf('Inventar')}
     />,
   )
-  expect(screen.getByText(/zu groß/)).toHaveTextContent('10.000 Tabellenzellen')
+  expect(screen.getByText(/zu groß/)).toHaveTextContent('5.000 Tabellenzellen')
 })
 
 test('the example fits the cause, and none is given when it is not known (U12)', () => {

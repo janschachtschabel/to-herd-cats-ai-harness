@@ -1,12 +1,15 @@
 // The table cell cap of live editing (review M2 U2). A table cell costs a live document
 // far more than its text (a check of a table of 20,000 cells ran a check worker out of
-// memory, and every cell is about a hundred bytes of Yjs state), so a page whose tables
-// hold more than MAX_TABLE_CELLS cells in all is too large for live editing. Counted
+// memory, and every cell is about a hundred bytes of Yjs state and about 1.5 KB of the
+// collab process's heap while the page is open: a page of 9,606 cells held ~30 MB, and
+// eight of them took the process over 512 MiB, review M4-1 P12), so a page whose tables
+// hold more than MAX_TABLE_CELLS cells in all is too large for live editing (larger
+// tables are edited as Markdown source). Counted
 // cheaply, on this thread, before a check worker is asked: on opening from the stored
 // Markdown (4413), on saving from the editor's document (not stored, "too large").
 // The count is the page view's parser's: a table is as wide as its widest row.
 
-export const MAX_TABLE_CELLS = 10_000;
+export const MAX_TABLE_CELLS = 5_000;
 
 const FENCE = /^(`{3,}|~{3,})/;
 const DELIMITER_CELL = /^\s*:?-+:?\s*$/;

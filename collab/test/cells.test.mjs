@@ -24,6 +24,10 @@ function table(columns, rows) {
   return [line("h"), line("---"), ...Array(rows).fill(line("x"))].join("\n");
 }
 
+test("the cap is 5,000 cells (review M4-1 P12: a table page of 9,606 cells held ~30 MB)", () => {
+  assert.equal(MAX_TABLE_CELLS, 5_000);
+});
+
 test("the Markdown count is the parser's count", () => {
   const cases = [
     "Text ohne Tabelle\n",

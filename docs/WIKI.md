@@ -245,9 +245,12 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Der Markdown-Parser (micromark, wie in der Seitenansicht) braucht dafür Zeit, die mit
   ihrer Zahl quadratisch wächst (40.000 `*a*` in einem Absatz: rund 8 s je Lesen, das
   Öffnen liest die Seite mehrmals).
-- **Tabellenzellen:** Die Tabellen einer Seite dürfen live zusammen höchstens 10.000
-  Zellen haben (jede Zelle kostet im Live-Zustand rund hundert Bytes, und die Prüfung
-  sehr großer Tabellen sprengte den Thread). Gezählt wird vor jeder Prüfung, ohne
+- **Tabellenzellen:** Die Tabellen einer Seite dürfen live zusammen höchstens 5.000
+  Zellen haben (jede Zelle kostet im Live-Zustand rund hundert Bytes und im Speicher des
+  Collab-Prozesses rund 1,5 KB, solange die Seite offen ist; die Prüfung sehr großer
+  Tabellen sprengte den Thread, und wenige offene Seiten mit 9.600 Zellen brachten den
+  Prozess über 512 MiB). Größere Tabellen bearbeitet man als Markdown-Quelltext im
+  Markdown-Editor. Gezählt wird vor jeder Prüfung, ohne
   Thread: Eine Seite darüber öffnet der Live-Editor nicht (4413, „zu groß“, mit dem
   Angebot des Markdown-Editors); ein Stand darüber wird nicht gespeichert, alle sehen
   „zu groß für die Live-Bearbeitung“ mit dem betroffenen Block, und die Sitzung läuft
