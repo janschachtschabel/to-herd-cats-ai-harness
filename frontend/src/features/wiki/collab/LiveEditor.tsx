@@ -42,9 +42,11 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   })
   useEffect(() => () => refreshPage(latest.current), [refreshPage])
   const editable = live.stopped === null && live.status !== 'connecting'
-  const unsaved = live.unsynced > 0 || (live.stopped !== null && !!live.lost && !copied)
-  useLeaveGuard(unsaved, t('wiki.live.leaveConfirm'))
   const lost = live.lost && live.lost !== page.content_md.trim() ? live.lost : null
+  // Once stopped, nothing more reaches the server: only text that differs from the
+  // page is at stake (not the editor's own empty paragraph of a refused session).
+  const unsaved = live.stopped === null ? live.unsynced > 0 : !!lost && !copied
+  useLeaveGuard(unsaved, t('wiki.live.leaveConfirm'))
 
   async function done() {
     setFinishing(true)

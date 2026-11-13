@@ -155,6 +155,10 @@ describe('live editor', () => {
     liveApi('editor', () => current)
     const { router, user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
     await waitFor(() => expect(connections).toHaveLength(1))
+    // The editor's own empty paragraph never reaches the server (found in a browser,
+    // review R18): leaving must not ask about unsaved changes nobody made.
+    act(() => connections[0]!.handlers.onUnsynced(1))
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     act(() => connections[0]!.handlers.onClose(4422))
     expect(
       await screen.findByText(/die der Live-Editor nicht unverändert bearbeiten kann/),
@@ -163,6 +167,8 @@ describe('live editor', () => {
     expect(screen.queryByRole('button', { name: 'Neu laden' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Im Markdown-Editor bearbeiten' }))
     await waitFor(() => expect(router.state.location.search).toEqual({ view: 'edit' }))
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
   })
 
   test('1013 and other transient closes leave reconnecting to the provider', async () => {
