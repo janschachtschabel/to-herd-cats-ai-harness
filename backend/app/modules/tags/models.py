@@ -21,6 +21,7 @@ class SubjectType(StrEnum):
     """What can carry tags; widened with each milestone (tickets, skills, agents)."""
 
     PAGE = "page"
+    TICKET = "ticket"
 
 
 class Tag(UuidPk, OrgScoped, Base):
@@ -58,7 +59,7 @@ class Tagging(OrgScoped, Base):
 
     __tablename__ = "tagging"
     __table_args__ = (
-        CheckConstraint("subject_type IN ('page')", name="subject_type"),
+        CheckConstraint("subject_type IN ('page', 'ticket')", name="subject_type"),
         Index("ix_tagging_subject", "subject_type", "subject_id"),
     )
 

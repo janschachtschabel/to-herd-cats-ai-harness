@@ -4,7 +4,8 @@
 
 - `ticket_timeline`: the ticket's thread gets one system message per change an event
   names, in a fixed order (created, status, assignee, priority, kind, parent, due
-  date, title, description). The body is a key with parameters for the client to word
+  date, title, description, a page linked or unlinked; tags get none). The body is a
+  key with parameters for the client to word
   (`{"key": "ticket.status_changed", "actor": "<id>", "from": "<id>", "to": "<id>"}`):
   ids, enumeration values and dates, never a title or a description. Each entry
   refers to the event and its own name (`client_id`), so a second delivery writes
@@ -40,6 +41,7 @@ ORDER = (
     Field.DUE_ON,
     Field.TITLE,
     Field.DESCRIPTION,
+    Field.PAGE,
 )
 KEYS = {
     Field.STATUS: "ticket.status_changed",
@@ -49,6 +51,11 @@ KEYS = {
     Field.DUE_ON: "ticket.due_changed",
     Field.TITLE: "ticket.title_changed",
     Field.DESCRIPTION: "ticket.description_changed",
+}
+# Fields whose entry says whether something was set or taken away.
+TOGGLED = {
+    Field.ASSIGNEE: ("ticket.assigned", "ticket.unassigned"),
+    Field.PAGE: ("ticket.page_linked", "ticket.page_unlinked"),
 }
 CREATED = "created"  # the name of a creation's own entry
 
@@ -68,8 +75,9 @@ def entries(event: Event) -> list[tuple[str, dict[str, object]]]:
         change = changes.get(field.value)
         if isinstance(change, dict):
             body["from"], body["to"] = change.get("from"), change.get("to")
-        if field == Field.ASSIGNEE:
-            body["key"] = "ticket.assigned" if body.get("to") else "ticket.unassigned"
+        if field in TOGGLED:
+            on, off = TOGGLED[field]
+            body["key"] = on if body.get("to") else off
             if not body.get("to"):
                 body.pop("to", None)
         found.append((field.value, body))

@@ -9,19 +9,22 @@ workflow per space.
   ignoring case.
 - `ticket_counter`: the last number given out per organisation; a new ticket takes
   the next one in its own transaction (`UPDATE … RETURNING`), so numbers never repeat.
+- `ticket_page_link`: a wiki page a ticket links (of any space, decision 11); it goes
+  with either end (foreign keys), so purging a page removes its links.
 - `work_item`: the ticket. Parent and child live in the same space, as do a ticket and
   its status: a database trigger refuses anything else. Tickets are never deleted on
   their own (cancelled is a status); they go with their space.
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
     CheckConstraint,
     Computed,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -34,7 +37,7 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
+from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
 from app.core.principal import PrincipalType
 
 KEY_PREFIX = "HC"  # a ticket's key is `HC-<number>` (plan M4 decision 1)
@@ -42,6 +45,7 @@ MAX_STATUSES = 20  # per space
 MAX_STATUS_NAME_CHARS = 40
 MAX_TITLE_CHARS = 200
 MAX_DESCRIPTION_CHARS = 100_000
+MAX_TAGS = 20  # per ticket
 
 
 def ticket_key(number: int) -> str:
@@ -179,4 +183,22 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
     # Read only by the list's text filter and the search; deferred.
     search_tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed(TICKET_TSV_SQL, persisted=True), deferred=True
+    )
+
+
+class TicketPageLink(OrgScoped, Base):
+    """A wiki page the ticket links. Shown only to whoever sees both ends."""
+
+    __tablename__ = "ticket_page_link"
+    __table_args__ = (Index("ix_ticket_page_link_page_id", "page_id"),)
+
+    work_item_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("work_item.id", ondelete="CASCADE"), primary_key=True
+    )
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Orders a ticket's pages (last linked first).
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
     )

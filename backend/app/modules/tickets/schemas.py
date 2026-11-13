@@ -5,8 +5,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.core.principal import PrincipalType
+from app.modules.tags.schemas import TagOut
+from app.modules.tickets.link_repository import LinkedPage
 from app.modules.tickets.models import (
     MAX_DESCRIPTION_CHARS,
+    MAX_TAGS,
     MAX_TITLE_CHARS,
     Priority,
     StatusCategory,
@@ -69,6 +72,16 @@ class TicketUpdate(BaseModel):
         return value
 
 
+class TicketTagsSet(BaseModel):
+    """The ticket's tags from now on (the set replaces the old one): system-wide tags
+    and tags of the ticket's space; `version` is the ticket version the client read."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag_ids: list[uuid.UUID] = Field(max_length=MAX_TAGS)
+    version: int
+
+
 class StatusRef(BaseModel):
     id: uuid.UUID
     name: str
@@ -103,7 +116,7 @@ class ChildCounts(BaseModel):
 
 class TicketSummaryOut(BaseModel):
     """A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
-    number. `version` guards writes (send it back; stale → 409)."""
+    number. `version` guards writes (send it back; stale → 409). `tags` by name."""
 
     id: uuid.UUID
     number: int
@@ -117,6 +130,7 @@ class TicketSummaryOut(BaseModel):
     reporter: PersonOut
     due_on: date | None
     parent: ParentOut | None
+    tags: list[TagOut]
     version: int
     created_at: datetime
     updated_at: datetime
@@ -148,6 +162,7 @@ class TicketSummaryOut(BaseModel):
             "reporter": PersonOut(type=t.reporter_type, id=t.reporter_id, name=view.reporter_name),
             "due_on": t.due_on,
             "parent": parent,
+            "tags": [TagOut.of(tag) for tag in view.tags],
             "version": t.version,
             "created_at": t.created_at,
             "updated_at": t.updated_at,
@@ -173,4 +188,26 @@ class TicketOut(TicketSummaryOut):
                 "description_md": view.ticket.description_md,
                 "children": counts,
             }
+        )
+
+
+class LinkedPageOut(BaseModel):
+    """A page the ticket links (one the caller sees)."""
+
+    id: uuid.UUID
+    space_id: uuid.UUID
+    space_name: str
+    title: str
+    path: str
+    linked_at: datetime
+
+    @classmethod
+    def of(cls, page: LinkedPage) -> "LinkedPageOut":
+        return cls(
+            id=page.page_id,
+            space_id=page.space_id,
+            space_name=page.space_name,
+            title=page.title,
+            path=page.path,
+            linked_at=page.linked_at,
         )

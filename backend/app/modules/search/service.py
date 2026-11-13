@@ -1,16 +1,17 @@
-"""Full-text search (spec 11, full text only) over what the actor may see: pages and,
-since M3, messages (`messaging/search.py`), in one ranking with one cursor.
+"""Full-text search (spec 11, full text only) over what the actor may see: pages,
+since M3 messages (`messaging/search.py`) and since M4 tickets (`tickets/search.py`),
+in one ranking with one cursor.
 
 Visibility is decided in SQL by the same rules as everywhere else (`core/access.py`):
 spaces the actor may read, drafts only where it holds `page.edit`; messages where
-their conversation is visible. A space filter the actor may not read is 404
-`space.not_found`, as for an unknown id; with a space, messages come from its
-channels and page threads only. Tags narrow to pages (messages carry none). Empty
-input is an empty result, not an error.
+their conversation is visible; tickets in the spaces where it holds `ticket.read`. A
+space filter the actor may not read is 404 `space.not_found`, as for an unknown id;
+with a space, messages come from its channels and threads only. Tags narrow to pages
+and tickets (messages carry none). Empty input is an empty result, not an error.
 
-Both kinds are fetched best first below the cursor, `limit + 1` each, and merged by
+Every kind is fetched best first below the cursor, `limit + 1` each, and merged by
 (score descending, id): every hit of the merged page is ranked before every hit left
-out, so the (score, id) cursor of its last hit continues both lists.
+out, so the (score, id) cursor of its last hit continues every list.
 """
 
 import uuid
@@ -27,9 +28,10 @@ from app.modules.messaging.search import MessageHit, MessageSearch
 from app.modules.search.repository import SearchRepository, SearchScope
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
+from app.modules.tickets.search import TicketHit, TicketSearch
 
-HitType = Literal["page", "message"]  # tickets and more join in later milestones
-HIT_TYPES: tuple[HitType, ...] = ("page", "message")
+HitType = Literal["page", "message", "ticket"]
+HIT_TYPES: tuple[HitType, ...] = ("page", "message", "ticket")
 MAX_QUERY_CHARS = 1000
 
 
@@ -47,6 +49,9 @@ class SearchHit:
     score: float
 
 
+AnyHit = SearchHit | MessageHit | TicketHit
+
+
 class SearchService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -60,15 +65,15 @@ class SearchService:
         tag_ids: Iterable[uuid.UUID] | None = None,
         types: Sequence[HitType] = HIT_TYPES,
         params: PageParams,
-    ) -> pagination.Page[SearchHit | MessageHit]:
+    ) -> pagination.Page[AnyHit]:
         """Best first. With `space_id`, only that space; with `tag_ids`, only what
-        carries every one of the tags."""
+        carries every one of the tags (pages and tickets)."""
         after = decode_score_cursor(params.cursor) if params.cursor else None
         if space_id is not None:
             await require(self.session, actor, Action.SPACE_READ, space_id)
         q = q.strip()[:MAX_QUERY_CHARS]
         tag_ids = list(dict.fromkeys(tag_ids or ()))
-        hits: list[SearchHit | MessageHit] = []
+        hits: list[AnyHit] = []
         if q and "page" in types:
             hits.extend(await self._pages(actor, q, space_id, tag_ids, after, params.limit + 1))
         if q and "message" in types and not tag_ids:
@@ -77,11 +82,22 @@ class SearchService:
                     actor, q, space_id=space_id, after=after, limit=params.limit + 1
                 )
             )
+        if q and "ticket" in types:
+            hits.extend(
+                await TicketSearch(self.session).find(
+                    actor,
+                    q,
+                    space_id=space_id,
+                    tag_ids=tag_ids,
+                    after=after,
+                    limit=params.limit + 1,
+                )
+            )
         hits.sort(key=lambda hit: (-hit.score, _id(hit)))
         items = hits[: params.limit]
         more = len(hits) > params.limit
         cursor = encode_score_cursor(items[-1].score, _id(items[-1])) if more else None
-        return pagination.Page[SearchHit | MessageHit](items=items, next_cursor=cursor)
+        return pagination.Page[AnyHit](items=items, next_cursor=cursor)
 
     async def _pages(
         self,
@@ -108,5 +124,5 @@ class SearchService:
         ]
 
 
-def _id(hit: SearchHit | MessageHit) -> uuid.UUID:
-    return hit.id if isinstance(hit, SearchHit) else hit.message_id
+def _id(hit: AnyHit) -> uuid.UUID:
+    return hit.message_id if isinstance(hit, MessageHit) else hit.id

@@ -16,8 +16,8 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
-from app.core.access import Action, Actor, require, space_ids_with
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.access import Action, Actor, require
+from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams
 from app.core.principal import Principal
 from app.modules.audit.recorder import record
@@ -25,7 +25,16 @@ from app.modules.messaging.models import Conversation
 from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets import hierarchy, listing
 from app.modules.tickets.assignment import check_assignment
-from app.modules.tickets.events import TICKET_CREATED, TICKET_UPDATED, Changes, Field, ticket_event
+from app.modules.tickets.base import (
+    editable,
+    emit_change,
+    readable,
+    ticket_not_found,
+    ticket_repository,
+    view_of,
+    with_tags,
+)
+from app.modules.tickets.events import TICKET_CREATED, TICKET_UPDATED, Changes, Field
 from app.modules.tickets.models import (
     Priority,
     StatusCategory,
@@ -33,22 +42,14 @@ from app.modules.tickets.models import (
     TicketStatus,
     WorkItem,
 )
-from app.modules.tickets.repository import TicketRepository, TicketScope, TicketView
+from app.modules.tickets.repository import TicketRepository, TicketView
 from app.modules.tickets.statuses import status_repository
 
-
-def ticket_not_found() -> NotFound:
-    return NotFound(code="ticket.not_found")
+__all__ = ["TicketService", "ticket_not_found", "ticket_repository"]
 
 
 def status_invalid() -> ValidationFailed:
     return ValidationFailed("Not a status of the ticket's space", code="ticket.status_invalid")
-
-
-def ticket_repository(session: AsyncSession, actor: Actor) -> TicketRepository:
-    """The actor's view of the tickets: the spaces where it may read them."""
-    scope = TicketScope(actor.org_id, space_ids_with(actor, Action.TICKET_READ))
-    return TicketRepository(session, scope)
 
 
 class TicketService:
@@ -100,20 +101,20 @@ class TicketService:
         changes: dict[Field, tuple[Any, Any]] = {}
         if assignee is not None:
             changes[Field.ASSIGNEE] = (None, assignee.id)
-        await self._emit(actor, TICKET_CREATED, ticket, changes)
+        await emit_change(self.session, actor, TICKET_CREATED, ticket, changes)
         await self._audit(actor, "ticket.created", ticket, {"number": ticket.number})
         await self._audit_changes(actor, ticket, changes, status)
-        return await self._view(repo, ticket.id)
+        return await view_of(self.session, actor, repo, ticket.id)
 
     async def get(self, actor: Actor, number: int) -> TicketView:
         repo = ticket_repository(self.session, actor)
-        ticket = await self._readable(actor, repo, number)
-        return await self._view(repo, ticket.id)
+        ticket = await readable(self.session, actor, repo, number)
+        return await view_of(self.session, actor, repo, ticket.id)
 
     async def thread_of(self, actor: Actor, number: int) -> Conversation:
         """The thread of the ticket `number`, for whoever sees the ticket (404
         `ticket.not_found` for anyone else)."""
-        ticket = await self._readable(actor, ticket_repository(self.session, actor), number)
+        ticket = await readable(self.session, actor, ticket_repository(self.session, actor), number)
         return await self.thread(actor, ticket)
 
     async def thread(self, actor: Actor, ticket: WorkItem) -> Conversation:
@@ -129,25 +130,19 @@ class TicketService:
         self, actor: Actor, number: int, version: int, values: dict[str, Any]
     ) -> TicketView:
         """`values`: the fields the client sent (`TicketUpdate`), null ones included."""
-        repo = ticket_repository(self.session, actor)
-        ticket = await self._readable(actor, repo, number, lock=True)
-        await require(self.session, actor, Action.TICKET_EDIT, ticket.space_id)
-        if ticket.version != version:
-            raise Conflict(
-                code="ticket.version_conflict", details={"current_version": ticket.version}
-            )
+        repo, ticket = await editable(self.session, actor, number, version)
         changes = await self._changes(actor, repo, ticket, values)
         status = None
         if Field.STATUS in changes:
             status = await self._status(actor, ticket.space_id, values["status_id"])
         if not changes:
-            return await self._view(repo, ticket.id)
+            return await view_of(self.session, actor, repo, ticket.id)
         _apply(ticket, values, changes)
         ticket.version += 1
         await self.session.flush()
-        await self._emit(actor, TICKET_UPDATED, ticket, changes)
+        await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes)
         await self._audit_changes(actor, ticket, changes, status)
-        return await self._view(repo, ticket.id)
+        return await view_of(self.session, actor, repo, ticket.id)
 
     async def list(
         self, actor: Actor, filters: listing.Filters, sort: listing.Sort, params: PageParams
@@ -155,7 +150,8 @@ class TicketService:
         after = listing.decode(sort, params.cursor) if params.cursor else None
         repo = ticket_repository(self.session, actor)
         rows = await repo.page(filters, sort, after, params.limit + 1)
-        items, more = rows[: params.limit], len(rows) > params.limit
+        items = await with_tags(self.session, actor, rows[: params.limit])
+        more = len(rows) > params.limit
         cursor = None
         if more:
             last = items[-1].ticket
@@ -164,24 +160,6 @@ class TicketService:
         return pagination.Page[TicketView](items=items, next_cursor=cursor)
 
     # --- helpers -------------------------------------------------------------------
-
-    async def _readable(
-        self, actor: Actor, repo: TicketRepository, number: int, *, lock: bool = False
-    ) -> WorkItem:
-        ticket = await repo.by_number(number, lock=lock)
-        if ticket is None:
-            raise ticket_not_found()
-        try:  # also notes an admin's look into a team or personal space (spec 5.5)
-            await require(self.session, actor, Action.TICKET_READ, ticket.space_id)
-        except NotFound:
-            raise ticket_not_found() from None
-        return ticket
-
-    async def _view(self, repo: TicketRepository, ticket_id: uuid.UUID) -> TicketView:
-        view = await repo.view(ticket_id)
-        if view is None:  # only if it went away after the check
-            raise ticket_not_found()
-        return view
 
     async def _status(
         self, actor: Actor, space_id: uuid.UUID, status_id: uuid.UUID | None
@@ -241,18 +219,6 @@ class TicketService:
             hierarchy.check_parent(kind, parent.kind)
         if Field.KIND in changes:
             hierarchy.check_children(kind, await repo.child_kinds(ticket.id))
-
-    async def _emit(self, actor: Actor, type_: str, ticket: WorkItem, changes: Changes) -> None:
-        thread = await self.thread(actor, ticket)
-        await ticket_event(
-            self.session,
-            actor,
-            type_,
-            ticket_id=ticket.id,
-            space_id=ticket.space_id,
-            conversation_id=thread.id,
-            changes=changes,
-        )
 
     async def _audit_changes(
         self, actor: Actor, ticket: WorkItem, changes: Changes, status: TicketStatus | None

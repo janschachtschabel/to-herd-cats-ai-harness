@@ -5,7 +5,8 @@ an event exists exactly when its change committed. One event per change:
   `fields`/`changes` name an assignee it was created with);
 - `ticket.updated` (the same keys): `fields` names every field that changed, sorted;
   `changes` holds the old and new value for the fields with a value worth a timeline
-  entry (`VALUED`): ids (status, assignee, parent) and enumeration values or dates.
+  entry (`VALUED`): ids (status, assignee, parent, a page linked or unlinked) and
+  enumeration values or dates. Tags are only named.
   A title or description change is only named, never carried (plan M4 Global
   Constraints): payloads hold ids and enumeration values, never text.
 
@@ -34,14 +35,24 @@ class Field(StrEnum):
     DESCRIPTION = "description"
     DUE_ON = "due_on"
     KIND = "kind"
+    PAGE = "page"  # a page linked (from null to its id) or unlinked (from its id to null)
     PARENT = "parent"
     PRIORITY = "priority"
     STATUS = "status"
+    TAGS = "tags"
     TITLE = "title"
 
 
 VALUED = frozenset(
-    {Field.ASSIGNEE, Field.DUE_ON, Field.KIND, Field.PARENT, Field.PRIORITY, Field.STATUS}
+    {
+        Field.ASSIGNEE,
+        Field.DUE_ON,
+        Field.KIND,
+        Field.PAGE,
+        Field.PARENT,
+        Field.PRIORITY,
+        Field.STATUS,
+    }
 )
 
 Value = uuid.UUID | date | StrEnum | None

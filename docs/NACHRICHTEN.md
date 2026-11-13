@@ -93,10 +93,12 @@ Jede Aufgabe hat genau eine Diskussion, angelegt mit der Aufgabe
 (`ticket.read` im Bereich, ab Leser); schreiben, wer im Bereich schreiben darf
 (`channel.post`). Wer den Bereich verlässt, sieht die Diskussion nicht mehr. Der Worker
 schreibt je geänderte Eigenschaft eine Systemmeldung (angelegt, Status, Zuständigkeit,
-Priorität, Art, übergeordnete Aufgabe, Fälligkeit, Titel, Beschreibung) mit altem und
-neuem Wert (Status-, Personen- und Aufgabennamen löst die API beim Lesen auf); Titel
-und Beschreibung werden nur genannt, nie wiedergegeben. In Kanäle und
-Direktnachrichten schreibt keine Aufgabe etwas.
+Priorität, Art, übergeordnete Aufgabe, Fälligkeit, Titel, Beschreibung, Seite
+verknüpft oder gelöst) mit altem und neuem Wert (Status-, Personen- und Aufgabennamen
+und Seitentitel löst die API beim Lesen auf; eine Seite, die die lesende Person nicht
+sehen darf, erscheint ohne Titel und ohne Kennung); Titel und Beschreibung werden nur
+genannt, nie wiedergegeben. Tags an einer Aufgabe ergeben keine Systemmeldung. In
+Kanäle und Direktnachrichten schreibt keine Aufgabe etwas.
 
 ### Aktivität
 
@@ -114,7 +116,10 @@ kommen mit Agenten (M6).
 ### Suche
 
 Strg+K durchsucht Seiten und Nachrichten zusammen: Kanäle lesbarer Bereiche, eigene
-Direktnachrichten, Diskussionen sichtbarer Seiten. Nie gefunden werden fremde
+Direktnachrichten, Diskussionen sichtbarer Seiten. Die Such-API (`GET /api/search`)
+findet seit M4 auch Aufgaben (`types=ticket`; eine Eingabe wie `HC-42` oder `42` stellt
+die sichtbare Aufgabe mit dieser Nummer an den Anfang); die Oberfläche zeigt sie mit
+den Aufgaben-Ansichten. Nie gefunden werden fremde
 Direktnachrichten (auch nicht während einer Einsicht), Systemmeldungen und gelöschte
 Nachrichten. Mit „Nur in diesem Bereich“ fallen Direktnachrichten weg. Ein Treffer
 öffnet das Gespräch an der Nachricht.

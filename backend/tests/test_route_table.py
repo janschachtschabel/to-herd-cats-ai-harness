@@ -118,6 +118,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/tickets/{number}", "ticket"),
     ("PATCH", "/api/tickets/{number}", "ticket"),
     ("GET", "/api/tickets/{number}/thread", "ticket"),  # the ticket's discussion
+    ("PUT", "/api/tickets/{number}/tags", "ticket"),
+    ("GET", "/api/tickets/{number}/pages", "ticket"),
+    ("PUT", "/api/tickets/{number}/pages/{page_id}", "ticket"),
+    ("DELETE", "/api/tickets/{number}/pages/{page_id}", "ticket"),
+    ("GET", "/api/pages/{page_id}/tickets", "page"),
     ("GET", "/api/spaces/{space_id}/ticket-statuses", "space"),
     ("POST", "/api/spaces/{space_id}/ticket-statuses", "space"),
     ("PATCH", "/api/ticket-statuses/{status_id}", "ticket_status"),
@@ -235,6 +240,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/conversations/{conversation_id}/read"): {"message_id": str(uuid7())},
     ("POST", "/api/spaces/{space_id}/tickets"): {"title": "X"},
     ("PATCH", "/api/tickets/{number}"): {"title": "X", "version": 1},
+    ("PUT", "/api/tickets/{number}/tags"): {"tag_ids": [], "version": 1},
     ("POST", "/api/spaces/{space_id}/ticket-statuses"): {"name": "X", "category": "open"},
     ("PATCH", "/api/ticket-statuses/{status_id}"): {"name": "X", "version": 1},
 }
@@ -305,7 +311,7 @@ async def test_ticket_routes_hide_tickets_without_a_role(
     ticket = await TicketService(session).create(actor, team_space.id, title="Geheim")
     for method, template, guard in ROUTES:
         if guard == "ticket":
-            path = template.replace("{number}", str(ticket.ticket.number))
+            path = _concrete(template.replace("{number}", str(ticket.ticket.number)))
             body = BODIES.get((method, template))
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)

@@ -32,6 +32,7 @@ from sqlalchemy.orm import aliased, defer
 from app.core.access_repository import person_holds_role
 from app.core.permissions import SPACE_ACTION_MIN_ROLE, Action
 from app.core.principal import PrincipalType
+from app.modules.tags.models import SubjectType, Tag, Tagging
 from app.modules.tickets.listing import LAST_DAY, Filters, Position, Sort
 from app.modules.tickets.models import (
     Priority,
@@ -67,13 +68,15 @@ class ParentRef:
 
 @dataclass(frozen=True, slots=True)
 class TicketView:
-    """A ticket with what showing it needs: its status, parent and people's names."""
+    """A ticket with what showing it needs: its status, parent, people's names and
+    (filled in by the services, `base.with_tags`) its tags."""
 
     ticket: WorkItem
     status: TicketStatus
     parent: ParentRef | None
     assignee_name: str | None
     reporter_name: str | None
+    tags: tuple[Tag, ...] = ()
 
 
 def _sort_key(sort: Sort) -> ColumnElement[object]:
@@ -82,6 +85,13 @@ def _sort_key(sort: Sort) -> ColumnElement[object]:
     if sort == Sort.DUE:
         return func.coalesce(WorkItem.due_on, LAST_DAY)
     return PRIORITY_RANK
+
+
+def _tagged(tag_id: uuid.UUID) -> Select[uuid.UUID]:
+    """The tickets carrying the tag (SQL)."""
+    return select(Tagging.subject_id).where(
+        Tagging.subject_type == SubjectType.TICKET, Tagging.tag_id == tag_id
+    )
 
 
 class TicketRepository:
@@ -264,6 +274,8 @@ class TicketRepository:
             stmt = stmt.where(WorkItem.parent_id == f.parent_id)
         if f.due_before is not None:
             stmt = stmt.where(WorkItem.due_on < f.due_before)
+        for tag_id in f.tag_ids:  # every one of them
+            stmt = stmt.where(WorkItem.id.in_(_tagged(tag_id)))
         if f.q is not None:
             query = func.websearch_to_tsquery(_GERMAN, f.q).op("||")(
                 func.websearch_to_tsquery(_SIMPLE, f.q)

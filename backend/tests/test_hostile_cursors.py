@@ -87,7 +87,10 @@ async def test_hostile_cursors_answer_422_everywhere(
         "/api/admin/dm-inspect",
         json={"conversation_id": dm.json()["id"], "reason": "hostile cursor test"},
     )
+    ticket = await owner.post(f"/api/spaces/{space_id}/tickets", json={"title": "Ticket"})
     ids = {
+        "{number}": str(ticket.json()["number"]),
+        "{status_id}": ticket.json()["status"]["id"],
         "{inspection_id}": inspection.json()["id"],
         "{space_id}": space_id,
         "{group_id}": str(group.id),

@@ -799,6 +799,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Page Tickets
+         * @description The tickets linking the page that the caller may see, newest first.
+         */
+        get: operations["list_page_tickets_api_pages__page_id__tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/trash": {
         parameters: {
             query?: never;
@@ -877,8 +897,8 @@ export interface paths {
         };
         /**
          * Search
-         * @description Pages and messages the caller may see, best first; empty `q` gives an empty
-         *     list. Tags narrow to pages.
+         * @description Pages, messages and tickets the caller may see, best first; empty `q` gives an
+         *     empty list. Tags narrow to pages and tickets.
          */
         get: operations["search_api_search_get"];
         put?: never;
@@ -1235,6 +1255,72 @@ export interface paths {
         head?: never;
         /** Update Ticket */
         patch: operations["update_ticket_api_tickets__number__patch"];
+        trace?: never;
+    };
+    "/api/tickets/{number}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ticket Pages
+         * @description The pages the ticket links that the caller sees, last linked first.
+         */
+        get: operations["list_ticket_pages_api_tickets__number__pages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/{number}/pages/{page_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link Page
+         * @description Link a page the caller sees, of any space (`ticket.edit`); linking again
+         *     changes nothing.
+         */
+        put: operations["link_page_api_tickets__number__pages__page_id__put"];
+        post?: never;
+        /**
+         * Unlink Page
+         * @description Remove the link to a page the caller sees (`ticket.edit`); 204 also when there
+         *     was none.
+         */
+        delete: operations["unlink_page_api_tickets__number__pages__page_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/{number}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Ticket Tags
+         * @description Replace the ticket's tags (`ticket.edit`); bumps the ticket version.
+         */
+        put: operations["set_ticket_tags_api_tickets__number__tags_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/tickets/{number}/thread": {
@@ -1790,6 +1876,33 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * LinkedPageOut
+         * @description A page the ticket links (one the caller sees).
+         */
+        LinkedPageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Linked At
+             * Format: date-time
+             */
+            linked_at: string;
+            /** Path */
+            path: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Space Name */
+            space_name: string;
+            /** Title */
+            title: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -2191,6 +2304,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[LinkedPageOut] */
+        Page_LinkedPageOut_: {
+            /** Items */
+            items: components["schemas"]["LinkedPageOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[MessageOut] */
         Page_MessageOut_: {
             /** Items */
@@ -2380,11 +2500,11 @@ export interface components {
         };
         /**
          * SearchResults
-         * @description A page of hits of both kinds, told apart by `type`.
+         * @description A page of hits of every kind, told apart by `type`.
          */
         SearchResults: {
             /** Items */
-            items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"])[];
+            items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"] | components["schemas"]["TicketHitOut"])[];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -2678,6 +2798,43 @@ export interface components {
             title: string;
         };
         /**
+         * TicketHitOut
+         * @description A ticket (`id`; addresses use `number`, people read `key`). `snippet` (from the
+         *     description) and `score` as for pages; input shaped like a visible ticket's key
+         *     ranks that ticket first.
+         */
+        TicketHitOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["TicketKind"];
+            /** Number */
+            number: number;
+            /** Score */
+            score: number;
+            /** Snippet */
+            snippet: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Space Name */
+            space_name: string;
+            status: components["schemas"]["StatusRef"];
+            /** Title */
+            title: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ticket";
+        };
+        /**
          * TicketKind
          * @enum {string}
          */
@@ -2717,6 +2874,8 @@ export interface components {
              */
             space_id: string;
             status: components["schemas"]["StatusRef"];
+            /** Tags */
+            tags: components["schemas"]["TagOut"][];
             /** Title */
             title: string;
             /**
@@ -2730,7 +2889,7 @@ export interface components {
         /**
          * TicketSummaryOut
          * @description A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
-         *     number. `version` guards writes (send it back; stale → 409).
+         *     number. `version` guards writes (send it back; stale → 409). `tags` by name.
          */
         TicketSummaryOut: {
             assignee: components["schemas"]["PersonOut"] | null;
@@ -2760,6 +2919,8 @@ export interface components {
              */
             space_id: string;
             status: components["schemas"]["StatusRef"];
+            /** Tags */
+            tags: components["schemas"]["TagOut"][];
             /** Title */
             title: string;
             /**
@@ -2767,6 +2928,17 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TicketTagsSet
+         * @description The ticket's tags from now on (the set replaces the old one): system-wide tags
+         *     and tags of the ticket's space; `version` is the ticket version the client read.
+         */
+        TicketTagsSet: {
+            /** Tag Ids */
+            tag_ids: string[];
             /** Version */
             version: number;
         };
@@ -4916,6 +5088,40 @@ export interface operations {
             };
         };
     };
+    list_page_tickets_api_pages__page_id__tickets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TicketSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     trash_page_api_pages__page_id__trash_post: {
         parameters: {
             query?: never;
@@ -5097,7 +5303,7 @@ export interface operations {
                 space_id?: string | null;
                 /** @description only with every tag */
                 tag?: string[] | null;
-                /** @description what to find: page, message (comma-separated) */
+                /** @description what to find: page, message, ticket (comma-separated) */
                 types?: string;
             };
             header?: never;
@@ -5986,6 +6192,8 @@ export interface operations {
                 parent?: string | null;
                 q?: string | null;
                 due_before?: string | null;
+                /** @description only with every tag */
+                tag?: string[] | null;
                 sort?: components["schemas"]["Sort"];
             };
             header?: never;
@@ -6057,6 +6265,135 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TicketUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_pages_api_tickets__number__pages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_LinkedPageOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_page_api_tickets__number__pages__page_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_page_api_tickets__number__pages__page_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_ticket_tags_api_tickets__number__tags_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketTagsSet"];
             };
         };
         responses: {

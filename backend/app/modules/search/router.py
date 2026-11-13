@@ -13,7 +13,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 
 def _types(raw: str) -> list[HitType]:
-    """`page,message` (any order, either alone); anything else is 422."""
+    """`page,message,ticket` (any order, any of them); anything else is 422."""
     names = [name.strip() for name in raw.split(",") if name.strip()]
     if not names or any(name not in HIT_TYPES for name in names):
         raise ValidationFailed(
@@ -31,11 +31,12 @@ async def search(
     space_id: Annotated[uuid.UUID | None, Query(description="only this space")] = None,
     tag: Annotated[list[uuid.UUID] | None, Query(description="only with every tag")] = None,
     types: Annotated[
-        str, Query(max_length=100, description="what to find: page, message (comma-separated)")
+        str,
+        Query(max_length=100, description="what to find: page, message, ticket (comma-separated)"),
     ] = ",".join(HIT_TYPES),
 ) -> SearchResults:
-    """Pages and messages the caller may see, best first; empty `q` gives an empty
-    list. Tags narrow to pages."""
+    """Pages, messages and tickets the caller may see, best first; empty `q` gives an
+    empty list. Tags narrow to pages and tickets."""
     page = await SearchService(session).search(
         actor, q, space_id=space_id, tag_ids=tag, types=_types(types), params=params
     )

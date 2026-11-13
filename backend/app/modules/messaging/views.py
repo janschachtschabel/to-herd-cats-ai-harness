@@ -1,8 +1,9 @@
 """Messages as their reader is shown them: with whom they mention, their reactions
 summed up (`mine` from the reader's side), the author's name, and a system message's
 timeline entry read from its body (a key with parameters, for the client to word),
-the ids in it named (people, ticket statuses, parent tickets). For messages the
-reader has been allowed to see; at most five queries for a whole page."""
+the ids in it named (people, ticket statuses, parent tickets, linked pages). For
+messages the reader has been allowed to see; at most six queries for a whole page. A
+linked page the reader cannot see is left out (neither its title nor its id)."""
 
 import json
 import uuid
@@ -21,11 +22,13 @@ from app.modules.messaging.social_repository import (
 from app.modules.tickets.models import ticket_key
 from app.modules.tickets.name_repository import TicketNameRepository
 from app.modules.users.repository import UserRepository
+from app.modules.wiki.visibility import PageReader
 
 # Timeline keys whose `from`/`to` are ids, by what they name.
 PERSON_KEYS = frozenset({"ticket.assigned", "ticket.unassigned"})
 STATUS_KEYS = frozenset({"ticket.status_changed"})
 TICKET_KEYS = frozenset({"ticket.parent_changed"})
+PAGE_KEYS = frozenset({"ticket.page_linked", "ticket.page_unlinked"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,11 +60,15 @@ class _Names:
     people: dict[uuid.UUID, str]
     statuses: dict[uuid.UUID, str]
     tickets: dict[uuid.UUID, int]
+    pages: dict[uuid.UUID, str]  # only those the reader sees
 
     def of(self, key: str, value: object) -> SystemValue | None:
         if not isinstance(value, str):
             return None
         ref = _uuid(value)
+        if key in PAGE_KEYS:
+            title = self.pages.get(ref) if ref is not None else None
+            return SystemValue(value=value, name=title) if title is not None else None
         name: str | None = None
         if ref is not None and key in PERSON_KEYS:
             name = self.people.get(ref)
@@ -141,6 +148,7 @@ async def message_views(
         people=await UserRepository(session).names(actor.org_id, people),
         statuses=await tickets.status_names(_refs(present, STATUS_KEYS)),
         tickets=await tickets.numbers(_refs(present, TICKET_KEYS)),
+        pages=await PageReader(session).titles(actor, _refs(present, PAGE_KEYS)),
     )
     return [
         MessageView(

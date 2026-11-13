@@ -18,9 +18,11 @@ from app.modules.tickets.schemas import (
     TicketCreate,
     TicketOut,
     TicketSummaryOut,
+    TicketTagsSet,
     TicketUpdate,
 )
 from app.modules.tickets.service import TicketService, ticket_not_found
+from app.modules.tickets.tagging import TicketTags
 
 space_tickets = APIRouter(prefix="/spaces/{space_id}/tickets", tags=["tickets"])
 tickets = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -87,6 +89,7 @@ async def list_tickets(
     parent: Annotated[uuid.UUID | None, Query(description="the parent's id")] = None,
     q: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
     due_before: date | None = None,
+    tag: Annotated[list[uuid.UUID] | None, Query(description="only with every tag")] = None,
     sort: Sort = Sort.UPDATED,
 ) -> Page[TicketSummaryOut]:
     """The tickets of every space where the caller may read them."""
@@ -101,6 +104,7 @@ async def list_tickets(
         parent_id=parent,
         q=q,
         due_before=due_before,
+        tag_ids=tuple(dict.fromkeys(tag or ())),
     )
     page = await TicketService(session).list(actor, filters, sort, params)
     return Page[TicketSummaryOut](
@@ -122,6 +126,17 @@ async def update_ticket(
     if "assignee" in values:
         values["assignee"] = _principal(values["assignee"])
     view = await TicketService(session).update(actor, ticket_number(number), body.version, values)
+    return await _full(session, actor, view)
+
+
+@tickets.put("/{number}/tags", response_model=TicketOut)
+async def set_ticket_tags(
+    number: int, body: TicketTagsSet, actor: ActorDep, session: SessionDep
+) -> TicketOut:
+    """Replace the ticket's tags (`ticket.edit`); bumps the ticket version."""
+    view = await TicketTags(session).set(
+        actor, ticket_number(number), body.tag_ids, version=body.version
+    )
     return await _full(session, actor, view)
 
 

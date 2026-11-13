@@ -8,7 +8,10 @@ from app.core.pagination import Page
 from app.core.principal import PrincipalType
 from app.modules.messaging.models import ConversationKind
 from app.modules.messaging.search import MessageHit
-from app.modules.search.service import SearchHit
+from app.modules.search.service import AnyHit, SearchHit
+from app.modules.tickets.models import TicketKind, ticket_key
+from app.modules.tickets.schemas import StatusRef
+from app.modules.tickets.search import TicketHit
 
 
 class PageHitOut(BaseModel):
@@ -94,12 +97,51 @@ class MessageHitOut(BaseModel):
         )
 
 
-SearchHitOut = Annotated[PageHitOut | MessageHitOut, Field(discriminator="type")]
+class TicketHitOut(BaseModel):
+    """A ticket (`id`; addresses use `number`, people read `key`). `snippet` (from the
+    description) and `score` as for pages; input shaped like a visible ticket's key
+    ranks that ticket first."""
+
+    type: Literal["ticket"]
+    id: uuid.UUID
+    number: int
+    key: str
+    title: str
+    kind: TicketKind
+    status: StatusRef
+    space_id: uuid.UUID
+    space_name: str
+    snippet: str
+    score: float
+
+    @classmethod
+    def of(cls, hit: TicketHit) -> "TicketHitOut":
+        status = hit.status
+        return cls(
+            type="ticket",
+            id=hit.id,
+            number=hit.number,
+            key=ticket_key(hit.number),
+            title=hit.title,
+            kind=hit.kind,
+            status=StatusRef(id=status.id, name=status.name, category=status.category),
+            space_id=hit.space_id,
+            space_name=hit.space_name,
+            snippet=hit.snippet,
+            score=hit.score,
+        )
+
+
+SearchHitOut = Annotated[PageHitOut | MessageHitOut | TicketHitOut, Field(discriminator="type")]
 
 
 class SearchResults(Page[SearchHitOut]):
-    """A page of hits of both kinds, told apart by `type`."""
+    """A page of hits of every kind, told apart by `type`."""
 
 
-def hit_out(hit: SearchHit | MessageHit) -> PageHitOut | MessageHitOut:
-    return PageHitOut.of(hit) if isinstance(hit, SearchHit) else MessageHitOut.of(hit)
+def hit_out(hit: AnyHit) -> PageHitOut | MessageHitOut | TicketHitOut:
+    if isinstance(hit, SearchHit):
+        return PageHitOut.of(hit)
+    if isinstance(hit, TicketHit):
+        return TicketHitOut.of(hit)
+    return MessageHitOut.of(hit)

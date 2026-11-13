@@ -1282,6 +1282,48 @@
         "title": "InspectionOut",
         "type": "object"
       },
+      "LinkedPageOut": {
+        "description": "A page the ticket links (one the caller sees).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "linked_at": {
+            "format": "date-time",
+            "title": "Linked At",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "space_name": {
+            "title": "Space Name",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "space_name",
+          "title",
+          "path",
+          "linked_at"
+        ],
+        "title": "LinkedPageOut",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -2392,6 +2434,33 @@
         "title": "Page[InspectableDmOut]",
         "type": "object"
       },
+      "Page_LinkedPageOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedPageOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[LinkedPageOut]",
+        "type": "object"
+      },
       "Page_MessageOut_": {
         "properties": {
           "items": {
@@ -2918,14 +2987,15 @@
         "type": "object"
       },
       "SearchResults": {
-        "description": "A page of hits of both kinds, told apart by `type`.",
+        "description": "A page of hits of every kind, told apart by `type`.",
         "properties": {
           "items": {
             "items": {
               "discriminator": {
                 "mapping": {
                   "message": "#/components/schemas/MessageHitOut",
-                  "page": "#/components/schemas/PageHitOut"
+                  "page": "#/components/schemas/PageHitOut",
+                  "ticket": "#/components/schemas/TicketHitOut"
                 },
                 "propertyName": "type"
               },
@@ -2935,6 +3005,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/MessageHitOut"
+                },
+                {
+                  "$ref": "#/components/schemas/TicketHitOut"
                 }
               ]
             },
@@ -3712,6 +3785,71 @@
         "title": "TicketCreate",
         "type": "object"
       },
+      "TicketHitOut": {
+        "description": "A ticket (`id`; addresses use `number`, people read `key`). `snippet` (from the\ndescription) and `score` as for pages; input shaped like a visible ticket's key\nranks that ticket first.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "space_name": {
+            "title": "Space Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusRef"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "ticket",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "number",
+          "key",
+          "title",
+          "kind",
+          "status",
+          "space_id",
+          "space_name",
+          "snippet",
+          "score"
+        ],
+        "title": "TicketHitOut",
+        "type": "object"
+      },
       "TicketKind": {
         "enum": [
           "epic",
@@ -3799,6 +3937,13 @@
           "status": {
             "$ref": "#/components/schemas/StatusRef"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagOut"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -3826,6 +3971,7 @@
           "reporter",
           "due_on",
           "parent",
+          "tags",
           "version",
           "created_at",
           "updated_at",
@@ -3836,7 +3982,7 @@
         "type": "object"
       },
       "TicketSummaryOut": {
-        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409).",
+        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409). `tags` by name.",
         "properties": {
           "assignee": {
             "anyOf": [
@@ -3905,6 +4051,13 @@
           "status": {
             "$ref": "#/components/schemas/StatusRef"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagOut"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -3932,11 +4085,37 @@
           "reporter",
           "due_on",
           "parent",
+          "tags",
           "version",
           "created_at",
           "updated_at"
         ],
         "title": "TicketSummaryOut",
+        "type": "object"
+      },
+      "TicketTagsSet": {
+        "additionalProperties": false,
+        "description": "The ticket's tags from now on (the set replaces the old one): system-wide tags\nand tags of the ticket's space; `version` is the ticket version the client read.",
+        "properties": {
+          "tag_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Tag Ids",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tag_ids",
+          "version"
+        ],
+        "title": "TicketTagsSet",
         "type": "object"
       },
       "TicketUpdate": {
@@ -7627,6 +7806,78 @@
         ]
       }
     },
+    "/api/pages/{page_id}/tickets": {
+      "get": {
+        "description": "The tickets linking the page that the caller may see, newest first.",
+        "operationId": "list_page_tickets_api_pages__page_id__tickets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TicketSummaryOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Page Tickets",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/pages/{page_id}/trash": {
       "post": {
         "operationId": "trash_page_api_pages__page_id__trash_post",
@@ -7926,7 +8177,7 @@
     },
     "/api/search": {
       "get": {
-        "description": "Pages and messages the caller may see, best first; empty `q` gives an empty\nlist. Tags narrow to pages.",
+        "description": "Pages, messages and tickets the caller may see, best first; empty `q` gives an\nempty list. Tags narrow to pages and tickets.",
         "operationId": "search_api_search_get",
         "parameters": [
           {
@@ -8010,13 +8261,13 @@
             }
           },
           {
-            "description": "what to find: page, message (comma-separated)",
+            "description": "what to find: page, message, ticket (comma-separated)",
             "in": "query",
             "name": "types",
             "required": false,
             "schema": {
-              "default": "page,message",
-              "description": "what to find: page, message (comma-separated)",
+              "default": "page,message,ticket",
+              "description": "what to find: page, message, ticket (comma-separated)",
               "maxLength": 100,
               "title": "Types",
               "type": "string"
@@ -9678,6 +9929,28 @@
             }
           },
           {
+            "description": "only with every tag",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only with every tag",
+              "title": "Tag"
+            }
+          },
+          {
             "in": "query",
             "name": "sort",
             "required": false,
@@ -9802,6 +10075,220 @@
           }
         },
         "summary": "Update Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets/{number}/pages": {
+      "get": {
+        "description": "The pages the ticket links that the caller sees, last linked first.",
+        "operationId": "list_ticket_pages_api_tickets__number__pages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LinkedPageOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ticket Pages",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets/{number}/pages/{page_id}": {
+      "delete": {
+        "description": "Remove the link to a page the caller sees (`ticket.edit`); 204 also when there\nwas none.",
+        "operationId": "unlink_page_api_tickets__number__pages__page_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Page",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "put": {
+        "description": "Link a page the caller sees, of any space (`ticket.edit`); linking again\nchanges nothing.",
+        "operationId": "link_page_api_tickets__number__pages__page_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Page",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/tickets/{number}/tags": {
+      "put": {
+        "description": "Replace the ticket's tags (`ticket.edit`); bumps the ticket version.",
+        "operationId": "set_ticket_tags_api_tickets__number__tags_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketTagsSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Ticket Tags",
         "tags": [
           "tickets"
         ]

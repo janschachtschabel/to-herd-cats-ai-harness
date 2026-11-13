@@ -9,13 +9,15 @@ Rights (spec 5.3) come only from `core/access.py`:
 """
 
 import uuid
+from collections.abc import Iterable
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, can, require, visible_space_ids
+from app.core.access import Action, Actor, can, require, space_ids_with, visible_space_ids
 from app.core.errors import Conflict, NotFound
 from app.modules.wiki.models import Page, PageStatus
-from app.modules.wiki.repository import PageRepository, PageScope
+from app.modules.wiki.repository import PageRepository, PageScope, page_seen
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.versions_repository import VersionRepository
 
@@ -55,6 +57,17 @@ class PageReader:
     def scope(self, actor: Actor) -> PageScope:
         """The actor's organisation and the spaces it may read (SQL)."""
         return PageScope(actor.org_id, visible_space_ids(actor))
+
+    def seen(self, actor: Actor) -> ColumnElement[bool]:
+        """The pages the actor sees, as SQL for other modules' lists (the same rule as
+        `readable`, for many pages at once)."""
+        return page_seen(
+            actor.org_id, visible_space_ids(actor), space_ids_with(actor, Action.PAGE_EDIT)
+        )
+
+    async def titles(self, actor: Actor, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """The titles of those of the pages the actor sees."""
+        return await self.repo(actor).titles(ids, space_ids_with(actor, Action.PAGE_EDIT))
 
     async def readable(self, actor: Actor, page_id: uuid.UUID, *, lock: bool = False) -> Page:
         """The page outside the trash if the actor may see it, else 404; with `lock`,

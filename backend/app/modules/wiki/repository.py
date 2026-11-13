@@ -7,9 +7,10 @@ Reads refresh rows already in the session (`populate_existing`): subtree stateme
 change rows in bulk, behind the session's back."""
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Select, and_, func, select, tuple_
+from sqlalchemy import ColumnElement, Select, and_, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
@@ -25,6 +26,20 @@ class PageScope:
 def under(parent_id: uuid.UUID | None) -> ColumnElement[bool]:
     """The children of `parent_id`; the top level for None (index-friendly)."""
     return Page.parent_id.is_(None) if parent_id is None else Page.parent_id == parent_id
+
+
+def page_seen(
+    org_id: uuid.UUID, readable: Select[uuid.UUID], drafts: Select[uuid.UUID]
+) -> ColumnElement[bool]:
+    """The pages an actor sees, as SQL: of its organisation, in a space it may read
+    (`readable`), outside the trash, and published or in a space where it may see
+    drafts (`drafts`, where it holds `page.edit`)."""
+    return and_(
+        Page.org_id == org_id,
+        Page.space_id.in_(readable),
+        Page.trashed_at.is_(None),
+        or_(Page.status == PageStatus.PUBLISHED, Page.space_id.in_(drafts)),
+    )
 
 
 class PageRepository:
@@ -123,3 +138,14 @@ class PageRepository:
         )
         current = await self.session.scalar(stmt)
         return 0 if current is None else int(current) + 1
+
+    async def titles(
+        self, ids: Iterable[uuid.UUID], drafts: Select[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """The titles of those pages the actor sees (`page_seen`), by id."""
+        wanted = list(set(ids))
+        if not wanted:
+            return {}
+        seen = page_seen(self.scope.org_id, self.scope.space_ids, drafts)
+        stmt = select(Page.id, Page.title).where(seen, Page.id.in_(wanted))
+        return {row.id: row.title for row in await self.session.execute(stmt)}

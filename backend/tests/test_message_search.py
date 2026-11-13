@@ -123,7 +123,7 @@ async def test_types_space_and_tags(wiki: Wiki, chat: Chat) -> None:
     tag = await wiki.admin.post("/api/tags", json={"name": "t"})
     assert tag.status_code == 201, tag.text
     assert await search(chat.admin, tag=tag.json()["id"]) == []  # messages carry no tags
-    bad = await chat.admin.get("/api/search", params={"q": WORD, "types": "page,ticket"})
+    bad = await chat.admin.get("/api/search", params={"q": WORD, "types": "page,skill"})
     assert bad.status_code == 422
 
 

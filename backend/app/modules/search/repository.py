@@ -16,7 +16,8 @@ from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.spaces.models import Space
-from app.modules.wiki.models import Page, PageStatus
+from app.modules.wiki.models import Page
+from app.modules.wiki.repository import page_seen
 
 START, STOP = "⟦", "⟧"  # the client highlights between them; no HTML
 _HEADLINE = (
@@ -63,12 +64,7 @@ class SearchRepository:
         self.scope = scope
 
     def _allowed(self) -> ColumnElement[bool]:
-        return and_(
-            Page.org_id == self.scope.org_id,
-            Page.space_id.in_(self.scope.readable),
-            Page.trashed_at.is_(None),
-            or_(Page.status == PageStatus.PUBLISHED, Page.space_id.in_(self.scope.drafts)),
-        )
+        return page_seen(self.scope.org_id, self.scope.readable, self.scope.drafts)
 
     async def pages(
         self,

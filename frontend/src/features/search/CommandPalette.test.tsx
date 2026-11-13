@@ -101,7 +101,7 @@ describe('search', () => {
       'GET /api/auth/me': makeMe([]),
       'GET /api/spaces': page([space]),
       'GET /api/search': (call) => {
-        expect(call.query.get('types')).toBeNull() // pages and messages
+        expect(call.query.get('types')).toBe('page,message') // no tickets yet
         return page([message, hit()])
       },
       'GET /api/conversations/:id': {

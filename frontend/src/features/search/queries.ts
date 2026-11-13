@@ -5,6 +5,9 @@ const PAGE_SIZE = 20
 
 export type AnyHit = SearchHit | MessageHit
 
+/** What the palette shows; ticket hits join with the ticket views. */
+const TYPES = 'page,message'
+
 /** Full-text search over the pages and messages one may read (the server filters by
  *  rights, one ranking for both); nothing is asked while `q` is blank. */
 export function useSearch(q: string, spaceId: string | null) {
@@ -17,6 +20,7 @@ export function useSearch(q: string, spaceId: string | null) {
             query: {
               q,
               space_id: spaceId ?? undefined,
+              types: TYPES,
               cursor: pageParam,
               limit: PAGE_SIZE,
             },
@@ -27,7 +31,10 @@ export function useSearch(q: string, spaceId: string | null) {
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: q.trim() !== '',
   })
-  const items: AnyHit[] = query.data?.pages.flatMap((page) => page.items) ?? []
+  const items: AnyHit[] =
+    query.data?.pages.flatMap((page) =>
+      page.items.filter((hit): hit is AnyHit => hit.type !== 'ticket'),
+    ) ?? []
   return {
     items,
     isFetching: query.isFetching,

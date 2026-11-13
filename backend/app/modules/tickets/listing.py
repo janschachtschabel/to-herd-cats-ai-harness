@@ -47,6 +47,7 @@ class Filters:
     parent_id: uuid.UUID | None = None
     q: str | None = None
     due_before: date | None = None
+    tag_ids: tuple[uuid.UUID, ...] = ()  # tickets carrying every one of them
 
 
 @dataclass(frozen=True, slots=True)
