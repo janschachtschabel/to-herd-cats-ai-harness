@@ -141,3 +141,30 @@ async def test_system_messages_stay_on_the_timeline(wiki: Wiki, session: AsyncSe
     assert (deleted.status_code, deleted.json()["error"]["code"]) == (403, "message.system")
     edited = await wiki.moderator.patch(f"/api/messages/{system['id']}", json={"body_md": "x"})
     assert edited.status_code == 403
+
+
+async def test_the_timeline_follows_the_changes_not_the_handler(
+    wiki: Wiki, session: AsyncSession
+) -> None:
+    """Review M3 N12: a retry or a second worker may handle a later event first; the
+    entries still stand in the order the changes happened, also around a comment
+    written in between."""
+    page = await new_page(wiki.editor, wiki.space_id, "Seite")
+    thread = await thread_of(wiki.editor, page)  # a draft: the editor sees it
+    comment = await wiki.editor.post(
+        f"/api/conversations/{thread['id']}/messages", json={"body_md": "Zwischendurch"}
+    )
+    assert comment.status_code == 201
+    await publish(wiki.editor, page)
+    rows = await session.scalars(
+        select(EventOutbox).where(EventOutbox.type.in_(PAGE_EVENTS)).order_by(EventOutbox.id)
+    )
+    for row in reversed(rows.all()):  # published handled before created
+        await page_timeline(session, Event.of(row))
+    items = await messages(wiki.viewer, thread["id"])
+    assert [m["body_md"] if m["kind"] == "human" else keys([m])[0] for m in items] == [
+        "page.created",
+        "Zwischendurch",
+        "page.published",
+    ]
+    assert items[0]["created_at"] < items[1]["created_at"] < items[2]["created_at"]

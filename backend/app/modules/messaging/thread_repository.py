@@ -5,6 +5,9 @@ the timeline handler (no actor: the event's organisation).
   everyone else (also concurrently) reads the one that won.
 - A system message refers to its event by `client_id`, unique among system messages,
   so a second delivery of an event inserts nothing.
+- A system message takes the event's time, as `created_at` and in its id (a UUIDv7 of
+  that moment): messages are listed by id, so the timeline follows the changes, not
+  the order the worker happened to handle them in (retries, several workers).
 """
 
 import uuid
@@ -13,6 +16,7 @@ from datetime import datetime
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
 from app.modules.messaging.models import (
     SYSTEM_AUTHOR,
@@ -66,6 +70,7 @@ class PageThreadRepository:
         stmt = (
             insert(Message)
             .values(
+                id=_id_at(at),
                 org_id=self.org_id,
                 conversation_id=thread.id,
                 author_type=SYSTEM_AUTHOR,
@@ -81,3 +86,9 @@ class PageThreadRepository:
             .returning(Message)
         )
         return (await self.session.scalars(stmt)).one_or_none()
+
+
+def _id_at(at: datetime) -> uuid.UUID:
+    """A new UUIDv7 whose time is `at`."""
+    nanoseconds = int(at.timestamp()) * 1_000_000_000 + at.microsecond * 1_000
+    return uuid7(nanoseconds=nanoseconds)
