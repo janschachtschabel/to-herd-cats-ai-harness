@@ -5,7 +5,7 @@
 // flanking rules let it open or close; where they would not, the character outside it
 // is written as a character reference (`**Hinweis:**&#x54;ext`), which reads as
 // punctuation there.
-import { WIKI_LINK, destination, title } from "./syntax.mjs";
+import { ENTITY, WIKI_LINK, destination, title } from "./syntax.mjs";
 
 // micromark's classes of the characters around a delimiter.
 const PUNCTUATION = /^[\p{P}\p{S}]$/u;
@@ -13,8 +13,8 @@ const WHITESPACE = /^\s$/u;
 const DELIMITER = { bold: "**", italic: "_", strike: "~~" };
 const ORDER = ["bold", "italic", "strike", "link"]; // outermost first on a tie
 // Characters with a meaning in inline Markdown; `|` for tables, `@` for e-mail
-// autolinks.
-const SPECIAL = /[\\`*_[\]~<&|@]/;
+// autolinks; `&` only where it starts a character reference (`escaped`).
+const SPECIAL = /[\\`*_[\]~<|@]/;
 // Whitespace the parser would read as such (or trim) where the editor has a
 // character: written as references.
 const ODD_SPACE = /[\p{White_Space}\p{Cc}]/u;
@@ -33,6 +33,14 @@ function escaped(chars, i, inLink = false) {
   // `_` between two letters or digits can neither open nor close emphasis.
   if (char === "_" && WORD.test(chars[i - 1] ?? "") && WORD.test(chars[i + 1] ?? "")) return char;
   if (SPECIAL.test(char)) return `\\${char}`;
+  if (char === "&")
+    return chars
+      .slice(i, i + 40)
+      .join("")
+      .replace(ENTITY, "\\$&")
+      .startsWith("\\")
+      ? "\\&"
+      : "&";
   if (ODD_SPACE.test(char)) return reference(char);
   if (inLink) return char;
   // Autolink literals the editor shows as text: `https\://`, `www\.`.
@@ -80,7 +88,9 @@ function codeSpan(text, inTable) {
 }
 
 function altText(alt) {
-  return [...alt].map((char) => (SPECIAL.test(char) || char === "!" ? `\\${char}` : char)).join("");
+  return [...alt]
+    .map((char) => (SPECIAL.test(char) || char === "!" || char === "&" ? `\\${char}` : char))
+    .join("");
 }
 
 // In a table a `|` ends the cell wherever it stands, unless it is escaped.
@@ -219,14 +229,21 @@ function works(piece, before, after) {
 /** Each delimiter made to work: where it would not, the text character outside it is
  * written as a reference (punctuation to the parser). */
 function flank(list) {
-  list.forEach((piece, i) => {
-    if (piece.kind !== "open" && piece.kind !== "close") return;
-    const before = kind(lastChar(list[i - 1]));
-    const after = kind(firstChar(list[i + 1]));
-    if (works(piece, before, after)) return;
-    const outside = piece.kind === "open" ? list[i - 1] : list[i + 1];
-    if (outside?.kind === "text" && outside.char !== null) outside.out = reference(outside.char);
-  });
+  // Until nothing changes: a reference next to one delimiter is punctuation next to
+  // the delimiter on its other side.
+  for (let changed = true; changed;) {
+    changed = false;
+    list.forEach((piece, i) => {
+      if (piece.kind !== "open" && piece.kind !== "close") return;
+      const before = kind(lastChar(list[i - 1]));
+      const after = kind(firstChar(list[i + 1]));
+      if (works(piece, before, after)) return;
+      const outside = piece.kind === "open" ? list[i - 1] : list[i + 1];
+      if (outside?.kind !== "text" || outside.char === null || outside.referenced) return;
+      outside.out = reference(outside.char);
+      outside.referenced = changed = true;
+    });
+  }
   return list;
 }
 

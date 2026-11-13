@@ -160,6 +160,14 @@ function items(r, depth, type) {
   return out;
 }
 
+/** Code in a table cell cannot hold a backslash right before `|`: GFM reads `\|` there
+ * as an escaped pipe and `\\|` as the end of the cell, so no Markdown says it. The save
+ * check refuses such a document (test/typed.test.mjs); the generator leaves it out. */
+function cellSafe(node) {
+  if (!node.marks?.some((mark) => mark.type === "code")) return node;
+  return { ...node, text: node.text.replace(/\\(?=\|)/g, "/") };
+}
+
 function table(r) {
   const columns = r.int(1, 4);
   const align = Array.from({ length: columns }, () =>
@@ -170,7 +178,7 @@ function table(r) {
     content: align.map((value) => ({
       type,
       attrs: { align: value },
-      content: [{ type: "tableParagraph", content: inline(r, { breaks: false }) }],
+      content: [{ type: "tableParagraph", content: inline(r, { breaks: false }).map(cellSafe) }],
     })),
   });
   const rows = [row("tableHeader")];

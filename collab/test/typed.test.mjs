@@ -102,6 +102,10 @@ const CASES = {
     }),
     "| [a](/x?a\\|b) |\n| --- |",
   ],
+  "delimiters on both sides of a referenced character": [
+    doc(paragraph(text("e"), text("a", "bold"), text("(", "bold", "strike"))),
+    "&#x65;**&#x61;~~(~~**",
+  ],
   "a table cell with a pipe": [
     doc({
       type: "table",
@@ -129,3 +133,18 @@ for (const [name, [json, markdown]] of Object.entries(CASES)) {
     assert.ok(result.ok, result.problem);
   });
 }
+
+test("code with a backslash before a pipe in a table cell is refused, never stored", () => {
+  // GFM reads `\|` in a cell as an escaped pipe and `\\|` as the end of the cell: no
+  // Markdown says this, so the save check refuses it (and the editor shows a notice).
+  const cell = (content) => ({
+    type: "tableHeader",
+    attrs: { align: null },
+    content: [{ type: "tableParagraph", content }],
+  });
+  const json = doc({
+    type: "table",
+    content: [{ type: "tableRow", content: [cell([text("a\\|b", "code")])] }],
+  });
+  assert.equal(readBack(json).ok, false);
+});

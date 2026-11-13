@@ -14,6 +14,8 @@
 // - control characters other than tab and line breaks in text (see CONTROL);
 // - line breaks and runs of spaces in an image description (one space; the page view
 //   shows it as an attribute), and spaces at its ends;
+// - which cells are headers: in Markdown the first row is the header row, and no
+//   other cell is one;
 // - attributes without Markdown: image size, link target/rel/class, list type, column
 //   width; bold, italic, strike and code on an image (invisible).
 
@@ -120,14 +122,27 @@ export function inlineOf(content) {
   return runs(tidy(atoms(content)));
 }
 
-function cell(node) {
+/** Canonical runs whose marks changed (links added), with the marks of their spaces and
+ * hard breaks taken from their neighbours again. */
+export function retidy(list) {
+  const out = [];
+  for (const run of list) {
+    if (run.t !== "text") out.push(run);
+    else
+      for (const char of run.text)
+        out.push({ t: char === " " ? "space" : "char", char, marks: run.marks });
+  }
+  return runs(tidy(out));
+}
+
+function cell(node, header) {
   const attrs = node.attrs ?? {};
   const paragraphs = (node.content ?? []).map((child) => ({
     type: child.type,
     inline: inlineOf(child.content),
   }));
   return {
-    type: node.type,
+    type: header ? "tableHeader" : "tableCell",
     align: attrs.align ?? null,
     colspan: attrs.colspan ?? 1,
     rowspan: attrs.rowspan ?? 1,
@@ -187,9 +202,9 @@ export function blockOf(node) {
     case "table":
       return {
         type: "table",
-        content: (node.content ?? []).map((row) => ({
+        content: (node.content ?? []).map((row, index) => ({
           type: row.type,
-          content: (row.content ?? []).map(cell),
+          content: (row.content ?? []).map((child) => cell(child, index === 0)),
         })),
       };
     default:

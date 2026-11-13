@@ -5,6 +5,7 @@
 // same code (mdast-util-gfm-autolink-literal), text node by text node. Wiki links
 // (`[[…]]`) are links of their own for the page view and stay untouched.
 import { gfmAutolinkLiteralFromMarkdown } from "mdast-util-gfm-autolink-literal";
+import { retidy } from "./canonical.mjs";
 import { WIKI_LINK, linkKey } from "./syntax.mjs";
 
 const [transform] = gfmAutolinkLiteralFromMarkdown().transforms;
@@ -58,7 +59,7 @@ export function withAutolinks(form) {
   if (!form || typeof form !== "object") return form;
   const out = {};
   for (const [key, value] of Object.entries(form)) {
-    out[key] = key === "inline" ? autolinks(value) : withAutolinks(value);
+    out[key] = key === "inline" ? retidy(autolinks(value)) : withAutolinks(value);
   }
   return out;
 }
