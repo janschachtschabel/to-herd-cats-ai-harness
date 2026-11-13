@@ -62,7 +62,11 @@ class CheckIn(BaseModel):
 
 
 class CheckOut(BaseModel):
+    """`ended_session_ids`: sessions that ended (logout, expiry) of people who may still
+    edit: their edits may be saved, then their connections close (4401)."""
+
     generation_ok: bool
     generation: int
     revoked_session_ids: list[uuid.UUID]
     revoked_user_ids: list[uuid.UUID]
+    ended_session_ids: list[uuid.UUID]

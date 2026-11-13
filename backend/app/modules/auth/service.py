@@ -27,6 +27,9 @@ from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 
 EXPIRED_SESSION_BATCH = 500
+# Ended sessions (logout, expiry) are kept this long, so live editing can still save
+# the last edits of a person whose session ended mid-session (review M2 R2).
+ENDED_SESSION_KEEP = timedelta(hours=1)
 
 
 class AuthService:
@@ -83,7 +86,9 @@ class AuthService:
         now = utcnow()
         # Housekeeping without a background task: every login removes a bounded batch
         # of expired sessions, anyone's (people who never return included).
-        await self.sessions.delete_expired(user.org_id, now, EXPIRED_SESSION_BATCH)
+        await self.sessions.delete_expired(
+            user.org_id, now - ENDED_SESSION_KEEP, EXPIRED_SESSION_BATCH
+        )
         await self.sessions.add(
             UserSession(
                 org_id=user.org_id,
@@ -96,7 +101,7 @@ class AuthService:
         return user, token
 
     async def logout(self, token: str) -> None:
-        await self.sessions.delete_by_hash(hash_token(token))
+        await self.sessions.end_by_hash(hash_token(token), utcnow())
 
     async def resolve(self, token: str) -> AuthContext | None:
         user_session = await self.sessions.get_active(hash_token(token), utcnow())
@@ -109,6 +114,17 @@ class AuthService:
         whether the session of an open connection still holds)."""
         user_session = await self.sessions.get_active_by_id(session_id, utcnow())
         if user_session is None or not user_session.user.is_active:
+            return None
+        return AuthContext(user=user_session.user, session_id=user_session.id)
+
+    async def resolve_ended_session(self, session_id: uuid.UUID) -> AuthContext | None:
+        """The caller of a login session that ended by logout or expiry, while the
+        person is still active (deactivation and an administrator's or a password
+        change's sign-out delete the session instead)."""
+        user_session = await self.sessions.get_by_id(session_id)
+        if user_session is None or user_session.expires_at > utcnow():
+            return None
+        if not user_session.user.is_active:
             return None
         return AuthContext(user=user_session.user, session_id=user_session.id)
 

@@ -2,10 +2,13 @@
 authenticates each connection with the person's session, loads the page's state and
 saves through here; it never touches the database.
 
-Every open connection is known by its login session (`session_id`), so an ended
-session, a deactivated person and a lost right all count as revoked. A save names the
-sessions whose people edited since the last save; each is checked again, and if one
-may no longer edit, nothing is saved (403 with the revoked sessions and people).
+Every open connection is known by its login session (`session_id`). A session that
+merely ended (logout, expiry) of a person who may still edit the page has *ended*:
+their edits are saved under their name, only their connection closes. A deactivated
+person, a session deleted by an administrator or a password change, and a lost right
+count as *revoked*. A save names the sessions whose people edited since the last
+save; each is checked again, and if one is revoked, nothing is saved (403 with the
+revoked sessions and people).
 
 Generations: every change made outside the live session (Markdown save, restore,
 move, trash and restore from the trash) bumps `page.collab_generation`, and so does a
@@ -80,6 +83,7 @@ class Check:
     generation_ok: bool
     generation: int
     revoked: Revoked
+    ended_session_ids: list[uuid.UUID]
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +91,7 @@ class _Editor:
     session_id: uuid.UUID
     user_id: uuid.UUID
     actor: Actor
+    ended: bool = False  # the login session ended (logout, expiry); the person may edit
 
 
 class CollabService:
@@ -156,16 +161,17 @@ class CollabService:
         page = await page_by_id(self.session, page_id, lock=bool(unsaved))
         if page is None:
             gone = sorted(set([*session_ids, *unsaved]))
-            return Check(False, generation, Revoked(gone, []))
+            return Check(False, generation, Revoked(gone, []), [])
         editors, revoked = await self._editors([*session_ids, *unsaved], org_id=page.org_id)
         lost = await self._lost(editors, page)
         result = _revoked(revoked, lost)
+        ended = sorted(e.session_id for e in editors if e.ended and e not in lost)
         ok = page.trashed_at is None and page.collab_generation == generation
         if ok and set(unsaved) & set(result.session_ids):
             page.collab_generation += 1
             await self.session.flush()
             ok = False
-        return Check(ok, page.collab_generation, result)
+        return Check(ok, page.collab_generation, result, ended)
 
     async def _save(
         self,
@@ -201,8 +207,14 @@ class CollabService:
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
         return page
 
-    async def _editor(self, session_id: uuid.UUID) -> _Editor | None:
+    async def _editor(self, session_id: uuid.UUID, *, ended: bool = False) -> _Editor | None:
+        """The session's person; with `ended`, also for a session that has ended."""
         ctx = await self.auth.resolve_session(session_id)
+        if ctx is None and ended:
+            ctx = await self.auth.resolve_ended_session(session_id)
+            if ctx is not None:
+                actor = await actor_for(self.session, ctx)
+                return _Editor(session_id, ctx.user.id, actor, ended=True)
         if ctx is None:
             return None
         return _Editor(session_id, ctx.user.id, await actor_for(self.session, ctx))
@@ -210,12 +222,13 @@ class CollabService:
     async def _editors(
         self, session_ids: list[uuid.UUID], *, org_id: uuid.UUID | None = None
     ) -> tuple[list[_Editor], list[uuid.UUID]]:
-        """The sessions still valid (in the order given, all of one organisation: the
-        given one, else the first valid session's) and the ones that are not."""
+        """The sessions still valid or merely ended (in the order given, all of one
+        organisation: the given one, else the first valid session's) and the ones that
+        are neither."""
         editors: list[_Editor] = []
         revoked: list[uuid.UUID] = []
         for session_id in dict.fromkeys(session_ids):
-            editor = await self._editor(session_id)
+            editor = await self._editor(session_id, ended=True)
             org = org_id or (editors[0].actor.org_id if editors else None)
             if editor is None or (org is not None and editor.actor.org_id != org):
                 revoked.append(session_id)

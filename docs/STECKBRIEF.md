@@ -118,8 +118,8 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 Keine. M1 und M2 haben weder Cronjobs noch Hintergrundaufträge. Der Collab-Prozess
 prüft alle 5 s für jedes offene Dokument Generation und Rechte über die API (kein
 Zeitplan, nur solange jemand live bearbeitet). Beim Start entfernt die API liegen
-gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene Sitzungen (jeder
-Person) löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
+gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene und beendete Sitzungen (jeder
+Person), die seit mehr als einer Stunde abgelaufen sind, löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
 Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Der Sicherungs-CronJob (Spezifikation 12.6) ist
 noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
 `deploy/compose/README.md`).

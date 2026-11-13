@@ -83,7 +83,7 @@ async def test_put_with_revoked_editor_is_403_and_saves_nothing(
     assert (await put_live(collab, page, [editor])).status_code == 200
 
 
-async def test_ended_session_and_deactivated_user_are_revoked(
+async def test_deactivated_user_is_revoked_and_a_logout_has_ended(
     wiki: Wiki, collab: AsyncClient
 ) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live")
@@ -101,13 +101,15 @@ async def test_ended_session_and_deactivated_user_are_revoked(
     assert check.json() == {
         "generation_ok": True,
         "generation": 0,
-        "revoked_session_ids": sorted([editor, editor2]),
-        "revoked_user_ids": [],  # whose ended session it was, the collab process knows
+        "revoked_session_ids": [editor2],
+        "revoked_user_ids": [],  # the deactivation deleted the sessions
+        "ended_session_ids": [editor],  # a logout is no revocation (review M2 R2)
     }
-    r = await put_live(collab, page, [moderator, editor])
+    r = await put_live(collab, page, [moderator, editor2])
     assert expect_error(r, 403, "collab.editors_revoked")["details"]["revoked_session_ids"] == [
-        editor
+        editor2
     ]
+    assert (await put_live(collab, page, [moderator, editor])).status_code == 200
     unknown = "01a1d2d9-2de5-75db-9dc6-a6fa1307273d"
     r = await put_live(collab, page, [unknown])
     assert expect_error(r, 403, "collab.editors_revoked")["details"]["revoked_session_ids"] == [
@@ -139,6 +141,7 @@ async def test_unsaved_edits_of_a_revoked_editor_end_the_generation(
         "generation": 0,
         "revoked_session_ids": [editor2],
         "revoked_user_ids": [str(wiki.users["editor2"].id)],
+        "ended_session_ids": [],
     }
     # With unsaved edits: the generation ends, once.
     body = {"session_ids": [editor, editor2], "unsaved_session_ids": [editor2], "generation": 0}
@@ -157,8 +160,9 @@ async def test_unsaved_edits_of_a_revoked_editor_end_the_generation(
         f"/internal/collab/pages/{page['id']}", params={"session_id": editor, "generation": 1}
     )
     assert r.json()["ydoc_b64"] is None
-    # An ended session's unsaved edits end it too; any valid session names the page.
-    assert (await wiki.editor.post("/api/auth/logout")).status_code == 204
+    # A deactivated person's unsaved edits end it too; any valid session names the page.
+    r = await wiki.admin.post(f"/api/admin/users/{wiki.users['editor'].id}/deactivate")
+    assert r.status_code == 204, r.text
     body = {"session_ids": [moderator], "unsaved_session_ids": [editor], "generation": 1}
     r = await collab.post(url, json=body)
     assert (r.json()["generation_ok"], r.json()["generation"]) == (False, 2)
@@ -188,12 +192,13 @@ async def test_unsaved_edits_end_the_generation_when_no_session_is_valid(
     wiki: Wiki, collab: AsyncClient
 ) -> None:
     """The internal API is trusted: the page row names the organisation, so the
-    generation ends even when every session that ever joined has ended."""
+    generation ends even when every session that ever joined is revoked."""
     page = await new_page(wiki.editor, wiki.space_id, "Live", content_md="a")
     editor = await session_id_of(collab, wiki.editor, page)
     editor2 = await session_id_of(collab, wiki.editor2, page)
-    assert (await wiki.editor.post("/api/auth/logout")).status_code == 204
-    assert (await wiki.editor2.post("/api/auth/logout")).status_code == 204
+    for name in ("editor", "editor2"):
+        r = await wiki.admin.post(f"/api/admin/users/{wiki.users[name].id}/deactivate")
+        assert r.status_code == 204, r.text
     url = f"/internal/collab/pages/{page['id']}/check"
     body = {"session_ids": [editor], "unsaved_session_ids": [editor2], "generation": 0}
     r = await collab.post(url, json=body)
@@ -203,10 +208,11 @@ async def test_unsaved_edits_end_the_generation_when_no_session_is_valid(
         "generation": 1,
         "revoked_session_ids": sorted([editor, editor2]),
         "revoked_user_ids": [],
+        "ended_session_ids": [],
     }
     after = await get_page(wiki.moderator, page)
     assert (after["content_md"], after["collab_generation"]) == ("a", 1)
-    # Without unsaved edits nothing ends; the ended sessions are named.
+    # Without unsaved edits nothing ends; the revoked sessions are named.
     body = {"session_ids": [editor, editor2], "generation": 1}
     r = await collab.post(url, json=body)
     assert (r.json()["generation_ok"], r.json()["generation"]) == (True, 1)

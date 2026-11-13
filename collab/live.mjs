@@ -14,8 +14,13 @@
 // open document asks the API whether its generation and its people still hold.
 // - Generation ended (a change outside the live session): every connection is closed
 //   with 4409 `generation_ended`, the document is dropped unsaved.
-// - A person may no longer edit (right removed, session ended, deactivated): their
-//   connections are closed with 4403 `revoked`. If they edited since the last save,
+// - A person's login session ended (logout, expiry) while they may still edit: what
+//   they typed is saved at once under their name, then their connections are closed
+//   with 4401 `unauthorized`; everyone else goes on in the same generation. A
+//   connection that leaves with unsaved edits is saved at once, too.
+// - A person may no longer edit (right removed, deactivated, signed out by an
+//   administrator or a password change): their connections are closed with 4403
+//   `revoked`. If they edited since the last save,
 //   the document holds edits no one may save, and every browser that saw them would
 //   bring them back on reconnecting: the API ends the generation (the check names the
 //   unsaved sessions), the document is dropped and everyone is closed with 4409. Until
@@ -80,7 +85,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
   /** Ask the API whether the generation and the people still hold; true when the
    * document was dropped. The unsaved sessions go along: one of them revoked ends the
    * generation. Throws `ApiUnavailable`. */
-  async function checkDocument(document, state) {
+  async function checkDocument(document, documentName, state) {
     const connected = document.getConnections().map((c) => c.context.sessionId);
     // Sessions that left are checked too (the API takes the organisation from the page).
     const sessionIds = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
@@ -90,9 +95,31 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
     if (answer.status !== 200) return false;
     const { revoked_session_ids: sessions, revoked_user_ids: users } = answer.body;
     revoke(document, new Set(sessions), new Set(users));
-    if (answer.body.generation_ok) return false;
-    discard(document, state, CLOSE.generationEnded);
-    return true;
+    if (!answer.body.generation_ok) {
+      discard(document, state, CLOSE.generationEnded);
+      return true;
+    }
+    const ended = new Set(answer.body.ended_session_ids ?? []);
+    if (ended.size > 0) await endSessions(document, documentName, state, ended);
+    return false;
+  }
+
+  /** Sessions that ended (logout, expiry) of people who may still edit: their edits
+   * are saved first, then their connections close with 4401. */
+  async function endSessions(document, documentName, state, ended) {
+    const unsaved = [...ended].some((sessionId) => state.dirty.has(sessionId));
+    if (unsaved && !state.holding && !state.discarded) {
+      try {
+        await document.saveMutex.runExclusive(() => store(document, documentName, state));
+      } catch (error) {
+        if (!(error instanceof ApiUnavailable)) throw error; // still dirty: saved later
+      }
+    }
+    for (const connection of document.getConnections()) {
+      if (ended.has(connection.context.sessionId)) {
+        closeSocket(connection.context, CLOSE.unauthorized);
+      }
+    }
   }
 
   /** A save was refused for revoked editors: hold the document until the API has
@@ -101,7 +128,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
     state.holding = true;
     ending.add(documentName);
     try {
-      await checkDocument(document, state);
+      await checkDocument(document, documentName, state);
     } catch (error) {
       if (!(error instanceof ApiUnavailable)) throw error;
       log("live check failed, retrying", { page_id: state.pageId });
@@ -218,6 +245,16 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       if (close) throw Object.assign(new Error(close[1]), { code: close[0], reason: close[1] });
     },
 
+    /** A connection that leaves with unsaved edits is saved at once, while its
+     * session is surely still valid (logging out right after leaving loses nothing). */
+    async onDisconnect({ context, document, documentName, instance }) {
+      const state = live.get(documentName);
+      if (!state || state.discarded || state.holding || !state.dirty.has(context?.sessionId)) {
+        return;
+      }
+      instance.storeDocumentHooks(document, { document, documentName, instance }, true);
+    },
+
     async onChange({ connection, context, documentName }) {
       const state = live.get(documentName);
       if (connection && state && context?.sessionId) state.dirty.set(context.sessionId, true);
@@ -257,7 +294,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
         const state = live.get(documentName);
         if (!state || state.discarded || state.holding) continue;
         try {
-          await checkDocument(document, state);
+          await checkDocument(document, documentName, state);
         } catch (error) {
           if (!(error instanceof ApiUnavailable)) throw error;
         }

@@ -20,6 +20,8 @@ export interface LiveConnection {
   provider: HocuspocusProvider | null
   clientId: number | null
   destroy: () => void
+  /** Waits until the server has every local change, then closes (before a logout). */
+  flush?: () => Promise<void>
 }
 
 export type Connect = (options: {
@@ -52,5 +54,16 @@ export const connectLive: Connect = ({ pageId, generation, doc, handlers }) => {
     provider,
     clientId: provider.awareness?.clientID ?? null,
     destroy: () => provider.destroy(),
+    flush: () =>
+      new Promise<void>((resolve) => {
+        const check = () => {
+          if (provider.hasUnsyncedChanges) return
+          provider.off('unsyncedChanges', check)
+          provider.destroy() // the collab process saves a leaving editor's edits at once
+          resolve()
+        }
+        provider.on('unsyncedChanges', check)
+        check()
+      }),
   }
 }

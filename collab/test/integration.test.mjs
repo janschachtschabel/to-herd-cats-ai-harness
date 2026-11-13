@@ -234,14 +234,32 @@ test(
     assert.ok(!stale.provider.synced);
     stale.destroy();
 
-    // The next session starts from the new Markdown; logging out ends it.
+    // The next session starts from the new Markdown. Logging out is not a revocation
+    // (review M2 R2): what was typed is saved, only that connection closes (4401), the
+    // other browser goes on in the same generation.
+    const second = await login("owner@it.example");
     const fresh = open(owner.cookie, page.id, page.collab_generation);
-    await synced(fresh);
+    const other = open(second.cookie, page.id, page.collab_generation);
+    await Promise.all([synced(fresh), synced(other)]);
     assert.equal(yDocToMarkdown(fresh.doc), "# Markdown-Modus");
+    type(fresh.doc, "Letzter Satz vor dem Abmelden");
+    await until(() => yDocToMarkdown(other.doc).includes("Letzter Satz"));
     assert.equal(
       (await api("/api/auth/logout", { method: "POST", cookie: owner.cookie })).status,
       204,
     );
-    await until(() => fresh.closes.includes(4403), 15_000);
+    await until(() => fresh.closes.includes(4401), 15_000);
+    await until(
+      async () => (await content(second.cookie, page.id)).content_md.includes("Letzter Satz"),
+      15_000,
+    );
+    type(other.doc, " und weiter");
+    await until(
+      async () => (await content(second.cookie, page.id)).content_md.includes("und weiter"),
+      15_000,
+    );
+    const after = await content(second.cookie, page.id);
+    assert.equal(after.collab_generation, page.collab_generation);
+    assert.deepEqual(other.closes, []);
   },
 );

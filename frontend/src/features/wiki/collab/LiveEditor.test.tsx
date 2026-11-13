@@ -15,13 +15,20 @@ interface FakeConnection {
   destroyed: boolean
 }
 const connections: FakeConnection[] = []
+const events: string[] = []
 
 vi.mock('./connect', async (original) => ({
   ...(await original<typeof import('./connect')>()),
   connectLive: (options: Omit<FakeConnection, 'destroyed'>) => {
     const connection = { ...options, destroyed: false }
     connections.push(connection)
-    return { provider: null, clientId: 1, destroy: () => void (connection.destroyed = true) }
+    const destroy = () => void (connection.destroyed = true)
+    const flush = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20)) // the server confirms
+      events.push('flushed')
+      destroy()
+    }
+    return { provider: null, clientId: 1, destroy, flush }
   },
 }))
 
@@ -59,6 +66,7 @@ function typeInto(doc: Y.Doc, text: string) {
 
 beforeEach(() => {
   connections.length = 0
+  events.length = 0
 })
 
 describe('live editor', () => {
@@ -164,6 +172,33 @@ describe('live editor', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Getrennt – neuer Versuch …')
     expect(connections[0]!.destroyed).toBe(false)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  test('logging out first sends what is typed in the live editor (review R2)', async () => {
+    const current = makePage({ space_id: space.id })
+    liveApi('editor', () => current)
+    mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([{ ...space, my_role: 'editor' }]),
+      'GET /api/spaces/:id': { ...space, my_role: 'editor' },
+      'GET /api/spaces/:id/pages/tree': () => page([nodeOf(current)]),
+      'GET /api/spaces/:id/pages/by-path': () => current,
+      'GET /api/pages/:id': () => current,
+      'GET /api/tags': page([]),
+      'GET /api/pages/:id/attachments': page([]),
+      'POST /api/auth/logout': () => {
+        events.push('logout')
+        return { status: 204 }
+      },
+    })
+    const { user } = await renderApp(`/spaces/${space.id}/p/handbuch?view=live`)
+    await waitFor(() => expect(connections).toHaveLength(1))
+    join(connections[0]!)
+    typeInto(connections[0]!.doc, 'letzter Satz')
+    await user.click(screen.getByRole('button', { name: /^Menü von/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Abmelden' }))
+    await waitFor(() => expect(events).toEqual(['flushed', 'logout']))
+    expect(connections[0]!.destroyed).toBe(true)
   })
 
   test('a viewer gets the read-only page without a live connection', async () => {

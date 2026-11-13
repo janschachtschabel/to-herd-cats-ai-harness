@@ -105,7 +105,11 @@ async def test_logout_invalidates_session(owner: AsyncClient, session: AsyncSess
     assert response.status_code == 204
     assert 'herd_session=""' in response.headers["set-cookie"]
     assert (await owner.get("/api/auth/me")).status_code == 401
-    assert await session.scalar(select(func.count()).select_from(UserSession)) == 0
+    # The row stays, ended, until a login clears it (live editing still needs to know
+    # whose session it was: review M2 R2).
+    ended = select(func.count()).select_from(UserSession).where(UserSession.expires_at <= utcnow())
+    assert await session.scalar(ended) == 1
+    assert await session.scalar(select(func.count()).select_from(UserSession)) == 1
 
 
 async def test_csrf_header_required_for_unsafe_methods(client: AsyncClient, owner_user) -> None:
@@ -162,7 +166,7 @@ async def _expired_session(session: AsyncSession, user: User) -> None:
             org_id=user.org_id,
             user_id=user.id,
             token_hash=hash_token(new_session_token()),
-            expires_at=utcnow() - timedelta(minutes=1),
+            expires_at=utcnow() - timedelta(hours=2),  # longer than ENDED_SESSION_KEEP
         )
     )
     await session.flush()

@@ -77,4 +77,5 @@ async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> Check
         generation=result.generation,
         revoked_session_ids=result.revoked.session_ids,
         revoked_user_ids=result.revoked.user_ids,
+        ended_session_ids=result.ended_session_ids,
     )

@@ -220,11 +220,18 @@ kennen.
   erreichbar bzw. aus), 1013 (später erneut versuchen). Gespeichert wird höchstens alle
   2 s, spätestens nach 10 s; alle 5 s prüft der Collab-Prozess Generation und Rechte.
   Eine Speicherung im Markdown-Modus, Wiederherstellen, Verschieben und Papierkorb
-  beenden die laufende Live-Sitzung (4409). Verliert jemand das Recht (Rolle,
-  Abmeldung, Deaktivierung), wird seine Verbindung mit 4403 getrennt; hatte er noch
-  ungespeicherte Änderungen, endet die Generation, damit kein anderer Browser sie
-  wieder einspielt (die anderen bekommen 4409, ihre ungespeicherten Änderungen gehen
-  verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
+  beenden die laufende Live-Sitzung (4409). Endet nur die Anmeldung (Abmelden,
+  Ablauf), ist das kein Entzug: Was die Person getippt hat, wird sofort unter ihrem
+  Namen gespeichert, dann wird nur ihre Verbindung mit 4401 getrennt; die anderen
+  arbeiten in derselben Generation weiter. Dafür bleibt eine beendete Sitzung eine
+  Stunde lang (abgelaufen) in `user_session` stehen, bevor eine Anmeldung sie
+  aufräumt. Wer eine Seite mit ungespeicherten Änderungen verlässt, wird sofort
+  gespeichert, und das Abmelden wartet bis zu 3 s, bis der Live-Editor alles
+  übertragen hat. Verliert jemand das Recht (Rolle, Deaktivierung, Abmelden durch
+  die Verwaltung oder ein Passwortwechsel), wird seine Verbindung mit 4403 getrennt;
+  hatte er noch ungespeicherte Änderungen, endet die Generation, damit kein anderer
+  Browser sie wieder einspielt (die anderen bekommen 4409, ihre ungespeicherten
+  Änderungen gehen verloren). Ein WebSocket-Frame hat höchstens 1 MiB, ein Live-Zustand höchstens
   5 MiB. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen.
 - **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen

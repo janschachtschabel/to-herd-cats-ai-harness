@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import UserSession
@@ -26,14 +26,24 @@ class SessionRepository:
         stmt = select(UserSession).where(UserSession.id == session_id, UserSession.expires_at > now)
         return await self.session.scalar(stmt)
 
-    async def delete_by_hash(self, token_hash: str) -> None:
-        await self.session.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
+    async def get_by_id(self, session_id: uuid.UUID) -> UserSession | None:
+        """Active or ended (until it is cleared away)."""
+        return await self.session.scalar(select(UserSession).where(UserSession.id == session_id))
 
-    async def delete_expired(self, org_id: uuid.UUID, now: datetime, limit: int) -> None:
-        """Up to `limit` expired sessions of the organisation, oldest first."""
+    async def end_by_hash(self, token_hash: str, now: datetime) -> None:
+        """The session ends now; the row stays until `delete_expired` clears it."""
+        await self.session.execute(
+            update(UserSession)
+            .where(UserSession.token_hash == token_hash, UserSession.expires_at > now)
+            .values(expires_at=now)
+        )
+
+    async def delete_expired(self, org_id: uuid.UUID, before: datetime, limit: int) -> None:
+        """Up to `limit` sessions of the organisation that ended before `before`,
+        oldest first."""
         expired = (
             select(UserSession.id)
-            .where(UserSession.org_id == org_id, UserSession.expires_at <= now)
+            .where(UserSession.org_id == org_id, UserSession.expires_at <= before)
             .order_by(UserSession.expires_at)
             .limit(limit)
             .with_for_update(skip_locked=True)

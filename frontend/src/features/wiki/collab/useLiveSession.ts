@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import type { WikiPage } from '@/lib/api'
+import { beforeLogout } from '@/lib/beforeLogout'
 import { connectLive, type Connect, type LiveConnection } from './connect'
 import { liveMarkdown } from './liveMarkdown'
 import { closeOutcome, liveStatus, peersOf, type Peer, type StopReason } from './liveSession'
@@ -88,6 +89,10 @@ export function useLiveSession(
         },
       },
     })
+    const unregister = beforeLogout(async () => {
+      open = false
+      await (live.flush?.() ?? Promise.resolve(live.destroy()))
+    })
     setDoc(fresh)
     setConnection(live)
     setSynced(false)
@@ -95,6 +100,7 @@ export function useLiveSession(
     setStopped(null)
     return () => {
       open = false
+      unregister()
       live.destroy()
       fresh.destroy()
     }

@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, unwrap, type Me, type Permission } from '@/lib/api'
+import { runBeforeLogout } from '@/lib/beforeLogout'
 
 export const meQuery = queryOptions({
   queryKey: ['auth', 'me'],
@@ -41,6 +42,7 @@ export function useLogout() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async () => {
+      await runBeforeLogout()
       await api.POST('/api/auth/logout')
     },
     onSettled: () => {
