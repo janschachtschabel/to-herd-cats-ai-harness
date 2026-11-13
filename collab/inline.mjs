@@ -1,12 +1,15 @@
 // Inline content (canonical runs, `canonical.mjs`) as Markdown that the page view's
 // parser reads back as the same runs (review M2 S2). Marks nest by how far they reach
 // (the longer one outside); bold is `**`, italic `_`, strike `~~`, so delimiters of
-// different marks never merge into one run. A delimiter works only when the character
-// outside it is a space, ASCII punctuation or the edge of the block; any other
-// character there is written as a character reference (`**Hinweis:**&#84;ext`).
+// different marks never merge into one run. A delimiter works only where CommonMark's
+// flanking rules let it open or close; where they would not, the character outside it
+// is written as a character reference (`**Hinweis:**&#x54;ext`), which reads as
+// punctuation there.
 import { WIKI_LINK, destination, title } from "./syntax.mjs";
 
-const PUNCTUATION = /^[!-/:-@[-`{-~]$/;
+// micromark's classes of the characters around a delimiter.
+const PUNCTUATION = /^[\p{P}\p{S}]$/u;
+const WHITESPACE = /^\s$/u;
 const DELIMITER = { bold: "**", italic: "_", strike: "~~" };
 const ORDER = ["link", "bold", "italic", "strike"]; // outermost first on a tie
 // Characters with a meaning in inline Markdown; `|` for tables, `@` for e-mail
@@ -89,6 +92,22 @@ function linkEnd(key) {
   return linkTitle ? `](${target} ${title(linkTitle)})` : `](${target})`;
 }
 
+// CommonMark autolinks: `<https://example.org>`, `<anna@example.org>`.
+const URI = /^[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>\p{Cc}]*$/u;
+const EMAIL =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
+/** A link written as an autolink when its text is its address (`<https://…>`), the
+ * way such links are usually written; null when it cannot be one. */
+function autolink(key, run, inTable) {
+  const [, href, linkTitle] = key.split("\u0000");
+  if (linkTitle || run.t !== "text" || run.marks.includes("code")) return null;
+  if (inTable && run.text.includes("|")) return null;
+  if (run.text === href && URI.test(href)) return `<${href}>`;
+  if (href === `mailto:${run.text}` && EMAIL.test(run.text)) return `<${run.text}>`;
+  return null;
+}
+
 const markType = (key) => (key.startsWith("link\u0000") ? "link" : key);
 
 /** How many runs from `index` on carry the mark. */
@@ -105,7 +124,7 @@ function pieces(runs, inTable) {
   const close = (key) => {
     out.push(
       markType(key) === "link"
-        ? { kind: "atom", out: linkEnd(key) }
+        ? { kind: "atom", gap: "close", out: linkEnd(key) }
         : { kind: "close", out: DELIMITER[key] },
     );
   };
@@ -121,16 +140,22 @@ function pieces(runs, inTable) {
           reach(runs, index, b) - reach(runs, index, a) ||
           ORDER.indexOf(markType(a)) - ORDER.indexOf(markType(b)),
       );
+    // A link over this run only, written as an autolink inside the other marks.
+    const link = opening.find((key) => markType(key) === "link");
+    const auto =
+      link && reach(runs, index, link) === index + 1 ? autolink(link, run, inTable) : null;
     for (const key of opening) {
+      if (auto && key === link) continue;
       if (markType(key) === "link") {
         // A `!` right before `[` would make the link an image.
         const previous = out.at(-1);
         if (previous?.kind === "text" && previous.out === "!") previous.out = "\\!";
-        out.push({ kind: "atom", out: "[" });
+        out.push({ kind: "atom", gap: "open", out: "[" });
       } else out.push({ kind: "open", out: DELIMITER[key] });
       open.push(key);
     }
-    if (run.t === "br") out.push({ kind: "atom", out: "\\\n" });
+    if (auto) out.push({ kind: "atom", out: auto });
+    else if (run.t === "br") out.push({ kind: "atom", out: "\\\n" });
     else if (run.t === "img") out.push({ kind: "atom", out: image(run) });
     else if (run.marks.includes("code"))
       out.push({ kind: "atom", out: codeSpan(run.text, inTable) });
@@ -143,21 +168,65 @@ function pieces(runs, inTable) {
   return out;
 }
 
-/** A delimiter works only next to a space, punctuation or the edge of the block. */
+const gapAt = (piece) =>
+  piece?.kind === "text" ? piece.char === " " : piece?.kind === "atom" && piece.out === "\\\n";
+const opens = (piece) => piece?.kind === "open" || piece?.gap === "open";
+const closes = (piece) => piece?.kind === "close" || piece?.gap === "close";
+
+/** Spaces and hard breaks just inside a delimiter or a link's brackets are moved
+ * outside: a delimiter next to a space would not work, and the marks of a space or a
+ * hard break are those of the text around it anyway (`canonical.mjs`). */
+function moveGaps(list) {
+  for (let moved = true; moved;) {
+    moved = false;
+    for (let i = 0; i + 1 < list.length; i++) {
+      const swap =
+        (opens(list[i]) && gapAt(list[i + 1])) || (gapAt(list[i]) && closes(list[i + 1]));
+      if (swap) {
+        [list[i], list[i + 1]] = [list[i + 1], list[i]];
+        moved = true;
+      }
+    }
+  }
+  return list;
+}
+
+/** micromark's class of a character: 1 whitespace (or the edge of the block), 2
+ * punctuation, 0 anything else. */
+function kind(char) {
+  if (char === undefined || WHITESPACE.test(char)) return 1;
+  return PUNCTUATION.test(char) ? 2 : 0;
+}
+
+const lastChar = (piece) => (piece ? [...piece.out].at(-1) : undefined);
+const firstChar = (piece) => (piece ? String.fromCodePoint(piece.out.codePointAt(0)) : undefined);
+
+/** Whether the delimiter opens (or closes) with these characters around it. */
+function works(piece, before, after) {
+  const left = after !== 1 && (after !== 2 || before !== 0); // left-flanking
+  const right = before !== 1 && (before !== 2 || after !== 0); // right-flanking
+  const underscore = piece.out === "_";
+  if (piece.kind === "open") return left && (!underscore || !right || before === 2);
+  return right && (!underscore || !left || after === 2);
+}
+
+/** Each delimiter made to work: where it would not, the text character outside it is
+ * written as a reference (punctuation to the parser). */
 function flank(list) {
   list.forEach((piece, i) => {
-    const outside =
-      piece.kind === "open" ? list[i - 1] : piece.kind === "close" ? list[i + 1] : null;
-    if (outside?.kind !== "text" || outside.char === null) return;
-    const edge = piece.kind === "open" ? outside.out.at(-1) : outside.out[0];
-    if (edge !== " " && !PUNCTUATION.test(edge)) outside.out = reference(outside.char);
+    if (piece.kind !== "open" && piece.kind !== "close") return;
+    const before = kind(lastChar(list[i - 1]));
+    const after = kind(firstChar(list[i + 1]));
+    if (works(piece, before, after)) return;
+    const outside = piece.kind === "open" ? list[i - 1] : list[i + 1];
+    if (outside?.kind === "text" && outside.char !== null) outside.out = reference(outside.char);
   });
   return list;
 }
 
 /** Canonical runs as Markdown. `table`: `|` is escaped in code too. */
 export function writeInline(runs, { table = false } = {}) {
-  return flank(pieces(runs, table))
+  return flank(moveGaps(pieces(runs, table)))
     .map((piece) => piece.out)
     .join("");
 }

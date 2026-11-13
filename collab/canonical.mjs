@@ -12,6 +12,8 @@
 //   of a list item (the item starts with its next block); an empty task item keeps a
 //   `&nbsp;` paragraph (the checkbox needs text after it);
 // - control characters other than tab and line breaks in text (see CONTROL);
+// - line breaks and runs of spaces in an image description (one space; the page view
+//   shows it as an attribute), and spaces at its ends;
 // - attributes without Markdown: image size, link target/rel/class, list type, column
 //   width; bold, italic, strike and code on an image (invisible).
 
@@ -50,7 +52,10 @@ function atoms(content) {
       out.push({
         t: "img",
         src: src ?? "",
-        alt: alt ?? "",
+        alt: String(alt ?? "")
+          .replace(CONTROL, "")
+          .replace(/\s+/g, " ")
+          .trim(),
         title: title ?? "",
         marks: markKeys(node.marks, ON_IMAGE),
       });
