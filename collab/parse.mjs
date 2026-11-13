@@ -145,15 +145,24 @@ function lists(node, source) {
   return out;
 }
 
+/** A table as wide as its widest row (review M2 T1/T10): the browser's editor makes
+ * every row equally wide when it loads a table, so the parser does it first. A short
+ * row gets empty cells (the page view shows them so, too); a row longer than the
+ * header gets empty headings at the end, so its last cells stay over their own column
+ * and visible in the page view (which hides cells beyond the header). */
 function table(node, source) {
+  const width = Math.max(...node.children.map((row) => row.children.length));
+  const columns = Array.from({ length: width }, (_, column) => column);
   return {
     type: "table",
     content: node.children.map((row, index) => ({
       type: "tableRow",
-      content: row.children.map((cell, column) => ({
+      content: columns.map((column) => ({
         type: index === 0 ? "tableHeader" : "tableCell",
         attrs: { align: node.align?.[column] ?? null },
-        content: [{ type: "tableParagraph", content: inline(cell.children, source) }],
+        content: [
+          { type: "tableParagraph", content: inline(row.children[column]?.children ?? [], source) },
+        ],
       })),
     })),
   };
@@ -224,5 +233,9 @@ export function parseMarkdown(markdown, keepRaw = () => false) {
       content.push(...block(node, markdown));
     }
   });
+  // An empty page holds one empty paragraph, as the browser's editor shows it: built
+  // into the shared document, undoing everything typed leaves that paragraph (an empty
+  // shared document would stop the browser, review M2 T6).
+  if (content.length === 0) content.push({ type: "paragraph" });
   return { json: { type: "doc", content }, sources };
 }

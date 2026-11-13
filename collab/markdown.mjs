@@ -11,17 +11,20 @@
 // compares both with the page view's parser (`meaning.mjs`). A block whose own
 // conversion changes its meaning, or that the editor could not show as built, is kept
 // as a raw block; if the page as a whole still comes back different, it is not opened
-// for live editing at all.
+// for live editing at all. The document served is the one the browser's editor shows
+// once loaded (`settle.mjs`): opening a page and leaving it sends nothing.
 import { getSchema } from "@tiptap/core";
-import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "y-prosemirror";
+import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
+import { FIELD } from "./editor.mjs";
 import { difference, meaningOf } from "./meaning.mjs";
 import { parseMarkdown } from "./parse.mjs";
 import { RAW_MARKDOWN, extensions } from "./schema.mjs";
 import { jsonToMarkdown } from "./serialize.mjs";
+import { settle } from "./settle.mjs";
 
 export { jsonToMarkdown };
 
-export const FIELD = "default"; // the Y.XmlFragment the browser's Collaboration extension uses
+export { FIELD };
 export const RAW_LANGUAGE = RAW_MARKDOWN;
 
 export const schema = getSchema(extensions());
@@ -45,6 +48,21 @@ export function editorProblem(json) {
   return schema.nodeFromJSON(back).eq(node) ? null : "changed by the Y.Doc";
 }
 
+/** The document as the browser's editor shows it once loaded (`settle.mjs`, review M2
+ * T1/T2): what its plugins change on loading is part of it, so opening a page and
+ * leaving it sends nothing. Null when the browser would stop on it or would not leave
+ * it alone. */
+function settled(json, settleDoc) {
+  let current = json;
+  for (let round = 0; round < 2; round += 1) {
+    const result = settleDoc(jsonToYDoc(current));
+    if (result.invalid !== null) return null;
+    if (result.update === null) return current;
+    current = result.json;
+  }
+  return null;
+}
+
 /** Whether the block comes back from the editor meaning the same, and the editor can
  * show it as built. */
 function survives(source) {
@@ -53,28 +71,43 @@ function survives(source) {
   return difference(meaningOf(source), meaningOf(jsonToMarkdown(json))) === null;
 }
 
+/** Whether the browser's editor, loading the block alone, leaves its meaning as is. */
+function settlesAlone(source, settleDoc) {
+  const shown = settled(parseMarkdown(source).json, settleDoc);
+  return shown !== null && difference(meaningOf(source), meaningOf(jsonToMarkdown(shown))) === null;
+}
+
 /** The editor's document for the Markdown (blocks it cannot show kept raw). */
 export function markdownToJSON(markdown) {
   return parseMarkdown(normalized(markdown)).json;
 }
 
-/** The editor document for the Markdown, or `safe: false` when the editor would
- * change what the page means or could not show it as built (then it must not be
- * edited live). */
-export function liveDocument(markdown) {
+/** The editor document for the Markdown as the browser's editor shows it once loaded,
+ * or `safe: false` when the editor would change what the page means or could not show
+ * it as built (then it must not be edited live). A change the browser's editor makes
+ * on loading is part of the document if it keeps the meaning; a block it would change
+ * in meaning is kept raw. `settleDoc` is the headless browser editor (tests replace
+ * it). */
+export function liveDocument(markdown, { settleDoc = settle } = {}) {
   const source = normalized(markdown);
   let meaning = null;
-  const attempts = [() => false, (_, block) => !survives(block)];
+  const attempts = [
+    () => false,
+    (_, block) => !survives(block),
+    (_, block) => !survives(block) || !settlesAlone(block, settleDoc),
+  ];
   for (const [attempt, keepRaw] of attempts.entries()) {
     const { json } = parseMarkdown(source, keepRaw);
     if (editorProblem(json) !== null) continue;
-    const written = jsonToMarkdown(json);
+    const shown = settled(json, settleDoc);
+    if (shown === null) continue;
+    const written = jsonToMarkdown(shown);
     // The same text means the same: no need to read both (the usual case for a page
     // the live editor wrote).
-    if (written === source) return { safe: true, json, plain: attempt === 0 };
+    if (written === source) return { safe: true, json: shown, plain: attempt === 0 };
     meaning ??= meaningOf(source);
     if (difference(meaning, meaningOf(written)) === null) {
-      return { safe: true, json, plain: attempt === 0 };
+      return { safe: true, json: shown, plain: attempt === 0 };
     }
   }
   return { safe: false, json: null };

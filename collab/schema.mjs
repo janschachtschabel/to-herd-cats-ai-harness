@@ -7,6 +7,8 @@
 // (`` [`a`](b) ``, `` **`a`** ``). Markdown is read and written by `parse.mjs` and
 // `serialize.mjs`, not by Tiptap's Markdown support.
 import { InputRule, Node } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
+import { ySyncPluginKey } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import Code from "@tiptap/extension-code";
 import CodeBlock from "@tiptap/extension-code-block";
@@ -17,6 +19,8 @@ import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 
 export const RAW_MARKDOWN = "raw-markdown";
+// The Y.Doc binding's plugin key: every transaction the binding makes carries its meta.
+export const SYNC_META = ySyncPluginKey;
 
 const LINK_PROTOCOLS = new Set(["http", "https", "mailto"]);
 
@@ -75,6 +79,27 @@ const MarkdownImage = Image.extend({
   },
 });
 
+/** Tiptap's autolink acts on any change, a document being loaded and other people's
+ * changes included (review M2 T2: `# README.md` became a link on opening). Here it acts
+ * only on the person's own changes; the Y.Doc binding marks every change it makes. */
+function ownChangesOnly(plugin) {
+  const append = plugin.spec.appendTransaction;
+  if (!plugin.key.startsWith("autolink$") || !append) return plugin;
+  return new Plugin({
+    ...plugin.spec,
+    appendTransaction: (transactions, oldState, newState) =>
+      transactions.some((transaction) => transaction.getMeta(SYNC_META) !== undefined)
+        ? undefined
+        : append(transactions, oldState, newState),
+  });
+}
+
+const MarkdownLink = Link.extend({
+  addProseMirrorPlugins() {
+    return this.parent().map(ownChangesOnly);
+  },
+});
+
 export function extensions() {
   return [
     StarterKit.configure({
@@ -91,7 +116,7 @@ export function extensions() {
     Code.extend({ excludes: "" }),
     Heading.extend({ content: LINE }),
     CodeBlock,
-    Link.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
+    MarkdownLink.configure({ openOnClick: false, isAllowedUri: (url) => allowedUri(url) }),
     // Inline, as in Markdown: an image may stand in a sentence, a cell, a list item or a
     // heading; as a block node the browser would delete such a paragraph (review M2 S1).
     MarkdownImage.configure({ inline: true }),

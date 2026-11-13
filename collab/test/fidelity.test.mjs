@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { yDocToProsemirrorJSON } from "y-prosemirror";
+import { yDocToProsemirrorJSON } from "@tiptap/y-tiptap";
 import {
   FIELD,
   editorProblem,

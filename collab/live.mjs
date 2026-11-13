@@ -6,7 +6,10 @@
 // with the person's session cookie at the API (`/internal/collab/auth`).
 //
 // A page is opened only if the editor can show it without changing what it means
-// (`liveDocument` in markdown.mjs); otherwise 4422 `collab.not_roundtrip_safe`. A save
+// (`liveDocument` in markdown.mjs); otherwise 4422 `collab.not_roundtrip_safe`. The
+// document served is the one the browser's editor shows once it has loaded it (the
+// collab process runs that editor headless, `settle.mjs`), so opening a page and
+// leaving it sends nothing. A save
 // stores only Markdown that reads back as the document (`documents.mjs`); one whose
 // Markdown equals what was loaded keeps the stored Markdown as it was written.
 //
@@ -32,11 +35,14 @@ import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
 import {
   editorProblem,
+  jsonToMarkdown,
   jsonToYDoc,
   liveDocument,
   yDocToJSON,
   yDocToMarkdown,
 } from "./markdown.mjs";
+import { sameMeaning } from "./meaning.mjs";
+import { settle } from "./settle.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { sizeGuard } from "./size.mjs";
 import {
@@ -107,18 +113,31 @@ export function liveExtension({
       const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
       const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
       Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
+      let tidied = !stored;
       if (stored) {
         Y.applyUpdate(document, Buffer.from(stored, "base64"));
-        // A state the browser's editor would repair (and save repaired) is not opened.
+        // A state the browser's editor would repair (and save repaired) is not opened;
+        // one it would only tidy without changing its meaning is tidied here, so the
+        // browser has nothing left to change (review M2 T1, ruling A).
         const problem = editorProblem(yDocToJSON(document));
-        if (problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
+        const shown = problem === null ? settle(document) : null;
+        if (!shown || shown.invalid !== null) throw deny(context, CLOSE.notRoundTripSafe);
+        if (shown.update !== null) {
+          const meaning = sameMeaning(yDocToMarkdown(document), jsonToMarkdown(shown.json));
+          if (!meaning) throw deny(context, CLOSE.notRoundTripSafe);
+          Y.applyUpdate(document, shown.update);
+          tidied = true;
+        }
       } else {
-        // Only a page the editor can show without changing its meaning is opened.
+        // Only a page the editor can show without changing its meaning is opened, as the
+        // browser's editor shows it once loaded.
         const converted = liveDocument(contentMd);
         if (!converted.safe) throw deny(context, CLOSE.notRoundTripSafe);
-        // Built from the Markdown: saved at once (content unchanged, so no version),
-        // so a browser that reconnects later meets the same Yjs history.
         Y.applyUpdate(document, Y.encodeStateAsUpdate(jsonToYDoc(converted.json)));
+      }
+      if (tidied) {
+        // Built or tidied here: saved at once (content unchanged, so no version), so a
+        // browser that reconnects later meets the same Yjs history.
         const saved = await api.save(context.pageId, {
           generation,
           ydoc: Y.encodeStateAsUpdate(document),

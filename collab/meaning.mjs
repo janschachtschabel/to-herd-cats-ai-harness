@@ -67,13 +67,30 @@ function normalizeChildren(children) {
   return out;
 }
 
+/** Every table as wide as its widest row, as the live editor keeps tables (review M2
+ * T1/T10): a short row's missing cells are empty (the page view shows them so); a row
+ * longer than the header makes the header wider. The page view hides cells beyond the
+ * header; the editor keeps them visible over empty headings, and that counts as the
+ * same table. */
+function rectangular(node) {
+  if (node.type === "table") {
+    const width = Math.max(node.align?.length ?? 0, ...node.children.map((r) => r.children.length));
+    node.align = Array.from({ length: width }, (_, column) => node.align?.[column] ?? null);
+    for (const row of node.children) {
+      while (row.children.length < width) row.children.push({ type: "tableCell", children: [] });
+    }
+  }
+  for (const child of node.children ?? []) rectangular(child);
+  return node;
+}
+
 /** The normalised syntax tree of the Markdown, as the page view would read it. */
 export function meaningOf(markdown) {
   const tree = fromMarkdown(markWikiLinks(markdown), {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });
-  return normalize(tree);
+  return normalize(rectangular(tree));
 }
 
 /** The first place where two trees differ (a path like `children.2.children.0.value`),
