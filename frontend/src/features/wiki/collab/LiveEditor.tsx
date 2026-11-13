@@ -69,6 +69,8 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
     setNotSaved(!saved)
     if (saved) {
       leave.current.confirmed = true
+      // The page view then shows the stored text at once, not the old one first (T15).
+      await fetchLatest(page).catch(() => undefined)
       await navigate({
         to: '/spaces/$spaceId/p/$',
         params: { spaceId: space.id, _splat: page.path },

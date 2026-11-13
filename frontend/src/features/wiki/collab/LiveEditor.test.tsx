@@ -169,6 +169,8 @@ describe('live editor', () => {
     const trees = api.find('GET', `/api/spaces/${space.id}/pages/tree`).length
     await user.click(screen.getByRole('button', { name: 'Fertig' }))
     await waitFor(() => expect(router.state.location.search).toEqual({}))
+    // The page view shows the stored text at once, never the old one first (T15).
+    expect(screen.queryByText('Alter Text')).not.toBeInTheDocument()
     expect(await screen.findByText('Alter Text NEU-GETIPPT')).toBeInTheDocument()
     expect(events).toEqual(['flushed'])
     expect(connections[0]!.destroyed).toBe(true)
