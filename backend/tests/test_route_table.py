@@ -61,6 +61,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/pages/{page_id}/diff", "page"),
     ("PUT", "/api/pages/{page_id}/tags", "page"),
     ("GET", "/api/tags", "session"),
+    ("GET", "/api/search", "session"),
     ("POST", "/api/tags", "session"),  # system tags: tag.manage; space tags: page.moderate
     ("PATCH", "/api/tags/{tag_id}", "session"),
     ("DELETE", "/api/tags/{tag_id}", "session"),

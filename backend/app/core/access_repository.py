@@ -98,6 +98,24 @@ def visible_ids_stmt(actor: Actor) -> Select[uuid.UUID]:
     )
 
 
+def ids_with_role_stmt(actor: Actor, min_role: SpaceRole) -> Select[uuid.UUID]:
+    """Ids of the spaces where `actor` holds at least `min_role`: all of the
+    organisation's for admins; otherwise those where the actor or one of its groups is
+    a member with such a role, plus the readable ones when `viewer` is enough (the
+    open-space floor gives no more than `viewer`)."""
+    if min_role == SpaceRole.VIEWER:
+        return visible_ids_stmt(actor)
+    role = _subject_role(actor)
+    member = exists().where(
+        SpaceMember.space_id == Space.id,
+        held_by(actor.principals),
+        _RANK >= min_role.rank,
+    )
+    return select(Space.id).where(
+        _in_scope(actor), role.is_not(None), or_(role.in_(ADMIN_ROLES), member)
+    )
+
+
 def _subject_role(actor: Actor) -> ScalarSelect[str]:
     """The actor's system role as it is now; NULL if it is inactive or not a person of
     the organisation (M1 knows no other principals that act)."""

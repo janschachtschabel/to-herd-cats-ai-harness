@@ -428,6 +428,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Pages the caller may see, best first; empty `q` gives an empty list.
+         */
+        get: operations["search_api_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces": {
         parameters: {
             query?: never;
@@ -928,6 +948,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[SearchHitOut] */
+        Page_SearchHitOut_: {
+            /** Items */
+            items: components["schemas"]["SearchHitOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[SpaceMemberOut] */
         Page_SpaceMemberOut_: {
             /** Items */
@@ -1007,6 +1034,38 @@ export interface components {
             locale: string;
             /** Version */
             version: number;
+        };
+        /**
+         * SearchHitOut
+         * @description `snippet` is plain text: render it as text and highlight what stands between
+         *     `⟦` and `⟧`. `score` orders the hits (higher is better); it has no unit.
+         */
+        SearchHitOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Path */
+            path: string;
+            /** Score */
+            score: number;
+            /** Snippet */
+            snippet: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Space Name */
+            space_name: string;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "page";
         };
         /**
          * SpaceCreate
@@ -2397,6 +2456,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_search_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                q?: string;
+                /** @description only this space */
+                space_id?: string | null;
+                /** @description only with every tag */
+                tag?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SearchHitOut_"];
                 };
             };
             /** @description Validation Error */

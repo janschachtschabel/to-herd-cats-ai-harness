@@ -1,5 +1,5 @@
-"""Keyset pagination: opaque cursors over (created_at, id), over (text key, id), or
-over id alone.
+"""Keyset pagination: opaque cursors over (created_at, id), over (text key, id), over
+(score, id) for ranked results, or over id alone.
 
 Ids are UUIDv7 and therefore ordered by creation time; tables without `created_at`
 page by id. Lists sorted by name page by (key, id).
@@ -7,6 +7,7 @@ page by id. Lists sorted by name page by (key, id).
 
 import base64
 import json
+import math
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -93,6 +94,24 @@ def decode_key_cursor(cursor: str) -> tuple[str, uuid.UUID]:
         if not isinstance(key, str) or not isinstance(id_, str):
             raise TypeError("cursor parts are not text")
         return _storable(key), uuid.UUID(id_)
+    except Exception as exc:
+        raise _invalid(exc) from exc
+
+
+def encode_score_cursor(score: float, id_: uuid.UUID) -> str:
+    raw = json.dumps([score, str(id_)]).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_score_cursor(cursor: str) -> tuple[float, uuid.UUID]:
+    """A finite number (no NaN, no infinity) and an id."""
+    try:
+        score, id_ = json.loads(_b64(cursor).decode())
+        if isinstance(score, bool) or not isinstance(score, int | float):
+            raise TypeError("score is not a number")
+        if not isinstance(id_, str) or not math.isfinite(score):
+            raise ValueError("bad score cursor")
+        return float(score), uuid.UUID(id_)
     except Exception as exc:
         raise _invalid(exc) from exc
 

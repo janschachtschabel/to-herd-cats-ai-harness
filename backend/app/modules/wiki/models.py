@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,6 +35,15 @@ MAX_TITLE_CHARS = 200
 MAX_SLUG_CHARS = 80
 MAX_SUMMARY_CHARS = 300
 MAX_LABEL_CHARS = 100
+
+
+# Full-text search (spec 11): the title stemmed (German) and as written (simple), both
+# weighted above the content. Kept up to date by Postgres on every write.
+SEARCH_TSV_SQL = (
+    "setweight(to_tsvector('german'::regconfig, title), 'A') || "
+    "setweight(to_tsvector('simple'::regconfig, title), 'A') || "
+    "setweight(to_tsvector('german'::regconfig, content_md), 'B')"
+)
 
 
 class PageStatus(StrEnum):
@@ -52,6 +63,7 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
             postgresql_where=text("trashed_at IS NULL"),
         ),
         Index("ix_page_space_id_parent_id", "space_id", "parent_id"),
+        Index("ix_page_search_tsv", "search_tsv", postgresql_using="gin"),
     )
 
     space_id: Mapped[uuid.UUID] = mapped_column(
@@ -77,6 +89,10 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
     updated_by_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     updated_by_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Read only by the search's SQL; deferred, so loading a page does not load it.
+    search_tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed(SEARCH_TSV_SQL, persisted=True), deferred=True
+    )
 
 
 class VersionSource(StrEnum):

@@ -21,7 +21,12 @@ from collections.abc import Sequence
 from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access_repository import AccessFacts, AccessRepository, visible_ids_stmt
+from app.core.access_repository import (
+    AccessFacts,
+    AccessRepository,
+    ids_with_role_stmt,
+    visible_ids_stmt,
+)
 from app.core.actor import Actor
 from app.core.errors import Forbidden, NotFound, Unauthorized
 from app.core.permissions import (
@@ -48,6 +53,7 @@ __all__ = [
     "can",
     "my_roles",
     "require",
+    "space_ids_with",
     "space_role",
     "system_permissions",
     "visible_space_ids",
@@ -65,6 +71,12 @@ async def actor_for(session: AsyncSession, auth: AuthContext) -> Actor:
 def visible_space_ids(actor: Actor) -> Select[uuid.UUID]:
     """The ids of every space `actor` may read, as SQL for list filters."""
     return visible_ids_stmt(actor)
+
+
+def space_ids_with(actor: Actor, action: Action) -> Select[uuid.UUID]:
+    """The ids of every space where `actor` may do the space action, as SQL for list
+    filters (`can` for each space, in one statement)."""
+    return ids_with_role_stmt(actor, SPACE_ACTION_MIN_ROLE[action])
 
 
 async def space_role(session: AsyncSession, actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:

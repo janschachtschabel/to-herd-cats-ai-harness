@@ -12,9 +12,18 @@ from sqlalchemy import event, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
-from app.core.access import Action, Actor, actor_for, can, require, space_role, visible_space_ids
+from app.core.access import (
+    Action,
+    Actor,
+    actor_for,
+    can,
+    require,
+    space_ids_with,
+    space_role,
+    visible_space_ids,
+)
 from app.core.errors import Forbidden, NotFound, Unauthorized
-from app.core.permissions import SpaceRole
+from app.core.permissions import SPACE_ACTION_MIN_ROLE, SpaceRole
 from app.core.principal import Principal, SystemRole
 from app.modules.auth.context import AuthContext
 from app.modules.groups.repository import GroupRepository
@@ -100,6 +109,21 @@ async def test_visible_space_ids_matches_can(
             assert await can(session, actor, Action.SPACE_READ, sid) == readable, label
             assert await can(session, actor, Action.SPACE_MANAGE, sid) == manageable, label
             assert await space_role(session, actor, sid) == role, label
+
+
+async def test_space_ids_with_matches_can(
+    session: AsyncSession, actors_and_spaces: tuple[list[User], list[Case]]
+) -> None:
+    """The SQL filter for one space action agrees with the single check, per action."""
+    people, cases = actors_and_spaces
+    for person in people:
+        actor = await actor_of(session, person)
+        for action in SPACE_ACTION_MIN_ROLE:
+            ids: set[UUID] = set((await session.scalars(space_ids_with(actor, action))).all())
+            for case in cases:
+                label = (person.system_role, case.kind, case.mode, action)
+                expected = await can(session, actor, action, case.space.id)
+                assert (case.space.id in ids) == expected, label
 
 
 @pytest.mark.parametrize(
