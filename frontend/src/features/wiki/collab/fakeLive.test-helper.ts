@@ -35,7 +35,8 @@ export function fakeConnectLive(options: Omit<FakeConnection, 'destroyed'>): Liv
     fake.events.push('flushed')
     return fake.finishAnswer()
   }
-  return { provider: null, clientId: 1, destroy, finish }
+  const reportLoadMutation = () => void fake.events.push('load-mutation')
+  return { provider: null, clientId: 1, destroy, finish, reportLoadMutation }
 }
 
 export const space = makeSpace({ name: 'Handbuch' })

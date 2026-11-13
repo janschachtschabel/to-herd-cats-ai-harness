@@ -49,6 +49,12 @@ COLLAB_SAVES = Counter(
     ["result"],
     registry=REGISTRY,
 )
+COLLAB_LOAD_MUTATIONS = Counter(
+    "herd_collab_load_mutations_total",
+    "Live editors that changed a document they had just loaded, before anyone typed "
+    "(the browser stopped the session instead of sending the change).",
+    registry=REGISTRY,
+)
 COLLAB_CONNECTIONS = Gauge(
     "herd_collab_connections",
     "Open live-editing connections relayed by the public port.",

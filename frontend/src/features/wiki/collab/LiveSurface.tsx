@@ -1,17 +1,14 @@
-import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect } from 'react'
 import type * as Y from 'yjs'
-import { extensions } from '@collab/schema.mjs'
+import { FIELD, liveExtensions } from '@collab/editor.mjs'
 import type { LiveConnection } from './connect'
 import { Toolbar } from './Toolbar'
 
-const FIELD = 'default' // the Y.XmlFragment the collab process reads (collab/markdown.mjs)
-
-/** The visual editor on the page's Y.Doc, with the collab process's own schema (so
- *  what is typed here is exactly what the server can write as Markdown) and the other
- *  people's cursors. */
+/** The visual editor on the page's Y.Doc, with the collab process's own editor (so what
+ *  is typed here is exactly what the server can write as Markdown, and the server knows
+ *  what this editor does on loading) and the other people's cursors. */
 export function LiveSurface({
   doc,
   connection,
@@ -19,6 +16,7 @@ export function LiveSurface({
   label,
   userName,
   onContentError,
+  onLoadMutation,
 }: {
   doc: Y.Doc
   connection: LiveConnection | null
@@ -27,13 +25,23 @@ export function LiveSurface({
   userName: string
   /** The shared document holds what the schema does not allow (review M2 S1). */
   onContentError: () => void
+  /** The editor changed the document it had just loaded before the person did anything
+   *  (review M2 ruling B): the change was not applied, so nothing was sent. */
+  onLoadMutation: () => void
 }) {
   const provider = connection?.provider ?? null
   const editor = useEditor(
     {
       extensions: [
-        ...extensions(),
-        Collaboration.configure({ document: doc, field: FIELD }),
+        ...liveExtensions({
+          document: doc,
+          field: FIELD,
+          onLoadMutation: () => {
+            // Not from inside the editor's transaction: stop right after it.
+            queueMicrotask(onLoadMutation)
+            return false
+          },
+        }),
         ...(provider
           ? [CollaborationCaret.configure({ provider, user: { name: userName, color: '#64748b' } })]
           : []),

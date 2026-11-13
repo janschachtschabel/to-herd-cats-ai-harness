@@ -10,6 +10,9 @@ export const UNSAVED = 'herd:unsaved'
 // later state can be), and that a later state was stored (review M2 S2/S3).
 export const UNREPRESENTABLE = 'herd:unrepresentable'
 export const REPRESENTABLE = 'herd:representable'
+// This browser's editor changed the document it had just loaded before the person did
+// anything; it stopped instead of sending the change (review M2 ruling B; counted).
+export const LOAD_MUTATION = 'herd:load-mutation'
 const FINISH_TIMEOUT_MS = 5000
 
 export interface AwarenessState {
@@ -36,6 +39,8 @@ export interface LiveConnection {
   /** "I am done": waits until the server has every local change and has stored it;
    *  false when it could not confirm that in time. Leaves the connection open. */
   finish?: () => Promise<boolean>
+  /** Tell the server that the editor changed a document it had just loaded. */
+  reportLoadMutation?: () => void
 }
 
 export type Connect = (options: {
@@ -74,6 +79,7 @@ export const connectLive: Connect = ({ pageId, generation, doc, handlers }) => {
     clientId: provider.awareness?.clientID ?? null,
     destroy: () => provider.destroy(),
     finish: () => finish(provider),
+    reportLoadMutation: () => provider.sendStateless(LOAD_MUTATION),
   }
 }
 

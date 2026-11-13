@@ -19,6 +19,7 @@ import {
   Strikethrough,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { markInput } from '@collab/editor.mjs'
 import { Button } from '@/components/ui/button'
 
 type Chain = ReturnType<Editor['chain']>
@@ -122,7 +123,10 @@ export function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolea
           disabled={disabled}
           aria-label={t(`wiki.live.tools.${tool.id}`)}
           aria-pressed={tool.active ? active[i] : undefined}
-          onClick={() => tool.run(editor.chain().focus()).run()}
+          onClick={() => {
+            markInput(editor)
+            tool.run(editor.chain().focus()).run()
+          }}
         >
           <tool.icon aria-hidden />
         </Button>

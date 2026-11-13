@@ -7,8 +7,9 @@ import { defineConfig } from 'vite'
 // The backend's public port (HERD_PUBLIC_PORT); override with HERD_API_PROXY.
 const apiTarget = process.env.HERD_API_PROXY ?? 'http://localhost:8080'
 
-// The live editor imports the collab process's schema (`../collab/schema.mjs`), so the
-// browser builds exactly the documents the server turns into Markdown. Its packages
+// The live editor imports the collab process's editor (`../collab/editor.mjs`: schema,
+// Y.Doc binding, load guard), so the browser builds exactly the documents the server
+// turns into Markdown and the server knows what the browser's editor does on loading. Its packages
 // resolve from this project (one copy of Tiptap and Yjs, whatever collab/ has installed).
 const collabDir = path.resolve(import.meta.dirname, '../collab')
 const SHARED = [
@@ -22,6 +23,8 @@ const SHARED = [
   '@tiptap/extension-link',
   '@tiptap/extension-code',
   '@tiptap/extension-heading',
+  '@tiptap/extension-collaboration',
+  '@tiptap/y-tiptap',
   'mdast-util-from-markdown',
   'mdast-util-gfm',
   'micromark-extension-gfm',

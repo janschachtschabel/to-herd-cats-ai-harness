@@ -244,3 +244,13 @@ async def test_unrepresentable_saves_are_counted(wiki: Wiki, collab: AsyncClient
     assert r.status_code == 204
     text = (await collab.get("/metrics")).text
     assert 'herd_collab_saves_total{result="unrepresentable"}' in text
+
+
+async def test_load_mutations_are_counted(wiki: Wiki, collab: AsyncClient) -> None:
+    # A browser's editor changed a document it had just loaded, before anyone typed
+    # (review M2 ruling B): the browser stopped and the collab process reports it.
+    page = await new_page(wiki.editor, wiki.space_id, "Live")
+    r = await collab.post(f"/internal/collab/pages/{page['id']}/load-mutation")
+    assert r.status_code == 204
+    text = (await collab.get("/metrics")).text
+    assert "herd_collab_load_mutations_total 1.0" in text

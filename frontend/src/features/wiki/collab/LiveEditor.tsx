@@ -144,6 +144,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
         label={t('wiki.live.label', { title: page.title })}
         userName={me?.user.name ?? ''}
         onContentError={() => live.refuse('invalid_content')}
+        onLoadMutation={live.loadMutation}
       />
       <p className="text-xs text-muted-foreground">{t('wiki.live.hint')}</p>
     </section>

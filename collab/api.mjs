@@ -64,6 +64,11 @@ export class InternalApi {
     return this.call("POST", `/pages/${pageId}/unrepresentable`);
   }
 
+  /** A browser's editor changed the document it had just loaded (counted). */
+  loadMutation(pageId) {
+    return this.call("POST", `/pages/${pageId}/load-mutation`);
+  }
+
   check(pageId, sessionIds, generation, unsavedSessionIds = []) {
     return this.call("POST", `/pages/${pageId}/check`, {
       session_ids: sessionIds,

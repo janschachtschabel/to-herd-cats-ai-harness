@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, Actor, actor_for, can
 from app.core.config import get_settings
 from app.core.errors import AppError, Conflict, Forbidden, Unauthorized
-from app.core.metrics import COLLAB_SAVES
+from app.core.metrics import COLLAB_LOAD_MUTATIONS, COLLAB_SAVES
 from app.modules.auth.service import AuthService
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
@@ -146,6 +146,12 @@ class CollabService:
         """A save the collab process refused itself (its Markdown would not read back
         as the document): counted with the other save results."""
         COLLAB_SAVES.labels(result="unrepresentable").inc()
+
+    @staticmethod
+    def load_mutation() -> None:
+        """A browser's editor changed a document it had just loaded, before anyone
+        typed (review M2 ruling B): it stopped and sent nothing; counted only."""
+        COLLAB_LOAD_MUTATIONS.inc()
 
     async def check(
         self,

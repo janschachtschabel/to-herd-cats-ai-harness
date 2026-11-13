@@ -25,6 +25,9 @@ export interface LiveSession {
   retry: () => void
   /** Stop for good on the browser's side (the shared document cannot be shown). */
   refuse: (reason: StopReason) => void
+  /** The editor changed the document it had just loaded (review M2 ruling B): report
+   *  it and stop for good, as for content the editor cannot show. */
+  loadMutation: () => void
   /** "Fertig": true once the server has stored everything typed here (or nothing more
    *  can be stored because the session ended); false while that is not confirmed. */
   finish: () => Promise<boolean>
@@ -148,6 +151,13 @@ export function useLiveSession(
 
   const refuse = useCallback((reason: StopReason) => current.current?.stop(reason), [])
 
+  const loadMutation = useCallback(() => {
+    const session = current.current
+    if (!session || !session.open()) return
+    session.live.reportLoadMutation?.()
+    session.stop('invalid_content')
+  }, [])
+
   const finish = useCallback(async () => {
     const session = current.current
     if (!session || !session.open() || !session.live.finish) return true
@@ -167,6 +177,7 @@ export function useLiveSession(
     unrepresentable,
     retry,
     refuse,
+    loadMutation,
     finish,
   }
 }

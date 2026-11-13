@@ -49,6 +49,7 @@ import {
   CLOSE,
   FLUSH,
   FLUSH_INTERVAL_MS,
+  LOAD_MUTATION,
   SAVED,
   UNREPRESENTABLE,
   UNSAVED,
@@ -82,6 +83,19 @@ export function liveExtension({
   const ending = new Set(); // document names whose generation must end before anyone joins
 
   const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending });
+
+  /** A browser's editor changed the document it had just loaded and stopped (once per
+   * connection: a browser cannot inflate the count). */
+  async function loadMutation(context, state) {
+    if (context.loadMutation || !state) return;
+    context.loadMutation = true;
+    log("live editor changed a loaded document", { page_id: state.pageId });
+    try {
+      await api.loadMutation(state.pageId);
+    } catch (error) {
+      if (!(error instanceof ApiUnavailable)) throw error; // only the count is missing
+    }
+  }
 
   return {
     extensionName: "herd-live",
@@ -185,9 +199,10 @@ export function liveExtension({
 
     /** "I am done": save now, then say whether everything is stored. */
     async onStateless({ connection, document, documentName, payload }) {
-      if (payload !== FLUSH) return;
       const state = live.get(documentName);
       const { context } = connection;
+      if (payload === LOAD_MUTATION) return loadMutation(context, state);
+      if (payload !== FLUSH) return;
       const now = Date.now();
       const due = now - (context.flushedAt ?? 0) >= FLUSH_INTERVAL_MS;
       if (state && due && state.dirty.size > 0 && !state.discarded && !state.holding) {

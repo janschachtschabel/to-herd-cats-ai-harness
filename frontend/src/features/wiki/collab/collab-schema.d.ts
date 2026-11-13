@@ -24,3 +24,18 @@ declare module '@collab/wikilinks.mjs' {
   export function replaceWikiLinks(markdown: string, replace: (link: WikiLink) => string): string
   export function linkText(title: string): string
 }
+
+declare module '@collab/editor.mjs' {
+  import type { AnyExtension, Editor } from '@tiptap/core'
+  import type { Transaction } from '@tiptap/pm/state'
+  import type * as Y from 'yjs'
+
+  export const FIELD: string
+  export function liveExtensions(options: {
+    document: Y.Doc
+    field?: string
+    onLoadMutation?: (transaction: Transaction) => boolean
+  }): AnyExtension[]
+  export function markInput(editor: Editor): void
+  export function hadInput(editor: Editor): boolean
+}

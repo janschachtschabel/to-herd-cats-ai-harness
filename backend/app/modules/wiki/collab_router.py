@@ -87,3 +87,11 @@ async def unrepresentable(page_id: uuid.UUID) -> Response:
     written as Markdown that reads back as what the editors see (counted only)."""
     CollabService.unrepresentable()
     return Response(status_code=204)
+
+
+@router.post("/pages/{page_id}/load-mutation", status_code=204)
+async def load_mutation(page_id: uuid.UUID) -> Response:
+    """A browser's live editor changed the document it had just loaded before anyone
+    typed; it stopped instead of sending the change (counted only)."""
+    CollabService.load_mutation()
+    return Response(status_code=204)

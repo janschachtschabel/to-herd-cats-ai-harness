@@ -28,6 +28,9 @@ export const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection
 // (nothing is stored until a later state can be), and that a later state was stored.
 export const UNREPRESENTABLE = "herd:unrepresentable";
 export const REPRESENTABLE = "herd:representable";
+// From a browser whose editor changed the document it had just loaded before the person
+// did anything: it stopped instead of sending the change (review M2 ruling B; counted).
+export const LOAD_MUTATION = "herd:load-mutation";
 
 // Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
 // browser shows initials in white on them.

@@ -20,6 +20,7 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
     saves: [],
     checks: [],
     unrepresentable: 0,
+    loadMutations: 0,
     saveAnswer: () => [200, { generation: state.generation, version: 2 }],
     checkAnswer: () => [
       200,
@@ -54,6 +55,11 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
           can_edit: true,
         },
       ]);
+    }
+    if (url.pathname.endsWith("/load-mutation")) {
+      state.loadMutations++;
+      response.writeHead(204);
+      return response.end();
     }
     if (url.pathname.endsWith("/unrepresentable")) {
       state.unrepresentable++;
