@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     attachment_max_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
     # Largest Markdown ZIP to import (bytes, packed); its route takes bodies this large.
     import_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
+    # Longest wait (seconds) for the next part of an upload's or import's body: 408 after.
+    body_read_timeout_seconds: float = Field(default=30.0, gt=0)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

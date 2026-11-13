@@ -67,12 +67,15 @@ class AttachmentService:
     async def upload(
         self, actor: Actor, page_id: uuid.UUID, filename: str, stream: AsyncIterator[bytes]
     ) -> Attachment:
-        """Rights first: nothing is read from someone who may not upload."""
+        """Rights first: nothing is read from someone who may not upload. The body is
+        read with no transaction open (no pooled connection held, however slowly it
+        arrives); the rights are checked again afterwards."""
         name = clean_filename(filename)
-        page = await self.reader.readable(actor, page_id)
-        await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
+        await self._editable(actor, page_id)
+        await self.session.commit()
         limit = get_settings().attachment_max_bytes
         with await spool(stream, limit, code="attachment.too_large") as body:
+            page = await self._editable(actor, page_id)
             kind = await asyncio.to_thread(filetypes.detect, body.head, body.text, body.file, name)
             attachments = self.repo(actor)
             await attachments.lock_blob(body.sha256)
@@ -97,6 +100,11 @@ class AttachmentService:
             self.session, actor, "attachment.uploaded", "attachment", attachment.id, details
         )
         return attachment
+
+    async def _editable(self, actor: Actor, page_id: uuid.UUID) -> Page:
+        page = await self.reader.readable(actor, page_id)
+        await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
+        return page
 
     async def list(
         self, actor: Actor, page_id: uuid.UUID, params: PageParams

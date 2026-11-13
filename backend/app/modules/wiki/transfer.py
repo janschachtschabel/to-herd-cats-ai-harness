@@ -96,8 +96,11 @@ class PageImport:
     async def import_zip(
         self, actor: Actor, space_id: uuid.UUID, stream: AsyncIterator[bytes]
     ) -> ImportResult:
-        """Rights first: nothing is read from someone who may not import."""
+        """Rights first: nothing is read from someone who may not import. The body is
+        read with no transaction open (no pooled connection held); the rights are
+        checked again afterwards."""
         await require(self.session, actor, Action.SPACE_MANAGE, space_id)
+        await self.session.commit()
         self.actor, self.space_id = actor, space_id
         self.result = ImportResult()
         self.made: dict[str, Page] = {}
@@ -107,6 +110,7 @@ class PageImport:
         self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
+            await require(self.session, actor, Action.SPACE_MANAGE, space_id)
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
             with zipped:
                 files, attached = self._sort(zipped)
