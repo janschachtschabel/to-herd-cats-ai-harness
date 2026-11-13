@@ -108,16 +108,13 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 MakeClient = Callable[..., Awaitable[AsyncClient]]
 
 
-@pytest.fixture
-async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
-    """New clients of one public app, all on the test session; each has its own cookies.
+def session_override(session: AsyncSession) -> Callable[[], AsyncIterator[AsyncSession]]:
+    """`get_session` for apps under test, on the test session.
 
-    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends."""
-    app = create_public_app()
+    Mirrors app.core.db.get_session: each request is its own unit of work and a failed
+    request rolls back only its own changes (a savepoint per request)."""
 
     async def _session_override() -> AsyncIterator[AsyncSession]:
-        # Mirrors app.core.db.get_session: each request is its own unit of work and a
-        # failed request rolls back only its own changes (a savepoint per request).
         nested = await session.begin_nested()
         try:
             yield session
@@ -130,6 +127,17 @@ async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
                 await nested.rollback()
             raise
         await run_after_commit(session)
+
+    return _session_override
+
+
+@pytest.fixture
+async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
+    """New clients of one public app, all on the test session; each has its own cookies.
+
+    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends."""
+    app = create_public_app()
+    _session_override = session_override(session)
 
     app.dependency_overrides[get_session] = _session_override
     # raise_app_exceptions=False: let the 500 handler's response reach the test.

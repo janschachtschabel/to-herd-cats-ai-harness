@@ -10,6 +10,8 @@ from sqlalchemy.engine import URL, make_url
 
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
+INTERNAL_TOKEN_MIN_LENGTH = 32
+
 
 class Settings(BaseSettings):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
@@ -31,6 +33,9 @@ class Settings(BaseSettings):
 
     public_port: int = 8080
     internal_port: int = 9090
+    # Guards /internal/* (header X-Herd-Internal-Token); unset, /internal/* answers 503.
+    # Shared with the collab process. At least 32 characters (`openssl rand -hex 32`).
+    internal_token: SecretStr | None = None
 
     session_cookie_name: str = "herd_session"
     session_ttl_hours: int = 24 * 7
@@ -75,6 +80,18 @@ class Settings(BaseSettings):
                 "HERD_BOOTSTRAP_ADMIN_PASSWORD must be "
                 f"{PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters long"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _internal_token_is_long_enough(self) -> Self:
+        if self.internal_token is not None:
+            length = len(self.internal_token.get_secret_value())
+            if length == 0:
+                self.internal_token = None
+            elif length < INTERNAL_TOKEN_MIN_LENGTH:
+                raise ValueError(
+                    f"HERD_INTERNAL_TOKEN must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
+                )
         return self
 
     @model_validator(mode="after")

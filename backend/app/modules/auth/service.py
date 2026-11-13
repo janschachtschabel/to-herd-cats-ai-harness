@@ -1,5 +1,6 @@
 """Login, logout and session resolution."""
 
+import uuid
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,6 +100,14 @@ class AuthService:
 
     async def resolve(self, token: str) -> AuthContext | None:
         user_session = await self.sessions.get_active(hash_token(token), utcnow())
+        if user_session is None or not user_session.user.is_active:
+            return None
+        return AuthContext(user=user_session.user, session_id=user_session.id)
+
+    async def resolve_session(self, session_id: uuid.UUID) -> AuthContext | None:
+        """The caller of a login session known by its id (live editing checks again
+        whether the session of an open connection still holds)."""
+        user_session = await self.sessions.get_active_by_id(session_id, utcnow())
         if user_session is None or not user_session.user.is_active:
             return None
         return AuthContext(user=user_session.user, session_id=user_session.id)

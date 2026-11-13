@@ -138,7 +138,11 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   `kube_pod_container_info`). Ohne kube-state-metrics feuert er nie.
 - **Port 9090** (`/health`, `/ready`, `/metrics`) hat keine Anmeldung; ihn schützt nur
   das Netz (Compose veröffentlicht ihn nicht, im Chart kein Ingress, optional
-  `networkPolicy.internalFrom`). Ein Token für interne Endpunkte kommt erst mit M2.
+  `networkPolicy.internalFrom`). Die interne Collab-Schnittstelle `/internal/*` auf
+  demselben Port verlangt zusätzlich den Header `X-Herd-Internal-Token` gleich
+  `HERD_INTERNAL_TOKEN` (mindestens 32 Zeichen, etwa `openssl rand -hex 32`; API und
+  Collab-Prozess brauchen denselben Wert). Ohne gesetztes Token antwortet `/internal/*`
+  immer mit 503 (`internal.disabled`), und die Live-Bearbeitung ist aus.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
   `networkPolicy.internalFrom` niemanden an Port 9090, also auch Prometheus nicht:
   Prometheus dort eintragen. Mit externer Datenbank braucht es eine Egress-Regel zu
@@ -187,7 +191,8 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   (auch hier den Ingress anpassen), höchstens 2.000 Einträge und 200 MB entpackt
   enthalten; Einträge mit `..`, absolutem Pfad oder als Symlink werden übersprungen.
   Ein Import läuft in einer Transaktion; große Archive brauchen entsprechend lange.
-  Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`. Der Export listet in
+  Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`.
+  Der Export listet in
   `_attachments/manifest.json`, welcher Anhang jede Datei war; der Import lässt Links
   `/api/attachments/<id>` auf mitgebrachte Anhänge auf die neuen zeigen. Links auf
   andere Anhänge (nicht im Archiv, beim Import abgelehnt, anderer Host) bleiben.

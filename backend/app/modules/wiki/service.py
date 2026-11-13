@@ -170,7 +170,7 @@ class PageService:
     ) -> Page:
         """Change title and/or content, saved as a new version (folded into the newest
         one of the same session, see `VersionService.record`); a request that changes
-        nothing changes nothing."""
+        nothing changes nothing. A content change ends the page's live sessions."""
         page = await self.readable(actor, page_id, lock=True)
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
         check_version(page, version)
@@ -179,6 +179,7 @@ class PageService:
             page.title, changed = title, True
         if content_md is not None and content_md != page.content_md:
             page.content_md, changed = content_md, True
+            page.collab_generation += 1  # saved outside the live session: it ends
         if changed:
             touch(page, actor)
             await self.session.flush()
@@ -190,6 +191,20 @@ class PageService:
                 session_key=session_key,
                 coalesce_seconds=coalesce_seconds,
             )
+        return page
+
+    async def save_live(
+        self, editors: list[Actor], page: Page, content_md: str, *, session_key: str
+    ) -> Page:
+        """Content from the page's live session, edited by `editors`: saved without
+        ending the session (the generation stays). The caller (`collab_service`) holds
+        the page row lock and has checked the generation and every editor's rights."""
+        if content_md == page.content_md:
+            return page
+        page.content_md = content_md
+        _, author = await VersionService(self.session).record_live(page, editors, session_key)
+        touch(page, author)
+        await self.session.flush()
         return page
 
     async def publish(self, actor: Actor, page_id: uuid.UUID, version: int) -> Page:

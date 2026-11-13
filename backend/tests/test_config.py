@@ -135,9 +135,20 @@ def test_alembic_uses_the_resolved_url(separate_password_env, engine) -> None:
     upgrade_head()
 
 
-def test_no_setting_without_a_reader() -> None:
-    """HERD_INTERNAL_TOKEN comes with its first reader (M2, /internal/*), not before."""
-    assert "internal_token" not in Settings.model_fields
+def test_internal_token_is_hidden_and_never_echoed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HERD_INTERNAL_TOKEN (read by /internal/*): a secret; too short fails the start
+    with a message that does not contain it."""
+    monkeypatch.setenv("HERD_INTERNAL_TOKEN", "it-" + "9" * 40)
+    settings = Settings()
+    for text_ in (repr(settings), str(settings.model_dump()), settings.model_dump_json()):
+        assert "it-999" not in text_
+    assert settings.internal_token is not None
+    assert settings.internal_token.get_secret_value() == "it-" + "9" * 40
+    monkeypatch.setenv("HERD_INTERNAL_TOKEN", "short-7e21")
+    with pytest.raises(ValidationError) as caught:
+        Settings()
+    assert "short-7e21" not in str(caught.value)
+    assert "at least 32" in str(caught.value)
 
 
 def test_bootstrap_password_is_hidden(

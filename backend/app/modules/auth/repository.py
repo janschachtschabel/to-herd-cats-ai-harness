@@ -22,6 +22,10 @@ class SessionRepository:
         )
         return await self.session.scalar(stmt)
 
+    async def get_active_by_id(self, session_id: uuid.UUID, now: datetime) -> UserSession | None:
+        stmt = select(UserSession).where(UserSession.id == session_id, UserSession.expires_at > now)
+        return await self.session.scalar(stmt)
+
     async def delete_by_hash(self, token_hash: str) -> None:
         await self.session.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
 

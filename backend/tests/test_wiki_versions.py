@@ -89,7 +89,11 @@ async def test_restore_creates_new_version_and_keeps_history(
     assert r.status_code == 200, r.text
     restored = r.json()
     assert (restored["content_md"], restored["title"], restored["path"]) == ("alt", "Neu", "alt")
-    assert (restored["version"], restored["collab_generation"]) == (page["version"] + 1, 1)
+    assert (restored["version"], restored["collab_generation"]) == (
+        page["version"] + 1,
+        page["collab_generation"] + 1,  # the PATCH ended one generation, the restore the next
+    )
+    assert page["collab_generation"] == 1
     items = (await _versions(wiki.editor, page))["items"]
     assert [(v["number"], v["source"], v["change_summary"]) for v in items] == [
         (3, "restore", "restore:1"),

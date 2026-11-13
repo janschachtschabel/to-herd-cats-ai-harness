@@ -41,3 +41,11 @@ def render_metrics() -> tuple[bytes, str]:
         MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
         return _generate_latest(registry), CONTENT_TYPE_LATEST
     return _generate_latest(REGISTRY), CONTENT_TYPE_LATEST
+
+
+COLLAB_SAVES = Counter(
+    "herd_collab_saves_total",
+    "Saves of live-editing sessions through the internal API, by result.",
+    ["result"],
+    registry=REGISTRY,
+)

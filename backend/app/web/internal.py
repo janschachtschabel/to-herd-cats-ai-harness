@@ -1,23 +1,54 @@
-"""The internal application (port HERD_INTERNAL_PORT): probes and metrics.
+"""The internal application (port HERD_INTERNAL_PORT): probes, metrics and the
+internal collab API.
 
 Never reachable through the public port and not part of the public OpenAPI document.
+`/internal/*` needs the header `X-Herd-Internal-Token` equal to HERD_INTERNAL_TOKEN
+(compared in constant time); without a configured token it answers 503.
 """
 
 import asyncio
+import hmac
 import logging
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.core.body_limit import BodyLimitMiddleware
+from app.core.config import get_settings
 from app.core.db import get_database
+from app.core.errors import AppError, Unauthorized, UnhandledErrorMiddleware, install_error_handlers
 from app.core.metrics import render_metrics
 from app.core.migrations import schema_is_compatible
+from app.modules.wiki.collab_router import router as collab_router
 
 logger = logging.getLogger(__name__)
 
 READY_TIMEOUT_SECONDS = 2.0
+INTERNAL_TOKEN_HEADER = "x-herd-internal-token"  # noqa: S105 (a header name)
+# A live save carries a Yjs state of up to 5 MB in base64 and up to 200,000 characters.
+INTERNAL_MAX_BODY_BYTES = 9 * 1024 * 1024
+
+
+class InternalDisabled(AppError):
+    status_code = 503
+    code = "internal.disabled"
+
+
+async def internal_token_guard(request: Request) -> None:
+    expected = get_settings().internal_token
+    if expected is None:
+        raise InternalDisabled()
+    given = request.headers.get(INTERNAL_TOKEN_HEADER, "")
+    if not hmac.compare_digest(given.encode("utf-8"), expected.get_secret_value().encode("utf-8")):
+        raise Unauthorized(code="internal.unauthorized")
+
+
+def internal_router() -> APIRouter:
+    internal = APIRouter(prefix="/internal", dependencies=[Depends(internal_token_guard)])
+    internal.include_router(collab_router)
+    return internal
 
 
 def get_engine() -> AsyncEngine:
@@ -30,6 +61,10 @@ def _not_ready(reason: str) -> JSONResponse:
 
 def create_internal_app() -> FastAPI:
     app = FastAPI(title="to-herd-cats-ai internal", openapi_url=None, docs_url=None, redoc_url=None)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=INTERNAL_MAX_BODY_BYTES)
+    app.add_middleware(UnhandledErrorMiddleware)
+    install_error_handlers(app)
+    app.include_router(internal_router())
 
     @app.get("/health")
     async def health() -> dict[str, str]:

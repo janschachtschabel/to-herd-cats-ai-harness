@@ -7,6 +7,7 @@ and restoring need `page.edit`. A diff compares at most `HERD_DIFF_MAX_LINES` li
 """
 
 import asyncio
+import builtins
 import uuid
 from datetime import timedelta
 
@@ -23,6 +24,8 @@ from app.modules.wiki import diffing
 from app.modules.wiki.models import Page, PageVersion, VersionSource
 from app.modules.wiki.versions_repository import NamedVersion
 from app.modules.wiki.visibility import PageReader, check_version, touch
+
+LIVE_COALESCE_SECONDS = 60
 
 
 def _not_found() -> NotFound:
@@ -73,6 +76,31 @@ class VersionService:
                 session_key=session_key,
             )
         )
+
+    async def record_live(
+        self, page: Page, editors: builtins.list[Actor], session_key: str
+    ) -> tuple[PageVersion, Actor]:
+        """A save from a live session edited by `editors` (in order of their edits):
+        folded into the newest version while that is one of this session, younger
+        than 60 s and by one of the editors; otherwise a new version by the first.
+        The author too, for the page's `updated_by`. Same lock rule as `record`."""
+        latest = await self.reader.versions(editors[0]).latest(page.id)
+        author = editors[0]
+        if latest is not None:
+            for editor in editors:
+                if _folds_into(
+                    latest, editor, VersionSource.COLLAB, session_key, LIVE_COALESCE_SECONDS
+                ):
+                    author = editor
+                    break
+        version = await self.record(
+            page,
+            author,
+            VersionSource.COLLAB,
+            session_key=session_key,
+            coalesce_seconds=LIVE_COALESCE_SECONDS,
+        )
+        return version, author
 
     async def list(
         self, actor: Actor, page_id: uuid.UUID, params: PageParams
