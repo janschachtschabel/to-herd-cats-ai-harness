@@ -49,6 +49,9 @@
       "csrf": "The request was refused for security reasons.",
       "wrong_password": "The current password is not correct."
     },
+    "server": {
+      "busy": "The server is busy right now. Please try again in a moment."
+    },
     "users": {
       "email_taken": "This email address is already taken.",
       "owner_only": "Only an owner may do this.",

@@ -11,6 +11,7 @@ from app.core.failure_limit import FailureLimiter
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.security import (
+    HashingBusy,
     hash_token,
     new_session_token,
     verify_against_dummy,
@@ -60,14 +61,24 @@ class AuthService:
             raise RateLimited(code="auth.too_many_attempts")
         org = await self.orgs.get_default()
         user = await self.users.get_by_email(org.id, email) if org else None
-        if user is None or not user.is_active or user.password_hash is None:
-            await verify_against_dummy(password)
-            await per_account.fail(attempt)
-            raise Unauthorized(code="auth.invalid_credentials")
-        if not await verify_password_async(user.password_hash, password):
+        checked = user.password_hash if user is not None and user.is_active else None
+        await self.session.commit()  # no connection is held while hashing
+        try:
+            valid = await _verify(checked, password)
+        except HashingBusy:  # refused before any check: not an attempt
+            await per_account.end(attempt)
+            await self.session.commit()
+            raise
+        if user is None or not valid:
             await per_account.fail(attempt)
             raise Unauthorized(code="auth.invalid_credentials")
         await per_account.end(attempt)  # a success is not a failed attempt
+        # Read again: the person may have been deactivated or got a new password
+        # while the password was being checked.
+        await self.session.refresh(user)
+        if not user.is_active or user.password_hash != checked:
+            await self.session.commit()
+            raise Unauthorized(code="auth.invalid_credentials")
         token = new_session_token()
         now = utcnow()
         # Housekeeping without a background task: every login removes a bounded batch
@@ -99,3 +110,11 @@ class AuthService:
     async def permissions(self, ctx: AuthContext) -> list[Action]:
         """The system-wide actions the caller holds now."""
         return await system_permissions(self.session, await actor_for(self.session, ctx))
+
+
+async def _verify(password_hash: str | None, password: str) -> bool:
+    """Without a usable account the dummy hash is verified: the answer takes as long."""
+    if password_hash is None:
+        await verify_against_dummy(password)
+        return False
+    return await verify_password_async(password_hash, password)

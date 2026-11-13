@@ -153,7 +153,10 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt.
 - **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft in
   Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig
-  je Prozess; jede braucht 64 MiB. Vor dieser Änderung (im Event-Loop) schaffte ein Pod
+  je Prozess; jede braucht 64 MiB. Höchstens `HERD_PASSWORD_HASH_QUEUE` (Standard 16)
+  Anfragen je Prozess warten auf einen Platz, weitere bekommen sofort 429
+  (`server.busy`, `Retry-After: 1`). Wartende und prüfende Anfragen halten keine
+  Datenbankverbindung und keine Sperre. Vor dieser Änderung (im Event-Loop) schaffte ein Pod
   auf der Messmaschine rund 15 Anmeldungen je Sekunde (siehe
   [Steckbrief](docs/STECKBRIEF.md)); neu gemessen ist das nicht.
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard

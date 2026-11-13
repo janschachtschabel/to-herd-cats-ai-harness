@@ -2,14 +2,20 @@
 
 argon2 is slow and memory-hard on purpose (~65 ms, 64 MiB each). Request code uses the
 `*_async` helpers: they run it in a worker thread (argon2-cffi releases the GIL), at
-most `HERD_PASSWORD_HASH_CONCURRENCY` at a time per process, so the event loop, and
-with it the probes and every other request, stays responsive, and memory stays
-bounded (concurrency × 64 MiB).
+most `HERD_PASSWORD_HASH_CONCURRENCY` at a time per process, so the event loop stays
+responsive and memory stays bounded (concurrency × 64 MiB). At most
+`HERD_PASSWORD_HASH_QUEUE` more wait for a slot; beyond that a request is answered at
+once with 429 `server.busy` and `Retry-After` (`HashingBusy`).
+
+Callers hold no database connection and no lock while they wait or hash (they commit
+first and re-read afterwards), so a flood of logins cannot exhaust the pool.
 """
 
 import asyncio
 import hashlib
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from functools import cache
 from weakref import WeakKeyDictionary
 
@@ -17,6 +23,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.core.config import get_settings
+from app.core.errors import RateLimited
 
 _hasher = PasswordHasher()  # argon2id with the library's current recommended parameters
 
@@ -39,16 +46,49 @@ def dummy_password_hash() -> str:
     return _hasher.hash(secrets.token_urlsafe(16))
 
 
-_slots: "WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = WeakKeyDictionary()
+class HashingBusy(RateLimited):
+    """Every hashing slot is taken and the queue is full: try again in a moment."""
+
+    code = "server.busy"
+    retry_after = 1
 
 
-def _slot() -> asyncio.Semaphore:
-    """The process's hashing slots (one semaphore per event loop)."""
+class _Gate:
+    """`slots` hashing at a time; at most `queue` more wait, the rest are refused."""
+
+    def __init__(self, slots: int, queue: int) -> None:
+        self._slots = asyncio.Semaphore(slots)
+        self._queue = queue
+        self._waiting = 0
+
+    @asynccontextmanager
+    async def slot(self) -> AsyncIterator[None]:
+        if self._slots.locked() and self._waiting >= self._queue:
+            raise HashingBusy()
+        self._waiting += 1
+        try:
+            await self._slots.acquire()
+        finally:
+            self._waiting -= 1
+        try:
+            yield
+        finally:
+            self._slots.release()
+
+
+_gates: "WeakKeyDictionary[asyncio.AbstractEventLoop, _Gate]" = WeakKeyDictionary()
+
+
+def _slot() -> AbstractAsyncContextManager[None]:
+    """A hashing slot of this process (one gate per event loop)."""
     loop = asyncio.get_running_loop()
-    slot = _slots.get(loop)
-    if slot is None:
-        slot = _slots[loop] = asyncio.Semaphore(get_settings().password_hash_concurrency)
-    return slot
+    gate = _gates.get(loop)
+    if gate is None:
+        settings = get_settings()
+        gate = _gates[loop] = _Gate(
+            settings.password_hash_concurrency, settings.password_hash_queue
+        )
+    return gate.slot()
 
 
 async def hash_password_async(password: str) -> str:

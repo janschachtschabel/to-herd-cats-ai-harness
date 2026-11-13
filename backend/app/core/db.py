@@ -25,8 +25,8 @@ def make_engine(url: str | URL | None = None, **kwargs: Any) -> AsyncEngine:
 class Database:
     """Holds the engine and session factory for one application instance."""
 
-    def __init__(self, url: str | URL | None = None) -> None:
-        self.engine = make_engine(url)
+    def __init__(self, url: str | URL | None = None, **engine_kwargs: Any) -> None:
+        self.engine = make_engine(url, **engine_kwargs)
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False)
 
     async def dispose(self) -> None:

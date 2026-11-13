@@ -2,7 +2,8 @@
 
 Every change is audited in the transaction that makes it. Writes for one organisation
 are serialised (`lock_admin_writes`), so the version check, the email check and the
-last-owner rule hold under concurrent requests. Only an owner grants or revokes the
+last-owner rule hold under concurrent requests. A new password is hashed before that
+lock, with no database connection held (`_hash`). Only an owner grants or revokes the
 owner role, and only an owner changes an owner's password or (de)activates an owner.
 """
 
@@ -38,6 +39,7 @@ class UserService:
         await require(self.session, actor, Action.USER_MANAGE)
         if _is_owner(data.system_role):
             _owner_only(actor)
+        password_hash = await self._hash(data.password)
         await self.users.lock_admin_writes(actor.org_id)
         if await self.users.get_by_email(actor.org_id, data.email):
             raise Conflict(code="users.email_taken")
@@ -47,7 +49,7 @@ class UserService:
             name=data.name,
             locale=data.locale,
             system_role=data.system_role,
-            password_hash=await hash_password_async(data.password) if data.password else None,
+            password_hash=password_hash,
         )
         await self.users.add(user)
         await SpaceService(self.session).create_personal(user)
@@ -66,6 +68,7 @@ class UserService:
         """A new password ends the person's sessions; someone changing their own keeps
         `current_session`, the one they are making the change with."""
         await require(self.session, actor, Action.USER_MANAGE)
+        password_hash = await self._hash(data.password)
         user = await self._current(actor, user_id)
         role_changes = data.system_role is not None and data.system_role != user.system_role
         if role_changes and (_is_owner(data.system_role) or _is_owner(user.system_role)):
@@ -83,8 +86,8 @@ class UserService:
             user.system_role = data.system_role
         if data.locale is not None:
             user.locale = data.locale
-        if data.password is not None:
-            user.password_hash = await hash_password_async(data.password)
+        if password_hash is not None:
+            user.password_hash = password_hash
             keep = current_session if actor.principal.id == user.id else None
             await self.sessions.delete_for_user(actor.org_id, user.id, keep=keep)
         user.version += 1
@@ -120,6 +123,14 @@ class UserService:
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.users.page(actor.org_id, after, params.limit + 1)
         return id_page(rows, params.limit, lambda u: u.id)
+
+    async def _hash(self, password: str | None) -> str | None:
+        """Hash before any lock is taken, with no connection held: the transaction so
+        far has only read (the permission check), so it is ended first."""
+        if password is None:
+            return None
+        await self.session.commit()
+        return await hash_password_async(password)
 
     async def _audit(
         self, actor: Actor, action: str, user: User, details: dict[str, Any] | None = None

@@ -3,7 +3,8 @@
 No right is needed beyond acting at all (a deactivated person does not act). The
 person's row is locked like an administrator's change of it, so the version check
 holds against both. A password change needs the current password (failed attempts
-are limited like logins) and ends every other session of the person.
+are limited like logins) and ends every other session of the person; its hashing
+runs with no connection and no lock held (checked again under the lock afterwards).
 """
 
 import uuid
@@ -48,16 +49,23 @@ class ProfileService:
         failures_per_minute: int,
     ) -> None:
         limiter = RateLimiter(self.session, limit=failures_per_minute)
-        attempt = await limiter.acquire(f"password-fail:{actor.principal.id}")
+        attempt = await limiter.acquire(f"password-fail:{actor.principal.id}")  # commits
         if attempt is None:
             raise RateLimited(code="auth.too_many_attempts")
-        user = await self._me(actor)
-        if user.password_hash is None or not await verify_password_async(
-            user.password_hash, current
-        ):
+        user = await self.users.get_current(actor.org_id, actor.principal.id)
+        if user is None:  # an agent, or a person deleted meanwhile
+            raise NotFound(code="users.not_found")
+        checked = user.password_hash
+        # Hash with no connection and no lock held; take the lock afterwards.
+        await self.session.commit()
+        if checked is None or not await verify_password_async(checked, current):
             raise ValidationFailed(code="auth.wrong_password")
+        new_hash = await hash_password_async(new)
+        user = await self._me(actor)
+        if user.password_hash != checked:  # changed meanwhile (another tab, an admin)
+            raise Conflict(code="users.version_conflict")
         await limiter.release(attempt)
-        user.password_hash = await hash_password_async(new)
+        user.password_hash = new_hash
         user.version += 1
         await self.session.flush()
         await SessionRepository(self.session).delete_for_user(

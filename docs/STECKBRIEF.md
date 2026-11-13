@@ -43,8 +43,16 @@ noch im Event-Loop lief: ein Pod schaffte 14–16 Anmeldungen je Sekunde bei run
 2,6 Kernen (rechnerisch 0,17 CPU-Sekunden je Anmeldung) und blockierte während jeder
 Prüfung alle anderen Anfragen dieses Pods (daher die Bereichsliste mit 250 ms statt
 11 ms unter Anmeldelast). Seit fix wave 1 läuft argon2 in Worker-Threads, höchstens
-`HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig je Prozess; der Event-Loop,
-die Probes und andere Anfragen bleiben dabei bedienbar. Je Client-Adresse sind
+`HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig je Prozess, so bleibt der
+Event-Loop frei. Seit fix wave 2 hält eine Anfrage, die auf einen Prüfplatz wartet oder
+prüft, weder eine Datenbankverbindung noch eine Sperre (Anmeldung, eigene
+Passwortänderung, Anlegen und Zurücksetzen durch die Administration); höchstens
+`HERD_PASSWORD_HASH_QUEUE` (Standard 16) Anfragen je Prozess warten, weitere bekommen
+sofort 429 `server.busy` mit `Retry-After: 1`. Eine Anmeldeflut füllt so nicht mehr
+den Verbindungspool: Ein Test mit einem Pool von einer Verbindung zeigt, dass `/ready`
+und angemeldete Anfragen bedient werden, während Prüfungen warten
+(`backend/tests/test_hashing_pool.py`). Live unter Last gemessen ist das nicht. Je
+Client-Adresse (IPv6: je /64) sind
 höchstens `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard 30) Anmeldeversuche je
 Minute erlaubt, gleich mit welcher E-Mail; fehlgeschlagene Versuche je Adresse und
 E-Mail höchstens `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5). Neu gemessen ist das

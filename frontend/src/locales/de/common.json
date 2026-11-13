@@ -49,6 +49,9 @@
       "csrf": "Die Anfrage wurde aus Sicherheitsgründen abgelehnt.",
       "wrong_password": "Das aktuelle Passwort stimmt nicht."
     },
+    "server": {
+      "busy": "Der Server ist gerade ausgelastet. Bitte versuche es gleich noch einmal."
+    },
     "users": {
       "email_taken": "Diese E-Mail-Adresse ist schon vergeben.",
       "owner_only": "Das darf nur ein Eigentümer.",

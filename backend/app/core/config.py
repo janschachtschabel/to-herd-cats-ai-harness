@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     login_ip_rate_limit_per_minute: int = 30
     # argon2 computations at a time per process (each ~64 MiB, off the event loop).
     password_hash_concurrency: int = Field(default=2, ge=1)
+    # Requests that may wait for one of those slots; more are answered 429 at once.
+    password_hash_queue: int = Field(default=16, ge=0)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

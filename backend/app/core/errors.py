@@ -53,6 +53,7 @@ class ValidationFailed(AppError):
 class RateLimited(AppError):
     status_code = 429
     code = "rate_limited"
+    retry_after: int | None = None  # seconds, sent as `Retry-After`
 
 
 _HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
@@ -66,7 +67,13 @@ def error_body(code: str, message: str) -> dict[str, dict[str, str]]:
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=error_body(exc.code, exc.message))
+        retry_after = getattr(exc, "retry_after", None)
+        headers = {"Retry-After": str(retry_after)} if retry_after is not None else None
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_body(exc.code, exc.message),
+            headers=headers,
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _handle_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
