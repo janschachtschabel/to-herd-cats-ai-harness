@@ -19,9 +19,10 @@
 # (loadgen.py, run with the backend's environment) gives every client its own loop
 # of login, then list.
 #
-# The login rate limit (HERD_LOGIN_RATE_LIMIT_PER_MINUTE, 5 per address and email) is
-# raised in this throwaway project only: otherwise nearly every load login would be a
-# cheap 429 instead of a real argon2 verification.
+# The login rate limits (HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE, 30 per address;
+# HERD_LOGIN_RATE_LIMIT_PER_MINUTE, 5 failures per address and email) are raised in this
+# throwaway project only: otherwise nearly every load login would be a cheap 429
+# instead of a real argon2 verification.
 set -euo pipefail
 cd "$(dirname "$0")"
 here="$(pwd)"
@@ -54,6 +55,7 @@ services:
   app:
     environment:
       HERD_LOGIN_RATE_LIMIT_PER_MINUTE: "1000000"
+      HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE: "1000000"
 EOF
 project=to-herd-cats-ai-load
 compose=(docker compose -p "$project" --env-file "$work/env" -f compose.yml -f "$work/override.yml")

@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     # Reverse proxies whose X-Forwarded-For/-Proto the public port believes (comma
     # separated IPs or networks, "*" for any); the client IP and scheme come from them.
     forwarded_allow_ips: str = "127.0.0.1"
+    # Failed logins per client address and email, and all logins per client address.
     login_rate_limit_per_minute: int = 5
+    login_ip_rate_limit_per_minute: int = 30
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

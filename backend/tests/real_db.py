@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -83,10 +84,16 @@ MakeRealClient = Callable[..., Awaitable[AsyncClient]]
 
 
 @pytest.fixture
-async def make_real_client(real_db: RealDb) -> AsyncIterator[MakeRealClient]:
-    """Clients of one public app with no overrides; `csrf=True` adds the header,
-    `client_ip` is the peer address, `wrap` puts an ASGI wrapper around the app."""
-    app = create_public_app()
+def real_app(real_db: RealDb) -> FastAPI:
+    """The public app on the real session dependency (a test may override settings)."""
+    return create_public_app()
+
+
+@pytest.fixture
+async def make_real_client(real_app: FastAPI) -> AsyncIterator[MakeRealClient]:
+    """Clients of `real_app`; `csrf=True` adds the header, `client_ip` is the peer
+    address, `wrap` puts an ASGI wrapper around the app."""
+    app = real_app
     clients: list[AsyncClient] = []
 
     async def _make(

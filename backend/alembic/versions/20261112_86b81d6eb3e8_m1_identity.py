@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_rate_limit_hit")),
     )
     op.create_index(op.f("ix_rate_limit_hit_key"), "rate_limit_hit", ["key"], unique=False)
+    op.create_index(op.f("ix_rate_limit_hit_hit_at"), "rate_limit_hit", ["hit_at"], unique=False)
     op.create_table(
         "app_user",
         sa.Column("email", sa.String(length=254), nullable=False),
@@ -89,6 +90,7 @@ def downgrade() -> None:
     op.drop_table("user_session")
     op.drop_index(op.f("ix_app_user_org_id"), table_name="app_user")
     op.drop_table("app_user")
+    op.drop_index(op.f("ix_rate_limit_hit_hit_at"), table_name="rate_limit_hit")
     op.drop_index(op.f("ix_rate_limit_hit_key"), table_name="rate_limit_hit")
     op.drop_table("rate_limit_hit")
     op.drop_table("organization")

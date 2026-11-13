@@ -35,11 +35,20 @@ class AuthService:
     async def login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
         """A new session for the person; the token goes into the cookie and nowhere else.
 
-        Attempts per client address and email are limited; a rejected attempt counts.
-        Without a usable account a dummy hash is verified, so the answer takes as long
-        either way. Single organisation per installation: the person is looked up in it."""
-        limiter = RateLimiter(self.session, limit=self.settings.login_rate_limit_per_minute)
-        if not await limiter.allow(f"login:{ip}:{email.lower()}"):
+        Two limits, both checked before any password is hashed: attempts per client
+        address, whatever the email (bounds the hashing one client can cause), and
+        failed attempts per client address and email (guessing one account). Only
+        failures count for the second, and only from that address, so nobody at
+        another address can lock the person out. Without a usable account a dummy
+        hash is verified, so the answer takes as long either way. Single organisation
+        per installation: the person is looked up in it."""
+        address = ip or "unknown"
+        per_ip = RateLimiter(self.session, limit=self.settings.login_ip_rate_limit_per_minute)
+        if await per_ip.acquire(f"login-ip:{address}") is None:
+            raise RateLimited(code="auth.too_many_attempts")
+        per_account = RateLimiter(self.session, limit=self.settings.login_rate_limit_per_minute)
+        attempt = await per_account.acquire(f"login-fail:{address}:{email.lower()}")
+        if attempt is None:
             raise RateLimited(code="auth.too_many_attempts")
         org = await self.orgs.get_default()
         user = await self.users.get_by_email(org.id, email) if org else None
@@ -48,6 +57,7 @@ class AuthService:
             raise Unauthorized(code="auth.invalid_credentials")
         if not verify_password(user.password_hash, password):
             raise Unauthorized(code="auth.invalid_credentials")
+        await per_account.release(attempt)  # a success is not a failed attempt
         token = new_session_token()
         now = utcnow()
         await self.sessions.delete_expired_for_user(user.org_id, user.id, now)
