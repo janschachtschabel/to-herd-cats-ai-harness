@@ -5,6 +5,9 @@
 # copy and split the page's editors (spec 12.4, stage 1). Its state is saved to
 # PostgreSQL through the API (at the latest 10 s after a change, and on SIGTERM
 # before it exits); the browsers reconnect by themselves after a restart.
+# Memory: the process refuses to load more documents than HERD_COLLAB_MEMORY_BUDGET_MB
+# (default 400) by its own estimate; the limit must hold that plus ~130 MB for the
+# process and ~250 MB per check worker, with a fifth to spare (docs/WIKI.md).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -105,6 +108,28 @@ spec:
     app.kubernetes.io/component: collab
   ports:
     - name: collab
+      port: 1234
+      targetPort: collab
+      protocol: TCP
+---
+# Its /metrics (the memory budget of the loaded documents: estimate, budget, refusals;
+# docs/WIKI.md), scraped like the API's: the ServiceMonitor selects this Service by its
+# endpoint label and its port name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}-collab-metrics
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+    app.kubernetes.io/endpoint: internal
+spec:
+  clusterIP: None
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: collab
+  ports:
+    - name: internal
       port: 1234
       targetPort: collab
       protocol: TCP

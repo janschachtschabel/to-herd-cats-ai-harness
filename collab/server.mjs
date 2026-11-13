@@ -1,6 +1,7 @@
 // The collab process (spec 9, E11): Hocuspocus behind one HTTP port.
 //
-// - `GET /health` answers 200 (the probe); every other plain request 404.
+// - `GET /health` answers 200 (the probe), `GET /metrics` the memory budget's numbers
+//   (Prometheus text, `memory.mjs`); every other plain request 404.
 // - WebSocket upgrades only on `/collab/<page id>?generation=<n>`, from an allowed
 //   Origin (HERD_PUBLIC_URL, or the request's own host), with the session cookie, at
 //   most 200 at a time, messages up to a whole live state (`size.mjs`; the API's relay
@@ -21,7 +22,9 @@
 // HERD_SESSION_COOKIE_NAME (herd_session), HERD_COLLAB_CHECK_WORKERS (1: the threads
 // that open and check pages, `checks.mjs`, each with a heap of at most 192 MB),
 // HERD_COLLAB_CHECK_TIMEOUT_SECONDS (10: the time limit of one check; past it the
-// worker is replaced, an open is "too large", a save is not stored).
+// worker is replaced, an open is "too large", a save is not stored),
+// HERD_COLLAB_MEMORY_BUDGET_MB (400: what the loaded documents may hold by the estimate
+// of `memory.mjs`; past it a page is refused with 4507 "busy").
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -30,58 +33,14 @@ import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
 import { CHECK_TIMEOUT_MS, createChecks, inlineChecks } from "./checks.mjs";
 import { liveExtension } from "./live.mjs";
+import { DEFAULT_BUDGET_MB, memoryBudget, metricsText } from "./memory.mjs";
+import { counter, logger, originAllowed, refuse } from "./admission.mjs";
 import { CLOSE, readCookie } from "./protocol.mjs";
+
+export { originAllowed };
 import { MAX_MESSAGE_BYTES } from "./size.mjs";
 
 const PAGE_PATH = /^\/collab\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-
-function hostOf(value) {
-  try {
-    return new URL(value).host.toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
-/** The Origin header must be HERD_PUBLIC_URL's origin; without one, the host the
- * browser connected to (the relay and ingresses forward it as X-Forwarded-Host). */
-export function originAllowed(headers, publicUrl) {
-  const origin = headers.origin;
-  if (!origin) return false;
-  if (publicUrl) return origin === new URL(publicUrl).origin;
-  const forwarded = headers["x-forwarded-host"]?.split(",")[0].trim();
-  const host = (forwarded || headers.host || "").toLowerCase();
-  return host !== "" && hostOf(origin) === host;
-}
-
-/** Counts per key (login session, session and page); `take` is false at the limit. */
-function counter() {
-  const counts = new Map();
-  return {
-    take(key, limit) {
-      const count = counts.get(key) ?? 0;
-      if (count >= limit) return false;
-      counts.set(key, count + 1);
-      return true;
-    },
-    give(key) {
-      const count = (counts.get(key) ?? 1) - 1;
-      if (count > 0) counts.set(key, count);
-      else counts.delete(key);
-    },
-  };
-}
-
-function refuse(socket, status) {
-  socket.end(`HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
-}
-
-function logger(fields) {
-  return (message, extra = {}) =>
-    console.log(
-      JSON.stringify({ timestamp: new Date().toISOString(), message, ...fields, ...extra }),
-    );
-}
 
 export function createCollabServer({
   apiUrl,
@@ -105,6 +64,7 @@ export function createCollabServer({
   checkWorkers = 1,
   checkHeapMb = 192,
   checkTimeoutMs = CHECK_TIMEOUT_MS,
+  memoryBudgetBytes = DEFAULT_BUDGET_MB * 1024 * 1024,
   checks: givenChecks = null,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
@@ -125,6 +85,7 @@ export function createCollabServer({
     retryMs,
     log,
     checks,
+    memory: memoryBudget({ budgetBytes: memoryBudgetBytes }),
     person(context, userId) {
       if (people.has(context.socket)) return true;
       // Closed while the API was answering: its close handler has run already and would
@@ -152,6 +113,10 @@ export function createCollabServer({
   let closing = null;
 
   const httpServer = createServer((request, response) => {
+    if (request.method === "GET" && request.url === "/metrics") {
+      response.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" });
+      return response.end(metricsText(extension.memory, hocuspocus.getDocumentsCount()));
+    }
     const healthy = request.method === "GET" && request.url === "/health" && !closing;
     response.writeHead(healthy ? 200 : 404, { "Content-Type": "text/plain" });
     response.end(healthy ? "ok" : "not found");
@@ -288,6 +253,7 @@ async function main(env) {
     maxPerPerson: positive(env.HERD_COLLAB_MAX_PER_PERSON, 20),
     checkWorkers: positive(env.HERD_COLLAB_CHECK_WORKERS, 1),
     checkTimeoutMs: positive(env.HERD_COLLAB_CHECK_TIMEOUT_SECONDS, 10) * 1000,
+    memoryBudgetBytes: positive(env.HERD_COLLAB_MEMORY_BUDGET_MB, DEFAULT_BUDGET_MB) * 1024 * 1024,
     idleTimeoutMs: positive(env.HERD_COLLAB_IDLE_MINUTES, 15) * 60_000,
   });
   const host =

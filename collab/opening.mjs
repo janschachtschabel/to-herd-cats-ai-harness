@@ -1,11 +1,13 @@
 // Opening a page into a live document (`live.mjs` onLoadDocument): the stored Markdown or
 // live state is loaded through the API, checked on a check worker (`checks.mjs`) and
 // built as the browser's editor shows it; what cannot be shown faithfully is refused
-// (4422), what is too large or too heavy to check is refused (4413).
+// (4422), what is too large or too heavy to check is refused (4413), and past the memory
+// budget of loaded documents (`memory.mjs`) nothing more is built (4507).
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { MAX_TABLE_CELLS, markdownTableCells } from "./cells.mjs";
 import { CheckFailed } from "./checks.mjs";
+import { documentEstimate, pageEstimate } from "./memory.mjs";
 import { CLOSE, deny } from "./protocol.mjs";
 
 export const DENIAL = {
@@ -15,7 +17,7 @@ export const DENIAL = {
   413: CLOSE.tooLarge,
 };
 
-export function openRules({ api, log, checks, size, live }) {
+export function openRules({ api, log, checks, size, live, memory }) {
   /** Load the page into `document`; its state goes into `live` under `documentName`.
    * Throws (and closes the connection) when it must not be opened. */
   async function load(document, documentName, context) {
@@ -31,6 +33,15 @@ export function openRules({ api, log, checks, size, live }) {
     if (cells > MAX_TABLE_CELLS) {
       log("live page too large", { page_id: context.pageId, table_cells: cells });
       throw deny(context, CLOSE.tooLarge);
+    }
+    // Past the memory budget of loaded documents the page is not built (review M4-1 P12):
+    // "busy", try again shortly or edit as Markdown. Given back in `live.mjs` when the
+    // document is unloaded or not loaded after all.
+    const storedBytes = stored ? Math.floor((stored.length * 3) / 4) : 0;
+    const estimate = pageEstimate({ storedBytes, chars: contentMd.length, cells });
+    if (!memory.reserve(documentName, estimate)) {
+      log("live editor busy", { page_id: context.pageId, estimate, used: memory.used });
+      throw deny(context, CLOSE.busy);
     }
     // The heavy work runs on a check worker (`checks.mjs`, review M2 T9), smaller pages
     // first (U6). A page too heavy to check there is too large for live editing.
@@ -78,6 +89,7 @@ export function openRules({ api, log, checks, size, live }) {
       if (saved.status === 409) throw deny(context, CLOSE.generationEnded);
       if (saved.status !== 200) throw deny(context, DENIAL[saved.status] ?? CLOSE.forbidden);
     }
+    memory.settle(documentName, documentEstimate({ stateBytes: state.size.bytes, cells }));
     state.source = contentMd;
     state.baseline = opened.baseline;
     live.set(documentName, state);

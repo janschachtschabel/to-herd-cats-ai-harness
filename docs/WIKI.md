@@ -224,8 +224,8 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Ein Thread prüft eine Seite nach der anderen; wartende Prüfungen kommen nach Größe
   dran, die kleinste zuerst, damit eine kleine Seite nicht hinter großen wartet. Eine
   große Prüfung wird höchstens viermal überholt, dann ist sie dran (sie wartet also nie
-  endlos). Jeder dieser Threads hat höchstens 192 MB Heap (so bleibt der Prozess mit
-  einem Thread unter dem Limit des Charts von 512 MiB). Braucht eine Prüfung mehr, endet
+  endlos). Jeder dieser Threads hat höchstens 192 MB Heap (im Speicherlimit
+  eingeplant, siehe „Speicher des Collab-Prozesses“). Braucht eine Prüfung mehr, endet
   nur diese Prüfung, und sie wird nicht wiederholt: Die Seite ist dann zu groß für die
   Live-Bearbeitung (4413, Markdown-Editor), bzw. ein solcher Stand wird nicht
   gespeichert und alle sehen den Hinweis (Ursache unbekannt). Der Thread wird ersetzt,
@@ -245,6 +245,34 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Der Markdown-Parser (micromark, wie in der Seitenansicht) braucht dafür Zeit, die mit
   ihrer Zahl quadratisch wächst (40.000 `*a*` in einem Absatz: rund 8 s je Lesen, das
   Öffnen liest die Seite mehrmals).
+- **Speicher des Collab-Prozesses:** Eine live geöffnete Seite kostet den
+  Collab-Prozess ein Vielfaches ihres gespeicherten Umfangs. Gemessen (RSS, ein
+  Prüf-Thread, 1 bis 12 Seiten zugleich geöffnet): 190.000 Zeichen Text rund 18 MB je
+  Seite, 5.000 Tabellenzellen rund 25 MB, 9.600 Zellen rund 45 MB; dazu einmal der
+  Prozess mit leerem Prüf-Thread (rund 130 MB) und der Prüf-Thread nach einer großen
+  Prüfung (bis rund 250 MB, sein Heap ist auf 192 MB begrenzt). Der Collab-Prozess
+  schätzt je geladener Seite 0,5 MB + 30 × Bytes des Live-Zustands + 3 KB je
+  Tabellenzelle (etwas über dem Gemessenen; vor dem Laden aus dem gespeicherten Zustand
+  oder 4 Bytes je Markdown-Zeichen + 100 je Zelle) und lädt keine weitere Seite, wenn
+  die Summe `HERD_COLLAB_MEMORY_BUDGET_MB` (Standard 400) überschritte: Wer sie dann
+  öffnet, sieht „Der Live-Editor ist gerade ausgelastet … Versuche es gleich noch
+  einmal, oder bearbeite die Seite im Markdown-Editor“ (Close-Code 4507; der Browser
+  verbindet sich nicht von selbst neu, „Neu laden“ und der Markdown-Editor werden
+  angeboten; gespeichert wird nichts). Die erste Seite wird immer geladen. Verlässt die
+  letzte Person eine Seite, wird sie entladen, sobald gespeichert ist, und ihre
+  Schätzung freigegeben. Metriken am Port des
+  Collab-Prozesses (`/metrics`, im Chart über den ServiceMonitor; in Rolle `all` am
+  internen Port 9090 der App mit ausgegeben): `herd_collab_memory_estimate_bytes`,
+  `herd_collab_memory_budget_bytes`, `herd_collab_memory_refusals_total`,
+  `herd_collab_documents`.
+  **Faustregel für das Speicherlimit:** Limit ≥ (130 MB + 250 MB × Prüf-Threads +
+  Budget) / 0,8. Mit den Standards (ein Thread, Budget 400) sind das 975 MB: Chart und
+  `compose.nodes.yml` setzen 1Gi. Wer das Budget erhöht, erhöht das Limit mit.
+  In Rolle `all` (Compose mit einem Container) ist der Collab-Prozess ein Kindprozess;
+  endet er (etwa weil der Kernel ihn wegen Speichermangels beendet), beendet sich die
+  ganze App mit Code 3, und der Orchestrator (`restart: unless-stopped`, Kubernetes)
+  startet sie neu. Das ist gewollt: Ohne Collab-Prozess wäre die Live-Bearbeitung
+  still aus.
 - **Tabellenzellen:** Die Tabellen einer Seite dürfen live zusammen höchstens 5.000
   Zellen haben (jede Zelle kostet im Live-Zustand rund hundert Bytes und im Speicher des
   Collab-Prozesses rund 1,5 KB, solange die Seite offen ist; die Prüfung sehr großer
@@ -360,7 +388,8 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
   kein Schreibrecht, 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
   zu groß, 4422 Seite nicht verlustfrei live bearbeitbar, 4429 zu viele Verbindungen
   (je Anmeldung 3 je Seite und 10 insgesamt, je Person 20 über alle Anmeldungen, nie
-  mehr als ein Viertel aller), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
+  mehr als ein Viertel aller), 4507 Live-Editor ausgelastet (Speicherbudget des
+  Collab-Prozesses, siehe oben), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
   nichts gesendet (der Browser verbindet sich neu),
   4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
@@ -368,4 +397,8 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
   `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
   Markdown speichern ließ), `herd_collab_load_mutations_total` (Editoren im Browser,
   die ein gerade geladenes Dokument von selbst geändert hätten und deshalb beendet
-  wurden; jeder Wert über 0 ist ein Fehler im Editor).
+  wurden; jeder Wert über 0 ist ein Fehler im Editor). Am Port 1234 des
+  Collab-Prozesses (`/metrics`; in Rolle `all` mit auf 9090): das Speicherbudget
+  (`herd_collab_memory_estimate_bytes`, `…_budget_bytes`, `…_refusals_total`,
+  `herd_collab_documents`). Steigen die Ablehnungen, ist das Budget zu klein für die
+  Nutzung: Budget und Speicherlimit gemeinsam erhöhen (Faustregel oben).

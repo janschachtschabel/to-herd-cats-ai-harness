@@ -1,6 +1,9 @@
 # Reference deployment: PostgreSQL and the app in one container (HERD_ROLE=all:
 # migrate, then serve, with the worker (outbox: notifications, page timelines, live
-# updates) in the same process and the live-editing process as a child on 127.0.0.1).
+# updates) in the same process and the live-editing process as a child on 127.0.0.1;
+# that child keeps its live documents under HERD_COLLAB_MEMORY_BUDGET_MB, 400 by
+# default, and needs up to about 800 MB with it, docs/WIKI.md. If the child dies, the
+# app exits and `restart: unless-stopped` starts it again).
 # compose.nodes.yml runs the roles in separate containers instead (two API nodes).
 # Secrets come from .env next to this file (see .env.example). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and

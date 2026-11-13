@@ -10,6 +10,9 @@ export const CLOSE = {
   tooLarge: [4413, "too_large"],
   saveRefused: [4400, "save_refused"], // the API refused a save for another reason
   notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
+  // The loaded documents hold the memory budget (`memory.mjs`): try again shortly or
+  // edit as Markdown (the browser stops, no reconnect loop).
+  busy: [4507, "busy"],
   // At the socket (server.mjs): too many connections of one login session or person,
   // no document joined in time, nothing sent for too long (the browser reconnects).
   tooMany: [4429, "too_many_connections"],

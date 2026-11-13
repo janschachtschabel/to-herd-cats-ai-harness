@@ -11,6 +11,7 @@ export type StopReason =
   | 'off'
   | 'invalid'
   | 'server_error'
+  | 'busy'
 
 /** Stops after which reconnecting cannot help, so no "reload" is offered. */
 export const FINAL_STOPS: ReadonlySet<StopReason> = new Set([
@@ -25,6 +26,7 @@ export const MARKDOWN_STOPS: ReadonlySet<StopReason> = new Set([
   'too_large',
   'invalid_content',
   'server_error',
+  'busy',
 ])
 
 /** A server error (1011: the collab process or the relay failed on this page) this
@@ -50,6 +52,7 @@ const STOPS: Record<number, StopReason> = {
   4422: 'not_roundtrip_safe',
   4429: 'connection_limit',
   4503: 'off',
+  4507: 'busy',
 }
 
 /** What a close means; `serverErrors`: the 1011 closes before this one since the

@@ -33,6 +33,7 @@ import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
 import { DENIAL, openRules } from "./opening.mjs";
 import { inlineChecks } from "./checks.mjs";
+import { memoryBudget } from "./memory.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { sizeGuard } from "./size.mjs";
 import {
@@ -58,6 +59,7 @@ export function liveExtension({
   log = () => {},
   person = () => true,
   checks = inlineChecks(),
+  memory = memoryBudget(),
   ...limits
 }) {
   const size = sizeGuard(limits);
@@ -68,7 +70,7 @@ export function liveExtension({
   const ending = new Set(); // document names whose generation must end before anyone joins
 
   const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending, checks });
-  const { load } = openRules({ api, log, checks, size, live });
+  const { load } = openRules({ api, log, checks, size, live, memory });
 
   /** A browser's editor changed the document it had just loaded and stopped (once per
    * connection: a browser cannot inflate the count). */
@@ -88,6 +90,7 @@ export function liveExtension({
     live,
     joined,
     loading,
+    memory,
 
     async onAuthenticate({ documentName, requestHeaders, context }) {
       if (documentName !== `page:${context.pageId}`) throw deny(context, CLOSE.forbidden);
@@ -111,6 +114,9 @@ export function liveExtension({
       loading.add(documentName);
       try {
         await load(document, documentName, context);
+      } catch (error) {
+        memory.release(documentName); // not loaded after all
+        throw error;
       } finally {
         loading.delete(documentName);
       }
@@ -209,6 +215,7 @@ export function liveExtension({
 
     async afterUnloadDocument({ documentName }) {
       live.delete(documentName);
+      memory.release(documentName);
     },
 
     /** Ask the API whether each open document's generation and people still hold. */

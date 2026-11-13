@@ -177,6 +177,7 @@ export async function liveFixture({ markdown, createCollabServer, ...options } =
     api,
     server,
     base,
+    metricsUrl: `http://127.0.0.1:${address.port}/metrics`,
     open(clientOptions, { generation = 0, page = PAGE } = {}) {
       const c = client(`${base}/collab/${page}?generation=${generation}`, clientOptions);
       clients.push(c);

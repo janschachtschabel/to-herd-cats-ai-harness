@@ -104,6 +104,11 @@ services:
       HERD_COLLAB_API_URL: http://api:9090
       HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
       HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+    # Live documents live in this process's memory: it loads no more than
+    # HERD_COLLAB_MEMORY_BUDGET_MB (400) by its estimate and refuses the next page as
+    # "busy" (4507). The limit holds that, the process and one check worker with a fifth
+    # to spare (docs/WIKI.md, sizing rule); a larger budget needs a larger limit.
+    mem_limit: 1g
     # The image's health check asks port 9090, which the collab role does not serve.
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]

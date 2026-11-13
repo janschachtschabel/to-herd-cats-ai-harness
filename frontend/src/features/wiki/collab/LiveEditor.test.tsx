@@ -68,6 +68,8 @@ describe('live editor', () => {
     [4404, 'nicht mehr sichtbar'],
     // Too large, or too heavy to check in time (review M4-1 P13).
     [4413, 'zu groß oder zu aufwendig für die Live-Bearbeitung'],
+    // The collab process holds its memory budget (review M4-1 P12).
+    [4507, 'Der Live-Editor ist gerade ausgelastet'],
   ])('%i stops reconnecting and leaves the text read-only', async (code, message) => {
     const current = makePage({ space_id: space.id, content_md: 'alt' })
     liveApi('editor', () => current)
@@ -89,7 +91,10 @@ describe('live editor', () => {
     expect(connections).toHaveLength(1)
     // Too large for live editing (review R8): the Markdown editor is offered.
     const offered = screen.queryByRole('link', { name: 'Im Markdown-Editor bearbeiten' })
-    expect(offered !== null).toBe(code === 4413)
+    expect(offered !== null).toBe(code === 4413 || code === 4507)
+    // Busy is not final: reloading is offered (and does not happen by itself).
+    const reload = screen.queryByRole('button', { name: 'Neu laden' })
+    expect(reload !== null).toBe(code !== 4401)
   })
 
   test('a server error on every attempt ends "Verbindet …" with the Markdown editor (U3)', async () => {

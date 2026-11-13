@@ -42,7 +42,7 @@ export interface LiveSession {
  * The page's live document: one Y.Doc and connection per generation. Close codes
  * (see liveSession.ts): 4409 → the connection ends, the page is fetched again and a
  * new connection with a fresh document joins the new generation; 4401/4403/4404/4413
- * (and 4400/4503, and 1011 three times before getting in) → stop reconnecting, keep the
+ * (and 4400/4503/4507, and 1011 three times before getting in) → stop reconnecting, keep the
  * text read-only; anything else → the provider reconnects by itself.
  */
 export function useLiveSession(

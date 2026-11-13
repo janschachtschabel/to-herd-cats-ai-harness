@@ -12,6 +12,7 @@ import hmac
 import logging
 from typing import Protocol
 
+import httpx
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -29,6 +30,7 @@ from app.modules.wiki.collab_router import router as collab_router
 logger = logging.getLogger(__name__)
 
 READY_TIMEOUT_SECONDS = 2.0
+COLLAB_METRICS_TIMEOUT_SECONDS = 1.0
 INTERNAL_TOKEN_HEADER = "x-herd-internal-token"  # noqa: S105 (a header name)
 # A live save carries a Yjs state of up to 5 MB in base64 and up to 200,000 characters.
 INTERNAL_MAX_BODY_BYTES = 9 * 1024 * 1024
@@ -69,9 +71,25 @@ def _not_ready(reason: str) -> JSONResponse:
     return JSONResponse(status_code=503, content={"status": "not_ready", "reason": reason})
 
 
-def create_internal_app(*, worker: Readiness | None = None) -> FastAPI:
-    """With `worker`, `/ready` also waits for the worker's loop (roles worker and all)."""
+async def _collab_metrics(url: str) -> bytes:
+    """The collab child's /metrics (role all), or nothing when it does not answer."""
+    try:
+        async with httpx.AsyncClient(timeout=COLLAB_METRICS_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as exc:
+        logger.warning("collab metrics unreachable", extra={"error": type(exc).__name__})
+        return b""
+    return response.content if response.status_code == 200 else b""
+
+
+def create_internal_app(
+    *, worker: Readiness | None = None, collab_metrics_url: str | None = None
+) -> FastAPI:
+    """With `worker`, `/ready` also waits for the worker's loop (roles worker and all).
+    With `collab_metrics_url` (role all: the collab child on 127.0.0.1, which no scraper
+    reaches), `/metrics` adds the child's metrics (its memory budget, review M4-1 P12)."""
     app = FastAPI(title="to-herd-cats-ai internal", openapi_url=None, docs_url=None, redoc_url=None)
+    app.state.collab_metrics_url = collab_metrics_url
     app.add_middleware(BodyLimitMiddleware, max_bytes=INTERNAL_MAX_BODY_BYTES)
     app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(FreshContext)  # outermost: no context of an earlier request
@@ -102,6 +120,8 @@ def create_internal_app(*, worker: Readiness | None = None) -> FastAPI:
     @app.get("/metrics")
     async def metrics() -> Response:
         body, content_type = render_metrics()
+        if collab_metrics_url is not None:
+            body += await _collab_metrics(collab_metrics_url)
         return Response(content=body, media_type=content_type)
 
     return app

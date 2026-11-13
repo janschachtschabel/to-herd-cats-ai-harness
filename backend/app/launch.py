@@ -156,11 +156,15 @@ def server_configs(
     """The public server sits behind the reverse proxy; the internal one is reached
     directly (probes, scrapes) and believes no forwarded headers."""
     keep_alive = keep_alive_seconds()
+    # Role all: the collab child listens on 127.0.0.1 only; its metrics come along.
+    collab_child = settings.role == "all" and settings.internal_token is not None
+    collab_metrics = f"http://127.0.0.1:{settings.collab_port}/metrics" if collab_child else None
+    internal = create_internal_app(worker=worker, collab_metrics_url=collab_metrics)
     return (
         _config(
             create_public_app(), settings.public_port, settings.forwarded_allow_ips, keep_alive
         ),
-        _config(create_internal_app(worker=worker), settings.internal_port, None, keep_alive),
+        _config(internal, settings.internal_port, None, keep_alive),
     )
 
 

@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 from alembic.script import ScriptDirectory
@@ -153,3 +154,48 @@ async def test_metrics_aggregate_the_multiprocess_directory_when_set(
     monkeypatch.setenv("PROMETHEUS_MULTIPROC_DIR", str(tmp_path))
     # An empty directory: no process has written values, so the in-process ones are not shown.
     assert "herd_http_requests_total{" not in (await internal_client.get("/metrics")).text
+
+
+async def _metrics_server(body: bytes) -> tuple[asyncio.Server, str]:
+    """A stand-in for the collab child's /metrics on 127.0.0.1."""
+
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r\n\r\n")
+        writer.write(
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+            + str(len(body)).encode()
+            + b"\r\nConnection: close\r\n\r\n"
+            + body
+        )
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    return server, f"http://127.0.0.1:{port}/metrics"
+
+
+async def test_metrics_include_the_collab_childs_in_role_all(engine):
+    """Review M4-1 P12: in role all the collab process is a child on 127.0.0.1, which no
+    scraper reaches; its memory-budget metrics come with the internal port's."""
+    lines = (
+        b"# TYPE herd_collab_memory_estimate_bytes gauge\nherd_collab_memory_estimate_bytes 42\n"
+    )
+    server, url = await _metrics_server(lines)
+    try:
+        app = create_internal_app(collab_metrics_url=url)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://i") as c:
+            text = (await c.get("/metrics")).text
+    finally:
+        server.close()
+        await server.wait_closed()
+    assert "herd_collab_memory_estimate_bytes 42\n" in text
+    assert "herd_http_requests_total" in text
+
+
+async def test_metrics_answer_without_a_reachable_collab_child():
+    app = create_internal_app(collab_metrics_url="http://127.0.0.1:1/metrics")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://i") as c:
+        r = await c.get("/metrics")
+    assert r.status_code == 200
+    assert "herd_collab_memory_estimate_bytes" not in r.text

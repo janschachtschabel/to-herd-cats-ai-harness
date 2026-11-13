@@ -278,3 +278,14 @@ def test_role_collab_runs_node_in_place(monkeypatch):
     assert file == "node" and argv[1].endswith("collab/server.mjs")
     assert env["HERD_COLLAB_HOST"] == "0.0.0.0"
     assert env["HERD_COLLAB_API_URL"] == "http://api:9090"
+
+
+def test_role_all_shows_the_collab_childs_metrics_on_the_internal_port():
+    token = "t" * 40
+    _, internal = launch.server_configs(
+        Settings(role="all", internal_token=token, collab_port=1300)
+    )
+    assert internal.app.state.collab_metrics_url == "http://127.0.0.1:1300/metrics"
+    for settings in (Settings(role="api", internal_token=token), Settings(role="all")):
+        _, internal = launch.server_configs(settings)
+        assert internal.app.state.collab_metrics_url is None

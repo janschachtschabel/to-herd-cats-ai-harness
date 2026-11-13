@@ -94,6 +94,23 @@ policy=$(doc NetworkPolicy t-to-herd-cats-ai-collab "$out")
 grep -A3 "ingress:" <<<"$policy" | grep -q "podSelector" || fail "collab ingress is not limited to pods"
 grep -B8 "port: 1234" <<<"$policy" | grep -q "app.kubernetes.io/component: api" \
   || fail "collab does not take its port from the API pods"
+# The collab process's memory (review M4-1 P12): 1Gi by default, with a modest request;
+# its /metrics (memory budget) is scraped like the API's, and the scrapers named in
+# internalFrom may reach its port.
+out=$(render)
+collab=$(doc Deployment t-to-herd-cats-ai-collab "$out")
+grep -A4 "limits:" <<<"$collab" | grep -q "memory: 1Gi" || fail "the collab memory limit is not 1Gi"
+grep -A3 "requests:" <<<"$collab" | grep -q "memory: 128Mi" || fail "the collab memory request is not 128Mi"
+out=$(render --set metrics.serviceMonitor.enabled=true)
+service=$(doc Service t-to-herd-cats-ai-collab-metrics "$out")
+[[ -n $service ]] || fail "no Service for the collab process's metrics"
+grep -q "app.kubernetes.io/endpoint: internal" <<<"$service" || fail "the ServiceMonitor does not select the collab metrics"
+grep -A3 "selector:" <<<"$service" | grep -q "app.kubernetes.io/component: collab" || fail "the collab metrics Service selects other pods"
+grep -A3 -- "- name: internal" <<<"$service" | grep -q "targetPort: collab" || fail "the collab metrics are not on its port"
+out=$(render --set networkPolicy.enabled=true \
+  --set 'networkPolicy.internalFrom[0].namespaceSelector.matchLabels.name=monitoring')
+policy=$(doc NetworkPolicy t-to-herd-cats-ai-collab "$out")
+grep -q "name: monitoring" <<<"$policy" || fail "the scrapers in internalFrom cannot reach the collab metrics"
 
 # The worker (outbox dispatcher, HERD_ROLE=worker): its own Deployment, one replica by
 # default, more on request (they claim disjoint batches); probes and metrics on the

@@ -11,6 +11,8 @@ describe('live session', () => {
     expect(closeOutcome(4422)).toEqual({ kind: 'stop', reason: 'not_roundtrip_safe' })
     expect(closeOutcome(4429)).toEqual({ kind: 'stop', reason: 'connection_limit' })
     expect(closeOutcome(4503)).toEqual({ kind: 'stop', reason: 'off' })
+    // The collab process's memory budget is held (review M4-1 P12): no reconnect loop.
+    expect(closeOutcome(4507)).toEqual({ kind: 'stop', reason: 'busy' })
     for (const code of [1000, 1006, 1012, 1013, 4408, 4502, 4504]) {
       expect(closeOutcome(code)).toEqual({ kind: 'retry' })
     }

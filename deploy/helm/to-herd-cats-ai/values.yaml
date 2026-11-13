@@ -71,7 +71,7 @@ persistence:
 ## @section Live editing (HERD_ROLE=collab)
 
 ## @param collab.enabled Run the collab process (Hocuspocus, live editing) as its own Deployment; the API relays /collab/ WebSockets to it. Off: the live editor reports that live editing is off
-## @param collab.resources Resource requests and limits of the collab container
+## @param collab.resources Resource requests and limits of the collab container. Sizing rule (docs/WIKI.md): memory limit ≥ (130 MiB + 250 MiB × HERD_COLLAB_CHECK_WORKERS + HERD_COLLAB_MEMORY_BUDGET_MB) / 0.8; the defaults (1 worker, budget 400) need 975 MiB. A larger budget (collab.env) needs a larger limit
 ## @param collab.env Extra environment variables of the collab process (name: value)
 ## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
 collab:
@@ -81,7 +81,7 @@ collab:
       cpu: 50m
       memory: 128Mi
     limits:
-      memory: 512Mi
+      memory: 1Gi
   env: {}
   internalToken:
     existingSecret: ""
@@ -147,7 +147,7 @@ ingress:
 
 ## @param networkPolicy.enabled Restrict traffic of the app pods (and of the collab process and the bundled PostgreSQL to the app)
 ## @param networkPolicy.publicFrom Peers allowed on the public port 8080 (NetworkPolicyPeer list, e.g. the ingress controller's namespace); empty: everyone
-## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
+## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 and on the collab process's port 1234 for its /metrics (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
 ## @param networkPolicy.egress Extra egress rules (NetworkPolicyEgressRule list), e.g. to an external database or OTLP collector; DNS and the bundled PostgreSQL are always allowed
 networkPolicy:
   enabled: false
