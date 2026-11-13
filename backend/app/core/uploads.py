@@ -25,18 +25,25 @@ class PayloadTooLarge(AppError):
 
 
 class BodyReadTimeout(AppError):
-    """No part of the body arrived for `HERD_BODY_READ_TIMEOUT_SECONDS`."""
+    """No part of the body arrived for `HERD_BODY_READ_TIMEOUT_SECONDS`, or the whole
+    body took longer than `HERD_BODY_TOTAL_TIMEOUT_SECONDS`."""
 
     status_code = 408
     code = "request.timeout"
 
 
-async def _arriving(stream: AsyncIterator[bytes], seconds: float) -> AsyncIterator[bytes]:
-    """`stream`, refused with 408 when the next part takes longer than `seconds`."""
+async def _arriving(
+    stream: AsyncIterator[bytes], seconds: float, total: float
+) -> AsyncIterator[bytes]:
+    """`stream`, refused with 408 when the next part takes longer than `seconds` or the
+    whole stream longer than `total` (review M2 S11)."""
     parts = aiter(stream)
+    deadline = asyncio.get_running_loop().time() + total
     while True:
         try:
-            async with asyncio.timeout(seconds):
+            async with asyncio.timeout_at(
+                min(deadline, asyncio.get_running_loop().time() + seconds)
+            ):
                 chunk = await anext(parts)
         except StopAsyncIteration:
             return
@@ -76,9 +83,12 @@ async def spool(stream: AsyncIterator[bytes], max_bytes: int, *, code: str) -> S
     hold no database connection meanwhile (they end their transaction first)."""
     spooled = Spooled(spooled_file(MEMORY_BYTES))
     decoder = codecs.getincrementaldecoder("utf-8")()
-    timeout = get_settings().body_read_timeout_seconds
+    settings = get_settings()
     try:
-        async for chunk in _arriving(stream, timeout):
+        arriving = _arriving(
+            stream, settings.body_read_timeout_seconds, settings.body_total_timeout_seconds
+        )
+        async for chunk in arriving:
             if not chunk:
                 continue
             spooled.size += len(chunk)

@@ -1,12 +1,14 @@
 """`core/storage.py` (LocalStorage) and `core/uploads.py` (spooling a body)."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
 
+from app.core.config import get_settings
 from app.core.storage import LocalStorage, StorageKeyError, StoredFileMissing
-from app.core.uploads import PayloadTooLarge, spool
+from app.core.uploads import BodyReadTimeout, PayloadTooLarge, spool
 
 
 async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
@@ -110,3 +112,20 @@ async def test_spool_refuses_more_than_the_limit() -> None:
 async def test_spool_knows_whether_it_is_text(chunks: tuple[bytes, ...], text: bool) -> None:
     with await spool(_stream(*chunks), 100, code="x") as spooled:
         assert spooled.text is text
+
+
+async def test_a_body_that_trickles_in_is_cut_off_at_the_total_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review M2 S11: one byte now and then keeps no upload open for ever."""
+    monkeypatch.setattr(get_settings(), "body_read_timeout_seconds", 1.0)
+    monkeypatch.setattr(get_settings(), "body_total_timeout_seconds", 0.3)
+
+    async def trickle() -> AsyncIterator[bytes]:
+        while True:
+            await asyncio.sleep(0.05)
+            yield b"x"
+
+    with pytest.raises(BodyReadTimeout) as caught:
+        await spool(trickle(), 1000, code="x")
+    assert (caught.value.status_code, caught.value.code) == (408, "request.timeout")

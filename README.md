@@ -286,7 +286,8 @@ kennen.
   Grenzen je Route selbst. Ein WebSocket-Frame der Live-Bearbeitung hat höchstens
   1 MiB. Während der Körper eines Uploads oder Imports ankommt, hält die App keine
   Datenbankverbindung; kommt `HERD_BODY_READ_TIMEOUT_SECONDS` (Standard 30) lang kein
-  weiteres Stück an, antwortet sie 408 `request.timeout`.
+  weiteres Stück an oder dauert der ganze Körper länger als
+  `HERD_BODY_TOTAL_TIMEOUT_SECONDS` (Standard 900), antwortet sie 408 `request.timeout`.
 - **NetworkPolicy** ist standardmäßig aus. Eingeschaltet lässt ein leeres
   `networkPolicy.internalFrom` niemanden an Port 9090 außer dem Collab-Prozess, also
   auch Prometheus nicht: Prometheus dort eintragen. Den Collab-Prozess (Port 1234)
