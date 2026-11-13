@@ -12,6 +12,7 @@ from app.modules.messaging.models import (
     DmInspection,
     Message,
 )
+from app.modules.messaging.notification_models import Notification
 from app.modules.messaging.social_models import ConversationRead, MessageMention, Reaction
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import Space, SpaceMember
@@ -34,6 +35,7 @@ __all__ = [
     "GroupMember",
     "Message",
     "MessageMention",
+    "Notification",
     "Organization",
     "Page",
     "PageCollabState",

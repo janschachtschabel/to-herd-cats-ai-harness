@@ -18,6 +18,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
 from app.modules.messaging import router as messaging
+from app.modules.messaging import router_activity as messaging_activity
 from app.modules.messaging import router_dms as messaging_dms
 from app.modules.messaging import router_social as messaging_social
 from app.modules.search.router import router as search_router
@@ -55,6 +56,7 @@ def api_router() -> APIRouter:
     api.include_router(messaging.messages)
     api.include_router(messaging_social.reads)
     api.include_router(messaging_social.reactions)
+    api.include_router(messaging_activity.activity)
     api.include_router(messaging_dms.dms)
     api.include_router(messaging_dms.dm_inspect)
     api.include_router(search_router)

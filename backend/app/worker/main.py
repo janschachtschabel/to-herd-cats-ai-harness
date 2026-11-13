@@ -16,6 +16,7 @@ import asyncio
 import logging
 from contextlib import suppress
 
+import app.worker.handlers  # noqa: F401 -- registers every module's handlers
 from app.core.db import Database
 from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL

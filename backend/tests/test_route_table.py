@@ -94,6 +94,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/conversations/{conversation_id}/read", "conversation"),
     ("PUT", "/api/messages/{message_id}/reactions/{emoji}", "message"),
     ("DELETE", "/api/messages/{message_id}/reactions/{emoji}", "message"),
+    ("GET", "/api/activity", "session"),
+    ("GET", "/api/activity/count", "session"),
+    ("POST", "/api/activity/read-all", "session"),
+    ("POST", "/api/activity/{notification_id}/read", "session"),
+    ("POST", "/api/activity/{notification_id}/done", "session"),
     ("POST", "/api/dms", "session"),
     ("GET", "/api/dms", "session"),
     ("GET", "/api/admin/dm-inspect", "admin"),
@@ -147,6 +152,7 @@ def _concrete(
         "{attachment_id}": str(uuid7()),
         "{inspection_id}": str(uuid7()),
         "{emoji}": "%F0%9F%91%8D",
+        "{notification_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
