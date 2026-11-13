@@ -12,7 +12,7 @@
 //   optionally `group`) for a longer local run.
 // Seeded, so a run can be repeated. HERD_E2E_MUTATED and HERD_E2E_GENERATED set how many
 // mutated and generated pages (defaults: the CI subset); HERD_E2E_GROUPS (comma-separated)
-// keeps only those groups.
+// keeps only those groups (`file` keeps every page of the files).
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -162,7 +162,10 @@ export function pages({
     list.map((page) => ({ group, ...page })),
   );
   for (const file of files) {
-    for (const page of JSON.parse(readFileSync(file, "utf8"))) out.push({ group: "file", ...page });
+    for (const page of JSON.parse(readFileSync(file, "utf8"))) {
+      out.push({ name: page.name, md: page.md, group: `file:${page.group ?? "page"}` });
+    }
   }
-  return only.length ? out.filter((page) => only.includes(page.group)) : out;
+  const kept = (group) => only.some((name) => group === name || group.startsWith(`${name}:`));
+  return only.length ? out.filter((page) => kept(page.group)) : out;
 }
