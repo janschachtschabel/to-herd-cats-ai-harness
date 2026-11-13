@@ -3,18 +3,20 @@
 // document could grow far beyond that in the seconds between two saves. Each
 // incoming update is checked before it is applied: a cheap estimate (the last
 // measurement plus what the updates since could add) and, only when that crosses a
-// limit, an exact measurement of the document as it would be with the update. An
-// update that would cross it is refused (its sender is closed with 4413); the document
-// and everyone else stay as they were.
+// limit, an exact measurement of the document as it would be with the update (at most
+// once a second per document). An update that would cross it, or that needs another
+// measurement within that second, is refused (its sender is closed with 4413); the
+// document and everyone else stay as they were.
 import * as Y from "yjs";
 import { yDocToMarkdown } from "./markdown.mjs";
 
 export const MAX_STATE_BYTES = 5 * 1024 * 1024;
 export const MAX_MARKDOWN_CHARS = 200_000;
-// Markdown characters one byte of a Hocuspocus message can add, generously (a
-// character next to a delimiter written as a reference, `&#x54;`, is six for one): the
-// estimate only decides when to measure exactly.
+// Markdown characters one byte of a Yjs update can add, generously (a character next
+// to a delimiter written as a reference, `&#x54;`, is six for one): the estimate only
+// decides when to measure exactly.
 const CHARS_PER_BYTE = 8;
+const MEASURE_EVERY_MS = 1000;
 
 const SYNC = 0;
 const SYNC_REPLY = 4;
@@ -52,6 +54,7 @@ export function contentOf(raw) {
 export function sizeGuard({
   maxStateBytes = MAX_STATE_BYTES,
   maxMarkdownChars = MAX_MARKDOWN_CHARS,
+  measureEveryMs = MEASURE_EVERY_MS,
 }) {
   function measure(document) {
     return {
@@ -81,7 +84,12 @@ export function sizeGuard({
     admit(document, state, raw) {
       const update = contentOf(raw);
       if (update === null) return true;
-      if (over(state.size, raw.length)) {
+      if (over(state.size, update.length)) {
+        // Measuring copies and writes out the whole document: at most once per
+        // interval and document (review M2 S10); an update needing more is refused.
+        const now = Date.now();
+        if (now - (state.measuredAt ?? -Infinity) < measureEveryMs) return false;
+        state.measuredAt = now;
         let size;
         try {
           size = measureWith(document, update);
@@ -93,8 +101,8 @@ export function sizeGuard({
         return true;
       }
       state.size = {
-        bytes: state.size.bytes + raw.length,
-        chars: state.size.chars + raw.length * CHARS_PER_BYTE,
+        bytes: state.size.bytes + update.length,
+        chars: state.size.chars + update.length * CHARS_PER_BYTE,
       };
       return true;
     },

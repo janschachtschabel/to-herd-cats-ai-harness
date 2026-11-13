@@ -43,7 +43,7 @@ for (const [label, limits] of [
 test("the size is measured exactly before an update is admitted (review M2 S5)", async () => {
   // 300 characters fit under a limit of 400: admitted, though a rough estimate of what
   // the update could add would refuse it. 200 more do not fit: refused.
-  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400 });
+  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 0 });
   const anna = live.open({ cookie: "herd_session=token-a" });
   await synced(anna);
   type(anna.doc, ` ${"a".repeat(300)}`);
@@ -70,5 +70,19 @@ test("a long text in one cell of a long table keeps the session (review M2 S5)",
   // Stored in proportion to the content: the note once, no padding of other rows.
   assert.ok(stored.length < markdown.length + note.length + 10, `${stored.length} characters`);
   assert.deepEqual(anna.closes, []);
+  assert.deepEqual(ben.closes, []);
+});
+
+test("a document is measured exactly at most once per interval (review M2 S10)", async () => {
+  // Near the limit every update would need a measurement of the whole document: within
+  // the interval a second one is not made, and the update is refused for its sender.
+  live = await liveFixture({ createCollabServer, maxMarkdownChars: 400, measureEveryMs: 60_000 });
+  const anna = live.open({ cookie: "herd_session=token-a" });
+  const ben = live.open({ cookie: "herd_session=token-b" });
+  await Promise.all([synced(anna), synced(ben)]);
+  type(anna.doc, ` ${"a".repeat(300)}`);
+  await until(() => text(ben).includes("a".repeat(300)));
+  type(anna.doc, "b");
+  await until(() => anna.closes.includes(4413));
   assert.deepEqual(ben.closes, []);
 });

@@ -95,6 +95,7 @@ export function createCollabServer({
   log = logger({ service: "to-herd-cats-ai", component: "collab" }),
   maxStateBytes,
   maxMarkdownChars,
+  measureEveryMs,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
   const held = counter();
@@ -114,6 +115,7 @@ export function createCollabServer({
     },
     maxStateBytes,
     maxMarkdownChars,
+    measureEveryMs,
   });
   const hocuspocus = new Hocuspocus({
     name: "to-herd-cats-ai-collab",
