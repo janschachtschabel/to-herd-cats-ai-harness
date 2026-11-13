@@ -3,7 +3,8 @@
 //
 // - A cell holds one `tableParagraph` (inline content, no hard breaks); Enter,
 //   Shift+Enter and Mod+Enter in it do nothing (Shift+Enter fell through to splitting
-//   the table, T8).
+//   the table, T8). Pasted lines, paragraphs, rows and tabs are joined into the cell's
+//   line with single spaces (U4).
 // - A merged cell has no Markdown: `colspan` and `rowspan` stay 1 (prosemirror-tables
 //   needs the attributes; HTML cannot set them), and a pasted table with merged cells is
 //   flattened first: each merged cell becomes its cells, the content in the first (T4).
@@ -115,12 +116,55 @@ function columnAlignment() {
   });
 }
 
-/** Pasted HTML: tables with merged cells flattened (only in a browser). */
+const SPACE = /[\t\n\r]+/g;
+
+/** The inline content of a pasted slice as one line (review M2 U4): its text blocks
+ * (lines, paragraphs, a table's cells) joined with a single space; line breaks and tabs
+ * become spaces; marks stay. */
+function oneLine(slice, schema) {
+  const out = [];
+  const space = () => {
+    const last = out.at(-1);
+    if (last && !(last.isText && last.text.endsWith(" "))) out.push(schema.text(" "));
+  };
+  const take = (node) => {
+    if (node.isText) out.push(schema.text(node.text.replace(SPACE, " "), node.marks));
+    else if (node.type.name === "image") out.push(node);
+    else space(); // a hard break
+  };
+  let first = true;
+  slice.content.descendants((node) => {
+    if (node.isInline) {
+      take(node);
+      return false;
+    }
+    if (!node.isTextblock) return true;
+    if (!first) space();
+    first = false;
+    node.forEach(take);
+    return false;
+  });
+  return out.filter((node) => !node.isText || node.text !== "");
+}
+
+/** Paste into a table cell (one line of text): everything pasted becomes that line, so
+ * a table is never split (review M2 U4). */
+function pasteIntoCell(view, _event, slice) {
+  const { $from, $to } = view.state.selection;
+  if ($from.parent.type.name !== "tableParagraph" || !$from.sameParent($to)) return false;
+  const nodes = oneLine(slice, view.state.schema);
+  view.dispatch(view.state.tr.replaceWith($from.pos, $to.pos, nodes).scrollIntoView());
+  return true;
+}
+
+/** Pasted HTML: tables with merged cells flattened (only in a browser); anything pasted
+ * into a cell joined into its line. */
 const PastedTables = Extension.create({
   name: "pastedTables",
   addProseMirrorPlugins: () => [
     new Plugin({
       props: {
+        handlePaste: pasteIntoCell,
         transformPastedHTML(html) {
           if (!/\b(colspan|rowspan)\b/i.test(html) || typeof DOMParser === "undefined") {
             return html;

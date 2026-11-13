@@ -125,7 +125,9 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   maskiert, damit kein Link daraus wird.
 - **Tabellen** sind, wie GFM sie kennt: Zellen halten eine Zeile Text (Markdown hat
   keine Zeilenumbrüche in Zellen), Enter, Umschalt+Enter und Strg+Enter fügen dort
-  nichts ein. Die erste Zeile ist die Kopfzeile. Jede Zeile ist so breit wie die
+  nichts ein. Wird in eine Zelle mehr als eine Zeile eingefügt (Text, Absätze, Zeilen
+  oder Spalten einer Tabellenkalkulation), kommt alles in diese Zelle, Zeilen und
+  Tabulatoren durch je ein Leerzeichen getrennt; die Tabelle bleibt eine. Die erste Zeile ist die Kopfzeile. Jede Zeile ist so breit wie die
   breiteste: eine kürzere bekommt leere Zellen am Ende, und hat eine Zeile mehr Zellen
   als die Kopfzeile, bekommt die Kopfzeile leere Zellen am Ende (jede Zelle bleibt über
   ihrer Überschrift; die Seitenansicht zeigte die überzähligen Zellen nicht).

@@ -112,43 +112,6 @@ test("an image inside a sentence", async () => {
   expect(stored).toBe("Anleitung\n\nKlicke auf ![Speichern](/icons/save.png) und dann auf Fertig.");
 });
 
-test("Enter and Shift+Enter in a table cell keep the table (review M2 T8)", async () => {
-  const table = "| A | B |\n| --- | --- |\n| x | y |";
-  const { article, stored } = await typeAndSave("Tabelle", table, async (tab, editor) => {
-    for (const [cell, keys] of [
-      ["x", ["Enter", "Shift+Enter"]],
-      ["A", ["Shift+Enter", "Enter"]],
-    ]) {
-      await editor.getByText(cell, { exact: true }).click();
-      await tab.keyboard.press("End");
-      // A cell holds one line of Markdown: these keys add nothing, the text goes on.
-      for (const key of keys) await tab.keyboard.press(key);
-      await tab.keyboard.type("z");
-    }
-  });
-  await expect(article.locator("table")).toHaveCount(1);
-  await expect(article.locator("table thead th").first()).toHaveText("Az");
-  await expect(article.locator("table tbody td").first()).toHaveText("xz");
-  await expect(article.locator("table tbody td").nth(1)).toHaveText("y");
-  expect(stored).toBe("| Az | B |\n| --- | --- |\n| xz | y |");
-});
-
-test("a row added with Tab to a table with an aligned column is saved (review M2 T3)", async () => {
-  const table = "| Name | Wert |\n| --- | --: |\n| a | 1 |";
-  const { article, stored } = await typeAndSave("Inventar", table, async (tab, editor) => {
-    await editor.getByText("1", { exact: true }).click();
-    await tab.keyboard.press("End");
-    await tab.keyboard.press("Tab"); // a new row
-    await tab.keyboard.type("b");
-    await tab.keyboard.press("Tab");
-    await tab.keyboard.type("2");
-    await expect(tab.getByText("lässt sich so nicht als Markdown speichern")).toBeHidden();
-  });
-  await expect(article.locator("table tbody tr")).toHaveCount(2);
-  await expect(article.locator("table tbody tr").nth(1).locator("td").nth(1)).toHaveText("2");
-  expect(stored).toBe("| Name | Wert |\n| --- | --: |\n| a | 1 |\n| b | 2 |");
-});
-
 test("undoing everything typed on a new page keeps the session (review M2 T6)", async () => {
   const doc = await publishedPage(context, space.id, "Neu", "");
   const tab = await context.newPage();

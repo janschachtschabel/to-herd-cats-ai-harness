@@ -103,4 +103,35 @@ describe('tables in the live editor (review M2 T4, T8)', () => {
     })
     expect(cells.every((attrs) => attrs.colspan === 1 && attrs.rowspan === 1)).toBe(true)
   })
+
+  // Review M2 U4: pasting several lines into a cell split the table in two. The lines
+  // are joined into the cell with a single space; pasted rows and tabs likewise.
+  const paste = new Event('paste') as ClipboardEvent // jsdom has no ClipboardEvent
+  const BODY = '| a | b |\n| --- | --- |'
+
+  test('pasted lines are joined into the cell', () => {
+    inCell('1').view.pasteText('erste Zeile\nzweite Zeile', paste)
+    expect(jsonToMarkdown(editor!.getJSON())).toBe(`${BODY}\n| 1erste Zeile zweite Zeile | 2 |`)
+  })
+
+  test('pasted paragraphs and line breaks are joined into the cell, marks kept', () => {
+    inCell('2').view.pasteHTML('<p><b>fett</b></p><p>zwei<br>drei</p>', paste)
+    expect(jsonToMarkdown(editor!.getJSON())).toBe(`${BODY}\n| 1 | 2**fett** zwei drei |`)
+  })
+
+  test('a pasted table and tabs become text of the cell', () => {
+    inCell('1').view.pasteHTML(
+      '<table><tr><td>x</td><td>y</td></tr><tr><td>z</td><td>w</td></tr></table>',
+      paste,
+    )
+    expect(jsonToMarkdown(editor!.getJSON())).toBe(`${BODY}\n| 1x y z w | 2 |`)
+    inCell('2').view.pasteText('p\tq\nr\ts', paste)
+    expect(jsonToMarkdown(editor!.getJSON())).toBe(`${BODY}\n| 1 | 2p q r s |`)
+  })
+
+  test('one pasted line outside a table is pasted as before', () => {
+    editor = new Editor({ element: document.createElement('div'), extensions: extensions() })
+    editor.view.pasteText('erste Zeile\nzweite Zeile', paste)
+    expect(jsonToMarkdown(editor.getJSON())).toBe('erste Zeile\n\nzweite Zeile')
+  })
 })
