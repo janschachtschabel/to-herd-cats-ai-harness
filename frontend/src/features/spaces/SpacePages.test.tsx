@@ -17,13 +17,14 @@ describe('spaces', () => {
     const me = makeMe(ADMIN_PERMISSIONS)
     const created = makeSpace({ name: 'Team Dienste', my_role: 'admin' })
     const group = makeEntry({ type: 'group', name: 'Redaktion' })
+    const listed: Space[] = []
     const members: SpaceMember[] = [
       { member_type: 'user', member_id: me.user.id, role: 'admin', name: 'Mia Muster' },
     ]
     const api = mockApi({
       'GET /api/auth/me': me,
-      'GET /api/spaces': page([]),
-      'POST /api/spaces': { status: 201, body: created },
+      'GET /api/spaces': () => page(listed),
+      'POST /api/spaces': () => (listed.push(created), { status: 201, body: created }),
       'GET /api/spaces/:id': created,
       'GET /api/spaces/:id/members': () => page(members),
       'PUT /api/spaces/:id/members': (call) => {
@@ -47,6 +48,9 @@ describe('spaces', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/spaces/${created.id}`))
+    // The sidebar lists the new space without a reload.
+    const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' })
+    expect(await within(nav).findByRole('link', { name: 'Team Dienste' })).toBeInTheDocument()
     expect(api.find('POST', '/api/spaces')[0]?.body).toEqual({
       kind: 'team',
       name: 'Team Dienste',

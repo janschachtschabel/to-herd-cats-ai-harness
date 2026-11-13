@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import { ADMIN_PERMISSIONS, makeMe, makeSpace, mockApi, page } from '@/test/api'
+import { ADMIN_PERMISSIONS, type Call, makeMe, makeSpace, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 import { NAV_SECTIONS, visibleSections } from './nav'
 
@@ -67,6 +67,28 @@ describe('shell', () => {
       .findAllByRole('link')
       .then((all) => all.map((a) => a.textContent))
     expect(await links).toEqual(['Bereiche', 'Handbuch', 'Team Dienste', 'Mein Bereich'])
+  })
+
+  test('the sidebar asks for its own spaces only and offers the rest page by page', async () => {
+    const me = makeMe(ADMIN_PERMISSIONS)
+    const api = mockApi({
+      'GET /api/auth/me': me,
+      'GET /api/spaces': (call: Call) =>
+        call.query.get('cursor') === 'next'
+          ? page([makeSpace({ kind: 'team', name: 'Team Später' })])
+          : page([makeSpace({ kind: 'open', name: 'Handbuch' })], 'next'),
+    })
+    const { user } = await renderApp('/spaces')
+    const nav = screen.getByRole('navigation', { name: 'Hauptnavigation' })
+    const spaces = nav.querySelector('[data-section="spaces"]') as HTMLElement
+    await within(spaces).findByRole('link', { name: 'Handbuch' })
+    const sidebarCalls = api
+      .find('GET', '/api/spaces')
+      .filter((c) => c.query.get('include_others_personal') === 'false')
+    expect(sidebarCalls.length).toBeGreaterThan(0)
+    await user.click(within(spaces).getByRole('button', { name: 'Weitere Bereiche' }))
+    expect(await within(spaces).findByRole('link', { name: 'Team Später' })).toBeInTheDocument()
+    expect(within(spaces).queryByRole('button', { name: 'Weitere Bereiche' })).toBeNull()
   })
 
   test('the user menu switches language and theme', async () => {

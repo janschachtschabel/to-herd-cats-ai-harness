@@ -9,7 +9,7 @@ from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
 from app.core.repository import BaseRepository, advisory_xact_lock
 from app.modules.groups.models import Group
-from app.modules.spaces.models import Space, SpaceMember
+from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.users.models import User
 
 
@@ -66,11 +66,22 @@ class SpaceRepository(BaseRepository[Space]):
         return await self.session.scalar(stmt)
 
     async def page_among(
-        self, ids: Select[uuid.UUID], after: uuid.UUID | None, limit: int
+        self,
+        ids: Select[uuid.UUID],
+        after: uuid.UUID | None,
+        limit: int,
+        *,
+        personal_only_of: uuid.UUID | None = None,
     ) -> list[Space]:
+        """A page of the spaces in `ids`; with `personal_only_of`, personal spaces of
+        anyone else are left out (before paging)."""
         stmt = select(Space).where(Space.id.in_(ids)).order_by(Space.id).limit(limit)
         if after is not None:
             stmt = stmt.where(Space.id > after)
+        if personal_only_of is not None:
+            stmt = stmt.where(
+                or_(Space.kind != SpaceKind.PERSONAL, Space.owner_user_id == personal_only_of)
+            )
         return list((await self.session.scalars(stmt)).all())
 
     async def member_page(

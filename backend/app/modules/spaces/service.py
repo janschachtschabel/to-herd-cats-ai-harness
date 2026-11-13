@@ -78,9 +78,16 @@ class SpaceService:
         roles = await my_roles(self.session, actor, [s.id for s in spaces])
         return {s.id: roles.get(s.id) for s in spaces}
 
-    async def list_visible(self, actor: Actor, params: PageParams) -> Page[Space]:
+    async def list_visible(
+        self, actor: Actor, params: PageParams, *, include_others_personal: bool = True
+    ) -> Page[Space]:
+        """Every space the actor may read; without `include_others_personal`, other
+        people's personal spaces (which admins may read) are left out."""
         after = decode_id_cursor(params.cursor) if params.cursor else None
-        rows = await self.spaces.page_among(visible_space_ids(actor), after, params.limit + 1)
+        own = None if include_others_personal else actor.principal.id
+        rows = await self.spaces.page_among(
+            visible_space_ids(actor), after, params.limit + 1, personal_only_of=own
+        )
         return id_page(rows, params.limit, lambda s: s.id)
 
     async def update(

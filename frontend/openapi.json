@@ -1948,6 +1948,18 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "description": "false: leave out other people's personal spaces",
+            "in": "query",
+            "name": "include_others_personal",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "false: leave out other people's personal spaces",
+              "title": "Include Others Personal",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

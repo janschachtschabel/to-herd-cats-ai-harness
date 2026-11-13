@@ -22,10 +22,17 @@ router = APIRouter(prefix="/spaces", tags=["spaces"])
 
 @router.get("", response_model=Page[SpaceOut])
 async def list_spaces(
-    params: Annotated[PageParams, Query()], actor: ActorDep, session: SessionDep
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+    include_others_personal: Annotated[
+        bool, Query(description="false: leave out other people's personal spaces")
+    ] = True,
 ) -> Page[SpaceOut]:
     service = SpaceService(session)
-    page = await service.list_visible(actor, params)
+    page = await service.list_visible(
+        actor, params, include_others_personal=include_others_personal
+    )
     roles = await service.my_roles(actor, page.items)
     return Page[SpaceOut](
         items=[SpaceOut.of(s, roles[s.id]) for s in page.items], next_cursor=page.next_cursor

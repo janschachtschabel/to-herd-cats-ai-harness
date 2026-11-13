@@ -225,3 +225,26 @@ async def test_every_person_has_exactly_one_personal_space(
     with pytest.raises(IntegrityError):  # the database refuses a second one
         async with session.begin_nested():
             await SpaceService(session).create_personal(user)
+
+
+async def test_list_can_leave_out_other_peoples_personal_spaces(
+    owner: AsyncClient, owner_user, make_user, make_space
+) -> None:
+    """What the sidebar asks for: an admin sees everyone's personal space, but the
+    filter is applied before paging, so later team spaces are not pushed off page 1."""
+    for _ in range(3):
+        await make_user()
+    team = await make_space()
+    everything = (await owner.get(SPACES, params={"limit": 100})).json()["items"]
+    assert sum(s["kind"] == "personal" for s in everything) == 4
+    seen: list[dict] = []
+    cursor = None
+    while True:
+        params = {"limit": 1, "include_others_personal": "false"}
+        params |= {"cursor": cursor} if cursor else {}
+        page = (await owner.get(SPACES, params=params)).json()
+        seen += page["items"]
+        if (cursor := page["next_cursor"]) is None:
+            break
+    own = [s["id"] for s in everything if s["owner_user_id"] == str(owner_user.id)]
+    assert sorted(s["id"] for s in seen) == sorted([str(team.id), *own])

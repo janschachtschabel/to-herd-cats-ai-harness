@@ -1248,6 +1248,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+                /** @description false: leave out other people's personal spaces */
+                include_others_personal?: boolean;
             };
             header?: never;
             path?: never;
