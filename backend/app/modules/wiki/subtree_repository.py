@@ -127,8 +127,8 @@ class SubtreeRepository(PageRepository):
             stmt = stmt.where(tuple_(Page.trashed_at, Page.id) < tuple_(*before))
         return list((await self.session.scalars(stmt)).all())
 
-    async def delete_subtree(self, root_id: uuid.UUID) -> int:
-        """Delete the page and everything below it, for good; returns how many."""
+    async def delete_subtree(self, root_id: uuid.UUID) -> list[uuid.UUID]:
+        """Delete the page and everything below it, for good; returns their ids."""
         stmt = (
             delete(Page)
             .where(
@@ -138,7 +138,7 @@ class SubtreeRepository(PageRepository):
             .returning(Page.id)
             .execution_options(synchronize_session=False)
         )
-        return len((await self.session.execute(stmt)).all())
+        return list((await self.session.scalars(stmt)).all())
 
 
 def _descendant_ids(root_id: uuid.UUID, trashed_at: datetime | None) -> Select[tuple[uuid.UUID]]:

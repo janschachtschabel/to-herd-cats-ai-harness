@@ -21,6 +21,7 @@ ALL_SYSTEM = [
     "group.manage",
     "page.purge",
     "space.create",
+    "tag.manage",
     "user.manage",
 ]
 

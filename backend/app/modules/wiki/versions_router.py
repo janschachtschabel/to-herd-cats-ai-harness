@@ -5,6 +5,7 @@ from fastapi import APIRouter, Path, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.wiki.present import page_out
 from app.modules.wiki.schemas import ExpectedVersion, PageOut
 from app.modules.wiki.version_schemas import DiffOut, VersionLabelIn, VersionOut, VersionSummaryOut
 from app.modules.wiki.versions import VersionService
@@ -47,7 +48,7 @@ async def restore_version(
     page_id: uuid.UUID, number: Number, body: ExpectedVersion, actor: ActorDep, session: SessionDep
 ) -> PageOut:
     page = await VersionService(session).restore(actor, page_id, number, body.version)
-    return PageOut.of(page)
+    return await page_out(session, actor, page)
 
 
 @page_versions.get("/diff", response_model=DiffOut)

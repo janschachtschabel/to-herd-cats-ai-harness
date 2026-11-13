@@ -27,7 +27,7 @@ class PrincipalRef(BaseModel):
 
 class PageOut(BaseModel):
     """`version` guards writes (send it back; stale → 409). `collab_generation` changes
-    whenever open live-editing sessions of the page end."""
+    whenever open live-editing sessions of the page end. `tags`: tag ids, by name."""
 
     id: uuid.UUID
     space_id: uuid.UUID
@@ -45,9 +45,10 @@ class PageOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     published_at: datetime | None
+    tags: list[uuid.UUID]
 
     @classmethod
-    def of(cls, page: Page) -> "PageOut":
+    def of(cls, page: Page, *, tags: list[uuid.UUID]) -> "PageOut":
         return cls(
             id=page.id,
             space_id=page.space_id,
@@ -65,11 +66,13 @@ class PageOut(BaseModel):
             created_at=page.created_at,
             updated_at=page.updated_at,
             published_at=page.published_at,
+            tags=tags,
         )
 
 
 class TreeNodeOut(BaseModel):
-    """A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`."""
+    """A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
+    `tags`: tag ids, by name."""
 
     id: uuid.UUID
     parent_id: uuid.UUID | None
@@ -78,9 +81,10 @@ class TreeNodeOut(BaseModel):
     path: str
     status: PageStatus
     sort_order: int
+    tags: list[uuid.UUID]
 
     @classmethod
-    def of(cls, page: Page) -> "TreeNodeOut":
+    def of(cls, page: Page, *, tags: list[uuid.UUID]) -> "TreeNodeOut":
         return cls(
             id=page.id,
             parent_id=page.parent_id,
@@ -89,6 +93,7 @@ class TreeNodeOut(BaseModel):
             path=page.path,
             status=page.status,
             sort_order=page.sort_order,
+            tags=tags,
         )
 
 

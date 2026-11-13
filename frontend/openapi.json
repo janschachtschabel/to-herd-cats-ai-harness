@@ -15,7 +15,8 @@
           "user.manage",
           "group.manage",
           "audit.read",
-          "page.purge"
+          "page.purge",
+          "tag.manage"
         ],
         "title": "Action",
         "type": "string"
@@ -518,7 +519,7 @@
         "type": "object"
       },
       "PageOut": {
-        "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end.",
+        "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end. `tags`: tag ids, by name.",
         "properties": {
           "collab_generation": {
             "title": "Collab Generation",
@@ -585,6 +586,14 @@
           "status": {
             "$ref": "#/components/schemas/PageStatus"
           },
+          "tags": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -618,7 +627,8 @@
           "updated_by",
           "created_at",
           "updated_at",
-          "published_at"
+          "published_at",
+          "tags"
         ],
         "title": "PageOut",
         "type": "object"
@@ -843,6 +853,33 @@
           "items"
         ],
         "title": "Page[SpaceOut]",
+        "type": "object"
+      },
+      "Page_TagOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TagOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TagOut]",
         "type": "object"
       },
       "Page_TrashedPageOut_": {
@@ -1282,6 +1319,149 @@
         "title": "SystemRole",
         "type": "string"
       },
+      "TagCreate": {
+        "additionalProperties": false,
+        "description": "Without `space_id` a system-wide tag (`tag.manage`); with one, a tag of that\nspace (`page.moderate` there).",
+        "properties": {
+          "color": {
+            "default": "#64748b",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "TagCreate",
+        "type": "object"
+      },
+      "TagOut": {
+        "description": "`space_id` null: a system-wide tag.",
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "name",
+          "color",
+          "version"
+        ],
+        "title": "TagOut",
+        "type": "object"
+      },
+      "TagUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; neither may be null. A tag keeps its scope.",
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "TagUpdate",
+        "type": "object"
+      },
+      "TagsSet": {
+        "additionalProperties": false,
+        "description": "The object's tags from now on (the set replaces the old one); `version` is the\npage version the client read.",
+        "properties": {
+          "tag_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Tag Ids",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tag_ids",
+          "version"
+        ],
+        "title": "TagsSet",
+        "type": "object"
+      },
       "TrashedPageOut": {
         "description": "A page that went into the trash on its own or with the pages below it; `path`\nand `parent_id` are where it was.",
         "properties": {
@@ -1331,7 +1511,7 @@
         "type": "object"
       },
       "TreeNodeOut": {
-        "description": "A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.",
+        "description": "A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.\n`tags`: tag ids, by name.",
         "properties": {
           "id": {
             "format": "uuid",
@@ -1365,6 +1545,14 @@
           "status": {
             "$ref": "#/components/schemas/PageStatus"
           },
+          "tags": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1377,7 +1565,8 @@
           "slug",
           "path",
           "status",
-          "sort_order"
+          "sort_order",
+          "tags"
         ],
         "title": "TreeNodeOut",
         "type": "object"
@@ -3081,6 +3270,60 @@
         ]
       }
     },
+    "/api/pages/{page_id}/tags": {
+      "put": {
+        "description": "Replace the page's tags (`page.edit`); bumps the page version.",
+        "operationId": "set_page_tags_api_pages__page_id__tags_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagsSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Page Tags",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/pages/{page_id}/trash": {
       "post": {
         "operationId": "trash_page_api_pages__page_id__trash_post",
@@ -3915,6 +4158,25 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "description": "only pages with this tag",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only pages with this tag",
+              "title": "Tag"
+            }
           }
         ],
         "responses": {
@@ -4013,6 +4275,213 @@
         "summary": "List Trash",
         "tags": [
           "wiki"
+        ]
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "operationId": "list_tags_api_tags_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "only system-wide tags and this space's",
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only system-wide tags and this space's",
+              "title": "Space Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TagOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tags",
+        "tags": [
+          "tags"
+        ]
+      },
+      "post": {
+        "operationId": "create_tag_api_tags_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Tag",
+        "tags": [
+          "tags"
+        ]
+      }
+    },
+    "/api/tags/{tag_id}": {
+      "delete": {
+        "description": "Also takes the tag off everything that carries it.",
+        "operationId": "delete_tag_api_tags__tag_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Tag",
+        "tags": [
+          "tags"
+        ]
+      },
+      "patch": {
+        "operationId": "update_tag_api_tags__tag_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Tag",
+        "tags": [
+          "tags"
         ]
       }
     }

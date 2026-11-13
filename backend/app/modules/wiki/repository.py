@@ -84,8 +84,10 @@ class PageRepository:
         drafts: bool,
         after: tuple[str, uuid.UUID] | None,
         limit: int,
+        among: Select[uuid.UUID] | None = None,
     ) -> list[Page]:
-        """The space's pages outside the trash, by path: parents before children."""
+        """The space's pages outside the trash, by path: parents before children;
+        with `among`, only the pages whose ids it selects."""
         stmt = (
             select(Page)
             .where(self._live(), Page.space_id == space_id)
@@ -97,6 +99,8 @@ class PageRepository:
             stmt = stmt.where(Page.status == PageStatus.PUBLISHED)
         if after is not None:
             stmt = stmt.where(tuple_(Page.path, Page.id) > tuple_(*after))
+        if among is not None:
+            stmt = stmt.where(Page.id.in_(among))
         return list((await self.session.scalars(stmt)).all())
 
     async def sibling_slugs(self, space_id: uuid.UUID, parent_id: uuid.UUID | None) -> set[str]:

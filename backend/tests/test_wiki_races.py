@@ -104,3 +104,19 @@ async def test_trash_racing_create_and_move_leaves_no_orphan(
         assert responses[1].status_code in (201, 422), responses[1].text
         assert responses[2].status_code in (200, 422), responses[2].text
     await _tree_is_consistent(real_db, space_id)
+
+
+async def test_same_tag_name_concurrently_has_one_winner(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    owner, _ = await _owner_with_space(make_real_client, real_db)
+    responses = await asyncio.gather(
+        *(
+            owner.post("/api/tags", json={"name": "Zwilling" if i % 2 else "zwilling"})
+            for i in range(N)
+        )
+    )
+    assert sorted(r.status_code for r in responses) == [201] + [409] * (N - 1)
+    assert {r.json()["error"]["code"] for r in responses if r.status_code == 409} == {
+        "tags.name_taken"
+    }

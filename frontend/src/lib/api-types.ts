@@ -339,6 +339,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Page Tags
+         * @description Replace the page's tags (`page.edit`); bumps the page version.
+         */
+        put: operations["set_page_tags_api_pages__page_id__tags_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/trash": {
         parameters: {
             query?: never;
@@ -547,6 +567,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tags */
+        get: operations["list_tags_api_tags_get"];
+        put?: never;
+        /** Create Tag */
+        post: operations["create_tag_api_tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Tag
+         * @description Also takes the tag off everything that carries it.
+         */
+        delete: operations["delete_tag_api_tags__tag_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Tag */
+        patch: operations["update_tag_api_tags__tag_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -555,7 +614,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage";
         /**
          * AuditOut
          * @description `actor_name`: the acting person's display name (None for other principals).
@@ -775,7 +834,7 @@ export interface components {
         /**
          * PageOut
          * @description `version` guards writes (send it back; stale → 409). `collab_generation` changes
-         *     whenever open live-editing sessions of the page end.
+         *     whenever open live-editing sessions of the page end. `tags`: tag ids, by name.
          */
         PageOut: {
             /** Collab Generation */
@@ -809,6 +868,8 @@ export interface components {
              */
             space_id: string;
             status: components["schemas"]["PageStatus"];
+            /** Tags */
+            tags: string[];
             /** Title */
             title: string;
             /**
@@ -878,6 +939,13 @@ export interface components {
         Page_SpaceOut_: {
             /** Items */
             items: components["schemas"]["SpaceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[TagOut] */
+        Page_TagOut_: {
+            /** Items */
+            items: components["schemas"]["TagOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -1035,6 +1103,64 @@ export interface components {
          */
         SystemRole: "owner" | "admin" | "member" | "guest";
         /**
+         * TagCreate
+         * @description Without `space_id` a system-wide tag (`tag.manage`); with one, a tag of that
+         *     space (`page.moderate` there).
+         */
+        TagCreate: {
+            /**
+             * Color
+             * @default #64748b
+             */
+            color?: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id?: string | null;
+        };
+        /**
+         * TagOut
+         * @description `space_id` null: a system-wide tag.
+         */
+        TagOut: {
+            /** Color */
+            color: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TagUpdate
+         * @description Fields left out stay as they are; neither may be null. A tag keeps its scope.
+         */
+        TagUpdate: {
+            /** Color */
+            color?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TagsSet
+         * @description The object's tags from now on (the set replaces the old one); `version` is the
+         *     page version the client read.
+         */
+        TagsSet: {
+            /** Tag Ids */
+            tag_ids: string[];
+            /** Version */
+            version: number;
+        };
+        /**
          * TrashedPageOut
          * @description A page that went into the trash on its own or with the pages below it; `path`
          *     and `parent_id` are where it was.
@@ -1061,6 +1187,7 @@ export interface components {
         /**
          * TreeNodeOut
          * @description A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
+         *     `tags`: tag ids, by name.
          */
         TreeNodeOut: {
             /**
@@ -1077,6 +1204,8 @@ export interface components {
             /** Sort Order */
             sort_order: number;
             status: components["schemas"]["PageStatus"];
+            /** Tags */
+            tags: string[];
             /** Title */
             title: string;
         };
@@ -2075,6 +2204,41 @@ export interface operations {
             };
         };
     };
+    set_page_tags_api_pages__page_id__tags_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagsSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     trash_page_api_pages__page_id__trash_post: {
         parameters: {
             query?: never;
@@ -2553,6 +2717,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+                /** @description only pages with this tag */
+                tag?: string | null;
             };
             header?: never;
             path: {
@@ -2603,6 +2769,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TrashedPageOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tags_api_tags_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description only system-wide tags and this space's */
+                space_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TagOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_tag_api_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tag_api_tags__tag_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tag_api_tags__tag_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagOut"];
                 };
             };
             /** @description Validation Error */

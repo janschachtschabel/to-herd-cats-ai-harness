@@ -59,6 +59,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/pages/{page_id}/versions/{number}", "page"),
     ("POST", "/api/pages/{page_id}/versions/{number}/restore", "page"),
     ("GET", "/api/pages/{page_id}/diff", "page"),
+    ("PUT", "/api/pages/{page_id}/tags", "page"),
+    ("GET", "/api/tags", "session"),
+    ("POST", "/api/tags", "session"),  # system tags: tag.manage; space tags: page.moderate
+    ("PATCH", "/api/tags/{tag_id}", "session"),
+    ("DELETE", "/api/tags/{tag_id}", "session"),
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -95,6 +100,7 @@ def _concrete(template: str, space_id: object | None = None, page_id: object | N
         "{member_type}": "user",
         "{member_id}": str(uuid7()),
         "{number}": "1",
+        "{tag_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -139,6 +145,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/pages/{page_id}/trash"): {"version": 1},
     ("PATCH", "/api/pages/{page_id}/versions/{number}"): {"label": "X"},
     ("POST", "/api/pages/{page_id}/versions/{number}/restore"): {"version": 1},
+    ("PUT", "/api/pages/{page_id}/tags"): {"tag_ids": [], "version": 1},
 }
 
 

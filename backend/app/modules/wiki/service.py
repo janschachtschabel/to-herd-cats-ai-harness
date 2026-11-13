@@ -20,6 +20,8 @@ from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.audit.recorder import record
+from app.modules.tags.models import SubjectType
+from app.modules.tags.repository import tag_repository
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus, VersionSource
 from app.modules.wiki.moves import PageMoves
 from app.modules.wiki.trash import PageTrash
@@ -48,15 +50,24 @@ class PageService:
         return page
 
     async def tree(
-        self, actor: Actor, space_id: uuid.UUID, params: PageParams
+        self,
+        actor: Actor,
+        space_id: uuid.UUID,
+        params: PageParams,
+        *,
+        tag_id: uuid.UUID | None = None,
     ) -> pagination.Page[Page]:
         """The space's pages outside the trash, flat, by path (parents first); each
-        carries `parent_id` and `sort_order` for nesting and ordering siblings."""
+        carries `parent_id` and `sort_order` for nesting and ordering siblings. With
+        `tag_id`, only the pages carrying that tag."""
         await require(self.session, actor, Action.SPACE_READ, space_id)
         drafts = await can(self.session, actor, Action.PAGE_EDIT, space_id)
         after = decode_key_cursor(params.cursor) if params.cursor else None
+        tagged = None
+        if tag_id is not None:
+            tagged = tag_repository(self.session, actor).subject_ids(SubjectType.PAGE, [tag_id])
         rows = await self.repo(actor).tree_page(
-            space_id, drafts=drafts, after=after, limit=params.limit + 1
+            space_id, drafts=drafts, after=after, limit=params.limit + 1, among=tagged
         )
         items = rows[: params.limit]
         more = len(rows) > params.limit

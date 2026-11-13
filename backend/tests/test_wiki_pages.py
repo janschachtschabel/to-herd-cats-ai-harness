@@ -72,6 +72,7 @@ async def test_tree_is_flat_sorted_by_path_and_paginated(wiki: Wiki) -> None:
             "path": "b/b1",
             "status": "draft",
             "sort_order": 0,
+            "tags": [],
         }
     ]
     assert first["items"][0]["id"] == a["id"]

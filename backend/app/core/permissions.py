@@ -14,7 +14,7 @@ class Action(StrEnum):
     PAGE_EDIT = "page.edit"  # also: see drafts; publish one's own drafts
     PAGE_PUBLISH = "page.publish"  # publish anyone's drafts
     PAGE_TRASH = "page.trash"  # put into and take out of the trash
-    PAGE_MODERATE = "page.moderate"
+    PAGE_MODERATE = "page.moderate"  # also: the space's tags
     # System-wide
     SPACE_CREATE = "space.create"
     DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
@@ -22,6 +22,7 @@ class Action(StrEnum):
     GROUP_MANAGE = "group.manage"
     AUDIT_READ = "audit.read"
     PAGE_PURGE = "page.purge"  # delete a trashed page for good (system admins)
+    TAG_MANAGE = "tag.manage"  # system-wide tags (space tags: `page.moderate`)
 
 
 class SpaceRole(StrEnum):
