@@ -38,11 +38,17 @@ Bereichsliste einfache, indizierte Abfragen mit Seitengröße ≤ 100.
 Speicher). Es fallen nur die Ressourcen unten an.
 
 **Engpass Anmeldung:** Die Passwortprüfung ist argon2id (64 MiB, 3 Durchläufe,
-4 Lanes) und läuft derzeit im Event-Loop des API-Prozesses. Ein Pod schafft gemessen
-14–16 Anmeldungen je Sekunde bei rund 2,6 Kernen (rechnerisch 0,17 CPU-Sekunden je
-Anmeldung), egal wie viele Clients warten, und blockiert während jeder Prüfung alle anderen Anfragen dieses
-Pods (daher die Bereichsliste mit 250 ms statt 11 ms unter Anmeldelast). Mehr
-Anmeldungen je Sekunde gibt es heute nur über mehr Replikas.
+4 Lanes). Die Zahlen oben sind **vor** fix wave 1 gemessen (Commit `ac8433f`), als sie
+noch im Event-Loop lief: ein Pod schaffte 14–16 Anmeldungen je Sekunde bei rund
+2,6 Kernen (rechnerisch 0,17 CPU-Sekunden je Anmeldung) und blockierte während jeder
+Prüfung alle anderen Anfragen dieses Pods (daher die Bereichsliste mit 250 ms statt
+11 ms unter Anmeldelast). Seit fix wave 1 läuft argon2 in Worker-Threads, höchstens
+`HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig je Prozess; der Event-Loop,
+die Probes und andere Anfragen bleiben dabei bedienbar. Je Client-Adresse sind
+höchstens `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard 30) Anmeldeversuche je
+Minute erlaubt, gleich mit welcher E-Mail; fehlgeschlagene Versuche je Adresse und
+E-Mail höchstens `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5). Neu gemessen ist das
+noch nicht. Mehr Anmeldungen je Sekunde gibt es weiterhin über mehr Replikas.
 
 ## Abhängigkeiten
 
@@ -131,9 +137,10 @@ Aus den Messwerten mit 20–30 % Puffer:
   gemessen). Der Request ist nicht gemessen, sondern gesetzt: Leerlauf und warm liegen
   bei 0,2 %; 250m tragen rechnerisch etwa 1,5 Anmeldungen je Sekunde dauerhaft.
 - **app Speicher:** Request = Last-Durchschnitt 129 MiB + 25 %, Limit = Lastspitze
-  156 MiB + 30 %. **Gilt nur, solange argon2 seriell im Event-Loop läuft.** Wird die
-  Prüfung in einen Thread-Pool verlegt, braucht jede gleichzeitige Prüfung 64 MiB mehr.
-  Das Chart behält deshalb vorerst 256Mi/512Mi.
+  156 MiB + 30 %, gemessen, als argon2 noch seriell im Event-Loop lief. Seit fix
+  wave 1 laufen bis zu `HERD_PASSWORD_HASH_CONCURRENCY` (2) Prüfungen gleichzeitig,
+  jede braucht 64 MiB: rechnerisch bis zu etwa 64 MiB mehr als gemessen (nicht neu
+  gemessen). Das Chart behält 256Mi/512Mi.
 - **db:** Die Formel ergibt 100Mi/105Mi, aber nur für eine fast leere Datenbank.
   PostgreSQLs `shared_buffers` ist ab Werk schon 128 MB; mit echten Daten wächst der
   Bedarf. Das Chart behält 256Mi/1Gi. Produktiv ist die Datenbank ohnehin extern.

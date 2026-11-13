@@ -15,7 +15,7 @@ from app.core.access import Action, Actor, require
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
-from app.core.security import hash_password
+from app.core.security import hash_password_async
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
 from app.modules.spaces.service import SpaceService
@@ -47,7 +47,7 @@ class UserService:
             name=data.name,
             locale=data.locale,
             system_role=data.system_role,
-            password_hash=hash_password(data.password) if data.password else None,
+            password_hash=await hash_password_async(data.password) if data.password else None,
         )
         await self.users.add(user)
         await SpaceService(self.session).create_personal(user)
@@ -84,7 +84,7 @@ class UserService:
         if data.locale is not None:
             user.locale = data.locale
         if data.password is not None:
-            user.password_hash = hash_password(data.password)
+            user.password_hash = await hash_password_async(data.password)
             keep = current_session if actor.principal.id == user.id else None
             await self.sessions.delete_for_user(actor.org_id, user.id, keep=keep)
         user.version += 1

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.principal import SystemRole
 from app.core.repository import advisory_xact_lock
-from app.core.security import hash_password
+from app.core.security import hash_password_async
 from app.core.slug import slugify
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
@@ -47,7 +47,7 @@ async def ensure_bootstrap(session: AsyncSession, settings: Settings) -> None:
             email=email.lower(),
             name=email.split("@")[0],
             system_role=SystemRole.OWNER,
-            password_hash=hash_password(password),
+            password_hash=await hash_password_async(password),
         )
     )
     spaces = SpaceService(session)

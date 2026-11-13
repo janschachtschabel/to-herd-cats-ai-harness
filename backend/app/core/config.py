@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # Failed logins per client address and email, and all logins per client address.
     login_rate_limit_per_minute: int = 5
     login_ip_rate_limit_per_minute: int = 30
+    # argon2 computations at a time per process (each ~64 MiB, off the event loop).
+    password_hash_concurrency: int = Field(default=2, ge=1)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

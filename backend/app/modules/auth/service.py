@@ -10,10 +10,10 @@ from app.core.errors import RateLimited, Unauthorized
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter
 from app.core.security import (
-    dummy_password_hash,
     hash_token,
     new_session_token,
-    verify_password,
+    verify_against_dummy,
+    verify_password_async,
 )
 from app.modules.auth.context import AuthContext
 from app.modules.auth.models import UserSession
@@ -53,9 +53,9 @@ class AuthService:
         org = await self.orgs.get_default()
         user = await self.users.get_by_email(org.id, email) if org else None
         if user is None or not user.is_active or user.password_hash is None:
-            verify_password(dummy_password_hash(), password)
+            await verify_against_dummy(password)
             raise Unauthorized(code="auth.invalid_credentials")
-        if not verify_password(user.password_hash, password):
+        if not await verify_password_async(user.password_hash, password):
             raise Unauthorized(code="auth.invalid_credentials")
         await per_account.release(attempt)  # a success is not a failed attempt
         token = new_session_token()

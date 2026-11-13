@@ -8,6 +8,7 @@ from pydantic import SecretStr
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import security
 from app.core.config import Settings
 from app.core.models_base import utcnow
 from app.core.principal import Principal, PrincipalType, SystemRole
@@ -18,7 +19,6 @@ from app.core.security import (
     new_session_token,
     verify_password,
 )
-from app.modules.auth import service as auth_service
 from app.modules.auth.models import UserSession
 from app.modules.orgs.models import Organization
 from app.modules.orgs.service import ensure_bootstrap
@@ -140,7 +140,7 @@ async def test_login_without_a_usable_account_still_verifies_a_hash(
 ) -> None:
     """Timing must not tell whether an account exists: a dummy hash is verified."""
     calls: list[str] = []
-    monkeypatch.setattr(auth_service, "verify_password", lambda h, p: calls.append(h) or False)
+    monkeypatch.setattr(security, "verify_password", lambda h, p: calls.append(h) or False)
     email = "nobody@example.com"
     if case == "inactive":
         email = (await make_user(is_active=False)).email

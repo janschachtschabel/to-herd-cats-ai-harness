@@ -126,10 +126,16 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
   Prüfsummen festgelegt und werden von Hand angehoben; Renovate erfasst sie nicht.
 - **CSP** erlaubt `style-src 'unsafe-inline'`, weil Radix (react-remove-scroll) ein
   `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt.
-- **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft derzeit im
-  Event-Loop des einen API-Prozesses. Auf der Messmaschine schafft ein Pod rund
-  15 Anmeldungen je Sekunde; währenddessen werden andere Anfragen langsamer
-  (siehe [Steckbrief](docs/STECKBRIEF.md)).
+- **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft in
+  Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig
+  je Prozess; jede braucht 64 MiB. Vor dieser Änderung (im Event-Loop) schaffte ein Pod
+  auf der Messmaschine rund 15 Anmeldungen je Sekunde (siehe
+  [Steckbrief](docs/STECKBRIEF.md)); neu gemessen ist das nicht.
+- **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
+  30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
+  `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche. Die
+  Client-Adresse stimmt nur, wenn der Reverse Proxy in `HERD_FORWARDED_ALLOW_IPS`
+  steht; sonst teilen sich alle Clients die Adresse des Proxys.
 
 ## Lizenz
 
