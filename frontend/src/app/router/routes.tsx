@@ -1,45 +1,23 @@
-import type { QueryClient } from '@tanstack/react-query'
-import {
-  createRootRouteWithContext,
-  createRoute,
-  lazyRouteComponent,
-  notFound,
-  Outlet,
-  redirect,
-} from '@tanstack/react-router'
-import { AppShell } from '@/app/shell/AppShell'
-import { adminLinks } from '@/app/shell/nav'
-import { hasPermission, meQuery } from '@/features/auth/queries'
+import { createRoute, lazyRouteComponent, notFound, redirect } from '@tanstack/react-router'
 import { pageQuery } from '@/features/wiki/queries'
-import type { Me, Permission } from '@/lib/api'
-import { NotFoundPage } from './NotFoundPage'
 import { ticketSearch } from '@/features/tickets/filters'
-import { messageSearch, pageSearch, safeRedirect } from './search'
+import { adminTree } from './adminRoutes'
+import { appRoute, loginRoute, rootRoute } from './base'
+import { messageSearch, pageSearch } from './search'
+
+export type { RouterContext } from './base'
 
 // Every page is its own chunk, loaded when its route is entered or hovered (intent
 // preload), so the first load carries only the shell and the page in view.
-const LoginPage = lazyRouteComponent(() => import('@/features/auth/LoginPage'), 'LoginPage')
 const SpacesPage = lazyRouteComponent(() => import('@/features/spaces/SpacesPage'), 'SpacesPage')
 const SpacePage = lazyRouteComponent(() => import('@/features/spaces/SpacePage'), 'SpacePage')
 const WikiLayout = lazyRouteComponent(() => import('@/features/wiki/WikiLayout'), 'WikiLayout')
 const WikiHome = lazyRouteComponent(() => import('@/features/wiki/WikiHome'), 'WikiHome')
 const PageScreen = lazyRouteComponent(() => import('@/features/wiki/PageScreen'), 'PageScreen')
 const TrashPage = lazyRouteComponent(() => import('@/features/wiki/trash/TrashPage'), 'TrashPage')
-const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
-const GroupsPage = lazyRouteComponent(
-  () => import('@/features/admin/groups/GroupsPage'),
-  'GroupsPage',
-)
-const GroupPage = lazyRouteComponent(() => import('@/features/admin/groups/GroupPage'), 'GroupPage')
 const ProfilePage = lazyRouteComponent(
   () => import('@/features/profile/ProfilePage'),
   'ProfilePage',
-)
-const TagsPage = lazyRouteComponent(() => import('@/features/admin/tags/TagsPage'), 'TagsPage')
-const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
-const DmInspectPage = lazyRouteComponent(
-  () => import('@/features/admin/dm-inspect/DmInspectPage'),
-  'DmInspectPage',
 )
 const ConversationScreen = lazyRouteComponent(
   () => import('@/features/messaging/conversation/ConversationScreen'),
@@ -65,46 +43,6 @@ const ActivityPage = lazyRouteComponent(
   () => import('@/features/activity/ActivityPage'),
   'ActivityPage',
 )
-
-export interface RouterContext {
-  queryClient: QueryClient
-}
-
-const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
-  notFoundComponent: NotFoundPage,
-})
-
-const loginRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/login',
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
-    const target = safeRedirect(search.redirect)
-    return target ? { redirect: target } : {}
-  },
-  beforeLoad: async ({ context, search }) => {
-    const me = await context.queryClient.ensureQueryData(meQuery)
-    if (me) throw redirect({ to: search.redirect ?? '/spaces' })
-  },
-  component: LoginPage,
-})
-
-/** Everything behind the login, inside the shell. */
-const appRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: 'app',
-  beforeLoad: async ({ context, location }) => {
-    const me = await context.queryClient.ensureQueryData(meQuery)
-    if (!me) throw redirect({ to: '/login', search: { redirect: location.href } })
-    return { me }
-  },
-  component: () => (
-    <AppShell>
-      <Outlet />
-    </AppShell>
-  ),
-  notFoundComponent: NotFoundPage,
-})
 
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -260,78 +198,6 @@ const profileRoute = createRoute({
   component: ProfilePage,
 })
 
-/** A page someone without the right must not even learn exists: not found. */
-function requirePermission(me: Me, permission: Permission): void {
-  if (!hasPermission(me, permission)) throw notFound()
-}
-
-const adminRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/admin',
-  loader: ({ context }) => {
-    if (adminLinks(context.me).length === 0) throw notFound()
-  },
-  component: Outlet,
-})
-
-const adminIndexRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/',
-  beforeLoad: ({ context }) => {
-    const first = adminLinks(context.me)[0]
-    if (!first) throw notFound()
-    throw redirect({ to: first.to })
-  },
-})
-
-const usersRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/users',
-  loader: ({ context }) => requirePermission(context.me, 'user.manage'),
-  component: UsersPage,
-})
-
-const groupsRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/groups',
-  loader: ({ context }) => requirePermission(context.me, 'group.manage'),
-  component: GroupsPage,
-})
-
-const groupRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/groups/$groupId',
-  loader: async ({ context }) => {
-    requirePermission(context.me, 'group.manage')
-    await GroupPage.preload?.()
-  },
-  component: function GroupRoute() {
-    const { groupId } = groupRoute.useParams()
-    return <GroupPage groupId={groupId} />
-  },
-})
-
-const tagsRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/tags',
-  loader: ({ context }) => requirePermission(context.me, 'tag.manage'),
-  component: TagsPage,
-})
-
-const auditRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/audit',
-  loader: ({ context }) => requirePermission(context.me, 'audit.read'),
-  component: AuditPage,
-})
-
-const dmInspectRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: '/dm-inspect',
-  loader: ({ context }) => requirePermission(context.me, 'dm.inspect'),
-  component: DmInspectPage,
-})
-
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -351,14 +217,6 @@ export const routeTree = rootRoute.addChildren([
     ticketRoute,
     activityRoute,
     profileRoute,
-    adminRoute.addChildren([
-      adminIndexRoute,
-      usersRoute,
-      groupsRoute,
-      groupRoute,
-      tagsRoute,
-      auditRoute,
-      dmInspectRoute,
-    ]),
+    adminTree,
   ]),
 ])
