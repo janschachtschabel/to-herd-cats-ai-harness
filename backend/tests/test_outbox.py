@@ -93,7 +93,6 @@ async def test_emit_names_the_actor_and_the_space(real_db: RealDb) -> None:
     assert (row.actor_type, row.actor_id, row.space_id) == ("user", actor.principal.id, None)
 
 
-
 async def test_a_delivery_record_holds_only_what_is_read(real_db: RealDb) -> None:
     """Hard rule 5 (review M3 N14): the dispatcher reads which handler had which event;
     nothing reads when, so no column holds it."""
