@@ -14,16 +14,12 @@ from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
-from app.core.db import (  # noqa: E402
-    discard_after_commit,
-    get_session,
-    make_engine,
-    run_after_commit,
-)
+from app.core.db import get_session, make_engine  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
 from app.core.migrations import upgrade_head  # noqa: E402
 from app.web.internal import create_internal_app, get_engine  # noqa: E402
 from app.web.public import create_public_app  # noqa: E402
+from tests.app_session import session_override  # noqa: E402
 from tests.factories import (  # noqa: E402, F401
     guest,
     guest_client,
@@ -34,6 +30,7 @@ from tests.factories import (  # noqa: E402, F401
     owner,
     owner_user,
 )
+from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_wiki import wiki  # noqa: E402, F401
@@ -106,29 +103,6 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 
 MakeClient = Callable[..., Awaitable[AsyncClient]]
-
-
-def session_override(session: AsyncSession) -> Callable[[], AsyncIterator[AsyncSession]]:
-    """`get_session` for apps under test, on the test session.
-
-    Mirrors app.core.db.get_session: each request is its own unit of work and a failed
-    request rolls back only its own changes (a savepoint per request)."""
-
-    async def _session_override() -> AsyncIterator[AsyncSession]:
-        nested = await session.begin_nested()
-        try:
-            yield session
-            await session.flush()
-            if nested.is_active:
-                await nested.commit()
-        except Exception:
-            discard_after_commit(session)
-            if nested.is_active:
-                await nested.rollback()
-            raise
-        await run_after_commit(session)
-
-    return _session_override
 
 
 @pytest.fixture

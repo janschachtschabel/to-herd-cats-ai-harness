@@ -69,7 +69,9 @@ async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut
 
 @router.post("/pages/{page_id}/check", response_model=CheckOut)
 async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> CheckOut:
-    result = await CollabService(session).check(page_id, body.session_ids, body.generation)
+    result = await CollabService(session).check(
+        page_id, body.session_ids, body.generation, unsaved=body.unsaved_session_ids
+    )
     return CheckOut(
         generation_ok=result.generation_ok,
         generation=result.generation,

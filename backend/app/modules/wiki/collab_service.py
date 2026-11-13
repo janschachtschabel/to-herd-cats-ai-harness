@@ -8,7 +8,8 @@ sessions whose people edited since the last save; each is checked again, and if 
 may no longer edit, nothing is saved (403 with the revoked sessions and people).
 
 Generations: every change made outside the live session (Markdown save, restore,
-move, trash and restore from the trash) bumps `page.collab_generation`. A save or a
+move, trash and restore from the trash) bumps `page.collab_generation`, and so does a
+check that finds unsaved edits of a revoked session in the document. A save or a
 load for an older generation is refused (409 `collab.generation_ended`), and the
 stored Yjs state of an older generation is never handed out again: the collab process
 then builds the document from the Markdown.
@@ -136,19 +137,35 @@ class CollabService:
         return page
 
     async def check(
-        self, page_id: uuid.UUID, session_ids: list[uuid.UUID], generation: int
+        self,
+        page_id: uuid.UUID,
+        session_ids: list[uuid.UUID],
+        generation: int,
+        *,
+        unsaved: list[uuid.UUID] | None = None,
     ) -> Check:
         """Whether the connections of these sessions may stay: the generation still
-        holds, and which sessions (and their people) may no longer edit."""
-        editors, revoked = await self._editors(session_ids)
+        holds, and which sessions (and their people) may no longer edit.
+
+        If a session with `unsaved` edits may no longer edit, the document holds edits
+        no one may save, and every browser that saw them would bring them back on
+        reconnecting: the generation ends here (the stored state goes with it)."""
+        unsaved = unsaved or []
+        editors, revoked = await self._editors([*session_ids, *unsaved])
         page = None
         if editors:
-            page = await CollabRepository(self.session, editors[0].actor.org_id).page(page_id)
+            live = CollabRepository(self.session, editors[0].actor.org_id)
+            page = await live.page(page_id, lock=bool(unsaved))
         if page is None:
             return Check(False, generation, _revoked(revoked, []))
         lost = await self._lost(editors, page)
+        result = _revoked(revoked, lost)
         ok = page.trashed_at is None and page.collab_generation == generation
-        return Check(ok, page.collab_generation, _revoked(revoked, lost))
+        if ok and set(unsaved) & set(result.session_ids):
+            page.collab_generation += 1
+            await self.session.flush()
+            ok = False
+        return Check(ok, page.collab_generation, result)
 
     async def _save(
         self,

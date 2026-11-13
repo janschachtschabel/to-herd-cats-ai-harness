@@ -52,7 +52,12 @@ class SaveOut(BaseModel):
 
 
 class CheckIn(BaseModel):
+    """`session_ids`: the document's connections; `unsaved_session_ids`: the sessions
+    whose edits are in the document but not saved yet (one of them revoked ends the
+    generation)."""
+
     session_ids: list[uuid.UUID] = Field(max_length=MAX_EDITORS)
+    unsaved_session_ids: list[uuid.UUID] = Field(default=[], max_length=MAX_EDITORS)
     generation: int = Field(ge=0)
 
 
