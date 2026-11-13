@@ -175,7 +175,6 @@ async def test_content_and_name_must_agree(wiki: Wiki) -> None:
     for name, data in (
         ("run.exe", b"MZ\x90\x00"),
         ("kaputt.zip", b"PK\x03\x04 not really a zip"),
-        ("daten.json", b"{not json"),
         ("leer.txt", b"\x00\x01\x02"),
     ):
         _error(await _upload(wiki.editor, page, name, data), 415, "attachment.type_not_allowed")

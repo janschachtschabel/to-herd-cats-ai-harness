@@ -2,12 +2,12 @@
 
 Binary formats by their magic bytes; Office files and ZIP by the archive's entries;
 text (TXT, Markdown, CSV, JSON) when it is all valid UTF-8 without NUL and does not
-begin like markup a browser would run. The file name's extension must then belong to
-what was found: a `bild.png` that is HTML is refused as HTML, and a PNG named
-`seite.html` is refused as a mismatch.
+begin like markup a browser would run (only the first bytes are looked at; nothing is
+parsed whole, JSON included: it is served as a download like any text). The file
+name's extension must then belong to what was found: a `bild.png` that is HTML is
+refused as HTML, and a PNG named `seite.html` is refused as a mismatch.
 """
 
-import json
 from dataclasses import dataclass
 from typing import IO
 
@@ -64,7 +64,7 @@ def detect(head: bytes, is_text: bool, file: IO[bytes], filename: str) -> FileTy
     if head[:4] in _ZIP_MAGIC:  # an archive, or nothing allowed (never text)
         found = _archive(file)
     else:
-        found = _binary(head) or (_text(head, file, filename) if is_text else None)
+        found = _binary(head) or (_text(head, filename) if is_text else None)
     if found is None:
         raise UnsupportedType()
     if extension_of(filename) not in found.extensions:
@@ -106,21 +106,9 @@ def _archive(file: IO[bytes]) -> FileType | None:
     return ZIP
 
 
-def _text(head: bytes, file: IO[bytes], filename: str) -> FileType | None:
+def _text(head: bytes, filename: str) -> FileType | None:
     start = head.removeprefix(b"\xef\xbb\xbf").lstrip()[:_MARKUP_WINDOW].lower()
     if any(marker in start for marker in _MARKUP):
         return None
     ext = extension_of(filename)
-    kind = next((t for t in TEXT_TYPES if ext in t.extensions), TEXT)
-    if kind is JSON and not _parses_as_json(file):
-        return None
-    return kind
-
-
-def _parses_as_json(file: IO[bytes]) -> bool:
-    file.seek(0)
-    try:
-        json.load(file)
-    except (ValueError, RecursionError):
-        return False
-    return True
+    return next((t for t in TEXT_TYPES if ext in t.extensions), TEXT)
