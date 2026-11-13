@@ -120,12 +120,18 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
         return await _deny(websocket, 504, "collab.timeout")
     if upstream is None:
         return await _deny(websocket, 502, "collab.unavailable")
-    await websocket.accept()
-    COLLAB_CONNECTIONS.inc()
+    # Whatever happens from here on (the browser may be gone already), the upstream
+    # connection ends with it: left open, it held one of the login session's slots in
+    # the collab process until its handshake timeout (review M2 U11).
     try:
-        await _relay(websocket, upstream)
+        await websocket.accept()
+        COLLAB_CONNECTIONS.inc()
+        try:
+            await _relay(websocket, upstream)
+        finally:
+            COLLAB_CONNECTIONS.dec()
     finally:
-        COLLAB_CONNECTIONS.dec()
+        await upstream.close()
 
 
 async def _dial(

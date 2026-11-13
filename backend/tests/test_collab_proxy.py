@@ -29,6 +29,7 @@ class Upstream:
 
     url: str = ""
     requests: list[tuple[str, dict[str, str]]] = field(default_factory=list)
+    closed: int = 0  # upstream connections that ended
 
 
 @pytest.fixture
@@ -38,11 +39,14 @@ async def upstream(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Upstream]:
     async def handler(ws: ServerConnection) -> None:
         assert ws.request is not None
         seen.requests.append((ws.request.path, dict(ws.request.headers.raw_items())))
-        async for message in ws:
-            if message == "close-4409":
-                await ws.close(4409, "generation_ended")
-                return
-            await ws.send(message)
+        try:
+            async for message in ws:
+                if message == "close-4409":
+                    await ws.close(4409, "generation_ended")
+                    return
+                await ws.send(message)
+        finally:
+            seen.closed += 1
 
     # As large as the collab process takes (its WebSocket server's maxPayload).
     async with serve(handler, "127.0.0.1", 0, max_size=None) as server:
@@ -267,6 +271,45 @@ async def test_a_handshake_that_takes_too_long_is_closed(
     closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
     assert closed == (4504, "collab.timeout")
     assert upstream.requests == []
+
+
+async def test_a_browser_gone_during_the_handshake_frees_the_upstream_at_once(
+    public_url: str, setup: Setup, upstream: Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review M2 U11: a browser that aborted while the relay checked and dialled left
+    the upstream connection open until the collab process's 10 s handshake timeout,
+    holding one of the login session's slots there."""
+    import socket
+    from urllib.parse import urlsplit
+
+    from app.web import collab_proxy
+
+    real = collab_proxy._dial
+
+    async def slow(*args: Any) -> Any:
+        await asyncio.sleep(0.3)  # the browser is gone by now
+        return await real(*args)
+
+    monkeypatch.setattr(collab_proxy, "_dial", slow)
+    url = urlsplit(_url(public_url, setup.page))
+    for _ in range(3):
+        raw = socket.create_connection((url.hostname, url.port))
+        raw.sendall(
+            (
+                f"GET {url.path}?{url.query} HTTP/1.1\r\nHost: {url.netloc}\r\n"
+                "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+                f"Origin: http://wiki.example\r\nCookie: {setup.cookie}\r\n\r\n"
+            ).encode()
+        )
+        await asyncio.sleep(0.05)
+        raw.close()  # aborted before the relay answers
+    for _ in range(100):  # 2 s, far below the collab process's 10 s
+        if len(upstream.requests) == 3 and upstream.closed == 3:
+            break
+        await asyncio.sleep(0.02)
+    assert len(upstream.requests) == 3
+    assert upstream.closed == 3, "every upstream connection of an aborted browser is closed"
 
 
 async def test_connections_are_counted(public_url: str, setup: Setup, upstream: Upstream) -> None:
