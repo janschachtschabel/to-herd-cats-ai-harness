@@ -6,7 +6,7 @@
 // breaks); a heading has no hard breaks; code may carry a link or emphasis
 // (`` [`a`](b) ``, `` **`a`** ``). Markdown is read and written by `parse.mjs` and
 // `serialize.mjs`, not by Tiptap's Markdown support.
-import { Node } from "@tiptap/core";
+import { InputRule, Node } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Code from "@tiptap/extension-code";
 import CodeBlock from "@tiptap/extension-code-block";
@@ -42,10 +42,30 @@ const TableParagraph = Node.create({
   renderHTML: () => ["p", 0],
 });
 
+// `![alt](src)` or `![alt](src "title")` just typed (Tiptap's image rule).
+const TYPED_IMAGE = /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/;
+
 /** Images as Markdown has them: source, alt text and title; no marks (the Y.Doc keeps
  * none on an image, so a linked image could not be shared; it stays a raw block). */
 const MarkdownImage = Image.extend({
   marks: "",
+  // Tiptap's own rule types the closing `)` again after the image; this one does not.
+  addInputRules() {
+    return [
+      new InputRule({
+        find: TYPED_IMAGE,
+        handler: ({ state, range, match }) => {
+          const [whole, image, alt, src, title] = match;
+          const from = range.from + whole.lastIndexOf(image);
+          state.tr.replaceWith(
+            from,
+            range.to,
+            this.type.create({ src, alt, title: title ?? null }),
+          );
+        },
+      }),
+    ];
+  },
   addAttributes() {
     return {
       src: { default: null },
