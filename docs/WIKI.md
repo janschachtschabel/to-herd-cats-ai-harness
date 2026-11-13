@@ -54,7 +54,10 @@ zählt sie nicht mit.
   „Synchronisiert“, „Speichert …“ oder „Getrennt“. **Fertig** speichert sofort und
   zeigt danach die Seite so, wie der Server sie hat; kann der Server das nicht
   bestätigen (z. B. API kurz weg), bleibt der Editor offen und sagt das. Leser bekommen
-  diese Schaltfläche nicht.
+  diese Schaltfläche nicht. Der Collab-Prozess bestätigt jeder Verbindung jeden
+  gespeicherten Stand; solange eine eigene Änderung nicht in einem bestätigten Stand
+  steckt, fragt der Browser, bevor man den Editor verlässt, neu lädt oder den Tab
+  schließt, und „Fertig“ wartet auf die Bestätigung.
 - **Generationen:** Speichern im Markdown-Editor, Wiederherstellen einer Version,
   Verschieben und Papierkorb beenden eine laufende Live-Sitzung. Die offenen
   Live-Editoren melden „Die Seite wurde außerhalb der Live-Sitzung geändert“, laden den
@@ -120,17 +123,30 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
 - **Wiki-Links** `[[Titel]]` gelten nur im Text, wie die Seitenansicht sie liest: in
   Code, Codeblöcken und in Link-Texten sind sie keine. Ein `(` direkt nach `]]` wird
   maskiert, damit kein Link daraus wird.
-- **Tabellenzellen** halten eine Zeile Text (Markdown hat keine Zeilenumbrüche in
-  Zellen): Enter und Umschalt+Enter fügen dort nichts ein. Die erste Zeile ist die
-  Kopfzeile.
+- **Tabellen** sind, wie GFM sie kennt: Zellen halten eine Zeile Text (Markdown hat
+  keine Zeilenumbrüche in Zellen), Enter, Umschalt+Enter und Strg+Enter fügen dort
+  nichts ein. Die erste Zeile ist die Kopfzeile. Jede Zeile ist so breit wie die
+  breiteste: eine kürzere bekommt leere Zellen am Ende, und hat eine Zeile mehr Zellen
+  als die Kopfzeile, bekommt die Kopfzeile leere Zellen am Ende (jede Zelle bleibt über
+  ihrer Überschrift; die Seitenansicht zeigte die überzähligen Zellen nicht).
+  Verbundene Zellen gibt es nicht: eine eingefügte Tabelle mit `colspan`/`rowspan` wird
+  vorher aufgeteilt, der Inhalt steht in der ersten Zelle. Eine Spalte hat eine
+  Ausrichtung, die ihrer Kopfzelle; eine mit Tab angefügte Zeile übernimmt sie.
 - **Bilder** stehen im Text wie in Markdown; `![Alt](adresse)` getippt wird zum Bild.
+  Wie Links nur mit `http`-, `https`- und relativen Adressen, wie die Seitenansicht sie
+  zeigt: ein eingefügtes oder getipptes Bild aus `blob:`, `file:` oder `data:` nimmt der
+  Editor nicht an, und ein solches Bild im gespeicherten Markdown erscheint als
+  Codeblock (die Seitenansicht zeigt es nicht).
 - **Speicherprüfung:** Vor jeder Live-Speicherung liest der Collab-Prozess das Markdown,
   das er schreiben will, wieder ein und vergleicht es mit dem Dokument im Editor;
   außerdem muss es die Prüfung beim Öffnen (unten) bestehen. Fällt eine der beiden
   durch, wird dieser Stand nicht gespeichert: das zuletzt gespeicherte Markdown bleibt,
   `herd_collab_saves_total{result="unrepresentable"}` zählt mit, und alle im Editor
   sehen einen Hinweis („Der aktuelle Stand lässt sich so nicht als Markdown
-  speichern …“), die Sitzung läuft weiter. Wer den Editor so verlässt, wird gefragt.
+  speichern …“), die Sitzung läuft weiter. Der Hinweis nennt die Art der Ursache
+  (würde als Markdown anders gelesen; ließe sich live nicht wieder öffnen; Aufbau
+  ungültig) und, soweit die Prüfung es weiß, den Block (Nummer und Textanfang): den
+  ersten, der auch allein durchfällt. Wer den Editor so verlässt, wird gefragt.
   Sobald ein späterer Stand gespeichert ist, verschwindet der Hinweis. Bekannter Fall:
   Code in einer Tabellenzelle mit einem Backslash direkt vor `|` (GFM liest `\|` dort
   als maskierten Strich und `\\|` als Zellenende; kein Markdown sagt das). Geprüft
@@ -144,18 +160,44 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Live-Editor die Seite nicht (Close-Code 4422) und bietet den Markdown-Editor an. Das
   betrifft nur Ausgefallenes, etwa einen eingerückten Codeblock direkt vor einer mit 0
   beginnenden nummerierten Liste aus HTML. Als Codeblock bleiben unter anderem
-  nummerierte Aufgabenlisten (`1. [ ] …`), die der Editor nicht kennt.
+  nummerierte Aufgabenlisten (`1. [ ] …`), die der Editor nicht kennt, und Listen, die
+  Aufgaben und gewöhnliche Punkte mischen (`- [ ] eins` / `- zwei`): Der Editor hat
+  dafür zwei Listenarten, aus einer Liste würden zwei. Eine Listenart mit wahlweisem
+  Kästchen würde das beheben, ist aber eine Änderung am gespeicherten Live-Format und
+  steht noch aus. Ebenso bleiben fettgedruckte oder verlinkte Bilder Codeblöcke.
 - **Öffnen ohne Ändern ändert nichts:** Wer den Live-Editor öffnet und ohne Eingabe
   wieder schließt, erzeugt weder eine Version noch ein anderes Markdown. Auch eine
   Änderung, die wieder zurückgenommen wurde, lässt das gespeicherte Markdown, wie es war.
+  Dafür lässt der Collab-Prozess den Editor des Browsers ohne Oberfläche über das
+  Dokument laufen, bevor er es ausliefert (`collab/settle.mjs`): was dessen Erweiterungen
+  beim Laden ändern würden (Tabellen ausgleichen, Adressen verlinken …), steckt schon im
+  ausgelieferten Dokument, sofern es die Bedeutung nicht ändert; sonst wird der Block
+  ein Codeblock bzw. ein gespeicherter Live-Stand nicht geöffnet (4422). Als letztes Netz
+  schickt der Browser keine Änderung, die nicht aus einer Eingabe stammt (Tastatur,
+  Einfügen, Ziehen, Werkzeugleiste): Ändert sein Editor das Dokument trotzdem von
+  selbst, beendet er die Sitzung mit dem Hinweis, dass er die Seite nicht unverändert
+  darstellen kann, und meldet das (`herd_collab_load_mutations_total`, soll 0 sein).
+- **Leerraum:** Mehrere Leerzeichen, Leerzeichen am Zeilenanfang und leere Absätze zeigt
+  der Editor, die Seitenansicht nicht: Markdown fasst sie zusammen, und die
+  Speicherprüfung vergleicht, was die Seitenansicht zeigt.
+- **Adressen ohne Leerzeichen danach:** Eine Adresse, die direkt am Ende eines Absatzes
+  oder mitten in einem Wort getippt wird, ist im Editor Text, auf der Seite aber ein
+  Link (GFM verlinkt sie). Beim nächsten Öffnen zeigt auch der Editor den Link, und die
+  nächste Speicherung schreibt `<https://…>`. Markdown kann „nicht verlinkt“ dort nicht
+  ausdrücken (`collab/autolink.mjs`).
 - **Nicht vorhanden:** Unterstreichen (kein Markdown dafür), eigene Größen oder
   Farben, eingebettete Inhalte.
 - Ein Live-Zustand hat höchstens 5 MiB und 200.000 Zeichen Markdown, ein
   WebSocket-Frame höchstens 1 MiB. Nahe der Grenze misst der Collab-Prozess vor jeder
   Änderung genau, wie groß die Seite damit würde (höchstens einmal je Sekunde und
-  Seite); eine Änderung darüber wird abgelehnt, nur für die Person, die sie geschickt
-  hat (4413), die anderen arbeiten weiter. Größere Seiten bearbeitet man im
+  Seite; eine weitere Änderung in derselben Sekunde wartet bis zur nächsten Messung);
+  eine Änderung darüber wird abgelehnt, nur für die Person, die sie geschickt hat
+  (4413), die anderen arbeiten weiter. Größere Seiten bearbeitet man im
   Markdown-Editor; der Live-Editor sagt das dann.
+- **Große Seiten:** Das Öffnen und die Speicherprüfung einer Seite von 200.000 Zeichen
+  dauern einige Sekunden. Sie laufen in eigenen Threads des Collab-Prozesses
+  (`HERD_COLLAB_CHECK_WORKERS`, Standard 2), damit alle anderen Live-Seiten
+  währenddessen flüssig bleiben; bereits geprüfte Blöcke werden nicht erneut geprüft.
 - **Abmelden:** Eine offene Live-Verbindung endet mit der nächsten Prüfung, also bis zu
   5 s nach dem Abmelden; was in diesen Sekunden noch ankommt, wird unter dem Namen der
   Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und
@@ -254,4 +296,6 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
   `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
-  Markdown speichern ließ).
+  Markdown speichern ließ), `herd_collab_load_mutations_total` (Editoren im Browser,
+  die ein gerade geladenes Dokument von selbst geändert hätten und deshalb beendet
+  wurden; jeder Wert über 0 ist ein Fehler im Editor).
