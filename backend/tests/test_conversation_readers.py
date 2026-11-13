@@ -1,8 +1,8 @@
 """Who may see a conversation, asked in two ways that must agree: per actor
 (`visible_conversations`, for lists and checks) and for many people at once
 (`readers_of`, for mentions, notifications and live delivery). A matrix of people
-and conversations (channels, DMs and page threads: published, draft, in the trash)
-holds them to the same answers."""
+and conversations (channels, DMs, page threads: published, draft, in the trash; ticket
+threads) holds them to the same answers."""
 
 import itertools
 
@@ -20,6 +20,7 @@ from app.modules.messaging.threads import ThreadService
 from app.modules.messaging.visibility import ConversationReader
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import SpaceKind
+from app.modules.tickets.service import TicketService
 from app.modules.users.models import User
 from app.modules.wiki.service import PageService
 
@@ -75,6 +76,10 @@ async def test_both_ways_of_asking_agree(
     for page in (published, draft, trashed, open_page):
         conversations.append(await threads.for_page(owner, page.id))
     await pages.trash(owner, trashed.id, trashed.version)
+    tickets = TicketService(session)
+    for space in (team, open_):
+        ticket = (await tickets.create(owner, space.id, title="Aufgabe")).ticket
+        conversations.append(await tickets.thread(owner, ticket))
     people["inactive"].is_active = False
     await session.flush()
 
@@ -91,7 +96,10 @@ async def test_both_ways_of_asking_agree(
         for c in conversations[:2]
     }
     threads_seen = [
-        await readers_of(session, owner.org_id, c.id, everyone) for c in conversations[5:]
+        await readers_of(session, owner.org_id, c.id, everyone) for c in conversations[5:9]
+    ]
+    tickets_seen = [
+        await readers_of(session, owner.org_id, c.id, everyone) for c in conversations[9:]
     ]
     names = {user.id: name for name, user in people.items()}
     assert sorted(names[u] for u in seen["team"]) == [
@@ -115,4 +123,9 @@ async def test_both_ways_of_asking_agree(
         ["admin", "grouped", "owner"],  # a draft: `page.edit` (the group is editor)
         [],  # in the trash: nobody
         ["admin", "direct", "grouped", "guest_in", "member", "owner"],  # open space
+    ]
+    # ticket threads: whoever may read tickets in the space (`ticket.read`: viewer)
+    assert [{names[u] for u in readers} for readers in tickets_seen] == [
+        {names[u] for u in seen["team"]},
+        {names[u] for u in seen["offen"]},
     ]

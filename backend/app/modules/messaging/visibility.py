@@ -10,6 +10,8 @@ Rights (spec 5.3) come only from `core/access.py`:
 - A page thread lives in its page's space and is seen by whoever sees the page
   (drafts only with `page.edit`, nothing while it is in the trash); writing in it
   needs `channel.post` there, as in a channel.
+- A ticket thread lives in its ticket's space and is seen by whoever may read tickets
+  there; writing in it needs `channel.post` there, as in a page thread.
 - A direct message belongs to no space: its participants see it and write in it
   (guests too), nobody else. It has nothing to manage.
 """
@@ -47,6 +49,7 @@ class ConversationReader:
             visible_space_ids(actor),
             space_ids_with(actor, Action.CHANNEL_POST),
             space_ids_with(actor, Action.PAGE_EDIT),
+            space_ids_with(actor, Action.TICKET_READ),
         )
 
     def repo(self, actor: Actor) -> ConversationRepository:
@@ -61,7 +64,9 @@ class ConversationReader:
         conversation = await self.repo(actor).visible(conversation_id, lock=lock)
         if conversation is None:
             raise conversation_not_found()
-        if conversation.kind != ConversationKind.DM:  # a DM: seen means taking part
+        if conversation.kind == ConversationKind.THREAD_TICKET:
+            await self.require_in_space(actor, Action.TICKET_READ, conversation)
+        elif conversation.kind != ConversationKind.DM:  # a DM: seen means taking part
             await self.require_in_space(actor, Action.SPACE_READ, conversation)
         return conversation
 

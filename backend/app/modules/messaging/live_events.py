@@ -5,13 +5,17 @@ handler's transaction (sent when it commits). The payload is compact JSON with i
 only, never content:
 
     {"t": <SSE event name>, "o": <org_id>, "c": <conversation_id|null>,
-     "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>}
+     "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>,
+     "w": <ticket_id> (ticket events only)}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
 see conversation `c` gets it (`dm.inspected`: a DM's participants, not the inspecting
-administrator). Every API process's hub (`live.py`) decodes it again; anything it cannot
-use is dropped. Payloads stay far below Postgres' 8000-byte limit (about 230 bytes).
+administrator). Ticket events (`ticket.created`, `ticket.updated`) name the ticket's
+thread as `c`, so whoever may see the thread, that is whoever may read tickets in the
+ticket's space, gets them, and the ticket as `w`. Every API process's hub (`live.py`)
+decodes it again; anything it cannot use is dropped. Payloads stay far below Postgres'
+8000-byte limit (about 280 bytes).
 """
 
 import json
@@ -42,8 +46,11 @@ LIVE_TYPES: dict[str, str] = {
     "channel.unarchived": "channel.changed",
     "access.changed": "access.changed",
     "dm.inspected": "dm.inspected",
+    "ticket.created": "ticket.created",
+    "ticket.updated": "ticket.updated",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
+TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
 # Events for one person: the payload's `user_id` is who gets them.
 FOR_ONE_PERSON = frozenset(
     {"notification.created", "conversation.read", "activity.changed", "access.changed"}
@@ -58,27 +65,31 @@ class LiveEvent:
     message_id: uuid.UUID | None
     parent_id: uuid.UUID | None
     user_id: uuid.UUID | None
+    ticket_id: uuid.UUID | None = None
 
     def payload(self) -> str:
-        return json.dumps(
-            {
-                "t": self.name,
-                "o": str(self.org_id),
-                "c": _text(self.conversation_id),
-                "m": _text(self.message_id),
-                "p": _text(self.parent_id),
-                "u": _text(self.user_id),
-            },
-            separators=(",", ":"),
-        )
+        data = {
+            "t": self.name,
+            "o": str(self.org_id),
+            "c": _text(self.conversation_id),
+            "m": _text(self.message_id),
+            "p": _text(self.parent_id),
+            "u": _text(self.user_id),
+        }
+        if self.ticket_id is not None:
+            data["w"] = str(self.ticket_id)
+        return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
-        """The server-sent event: its name and the ids a client reloads by."""
+        """The server-sent event: its name and the ids a client reloads by (a ticket
+        event also `ticket_id`)."""
         data = {
             "conversation_id": _text(self.conversation_id),
             "message_id": _text(self.message_id),
             "parent_id": _text(self.parent_id),
         }
+        if self.ticket_id is not None:
+            data["ticket_id"] = str(self.ticket_id)
         return sse_frame(self.name, data)
 
 
@@ -103,6 +114,7 @@ def of_event(event: Event) -> LiveEvent | None:
         message_id=_uuid(payload.get("message_id")),
         parent_id=_uuid(payload.get("parent_id")),
         user_id=_uuid(payload.get("user_id")) if event.type in FOR_ONE_PERSON else None,
+        ticket_id=_uuid(payload.get("ticket_id")) if event.type in TICKET_TYPES else None,
     )
 
 
@@ -128,13 +140,13 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        ids = {key: _strict_uuid(data.get(key)) for key in ("c", "m", "p", "u")}
+        ids = {key: _strict_uuid(data.get(key)) for key in ("c", "m", "p", "u", "w")}
         org_id = _strict_uuid(data.get("o"))
     except (ValueError, TypeError, RecursionError):
         return None
     if org_id is None:
         return None
-    return LiveEvent(data["t"], org_id, ids["c"], ids["m"], ids["p"], ids["u"])
+    return LiveEvent(data["t"], org_id, ids["c"], ids["m"], ids["p"], ids["u"], ids["w"])
 
 
 def _strict_uuid(value: object) -> uuid.UUID | None:

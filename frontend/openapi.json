@@ -52,7 +52,7 @@
         "type": "object"
       },
       "ActivityConversation": {
-        "description": "`name` is null for a direct message and a page thread; `page_id` names a page\nthread's page (null for other kinds).",
+        "description": "`name` is null for a direct message and a page or ticket thread; `page_id` names\na page thread's page, `ticket_number` a ticket thread's ticket (null for other\nkinds; the ticket's address is `/tickets/<number>`).",
         "properties": {
           "id": {
             "format": "uuid",
@@ -96,6 +96,17 @@
               }
             ],
             "title": "Space Id"
+          },
+          "ticket_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Number"
           }
         },
         "required": [
@@ -103,7 +114,8 @@
           "kind",
           "name",
           "space_id",
-          "page_id"
+          "page_id",
+          "ticket_number"
         ],
         "title": "ActivityConversation",
         "type": "object"
@@ -486,7 +498,8 @@
         "enum": [
           "channel",
           "dm",
-          "thread_page"
+          "thread_page",
+          "thread_ticket"
         ],
         "title": "ConversationKind",
         "type": "string"
@@ -1026,7 +1039,7 @@
         "type": "object"
       },
       "HitConversation": {
-        "description": "Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page\nthread's page (null otherwise); `space_id`: null for a direct message.",
+        "description": "Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page\nthread's page, `ticket_number`: a ticket thread's ticket (null otherwise);\n`space_id`: null for a direct message.",
         "properties": {
           "id": {
             "format": "uuid",
@@ -1070,6 +1083,17 @@
               }
             ],
             "title": "Space Id"
+          },
+          "ticket_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Number"
           }
         },
         "required": [
@@ -1077,7 +1101,8 @@
           "kind",
           "name",
           "space_id",
-          "page_id"
+          "page_id",
+          "ticket_number"
         ],
         "title": "HitConversation",
         "type": "object"
@@ -1796,7 +1821,9 @@
       "NotificationReason": {
         "enum": [
           "mention",
-          "reply"
+          "reply",
+          "assignment",
+          "ticket_comment"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -3369,7 +3396,7 @@
         "type": "object"
       },
       "SystemEntryOut": {
-        "description": "A system message's timeline entry, for the client to word: `key` is the page\nevent (`page.published`, ...), `actor` who caused it (null if unknown), `number`\nthe restored version (only for `page.version_restored`).",
+        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown), `number` the restored version (only for\n`page.version_restored`), `old`/`new` what a ticket field changed from and to\n(null where there was nothing, and always for title and description).",
         "properties": {
           "actor": {
             "anyOf": [
@@ -3385,6 +3412,16 @@
             "title": "Key",
             "type": "string"
           },
+          "new": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "number": {
             "anyOf": [
               {
@@ -3395,12 +3432,24 @@
               }
             ],
             "title": "Number"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "key",
           "actor",
-          "number"
+          "number",
+          "old",
+          "new"
         ],
         "title": "SystemEntryOut",
         "type": "object"
@@ -3415,6 +3464,32 @@
         ],
         "title": "SystemRole",
         "type": "string"
+      },
+      "SystemValueOut": {
+        "description": "A value a ticket changed from or to: an id (person, status, parent ticket), an\nenumeration value or a date; `name` names an id (the person, the status, the\nparent's key `HC-<n>`), null for other values and for what is gone.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "name"
+        ],
+        "title": "SystemValueOut",
+        "type": "object"
       },
       "TagCreate": {
         "additionalProperties": false,
@@ -9729,6 +9804,49 @@
         "summary": "Update Ticket",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/tickets/{number}/thread": {
+      "get": {
+        "description": "The ticket's thread (made with the ticket), for whoever sees the ticket; its\nmessages, the system timeline among them, come from\n`/conversations/{id}/messages`.",
+        "operationId": "get_ticket_thread_api_tickets__number__thread_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Thread",
+        "tags": [
+          "messaging"
         ]
       }
     }

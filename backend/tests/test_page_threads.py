@@ -168,18 +168,19 @@ async def test_mentions_in_a_page_thread_lead_to_the_page(
         "name": None,
         "space_id": wiki.space_id,
         "page_id": page["id"],
+        "ticket_number": None,
     }
     assert (await wiki.viewer.get("/api/activity")).json()["items"] == []
 
 
-async def test_an_import_emits_once_and_its_pages_get_threads_when_opened(
+async def test_an_import_emits_nothing_and_its_pages_get_threads_when_opened(
     wiki: Wiki, session: AsyncSession
 ) -> None:
     from tests.test_wiki_import_export import _import, _zip
 
     imported = await _import(wiki.admin, wiki.space_id, _zip({"a.md": "A", "b.md": "B"}))
     assert imported.status_code == 200, imported.text
-    assert await events_of(session, *PAGE_EVENTS, "space.imported") == ["space.imported"]
+    assert await events_of(session, *PAGE_EVENTS, "space.imported") == []
     tree = await wiki.viewer.get(f"/api/spaces/{wiki.space_id}/pages/tree")
     page = tree.json()["items"][0]
     thread = await thread_of(wiki.viewer, page)

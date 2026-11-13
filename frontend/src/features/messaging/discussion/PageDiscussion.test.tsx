@@ -17,7 +17,13 @@ function discussionApi() {
     kind: 'system',
     author: null,
     body_md: '{"key": "page.published", "actor": "jan"}',
-    system: { key: 'page.published', actor: { id: 'jan', name: 'Jan Jansen' }, number: null },
+    system: {
+      key: 'page.published',
+      actor: { id: 'jan', name: 'Jan Jansen' },
+      number: null,
+      old: null,
+      new: null,
+    },
     created_at: '2026-11-13T09:00:00Z',
   })
   const restored = makeMessage({
@@ -25,7 +31,7 @@ function discussionApi() {
     kind: 'system',
     author: null,
     body_md: '{"key": "page.version_restored", "actor": "x", "number": 2}',
-    system: { key: 'page.version_restored', actor: null, number: 2 },
+    system: { key: 'page.version_restored', actor: null, number: 2, old: null, new: null },
     created_at: '2026-11-13T09:01:00Z',
   })
   const comment = makeMessage({

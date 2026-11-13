@@ -8,6 +8,8 @@ never even loaded:
 
 - a page thread: its page is outside the trash, in a space the actor may read, and
   published, or the actor may edit pages there (drafts).
+- a ticket thread: its space is one where the actor may read tickets (a ticket never
+  leaves its space, and its thread goes with it).
 
 Messages are seen where their conversation is (`message_repository.py`).
 """
@@ -35,6 +37,7 @@ class ConversationScope:
     space_ids: Select[uuid.UUID]  # the spaces the actor may read (SQL)
     post_space_ids: Select[uuid.UUID]  # the spaces where it holds `channel.post` (SQL)
     edit_space_ids: Select[uuid.UUID]  # the spaces where it holds `page.edit` (SQL)
+    ticket_space_ids: Select[uuid.UUID]  # the spaces where it holds `ticket.read` (SQL)
 
 
 def takes_part(principal: Principal) -> ColumnElement[bool]:
@@ -64,7 +67,11 @@ def visible_conversations(scope: ConversationScope) -> ColumnElement[bool]:
         Conversation.space_id.in_(scope.space_ids),
         page_seen,
     )
-    return and_(Conversation.org_id == scope.org_id, or_(false(), channel, dm, thread))
+    ticket = and_(
+        Conversation.kind == ConversationKind.THREAD_TICKET,
+        Conversation.space_id.in_(scope.ticket_space_ids),
+    )
+    return and_(Conversation.org_id == scope.org_id, or_(false(), channel, dm, thread, ticket))
 
 
 def _page_seen(status_rule: ColumnElement[bool]) -> ColumnElement[bool]:
@@ -101,10 +108,14 @@ def seen_by_person() -> ColumnElement[bool]:
         person_reads_space(Conversation.space_id),
         _page_seen(or_(Page.status == PageStatus.PUBLISHED, edits)),
     )
+    ticket = and_(
+        Conversation.kind == ConversationKind.THREAD_TICKET,
+        person_holds_role(Conversation.space_id, SPACE_ACTION_MIN_ROLE[Action.TICKET_READ]),
+    )
     return and_(
         Conversation.org_id == User.org_id,
         User.is_active.is_(True),
-        or_(false(), channel, dm, thread),
+        or_(false(), channel, dm, thread, ticket),
     )
 
 

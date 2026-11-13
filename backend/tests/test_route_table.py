@@ -117,6 +117,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/tickets", "session"),
     ("GET", "/api/tickets/{number}", "ticket"),
     ("PATCH", "/api/tickets/{number}", "ticket"),
+    ("GET", "/api/tickets/{number}/thread", "ticket"),  # the ticket's discussion
     ("GET", "/api/spaces/{space_id}/ticket-statuses", "space"),
     ("POST", "/api/spaces/{space_id}/ticket-statuses", "space"),
     ("PATCH", "/api/ticket-statuses/{status_id}", "ticket_status"),

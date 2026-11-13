@@ -39,6 +39,7 @@ async def test_a_channel_message_is_found_by_the_space_readers_only(chat: Chat) 
         "name": "plaudern",
         "space_id": str(chat.space.id),
         "page_id": None,
+        "ticket_number": None,
     }
     assert hit["author"] == {
         "type": "user",

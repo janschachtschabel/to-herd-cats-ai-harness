@@ -23,12 +23,15 @@ from app.modules.messaging.schemas import (
 from app.modules.messaging.service import ConversationService, MessageService
 from app.modules.messaging.threads import ThreadService
 from app.modules.messaging.views import message_views
+from app.modules.tickets.router import ticket_number
+from app.modules.tickets.service import TicketService
 
 space_channels = APIRouter(prefix="/spaces/{space_id}/channels", tags=["messaging"])
 channels = APIRouter(prefix="/channels", tags=["messaging"])
 conversations = APIRouter(prefix="/conversations", tags=["messaging"])
 messages = APIRouter(prefix="/messages", tags=["messaging"])
 page_threads = APIRouter(prefix="/pages/{page_id}/thread", tags=["messaging"])
+ticket_threads = APIRouter(prefix="/tickets/{number}/thread", tags=["messaging"])
 
 ArchivedQuery = Annotated[bool, Query(description="true: archived channels too")]
 
@@ -222,4 +225,13 @@ async def get_page_thread(
     """The page's discussion (created on first access), for whoever sees the page;
     its messages come from `/conversations/{id}/messages`."""
     thread = await ThreadService(session).for_page(actor, page_id)
+    return await _out(session, actor, thread)
+
+
+@ticket_threads.get("", response_model=ConversationOut)
+async def get_ticket_thread(number: int, actor: ActorDep, session: SessionDep) -> ConversationOut:
+    """The ticket's thread (made with the ticket), for whoever sees the ticket; its
+    messages, the system timeline among them, come from
+    `/conversations/{id}/messages`."""
+    thread = await TicketService(session).thread_of(actor, ticket_number(number))
     return await _out(session, actor, thread)

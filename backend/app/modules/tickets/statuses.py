@@ -27,6 +27,7 @@ from app.core.access import Action, Actor, require, space_ids_with
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
 from app.modules.audit.recorder import changes, record, snapshot
+from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets.events import TICKET_UPDATED, Field, ticket_event
 from app.modules.tickets.models import (
     MAX_STATUSES,
@@ -155,6 +156,9 @@ class StatusService:
         await repo.delete(status)
         await repo.renumber(others)
         await self._audit(actor, "ticket_status.deleted", status, details)
+        threads = await TicketThreadRepository(self.session, actor.org_id).thread_ids(
+            [ticket_id for ticket_id, _ in moved]
+        )
         for ticket_id, space_id in moved:  # each moved ticket changed: one event each
             await ticket_event(
                 self.session,
@@ -162,7 +166,7 @@ class StatusService:
                 TICKET_UPDATED,
                 ticket_id=ticket_id,
                 space_id=space_id,
-                conversation_id=None,
+                conversation_id=threads.get(ticket_id),
                 changes={Field.STATUS: (status.id, replace_with)},
             )
         return moved

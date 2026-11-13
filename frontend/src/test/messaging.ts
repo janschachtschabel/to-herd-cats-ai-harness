@@ -62,6 +62,7 @@ export function makeActivity(overrides: Partial<ActivityEntry> = {}): ActivityEn
       name: 'allgemein',
       space_id: 'space-1',
       page_id: null,
+      ticket_number: null,
     },
     message_id: uid(),
     parent_id: null,

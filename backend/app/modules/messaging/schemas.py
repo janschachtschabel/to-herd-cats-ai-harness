@@ -17,7 +17,7 @@ from app.modules.messaging.models import (
     MessageKind,
 )
 from app.modules.messaging.social_repository import ReactionSummary
-from app.modules.messaging.views import MessageView, SystemEntry
+from app.modules.messaging.views import MessageView, SystemEntry, SystemValue
 
 # No line breaks or other control characters: a name is one line in the sidebar.
 ChannelName = Annotated[
@@ -198,21 +198,44 @@ class PersonNameOut(BaseModel):
     name: str
 
 
+class SystemValueOut(BaseModel):
+    """A value a ticket changed from or to: an id (person, status, parent ticket), an
+    enumeration value or a date; `name` names an id (the person, the status, the
+    parent's key `HC-<n>`), null for other values and for what is gone."""
+
+    value: str
+    name: str | None
+
+    @classmethod
+    def of(cls, value: SystemValue | None) -> "SystemValueOut | None":
+        return None if value is None else cls(value=value.value, name=value.name)
+
+
 class SystemEntryOut(BaseModel):
-    """A system message's timeline entry, for the client to word: `key` is the page
-    event (`page.published`, ...), `actor` who caused it (null if unknown), `number`
-    the restored version (only for `page.version_restored`)."""
+    """A system message's timeline entry, for the client to word: `key` is the page or
+    ticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused
+    it (null if unknown), `number` the restored version (only for
+    `page.version_restored`), `old`/`new` what a ticket field changed from and to
+    (null where there was nothing, and always for title and description)."""
 
     key: str
     actor: PersonNameOut | None
     number: int | None
+    old: SystemValueOut | None
+    new: SystemValueOut | None
 
     @classmethod
     def of(cls, entry: SystemEntry) -> "SystemEntryOut":
         actor = None
         if entry.actor_id is not None and entry.actor_name is not None:
             actor = PersonNameOut(id=entry.actor_id, name=entry.actor_name)
-        return cls(key=entry.key, actor=actor, number=entry.number)
+        return cls(
+            key=entry.key,
+            actor=actor,
+            number=entry.number,
+            old=SystemValueOut.of(entry.old),
+            new=SystemValueOut.of(entry.new),
+        )
 
 
 class MessageOut(BaseModel):

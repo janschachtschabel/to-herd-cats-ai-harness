@@ -21,6 +21,8 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import PageParams
 from app.core.principal import Principal
 from app.modules.audit.recorder import record
+from app.modules.messaging.models import Conversation
+from app.modules.messaging.thread_repository import TicketThreadRepository
 from app.modules.tickets import hierarchy, listing
 from app.modules.tickets.assignment import check_assignment
 from app.modules.tickets.events import TICKET_CREATED, TICKET_UPDATED, Changes, Field, ticket_event
@@ -107,6 +109,17 @@ class TicketService:
         repo = ticket_repository(self.session, actor)
         ticket = await self._readable(actor, repo, number)
         return await self._view(repo, ticket.id)
+
+    async def thread_of(self, actor: Actor, number: int) -> Conversation:
+        """The thread of the ticket `number`, for whoever sees the ticket (404
+        `ticket.not_found` for anyone else)."""
+        ticket = await self._readable(actor, ticket_repository(self.session, actor), number)
+        return await self.thread(actor, ticket)
+
+    async def thread(self, actor: Actor, ticket: WorkItem) -> Conversation:
+        """The ticket's thread (spec 6.2), made with the ticket; for a ticket the actor
+        has read."""
+        return await TicketThreadRepository(self.session, actor.org_id).thread_for(ticket)
 
     async def children(self, actor: Actor, view: TicketView) -> dict[StatusCategory, int]:
         """For a ticket the actor has read."""
@@ -230,13 +243,14 @@ class TicketService:
             hierarchy.check_children(kind, await repo.child_kinds(ticket.id))
 
     async def _emit(self, actor: Actor, type_: str, ticket: WorkItem, changes: Changes) -> None:
+        thread = await self.thread(actor, ticket)
         await ticket_event(
             self.session,
             actor,
             type_,
             ticket_id=ticket.id,
             space_id=ticket.space_id,
-            conversation_id=None,
+            conversation_id=thread.id,
             changes=changes,
         )
 

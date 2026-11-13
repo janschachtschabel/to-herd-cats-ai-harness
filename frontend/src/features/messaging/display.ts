@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next'
 import type { SystemEntry } from '@/lib/api'
 
 interface Named {
-  kind: 'channel' | 'dm' | 'thread_page'
+  kind: 'channel' | 'dm' | 'thread_page' | 'thread_ticket'
   name: string | null
   participants?: { id: string; name: string; is_active: boolean }[]
 }

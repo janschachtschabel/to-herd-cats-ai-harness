@@ -12,14 +12,16 @@ conversation:
 - `thread_page`: the discussion of one wiki page (`page_id`, unique), in the page's
   space, seen by whoever sees the page (drafts with `page.edit`, nothing while the
   page is in the trash), removed with the page when it is purged.
+- `thread_ticket`: the discussion of one ticket (`work_item_id`, unique), in the
+  ticket's space, seen by whoever may read tickets there; it comes with the ticket.
 
 Messages: top level (`parent_id` NULL) or a reply to a top-level message of the same
 conversation (one level; the services check it). A top-level message counts its
 replies (`reply_count`, `last_reply_at`), kept in the reply's transaction under a row
 lock on the parent. Deleting is soft: `deleted_at` is set and the text emptied.
-`system` messages (spec 6.2) exist only in page threads; database triggers
-(migration m3 messages) refuse them anywhere else and refuse to change a
-conversation's kind.
+`system` messages (spec 6.2) exist only in page and ticket threads; database triggers
+(migrations m3 messages, m4 ticket threads) refuse them anywhere else and refuse to
+change a conversation's kind.
 """
 
 import uuid
@@ -60,12 +62,13 @@ class ConversationKind(StrEnum):
     CHANNEL = "channel"
     DM = "dm"
     THREAD_PAGE = "thread_page"
+    THREAD_TICKET = "thread_ticket"
 
 
 class Conversation(UuidPk, OrgScoped, Base):
     __tablename__ = "conversation"
     __table_args__ = (
-        CheckConstraint("kind IN ('channel', 'dm', 'thread_page')", name="kind"),
+        CheckConstraint("kind IN ('channel', 'dm', 'thread_page', 'thread_ticket')", name="kind"),
         CheckConstraint(
             "kind <> 'channel' OR (space_id IS NOT NULL AND name IS NOT NULL)",
             name="channel_fields",
@@ -84,6 +87,13 @@ class Conversation(UuidPk, OrgScoped, Base):
         ),
         UniqueConstraint("page_id"),
         CheckConstraint(
+            "(kind = 'thread_ticket') = (work_item_id IS NOT NULL)"
+            " AND (kind <> 'thread_ticket' OR (space_id IS NOT NULL AND name IS NULL"
+            " AND topic IS NULL))",
+            name="ticket_thread_fields",
+        ),
+        UniqueConstraint("work_item_id"),
+        CheckConstraint(
             "(created_by_type IS NULL) = (created_by_id IS NULL)", name="created_by_pair"
         ),
         Index("ix_conversation_space_id", "space_id"),
@@ -101,6 +111,10 @@ class Conversation(UuidPk, OrgScoped, Base):
     # A page thread's page; NULL for other kinds.
     page_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE")
+    )
+    # A ticket thread's ticket; NULL for other kinds.
+    work_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("work_item.id", ondelete="CASCADE")
     )
     # Who created it; NULL for what the system set up (`#allgemein`).
     created_by_type: Mapped[PrincipalType | None] = mapped_column(String(16))
@@ -168,7 +182,7 @@ SEARCHABLE_SQL = "kind = 'human' AND deleted_at IS NULL"
 
 class MessageKind(StrEnum):
     HUMAN = "human"
-    SYSTEM = "system"  # page threads only (database triggers)
+    SYSTEM = "system"  # page and ticket threads only (database triggers)
 
 
 SYSTEM_AUTHOR = "system"  # `author_type` of system messages, which have no author id

@@ -110,7 +110,7 @@ async def list_tickets(
 
 @tickets.get("/{number}", response_model=TicketOut)
 async def get_ticket(number: int, actor: ActorDep, session: SessionDep) -> TicketOut:
-    view = await TicketService(session).get(actor, _number(number))
+    view = await TicketService(session).get(actor, ticket_number(number))
     return await _full(session, actor, view)
 
 
@@ -121,11 +121,11 @@ async def update_ticket(
     values = {name: getattr(body, name) for name in body.model_fields_set if name != "version"}
     if "assignee" in values:
         values["assignee"] = _principal(values["assignee"])
-    view = await TicketService(session).update(actor, _number(number), body.version, values)
+    view = await TicketService(session).update(actor, ticket_number(number), body.version, values)
     return await _full(session, actor, view)
 
 
-def _number(number: int) -> int:
+def ticket_number(number: int) -> int:
     """Numbers out of range are no ticket (404, like any free number)."""
     if not 1 <= number < 2**31:
         raise ticket_not_found()

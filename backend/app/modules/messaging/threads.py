@@ -1,7 +1,8 @@
 """Threads: one level of replies under a top-level message (spec 6.1), and the
 threads of wiki pages with their system timeline (`ThreadService`, `page_timeline`).
 
-A reply names a top-level message of the same conversation that the actor can see;
+A reply names a top-level message of the same conversation that the actor can see
+and that is not a system message (a timeline entry takes no replies, in any thread);
 anything else is 422 `message.bad_parent` (an unseen or unknown parent reads the
 same). The parent is locked while the reply is written, so concurrent replies count
 one after the other and `reply_count` and `last_reply_at` stay right.
@@ -16,7 +17,7 @@ from app.core.actor import Actor
 from app.core.errors import ValidationFailed
 from app.core.outbox import Event, emit
 from app.modules.messaging.message_repository import MessageRepository
-from app.modules.messaging.models import Conversation, Message
+from app.modules.messaging.models import Conversation, Message, MessageKind
 from app.modules.messaging.thread_repository import PageThreadRepository
 from app.modules.wiki.events import PAGE_EVENTS
 from app.modules.wiki.visibility import PageReader
@@ -31,7 +32,12 @@ async def lock_parent(
 ) -> Message:
     """The parent of a new reply, locked until the transaction ends."""
     parent = await repo.get(parent_id, lock=True)
-    if parent is None or parent.conversation_id != conversation.id or parent.parent_id:
+    if (
+        parent is None
+        or parent.conversation_id != conversation.id
+        or parent.parent_id
+        or parent.kind == MessageKind.SYSTEM
+    ):
         raise bad_parent()
     return parent
 

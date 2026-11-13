@@ -40,13 +40,15 @@ class PageHitOut(BaseModel):
 
 class HitConversation(BaseModel):
     """Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page
-    thread's page (null otherwise); `space_id`: null for a direct message."""
+    thread's page, `ticket_number`: a ticket thread's ticket (null otherwise);
+    `space_id`: null for a direct message."""
 
     id: uuid.UUID
     kind: ConversationKind
     name: str | None
     space_id: uuid.UUID | None
     page_id: uuid.UUID | None
+    ticket_number: int | None
 
 
 class HitAuthor(BaseModel):
@@ -83,6 +85,7 @@ class MessageHitOut(BaseModel):
                 name=hit.conversation_name,
                 space_id=hit.space_id,
                 page_id=hit.page_id,
+                ticket_number=hit.ticket_number,
             ),
             author=author,
             created_at=hit.created_at,

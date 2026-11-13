@@ -37,7 +37,6 @@ from app.modules.tags.service import TagService
 from app.modules.wiki import archive, frontmatter
 from app.modules.wiki.attachment_links import rewrite_links
 from app.modules.wiki.attachments import AttachmentService
-from app.modules.wiki.events import space_imported
 from app.modules.wiki.import_layout import (
     ATTACHMENTS,
     SLUG_CHARS,
@@ -109,7 +108,6 @@ class PageImport:
             "skipped": len(self.result.skipped),
         }
         await record(self.session, actor, "space.imported", "space", space_id, details)
-        await space_imported(self.session, actor, space_id, self.result.created)
         return self.result
 
     def _skip(self, info: zipfile.ZipInfo, reason: str) -> None:

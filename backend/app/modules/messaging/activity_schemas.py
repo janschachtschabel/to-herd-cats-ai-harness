@@ -10,14 +10,16 @@ from app.modules.messaging.notification_models import NotificationReason
 
 
 class ActivityConversation(BaseModel):
-    """`name` is null for a direct message and a page thread; `page_id` names a page
-    thread's page (null for other kinds)."""
+    """`name` is null for a direct message and a page or ticket thread; `page_id` names
+    a page thread's page, `ticket_number` a ticket thread's ticket (null for other
+    kinds; the ticket's address is `/tickets/<number>`)."""
 
     id: uuid.UUID
     kind: ConversationKind
     name: str | None
     space_id: uuid.UUID | None
     page_id: uuid.UUID | None
+    ticket_number: int | None
 
 
 class ActivityAuthor(BaseModel):
@@ -62,6 +64,7 @@ class ActivityOut(BaseModel):
                 name=entry.conversation_name,
                 space_id=entry.space_id,
                 page_id=entry.page_id,
+                ticket_number=entry.ticket_number,
             ),
             message_id=n.message_id,
             parent_id=entry.parent_id,

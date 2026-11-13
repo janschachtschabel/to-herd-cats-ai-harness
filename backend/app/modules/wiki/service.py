@@ -168,7 +168,7 @@ class PageService:
         )
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
-        timeline = source != VersionSource.IMPORT  # an import emits once (`space.imported`)
+        timeline = source != VersionSource.IMPORT  # an import emits no events
         if timeline:
             await page_event(self.session, actor, PAGE_CREATED, page)
         if publish:

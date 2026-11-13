@@ -3,7 +3,7 @@ import { useCallback } from 'react'
 
 interface Where {
   id: string
-  kind: 'channel' | 'dm' | 'thread_page'
+  kind: 'channel' | 'dm' | 'thread_page' | 'thread_ticket'
   page_id: string | null
 }
 

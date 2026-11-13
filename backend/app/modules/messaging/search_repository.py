@@ -2,7 +2,8 @@
 
 Rights are part of the one statement, for every kind of conversation at once:
 `visible_conversations` (channels through the spaces the actor may read, direct
-messages through taking part, page threads through the page's visibility). An admin's
+messages through taking part, page threads through the page's visibility, ticket
+threads through the ticket's space). An admin's
 inspection of a DM gives no access here. Deleted and system messages are never
 matched (`message.search_tsv`, partial index). Ranked like page content (German
 stems or words as written, cover density); ties by id; snippets only for the
@@ -29,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.repository import ConversationScope, visible_conversations
+from app.modules.tickets.models import WorkItem
 from app.modules.users.models import User
 
 START, STOP = "⟦", "⟧"
@@ -49,6 +51,7 @@ class MessageHit:
     conversation_name: str | None
     space_id: uuid.UUID | None
     page_id: uuid.UUID | None
+    ticket_number: int | None
     author_id: uuid.UUID | None
     author_name: str | None
     created_at: datetime
@@ -112,6 +115,7 @@ class MessageSearchRepository:
                 Conversation.name,
                 Conversation.space_id,
                 Conversation.page_id,
+                WorkItem.number,
                 Message.author_id,
                 User.name,
                 Message.created_at,
@@ -120,6 +124,7 @@ class MessageSearchRepository:
             )
             .join(top, top.c.id == Message.id)
             .join(Conversation, Conversation.id == Message.conversation_id)
+            .outerjoin(WorkItem, WorkItem.id == Conversation.work_item_id)
             .outerjoin(User, User.id == Message.author_id)
             .order_by(top.c.score.desc(), Message.id)
         )

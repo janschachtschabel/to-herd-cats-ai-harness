@@ -8,6 +8,9 @@ handler `notify_on_message` (`handlers.py`) in the handler's transaction:
 - `reply` (on `message.created` only): the author of the thread's top message and
   everyone who replied in the thread before this reply, unless they get a `mention`
   for it.
+- `ticket_comment` (on `message.created` only, in a ticket thread): the ticket's
+  assignee and reporter, unless they get a `mention` or a `reply` for it (plan M4
+  decision 10).
 
 Never to the message's author. Whether a person may see the conversation is checked
 again here, at delivery time: someone who lost access since the message was written
@@ -50,11 +53,14 @@ async def notify_on_message(session: AsyncSession, event: Event) -> None:
         if parent is not None:
             for user_id in await repo.thread_people(parent, message):
                 wanted.setdefault(user_id, NotificationReason.REPLY)
+    if event.type == "message.created":
+        for user_id in await repo.ticket_people(message.conversation_id):
+            wanted.setdefault(user_id, NotificationReason.TICKET_COMMENT)
     wanted.pop(message.author_id, None)
     readers = await readers_of(session, event.org_id, message.conversation_id, wanted)
     added = await repo.add(message, [(u, r) for u, r in wanted.items() if u in readers])
     for notification in added:
-        await _created(session, event, notification)
+        await announce(session, event, notification)
 
 
 async def _withdrawn(session: AsyncSession, event: Event, user_id: uuid.UUID) -> None:
@@ -70,7 +76,8 @@ async def _withdrawn(session: AsyncSession, event: Event, user_id: uuid.UUID) ->
     )
 
 
-async def _created(session: AsyncSession, event: Event, notification: Notification) -> None:
+async def announce(session: AsyncSession, event: Event, notification: Notification) -> None:
+    """`notification.created` for a new notification (ids only, for its person)."""
     await emit(
         session,
         type="notification.created",

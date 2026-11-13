@@ -11,12 +11,12 @@ Content changes emit nothing: they are too many, and the versions show them. Pay
 hold ids and numbers, never titles, paths or content. Subject: the page; space: its
 space.
 
-An import emits one `space.imported` (subject the space, payload `created`) instead of
-an event per page: thousands of pages stay one transaction of a bounded number of
-statements per page (review M2 R19), and their threads start empty when first opened.
+An import emits no events (only its audit entry `space.imported`): thousands of pages
+stay one transaction of a bounded number of statements per page (review M2 R19), and
+their threads start empty when first opened. (An import event nobody read was dropped
+in M4: imported pages get no timeline entries.)
 """
 
-import uuid
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,6 @@ PAGE_MOVED = "page.moved"
 PAGE_TRASHED = "page.trashed"
 PAGE_RESTORED = "page.restored"
 PAGE_VERSION_RESTORED = "page.version_restored"
-SPACE_IMPORTED = "space.imported"
 
 PAGE_EVENTS = (
     PAGE_CREATED,
@@ -55,18 +54,4 @@ async def page_event(
         subject_type="page",
         subject_id=page.id,
         payload={"page_id": str(page.id), **extra},
-    )
-
-
-async def space_imported(
-    session: AsyncSession, actor: Actor, space_id: uuid.UUID, created: int
-) -> None:
-    await emit(
-        session,
-        type=SPACE_IMPORTED,
-        actor=actor,
-        space_id=space_id,
-        subject_type="space",
-        subject_id=space_id,
-        payload={"space_id": str(space_id), "created": created},
     )

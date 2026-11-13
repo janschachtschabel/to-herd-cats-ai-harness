@@ -1237,6 +1237,28 @@ export interface paths {
         patch: operations["update_ticket_api_tickets__number__patch"];
         trace?: never;
     };
+    "/api/tickets/{number}/thread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Thread
+         * @description The ticket's thread (made with the ticket), for whoever sees the ticket; its
+         *     messages, the system timeline among them, come from
+         *     `/conversations/{id}/messages`.
+         */
+        get: operations["get_ticket_thread_api_tickets__number__thread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1259,8 +1281,9 @@ export interface components {
         };
         /**
          * ActivityConversation
-         * @description `name` is null for a direct message and a page thread; `page_id` names a page
-         *     thread's page (null for other kinds).
+         * @description `name` is null for a direct message and a page or ticket thread; `page_id` names
+         *     a page thread's page, `ticket_number` a ticket thread's ticket (null for other
+         *     kinds; the ticket's address is `/tickets/<number>`).
          */
         ActivityConversation: {
             /**
@@ -1275,6 +1298,8 @@ export interface components {
             page_id: string | null;
             /** Space Id */
             space_id: string | null;
+            /** Ticket Number */
+            ticket_number: number | null;
         };
         /**
          * ActivityCountOut
@@ -1448,7 +1473,7 @@ export interface components {
          * ConversationKind
          * @enum {string}
          */
-        ConversationKind: "channel" | "dm" | "thread_page";
+        ConversationKind: "channel" | "dm" | "thread_page" | "thread_ticket";
         /**
          * ConversationOut
          * @description `can_post`: whether the caller may write here now (the right in the space, and
@@ -1653,7 +1678,8 @@ export interface components {
         /**
          * HitConversation
          * @description Where a message stands. `name`: a channel's (null otherwise); `page_id`: a page
-         *     thread's page (null otherwise); `space_id`: null for a direct message.
+         *     thread's page, `ticket_number`: a ticket thread's ticket (null otherwise);
+         *     `space_id`: null for a direct message.
          */
         HitConversation: {
             /**
@@ -1668,6 +1694,8 @@ export interface components {
             page_id: string | null;
             /** Space Id */
             space_id: string | null;
+            /** Ticket Number */
+            ticket_number: number | null;
         };
         /** HunkOut */
         HunkOut: {
@@ -1963,7 +1991,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment";
         /** OrgOut */
         OrgOut: {
             /**
@@ -2532,16 +2560,20 @@ export interface components {
         };
         /**
          * SystemEntryOut
-         * @description A system message's timeline entry, for the client to word: `key` is the page
-         *     event (`page.published`, ...), `actor` who caused it (null if unknown), `number`
-         *     the restored version (only for `page.version_restored`).
+         * @description A system message's timeline entry, for the client to word: `key` is the page or
+         *     ticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused
+         *     it (null if unknown), `number` the restored version (only for
+         *     `page.version_restored`), `old`/`new` what a ticket field changed from and to
+         *     (null where there was nothing, and always for title and description).
          */
         SystemEntryOut: {
             actor: components["schemas"]["PersonNameOut"] | null;
             /** Key */
             key: string;
+            new: components["schemas"]["SystemValueOut"] | null;
             /** Number */
             number: number | null;
+            old: components["schemas"]["SystemValueOut"] | null;
         };
         /**
          * SystemRole
@@ -2549,6 +2581,18 @@ export interface components {
          * @enum {string}
          */
         SystemRole: "owner" | "admin" | "member" | "guest";
+        /**
+         * SystemValueOut
+         * @description A value a ticket changed from or to: an id (person, status, parent ticket), an
+         *     enumeration value or a date; `name` names an id (the person, the status, the
+         *     parent's key `HC-<n>`), null for other values and for what is gone.
+         */
+        SystemValueOut: {
+            /** Name */
+            name: string | null;
+            /** Value */
+            value: string;
+        };
         /**
          * TagCreate
          * @description Without `space_id` a system-wide tag (`tag.manage`); with one, a tag of that
@@ -6023,6 +6067,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_thread_api_tickets__number__thread_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
                 };
             };
             /** @description Validation Error */

@@ -90,6 +90,7 @@ describe('search', () => {
         name: 'allgemein',
         space_id: space.id,
         page_id: null,
+        ticket_number: null,
       },
       author: { type: 'user', id: 'jan', name: 'Jan Jansen' },
       created_at: '2026-11-13T09:00:00Z',

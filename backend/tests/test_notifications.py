@@ -65,6 +65,7 @@ async def test_a_mention_notifies_exactly_once(chat: Chat, session: AsyncSession
         "name": "plaudern",
         "space_id": str(chat.space.id),
         "page_id": None,
+        "ticket_number": None,
     }
     assert entry["author"] == {
         "type": "user",

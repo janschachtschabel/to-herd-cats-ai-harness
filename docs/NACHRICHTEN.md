@@ -75,8 +75,9 @@ Jede Wiki-Seite hat eine Diskussion (Schaltfläche „Diskussion“ an der Seite
 enthält Beiträge und, grau, was mit der Seite geschah: angelegt, veröffentlicht,
 verschoben, in den Papierkorb gelegt, wiederhergestellt, Version wiederhergestellt.
 „Systemmeldungen ausblenden“ blendet diese Zeilen aus. Systemmeldungen schreibt nur der
-Worker, nur in Seiten-Diskussionen (die Datenbank verhindert sie in Kanälen und
-Direktnachrichten). Sie tragen die Zeit der Änderung (auch in ihrer ID), stehen also in
+Worker, nur in Seiten- und Aufgaben-Diskussionen (die Datenbank verhindert sie in
+Kanälen und Direktnachrichten). Auf eine Systemmeldung antwortet niemand (422
+`message.bad_parent`). Sie tragen die Zeit der Änderung (auch in ihrer ID), stehen also in
 der Reihenfolge der Änderungen, auch wenn ein Worker sie später oder in anderer
 Reihenfolge schreibt. Sie lassen sich weder bearbeiten noch löschen, zählen nicht als
 ungelesen und benachrichtigen niemanden. Inhaltliche Änderungen (Markdown- oder
@@ -85,15 +86,30 @@ Seite; die Diskussionen importierter Seiten beginnen leer. Liegt eine Seite im
 Papierkorb, ist auch ihre Diskussion für alle unsichtbar, bis die Seite wiederhergestellt
 ist; endgültiges Löschen der Seite löscht die Diskussion mit.
 
+### Aufgaben-Diskussion
+
+Jede Aufgabe hat genau eine Diskussion, angelegt mit der Aufgabe
+(`GET /api/tickets/{number}/thread`). Sehen darf sie, wer die Aufgabe sehen darf
+(`ticket.read` im Bereich, ab Leser); schreiben, wer im Bereich schreiben darf
+(`channel.post`). Wer den Bereich verlässt, sieht die Diskussion nicht mehr. Der Worker
+schreibt je geänderte Eigenschaft eine Systemmeldung (angelegt, Status, Zuständigkeit,
+Priorität, Art, übergeordnete Aufgabe, Fälligkeit, Titel, Beschreibung) mit altem und
+neuem Wert (Status-, Personen- und Aufgabennamen löst die API beim Lesen auf); Titel
+und Beschreibung werden nur genannt, nie wiedergegeben. In Kanäle und
+Direktnachrichten schreibt keine Aufgabe etwas.
+
 ### Aktivität
 
 „Aktivität“ (Reiter „Für mich“) listet Erwähnungen und Antworten in Threads, an denen
-man beteiligt ist (als Starter oder mit einer früheren Antwort), neueste zuerst.
+man beteiligt ist (als Starter oder mit einer früheren Antwort), neueste zuerst; dazu
+Zuweisungen einer Aufgabe durch jemand anderen (`assignment`, nicht wer sie selbst
+übernimmt) und Beiträge in der Diskussion einer Aufgabe, die man bearbeitet oder
+gemeldet hat (`ticket_comment`, nicht zusätzlich zu einer Erwähnung oder Antwort).
 „Öffnen“ springt zur Nachricht, „Erledigt“ nimmt einen Eintrag aus der offenen Liste,
 „Alle als gelesen markieren“ setzt den Zähler zurück. Der Zähler steht in der
 Seitenleiste und im Fenstertitel („(3) Herd“). Einträge zu Gesprächen, die man nicht
 mehr sehen darf, oder zu gelöschten Nachrichten verschwinden. Weitere Gründe und Reiter
-kommen mit Aufgaben (M4) und Agenten (M6).
+kommen mit Agenten (M6).
 
 ### Suche
 
@@ -107,7 +123,9 @@ Nachrichten. Mit „Nur in diesem Bereich“ fallen Direktnachrichten weg. Ein T
 
 Live (ohne Neuladen, über `/api/stream`): neue, geänderte und gelöschte Nachrichten
 und Thread-Antworten, Reaktionen, Lesestand aus anderen Tabs, neue Kanäle und
-Kanaländerungen, Aktivität und ihr Zähler, Systemmeldungen der Seiten-Diskussion,
+Kanaländerungen, Aktivität und ihr Zähler, Systemmeldungen der Seiten- und
+Aufgaben-Diskussion, neue und geänderte Aufgaben (`ticket.created`, `ticket.updated`,
+an alle, die Aufgaben im Bereich sehen dürfen; nur Kennungen),
 der Hinweis auf eine Einsicht (an die Teilnehmenden, `dm.inspected`) und geänderter
 Zugang: Wer in einen Bereich aufgenommen, daraus entfernt oder in der Rolle geändert
 wird (direkt oder über eine Gruppe), oder wessen Gruppenmitgliedschaft sich ändert,
@@ -117,9 +135,8 @@ Seitenleiste vergisst es. Der Browser sammelt Ereignisse 250 ms und lädt danach
 betroffene Ansicht einmal neu, nicht je Ereignis. Nach jeder Unterbrechung lädt er die
 offenen Ansichten neu (`resync`); verpasste Ereignisse werden nicht nachgespielt.
 
-Nicht live: Ändert jemand die Art eines Bereichs (offen ↔ Team), bekommen die
-Betroffenen kein eigenes Ereignis; sie bekommen ab dem nächsten Ereignis nichts mehr
-zugestellt, und eine offene Ansicht merkt es beim nächsten Abruf (spätestens nach 60 s).
+Die Art eines Bereichs (offen, Team, persönlich) ändert sich nie (`PATCH` mit `kind`
+ist 422); Zugang ändert sich nur über Mitgliedschaften, Rollen und Gruppen.
 
 ## Einsicht in Direktnachrichten
 
