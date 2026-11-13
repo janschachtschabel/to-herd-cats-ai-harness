@@ -80,6 +80,8 @@ function TagsForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
   const save = useSetTicketTags(ticket)
   const reload = useReloadTicket(ticket.number)
   const [chosen, setChosen] = useState(() => new Set(ticket.tags.map((tag) => tag.id)))
+  // The version the choice is based on: a change meanwhile is a conflict, not lost.
+  const [base, setBase] = useState(ticket.version)
   const toggle = (id: string) =>
     setChosen((before) => {
       const next = new Set(before)
@@ -89,7 +91,7 @@ function TagsForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
     })
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    save.mutate([...chosen], { onSuccess: onDone })
+    save.mutate({ tagIds: [...chosen], base }, { onSuccess: onDone })
   }
   if (tags.isPending) return <LoadingState rows={2} />
   if (tags.isError) return <ErrorState error={tags.error} onRetry={() => void tags.refetch()} />
@@ -120,7 +122,15 @@ function TagsForm({ ticket, onDone }: { ticket: Ticket; onDone: () => void }) {
           </label>
         ))}
       </fieldset>
-      <SaveError error={save.error} onReload={() => void reload().then(() => save.reset())} />
+      <SaveError
+        error={save.error}
+        onReload={() =>
+          void reload().then((fresh) => {
+            setBase(fresh.version)
+            save.reset()
+          })
+        }
+      />
       <FormActions>
         <Button type="button" variant="outline" onClick={onDone}>
           {t('actions.cancel')}

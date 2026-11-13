@@ -112,11 +112,12 @@ export type TicketChange = Omit<Schemas['TicketUpdate'], 'version'>
 export function useUpdateTicket(ticket: Pick<Ticket, 'number' | 'version'>) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (change: TicketChange) =>
+    // `base`: the version a draft was opened at (a text edit); otherwise the one shown.
+    mutationFn: async ({ base, ...change }: TicketChange & { base?: number }) =>
       unwrap(
         await api.PATCH('/api/tickets/{number}', {
           params: { path: { number: ticket.number } },
-          body: { ...change, version: ticket.version },
+          body: { ...change, version: base ?? ticket.version },
         }),
       ),
     onSuccess: (updated) => storeTicket(queryClient, updated),
@@ -126,11 +127,11 @@ export function useUpdateTicket(ticket: Pick<Ticket, 'number' | 'version'>) {
 export function useSetTicketTags(ticket: Ticket) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (tagIds: string[]) =>
+    mutationFn: async ({ tagIds, base }: { tagIds: string[]; base: number }) =>
       unwrap(
         await api.PUT('/api/tickets/{number}/tags', {
           params: { path: { number: ticket.number } },
-          body: { tag_ids: tagIds, version: ticket.version },
+          body: { tag_ids: tagIds, version: base },
         }),
       ),
     onSuccess: (updated) => storeTicket(queryClient, updated),

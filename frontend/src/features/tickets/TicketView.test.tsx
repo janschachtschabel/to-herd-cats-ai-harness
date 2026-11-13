@@ -174,6 +174,29 @@ describe('ticket view', () => {
     ).toEqual([1, 2])
   })
 
+  test('a text edit saves against the version it was opened at, not a later live one', async () => {
+    let version = 1
+    const id = '00000000-0000-7000-b000-0000000000ab'
+    const api = ticketApi('editor', makeTicket(), {
+      'GET /api/tickets/:number': () =>
+        makeTicket({ id, version, description_md: version > 1 ? 'Von Jan geändert.' : 'Alt.' }),
+      'PATCH /api/tickets/:number': () => apiError(409, 'ticket.version_conflict'),
+    })
+    const { user, queryClient } = await renderApp('/tickets/42')
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    const field = screen.getByRole('textbox', { name: 'Beschreibung' })
+    await user.clear(field)
+    await user.type(field, 'Meine Fassung.')
+    // Someone else saves meanwhile; the live event refreshes the ticket under the form.
+    version = 2
+    await queryClient.invalidateQueries({ queryKey: ['tickets'] })
+    await waitFor(() => expect(api.find('GET', '/api/tickets/42').length).toBeGreaterThanOrEqual(2))
+    await user.click(screen.getByRole('button', { name: 'Speichern' }))
+    expect(await screen.findByText(/inzwischen geändert/)).toBeInTheDocument()
+    expect(field).toHaveValue('Meine Fassung.')
+    expect((api.find('PATCH', '/api/tickets/42')[0]!.body as { version: number }).version).toBe(1)
+  })
+
   test('a ticket one may not see is not there, as a free number', async () => {
     ticketApi('viewer', makeTicket(), {
       'GET /api/tickets/:number': apiError(404, 'ticket.not_found'),

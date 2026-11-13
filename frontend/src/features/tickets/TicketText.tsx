@@ -16,7 +16,10 @@ const MAX_DESCRIPTION = 100_000
 export function TicketTitle({ ticket, editable }: { ticket: Ticket; editable: boolean }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<string | null>(null)
+  // The version the draft is based on: a live change meanwhile is a conflict, not lost.
+  const [base, setBase] = useState(ticket.version)
   const save = useTicketSave(ticket)
+  const reload = () => void save.reload().then((fresh) => setBase(fresh.version))
   if (draft === null) {
     return (
       <div className="flex items-start gap-2">
@@ -31,7 +34,10 @@ export function TicketTitle({ ticket, editable }: { ticket: Ticket; editable: bo
             variant="ghost"
             size="icon-sm"
             aria-label={t('tickets.view.editTitle')}
-            onClick={() => setDraft(ticket.title)}
+            onClick={() => {
+              setBase(ticket.version)
+              setDraft(ticket.title)
+            }}
           >
             <Pencil aria-hidden />
           </Button>
@@ -44,7 +50,7 @@ export function TicketTitle({ ticket, editable }: { ticket: Ticket; editable: bo
     const title = draft.trim()
     if (!title || title.length > MAX_TITLE) return
     if (title === ticket.title) return setDraft(null)
-    save.mutate({ title }, { onSuccess: () => setDraft(null) })
+    save.mutate({ title, base }, { onSuccess: () => setDraft(null) })
   }
   return (
     <form
@@ -62,7 +68,7 @@ export function TicketTitle({ ticket, editable }: { ticket: Ticket; editable: bo
         autoFocus
         onChange={(event) => setDraft(event.target.value)}
       />
-      <SaveError error={save.error} onReload={() => void save.reload()} />
+      <SaveError error={save.error} onReload={reload} />
       <FormActions>
         <Button type="button" variant="outline" onClick={() => setDraft(null)}>
           {t('actions.cancel')}
@@ -80,12 +86,14 @@ export function TicketTitle({ ticket, editable }: { ticket: Ticket; editable: bo
 export function TicketDescription({ ticket, editable }: { ticket: Ticket; editable: boolean }) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<string | null>(null)
+  const [base, setBase] = useState(ticket.version)
   const save = useTicketSave(ticket)
+  const reload = () => void save.reload().then((fresh) => setBase(fresh.version))
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (draft === null || draft.length > MAX_DESCRIPTION) return
     if (draft === ticket.description_md) return setDraft(null)
-    save.mutate({ description_md: draft }, { onSuccess: () => setDraft(null) })
+    save.mutate({ description_md: draft, base }, { onSuccess: () => setDraft(null) })
   }
   return (
     <section aria-labelledby="ticket-description" className="flex flex-col gap-2">
@@ -94,7 +102,14 @@ export function TicketDescription({ ticket, editable }: { ticket: Ticket; editab
           {t('tickets.fields.description')}
         </h2>
         {editable && draft === null && (
-          <Button variant="ghost" size="sm" onClick={() => setDraft(ticket.description_md)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setBase(ticket.version)
+              setDraft(ticket.description_md)
+            }}
+          >
             <Pencil aria-hidden />
             {t('tickets.view.editDescription')}
           </Button>
@@ -121,7 +136,7 @@ export function TicketDescription({ ticket, editable }: { ticket: Ticket; editab
               ? t('validation.tooLong', { count: MAX_DESCRIPTION })
               : t('tickets.fields.markdownHint')}
           </p>
-          <SaveError error={save.error} onReload={() => void save.reload()} />
+          <SaveError error={save.error} onReload={reload} />
           <FormActions>
             <Button type="button" variant="outline" onClick={() => setDraft(null)}>
               {t('actions.cancel')}
