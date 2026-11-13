@@ -84,6 +84,16 @@ outbox dispatcher) and `collab` (role `collab`). A message written on one node a
 live on the other through PostgreSQL (`LISTEN`/`NOTIFY`). It is the acceptance setup for
 live delivery across nodes, not a production layout (one host, one database).
 
+Only processes that run a worker (`app` in role `all`, `worker` here) report the outbox
+gauges on `/metrics` (`herd_outbox_pending`, `herd_outbox_oldest_pending_seconds`,
+`herd_outbox_failed`, `herd_worker_last_pass_timestamp_seconds`); the API nodes do not.
+A worker's `/ready` turns not ready when it has made no progress for four handler time
+limits. Two settings are not passed through from `.env`; to change them, add them to the
+`environment` of the services concerned: `HERD_WORKER_HANDLER_TIMEOUT_SECONDS` (default
+30, the time limit of one handler call; worker) and `HERD_LIVE_MAX_LAG_SECONDS` (default
+5, how far an API process's live delivery may fall behind before it drops what waits
+and tells the browsers to reload; API nodes). See `docs/NACHRICHTEN.md`.
+
 ```bash
 docker compose -f compose.yml -f compose.nodes.yml up -d --build --wait
 docker compose -f compose.yml -f compose.nodes.yml down -v

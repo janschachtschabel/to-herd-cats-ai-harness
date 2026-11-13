@@ -86,6 +86,30 @@ Zustellung eines Prozesses Ereignis für Ereignis nacheinander prüft und dafür
 Schreibanfragen um den Datenbank-Pool und die CPU konkurriert. Ein Knoten, der viele
 Schreibanfragen und viele Verbindungen zugleich bedient, ist damit der erste Engpass.
 
+**Nach der Überarbeitung der Zustellung (Stapel, 13.11.2026):** Ein API-Prozess prüft
+jetzt alles, was angekommen ist (bis 200 Ereignisse), mit höchstens zwei Abfragen und
+verwirft die Warteschlange mit `resync`, wenn sie mehr als 5 s nachhängt. Gemessen ohne
+Docker: ein API-Prozess (`HERD_ROLE=api`) und ein Worker an einem lokalen PostgreSQL,
+100 Personen mit je einer SSE-Verbindung am selben Prozess, eine von ihnen schreibt
+50 Nachrichten je Sekunde über 20 s in einen Team-Kanal, den alle sehen (der Lastgenerator
+lief auf derselben Maschine, Lastmittel 2–4,5 bei 4 Kernen):
+
+| Lauf | Schreiben P50 / P95 / max | Zustellung (Senden bis `event:`) P50 / P99 / max | angekommen, `resync` |
+|---|---|---|---|
+| 1 | 237 / 571 / 741 ms | 408–423 / 1.076–1.100 / 1.262 ms | 1.000 von 1.000 je Verbindung, 0 |
+| 2 | 41 / 116 / 389 ms | 109–117 / 431–442 / 541 ms | 1.000 von 1.000 je Verbindung, 0 |
+
+Die Zahlen gelten für die erste und die letzte der 100 Verbindungen. Im Prozess
+(`herd_live_delivery_lag_seconds`, vom `NOTIFY` bis zur Übergabe) lagen alle 2.000
+Ereignisse unter 1 s, 1.812 unter 250 ms. Zum Vergleich der alte Stand (Ereignis für
+Ereignis eine Abfrage) im selben Aufbau, aber unter fremder Last: P50 17,0 s, P99
+21,2 s, höchstens 22,3 s, ohne Grenze nach oben. Der Rest der Zustellzeit im Lauf 1 ist
+die CPU des API-Prozesses, der zugleich die Schreibanfragen bedient (Schreiben P50
+237 ms); nicht profiliert. **Unter fremder Last** (andere Prozesse auf der Maschine,
+Schreiben P50 0,5–1,9 s) lag die Zustellung des neuen Stands bei P50 1,0–3,7 s und P99
+bis 9,7 s; in zwei Läufen griff die 5-s-Grenze (zweimal bzw. einmal `resync`; 798
+bzw. 899 von 1.000 Ereignissen kamen einzeln an, der Rest über das Nachladen).
+
 **Kosten:** M2 und M3 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
 Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der Anhänge auf dem
 Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je Anhang).
@@ -300,8 +324,10 @@ API A 42 % Ø / 76 % max, 130 / 132 MiB; B 14 %; Worker 16 %.
   Prozess der API fast nichts.
 - **Je offene SSE-Verbindung** rund 0,14 MiB im API-Prozess (100 Verbindungen: +14 MiB).
 - **Datenbank:** nicht getrennt gemessen (die PostgreSQL-Instanz teilten sich andere
-  Prozesse). Je Ereignis eine Abfrage je API-Prozess mit Verbindungen dieser
-  Organisation, dazu die Arbeit des Workers (Zustellnachweis je Handler).
+  Prozesse). Seit der Überarbeitung je Stapel angekommener Ereignisse (bis 200)
+  höchstens zwei Abfragen je API-Prozess mit passenden Verbindungen (Lauf oben: eine
+  Abfrage je Ereignis), dazu die Arbeit des Workers (Zustellnachweis je Handler) und
+  alle 10 s je Worker das Zählen der offenen und aufgegebenen Ereignisse.
 
 ### Gemessen: Speicherprüfung und Größenmessung der Live-Bearbeitung
 
@@ -438,16 +464,24 @@ in [`NACHRICHTEN.md`](NACHRICHTEN.md).
 
 | Metrik | Art | Bedeutung |
 |---|---|---|
-| `herd_outbox_pending` | Gauge (Worker) | offene Ereignisse der Outbox |
-| `herd_outbox_oldest_pending_seconds` | Gauge (Worker) | Alter des ältesten offenen Ereignisses |
-| `herd_outbox_dispatch_total{handler,result}` | Zähler | Zustellungen je Handler: `ok`, `duplicate`, `error`, `failed` (aufgegeben) |
+| `herd_outbox_pending` | Gauge (nur Prozesse mit Worker, alle 10 s) | offene Ereignisse der Outbox |
+| `herd_outbox_oldest_pending_seconds` | Gauge (nur mit Worker) | Alter des ältesten offenen Ereignisses |
+| `herd_outbox_failed` | Gauge (nur mit Worker) | aufgegebene Ereignisse in der Datenbank |
+| `herd_worker_last_pass_timestamp_seconds` | Gauge (nur mit Worker) | Unix-Zeit des letzten abgeschlossenen Durchlaufs |
+| `herd_outbox_dispatch_total{handler,result}` | Zähler | Zustellungen je Handler: `ok`, `duplicate`, `error`, `timeout`, `failed` (aufgegeben) |
 | `herd_sse_connections` | Gauge (API) | offene SSE-Verbindungen |
-| `herd_live_events_total{type}` | Zähler (API) | zugestellte Live-Ereignisse je Typ |
+| `herd_live_events_total{type}` | Zähler (API) | empfangene Live-Ereignisse je Typ |
+| `herd_live_queue_depth` | Gauge (API) | empfangene, noch nicht verteilte Live-Ereignisse |
+| `herd_live_delivery_lag_seconds` | Histogramm (API) | Eintreffen des `NOTIFY` bis Übergabe an die Verbindungen |
+| `herd_live_resyncs_total{reason}` | Zähler (API) | `resync` an Verbindungen: `lag`, `overflow`, `reconnect`, `check_failed` |
 
 Alarme in der PrometheusRule des Charts: `HerdOutboxBacklog` (ältestes offenes
-Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (ein Ereignis aufgegeben,
-Warnung), dazu wie bisher `HerdNotReady` (deckt die Worker-Pods mit ab). Ein Worker mit
-0 Replikas löst keinen Alarm aus. Nachrichteninhalte stehen nie in Labels.
+Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (Zahl der aufgegebenen
+Ereignisse gestiegen, Warnung), `HerdWorkerStalled` (ein Worker seit über 3 Minuten
+ohne abgeschlossenen Durchlauf, Warnung), `HerdWorkerAbsent` (API-Pods ohne Worker
+ihres Releases, 5 Minuten, kritisch), dazu wie bisher `HerdNotReady` (deckt die
+Worker-Pods mit ab). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
+stehen nie in Labels.
 
 ## Tests (Stand M3)
 

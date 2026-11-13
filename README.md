@@ -134,10 +134,12 @@ Seit M3 gehört dazu der Worker der Outbox: ein Deployment `<release>-worker`
 `worker.env` für eigene Variablen, `api.env` gilt dort nicht; `worker.resources`,
 voreingestellt Request 50m/192Mi, Limit 384Mi) mit einem headless Service
 `<release>-worker`, über den der ServiceMonitor seine Metriken holt. Mit
-`worker.replicas: 0` kommt nichts mehr live an und kein Alarm meldet das. Die
-PrometheusRule hat zwei neue Alarme: `HerdOutboxBacklog` (das älteste offene Ereignis
-ist älter als 5 Minuten, kritisch) und `HerdOutboxFailed` (ein Ereignis wurde nach allen
-Versuchen aufgegeben, Warnung). Die Live-Zustellung (`/api/stream`, Server-Sent Events)
+`worker.replicas: 0` kommt nichts mehr live an; das meldet der Alarm `HerdWorkerAbsent`.
+Die PrometheusRule hat vier neue Alarme: `HerdOutboxBacklog` (das älteste offene
+Ereignis ist älter als 5 Minuten, kritisch), `HerdOutboxFailed` (die Zahl aufgegebener
+Ereignisse in der Datenbank ist gestiegen, Warnung), `HerdWorkerStalled` (ein Worker hat
+seit über 3 Minuten keinen Durchlauf abgeschlossen, Warnung) und `HerdWorkerAbsent`
+(API-Pods laufen, aber kein Worker ihres Releases meldet sich, kritisch). Die Live-Zustellung (`/api/stream`, Server-Sent Events)
 braucht am Ingress ungepufferte Antworten und ein Lese-Timeout von mindestens 1 h; das
 Chart setzt keine Annotation dafür (Controller unterscheiden sich), `values.yaml`
 beschreibt sie und `ci/production-values.yaml` setzt für ingress-nginx
@@ -419,13 +421,19 @@ kennen.
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
   Systemmeldungen der Seiten-Diskussion und die Live-Zustellung. Bis M6 ohne DBOS (Plan
   M3, Entscheidung 1). `HERD_ROLE=worker` hat nur den internen Port (`/ready` meldet, ob
-  seine Schleife die Datenbank erreicht); `HERD_ROLE=all` enthält den Worker und teilt
+  seine Schleife läuft, die Datenbank erreicht und innerhalb von vier Zeitgrenzen
+  vorankommt); `HERD_ROLE=all` enthält den Worker und teilt
   mit ihm den Datenbank-Pool. Mehrere Worker sind sicher (getrennte Stapel, Zustellung
   mindestens einmal, idempotente Handler). Ohne laufenden Worker gehen keine Nachrichten
   verloren, aber nichts kommt live an, Benachrichtigungen und Systemmeldungen bleiben aus,
-  bis ein Worker läuft. Scheiternde Handler werden mit Wartezeit (bis 5 Minuten)
-  wiederholt, nach 10 Durchläufen aufgegeben (`outbox.failed`). Metriken:
-  `herd_outbox_pending`, `herd_outbox_oldest_pending_seconds`,
+  bis ein Worker läuft. Jeder Handler-Aufruf hat eine Zeitgrenze
+  (`HERD_WORKER_HANDLER_TIMEOUT_SECONDS`, Standard 30 s; auch als `lock_timeout` und
+  `statement_timeout` der Transaktion); eine Überschreitung zählt als gescheiterter
+  Versuch. Scheiternde Handler werden mit Wartezeit (bis 5 Minuten) wiederholt, nach
+  10 Durchläufen aufgegeben (`outbox.failed`). Metriken (nur von Prozessen mit Worker,
+  alle 10 s aus der Datenbank): `herd_outbox_pending`,
+  `herd_outbox_oldest_pending_seconds`, `herd_outbox_failed`,
+  `herd_worker_last_pass_timestamp_seconds`, dazu
   `herd_outbox_dispatch_total{handler,result}`. Verteilte Ereignisse werden nach 7 Tagen
   gelöscht. Einzelheiten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md#worker-und-outbox).
 - **Live-Zustellung (SSE) hinter Ingress oder Reverse Proxy:** `GET /api/stream` bleibt
@@ -434,22 +442,26 @@ kennen.
   15 s des Heartbeats liegen (empfohlen 1 h, ingress-nginx
   `nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"`). Zum Browser HTTP/2, sonst
   belegt jeder Tab eine der 6 HTTP/1.1-Verbindungen je Host. Je Anmeldung höchstens 5
-  Verbindungen **je API-Prozess** (429 `live.too_many_streams`); hinter einem Load
-  Balancer gilt die Grenze je Pod. Sticky Sessions sind nicht nötig: Jeder API-Pod lauscht
-  mit einer eigenen Datenbankverbindung (außerhalb des Pools) auf `herd_live` und prüft
-  je Ereignis mit einer Abfrage, wer es sehen darf. Bei SIGTERM beendet die API ihre
+  und je Person höchstens 10 Verbindungen **je API-Prozess** (429
+  `live.too_many_streams`); hinter einem Load Balancer gelten die Grenzen je Pod. Sticky
+  Sessions sind nicht nötig: Jeder API-Pod lauscht mit einer eigenen Datenbankverbindung
+  (außerhalb des Pools) auf `herd_live` und prüft je Stapel angekommener Ereignisse (bis
+  200) mit höchstens zwei Abfragen, wer was sehen darf. Liegt das älteste wartende
+  Ereignis länger als `HERD_LIVE_MAX_LAG_SECONDS` (Standard 5 s) zurück, verwirft der Pod
+  die Warteschlange und schickt allen `resync` (Metriken `herd_live_queue_depth`,
+  `herd_live_delivery_lag_seconds`, `herd_live_resyncs_total{reason}`). Bei SIGTERM beendet die API ihre
   Verbindungen zuerst, die Browser verbinden sich nach 5 s neu und laden nach; verpasste
   Ereignisse werden nicht nachgespielt. Beispiele:
   [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md#betrieb-hinter-einem-reverse-proxy).
 - **Datenbankverbindungen:** Zum Pool kommt je API-Prozess eine dauerhafte
   LISTEN-Verbindung, je Worker eine weitere (Worker: zwei aus dem Pool während einer
   Verteilung). `max_connections` der Datenbank danach bemessen.
-- **Bekannte Lücken der Live-Zustellung (M3):** Wer aus einem Bereich entfernt wird,
-  bekommt ab dem nächsten Ereignis nichts mehr, aber kein eigenes Ereignis; die offene
-  Ansicht merkt es spätestens nach 60 s. Der Hinweis auf eine Einsicht der Verwaltung
-  erscheint bei den Teilnehmenden beim nächsten Laden. Eine einzelne Nachricht lässt
-  sich nicht abrufen (der Anfang eines Threads steht nur dann über den Antworten, wenn
-  er im geladenen Verlauf ist).
+- **Live-Zustellung bei geänderten Rechten (M3):** Wer in einen Bereich aufgenommen, aus
+  ihm entfernt oder in der Rolle geändert wird (direkt oder über eine Gruppe), bekommt
+  sofort `access.changed` (ohne IDs) und lädt neu; die Teilnehmenden einer
+  Direktnachricht, in die die Verwaltung Einsicht nimmt, bekommen sofort `dm.inspected`.
+  Der Browser fasst Aktualisierungen 250 ms lang zusammen. Lücke: Ein Wechsel der
+  Bereichsart (offen/Team) sendet kein `access.changed`.
 - **Einsicht in Direktnachrichten** (`dm.inspect`, nur Inhaber und Administratoren):
   Begründung 10 bis 500 Zeichen, 60 Minuten, nur lesend, nur für die Person, die sie
   begonnen hat; Audit `dm.admin_lookup` (Liste der Gespräche einer Person) und
