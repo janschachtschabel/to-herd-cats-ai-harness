@@ -9,7 +9,9 @@ conversation:
   conversation; participants never change. An admin reads one only through an
   inspection (`dm_inspection`, spec 5.5).
 
-Page threads add their kind, columns and checks with their own migration (Task 8).
+- `thread_page`: the discussion of one wiki page (`page_id`, unique), in the page's
+  space, seen by whoever sees the page (drafts with `page.edit`, nothing while the
+  page is in the trash), removed with the page when it is purged.
 
 Messages: top level (`parent_id` NULL) or a reply to a top-level message of the same
 conversation (one level; the services check it). A top-level message counts its
@@ -55,12 +57,13 @@ MAX_REASON_CHARS = 500
 class ConversationKind(StrEnum):
     CHANNEL = "channel"
     DM = "dm"
+    THREAD_PAGE = "thread_page"
 
 
 class Conversation(UuidPk, OrgScoped, Base):
     __tablename__ = "conversation"
     __table_args__ = (
-        CheckConstraint("kind IN ('channel', 'dm')", name="kind"),
+        CheckConstraint("kind IN ('channel', 'dm', 'thread_page')", name="kind"),
         CheckConstraint(
             "kind <> 'channel' OR (space_id IS NOT NULL AND name IS NOT NULL)",
             name="channel_fields",
@@ -71,6 +74,13 @@ class Conversation(UuidPk, OrgScoped, Base):
             name="dm_fields",
         ),
         UniqueConstraint("org_id", "dm_key"),
+        CheckConstraint(
+            "(kind = 'thread_page') = (page_id IS NOT NULL)"
+            " AND (kind <> 'thread_page' OR (space_id IS NOT NULL AND name IS NULL"
+            " AND topic IS NULL))",
+            name="thread_fields",
+        ),
+        UniqueConstraint("page_id"),
         CheckConstraint(
             "(created_by_type IS NULL) = (created_by_id IS NULL)", name="created_by_pair"
         ),
@@ -86,6 +96,10 @@ class Conversation(UuidPk, OrgScoped, Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # A direct message's participants, as a hash (`dms.dm_key`); NULL for other kinds.
     dm_key: Mapped[str | None] = mapped_column(String(64))
+    # A page thread's page; NULL for other kinds.
+    page_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE")
+    )
     # Who created it; NULL for what the system set up (`#allgemein`).
     created_by_type: Mapped[PrincipalType | None] = mapped_column(String(16))
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
@@ -165,6 +179,14 @@ class Message(UuidPk, OrgScoped, Base):
             name="author",
         ),
         CheckConstraint(f"char_length(body_md) <= {MAX_BODY_CHARS}", name="body_length"),
+        # A system message names the event it was written for (`client_id`), once.
+        CheckConstraint("author_type <> 'system' OR client_id IS NOT NULL", name="system_event"),
+        Index(
+            "uq_message_system_client_id",
+            "client_id",
+            unique=True,
+            postgresql_where=text("author_type = 'system'"),
+        ),
         Index(
             "ix_message_conversation_id_top",
             "conversation_id",

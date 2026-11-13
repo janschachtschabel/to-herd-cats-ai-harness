@@ -48,7 +48,7 @@
         "type": "object"
       },
       "ActivityConversation": {
-        "description": "`name` is null for a direct message.",
+        "description": "`name` is null for a direct message and a page thread; `page_id` names a page\nthread's page (null for other kinds).",
         "properties": {
           "id": {
             "format": "uuid",
@@ -69,6 +69,18 @@
             ],
             "title": "Name"
           },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
           "space_id": {
             "anyOf": [
               {
@@ -86,7 +98,8 @@
           "id",
           "kind",
           "name",
-          "space_id"
+          "space_id",
+          "page_id"
         ],
         "title": "ActivityConversation",
         "type": "object"
@@ -413,13 +426,14 @@
       "ConversationKind": {
         "enum": [
           "channel",
-          "dm"
+          "dm",
+          "thread_page"
         ],
         "title": "ConversationKind",
         "type": "string"
       },
       "ConversationOut": {
-        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds.",
+        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds. `page_id`: a page thread's\npage (null for other kinds).",
         "properties": {
           "archived_at": {
             "anyOf": [
@@ -478,6 +492,18 @@
             ],
             "title": "Name"
           },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
           "participants": {
             "items": {
               "$ref": "#/components/schemas/ParticipantOut"
@@ -517,6 +543,7 @@
           "id",
           "kind",
           "space_id",
+          "page_id",
           "name",
           "topic",
           "archived_at",
@@ -692,6 +719,18 @@
             ],
             "title": "Name"
           },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
           "participants": {
             "items": {
               "$ref": "#/components/schemas/ParticipantOut"
@@ -731,6 +770,7 @@
           "id",
           "kind",
           "space_id",
+          "page_id",
           "name",
           "topic",
           "archived_at",
@@ -5135,6 +5175,18 @@
               "description": "oldest first, from just after this message",
               "title": "After"
             }
+          },
+          {
+            "description": "false: without system messages (page threads)",
+            "in": "query",
+            "name": "include_system",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "false: without system messages (page threads)",
+              "title": "Include System",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6373,6 +6425,50 @@
         "summary": "Set Page Tags",
         "tags": [
           "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/thread": {
+      "get": {
+        "description": "The page's discussion (created on first access), for whoever sees the page;\nits messages come from `/conversations/{id}/messages`.",
+        "operationId": "get_page_thread_api_pages__page_id__thread_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page Thread",
+        "tags": [
+          "messaging"
         ]
       }
     },

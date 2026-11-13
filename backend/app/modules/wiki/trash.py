@@ -21,6 +21,7 @@ from app.modules.audit.recorder import record
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.wiki.attachments import AttachmentService
+from app.modules.wiki.events import PAGE_RESTORED, PAGE_TRASHED, page_event
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.tree import child_path, depth_of
@@ -43,6 +44,7 @@ class PageTrash:
         check_version(locked, version)
         count = await pages.trash_at_or_below(locked.space_id, locked.path, utcnow())
         await record(self.session, actor, "page.trashed", "page", page_id, {"pages": count})
+        await page_event(self.session, actor, PAGE_TRASHED, locked)
 
     async def restore(self, actor: Actor, page_id: uuid.UUID) -> Page:
         """Back to its parent if that is outside the trash, else to the top level;
@@ -77,6 +79,7 @@ class PageTrash:
         await pages.restore_below([p.id for p in below], old_path, new_path)
         details = {"pages": 1 + len(below)}
         await record(self.session, actor, "page.restored", "page", page.id, details)
+        await page_event(self.session, actor, PAGE_RESTORED, page)
         return page
 
     async def list(

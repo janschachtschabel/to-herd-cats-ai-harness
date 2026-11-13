@@ -12,7 +12,7 @@ from sqlalchemy import ColumnElement, and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.messaging.models import Conversation, Message
+from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.repository import ConversationScope, visible_conversations
 from app.modules.messaging.social_models import ConversationRead, MessageMention, Reaction
 
@@ -154,6 +154,7 @@ class ReadRepository:
         unseen: ColumnElement[bool] = and_(
             Message.conversation_id == Conversation.id,
             Message.deleted_at.is_(None),
+            Message.kind == MessageKind.HUMAN,  # a page's timeline is nothing to read
             Message.author_id.is_distinct_from(me),
             or_(position.is_(None), Message.id > position),
         )
@@ -176,7 +177,11 @@ class ReadRepository:
             Conversation.id.label("conversation_id"),
             unread.label("unread"),
             mentions.label("mentions"),
-        ).where(visible_conversations(self.scope))
+        ).where(
+            visible_conversations(self.scope),
+            # A page's discussion counts once the person has opened it (read in it).
+            or_(Conversation.kind != ConversationKind.THREAD_PAGE, position.is_not(None)),
+        )
         if after is not None:
             counted = counted.where(Conversation.id > after)
         rows = counted.subquery()

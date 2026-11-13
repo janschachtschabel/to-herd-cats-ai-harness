@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, Actor
 from app.core.errors import Conflict, ValidationFailed
 from app.modules.audit.recorder import record
+from app.modules.wiki.events import PAGE_MOVED, page_event
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus
 from app.modules.wiki.subtree_repository import SubtreeRepository
 from app.modules.wiki.tree import child_path, depth_of, unique_slug
@@ -57,6 +58,7 @@ class PageMoves:
         await self.session.flush()
         details = {"from": old_path, "to": page.path}
         await record(self.session, actor, "page.moved", "page", page.id, details)
+        await page_event(self.session, actor, PAGE_MOVED, page)
         return page
 
     async def _reparent(

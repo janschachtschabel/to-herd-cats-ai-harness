@@ -5,7 +5,9 @@ moves forward (an older message changes nothing), and only a move is emitted
 (`conversation.read`, with the reader's id: it is delivered to that person only).
 The counters list every conversation the person may see at the time of asking with
 something unread, in one query filtered by visibility in SQL: a conversation gone
-from view (a membership removed) is gone from the counters at once.
+from view (a membership removed) is gone from the counters at once. System messages
+(a page's timeline) are never unread, and a page thread counts only once the person
+has a read position in it (has opened it): every page has a thread.
 """
 
 import uuid

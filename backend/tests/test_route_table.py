@@ -73,6 +73,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/spaces/{space_id}/import", "space"),
     ("GET", "/api/spaces/{space_id}/export", "space"),
     ("GET", "/api/pages/{page_id}/export", "page"),
+    ("GET", "/api/pages/{page_id}/thread", "page"),  # the page's discussion
     ("GET", "/api/tags", "session"),
     ("GET", "/api/search", "session"),
     ("POST", "/api/tags", "session"),  # system tags: tag.manage; space tags: page.moderate

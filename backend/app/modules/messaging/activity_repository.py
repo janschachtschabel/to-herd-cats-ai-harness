@@ -30,6 +30,7 @@ class ActivityEntry:
     conversation_kind: ConversationKind
     conversation_name: str | None
     space_id: uuid.UUID | None
+    page_id: uuid.UUID | None  # a page thread's page
     parent_id: uuid.UUID | None  # the thread the message is in, if any
     author_id: uuid.UUID | None
     author_name: str | None
@@ -117,6 +118,7 @@ class ActivityRepository:
                 Conversation.kind,
                 Conversation.name,
                 Conversation.space_id,
+                Conversation.page_id,
                 Message.parent_id,
                 Message.author_id,
                 User.name,

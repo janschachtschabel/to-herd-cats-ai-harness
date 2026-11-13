@@ -7,6 +7,9 @@ Rights (spec 5.3) come only from `core/access.py`:
 - Writing in a channel needs `channel.post` in its space (`viewer` and up), managing
   it `channel.manage` (`moderator` and up). Nobody writes in an archived channel
   (409 `conversation.archived`); reading stays possible.
+- A page thread lives in its page's space and is seen by whoever sees the page
+  (drafts only with `page.edit`, nothing while it is in the trash); writing in it
+  needs `channel.post` there, as in a channel.
 - A direct message belongs to no space: its participants see it and write in it
   (guests too), nobody else. It has nothing to manage.
 """
@@ -43,6 +46,7 @@ class ConversationReader:
             actor.principal,
             visible_space_ids(actor),
             space_ids_with(actor, Action.CHANNEL_POST),
+            space_ids_with(actor, Action.PAGE_EDIT),
         )
 
     def repo(self, actor: Actor) -> ConversationRepository:

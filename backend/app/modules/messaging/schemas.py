@@ -88,11 +88,13 @@ class ConversationOut(BaseModel):
     the channel not archived). `created_by` is null for what the system set up.
     `version` guards writes (send it back; stale → 409). A direct message lists its
     `participants` and, on its own (`GET /conversations/{id}`), every admin
-    `inspections` of it; both are empty for other kinds."""
+    `inspections` of it; both are empty for other kinds. `page_id`: a page thread's
+    page (null for other kinds)."""
 
     id: uuid.UUID
     kind: ConversationKind
     space_id: uuid.UUID | None
+    page_id: uuid.UUID | None
     name: str | None
     topic: str | None
     archived_at: datetime | None
@@ -119,6 +121,7 @@ class ConversationOut(BaseModel):
             id=conversation.id,
             kind=conversation.kind,
             space_id=conversation.space_id,
+            page_id=conversation.page_id,
             name=conversation.name,
             topic=conversation.topic,
             archived_at=conversation.archived_at,

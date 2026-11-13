@@ -773,6 +773,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}/thread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Page Thread
+         * @description The page's discussion (created on first access), for whoever sees the page;
+         *     its messages come from `/conversations/{id}/messages`.
+         */
+        get: operations["get_page_thread_api_pages__page_id__thread_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/trash": {
         parameters: {
             query?: never;
@@ -1138,7 +1159,8 @@ export interface components {
         };
         /**
          * ActivityConversation
-         * @description `name` is null for a direct message.
+         * @description `name` is null for a direct message and a page thread; `page_id` names a page
+         *     thread's page (null for other kinds).
          */
         ActivityConversation: {
             /**
@@ -1149,6 +1171,8 @@ export interface components {
             kind: components["schemas"]["ConversationKind"];
             /** Name */
             name: string | null;
+            /** Page Id */
+            page_id: string | null;
             /** Space Id */
             space_id: string | null;
         };
@@ -1292,14 +1316,15 @@ export interface components {
          * ConversationKind
          * @enum {string}
          */
-        ConversationKind: "channel" | "dm";
+        ConversationKind: "channel" | "dm" | "thread_page";
         /**
          * ConversationOut
          * @description `can_post`: whether the caller may write here now (the right in the space, and
          *     the channel not archived). `created_by` is null for what the system set up.
          *     `version` guards writes (send it back; stale → 409). A direct message lists its
          *     `participants` and, on its own (`GET /conversations/{id}`), every admin
-         *     `inspections` of it; both are empty for other kinds.
+         *     `inspections` of it; both are empty for other kinds. `page_id`: a page thread's
+         *     page (null for other kinds).
          */
         ConversationOut: {
             /** Archived At */
@@ -1322,6 +1347,8 @@ export interface components {
             kind: components["schemas"]["ConversationKind"];
             /** Name */
             name: string | null;
+            /** Page Id */
+            page_id: string | null;
             /** Participants */
             participants?: components["schemas"]["ParticipantOut"][];
             /** Space Id */
@@ -1404,6 +1431,8 @@ export interface components {
             last_message_at: string | null;
             /** Name */
             name: string | null;
+            /** Page Id */
+            page_id: string | null;
             /** Participants */
             participants?: components["schemas"]["ParticipantOut"][];
             /** Space Id */
@@ -3504,6 +3533,8 @@ export interface operations {
                 before?: string | null;
                 /** @description oldest first, from just after this message */
                 after?: string | null;
+                /** @description false: without system messages (page threads) */
+                include_system?: boolean;
             };
             header?: never;
             path: {
@@ -4271,6 +4302,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_page_thread_api_pages__page_id__thread_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
                 };
             };
             /** @description Validation Error */

@@ -12,7 +12,7 @@ from sqlalchemy import ColumnElement, and_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.messaging.models import Conversation, Message
+from app.modules.messaging.models import Conversation, Message, MessageKind
 from app.modules.messaging.repository import ConversationScope, visible_conversations
 
 
@@ -65,14 +65,18 @@ class MessageRepository:
         *,
         older_than: uuid.UUID | None = None,
         newer_than: uuid.UUID | None = None,
+        human_only: bool = False,
     ) -> list[Message]:
         """Top-level messages of a conversation: newest first, older than `older_than`;
-        or, with `newer_than`, oldest first from just after it."""
+        or, with `newer_than`, oldest first from just after it. With `human_only`,
+        without system messages."""
         stmt = select(Message).where(
             self._visible(),
             Message.conversation_id == conversation_id,
             Message.parent_id.is_(None),
         )
+        if human_only:
+            stmt = stmt.where(Message.kind == MessageKind.HUMAN)
         if newer_than is not None:
             stmt = stmt.where(Message.id > newer_than).order_by(Message.id)
         else:

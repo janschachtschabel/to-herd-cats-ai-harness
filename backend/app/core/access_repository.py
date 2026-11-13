@@ -154,45 +154,64 @@ def visible_ids_stmt(actor: Actor) -> Select[uuid.UUID]:
     )
 
 
-def person_reads_space(space_id: SQLColumnExpression[uuid.UUID | None]) -> ColumnElement[bool]:
-    """The rule of `visible_ids_stmt` seen from the other side: whether the (correlated)
-    `User` row may read the space `space_id`, with the person's groups as they are now.
-    For questions about many people at once ("who of these may see it?", review M3
-    focus 4 and 5) in one statement; `tests/test_conversation_readers.py` holds both
-    forms to the same answers."""
+def _person_member(min_role: SpaceRole | None = None) -> ColumnElement[bool]:
+    """The (correlated) `User`, or one of its groups as they are now, is a member of the
+    (correlated) `Space`, with at least `min_role` if given."""
     # Every table but the subquery's own is the caller's (correlated), however deep.
     groups = (
         select(GroupMember.group_id)
         .where(GroupMember.member_type == PrincipalType.USER, GroupMember.member_id == User.id)
         .correlate_except(GroupMember)
     )
-    member = (
-        exists()
-        .where(
-            SpaceMember.space_id == Space.id,
-            or_(
-                and_(
-                    SpaceMember.member_type == PrincipalType.USER, SpaceMember.member_id == User.id
-                ),
-                and_(
-                    SpaceMember.member_type == PrincipalType.GROUP,
-                    SpaceMember.member_id.in_(groups),
-                ),
-            ),
-        )
-        .correlate_except(SpaceMember)
-    )
+    clauses = [
+        SpaceMember.space_id == Space.id,
+        or_(
+            and_(SpaceMember.member_type == PrincipalType.USER, SpaceMember.member_id == User.id),
+            and_(SpaceMember.member_type == PrincipalType.GROUP, SpaceMember.member_id.in_(groups)),
+        ),
+    ]
+    if min_role is not None:
+        clauses.append(_RANK >= min_role.rank)
+    return exists().where(*clauses).correlate_except(SpaceMember)
+
+
+def person_reads_space(space_id: SQLColumnExpression[uuid.UUID | None]) -> ColumnElement[bool]:
+    """The rule of `visible_ids_stmt` seen from the other side: whether the (correlated)
+    `User` row may read the space `space_id`, with the person's groups as they are now.
+    For questions about many people at once ("who of these may see it?", review M3
+    focus 4 and 5) in one statement; `tests/test_conversation_readers.py` holds both
+    forms to the same answers."""
     open_to_role = and_(Space.kind == SpaceKind.OPEN, User.system_role.in_(OPEN_SPACE_READERS))
     readable = (
         exists()
         .where(
             Space.id == space_id,
             Space.org_id == User.org_id,
-            or_(User.system_role.in_(ADMIN_ROLES), member, open_to_role),
+            or_(User.system_role.in_(ADMIN_ROLES), _person_member(), open_to_role),
         )
         .correlate_except(Space)
     )
     return and_(User.is_active.is_(True), readable)
+
+
+def person_holds_role(
+    space_id: SQLColumnExpression[uuid.UUID | None], min_role: SpaceRole
+) -> ColumnElement[bool]:
+    """`ids_with_role_stmt` seen from the other side: whether the (correlated) `User`
+    holds at least `min_role` in the space (admins hold every role; the open-space
+    floor gives no more than `viewer`)."""
+    if min_role == SpaceRole.VIEWER:
+        return person_reads_space(space_id)
+    held = (
+        exists()
+        .where(
+            Space.id == space_id,
+            Space.org_id == User.org_id,
+            or_(User.system_role.in_(ADMIN_ROLES), _person_member(min_role)),
+        )
+        .correlate_except(Space)
+    )
+    return and_(User.is_active.is_(True), held)
 
 
 def ids_with_role_stmt(actor: Actor, min_role: SpaceRole) -> Select[uuid.UUID]:

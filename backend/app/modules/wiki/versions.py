@@ -22,6 +22,7 @@ from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
 from app.modules.wiki import diffing
+from app.modules.wiki.events import PAGE_VERSION_RESTORED, page_event
 from app.modules.wiki.models import Page, PageVersion, VersionSource
 from app.modules.wiki.versions_repository import NamedVersion
 from app.modules.wiki.visibility import PageReader, check_version, touch
@@ -168,6 +169,7 @@ class VersionService:
         await self.record(page, actor, VersionSource.RESTORE, change_summary=f"restore:{number}")
         details = {"number": number}
         await record(self.session, actor, "page.version_restored", "page", page.id, details)
+        await page_event(self.session, actor, PAGE_VERSION_RESTORED, page, number=number)
         return page
 
 

@@ -182,6 +182,8 @@ class MessageService:
     async def delete(self, actor: Actor, message_id: uuid.UUID) -> None:
         message, conversation = await self.readable(actor, message_id, lock=True)
         await self.reader.require_post(actor, conversation)
+        if message.kind == MessageKind.SYSTEM:  # the page's timeline stays as it was
+            raise Forbidden(code="message.system")
         own = _by(message, actor)
         if not own and not await self._may_manage(actor, conversation):
             raise Forbidden(code="message.not_author")
@@ -202,10 +204,11 @@ class MessageService:
         params: PageParams,
         before: uuid.UUID | None = None,
         after: uuid.UUID | None = None,
+        include_system: bool = True,
     ) -> Page[Message]:
         """Top-level messages with their reply counts: newest first (older ones page
         by page; `before` starts below a message); with `after`, oldest first from just
-        after a message."""
+        after a message. Without `include_system`, no system messages (page threads)."""
         if before is not None and after is not None:
             raise ValidationFailed("before or after, not both", code="validation_failed")
         conversation = await self.reader.readable(actor, conversation_id)
@@ -215,6 +218,7 @@ class MessageService:
             params.limit + 1,
             older_than=None if after else position or before,
             newer_than=position or after if after else None,
+            human_only=not include_system,
         )
         return id_page(rows, params.limit, lambda m: m.id)
 

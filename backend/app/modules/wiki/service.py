@@ -22,6 +22,7 @@ from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.audit.recorder import record
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
+from app.modules.wiki.events import PAGE_CREATED, PAGE_PUBLISHED, page_event
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus, VersionSource
 from app.modules.wiki.moves import PageMoves
 from app.modules.wiki.repository import PageRepository
@@ -167,8 +168,13 @@ class PageService:
         )
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
+        timeline = source != VersionSource.IMPORT  # an import emits once (`space.imported`)
+        if timeline:
+            await page_event(self.session, actor, PAGE_CREATED, page)
         if publish:
             await record(self.session, actor, "page.published", "page", page.id)
+            if timeline:
+                await page_event(self.session, actor, PAGE_PUBLISHED, page)
         return page
 
     async def update(
@@ -246,6 +252,7 @@ class PageService:
         touch(page, actor)
         await self.session.flush()
         await record(self.session, actor, "page.published", "page", page.id)
+        await page_event(self.session, actor, PAGE_PUBLISHED, page)
         return page
 
 
