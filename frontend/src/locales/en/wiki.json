@@ -226,7 +226,12 @@
         "wherePairEmpty": "It concerns blocks {{number}} and {{next}}, which cannot be saved together.",
         "rest": "The latest changes stay unsaved until it is changed; the session goes on."
       },
-      "leaveConfirm": "Not all changes have reached the server yet. Leave anyway?",
+      "leaveConfirm": {
+        "unconfirmed": "The server has not yet confirmed that your latest changes are saved. Leave anyway? They may be lost.",
+        "unsent": "Your latest changes have not reached the server yet (the connection is interrupted). Leave anyway? They will be lost.",
+        "unsaveable": "The current state cannot be saved (see the notice). Leave anyway? The changes since the last save will be lost.",
+        "lost": "Your text is not saved. Copy it as Markdown first. Leave anyway?"
+      },
       "regenerated": "The page was changed outside the live session (saved, restored or moved). The current version is loaded.",
       "copy": "Copy my text as Markdown",
       "copied": "Copied",

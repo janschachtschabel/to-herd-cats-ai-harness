@@ -56,8 +56,14 @@ zählt sie nicht mit.
   bestätigen (z. B. API kurz weg), bleibt der Editor offen und sagt das. Leser bekommen
   diese Schaltfläche nicht. Der Collab-Prozess bestätigt jeder Verbindung jeden
   gespeicherten Stand; solange eine eigene Änderung nicht in einem bestätigten Stand
-  steckt, fragt der Browser, bevor man den Editor verlässt, neu lädt oder den Tab
-  schließt, und „Fertig“ wartet auf die Bestätigung.
+  steckt, wird beim Verlassen erst gespeichert: Wer innerhalb der App weitergeht (Link,
+  Seitenbaum, Zurück), dessen Änderungen speichert der Editor sofort, und gefragt wird
+  nur, wenn der Server das nicht bestätigt. Die Frage sagt, warum: Änderungen nicht
+  beim Server angekommen (Verbindung unterbrochen), Stand lässt sich nicht speichern
+  (Hinweis), oder Speichern nicht bestätigt. Neu laden und Tab schließen können nicht
+  warten; der Browser fragt dann mit seiner eigenen Meldung, solange eine Änderung
+  nicht bestätigt ist (was beim Server angekommen ist, speichert er beim Trennen
+  trotzdem). „Fertig“ wartet auf die Bestätigung.
 - **Generationen:** Speichern im Markdown-Editor, Wiederherstellen einer Version,
   Verschieben und Papierkorb beenden eine laufende Live-Sitzung. Die offenen
   Live-Editoren melden „Die Seite wurde außerhalb der Live-Sitzung geändert“, laden den

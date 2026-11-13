@@ -58,9 +58,25 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
   useEffect(() => {
     leave.current.unsaved = unsaved
   })
+  // Leaving within the app saves first and asks only if that is not confirmed; the
+  // question says why (review M2 U9).
+  const reason = useRef('')
+  useEffect(() => {
+    if (live.stopped !== null) reason.current = 'lost'
+    else if (live.unrepresentable) reason.current = 'unsaveable'
+    else if (live.unsynced > 0) reason.current = 'unsent'
+    else reason.current = 'unconfirmed'
+  })
   useLeaveGuard(
     () => leave.current.unsaved && !leave.current.confirmed,
-    t('wiki.live.leaveConfirm'),
+    () => t(`wiki.live.leaveConfirm.${reason.current}`),
+    async () => {
+      if (live.stopped !== null) return // nothing more reaches the server
+      setFinishing(true)
+      const saved = await live.finish()
+      setFinishing(false)
+      if (saved) leave.current.confirmed = true
+    },
   )
 
   async function done() {
