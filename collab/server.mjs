@@ -16,13 +16,15 @@
 // Settings (environment): HERD_INTERNAL_TOKEN (required), HERD_COLLAB_API_URL (the
 // API's internal port, default http://127.0.0.1:9090), HERD_COLLAB_PORT (1234),
 // HERD_COLLAB_HOST (127.0.0.1 with HERD_ROLE=all, else 0.0.0.0), HERD_PUBLIC_URL,
-// HERD_SESSION_COOKIE_NAME (herd_session).
+// HERD_SESSION_COOKIE_NAME (herd_session), HERD_COLLAB_CHECK_WORKERS (2: the threads
+// that open and check pages, `checks.mjs`).
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { Hocuspocus } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
+import { createChecks, inlineChecks } from "./checks.mjs";
 import { liveExtension } from "./live.mjs";
 import { CLOSE, readCookie } from "./protocol.mjs";
 
@@ -96,8 +98,12 @@ export function createCollabServer({
   maxStateBytes,
   maxMarkdownChars,
   measureEveryMs,
+  checkWorkers = 2,
 }) {
   const api = new InternalApi({ baseUrl: apiUrl, token });
+  // Opening and saving a large page takes seconds of work: on worker threads, so that
+  // every other live document goes on meanwhile (review M2 T9). 0: on this thread.
+  const checks = checkWorkers > 0 ? createChecks({ workers: checkWorkers }) : inlineChecks();
   const held = counter();
   const people = new WeakMap(); // socket -> the person's key, once authenticated
   const perPerson = Math.max(1, Math.min(maxPerPerson, Math.floor(maxConnections / 4)));
@@ -106,6 +112,7 @@ export function createCollabServer({
     cookieName,
     retryMs,
     log,
+    checks,
     person(context, userId) {
       if (people.has(context.socket)) return true;
       // Closed while the API was answering: its close handler has run already and would
@@ -229,6 +236,7 @@ export function createCollabServer({
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
         for (const ws of sockets) ws.terminate();
+        await checks.close();
       })();
       return closing;
     },
@@ -253,6 +261,7 @@ async function main(env) {
     maxPerSession: positive(env.HERD_COLLAB_MAX_PER_SESSION, 10),
     maxPerPage: positive(env.HERD_COLLAB_MAX_PER_PAGE, 3),
     maxPerPerson: positive(env.HERD_COLLAB_MAX_PER_PERSON, 20),
+    checkWorkers: positive(env.HERD_COLLAB_CHECK_WORKERS, 2),
     idleTimeoutMs: positive(env.HERD_COLLAB_IDLE_MINUTES, 15) * 60_000,
   });
   const host =

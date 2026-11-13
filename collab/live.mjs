@@ -33,17 +33,7 @@ import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
-import {
-  FIELD,
-  editorProblem,
-  jsonToMarkdown,
-  jsonToYDoc,
-  liveDocument,
-  yDocToJSON,
-  yDocToMarkdown,
-} from "./markdown.mjs";
-import { sameMeaning } from "./meaning.mjs";
-import { settle } from "./settle.mjs";
+import { inlineChecks } from "./checks.mjs";
 import { presenceGuard } from "./presence.mjs";
 import { sizeGuard } from "./size.mjs";
 import {
@@ -68,13 +58,15 @@ const DENIAL = {
   413: CLOSE.tooLarge,
 };
 
-/** `person(context, userId)`: false when the person holds too many connections. */
+/** `person(context, userId)`: false when the person holds too many connections.
+ * `checks`: where the heavy checks run (`checks.mjs`). */
 export function liveExtension({
   api,
   cookieName,
   retryMs = 5000,
   log = () => {},
   person = () => true,
+  checks = inlineChecks(),
   ...limits
 }) {
   const size = sizeGuard(limits);
@@ -83,7 +75,7 @@ export function liveExtension({
   const joined = new WeakSet(); // sockets that completed the handshake and joined a document
   const ending = new Set(); // document names whose generation must end before anyone joins
 
-  const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending });
+  const { discard, checkDocument, store } = documentRules({ api, log, retryMs, ending, checks });
 
   /** A browser's editor changed the document it had just loaded and stopped (once per
    * connection: a browser cannot inflate the count). */
@@ -128,35 +120,24 @@ export function liveExtension({
       const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
       const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
       Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
-      let tidied = !stored;
+      // The heavy work runs on a check worker (`checks.mjs`, review M2 T9).
+      let opened;
       if (stored) {
-        Y.applyUpdate(document, Buffer.from(stored, "base64"));
         // A state the browser's editor would repair (and save repaired) is not opened;
-        // one it would only tidy without changing its meaning is tidied here, so the
-        // browser has nothing left to change (review M2 T1, ruling A).
-        const problem = editorProblem(yDocToJSON(document));
-        const shown = problem === null ? settle(document) : null;
-        if (!shown || shown.invalid !== null) throw deny(context, CLOSE.notRoundTripSafe);
-        if (shown.update !== null) {
-          const meaning = sameMeaning(yDocToMarkdown(document), jsonToMarkdown(shown.json));
-          if (!meaning) throw deny(context, CLOSE.notRoundTripSafe);
-          Y.applyUpdate(document, shown.update);
-          tidied = true;
-        }
-        // An empty shared document stops the browser once someone undoes their first
-        // paragraph (review M2 T6): it holds one empty paragraph, as a built one does.
-        const fragment = document.getXmlFragment(FIELD);
-        if (fragment.length === 0) {
-          fragment.insert(0, [new Y.XmlElement("paragraph")]);
-          tidied = true;
-        }
+        // one it would only tidy without changing its meaning is tidied, so the browser
+        // has nothing left to change (review M2 T1, ruling A).
+        const bytes = Buffer.from(stored, "base64");
+        opened = await checks.tidy(bytes);
+        if (opened.problem !== null) throw deny(context, CLOSE.notRoundTripSafe);
+        Y.applyUpdate(document, bytes);
       } else {
         // Only a page the editor can show without changing its meaning is opened, as the
         // browser's editor shows it once loaded.
-        const converted = liveDocument(contentMd);
-        if (!converted.safe) throw deny(context, CLOSE.notRoundTripSafe);
-        Y.applyUpdate(document, Y.encodeStateAsUpdate(jsonToYDoc(converted.json)));
+        opened = await checks.open(contentMd);
+        if (!opened.safe) throw deny(context, CLOSE.notRoundTripSafe);
       }
+      const tidied = opened.update !== null;
+      if (tidied) Y.applyUpdate(document, opened.update);
       if (tidied) {
         // Built or tidied here: saved at once (content unchanged, so no version), so a
         // browser that reconnects later meets the same Yjs history.
@@ -171,7 +152,7 @@ export function liveExtension({
         if (saved.status !== 200) throw deny(context, DENIAL[saved.status] ?? CLOSE.forbidden);
       }
       state.source = contentMd;
-      state.baseline = yDocToMarkdown(document);
+      state.baseline = opened.baseline;
       state.size = size.measure(document);
       live.set(documentName, state);
     },

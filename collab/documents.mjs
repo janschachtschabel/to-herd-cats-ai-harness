@@ -13,9 +13,8 @@ import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { yDocToJSON } from "./markdown.mjs";
 import { CLOSE, REPRESENTABLE, STORED, UNREPRESENTABLE, closeSocket } from "./protocol.mjs";
-import { readBack } from "./readback.mjs";
 
-export function documentRules({ api, log, retryMs, ending }) {
+export function documentRules({ api, log, retryMs, ending, checks }) {
   function discard(document, state, close) {
     state.discarded = true;
     for (const connection of document.getConnections()) closeSocket(connection.context, close);
@@ -107,14 +106,26 @@ export function documentRules({ api, log, retryMs, ending }) {
   async function store(document, documentName, state) {
     const editors = [...state.dirty.keys()];
     if (editors.length === 0) return;
-    const written = readBack(yDocToJSON(document));
-    if (!written.ok) return unrepresentable(document, state, written.problem);
+    // The state as it is now; the check runs on a worker (review M2 T9) while edits
+    // may go on: those mark their sessions unsaved again.
+    const json = yDocToJSON(document);
     const ydoc = Y.encodeStateAsUpdate(document);
     const snapshot = Buffer.from(Y.encodeSnapshot(Y.snapshot(document))).toString("base64");
+    for (const sessionId of editors) state.dirty.delete(sessionId);
+    let written;
+    try {
+      written = await checks.readBack(json);
+    } catch (error) {
+      for (const sessionId of editors) state.dirty.set(sessionId, true);
+      throw error;
+    }
+    if (!written.ok) {
+      for (const sessionId of editors) state.dirty.set(sessionId, true);
+      return unrepresentable(document, state, written.problem);
+    }
     // Unchanged from what was loaded (an edit undone, or a browser tidying the
     // document's structure): the stored Markdown stays exactly as it was written.
     const contentMd = written.markdown === state.baseline ? state.source : written.markdown;
-    for (const sessionId of editors) state.dirty.delete(sessionId);
     let answer;
     try {
       answer = await api.save(state.pageId, {

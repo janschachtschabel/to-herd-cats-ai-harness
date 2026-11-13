@@ -63,12 +63,30 @@ function settled(json, settleDoc) {
   return null;
 }
 
+/** A bounded memo of per-block answers, by the block's text (review M2 T9: a page's
+ * blocks hardly change between two saves, and checking each again took seconds on a
+ * large page). */
+function memo(limit = 20_000) {
+  const answers = new Map();
+  return (key, compute) => {
+    if (answers.has(key)) return answers.get(key);
+    const answer = compute();
+    if (answers.size >= limit) answers.delete(answers.keys().next().value);
+    answers.set(key, answer);
+    return answer;
+  };
+}
+
+const survived = memo();
+
 /** Whether the block comes back from the editor meaning the same, and the editor can
  * show it as built. */
 function survives(source) {
-  const { json } = parseMarkdown(source);
-  if (editorProblem(json) !== null) return false;
-  return difference(meaningOf(source), meaningOf(jsonToMarkdown(json))) === null;
+  return survived(source, () => {
+    const { json } = parseMarkdown(source);
+    if (editorProblem(json) !== null) return false;
+    return difference(meaningOf(source), meaningOf(jsonToMarkdown(json))) === null;
+  });
 }
 
 /** Whether the browser's editor, loading the block alone, leaves its meaning as is. */

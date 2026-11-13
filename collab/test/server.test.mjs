@@ -221,7 +221,8 @@ test("while the generation cannot be ended, the document takes no one", async ()
   ];
   api.checkAnswer = () => [503, {}];
   type(b.doc, "verboten");
-  await until(() => api.checks.length > 0);
+  // The save was refused: the document is held until the generation has ended.
+  await until(() => [...server.extension.live.values()].some((state) => state.holding));
   const late = open({ cookie: "herd_session=token-a" });
   await until(() => late.closes.includes(1013));
   assert.ok(!late.provider.synced);
