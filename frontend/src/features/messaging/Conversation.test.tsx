@@ -171,7 +171,7 @@ describe('conversation', () => {
 
   test('a conversation one lost access to says so instead of failing', async () => {
     const channel = makeConversation()
-    mockApi({
+    const api = mockApi({
       ...shellRoutes(me),
       'GET /api/conversations/:id': apiError(404, 'conversation.not_found'),
     })
@@ -182,6 +182,9 @@ describe('conversation', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Zur Aktivität' })).toBeInTheDocument()
+    // The sidebar forgets it too, and a 404 is not asked again.
+    await waitFor(() => expect(api.find('GET', '/api/channels').length).toBeGreaterThan(1))
+    expect(api.find('GET', `/api/conversations/${channel.id}`)).toHaveLength(1)
   })
 
   test('the "new" marker stands before the first unread message and the newest is read', async () => {

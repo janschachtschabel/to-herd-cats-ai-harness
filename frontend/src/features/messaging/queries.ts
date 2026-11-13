@@ -5,8 +5,8 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query'
-import { useMemo } from 'react'
-import { api, unwrap, type Conversation, type Schemas, type Unread } from '@/lib/api'
+import { useCallback, useMemo } from 'react'
+import { api, ApiError, unwrap, type Conversation, type Schemas, type Unread } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
 import { messagingKeys } from './keys'
 
@@ -38,6 +38,9 @@ export const conversationQuery = (conversationId: string) =>
     // look again now and then, so an open view notices and leaves.
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
+    // Gone is gone: asking again changes nothing.
+    retry: (failures, error) =>
+      !(error instanceof ApiError && error.status === 404) && failures < 1,
   })
 
 export const pageThreadQuery = (pageId: string) =>
@@ -70,6 +73,16 @@ export function useConversation(conversationId: string) {
 
 export function usePageThread(pageId: string) {
   return useQuery(pageThreadQuery(pageId))
+}
+
+/** After a conversation turned out to be gone: the sidebar lists and counters forget it. */
+export function useForgetGone() {
+  const queryClient = useQueryClient()
+  return useCallback(() => {
+    for (const queryKey of [messagingKeys.channels, messagingKeys.dms, messagingKeys.unread]) {
+      void queryClient.invalidateQueries({ queryKey: [...queryKey] })
+    }
+  }, [queryClient])
 }
 
 function storeConversation(queryClient: QueryClient, conversation: Conversation) {

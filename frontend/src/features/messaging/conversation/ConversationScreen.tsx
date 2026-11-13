@@ -1,17 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { spaceQuery } from '@/features/spaces/queries'
 import { EmptyState, ErrorState, LoadingState } from '@/features/shared/states'
 import { ApiError, type Conversation } from '@/lib/api'
-import { useConversation } from '../queries'
+import { useConversation, useForgetGone } from '../queries'
 import { ConversationHeader } from './ConversationHeader'
 import { ConversationPane } from './ConversationPane'
 
 /** The conversation one may no longer (or never could) see: say so and offer a way on. */
 function Gone() {
   const { t } = useTranslation()
+  const forget = useForgetGone()
+  useEffect(() => forget(), [forget])
   return (
     <EmptyState text={t('messaging.conversation.gone')}>
       <Button variant="outline" asChild>

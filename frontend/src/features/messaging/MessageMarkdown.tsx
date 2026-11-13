@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm'
 import { safeUrl } from '@/features/wiki/markdown'
 
 const MENTION = 'user:'
+const TOKEN = /@\[([^\]\n]*)\]\((user:[0-9a-fA-F-]{36})\)/g
 
 /** A mention keeps its `user:` target (rendered as a name, never as a link); every
  *  other target passes the wiki's check (http, https, mailto, relative). */
@@ -31,6 +32,8 @@ export function MessageMarkdown({ markdown, meId }: { markdown: string; meId?: s
     img: ({ src, alt }) =>
       typeof src === 'string' && src ? <img src={src} alt={alt ?? ''} loading="lazy" /> : null,
   }
+  // The "@" goes into the mention's text, so the name reads as one chip.
+  const source = markdown.replace(TOKEN, '[@$1]($2)')
   return (
     <div className="wiki-prose message-prose">
       <ReactMarkdown
@@ -38,7 +41,7 @@ export function MessageMarkdown({ markdown, meId }: { markdown: string; meId?: s
         urlTransform={urlTransform}
         components={components}
       >
-        {markdown}
+        {source}
       </ReactMarkdown>
     </div>
   )
