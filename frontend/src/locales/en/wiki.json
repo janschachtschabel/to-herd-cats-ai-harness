@@ -221,6 +221,8 @@
         "unknown": "The current state cannot be saved as Markdown like this.",
         "where": "It concerns block {{number}} (“{{start}}”).",
         "whereEmpty": "It concerns block {{number}}.",
+        "wherePair": "It concerns blocks {{number}} and {{next}}, which cannot be saved together (“{{start}}” …).",
+        "wherePairEmpty": "It concerns blocks {{number}} and {{next}}, which cannot be saved together.",
         "rest": "The latest changes stay unsaved until it is changed; the session goes on."
       },
       "leaveConfirm": "Not all changes have reached the server yet. Leave anyway?",

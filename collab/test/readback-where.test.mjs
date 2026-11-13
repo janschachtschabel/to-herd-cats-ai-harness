@@ -46,3 +46,37 @@ test("a state that saves names nothing", () => {
   const result = readBack(doc(paragraph(text("Eins")), paragraph(text("Zwei"))));
   assert.deepEqual(result, { ok: true, markdown: "Eins\n\nZwei" });
 });
+
+// Two blocks that each save alone but not together (review M2 U1): the notice names
+// the pair, not nothing.
+test("two neighbours that fail only together are named as a pair", () => {
+  const list = {
+    type: "bulletList",
+    content: [{ type: "listItem", content: [paragraph(text("a"))] }],
+  };
+  const indented = {
+    type: "codeBlock",
+    attrs: { language: "raw-markdown" },
+    content: [text("  <b>x</b>")],
+  };
+  const result = readBack(doc(paragraph(text("Eins")), list, indented));
+  assert.equal(result.ok, false);
+  assert.equal(result.block, 1);
+  assert.equal(result.through, 2);
+});
+
+test("the notice carries the block, or the pair", async () => {
+  const { unrepresentableNotice } = await import("../protocol.mjs");
+  assert.equal(
+    unrepresentableNotice({ kind: "markdown", block: 2 }),
+    "herd:unrepresentable:markdown:2",
+  );
+  assert.equal(
+    unrepresentableNotice({ kind: "markdown", block: 1, through: 2 }),
+    "herd:unrepresentable:markdown:1-2",
+  );
+  assert.equal(
+    unrepresentableNotice({ kind: "unknown", block: null }),
+    "herd:unrepresentable:unknown:",
+  );
+});

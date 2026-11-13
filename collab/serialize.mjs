@@ -6,11 +6,12 @@
 // that could not be saved).
 import { canonical } from "./canonical.mjs";
 import { writeInline } from "./inline.mjs";
+import { listEnds } from "./parse.mjs";
 import { RAW_MARKDOWN } from "./schema.mjs";
 import { escapeBlockStart } from "./syntax.mjs";
 
 const LIST_FAMILY = { bulletList: "bullet", taskList: "bullet", orderedList: "ordered" };
-const MARKERS = { bullet: ["-", "*"], ordered: [".", ")"] };
+const MARKERS = { bullet: ["-", "*", "+"], ordered: [".", ")"] };
 const ALIGN = { left: ":--", right: "--:", center: ":-:" };
 
 function prefixLines(text, first, rest) {
@@ -82,9 +83,8 @@ function interrupts(list) {
   return !LIST_FAMILY[first[0].type] || interrupts(first[0]);
 }
 
-function list(block, variant) {
+function list(block, marker) {
   const family = LIST_FAMILY[block.type];
-  const marker = MARKERS[family][variant];
   const tight = block.content.every((item) =>
     item.content.every((child, i) => i === 0 || tightPair(item.content[i - 1], child)),
   );
@@ -103,7 +103,7 @@ function list(block, variant) {
   return items.join(tight ? "\n" : "\n\n");
 }
 
-function blockText(block, variant) {
+function blockText(block, marker) {
   switch (block.type) {
     case "paragraph":
       return paragraph(block);
@@ -118,7 +118,7 @@ function blockText(block, variant) {
     case "bulletList":
     case "taskList":
     case "orderedList":
-      return list(block, variant);
+      return list(block, marker);
     case "table":
       return table(block);
     default:
@@ -126,18 +126,36 @@ function blockText(block, variant) {
   }
 }
 
-/** Blocks separated by blank lines (or `separator`); a list right after a list of the
- * same family takes the other marker, so the two stay two lists. */
+const isRaw = (block) => block?.type === "codeBlock" && block.language === RAW_MARKDOWN;
+
+/** The list a block ends (`last`) or starts (`first`) with as Markdown, or null: a
+ * raw block's from its source. An editor list's own marker is chosen when it is
+ * written. */
+function rawList(block, end) {
+  return isRaw(block) && block.text ? listEnds(block.text)[end] : null;
+}
+
+/** Blocks separated by blank lines (or `separator`). A list takes the first marker of
+ * its family that the list right before it and a raw block's list right after it do
+ * not use, so Markdown reads them as separate lists (review M2 U1: a raw block's list
+ * counts too). */
 function blocks(content, separator = "\n\n") {
   const out = [];
-  let previousFamily = null;
-  let variant = 0;
-  for (const block of content) {
-    const family = LIST_FAMILY[block.type] ?? null;
-    variant = family && family === previousFamily ? 1 - variant : 0;
-    previousFamily = family;
-    out.push(blockText(block, variant));
-  }
+  let previous = null; // the list the block before ended with: { family, marker }
+  content.forEach((block, index) => {
+    const family = LIST_FAMILY[block.type];
+    if (!family) {
+      out.push(blockText(block));
+      previous = rawList(block, "last");
+      return;
+    }
+    const taken = [previous, rawList(content[index + 1], "first")]
+      .filter((end) => end?.family === family)
+      .map((end) => end.marker);
+    const marker = MARKERS[family].find((each) => !taken.includes(each)) ?? MARKERS[family][0];
+    out.push(blockText(block, marker));
+    previous = { family, marker };
+  });
   return out.join(separator);
 }
 

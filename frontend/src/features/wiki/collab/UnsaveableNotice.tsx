@@ -14,9 +14,14 @@ export function UnsaveableNotice({ notice, doc }: { notice: Unsaveable; doc: Y.D
         <p>{t(`wiki.live.unsaveable.${notice.kind}`)}</p>
         {notice.block !== null && (
           <p>
-            {start
-              ? t('wiki.live.unsaveable.where', { number: notice.block + 1, start })
-              : t('wiki.live.unsaveable.whereEmpty', { number: notice.block + 1 })}
+            {t(
+              `wiki.live.unsaveable.${notice.through === null ? 'where' : 'wherePair'}${start ? '' : 'Empty'}`,
+              {
+                number: notice.block + 1,
+                next: (notice.through ?? notice.block) + 1,
+                start,
+              },
+            )}
           </p>
         )}
         <p>{t('wiki.live.unsaveable.rest')}</p>

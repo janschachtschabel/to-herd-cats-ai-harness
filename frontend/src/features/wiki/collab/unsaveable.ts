@@ -7,21 +7,25 @@ const START_LENGTH = 40
 /** Why the latest state cannot be saved, and where, as far as the save check knows it
  *  (collab/readback.mjs): `structure` (the editor cannot hold it), `reopen` (the
  *  Markdown would not open again unchanged), `markdown` (it reads back as something
- *  else); `block` is the index of the top-level block, null when unknown. */
+ *  else); `block` is the index of the top-level block, null when unknown; `through`
+ *  the second of two neighbours that fail only together (review M2 U1), else null. */
 export interface Unsaveable {
   kind: (typeof KINDS)[number] | 'unknown'
   block: number | null
+  through: number | null
 }
 
-/** The notice the collab process sends (`herd:unrepresentable:<kind>:<block>`), or
- *  null for any other message. */
+/** The notice the collab process sends (`herd:unrepresentable:<kind>:<where>`, where
+ *  is `<block>` or `<block>-<through>`), or null for any other message. */
 export function unsaveable(payload: string): Unsaveable | null {
   if (payload !== NOTICE && !payload.startsWith(`${NOTICE}:`)) return null
-  const [kind = '', block = ''] = payload.slice(NOTICE.length + 1).split(':')
+  const [kind = '', where = ''] = payload.slice(NOTICE.length + 1).split(':')
   const known = (KINDS as readonly string[]).includes(kind)
+  const match = known ? /^(\d+)(?:-(\d+))?$/.exec(where) : null
   return {
     kind: known ? (kind as Unsaveable['kind']) : 'unknown',
-    block: known && /^\d+$/.test(block) ? Number(block) : null,
+    block: match ? Number(match[1]) : null,
+    through: match?.[2] ? Number(match[2]) : null,
   }
 }
 

@@ -31,24 +31,33 @@ function splitRaw(node, sources) {
   return { ...node, content };
 }
 
-/** `{ ok: true, markdown }`, or `{ ok: false, markdown, problem, kind, block }` when the
- * Markdown must not be stored for this document. `kind`: "structure" (the editor
- * cannot hold the document), "reopen" (the live editor would not open the Markdown
- * unchanged) or "markdown" (it reads back as something else). `block`: the index of
- * the first top-level block that fails on its own, null when none does. */
+/** `{ ok: true, markdown }`, or `{ ok: false, markdown, problem, kind, block, through }`
+ * when the Markdown must not be stored for this document. `kind`: "structure" (the
+ * editor cannot hold the document), "reopen" (the live editor would not open the
+ * Markdown unchanged) or "markdown" (it reads back as something else). `block`: the
+ * index of the first top-level block that fails on its own; when none does, of the
+ * first of two neighbours that fail together (`through`: the second; review M2 U1);
+ * null when neither is found. */
 export function readBack(json) {
   const result = check(json);
   if (result.ok) return result;
-  return { ...result, block: firstFailing(json) };
+  return { ...result, ...firstFailing(json) };
 }
 
-/** The first top-level block that fails the check on its own (or null). Only run for
- * a state that failed, so a save that passes costs nothing more. */
+const fails = (...blocks) => !check({ type: "doc", content: blocks }).ok;
+
+/** Where the check fails: the first top-level block that fails alone, else the first
+ * pair of neighbours that fails together. Only run for a state that failed, so a save
+ * that passes costs nothing more. */
 function firstFailing(json) {
   const blocks = json?.content ?? [];
-  if (blocks.length < 2) return blocks.length === 1 ? 0 : null;
-  const index = blocks.findIndex((block) => !check({ type: "doc", content: [block] }).ok);
-  return index === -1 ? null : index;
+  if (blocks.length < 2) return { block: blocks.length === 1 ? 0 : null, through: null };
+  const alone = blocks.findIndex((block) => fails(block));
+  if (alone !== -1) return { block: alone, through: null };
+  const pair = blocks.findIndex(
+    (block, index) => index + 1 < blocks.length && fails(block, blocks[index + 1]),
+  );
+  return pair === -1 ? { block: null, through: null } : { block: pair, through: pair + 1 };
 }
 
 function check(json) {

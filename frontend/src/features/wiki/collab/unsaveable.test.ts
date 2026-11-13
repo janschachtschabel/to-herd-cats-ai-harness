@@ -3,10 +3,29 @@ import * as Y from 'yjs'
 import { blockStart, unsaveable } from './unsaveable'
 
 test('the notice of the collab process names the kind of cause and the block', () => {
-  expect(unsaveable('herd:unrepresentable:markdown:3')).toEqual({ kind: 'markdown', block: 3 })
-  expect(unsaveable('herd:unrepresentable:structure:')).toEqual({ kind: 'structure', block: null })
-  expect(unsaveable('herd:unrepresentable')).toEqual({ kind: 'unknown', block: null })
-  expect(unsaveable('herd:unrepresentable:neu:x')).toEqual({ kind: 'unknown', block: null })
+  const none = { through: null }
+  expect(unsaveable('herd:unrepresentable:markdown:3')).toEqual({
+    kind: 'markdown',
+    block: 3,
+    ...none,
+  })
+  expect(unsaveable('herd:unrepresentable:structure:')).toEqual({
+    kind: 'structure',
+    block: null,
+    ...none,
+  })
+  expect(unsaveable('herd:unrepresentable')).toEqual({ kind: 'unknown', block: null, ...none })
+  expect(unsaveable('herd:unrepresentable:neu:x')).toEqual({
+    kind: 'unknown',
+    block: null,
+    ...none,
+  })
+  // Two neighbours that fail only together (review M2 U1).
+  expect(unsaveable('herd:unrepresentable:markdown:1-2')).toEqual({
+    kind: 'markdown',
+    block: 1,
+    through: 2,
+  })
   expect(unsaveable('herd:representable')).toBeNull()
 })
 

@@ -5,7 +5,7 @@
 // the live editor again (`readback.mjs`, review M2 S2/S3). A state that cannot be
 // written so is not stored: the last good Markdown stays, the API counts it
 // (`herd_collab_saves_total{result="unrepresentable"}`), every connection is told
-// (`herd:unrepresentable:<kind>:<block>`, the session goes on) and the edits stay unsaved until a
+// (`herd:unrepresentable:<kind>:<where>`, the session goes on) and the edits stay unsaved until a
 // later state saves (`herd:representable`). Every stored state is acknowledged to every
 // connection with its snapshot (`herd:stored:`), so a browser knows when its own changes
 // are stored.
@@ -13,7 +13,7 @@ import * as Y from "yjs";
 import { ApiUnavailable } from "./api.mjs";
 import { CheckFailed } from "./checks.mjs";
 import { yDocToJSON } from "./markdown.mjs";
-import { CLOSE, REPRESENTABLE, STORED, UNREPRESENTABLE, closeSocket } from "./protocol.mjs";
+import { CLOSE, REPRESENTABLE, STORED, closeSocket, unrepresentableNotice } from "./protocol.mjs";
 
 export function documentRules({ api, log, retryMs, ending, checks }) {
   function discard(document, state, close) {
@@ -94,9 +94,10 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
 
   /** The latest state cannot be stored: say so, with the kind of cause and the block
    * (the edits stay unsaved). */
-  async function unrepresentable(document, state, { problem, kind, block }) {
+  async function unrepresentable(document, state, written) {
+    const { problem } = written;
     if (!state.unrepresentable) log("live save refused", { page_id: state.pageId, problem });
-    const notice = `${UNREPRESENTABLE}:${kind}:${block ?? ""}`;
+    const notice = unrepresentableNotice(written);
     if (state.unrepresentable !== notice) tell(document, notice);
     state.unrepresentable = notice;
     try {

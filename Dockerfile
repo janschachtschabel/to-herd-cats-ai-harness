@@ -21,7 +21,7 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 # The live editor and the page view import the collab process's editor (schema, Y.Doc
 # binding, load guard), its serializer and its wiki-link finder (one rule for both sides).
-COPY collab/editor.mjs collab/schema.mjs collab/tables.mjs collab/syntax.mjs collab/serialize.mjs \
+COPY collab/editor.mjs collab/schema.mjs collab/tables.mjs collab/syntax.mjs collab/serialize.mjs collab/parse.mjs \
      collab/canonical.mjs collab/inline.mjs collab/wikilinks.mjs /src/collab/
 RUN npm run build
 

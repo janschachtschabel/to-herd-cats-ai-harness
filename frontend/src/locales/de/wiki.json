@@ -221,6 +221,8 @@
         "unknown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern.",
         "where": "Betroffen ist Block {{number}} („{{start}}“).",
         "whereEmpty": "Betroffen ist Block {{number}}.",
+        "wherePair": "Betroffen sind die Blöcke {{number}} und {{next}}, die nur zusammen nicht gespeichert werden können („{{start}}“ …).",
+        "wherePairEmpty": "Betroffen sind die Blöcke {{number}} und {{next}}, die nur zusammen nicht gespeichert werden können.",
         "rest": "Die letzten Änderungen bleiben ungespeichert, bis ihr ihn ändert; die Sitzung läuft weiter."
       },
       "leaveConfirm": "Noch nicht alle Änderungen sind beim Server angekommen. Trotzdem verlassen?",

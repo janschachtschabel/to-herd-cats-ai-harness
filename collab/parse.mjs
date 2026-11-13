@@ -212,6 +212,40 @@ export function rawBlock(text) {
   };
 }
 
+const LIST_ENDS_LIMIT = 2000;
+const listEndsMemo = new Map();
+
+/** The list a top-level node is, as `{ family, marker }` (`bullet` with `-`, `*` or
+ * `+`; `ordered` with `.` or `)`), or null. */
+function listMarker(node, source) {
+  if (node?.type !== "list") return null;
+  const at = node.position.start.offset;
+  if (!node.ordered) return { family: "bullet", marker: source[at] };
+  const match = /^\d{1,9}([.)])/.exec(source.slice(at, at + 10));
+  return match ? { family: "ordered", marker: match[1] } : null;
+}
+
+/** The lists a raw block's source starts and ends with (review M2 U1): Markdown reads
+ * a list of the same family and marker right after (or before) it as part of that list,
+ * so the serializer gives a neighbouring list another marker. `{ first, last }`, each
+ * `{ family, marker }` or null. */
+export function listEnds(source) {
+  if (listEndsMemo.has(source)) return listEndsMemo.get(source);
+  const tree = fromMarkdown(hideWikiLinks(source), {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+  const ends = {
+    first: listMarker(tree.children[0], source),
+    last: listMarker(tree.children.at(-1), source),
+  };
+  if (listEndsMemo.size >= LIST_ENDS_LIMIT) {
+    listEndsMemo.delete(listEndsMemo.keys().next().value);
+  }
+  listEndsMemo.set(source, ends);
+  return ends;
+}
+
 /**
  * The editor's document for the Markdown. Each top-level block becomes editor nodes,
  * or a raw block when it holds what the editor cannot show or when `keepRaw(index,
