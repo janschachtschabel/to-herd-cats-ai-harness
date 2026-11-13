@@ -4,7 +4,7 @@
     "description": "Durchsucht alle Seiten und Nachrichten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",
     "input": "Suchbegriff",
     "placeholder": "Seiten und Nachrichten durchsuchen …",
-    "hint": "Gib einen Begriff ein, um Seiten und Nachrichten zu finden.",
+    "hint": "Gib einen Begriff ein, um Seiten, Nachrichten und Tickets zu finden.",
     "empty": "Keine Treffer.",
     "results": "Treffer",
     "onlyHere": "Nur in diesem Bereich",

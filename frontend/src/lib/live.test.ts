@@ -68,7 +68,13 @@ describe('live stream', () => {
       '{"conversation_id":"c1","message_id":"m1","parent_id":null,"body_md":"x"}',
     )
     expect(seen).toEqual([
-      { type: 'message.created', conversationId: 'c1', messageId: 'm1', parentId: null },
+      {
+        type: 'message.created',
+        conversationId: 'c1',
+        messageId: 'm1',
+        parentId: null,
+        ticketId: null,
+      },
     ])
     unmount()
     expect(source.readyState).toBe(FakeEventSource.CLOSED)
@@ -103,6 +109,22 @@ describe('live stream', () => {
       conversationId: null,
       messageId: null,
       parentId: null,
+      ticketId: null,
+    })
+  })
+
+  test('ticket events carry the ticket and its thread', () => {
+    expect(
+      parseLiveEvent(
+        'ticket.updated',
+        '{"conversation_id":"c1","message_id":null,"parent_id":null,"ticket_id":"t1"}',
+      ),
+    ).toEqual({
+      type: 'ticket.updated',
+      conversationId: 'c1',
+      messageId: null,
+      parentId: null,
+      ticketId: 't1',
     })
   })
 })

@@ -31,7 +31,8 @@ class ActivityAuthor(BaseModel):
 class ActivityOut(BaseModel):
     """A notification: why, where, from whom, and the first 140 characters of the
     message's Markdown. `parent_id`: the thread the message is in (null: top level).
-    `read_at`/`done_at`: null until marked."""
+    `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
+    `author` is who assigned, `snippet` is empty."""
 
     id: uuid.UUID
     reason: NotificationReason

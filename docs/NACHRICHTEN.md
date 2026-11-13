@@ -55,8 +55,10 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
   der Suche): dann holt die Leiste sie einzeln (`GET /api/messages/{id}`, gleiche Rechte
   wie das Gespräch, sonst 404). Threads haben genau eine Ebene; das prüft auch die
   Datenbank (Trigger `message_one_level_threads`).
-- **Erwähnungen:** `@` öffnet die Personenauswahl (aus dem Verzeichnis; das Eingabefeld
-  ist dabei eine Combobox mit der Liste als Popup); im Text steht dann
+- **Erwähnungen:** `@` öffnet die Personenauswahl (aus dem Verzeichnis, nur wer den
+  Bereich des Gesprächs sehen darf: `GET /api/directory?space_id=…`; in einer
+  Direktnachricht nur deren Teilnehmende; das Eingabefeld ist dabei eine Combobox mit
+  der Liste als Popup); im Text steht dann
   `@[Name](user:<id>)`. Entfernt eine Bearbeitung eine Erwähnung, verschwindet die noch
   ungelesene Benachrichtigung dieser Person; eine schon gelesene bleibt. Höchstens 50 je Nachricht. Benachrichtigt wird nur, wer das
   Gespräch sehen darf; die anderen nennt der Composer („Nicht benachrichtigt: … – kann
@@ -108,8 +110,10 @@ Zuweisungen einer Aufgabe durch jemand anderen (`assignment`, nicht wer sie selb
 übernimmt) und Beiträge in der Diskussion einer Aufgabe, die man bearbeitet oder
 gemeldet hat (`ticket_comment`, nicht zusätzlich zu einer Erwähnung oder Antwort).
 „Öffnen“ springt zur Nachricht, „Erledigt“ nimmt einen Eintrag aus der offenen Liste,
-„Alle als gelesen markieren“ setzt den Zähler zurück. Der Zähler steht in der
-Seitenleiste und im Fenstertitel („(3) Herd“). Einträge zu Gesprächen, die man nicht
+„Alle als gelesen markieren“ setzt den Zähler zurück. Eine Zuweisung zeigt, wer
+zugewiesen hat, und keinen Textausschnitt (sie verweist auf die Systemmeldung im
+Ticket-Thread). Der Zähler steht in der Seitenleiste und im Fenstertitel („(3) Herd“);
+über 99 zeigen Zähler „99+“. Einträge zu Gesprächen, die man nicht
 mehr sehen darf, oder zu gelöschten Nachrichten verschwinden. Weitere Gründe und Reiter
 kommen mit Agenten (M6).
 

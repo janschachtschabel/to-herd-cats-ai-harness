@@ -127,3 +127,60 @@ async def test_guests_may_not_read_the_directory(guest_client: AsyncClient) -> N
 
 async def test_anonymous_callers_are_refused(client: AsyncClient) -> None:
     assert (await client.get(DIRECTORY)).status_code == 401
+
+
+# --- `space_id`: only the people who may read that space (M4: the assignee picker and
+# the mention picker offer no one who could not see the ticket or the conversation).
+
+
+async def test_space_filter_lists_only_people_who_read_the_space(
+    member_client: AsyncClient, member, make_user, make_group, make_space
+) -> None:
+    from app.core.permissions import SpaceRole
+
+    inside = await make_user(name="Ida Inside")
+    via_group = await make_user(name="Gus Grouped")
+    team = await make_group("Gruppe", members=[via_group])
+    await make_user(name="Olaf Outside")
+    gone = await make_user(name="Ina Gone", is_active=False)
+    space = await make_space(
+        "team",
+        members=[
+            (member, SpaceRole.VIEWER),
+            (inside, SpaceRole.EDITOR),
+            (team, SpaceRole.VIEWER),
+            (gone, SpaceRole.ADMIN),
+        ],
+    )
+    found = await _entries(member_client, space_id=str(space.id), limit=100)
+    assert {e["name"] for e in found} == {"Max Member", "Ida Inside", "Gus Grouped"}
+    assert {e["type"] for e in found} == {"user"}  # never groups
+
+
+async def test_space_filter_in_an_open_space_lists_everyone_but_guests(
+    member_client: AsyncClient, make_user, make_space
+) -> None:
+    from app.core.principal import SystemRole
+
+    await make_user(name="Mona Mitglied")
+    await make_user(SystemRole.GUEST, name="Gerd Gast")
+    space = await make_space("open")
+    names = {e["name"] for e in await _entries(member_client, space_id=str(space.id), limit=100)}
+    assert "Mona Mitglied" in names
+    assert "Gerd Gast" not in names
+
+
+async def test_space_filter_on_a_space_one_cannot_see_is_404(
+    member_client: AsyncClient, make_user, make_space
+) -> None:
+    from app.core.permissions import SpaceRole
+
+    other = await make_user(name="Tina Team")
+    hidden = await make_space("team", members=[(other, SpaceRole.ADMIN)])
+    response = await member_client.get(DIRECTORY, params={"space_id": str(hidden.id)})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "space.not_found"
+    unknown = "00000000-0000-7000-8000-00000000abcd"
+    response = await member_client.get(DIRECTORY, params={"space_id": unknown})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "space.not_found"

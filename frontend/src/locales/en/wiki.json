@@ -4,7 +4,7 @@
     "description": "Searches every page and message you may read. Arrow keys choose, Enter opens.",
     "input": "Search term",
     "placeholder": "Search pages and messages …",
-    "hint": "Type a term to find pages and messages.",
+    "hint": "Type a term to find pages, messages and tickets.",
     "empty": "No results.",
     "results": "Results",
     "onlyHere": "Only in this space",

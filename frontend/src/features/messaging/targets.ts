@@ -5,13 +5,16 @@ interface Where {
   id: string
   kind: 'channel' | 'dm' | 'thread_page' | 'thread_ticket'
   page_id: string | null
+  ticket_number?: number | null
 }
 
 /** Where a message is shown: a channel or direct message on its own screen, a page
- *  thread's message in the page's discussion. `thread`: the thread it is a reply in. */
+ *  thread's message in the page's discussion, a ticket thread's on the ticket.
+ *  `thread`: the thread it is a reply in. */
 export type MessageTarget =
   | { to: 'conversation'; conversationId: string; thread?: string; message: string }
   | { to: 'page'; pageId: string; thread?: string; message: string }
+  | { to: 'ticket'; number: number; thread?: string; message: string }
 
 export function messageTarget(
   conversation: Where,
@@ -21,6 +24,9 @@ export function messageTarget(
   const thread = parentId ?? undefined
   if (conversation.kind === 'thread_page' && conversation.page_id) {
     return { to: 'page', pageId: conversation.page_id, thread, message: messageId }
+  }
+  if (conversation.kind === 'thread_ticket' && conversation.ticket_number) {
+    return { to: 'ticket', number: conversation.ticket_number, thread, message: messageId }
   }
   return { to: 'conversation', conversationId: conversation.id, thread, message: messageId }
 }
@@ -33,6 +39,12 @@ export function useOpenMessage() {
       const search = { thread: target.thread, message: target.message }
       if (target.to === 'page') {
         void navigate({ to: '/go/page/$pageId', params: { pageId: target.pageId }, search })
+      } else if (target.to === 'ticket') {
+        void navigate({
+          to: '/tickets/$number',
+          params: { number: String(target.number) },
+          search,
+        })
       } else {
         void navigate({
           to: '/c/$conversationId',

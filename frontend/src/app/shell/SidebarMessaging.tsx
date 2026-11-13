@@ -11,6 +11,7 @@ import { dmLabel } from '@/features/messaging/display'
 import { useChannels, useDms, useUnread } from '@/features/messaging/queries'
 import { UnreadBadge } from '@/features/messaging/sidebar/UnreadBadge'
 import { useSidebarSpaces } from '@/features/spaces/queries'
+import { badgeCount } from '@/lib/format'
 import { navLinkActive, navLinkClass } from './navStyles'
 import { SectionHeading } from './SectionHeading'
 
@@ -33,7 +34,7 @@ export function ActivitySection() {
         <span className="flex-1">{t('nav.activity')}</span>
         {count > 0 && (
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white tabular-nums">
-            <span aria-hidden>{count}</span>
+            <span aria-hidden>{badgeCount(count)}</span>
             <span className="sr-only">{t('activity.unreadCount', { count })}</span>
           </span>
         )}

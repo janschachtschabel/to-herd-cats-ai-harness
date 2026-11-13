@@ -1479,7 +1479,8 @@ export interface components {
          * ActivityOut
          * @description A notification: why, where, from whom, and the first 140 characters of the
          *     message's Markdown. `parent_id`: the thread the message is in (null: top level).
-         *     `read_at`/`done_at`: null until marked.
+         *     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
+         *     `author` is who assigned, `snippet` is empty.
          */
         ActivityOut: {
             author: components["schemas"]["ActivityAuthor"] | null;
@@ -4555,6 +4556,8 @@ export interface operations {
                 cursor?: string | null;
                 q?: string;
                 type?: ("user" | "group") | null;
+                /** @description only people who read this space */
+                space_id?: string | null;
             };
             header?: never;
             path?: never;

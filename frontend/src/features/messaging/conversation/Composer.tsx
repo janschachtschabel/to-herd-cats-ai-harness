@@ -2,20 +2,20 @@ import { SendHorizontal } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { useDirectory } from '@/features/directory/queries'
 import type { DirectoryEntry } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { insertMention, mentionsIn, typedMention, type Mentioned } from '../mentions'
 import { draftKey, getDraft, setDraft } from './drafts'
+import { useConversationView } from './ConversationContext'
+import { useMentionCandidates } from './mentionCandidates'
 import { MentionPicker } from './MentionPicker'
 import { useSendMessage } from './queries'
 
 const MAX_CHARS = 20_000
-const NOBODY = new Set<string>()
 
 /**
  * Writes a message in Markdown: Enter sends, Shift+Enter starts a new line. `@` opens
- * the people picker; a pick inserts `@[Name](user:<id>)` and the id is sent as a
+ * the people picker (only people who can see the conversation); a pick inserts `@[Name](user:<id>)` and the id is sent as a
  * mention. What one types stays as this conversation's draft while the tab lives.
  * After sending, the people who were mentioned but not told are named.
  */
@@ -29,6 +29,7 @@ export function Composer({
   label: string
 }) {
   const { t } = useTranslation()
+  const { conversation, meId } = useConversationView()
   const { send } = useSendMessage(conversationId, parentId)
   const key = draftKey(conversationId, parentId)
   const [text, setTextState] = useState(() => getDraft(key))
@@ -42,8 +43,8 @@ export function Composer({
 
   const typing = typedMention(text, caret)
   const pickerOpen = typing !== null && dismissed !== typing.start
-  const people = useDirectory(typing?.query ?? '', NOBODY, pickerOpen, 'user')
-  const options = pickerOpen ? people.items.slice(0, 8) : []
+  const people = useMentionCandidates(conversation, typing?.query ?? '', pickerOpen, meId)
+  const options = pickerOpen ? people.items : []
   const tooLong = text.length > MAX_CHARS
 
   const setText = (value: string, at: number) => {

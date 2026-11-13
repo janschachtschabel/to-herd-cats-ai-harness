@@ -13,6 +13,8 @@ export const LIVE_EVENTS = [
   'activity.changed',
   'access.changed',
   'dm.inspected',
+  'ticket.created',
+  'ticket.updated',
   'resync',
 ] as const
 
@@ -23,6 +25,8 @@ export interface LiveEvent {
   conversationId: string | null
   messageId: string | null
   parentId: string | null
+  /** The ticket of `ticket.created` / `ticket.updated` (its thread is `conversationId`). */
+  ticketId: string | null
 }
 
 /** `limited`: the server refused another stream for this session (429, too many tabs). */
@@ -31,7 +35,13 @@ export type LiveStatus = 'connecting' | 'open' | 'retrying' | 'limited'
 /** Waits before opening again after the server refused or closed the stream. */
 export const BACKOFF_MS = [5_000, 10_000, 30_000, 60_000] as const
 
-const RESYNC: LiveEvent = { type: 'resync', conversationId: null, messageId: null, parentId: null }
+const RESYNC: LiveEvent = {
+  type: 'resync',
+  conversationId: null,
+  messageId: null,
+  parentId: null,
+  ticketId: null,
+}
 
 let status: LiveStatus = 'connecting'
 const listeners = new Set<() => void>()
@@ -56,7 +66,8 @@ function idOrNull(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null
 }
 
-/** An event's data (`{"conversation_id", "message_id", "parent_id"}`); null if unreadable. */
+/** An event's data (`{"conversation_id", "message_id", "parent_id"}`, tickets add
+ *  `ticket_id`); null if unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')
@@ -67,6 +78,7 @@ export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | n
       conversationId: idOrNull(fields.conversation_id),
       messageId: idOrNull(fields.message_id),
       parentId: idOrNull(fields.parent_id),
+      ticketId: idOrNull(fields.ticket_id),
     }
   } catch {
     return null

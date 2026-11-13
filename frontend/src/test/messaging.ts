@@ -81,5 +81,6 @@ export function shellRoutes(me: Me, spaces: Space[] = []) {
     'GET /api/dms': page([]),
     'GET /api/conversations/unread': page([]),
     'GET /api/activity/count': { open: 0, unread: 0 },
+    'GET /api/tickets/counts': { assigned_open: 0 },
   }
 }

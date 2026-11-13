@@ -135,7 +135,7 @@
   },
   "activity": {
     "title": "Aktivität",
-    "description": "Was dich betrifft: Erwähnungen und Antworten, neueste zuerst.",
+    "description": "Was dich betrifft: Erwähnungen, Antworten, Zuweisungen und Kommentare an deinen Tickets, neueste zuerst.",
     "tabs": "Ansichten",
     "forMe": "Für mich",
     "showDone": "Erledigte zeigen",

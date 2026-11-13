@@ -13,6 +13,7 @@ import { hasPermission, meQuery } from '@/features/auth/queries'
 import { pageQuery } from '@/features/wiki/queries'
 import type { Me, Permission } from '@/lib/api'
 import { NotFoundPage } from './NotFoundPage'
+import { ticketSearch } from '@/features/tickets/filters'
 import { messageSearch, pageSearch, safeRedirect } from './search'
 
 // Every page is its own chunk, loaded when its route is entered or hovered (intent
@@ -43,6 +44,14 @@ const DmInspectPage = lazyRouteComponent(
 const ConversationScreen = lazyRouteComponent(
   () => import('@/features/messaging/conversation/ConversationScreen'),
   'ConversationScreen',
+)
+const TicketsPage = lazyRouteComponent(
+  () => import('@/features/tickets/TicketsPage'),
+  'TicketsPage',
+)
+const TicketScreen = lazyRouteComponent(
+  () => import('@/features/tickets/TicketScreen'),
+  'TicketScreen',
 )
 const ActivityPage = lazyRouteComponent(
   () => import('@/features/activity/ActivityPage'),
@@ -184,6 +193,40 @@ const conversationRoute = createRoute({
   },
 })
 
+/** Tickets across spaces; without filters "my tickets" (filters stand in the address). */
+const ticketsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/tickets',
+  validateSearch: ticketSearch,
+  loader: () => TicketsPage.preload?.(),
+  component: function TicketsRoute() {
+    const search = ticketsRoute.useSearch()
+    const navigate = ticketsRoute.useNavigate()
+    return (
+      <TicketsPage
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
+})
+
+/** A ticket by its number (`/tickets/42`); `thread`/`message` as for conversations. */
+const ticketRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/tickets/$number',
+  validateSearch: messageSearch,
+  loader: ({ params }) => {
+    if (!/^[1-9]\d{0,8}$/.test(params.number)) throw notFound()
+    return TicketScreen.preload?.()
+  },
+  component: function TicketRoute() {
+    const { number } = ticketRoute.useParams()
+    const { thread, message } = ticketRoute.useSearch()
+    return <TicketScreen number={Number(number)} thread={thread} message={message} />
+  },
+})
+
 const activityRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/activity',
@@ -276,6 +319,8 @@ export const routeTree = rootRoute.addChildren([
     spaceRoute.addChildren([spaceIndexRoute, pageRoute, trashRoute, spaceSettingsRoute]),
     pageByIdRoute,
     conversationRoute,
+    ticketsRoute,
+    ticketRoute,
     activityRoute,
     profileRoute,
     adminRoute.addChildren([

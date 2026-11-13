@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
+import { ticketKeys } from '@/features/tickets/keys'
 import { activityKeys, messagingKeys } from './keys'
 import { COALESCE_MS, createCoalescer, invalidateFor } from './live'
 
@@ -18,13 +19,24 @@ const KEYS = {
   activityCount: activityKeys.count,
   spaces: ['spaces', 'sidebar'],
   wiki: ['wiki', 'page', 'x'],
+  ticketList: ticketKeys.list({ assignee: 'me' }),
+  ticket: ticketKeys.detail(42),
+  ticketCounts: ticketKeys.counts,
+  board: ticketKeys.board('space'),
+  pageTickets: ticketKeys.pageTickets('page'),
 }
 
 /** A client holding every key above, fresh; returns which keys an event made stale. */
 function staleAfter(event: Partial<LiveEvent> & Pick<LiveEvent, 'type'>): string[] {
   const client = new QueryClient()
   for (const key of Object.values(KEYS)) client.setQueryData(key, { items: [] })
-  invalidateFor(client, { conversationId: null, messageId: null, parentId: null, ...event })
+  invalidateFor(client, {
+    conversationId: null,
+    messageId: null,
+    parentId: null,
+    ticketId: null,
+    ...event,
+  })
   return Object.entries(KEYS)
     .filter(([, key]) => client.getQueryState(key)?.isInvalidated)
     .map(([name]) => name)
@@ -44,7 +56,22 @@ describe('live invalidation', () => {
       'pageThread',
       'activity',
       'activityCount',
+      'ticketList',
+      'ticket',
+      'ticketCounts',
+      'board',
+      'pageTickets',
     ])
+  })
+
+  test('a ticket event refreshes every ticket view, nothing of messaging', () => {
+    const tickets = ['ticketList', 'ticket', 'ticketCounts', 'board', 'pageTickets']
+    expect(staleAfter({ type: 'ticket.updated', conversationId: 'a', ticketId: 't' })).toEqual(
+      tickets,
+    )
+    expect(staleAfter({ type: 'ticket.created', conversationId: 'a', ticketId: 't' })).toEqual(
+      tickets,
+    )
   })
 
   test('a message refreshes its conversation (and thread), the counters, the DM list', () => {
@@ -97,12 +124,14 @@ describe('coalescing', () => {
         conversationId: 'a',
         messageId: `m${i}`,
         parentId: null,
+        ticketId: null,
       })
       coalescer.add({
         type: 'conversation.read',
         conversationId: 'a',
         messageId: null,
         parentId: null,
+        ticketId: null,
       })
     }
     expect(spy).not.toHaveBeenCalled()
@@ -124,6 +153,7 @@ describe('coalescing', () => {
       conversationId: null,
       messageId: null,
       parentId: null,
+      ticketId: null,
     })
     vi.advanceTimersByTime(COALESCE_MS)
     expect(spy).toHaveBeenCalledTimes(1) // a new window after the last
@@ -132,6 +162,7 @@ describe('coalescing', () => {
       conversationId: null,
       messageId: null,
       parentId: null,
+      ticketId: null,
     })
     coalescer.stop()
     vi.advanceTimersByTime(COALESCE_MS)

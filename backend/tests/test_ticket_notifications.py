@@ -44,7 +44,14 @@ async def test_being_assigned_notifies_once(desk: Desk, session: AsyncSession) -
     assert await _for_me(desk.editor2) == [("assignment", "thread_ticket")]
     (entry,) = (await desk.editor2.get("/api/activity")).json()["items"]
     assert entry["conversation"]["ticket_number"] == ticket["number"]
-    assert entry["author"] is None  # a system message
+    # A timeline entry has no author: the activity names who assigned, and shows no
+    # snippet (its body is the entry's key and ids, for the client to word).
+    assert entry["author"] == {
+        "type": "user",
+        "id": desk.id_of("moderator"),
+        "name": "Desk moderator",
+    }
+    assert entry["snippet"] == ""
     assert await _count(session) == 1
     created = await session.scalar(
         select(func.count())

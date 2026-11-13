@@ -135,7 +135,7 @@
   },
   "activity": {
     "title": "Activity",
-    "description": "What concerns you: mentions and replies, newest first.",
+    "description": "What concerns you: mentions, replies, assignments and comments on your tickets, newest first.",
     "tabs": "Views",
     "forMe": "For me",
     "showDone": "Show done",

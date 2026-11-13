@@ -1,0 +1,232 @@
+{
+  "nav": {
+    "tickets": "Tickets"
+  },
+  "activity": {
+    "reasons": {
+      "assignment": "assigned {{where}} to you",
+      "ticket_comment": "commented on {{where}}"
+    }
+  },
+  "tickets": {
+    "title": "Tickets",
+    "kinds": {
+      "epic": "Epic",
+      "story": "Story",
+      "task": "Task",
+      "bug": "Bug"
+    },
+    "priorities": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal",
+      "low": "Low"
+    },
+    "categories": {
+      "open": "Open",
+      "active": "In progress",
+      "review": "In review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "sorts": {
+      "updated": "Last changed",
+      "due": "Due date",
+      "priority": "Priority",
+      "number": "Newest first"
+    },
+    "sidebar": {
+      "count_one": "{{count}} open ticket for you",
+      "count_other": "{{count}} open tickets for you"
+    },
+    "fields": {
+      "space": "Space",
+      "title": "Title",
+      "description": "Description",
+      "markdownHint": "Markdown: **bold**, _italic_, lists, links, code.",
+      "status": "Status",
+      "assignee": "Assigned to",
+      "unassigned": "Nobody",
+      "unknownPerson": "Unknown",
+      "priority": "Priority",
+      "kind": "Kind",
+      "due": "Due on",
+      "dueOn": "Due {{date}}",
+      "noDue": "No date",
+      "parent": "Parent",
+      "noParent": "None",
+      "chooseParent": "Change",
+      "tags": "Tags"
+    },
+    "filters": {
+      "label": "Filter tickets",
+      "text": "Search title or description",
+      "state": "Status",
+      "unfinished": "Not done",
+      "allStates": "All",
+      "space": "Space",
+      "allSpaces": "All spaces",
+      "any": "All",
+      "sort": "Sort by"
+    },
+    "list": {
+      "views": "View",
+      "mine": "My tickets",
+      "all": "All tickets",
+      "mineDescription": "What is assigned to you and not done yet.",
+      "allDescription": "The tickets of every space you may see.",
+      "emptyMine": "Nothing open is assigned to you right now.",
+      "empty": "No tickets for these filters."
+    },
+    "create": {
+      "open": "New ticket",
+      "title": "New ticket",
+      "description": "A title is enough; everything else can be added later.",
+      "submit": "Create"
+    },
+    "view": {
+      "gone": "This ticket does not exist, or you may not see it.",
+      "toList": "To the tickets",
+      "breadcrumbs": "Where the ticket is",
+      "fields": "Ticket fields",
+      "editTitle": "Change title",
+      "editDescription": "Edit",
+      "noDescription": "No description yet.",
+      "children_one": "{{count}} child ticket",
+      "children_other": "{{count}} child tickets"
+    },
+    "progress": {
+      "label_one": "{{done}} of {{count}} done",
+      "label_other": "{{done}} of {{count}} done"
+    },
+    "assign": {
+      "take": "Take",
+      "release": "Let go",
+      "clear": "Unassign",
+      "choose": "Assign to someone"
+    },
+    "tags": {
+      "edit": "Change tags",
+      "description": "Tags of this space and system-wide tags, at most 20.",
+      "none": "None",
+      "noneAvailable": "This space has no tags yet."
+    },
+    "links": {
+      "pages": "Linked pages",
+      "addPage": "Link a page",
+      "noPages": "None",
+      "removePage": "Unlink “{{title}}”",
+      "tickets": "Linked tickets",
+      "addTicket": "Link a ticket",
+      "noTickets": "No tickets linked to this page yet.",
+      "unlinkTicket": "Unlink {{key}}"
+    },
+    "pick": {
+      "page": "Find a page by its title or content.",
+      "ticket": "Find a ticket by key (HC-42) or title.",
+      "input": "Search",
+      "results": "Results",
+      "empty": "Nothing found."
+    },
+    "discussion": {
+      "title": "Comments",
+      "empty": "No comments on this ticket yet.",
+      "composer": "Write a comment"
+    },
+    "timeline": {
+      "created": "{{actor}} created the ticket.",
+      "status_changed": "{{actor}} changed the status from {{from}} to {{to}}.",
+      "assigned": "{{actor}} assigned the ticket to {{to}}.",
+      "unassigned": "{{actor}} removed {{from}} from the ticket.",
+      "priority_changed": "{{actor}} changed the priority from {{from}} to {{to}}.",
+      "kind_changed": "{{actor}} changed the kind from {{from}} to {{to}}.",
+      "parent_set": "{{actor}} put the ticket under {{to}}.",
+      "parent_removed": "{{actor}} took the ticket out of {{from}}.",
+      "due_set": "{{actor}} set the due date to {{to}}.",
+      "due_removed": "{{actor}} removed the due date.",
+      "title_changed": "{{actor}} changed the title.",
+      "description_changed": "{{actor}} changed the description.",
+      "page_linked": "{{actor}} linked the page “{{title}}”.",
+      "page_linked_hidden": "{{actor}} linked a page.",
+      "page_unlinked": "{{actor}} unlinked “{{title}}”.",
+      "page_unlinked_hidden": "{{actor}} unlinked a page.",
+      "unknown": "{{actor}} changed the ticket.",
+      "goneStatus": "a deleted status"
+    },
+    "space": {
+      "views": "Views of the space",
+      "wiki": "Wiki",
+      "board": "Board",
+      "epics": "Epics"
+    },
+    "board": {
+      "title": "Board",
+      "columns": "Board columns",
+      "filters": "Filter the board",
+      "onlyMine": "Only mine",
+      "epic": "Epic",
+      "count_one": "{{count}} ticket",
+      "count_other": "{{count}} tickets",
+      "emptyColumn": "No tickets",
+      "moveCard": "Move {{key}}",
+      "changeStatus": "Change status of {{key}}",
+      "statusMenu": "Change status",
+      "conflict": "The ticket was changed in the meantime and is back in its place. The board is reloaded; please try again.",
+      "dnd": {
+        "instructions": "Space or Enter picks the card up. Arrow left or right chooses the column, Space or Enter drops it, Escape cancels.",
+        "start": "Picked up {{key}}.",
+        "over": "{{key}} over {{status}}.",
+        "outside": "{{key}} over no column.",
+        "end": "Dropped {{key}} in {{status}}.",
+        "cancel": "{{key}} not moved."
+      }
+    },
+    "epics": {
+      "title": "Epics",
+      "create": "New epic",
+      "empty": "No epics in this space yet.",
+      "toggle": "Show the child tickets of {{key}}",
+      "noChildren": "No child tickets yet."
+    },
+    "statuses": {
+      "title": "Ticket statuses",
+      "description": "The board's columns, in this order. The category decides what counts as open, in progress or done.",
+      "name": "Name",
+      "newName": "New status",
+      "category": "Category",
+      "new": "Add a status",
+      "add": "Add",
+      "nameOf": "Name of {{name}}",
+      "categoryOf": "Category of {{name}}",
+      "up": "Move {{name}} up",
+      "down": "Move {{name}} down",
+      "delete": "Delete {{name}}",
+      "deleteTitle": "Delete status “{{name}}”",
+      "deleteText": "Tickets in this status move to the chosen status.",
+      "replaceWith": "Move tickets to",
+      "tooMany": "A space can have at most {{count}} statuses."
+    },
+    "card": {
+      "label": "Ticket {{key}}: {{title}}"
+    }
+  },
+  "errors": {
+    "ticket": {
+      "not_found": "This ticket does not exist, or you may not see it.",
+      "version_conflict": "Someone has changed the ticket in the meantime.",
+      "assignee_invalid": "This person cannot be given tickets here.",
+      "status_invalid": "This status does not exist in this space.",
+      "parent_invalid": "This ticket cannot be the parent here.",
+      "kind_invalid": "This kind does not fit the parent or child tickets.",
+      "too_many_pages": "No more than 50 pages can be linked."
+    },
+    "ticket_status": {
+      "not_found": "This status does not exist (any more).",
+      "name_taken": "A status with this name already exists.",
+      "category_required": "There must always be an open and a done status.",
+      "in_use": "The status still has tickets. Choose where they move.",
+      "replacement_invalid": "This replacement status does not work.",
+      "version_conflict": "Someone has changed this status in the meantime."
+    }
+  }
+}

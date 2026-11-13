@@ -11,13 +11,13 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, and_, delete, func, select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import ColumnElement, Uuid, and_, case, cast, delete, func, literal, select, update
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core.principal import PrincipalType
-from app.modules.messaging.models import Conversation, ConversationKind, Message
+from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import ConversationScope, visible_conversations
 from app.modules.tickets.models import WorkItem
@@ -37,7 +37,7 @@ class ActivityEntry:
     parent_id: uuid.UUID | None  # the thread the message is in, if any
     author_id: uuid.UUID | None
     author_name: str | None
-    snippet: str  # the start of the message's Markdown
+    snippet: str  # the start of the message's Markdown; empty for a timeline entry
 
 
 class NotificationRepository:
@@ -151,7 +151,13 @@ class ActivityRepository:
     async def page(
         self, before: uuid.UUID | None, limit: int, *, only_open: bool
     ) -> list[ActivityEntry]:
-        """The person's notifications, newest first."""
+        """The person's notifications, newest first. A timeline entry (an assignment)
+        has no author: its actor stands in, and it has no snippet (its body is a key
+        and ids, which the client words)."""
+        system = Message.kind == MessageKind.SYSTEM
+        actor = cast(cast(Message.body_md, JSONB)["actor"].astext, Uuid)
+        author_id = case((system, actor), else_=Message.author_id)
+        snippet = case((system, literal("")), else_=func.left(Message.body_md, SNIPPET_CHARS))
         stmt = (
             select(
                 Notification,
@@ -161,14 +167,14 @@ class ActivityRepository:
                 Conversation.page_id,
                 WorkItem.number,
                 Message.parent_id,
-                Message.author_id,
+                author_id,
                 User.name,
-                func.left(Message.body_md, SNIPPET_CHARS),
+                snippet,
             )
             .join(Conversation, Conversation.id == Notification.conversation_id)
             .join(Message, Message.id == Notification.message_id)
             .outerjoin(WorkItem, WorkItem.id == Conversation.work_item_id)
-            .outerjoin(User, User.id == Message.author_id)
+            .outerjoin(User, and_(User.id == author_id, User.org_id == Notification.org_id))
             .where(self._mine())
             .order_by(Notification.id.desc())
             .limit(limit)

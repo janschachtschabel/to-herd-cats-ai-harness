@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import type { Unread } from '@/lib/api'
+import { badgeCount } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-/** The unread count beside a conversation; mentions of me make it stand out. */
+/** The unread count beside a conversation (above 99: "99+"); mentions of me make it
+ *  stand out. */
 export function UnreadBadge({ unread }: { unread: Unread | undefined }) {
   const { t } = useTranslation()
   if (!unread || (unread.unread === 0 && unread.mentions === 0)) return null
@@ -19,7 +21,7 @@ export function UnreadBadge({ unread }: { unread: Unread | undefined }) {
     >
       <span aria-hidden>
         {mentioned ? '@' : ''}
-        {count}
+        {badgeCount(count)}
       </span>
       <span className="sr-only">
         {mentioned

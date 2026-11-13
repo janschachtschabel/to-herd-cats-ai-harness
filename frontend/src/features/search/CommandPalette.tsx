@@ -12,9 +12,10 @@ import { cn } from '@/lib/utils'
 import { type AnyHit, useSearch } from './queries'
 import { SearchHitRow } from './SearchHitRow'
 
-/** Search over every page and message one may read: Up/Down choose, Enter opens,
- *  Escape closes. Inside a space, "only this space" narrows the search to it (its
- *  pages, channels and page discussions). */
+/** Search over every page, message and ticket one may read: Up/Down choose, Enter
+ *  opens, Escape closes; a ticket's key (`HC-42`) finds that ticket first. Inside a
+ *  space, "only this space" narrows the search to it (its pages, channels, page
+ *  discussions and tickets). */
 export function CommandPalette({
   open,
   onOpenChange,
@@ -39,6 +40,10 @@ export function CommandPalette({
     onOpenChange(false)
     if (hit.type === 'message') {
       openMessage(messageTarget(hit.conversation, hit.id, hit.parent_id))
+      return
+    }
+    if (hit.type === 'ticket') {
+      void navigate({ to: '/tickets/$number', params: { number: String(hit.number) } })
       return
     }
     void navigate({

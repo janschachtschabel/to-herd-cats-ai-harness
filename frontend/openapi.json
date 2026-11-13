@@ -140,7 +140,7 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked.",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty.",
         "properties": {
           "author": {
             "anyOf": [
@@ -6943,6 +6943,25 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "description": "only people who read this space",
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only people who read this space",
+              "title": "Space Id"
             }
           }
         ],

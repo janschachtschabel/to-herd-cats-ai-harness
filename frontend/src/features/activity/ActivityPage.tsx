@@ -1,4 +1,11 @@
-import { AtSign, Check, CheckCheck, MessageSquareReply } from 'lucide-react'
+import {
+  AtSign,
+  Check,
+  CheckCheck,
+  MessageSquare,
+  MessageSquareReply,
+  UserCheck,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -87,6 +94,13 @@ export function ActivityPage() {
   )
 }
 
+const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
+  mention: AtSign,
+  reply: MessageSquareReply,
+  assignment: UserCheck,
+  ticket_comment: MessageSquare,
+}
+
 function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
@@ -94,7 +108,7 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const read = useMarkActivityRead(entry.id)
   const done = useMarkActivityDone(entry.id)
   const unread = !entry.read_at && !entry.done_at
-  const Icon = entry.reason === 'mention' ? AtSign : MessageSquareReply
+  const Icon = REASON_ICONS[entry.reason]
   const where = conversationLabel(t, entry.conversation, me?.user.id)
   const author = entry.author?.name ?? t('messaging.message.unknownAuthor')
 
@@ -118,9 +132,11 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
           <span className="font-medium">{author}</span>{' '}
           {t(`activity.reasons.${entry.reason}`, { where })}
         </p>
-        <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-          {plainMentions(entry.snippet)}
-        </p>
+        {entry.snippet && (
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+            {plainMentions(entry.snippet)}
+          </p>
+        )}
         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <time dateTime={entry.created_at}>{formatDateTime(entry.created_at, i18n.language)}</time>
           {entry.done_at && <Badge variant="secondary">{t('activity.done')}</Badge>}

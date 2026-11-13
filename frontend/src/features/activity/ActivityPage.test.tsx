@@ -40,4 +40,32 @@ describe('activity', () => {
     await renderApp('/activity')
     expect(await screen.findByText('Nichts Neues für dich.')).toBeInTheDocument()
   })
+
+  test('an assignment names who assigned which ticket and opens the ticket', async () => {
+    const entry = makeActivity({
+      reason: 'assignment',
+      conversation: {
+        id: 'c-9',
+        kind: 'thread_ticket',
+        name: null,
+        space_id: 'space-1',
+        page_id: null,
+        ticket_number: 42,
+      },
+      author: { type: 'user', id: 'jan', name: 'Jan Jansen' },
+      snippet: '',
+    })
+    mockApi({
+      ...shellRoutes(makeMe([])),
+      'GET /api/activity': page([entry]),
+      'POST /api/activity/:id/read': { status: 204 },
+      'GET /api/tickets/:number': { status: 404, body: { error: { code: 'ticket.not_found' } } },
+    })
+    const { user, router } = await renderApp('/activity')
+    const item = (await screen.findByText('Jan Jansen')).closest('li')!
+    expect(item).toHaveTextContent('Jan Jansen hat dir HC-42 zugewiesen')
+    await user.click(within(item).getByRole('button', { name: 'Öffnen' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tickets/42'))
+    expect(router.state.location.search).toEqual({ message: entry.message_id })
+  })
 })

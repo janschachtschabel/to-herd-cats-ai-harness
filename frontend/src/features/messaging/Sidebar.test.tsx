@@ -30,6 +30,7 @@ describe('sidebar messaging', () => {
       'GET /api/dms': page([{ ...dm, last_message_at: null }]),
       'GET /api/conversations/unread': page([
         { conversation_id: general.id, unread: 3, mentions: 0 },
+        { conversation_id: team.id, unread: 250, mentions: 0 },
         { conversation_id: dm.id, unread: 1, mentions: 1 },
       ]),
       'GET /api/activity/count': { open: 4, unread: 2 },
@@ -38,7 +39,10 @@ describe('sidebar messaging', () => {
     const channels = within(section('channels'))
     const link = await channels.findByRole('link', { name: /allgemein/ })
     expect(link).toHaveTextContent('3 ungelesene Nachrichten')
-    expect(channels.getByRole('link', { name: /team-dienste/ })).not.toHaveTextContent(/ungelesen/)
+    // Above 99 the badge reads "99+"; screen readers hear the number.
+    const busy = channels.getByRole('link', { name: /team-dienste/ })
+    expect(busy).toHaveTextContent('99+')
+    expect(busy).toHaveTextContent('250 ungelesene Nachrichten')
     const direct = within(section('direct'))
     expect(await direct.findByRole('link', { name: /Jan Jansen, Lea Löwe/ })).toHaveTextContent(
       '1 Erwähnung von dir',

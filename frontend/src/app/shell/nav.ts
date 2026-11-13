@@ -1,7 +1,7 @@
 import type { Me, Permission } from '@/lib/api'
 
 /** The milestone this build is at; sections of later milestones stay hidden. */
-export const CURRENT_MILESTONE = 3
+export const CURRENT_MILESTONE = 4
 
 export type SectionId = 'activity' | 'search' | 'channels' | 'direct' | 'spaces' | 'work' | 'admin'
 

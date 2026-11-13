@@ -1,8 +1,8 @@
 import { Loader2, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { useDirectory } from '@/features/directory/queries'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import type { MentionCandidates } from './mentionCandidates'
 
 /** The people one can mention, above the composer while `@name` is being typed.
  *  Arrows move, Enter or Tab picks, Escape closes (handled by the composer). */
@@ -15,7 +15,7 @@ export function MentionPicker({
   onHover,
 }: {
   id: string
-  people: ReturnType<typeof useDirectory>
+  people: MentionCandidates
   options: DirectoryEntry[]
   active: number
   onPick: (entry: DirectoryEntry) => void

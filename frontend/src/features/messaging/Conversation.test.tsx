@@ -173,6 +173,39 @@ describe('conversation', () => {
     ).toBeInTheDocument()
   })
 
+  test("the mention picker offers only people who can see the channel's space", async () => {
+    const channel = makeConversation()
+    const api = conversationApi({
+      conversation: channel,
+      messages: [],
+      extra: { 'GET /api/directory': page([makeEntry({ name: 'Lea Löwe' })]) },
+    })
+    const { user } = await renderApp(`/c/${channel.id}`)
+    await user.type(await screen.findByRole('combobox', { name: 'Nachricht an #allgemein' }), '@le')
+    await screen.findByRole('option', { name: 'Lea Löwe' })
+    expect(api.find('GET', '/api/directory').at(-1)!.query.get('space_id')).toBe('space-1')
+  })
+
+  test('in a direct message the mention picker offers its other participants only', async () => {
+    const dm = makeConversation({
+      kind: 'dm',
+      space_id: null,
+      name: null,
+      participants: [
+        { id: me.user.id, name: me.user.name, is_active: true },
+        { id: 'jan', name: 'Jan Jansen', is_active: true },
+        { id: 'jo', name: 'Jo Gone', is_active: false },
+      ],
+    })
+    const api = conversationApi({ conversation: dm, messages: [] })
+    const { user } = await renderApp(`/c/${dm.id}`)
+    await user.type(await screen.findByRole('combobox', { name: /Nachricht an/ }), '@j')
+    expect(await screen.findByRole('option', { name: 'Jan Jansen' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Jo Gone' })).toBeNull()
+    expect(screen.queryByRole('option', { name: me.user.name })).toBeNull()
+    expect(api.find('GET', '/api/directory')).toHaveLength(0)
+  })
+
   test('a thread whose message is not among the loaded ones shows it all the same', async () => {
     const channel = makeConversation()
     const parent = makeMessage({

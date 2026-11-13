@@ -14,9 +14,9 @@ import { useDeleteMessage, useToggleReaction } from './queries'
 import { AddReaction, Reactions } from './Reactions'
 import { MessageTime } from './MessageTime'
 
-/** A system entry of a page thread: a grey line on the timeline. */
+/** A system entry of a page or ticket thread: a grey line on the timeline. */
 function SystemRow({ message }: { message: Message }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   if (!message.system) return null
   return (
     <div
@@ -24,7 +24,7 @@ function SystemRow({ message }: { message: Message }) {
       data-kind="system"
     >
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-      <span>{systemText(t, message.system)}</span>
+      <span>{systemText(t, message.system, i18n.language)}</span>
       <MessageTime iso={message.created_at} />
     </div>
   )

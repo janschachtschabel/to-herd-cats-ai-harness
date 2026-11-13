@@ -1,15 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { api, unwrap, type MessageHit, type SearchHit } from '@/lib/api'
+import { api, unwrap, type MessageHit, type SearchHit, type TicketHit } from '@/lib/api'
 
 const PAGE_SIZE = 20
 
-export type AnyHit = SearchHit | MessageHit
+export type AnyHit = SearchHit | MessageHit | TicketHit
 
-/** What the palette shows; ticket hits join with the ticket views. */
-const TYPES = 'page,message'
-
-/** Full-text search over the pages and messages one may read (the server filters by
- *  rights, one ranking for both); nothing is asked while `q` is blank. */
+/** Full-text search over the pages, messages and tickets one may read (the server
+ *  filters by rights, one ranking for all; a ticket's key ranks it first); nothing is
+ *  asked while `q` is blank. */
 export function useSearch(q: string, spaceId: string | null) {
   const query = useInfiniteQuery({
     queryKey: ['search', q, spaceId],
@@ -20,7 +18,7 @@ export function useSearch(q: string, spaceId: string | null) {
             query: {
               q,
               space_id: spaceId ?? undefined,
-              types: TYPES,
+              types: 'page,message,ticket',
               cursor: pageParam,
               limit: PAGE_SIZE,
             },
@@ -31,10 +29,7 @@ export function useSearch(q: string, spaceId: string | null) {
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     enabled: q.trim() !== '',
   })
-  const items: AnyHit[] =
-    query.data?.pages.flatMap((page) =>
-      page.items.filter((hit): hit is AnyHit => hit.type !== 'ticket'),
-    ) ?? []
+  const items: AnyHit[] = query.data?.pages.flatMap((page) => page.items) ?? []
   return {
     items,
     isFetching: query.isFetching,

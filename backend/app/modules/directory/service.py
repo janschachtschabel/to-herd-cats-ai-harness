@@ -1,6 +1,7 @@
 """The directory: the people and groups of the organisation, by name, so that space
 admins without `user.manage` or `group.manage` can add members. Needs `directory.read`
-(everyone but guests); shows only active people."""
+(everyone but guests); shows only active people. With a space, only the people who may
+read it (and the caller must read it too: otherwise 404, as for an unknown space)."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +21,14 @@ class DirectoryService:
 
     async def search(self, actor: Actor, query: DirectoryQuery) -> Page[DirectoryEntry]:
         await require(self.session, actor, Action.DIRECTORY_READ)
+        if query.space_id is not None:
+            await require(self.session, actor, Action.SPACE_READ, query.space_id)
         after = decode_key_cursor(query.cursor) if query.cursor else None
         types = frozenset({query.type}) if query.type else ALL_TYPES
+        if query.space_id is not None:
+            types = types & {PrincipalType.USER}
         rows = await self.directory.search(
-            actor.org_id, query.q.strip(), types, after, query.limit + 1
+            actor.org_id, query.q.strip(), types, after, query.limit + 1, query.space_id
         )
         items = rows[: query.limit]
         more = len(rows) > query.limit

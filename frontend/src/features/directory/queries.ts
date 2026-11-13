@@ -4,23 +4,30 @@ import { pagedQuery } from '@/lib/paging'
 
 export type DirectoryType = 'user' | 'group'
 
-export const directoryQuery = (q: string, type?: DirectoryType) =>
-  pagedQuery(['directory', q, type ?? 'all'], async (cursor) =>
-    unwrap(await api.GET('/api/directory', { params: { query: { q, cursor, limit: 20, type } } })),
+/** With `spaceId`: only the people who may read that space (never groups). */
+export const directoryQuery = (q: string, type?: DirectoryType, spaceId?: string) =>
+  pagedQuery(['directory', q, type ?? 'all', spaceId ?? 'org'], async (cursor) =>
+    unwrap(
+      await api.GET('/api/directory', {
+        params: { query: { q, cursor, limit: 20, type, space_id: spaceId } },
+      }),
+    ),
   )
 
 /** The key that names a principal in "present" sets: "type:id". */
 export const principalKey = (entry: { type: string; id: string }) => `${entry.type}:${entry.id}`
 
 /** People and groups (only people with `type: 'user'`) whose name contains `q`,
- *  without those in `exclude`. Fetched only while `enabled` (the picker is open). */
+ *  without those in `exclude`; with `spaceId` only the people who may read that space.
+ *  Fetched only while `enabled` (the picker is open). */
 export function useDirectory(
   q: string,
   exclude: Set<string>,
   enabled: boolean,
   type?: DirectoryType,
+  spaceId?: string,
 ) {
-  const query = useInfiniteQuery({ ...directoryQuery(q, type), enabled })
+  const query = useInfiniteQuery({ ...directoryQuery(q, type, spaceId), enabled })
   const all: DirectoryEntry[] = query.data?.pages.flatMap((page) => page.items) ?? []
   return {
     items: all.filter((entry) => !exclude.has(principalKey(entry))),

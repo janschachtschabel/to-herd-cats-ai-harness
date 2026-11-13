@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import type { MessageHit, SearchHit } from '@/lib/api'
+import type { MessageHit, SearchHit, TicketHit } from '@/lib/api'
 import { makeMe, makePage, makeSpace, mockApi, nodeOf, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 
@@ -72,7 +72,9 @@ describe('search', () => {
     const { user } = await renderApp('/spaces')
     await user.keyboard('{Control>}k{/Control}')
     expect(
-      await screen.findByText('Gib einen Begriff ein, um Seiten und Nachrichten zu finden.'),
+      await screen.findByText(
+        'Gib einen Begriff ein, um Seiten, Nachrichten und Tickets zu finden.',
+      ),
     ).toBeInTheDocument()
     await user.type(screen.getByRole('combobox', { name: 'Suchbegriff' }), 'nix')
     expect(await screen.findByText('Keine Treffer.')).toBeInTheDocument()
@@ -101,7 +103,7 @@ describe('search', () => {
       'GET /api/auth/me': makeMe([]),
       'GET /api/spaces': page([space]),
       'GET /api/search': (call) => {
-        expect(call.query.get('types')).toBe('page,message') // no tickets yet
+        expect(call.query.get('types')).toBe('page,message,ticket')
         return page([message, hit()])
       },
       'GET /api/conversations/:id': {
@@ -121,5 +123,38 @@ describe('search', () => {
       thread: message.parent_id,
       message: message.id,
     })
+  })
+})
+
+describe('ticket hits', () => {
+  test('a key finds its ticket first; Enter opens the ticket', async () => {
+    const ticket: TicketHit = {
+      type: 'ticket',
+      id: '00000000-0000-7000-b000-000000000042',
+      number: 42,
+      key: 'HC-42',
+      title: 'Login schlägt fehl',
+      kind: 'bug',
+      status: { id: 's1', name: 'In Arbeit', category: 'active' },
+      space_id: space.id,
+      space_name: space.name,
+      snippet: '',
+      score: 101,
+    }
+    mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([space]),
+      'GET /api/search': page([ticket, hit()]),
+      'GET /api/tickets/:number': { status: 404, body: { error: { code: 'ticket.not_found' } } },
+    })
+    const { router, user } = await renderApp('/spaces')
+    await user.keyboard('{Control>}k{/Control}')
+    await user.type(await screen.findByRole('combobox', { name: 'Suchbegriff' }), 'HC-42')
+    const first = (await screen.findAllByRole('option'))[0]!
+    expect(first).toHaveTextContent('HC-42')
+    expect(first).toHaveTextContent('Login schlägt fehl')
+    expect(first).toHaveTextContent('In Arbeit')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tickets/42'))
   })
 })

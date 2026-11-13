@@ -23,7 +23,7 @@ describe('shell', () => {
   test('a member sees no administration', async () => {
     mockApi({ 'GET /api/auth/me': makeMe(['space.create']), 'GET /api/spaces': page([]) })
     await renderApp('/spaces')
-    expect(sections()).toEqual(['activity', 'search', 'channels', 'direct', 'spaces'])
+    expect(sections()).toEqual(['activity', 'search', 'channels', 'direct', 'spaces', 'work'])
     expect(screen.queryByText('Verwaltung')).not.toBeInTheDocument()
   })
 
@@ -38,11 +38,20 @@ describe('shell', () => {
   test('shell hides sections of later milestones', async () => {
     mockApi({ 'GET /api/auth/me': makeMe(ADMIN_PERMISSIONS), 'GET /api/spaces': page([]) })
     await renderApp('/spaces')
-    expect(sections()).toEqual(['activity', 'search', 'channels', 'direct', 'spaces', 'admin'])
-    expect(screen.queryByText('Arbeit')).not.toBeInTheDocument()
-    // The filter, not the absence of renderers, decides: at M4 "work" is in.
+    expect(sections()).toEqual([
+      'activity',
+      'search',
+      'channels',
+      'direct',
+      'spaces',
+      'work',
+      'admin',
+    ])
+    expect(screen.getByText('Arbeit')).toBeInTheDocument()
+    // The filter, not the absence of renderers, decides: before M4 "work" is out.
     const me = makeMe(ADMIN_PERMISSIONS)
     expect(visibleSections(me, 1).map((s) => s.id)).toEqual(['spaces', 'admin'])
+    expect(visibleSections(me, 3).map((s) => s.id)).not.toContain('work')
     expect(visibleSections(me, 4).map((s) => s.id)).toEqual(
       NAV_SECTIONS.filter((s) => s.milestone <= 4).map((s) => s.id),
     )

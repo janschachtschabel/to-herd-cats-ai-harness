@@ -25,6 +25,7 @@ export function DirectoryCombobox({
   onSelect,
   exclude,
   type,
+  spaceId,
 }: {
   control: ControlProps
   selected: DirectoryEntry | null
@@ -32,6 +33,8 @@ export function DirectoryCombobox({
   exclude: Set<string>
   /** Only people (`user`) or only groups; both when left out. */
   type?: DirectoryType
+  /** Only the people who may read this space. */
+  spaceId?: string
 }) {
   const { t } = useTranslation()
   const listId = useId()
@@ -39,7 +42,7 @@ export function DirectoryCombobox({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const q = useDebouncedValue(text.trim())
-  const directory = useDirectory(q, exclude, open, type)
+  const directory = useDirectory(q, exclude, open, type, spaceId)
   // While the typed text has not reached the search yet, older results are not offered.
   const settled = q === text.trim()
   const options = settled ? directory.items : []

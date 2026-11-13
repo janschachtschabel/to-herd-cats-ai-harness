@@ -9,6 +9,7 @@ import { adminLinks, visibleSections, type AdminLink, type SectionId } from './n
 import { SectionHeading } from './SectionHeading'
 import { ActivitySection, ChannelsSection, DirectSection } from './SidebarMessaging'
 import { SidebarSpaces } from './SidebarSpaces'
+import { WorkSection } from './SidebarWork'
 
 const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/users': UserRound,
@@ -83,6 +84,7 @@ const SECTIONS: Partial<Record<SectionId, () => ReactNode>> = {
   channels: ChannelsSection,
   direct: DirectSection,
   spaces: SpacesSection,
+  work: WorkSection,
   admin: AdminSection,
 }
 
