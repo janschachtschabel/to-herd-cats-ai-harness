@@ -117,6 +117,13 @@ Bekannte Grenzen und bewusste Entscheidungen aus M1. Wer betreibt, sollte sie ke
 - **Mitgeliefertes PostgreSQL im Chart** (`postgresql.enabled`, Standard `true`) ist
   zum Ausprobieren gedacht: ein Pod, keine Replikation, keine Sicherung. In Produktion
   `postgresql.enabled=false` und eine externe Datenbank setzen.
+  Sein Passwort erzeugt das Chart einmal und liest es danach per `lookup` aus dem
+  Cluster. Wer mit `helm template` ausrollt (Argo CD, Flux), bekommt dabei bei jedem
+  Rendern ein neues Passwort, das nicht mehr zum Datenvolume passt: dort
+  `database.existingSecret` auf ein selbst angelegtes Secret setzen.
+- **Rollouts**: Ein API-Pod wartet beim Beenden 5 s (`preStop`), bis er aus den
+  Endpunkten genommen ist, und hat dann bis zu 30 s, laufende Anfragen zu beenden
+  (`terminationGracePeriodSeconds: 35`).
 - **Migrations-Job**: Nur mit externer Datenbank ist er ein Helm-Hook
   (`pre-install,pre-upgrade`). Mit dem mitgelieferten PostgreSQL ist er ein normaler
   Job je Release-Revision, weil der Hook vor der Datenbank liefe; bis er fertig ist,

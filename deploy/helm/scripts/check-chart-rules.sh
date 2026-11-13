@@ -27,4 +27,11 @@ out=$(render --set ingress.enabled=true --set api.forwardedAllowIps=10.0.0.0/8)
 grep -A1 -- "- name: HERD_FORWARDED_ALLOW_IPS" <<<"$out" | grep -q '"10.0.0.0/8"' \
   || fail "HERD_FORWARDED_ALLOW_IPS is not passed on"
 
+# Rollouts: the API pod waits before it stops accepting, while the endpoints are
+# removed, and the grace period covers that wait plus the drain.
+out=$(render)
+api=$(awk '/^kind: Deployment/{d=1} d&&/^---/{exit} d' <<<"$out")
+grep -q 'command: \["sleep", "5"\]' <<<"$api" || fail "the API has no preStop sleep of 5 s"
+grep -q "terminationGracePeriodSeconds: 35" <<<"$api" || fail "the grace period does not cover preStop + 30 s"
+
 echo "chart rules OK"

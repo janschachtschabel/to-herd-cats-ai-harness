@@ -44,7 +44,7 @@ secrets:
 ## @section Database
 
 ## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
-## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE)
+## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL; set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
 database:
   url: ""
   existingSecret: ""
