@@ -87,6 +87,7 @@ test("inspecting a direct message needs a reason, is read only and audited", asy
   await expect(list).toContainText("Vertraulich: die Gehaltsfrage.");
   // Read only: nothing to write, react, edit or delete.
   await expect(a.getByRole("textbox")).toHaveCount(0);
+  await expect(a.getByRole("combobox", { name: /^Nachricht an/ })).toHaveCount(0);
   for (const name of ["Reaktion hinzufügen", "Nachricht bearbeiten", "Nachricht löschen"]) {
     await expect(a.getByRole("button", { name })).toHaveCount(0);
   }

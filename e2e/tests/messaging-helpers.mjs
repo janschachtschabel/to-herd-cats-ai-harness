@@ -42,7 +42,8 @@ export async function openLive(context, path) {
   return page;
 }
 
-export const composer = (page, name) => page.getByRole("textbox", { name });
+/** The composer: a combobox (its popup is the mention list). */
+export const composer = (page, name) => page.getByRole("combobox", { name });
 
 /** Types a message into the composer and sends it with Enter. */
 export async function send(page, name, text) {
