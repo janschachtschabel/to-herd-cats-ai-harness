@@ -74,6 +74,15 @@ const CASES = {
     doc(paragraph(text("Siehe [[API_Keys]] und [[a *b*]]."))),
     "Siehe [[API_Keys]] und [[a \\*b\\*]].",
   ],
+  "an emoji right after bold punctuation": [
+    doc(paragraph(text("Achtung!", "bold"), text("\u{1F600} ok"))),
+    "**Achtung!**&#x1F600; ok",
+  ],
+  "an exclamation mark before a wiki link": [doc(paragraph(text("![[Seite]]"))), "\\![[Seite]]"],
+  "a rule as the first thing in a list item": [
+    doc({ type: "bulletList", content: [item(paragraph(), { type: "horizontalRule" })] }),
+    "- ___",
+  ],
   "a table cell with a pipe": [
     doc({
       type: "table",

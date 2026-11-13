@@ -71,7 +71,7 @@ function codeSpan(text, inTable) {
   const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
   const pad =
-    /^`|`$/.test(text) || (/^ /.test(text) && / $/.test(text) && text.trim() !== "") ? " " : "";
+    /^`|`$/.test(text) || (/^ /.test(text) && / $/.test(text) && /[^ ]/.test(text)) ? " " : "";
   const body = inTable ? text.replace(/\|/g, "\\|") : text;
   return `${fence}${pad}${body}${pad}${fence}`;
 }
@@ -147,9 +147,6 @@ function pieces(runs, inTable) {
     for (const key of opening) {
       if (auto && key === link) continue;
       if (markType(key) === "link") {
-        // A `!` right before `[` would make the link an image.
-        const previous = out.at(-1);
-        if (previous?.kind === "text" && previous.out === "!") previous.out = "\\!";
         out.push({ kind: "atom", gap: "open", out: "[" });
       } else out.push({ kind: "open", out: DELIMITER[key] });
       open.push(key);
@@ -195,6 +192,8 @@ function moveGaps(list) {
  * punctuation, 0 anything else. */
 function kind(char) {
   if (char === undefined || WHITESPACE.test(char)) return 1;
+  // micromark looks at UTF-16 code units: half of a surrogate pair is neither.
+  if (char.codePointAt(0) > 0xffff) return 0;
   return PUNCTUATION.test(char) ? 2 : 0;
 }
 
@@ -224,9 +223,24 @@ function flank(list) {
   return list;
 }
 
+/** Last touches once every piece is written: a `!` right before `[` would start an
+ * image; a bare `_` (`escaped`) must still stand between two letters or digits. */
+function tidy(list) {
+  list.forEach((piece, i) => {
+    if (piece.kind !== "text" || piece.char === null) return;
+    if (piece.out === "!" && list[i + 1]?.out.startsWith("[")) piece.out = "\\!";
+    if (piece.out === "_") {
+      const word =
+        WORD.test(lastChar(list[i - 1]) ?? "") && WORD.test(firstChar(list[i + 1]) ?? "");
+      if (!word) piece.out = "\\_";
+    }
+  });
+  return list;
+}
+
 /** Canonical runs as Markdown. `table`: `|` is escaped in code too. */
 export function writeInline(runs, { table = false } = {}) {
-  return flank(moveGaps(pieces(runs, table)))
+  return tidy(flank(moveGaps(pieces(runs, table))))
     .map((piece) => piece.out)
     .join("");
 }

@@ -67,7 +67,7 @@ function tightPair(previous, next) {
   if (!["paragraph", "heading", "codeBlock"].includes(previous.type)) return false;
   if (previous.type === "codeBlock" && previous.language === RAW_MARKDOWN) return false;
   if (next.type === "codeBlock") return next.language !== RAW_MARKDOWN;
-  if (next.type === "heading" || next.type === "blockquote") return true;
+  if (next.type === "heading") return true;
   if (!LIST_FAMILY[next.type] || !next.content[0]?.content.length) return false;
   // Only a bullet list or one starting at 1 can interrupt a paragraph.
   return previous.type !== "paragraph" || next.type !== "orderedList" || next.start === 1;
@@ -86,7 +86,10 @@ function list(block, variant) {
     else if (item.type === "taskItem") first = `${marker} [${item.checked ? "x" : " "}] `;
     else first = `${marker} `;
     const indent = " ".repeat(family === "ordered" ? first.length : 2);
-    return prefixLines(blocks(item.content, tight ? "\n" : "\n\n"), first, indent);
+    let text = blocks(item.content, tight ? "\n" : "\n\n");
+    // `- ---` would be a rule of its own, not a list item holding one.
+    if (item.content[0]?.type === "horizontalRule") text = `___${text.slice(3)}`;
+    return prefixLines(text, first, indent);
   });
   return items.join(tight ? "\n" : "\n\n");
 }
