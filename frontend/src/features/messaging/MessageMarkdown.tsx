@@ -11,6 +11,10 @@ function urlTransform(url: string): string {
   return url.startsWith(MENTION) ? url : safeUrl(url)
 }
 
+function isLocal(src: string): boolean {
+  return src.startsWith('/') && !src.startsWith('//')
+}
+
 /** A message's Markdown, with the wiki's safe renderer: GFM, never raw HTML (no
  *  rehype-raw), links only to allowed targets. `@[Name](user:<id>)` shows as a
  *  highlighted name, more so when it names `meId`. */
@@ -29,8 +33,14 @@ export function MessageMarkdown({ markdown, meId }: { markdown: string; meId?: s
         </a>
       )
     },
+    // Only images of this installation (a path); one from elsewhere would be a
+    // request to a third party, so only its text shows.
     img: ({ src, alt }) =>
-      typeof src === 'string' && src ? <img src={src} alt={alt ?? ''} loading="lazy" /> : null,
+      typeof src === 'string' && isLocal(src) ? (
+        <img src={src} alt={alt ?? ''} loading="lazy" />
+      ) : (
+        <span>{alt}</span>
+      ),
   }
   // The "@" goes into the mention's text, so the name reads as one chip.
   const source = markdown.replace(TOKEN, '[@$1]($2)')

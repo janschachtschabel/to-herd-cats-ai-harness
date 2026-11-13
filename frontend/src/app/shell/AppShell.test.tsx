@@ -1,5 +1,5 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { ADMIN_PERMISSIONS, type Call, makeMe, makeSpace, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 import { NAV_SECTIONS, visibleSections } from './nav'
@@ -95,5 +95,37 @@ describe('shell', () => {
     await user.click(screen.getByRole('button', { name: 'Menü von Mia Muster' }))
     await user.click(screen.getByRole('menuitemradio', { name: 'Dunkel' }))
     expect(document.documentElement).toHaveClass('dark')
+  })
+
+  test('on a narrow screen the sidebar starts closed, opens over the page and closes again', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('max-width'),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    mockApi({ 'GET /api/auth/me': makeMe(['space.create']), 'GET /api/spaces': page([]) })
+    const { user } = await renderApp('/spaces')
+    const toggle = screen.getByRole('button', { name: 'Seitenleiste ein- oder ausblenden' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('navigation', { name: 'Hauptnavigation' })).toBeNull()
+    await user.click(toggle)
+    expect(screen.getByRole('navigation', { name: 'Hauptnavigation' })).toBeVisible()
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await user.keyboard('{Escape}')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Hauptnavigation' })).getByRole('link', {
+        name: 'Aktivität',
+      }),
+    )
+    expect(toggle).toHaveAttribute('aria-expanded', 'false') // a link was followed
+    expect(screen.queryByRole('navigation', { name: 'Hauptnavigation' })).toBeNull()
   })
 })

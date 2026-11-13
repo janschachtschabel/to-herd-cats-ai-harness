@@ -1,5 +1,5 @@
 import { PanelLeft } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { LocaleError } from '@/features/profile/LocaleError'
@@ -9,12 +9,14 @@ import { cn } from '@/lib/utils'
 import { LiveHint } from './LiveStatus'
 import { Sidebar } from './Sidebar'
 import { useShellLive } from './useShellLive'
+import { useSidebar } from './useSidebar'
 import { UserMenu } from './UserMenu'
 
-/** Sidebar on the left, header with the user menu, the page in the middle. */
+/** Sidebar on the left (over the page on a narrow screen), header with the user menu,
+ *  the page in the middle. */
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(true)
+  const { open, narrow, toggle, close, onSidebarClick } = useSidebar()
   useUserLocale()
   useShellLive()
   return (
@@ -26,11 +28,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {t('nav.skipToContent')}
         </a>
+        {narrow && open && (
+          // A click beside the open sidebar closes it (Escape does too).
+          <div className="fixed inset-0 z-30 bg-black/40" aria-hidden onClick={close} />
+        )}
         <aside
           id="sidebar"
+          hidden={!open}
+          onClick={onSidebarClick}
           className={cn(
             'flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground',
             open ? 'w-64' : 'hidden',
+            narrow && 'fixed inset-y-0 left-0 z-40 max-w-[85vw] shadow-lg',
           )}
         >
           <Sidebar />
@@ -43,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-label={t('nav.toggleSidebar')}
               aria-controls="sidebar"
               aria-expanded={open}
-              onClick={() => setOpen((value) => !value)}
+              onClick={toggle}
             >
               <PanelLeft aria-hidden />
             </Button>
