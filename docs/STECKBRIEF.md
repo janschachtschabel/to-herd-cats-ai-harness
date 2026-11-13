@@ -215,8 +215,10 @@ argon2-Prüfungen (je 64 MiB) gleichzeitig laufen.
   mehrere API-Replikas, der Collab-Prozess als eigener Pod, Neustart des
   Collab-Prozesses unter Last. Kein Kubernetes in der Sandbox.
 - Mehr als eine Seite mit Live-Bearbeitung gleichzeitig, große Seiten (nahe 200.000
-  Zeichen oder 5 MiB Yjs-Zustand), Uploads und Importe unter Last, die Dauer großer
-  Importe (eine Transaktion).
+  Zeichen oder 5 MiB Yjs-Zustand), Uploads und Importe unter Last. Die Dauer eines
+  großen Imports ist nur ohne Image gemessen (Review M2 R19, im Prozess gegen das lokale
+  PostgreSQL, 2.000 Seiten in einem Ordner mit Tags): vorher 80 s, jetzt 11 s
+  (6,7 statt 28,6 SQL-Anweisungen je Seite).
 - Das Image mit Debian-Updates (siehe unten), Trivy.
 
 ### Empfehlung Request und Limit
@@ -267,6 +269,20 @@ auflösen kann. Die Größe mit Updates steht im Build-Protokoll der CI.
 |---|---|
 | Ansprechperson | Jan (Projektverantwortung, hat die Spezifikation freigegeben) |
 | Vertretung | noch nicht benannt |
+
+## Sicherheitshinweise
+
+- **Vertrauensbereich Collab-Prozess (bewusst so, Review M2 R14):** Die API reicht beim
+  Aufbau einer Live-Verbindung das Sitzungs-Cookie der Person an den Collab-Prozess
+  weiter; die interne API nimmt Laden und Speichern für jede Seite an, die diese
+  Person bearbeiten darf, solange die Sitzung gilt. API und Collab-Prozess bilden
+  damit einen Vertrauensbereich: Ein übernommener Collab-Prozess könnte alle Seiten
+  lesen und überschreiben, die eine gerade verbundene Person bearbeiten darf, in ihrem
+  Namen, und Live-Sitzungen beliebiger Seiten beenden; erreicht er die öffentliche API,
+  könnte er sie als diese Person aufrufen. Im Chart trennt die NetworkPolicy den
+  Collab-Pod von der öffentlichen API; in Compose laufen beide im selben Container.
+  Mit M9 ersetzen kurzlebige, an Seite und Generation gebundene Tokens das
+  weitergereichte Cookie.
 
 ## Betriebshinweise
 

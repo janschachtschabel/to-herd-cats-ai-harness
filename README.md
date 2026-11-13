@@ -336,7 +336,8 @@ kennen.
   gepackt höchstens `HERD_IMPORT_MAX_BYTES` (Standard 104857600, 100 MiB) groß sein
   (auch hier den Ingress anpassen), höchstens 2.000 Einträge und 200 MB entpackt
   enthalten; Einträge mit `..`, absolutem Pfad oder als Symlink werden übersprungen.
-  Ein Import läuft in einer Transaktion; große Archive brauchen entsprechend lange.
+  Ein Import läuft in einer Transaktion; 2.000 Seiten brauchen gemessen etwa 11 s
+  (ohne Anhänge, lokales PostgreSQL), ein Ingress-Timeout muss das abdecken.
   Import und Export nutzen dieselben temporären Dateien unter `HERD_DATA_DIR/tmp`.
   Der Export listet in
   `_attachments/manifest.json`, welcher Anhang jede Datei war; der Import lässt Links
