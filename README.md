@@ -214,7 +214,9 @@ kennen.
   (`HERD_COLLAB_URL`, Standard `ws://127.0.0.1:1234`) weiter. Abgelehnt wird mit
   Schließcodes, die der Browser lesen kann: 4401 (keine gültige Sitzung), 4403 (kein
   Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
-  beendet: Seite neu laden), 4413 (Zustand zu groß), 4422 (`collab.not_roundtrip_safe`:
+  beendet: Seite neu laden), 4413 (Zustand oder Markdown zu groß für die
+  Live-Bearbeitung; der Browser bietet den Markdown-Editor an), 4400 (Speicherung aus
+  anderem Grund abgelehnt), 4422 (`collab.not_roundtrip_safe`:
   der Live-Editor würde die Bedeutung des Markdowns ändern, siehe `docs/WIKI.md`; der
   Browser bietet den Markdown-Editor an), 4429 (zu viele Verbindungen dieser
   Anmeldung: höchstens 3 je Seite und 10 insgesamt, im Collab-Prozess einstellbar mit

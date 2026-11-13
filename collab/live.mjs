@@ -37,6 +37,7 @@ export const CLOSE = {
   unauthorized: [4401, "unauthorized"],
   notFound: [4404, "not_found"],
   tooLarge: [4413, "too_large"],
+  saveRefused: [4400, "save_refused"], // the API refused a save for another reason
   notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
   // Set by server.mjs at the socket: too many connections of one login session (4429),
   // no document joined in time (4408).
@@ -50,7 +51,12 @@ export const SAVED = "herd:saved";
 export const UNSAVED = "herd:unsaved";
 const FLUSH_INTERVAL_MS = 1000; // at most one forced save per connection per second
 
-const DENIAL = { 401: CLOSE.unauthorized, 403: CLOSE.forbidden, 404: CLOSE.notFound };
+const DENIAL = {
+  401: CLOSE.unauthorized,
+  403: CLOSE.forbidden,
+  404: CLOSE.notFound,
+  413: CLOSE.tooLarge,
+};
 // Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
 // browser shows initials in white on them.
 const COLORS = ["#1d4ed8", "#be185d", "#15803d", "#b45309", "#6d28d9", "#0e7490", "#b91c1c"];
@@ -178,7 +184,8 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
       return endGeneration(document, documentName, state);
     }
     if (answer.status === 413) return discard(document, state, CLOSE.tooLarge);
-    return discard(document, state, CLOSE.notFound);
+    if (answer.status === 404) return discard(document, state, CLOSE.notFound);
+    return discard(document, state, CLOSE.saveRefused);
   }
 
   return {

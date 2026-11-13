@@ -4,11 +4,6 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from app.modules.wiki.collab_models import MAX_YDOC_BYTES
-from app.modules.wiki.models import MAX_CONTENT_CHARS
-
-# Room for base64 of a state somewhat over the limit, so the limit answers 413.
-_MAX_YDOC_B64_CHARS = (MAX_YDOC_BYTES // 3 + 2) * 4 + 1024
 MAX_EDITORS = 200
 
 
@@ -39,9 +34,13 @@ class LiveDocumentOut(BaseModel):
 
 
 class SaveIn(BaseModel):
+    """State and Markdown are bounded by the internal body limit only: their own
+    limits answer 413 `collab.state_too_large` (`CollabService`), which the live
+    editor shows as "too large for live editing" (review M2 R8)."""
+
     generation: int = Field(ge=0)
-    ydoc_b64: str = Field(max_length=_MAX_YDOC_B64_CHARS)
-    content_md: str = Field(max_length=MAX_CONTENT_CHARS)
+    ydoc_b64: str
+    content_md: str
     editor_session_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_EDITORS)
     session_key: str = Field(min_length=1, max_length=100)
 

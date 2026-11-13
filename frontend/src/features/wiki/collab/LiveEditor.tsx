@@ -111,7 +111,7 @@ export function LiveEditor({ page, connect }: { page: WikiPage; connect?: Connec
                   {t('wiki.live.reload')}
                 </Button>
               )}
-              {live.stopped === 'not_roundtrip_safe' && (
+              {(live.stopped === 'not_roundtrip_safe' || live.stopped === 'too_large') && (
                 <Button size="sm" variant="outline" asChild>
                   <Link
                     to="/spaces/$spaceId/p/$"

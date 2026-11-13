@@ -145,6 +145,9 @@ describe('live editor', () => {
     ).toBeInTheDocument()
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(connections).toHaveLength(1)
+    // Too large for live editing (review R8): the Markdown editor is offered.
+    const offered = screen.queryByRole('link', { name: 'Im Markdown-Editor bearbeiten' })
+    expect(offered !== null).toBe(code === 4413)
   })
 
   test('4422: a page the live editor would change is offered in the Markdown editor', async () => {

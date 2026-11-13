@@ -31,7 +31,7 @@ from app.modules.auth.service import AuthService
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
 from app.modules.wiki.collab_repository import CollabRepository, page_by_id
-from app.modules.wiki.models import Page
+from app.modules.wiki.models import MAX_CONTENT_CHARS, Page
 from app.modules.wiki.service import PageService
 from app.modules.wiki.visibility import PageReader, page_not_found
 
@@ -182,7 +182,7 @@ class CollabService:
         session_ids: list[uuid.UUID],
         session_key: str,
     ) -> Page:
-        if len(ydoc) > MAX_YDOC_BYTES:
+        if len(ydoc) > MAX_YDOC_BYTES or len(content_md) > MAX_CONTENT_CHARS:
             raise StateTooLarge()
         editors, revoked = await self._editors(session_ids)
         if not editors:

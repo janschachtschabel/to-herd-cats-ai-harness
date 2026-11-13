@@ -204,13 +204,23 @@ async def test_ydoc_over_5mb_is_413(wiki: Wiki, collab: AsyncClient) -> None:
     expect_error(await put_live(collab, page, [sid], ydoc_b64=big), 413, "collab.state_too_large")
     ok = ydoc(b"\x00" * (5 * 1024 * 1024))
     assert (await put_live(collab, page, [sid], ydoc_b64=ok)).status_code == 200
+    # Far over the limit (still within the body limit): 413 as well, never 422.
+    huge = ydoc(b"\x00" * (6 * 1024 * 1024))
+    expect_error(await put_live(collab, page, [sid], ydoc_b64=huge), 413, "collab.state_too_large")
+
+
+async def test_markdown_over_the_page_limit_is_413(wiki: Wiki, collab: AsyncClient) -> None:
+    """Review M2 R8: the live editor says the page is too large, not "not found"."""
+    page = await new_page(wiki.editor, wiki.space_id, "Live")
+    sid = await session_id_of(collab, wiki.editor, page)
+    r = await put_live(collab, page, [sid], content_md="x" * 200_001)
+    expect_error(r, 413, "collab.state_too_large")
+    assert (await put_live(collab, page, [sid], content_md="x" * 200_000)).status_code == 200
 
 
 async def test_put_refuses_bad_input(wiki: Wiki, collab: AsyncClient) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Live")
     sid = await session_id_of(collab, wiki.editor, page)
-    r = await put_live(collab, page, [sid], content_md="x" * 200_001)
-    expect_error(r, 422, "validation_failed")
     expect_error(
         await put_live(collab, page, [sid], ydoc_b64="!!notbase64"), 422, "collab.state_invalid"
     )
