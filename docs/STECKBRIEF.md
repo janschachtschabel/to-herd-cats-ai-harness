@@ -60,6 +60,9 @@ noch nicht. Mehr Anmeldungen je Sekunde gibt es weiterhin über mehr Replikas.
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
 
 Keine ausgehenden Verbindungen zu Dritten, keine Drittanbieter-Anfragen im Browser.
+Die API-Dokumentation `/api/docs` (Swagger UI, lädt ihre Skripte von einem CDN) gibt
+es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
+`production`. Das OpenAPI-Dokument `/api/openapi.json` bleibt immer erreichbar.
 
 ## Clusterfähigkeit
 

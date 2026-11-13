@@ -36,7 +36,9 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="to-herd-cats-ai",
         openapi_url="/api/openapi.json",
-        docs_url="/api/docs",
+        # Swagger UI loads its scripts from a CDN: never in production, where the
+        # browser makes no third-party requests. /api/openapi.json stays.
+        docs_url=None if settings.environment == "production" else "/api/docs",
         redoc_url=None,
     )
     # Added first is innermost: errors are answered before the request line is written.
