@@ -39,7 +39,8 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
 ### Nachrichten, Threads, Erwähnungen, Reaktionen
 
 - Eingabe sendet, Umschalt+Eingabe beginnt eine neue Zeile. Markdown wird mit demselben
-  sicheren Renderer wie im Wiki gezeigt (kein rohes HTML, nur erlaubte Link-Ziele).
+  sicheren Renderer wie im Wiki gezeigt (kein rohes HTML, nur erlaubte Link-Ziele;
+  Bilder nur von dieser Installation, bei fremden Adressen steht nur der Bildtext).
   Eine Nachricht hat höchstens 20.000 Zeichen. Was man tippt, bleibt als Entwurf je
   Gespräch, solange der Tab offen ist.
 - Gesendet wird sofort sichtbar; scheitert das Senden, steht an der Nachricht „Erneut
@@ -49,11 +50,15 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
   Eine gelöschte Nachricht zeigt „Diese Nachricht wurde gelöscht.“, ihre Antworten im
   Thread bleiben.
 - **Threads:** „Im Thread antworten“ öffnet rechts die Thread-Leiste. Antworten zählen
-  an der Nachricht („2 Antworten“). Die Nachricht selbst steht oben in der Leiste nur,
-  wenn sie im geladenen Verlauf ist (es gibt keinen Abruf einer einzelnen Nachricht);
-  sonst stehen dort nur die Antworten.
-- **Erwähnungen:** `@` öffnet die Personenauswahl (aus dem Verzeichnis); im Text steht
-  dann `@[Name](user:<id>)`. Höchstens 50 je Nachricht. Benachrichtigt wird nur, wer das
+  an der Nachricht („2 Antworten“). Die Nachricht selbst steht oben in der Leiste, auch
+  wenn sie nicht im geladenen Verlauf ist (ältere Nachricht, Link aus der Aktivität oder
+  der Suche): dann holt die Leiste sie einzeln (`GET /api/messages/{id}`, gleiche Rechte
+  wie das Gespräch, sonst 404). Threads haben genau eine Ebene; das prüft auch die
+  Datenbank (Trigger `message_one_level_threads`).
+- **Erwähnungen:** `@` öffnet die Personenauswahl (aus dem Verzeichnis; das Eingabefeld
+  ist dabei eine Combobox mit der Liste als Popup); im Text steht dann
+  `@[Name](user:<id>)`. Entfernt eine Bearbeitung eine Erwähnung, verschwindet die noch
+  ungelesene Benachrichtigung dieser Person; eine schon gelesene bleibt. Höchstens 50 je Nachricht. Benachrichtigt wird nur, wer das
   Gespräch sehen darf; die anderen nennt der Composer („Nicht benachrichtigt: … – kann
   dieses Gespräch nicht sehen“). Ob jemand zu einem Bereich gehört, verrät das nicht:
   Unbekannte, deaktivierte und unberechtigte Personen werden gleich behandelt.
@@ -71,7 +76,9 @@ enthält Beiträge und, grau, was mit der Seite geschah: angelegt, veröffentlic
 verschoben, in den Papierkorb gelegt, wiederhergestellt, Version wiederhergestellt.
 „Systemmeldungen ausblenden“ blendet diese Zeilen aus. Systemmeldungen schreibt nur der
 Worker, nur in Seiten-Diskussionen (die Datenbank verhindert sie in Kanälen und
-Direktnachrichten); sie lassen sich weder bearbeiten noch löschen, zählen nicht als
+Direktnachrichten). Sie tragen die Zeit der Änderung (auch in ihrer ID), stehen also in
+der Reihenfolge der Änderungen, auch wenn ein Worker sie später oder in anderer
+Reihenfolge schreibt. Sie lassen sich weder bearbeiten noch löschen, zählen nicht als
 ungelesen und benachrichtigen niemanden. Inhaltliche Änderungen (Markdown- oder
 Live-Speichern) erzeugen keine Systemmeldung. Ein Import erzeugt keine Meldungen je
 Seite; die Diskussionen importierter Seiten beginnen leer. Liegt eine Seite im
@@ -100,21 +107,19 @@ Nachrichten. Mit „Nur in diesem Bereich“ fallen Direktnachrichten weg. Ein T
 
 Live (ohne Neuladen, über `/api/stream`): neue, geänderte und gelöschte Nachrichten
 und Thread-Antworten, Reaktionen, Lesestand aus anderen Tabs, neue Kanäle und
-Kanaländerungen, Aktivität und ihr Zähler, Systemmeldungen der Seiten-Diskussion.
-Nach jeder Unterbrechung lädt der Browser die offenen Ansichten neu (`resync`); verpasste
-Ereignisse werden nicht nachgespielt.
+Kanaländerungen, Aktivität und ihr Zähler, Systemmeldungen der Seiten-Diskussion,
+der Hinweis auf eine Einsicht (an die Teilnehmenden, `dm.inspected`) und geänderter
+Zugang: Wer in einen Bereich aufgenommen, daraus entfernt oder in der Rolle geändert
+wird (direkt oder über eine Gruppe), oder wessen Gruppenmitgliedschaft sich ändert,
+bekommt `access.changed`; der Browser lädt dann alles Gezeigte neu, ein nicht mehr
+sichtbares Gespräch sagt sofort „Dieses Gespräch gibt es nicht (mehr) …“, und die
+Seitenleiste vergisst es. Der Browser sammelt Ereignisse 250 ms und lädt danach jede
+betroffene Ansicht einmal neu, nicht je Ereignis. Nach jeder Unterbrechung lädt er die
+offenen Ansichten neu (`resync`); verpasste Ereignisse werden nicht nachgespielt.
 
-Nicht live (bekannte Lücken, zur Prüfung des Moduls vorgemerkt):
-
-- **Zugang verloren:** Wer aus einem Bereich entfernt wird, bekommt ab dem nächsten
-  Ereignis nichts mehr zugestellt, aber kein eigenes Ereignis. Eine offene Ansicht merkt
-  es beim nächsten Abruf: spätestens nach 60 s (das offene Gespräch wird jede Minute
-  neu geladen), beim Zurückkehren ins Fenster oder bei der nächsten Aktion; dann sagt
-  sie „Dieses Gespräch gibt es nicht (mehr) …“ und die Seitenleiste vergisst es.
-- **Hinweis auf eine Einsicht** erscheint bei den Teilnehmenden beim nächsten Laden des
-  Gesprächs, nicht sofort.
-- Eine einzelne Nachricht lässt sich nicht abrufen (siehe Threads); ein Link auf eine
-  Antwort öffnet das Gespräch mit ihrem Thread.
+Nicht live: Ändert jemand die Art eines Bereichs (offen ↔ Team), bekommen die
+Betroffenen kein eigenes Ereignis; sie bekommen ab dem nächsten Ereignis nichts mehr
+zugestellt, und eine offene Ansicht merkt es beim nächsten Abruf (spätestens nach 60 s).
 
 ## Einsicht in Direktnachrichten
 
@@ -148,8 +153,8 @@ Entscheidung 1).
   (`/health`, `/ready`, `/metrics` auf 9090). `HERD_ROLE=all` (Compose) startet den
   Worker im API-Prozess mit; er teilt sich dort den Datenbank-Pool der API (bewusst so).
   Mehrere Worker sind sicher: Sie holen getrennte Stapel (`FOR NO KEY UPDATE SKIP
-  LOCKED`). Der Worker braucht zwei Datenbankverbindungen gleichzeitig (Stapel und
-  Handler) und eine dritte zum Lauschen auf `herd_outbox`.
+  LOCKED`). Der Worker braucht bis zu drei Datenbankverbindungen gleichzeitig (Stapel,
+  Handler, Metriken) und eine weitere zum Lauschen auf `herd_outbox`.
 - **Zustellung mindestens einmal:** Jeder Handler läuft je Ereignis in einer eigenen
   Transaktion, die zugleich einen Zustellnachweis (`event_delivery`) schreibt. Stirbt der
   Worker mitten drin, bekommt beim nächsten Durchlauf nur der fehlende Handler das
@@ -160,11 +165,24 @@ Entscheidung 1).
   Handler, wartet das Ereignis 2^Versuche Sekunden (höchstens 5 Minuten) und geht dann
   nur an die fehlenden Handler; nach 10 gescheiterten Durchläufen ist es
   „fehlgeschlagen“ (Log `outbox.failed`, ohne Nutzlast). Verteilte Ereignisse werden
-  nach 7 Tagen gelöscht (je Minute höchstens 1.000).
+  nach 7 Tagen gelöscht (je Minute höchstens 1.000); fehlgeschlagene bleiben in der
+  Tabelle (Gauge `herd_outbox_failed`).
+- **Zeitgrenze je Handler:** Jeder Handler-Aufruf hat höchstens
+  `HERD_WORKER_HANDLER_TIMEOUT_SECONDS` (Standard 30 s), durchgesetzt in Python und in
+  der Datenbank (`lock_timeout` und `statement_timeout` der Transaktion): Ein Handler,
+  der an einer Sperre hängt, wird abgebrochen. Das zählt als gescheiterter Versuch
+  (Log `outbox.handler_timeout`, Metrik `result="timeout"`), mit der üblichen Wartezeit.
+  Ein Handler, der im Stapel einmal in die Zeitgrenze lief, wird für den Rest des
+  Stapels übersprungen (dessen Ereignisse bleiben ohne gezählten Versuch fällig): Ein
+  Hänger hält die anderen Handler höchstens eine Zeitgrenze lang auf.
+- **Bereit (`/ready`)** ist der Worker, solange seine Schleife läuft, der letzte
+  Durchlauf die Datenbank erreichte und er innerhalb von vier Zeitgrenzen (Standard
+  120 s) einen Stapel abgeschlossen oder nichts Fälliges gefunden hat.
 - **Ohne Worker** entstehen Nachrichten weiter, aber niemand bekommt sie live,
   Benachrichtigungen und Systemmeldungen bleiben aus; die Ereignisse warten und werden
   nachgeholt, sobald ein Worker läuft. Ein Browser sieht neue Nachrichten dann erst beim
-  Neuladen (oder nach bis zu 60 s im offenen Gespräch).
+  Neuladen (oder nach bis zu 60 s im offenen Gespräch). Der Alarm `HerdWorkerAbsent`
+  meldet das.
 - **Handler-Module importieren:** Der Worker kennt nur Handler, deren Modul geladen
   ist. Jedes Modul mit Handlern gehört in `backend/app/worker/handlers.py`, das
   `app/worker/main.py` vor dem Start importiert; ein Test startet einen frischen Prozess,
@@ -176,18 +194,28 @@ Entscheidung 1).
   Überlagerung `deploy/compose/compose.nodes.yml` startet ihn als eigenen Dienst neben
   zwei API-Knoten (`SMOKE_NODES=1 bash deploy/compose/smoke.sh` prüft damit: Nachricht
   an Knoten A, Ereignis im Stream von Knoten B).
-- **Metriken** (Port 9090): `herd_outbox_pending` und
-  `herd_outbox_oldest_pending_seconds` (offene Ereignisse, ältestes in Sekunden),
-  `herd_outbox_dispatch_total{handler,result}` mit `ok`, `duplicate`, `error`, `failed`.
-  Logs: `outbox.handler_failed` (Warnung: Ereignis, Typ, Handler, Fehlerklasse),
-  `outbox.failed`, `outbox.pass_failed`. Die Gauges berechnet nur ein Prozess mit
-  Worker; API-Pods melden sie als 0 (Dashboards auf den Job des Workers filtern).
-- **Alarme** (PrometheusRule des Charts): `HerdOutboxBacklog` (ältestes offenes Ereignis
-  älter als 5 Minuten, kritisch) und `HerdOutboxFailed` (ein Ereignis wurde nach allen
-  Versuchen aufgegeben, Warnung; feuert auch einmal, wenn ein frisches Prometheus einen
-  Worker mit früheren Fehlschlägen zum ersten Mal abfragt). Ein auf 0 Replikas
-  skalierter Worker löst keinen Alarm aus, ebenso wenig ein Durchlauf, der hängt, ohne
-  einen Fehler zu melden (der Gauge bleibt dann auf dem letzten Wert).
+- **Metriken** (Port 9090), nur von Prozessen mit Worker (Rolle `worker` oder `all`;
+  ein API-Pod meldet sie nicht, statt eine leere Warteschlange vorzutäuschen), alle
+  10 s aus der Datenbank gelesen, auch während ein Durchlauf hängt:
+  `herd_outbox_pending` und `herd_outbox_oldest_pending_seconds` (offene Ereignisse,
+  ältestes in Sekunden), `herd_outbox_failed` (aufgegebene Ereignisse in der Tabelle;
+  übersteht Neustarts), `herd_worker_last_pass_timestamp_seconds` (Unix-Zeit des
+  letzten abgeschlossenen Stapels oder Durchlaufs ohne Fälliges, je Worker), dazu
+  `herd_outbox_dispatch_total{handler,result}` mit `ok`, `duplicate`, `error`,
+  `timeout`, `failed`. Logs: `outbox.handler_failed` und `outbox.handler_timeout`
+  (Warnung: Ereignis, Typ, Handler, Fehlerklasse), `outbox.failed`,
+  `outbox.pass_failed`, `outbox.metrics_failed`.
+- **Alarme** (PrometheusRule des Charts):
+  - `HerdOutboxBacklog`: ältestes offenes Ereignis älter als 5 Minuten (kritisch).
+  - `HerdOutboxFailed`: `herd_outbox_failed` ist in den letzten 15 Minuten gestiegen
+    (Warnung); feuert auch 15 Minuten lang, wenn ein frisches Prometheus den Wert zum
+    ersten Mal über 0 sieht. Ein Neustart oder neuer Pod mit gleichem Wert bleibt still.
+  - `HerdWorkerStalled`: ein Worker hat seit mehr als 3 Minuten keinen Stapel
+    abgeschlossen, 2 Minuten lang (Warnung, je Pod).
+  - `HerdWorkerAbsent`: API-Pods laufen (`herd_sse_connections`), aber kein Worker
+    ihres Releases meldet sich, 5 Minuten lang (kritisch; etwa `worker.replicas: 0`).
+    Der Alarm ordnet Worker und API über die Service-Namen des Charts zu (Job
+    `<release>-worker` gehört zu `<release>-internal`).
 
 ## Live-Zustellung (SSE)
 
@@ -197,24 +225,44 @@ Browser lädt nach, was er zeigen will, mit seinen normalen Rechten.
 
 - **Weg eines Ereignisses:** Commit → Worker → `publish_live` → `NOTIFY herd_live` →
   jeder API-Prozess (eine eigene `LISTEN`-Verbindung je Prozess, außerhalb des Pools)
-  prüft mit einer Abfrage je Ereignis, welche seiner offenen Verbindungen es sehen dürfen
-  (Sitzung gültig, Person aktiv, Gespräch jetzt sichtbar), und schickt es nur dorthin.
+  nimmt, was angekommen ist (bis 200 Ereignisse), prüft für diesen ganzen Stapel mit
+  höchstens zwei Abfragen, welche seiner offenen Verbindungen welches Ereignis sehen
+  dürfen (Sitzung gültig, Person aktiv, Gespräch jetzt sichtbar), und schickt es nur
+  dorthin; was für eine Verbindung zusammen ansteht, geht in einem Schreibvorgang
+  hinaus.
+- **Nachhängen begrenzt:** Ist das älteste wartende Ereignis eines API-Prozesses älter
+  als `HERD_LIVE_MAX_LAG_SECONDS` (Standard 5 s), verwirft der Prozess alles Wartende
+  und schickt jeder Verbindung `resync` (Log `live.fell_behind`), statt immer später
+  zuzustellen. Gemessen (100 Verbindungen, 50 Nachrichten/s, `docs/STECKBRIEF.md`).
+- **Nach einem Verbindungsverlust** baut der Prozess die `LISTEN`-Verbindung nach 1 s
+  wieder auf; die Wartezeit wächst (bis 30 s) nur, solange Versuche scheitern, und
+  beginnt nach jeder funktionierenden Verbindung neu.
   Eine Nachricht, die an einem API-Knoten geschrieben wurde, kommt so auch an jedem
   anderen an (geprüft mit zwei echten Prozessen, `tests/test_live_two_nodes.py`).
-- **Grenzen:** höchstens **5 Verbindungen je Anmeldung und API-Prozess** (die sechste
-  bekommt 429 `live.too_many_streams`, die Oberfläche sagt „Zu viele offene Fenster:
-  Live-Aktualisierung pausiert“). Die Grenze gilt je Prozess: Hinter einem Load
-  Balancer kann eine Anmeldung je API-Pod fünf halten. Je Verbindung puffert der
-  Prozess höchstens 100 Ereignisse; läuft der Puffer über, kommt `resync`.
+- **Grenzen:** höchstens **5 Verbindungen je Anmeldung** und **10 je Person** (über alle
+  ihre Anmeldungen) **je API-Prozess**; die nächste bekommt 429 `live.too_many_streams`,
+  die Oberfläche sagt „Zu viele offene Fenster: Live-Aktualisierung pausiert“. Die
+  Grenzen gelten je Prozess: Hinter einem Load Balancer kann eine Person je API-Pod
+  zehn halten. Je Verbindung puffert der Prozess höchstens 100 Ereignisse; läuft der
+  Puffer über, kommt `resync`.
 - **Beenden:** Endet die Anmeldung (Abmelden, Ablauf, Deaktivierung), bekommt die
   Verbindung ab dem nächsten Ereignis nichts mehr und wird spätestens nach 30 s
   geschlossen; ein neuer Versuch bekommt 401. Bei SIGTERM schließt der API-Prozess seine
   Verbindungen zuerst; die Browser verbinden sich nach 5 s neu (`retry: 5000`), dann mit
   wachsender Wartezeit (5, 10, 30, 60 s).
 - **Metriken:** `herd_sse_connections` (offene Verbindungen),
-  `herd_live_events_total{type}` (zugestellte Ereignisse je Typ). Logs:
-  `live.payload_dropped`, `live.check_failed`, `live.deliver_failed`,
-  `live.session_check_failed`, `listen.connection_lost`.
+  `herd_live_events_total{type}` (empfangene Ereignisse je Typ), `herd_live_queue_depth`
+  (empfangen, noch nicht verteilt), `herd_live_delivery_lag_seconds` (Histogramm: vom
+  Eintreffen des `NOTIFY` bis zur Übergabe an die Verbindungen),
+  `herd_live_resyncs_total{reason}` (`lag`, `overflow`, `reconnect`, `check_failed`).
+  Logs: `live.payload_dropped`, `live.check_failed`, `live.deliver_failed`,
+  `live.fell_behind`, `live.session_check_failed`, `listen.connection_lost`.
+- **Bekannte Grenze (für M6 vorgemerkt):** Die Ungelesen-Zähler
+  (`GET /api/conversations/unread`) zählen bei jedem Abruf alle ungelesenen Nachrichten
+  je sichtbarem Gespräch; das kostet Zeit im Verhältnis zum Ungelesenen (gemessen
+  13–22 ms bei 239, 187–237 ms bei 200.239 Ungelesenen in einem Kanal). Live-Ereignisse
+  lösen den Abruf aus; der Browser bündelt sie (ein Abruf je 250 ms), die Zählung selbst
+  ist noch nicht begrenzt.
 
 ### Betrieb hinter einem Reverse Proxy
 
@@ -234,8 +282,8 @@ folgt für Proxy und Ingress:
    jeder Tab hält eine davon dauerhaft. Mit mehreren Tabs warten dann andere Anfragen.
    TLS mit HTTP/2 am Proxy behebt das (zur App darf es HTTP/1.1 bleiben).
 4. **Mehrere API-Replikas:** keine Sticky Sessions nötig. Jeder Pod braucht eine
-   zusätzliche Datenbankverbindung (LISTEN) und eine kurze Abfrage je Ereignis, wenn er
-   Verbindungen dieser Organisation hält.
+   zusätzliche Datenbankverbindung (LISTEN) und höchstens zwei kurze Abfragen je Stapel
+   von Ereignissen, wenn er Verbindungen dazu hält.
 
 Beispiel nginx vor Compose (zusätzlich zu dem Block für die Live-Bearbeitung in
 [`WIKI.md`](WIKI.md#betrieb-hinter-einem-reverse-proxy)):
@@ -267,7 +315,11 @@ Dokumentationen der Controller; geprüft sind hier nur der direkte Zugriff und C
   Verbindung offen ist).
 - „Live-Aktualisierung unterbrochen – neuer Versuch …“: Die Verbindung bricht ab (Proxy-
   Timeout, Neustart eines Pods); bei jedem Wiederaufbau lädt der Browser nach.
-- „Zu viele offene Fenster“: mehr als 5 Tabs derselben Anmeldung am selben API-Prozess.
-- `herd_outbox_oldest_pending_seconds` steigt dauerhaft: Ein Handler scheitert
-  (`outbox.handler_failed` im Log des Workers) oder der Worker kommt nicht hinterher
-  (mehr Worker-Replikas helfen).
+- „Zu viele offene Fenster“: mehr als 5 Tabs derselben Anmeldung (oder 10 derselben
+  Person) am selben API-Prozess.
+- `herd_outbox_oldest_pending_seconds` steigt dauerhaft: Ein Handler scheitert oder
+  läuft in die Zeitgrenze (`outbox.handler_failed`, `outbox.handler_timeout` im Log des
+  Workers), oder der Worker kommt nicht hinterher (mehr Worker-Replikas helfen).
+- `herd_live_resyncs_total{reason="lag"}` steigt: Ein API-Prozess kommt mit dem Verteilen
+  nicht nach (CPU des Pods, Datenbank); die Browser laden dann neu statt live zu
+  bekommen. `herd_live_delivery_lag_seconds` zeigt, wie spät zugestellt wird.
