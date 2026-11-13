@@ -1,7 +1,9 @@
-"""Demo data for a fresh test installation (M1 to M3), through the public API as the
+"""Demo data for a fresh test installation (M1 to M4), through the public API as the
 browser uses it: three people, the team space "Team Nord" with two pages, two channels
-with messages, thread replies, mentions and reactions, a direct message, and a page
-discussion that starts with the worker's system entries.
+with messages, thread replies, mentions and reactions, a direct message, a page
+discussion that starts with the worker's system entries, and tickets (an epic with
+stories, tasks and a bug in several statuses, assignments, tags, a linked page,
+comments, a ticket key in a channel; see scripts/demo_tickets.py).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
@@ -10,7 +12,8 @@ discussion that starts with the worker's system entries.
 characters) becomes the demo people's password. Passwords are read from the
 environment only, never from arguments, and never printed. The worker must run (role
 `all`, or a worker beside the API): the script waits up to 60 s for the page's system
-entries. A second run stops before changing anything (the demo people exist).
+entries (and then for the tickets'). A second run stops before changing anything (the
+demo people exist).
 """
 
 import argparse
@@ -20,9 +23,12 @@ import sys
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
 
 import httpx
+
+from scripts import demo_tickets
+from scripts.demo_api import DemoFailed, call, mention, post
+from scripts.demo_tickets import SeededTickets
 
 Connect = Callable[[], Awaitable[httpx.AsyncClient]]
 
@@ -38,10 +44,6 @@ class DemoExists(Exception):
     """The demo people exist already: the demo ran on this installation before."""
 
 
-class DemoFailed(Exception):
-    """The API refused a step (status and error code in the message)."""
-
-
 @dataclass
 class Seeded:
     space_id: str = ""
@@ -50,38 +52,13 @@ class Seeded:
     emails: dict[str, str] = field(default_factory=dict)
     channels: dict[str, str] = field(default_factory=dict)
     dm_id: str = ""
-
-
-async def _call(client: httpx.AsyncClient, method: str, path: str, body: Any = None) -> Any:
-    response = await client.request(method, path, json=body)
-    if response.status_code >= 300:
-        code = response.json().get("error", {}).get("code") if response.content else None
-        raise DemoFailed(f"{method} {path}: {response.status_code} {code}")
-    return response.json() if response.content else None
+    tickets: SeededTickets = field(default_factory=SeededTickets)
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
     client = await connect()
-    await _call(client, "POST", "/api/auth/login", {"email": email, "password": password})
+    await call(client, "POST", "/api/auth/login", {"email": email, "password": password})
     return client
-
-
-def mention(name: str, user_id: str) -> str:
-    """A mention as the composer writes it (`@[Name](user:<id>)`)."""
-    return f"@[{name}](user:{user_id})"
-
-
-async def _post(
-    client: httpx.AsyncClient,
-    conversation_id: str,
-    body_md: str,
-    *,
-    parent_id: str | None = None,
-    mentions: tuple[str, ...] = (),
-) -> str:
-    body = {"body_md": body_md, "parent_id": parent_id, "mentions": list(mentions)}
-    message = await _call(client, "POST", f"/api/conversations/{conversation_id}/messages", body)
-    return str(message["id"])
 
 
 async def _people(admin: httpx.AsyncClient, password: str, seeded: Seeded) -> None:
@@ -96,21 +73,21 @@ async def _people(admin: httpx.AsyncClient, password: str, seeded: Seeded) -> No
 
 
 async def _space(admin: httpx.AsyncClient, seeded: Seeded) -> None:
-    space = await _call(admin, "POST", "/api/spaces", {"name": "Team Nord", "kind": "team"})
+    space = await call(admin, "POST", "/api/spaces", {"name": "Team Nord", "kind": "team"})
     seeded.space_id = str(space["id"])
     for key, (_name, _email, role) in PEOPLE.items():
         member = {"member_type": "user", "member_id": seeded.ids[key], "role": role}
-        await _call(admin, "PUT", f"/api/spaces/{seeded.space_id}/members", member)
+        await call(admin, "PUT", f"/api/spaces/{seeded.space_id}/members", member)
 
 
 async def _pages(anna: httpx.AsyncClient, seeded: Seeded) -> None:
     """Two published pages; the second is changed and restored, so its discussion gets
     three system entries (created, published, version restored)."""
     pages = f"/api/spaces/{seeded.space_id}/pages"
-    handbook = await _call(anna, "POST", pages, {"title": "Handbuch", "content_md": HANDBOOK})
+    handbook = await call(anna, "POST", pages, {"title": "Handbuch", "content_md": HANDBOOK})
     publish = {"version": handbook["version"]}
-    await _call(anna, "POST", f"/api/pages/{handbook['id']}/publish", publish)
-    leave = await _call(
+    await call(anna, "POST", f"/api/pages/{handbook['id']}/publish", publish)
+    leave = await call(
         anna,
         "POST",
         pages,
@@ -118,11 +95,11 @@ async def _pages(anna: httpx.AsyncClient, seeded: Seeded) -> None:
     )
     page_id = str(leave["id"])
     publish = {"version": leave["version"]}
-    leave = await _call(anna, "POST", f"/api/pages/{page_id}/publish", publish)
+    leave = await call(anna, "POST", f"/api/pages/{page_id}/publish", publish)
     edit = {"content_md": LEAVE + "\nEntwurf: 35 Tage für alle.\n", "version": leave["version"]}
-    leave = await _call(anna, "PATCH", f"/api/pages/{page_id}", edit)
+    leave = await call(anna, "PATCH", f"/api/pages/{page_id}", edit)
     restore = {"version": leave["version"]}
-    await _call(anna, "POST", f"/api/pages/{page_id}/versions/1/restore", restore)
+    await call(anna, "POST", f"/api/pages/{page_id}/versions/1/restore", restore)
     seeded.page_id = page_id
 
 
@@ -130,37 +107,37 @@ async def _channels(people: dict[str, httpx.AsyncClient], seeded: Seeded) -> Non
     anna, ben, clara = people["anna"], people["ben"], people["clara"]
     channels = f"/api/spaces/{seeded.space_id}/channels"
     for name, topic in (("team-nord", "Alles rund ums Team"), ("projekt-kranich", None)):
-        channel = await _call(anna, "POST", channels, {"name": name, "topic": topic})
+        channel = await call(anna, "POST", channels, {"name": name, "topic": topic})
         seeded.channels[name] = str(channel["id"])
 
     team = seeded.channels["team-nord"]
-    welcome = await _post(anna, team, "Willkommen im Kanal von **Team Nord**! 👋")
+    welcome = await post(anna, team, "Willkommen im Kanal von **Team Nord**! 👋")
     clara_id = seeded.ids["clara"]
-    await _post(
+    await post(
         ben,
         team,
         f"Danke! {mention('Clara Klein', clara_id)}, das Handbuch hat jetzt eine Urlaubsseite.",
         mentions=(clara_id,),
     )
     for client, emoji in ((clara, "👍"), (ben, "🎉")):
-        await _call(client, "PUT", f"/api/messages/{welcome}/reactions/{emoji}")
+        await call(client, "PUT", f"/api/messages/{welcome}/reactions/{emoji}")
 
     kranich, ben_id = seeded.channels["projekt-kranich"], seeded.ids["ben"]
-    kickoff = await _post(
+    kickoff = await post(
         anna,
         kranich,
         f"Kick-off am Montag um 10 Uhr. {mention('Ben Berg', ben_id)}, bringst du die Zahlen mit?",
         mentions=(ben_id,),
     )
-    await _post(ben, kranich, "Mache ich, inklusive Prognose.", parent_id=kickoff)
-    await _post(clara, kranich, "Ich lese mit und schreibe Protokoll.", parent_id=kickoff)
+    await post(ben, kranich, "Mache ich, inklusive Prognose.", parent_id=kickoff)
+    await post(clara, kranich, "Ich lese mit und schreibe Protokoll.", parent_id=kickoff)
 
 
 async def _dm(people: dict[str, httpx.AsyncClient], seeded: Seeded) -> None:
-    dm = await _call(people["anna"], "POST", "/api/dms", {"user_ids": [seeded.ids["ben"]]})
+    dm = await call(people["anna"], "POST", "/api/dms", {"user_ids": [seeded.ids["ben"]]})
     seeded.dm_id = str(dm["id"])
-    await _post(people["anna"], seeded.dm_id, "Hast du kurz Zeit wegen des Budgets?")
-    await _post(people["ben"], seeded.dm_id, "Klar, ruf einfach an.")
+    await post(people["anna"], seeded.dm_id, "Hast du kurz Zeit wegen des Budgets?")
+    await post(people["ben"], seeded.dm_id, "Klar, ruf einfach an.")
 
 
 async def timeline_ready(
@@ -171,7 +148,7 @@ async def timeline_ready(
     deadline = time.monotonic() + wait_seconds
     path = f"/api/conversations/{conversation_id}/messages"
     while True:
-        items = (await _call(client, "GET", path))["items"]
+        items = (await call(client, "GET", path))["items"]
         if sum(1 for m in items if m["kind"] == "system") >= SYSTEM_ENTRIES:
             return
         if time.monotonic() >= deadline:
@@ -183,16 +160,16 @@ async def _discussion(
     people: dict[str, httpx.AsyncClient], seeded: Seeded, wait_seconds: float
 ) -> None:
     ben, anna = people["ben"], people["anna"]
-    thread = await _call(ben, "GET", f"/api/pages/{seeded.page_id}/thread")
+    thread = await call(ben, "GET", f"/api/pages/{seeded.page_id}/thread")
     await timeline_ready(ben, str(thread["id"]), wait_seconds=wait_seconds)
     anna_id = seeded.ids["anna"]
-    question = await _post(
+    question = await post(
         ben,
         str(thread["id"]),
         f"{mention('Anna Nord', anna_id)}, gilt die Regel auch für Teilzeit?",
         mentions=(anna_id,),
     )
-    await _post(anna, str(thread["id"]), "Ja, anteilig nach Arbeitstagen.", parent_id=question)
+    await post(anna, str(thread["id"]), "Ja, anteilig nach Arbeitstagen.", parent_id=question)
 
 
 async def seed(
@@ -219,6 +196,17 @@ async def seed(
     await _dm(people, seeded)
     await settle()
     await _discussion(people, seeded, wait_seconds)
+    seeded.tickets = await demo_tickets.build(
+        admin,
+        people,
+        space_id=seeded.space_id,
+        page_id=seeded.page_id,
+        ids=seeded.ids,
+        channel_id=seeded.channels["projekt-kranich"],
+    )
+    await demo_tickets.comment(
+        people, seeded.tickets, seeded.ids, settle=settle, wait_seconds=wait_seconds
+    )
     return seeded
 
 
@@ -271,7 +259,8 @@ async def _main(base: str, admin_email: str) -> int:
         for client in clients:
             await client.aclose()
     people = ", ".join(seeded.emails.values())
-    print(f"demo ready: space Team Nord ({seeded.space_id}), people {people}")
+    tickets = len(seeded.tickets.numbers)
+    print(f"demo ready: space Team Nord ({seeded.space_id}), {tickets} tickets, people {people}")
     return 0
 
 
