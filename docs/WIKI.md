@@ -209,7 +209,9 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
   Host.
 - Close-Codes (in den Entwicklerwerkzeugen des Browsers): 4401 Sitzung ungültig, 4403
   kein Schreibrecht, 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
-  zu groß, 4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
+  zu groß, 4422 Seite nicht verlustfrei live bearbeitbar, 4429 zu viele Verbindungen
+  dieser Anmeldung (3 je Seite, 10 insgesamt), 4408/4504 Verbindungsaufbau zu langsam,
+  4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
   `revoked`, `too_large`, `refused`).

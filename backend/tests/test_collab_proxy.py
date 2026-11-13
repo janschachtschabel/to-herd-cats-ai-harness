@@ -200,6 +200,27 @@ async def test_collab_process_down_is_502(
     assert closed == (4502, "collab.unavailable")
 
 
+async def test_a_handshake_that_takes_too_long_is_closed(
+    public_url: str, setup: Setup, upstream: Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review M2 R7: checking and dialling the collab process together take at most
+    HANDSHAKE_TIMEOUT_SECONDS; a socket stuck there does not stay open."""
+    from app.web import collab_proxy
+
+    real = collab_proxy._authorize
+
+    async def slow(*args: Any) -> Any:
+        await asyncio.sleep(1.0)
+        return await real(*args)
+
+    monkeypatch.setattr(collab_proxy, "HANDSHAKE_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(collab_proxy, "_authorize", slow)
+    url = _url(public_url, setup.page)
+    closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
+    assert closed == (4504, "collab.timeout")
+    assert upstream.requests == []
+
+
 async def test_connections_are_counted(public_url: str, setup: Setup, upstream: Upstream) -> None:
     from app.core.metrics import COLLAB_CONNECTIONS
 

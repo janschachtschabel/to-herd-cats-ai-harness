@@ -4,17 +4,23 @@
 // - WebSocket upgrades only on `/collab/<page id>?generation=<n>`, from an allowed
 //   Origin (HERD_PUBLIC_URL, or the request's own host), with the session cookie, at
 //   most 200 at a time, messages up to 1 MB. The live rules are in `live.mjs`.
+// - One login session (its cookie) holds at most HERD_COLLAB_MAX_PER_SESSION (10)
+//   connections, at most HERD_COLLAB_MAX_PER_PAGE (3) of them on one page; more are
+//   closed with 4429 `too_many_connections`. A socket that has not joined its document
+//   within 10 s is closed with 4408 `handshake_timeout`, so idle sockets cannot hold
+//   the global limit (review M2 R7).
 //
 // Settings (environment): HERD_INTERNAL_TOKEN (required), HERD_COLLAB_API_URL (the
 // API's internal port, default http://127.0.0.1:9090), HERD_COLLAB_PORT (1234),
 // HERD_COLLAB_HOST (127.0.0.1 with HERD_ROLE=all, else 0.0.0.0), HERD_PUBLIC_URL,
 // HERD_SESSION_COOKIE_NAME (herd_session).
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { Hocuspocus } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
-import { liveExtension } from "./live.mjs";
+import { liveExtension, readCookie } from "./live.mjs";
 
 const PAGE_PATH = /^\/collab\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const MAX_MESSAGE_BYTES = 1024 * 1024;
@@ -38,6 +44,24 @@ export function originAllowed(headers, publicUrl) {
   return host !== "" && hostOf(origin) === host;
 }
 
+/** Counts per key (login session, session and page); `take` is false at the limit. */
+function counter() {
+  const counts = new Map();
+  return {
+    take(key, limit) {
+      const count = counts.get(key) ?? 0;
+      if (count >= limit) return false;
+      counts.set(key, count + 1);
+      return true;
+    },
+    give(key) {
+      const count = (counts.get(key) ?? 1) - 1;
+      if (count > 0) counts.set(key, count);
+      else counts.delete(key);
+    },
+  };
+}
+
 function refuse(socket, status) {
   socket.end(`HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
 }
@@ -55,6 +79,9 @@ export function createCollabServer({
   publicUrl = null,
   cookieName = "herd_session",
   maxConnections = 200,
+  maxPerSession = 10,
+  maxPerPage = 3,
+  handshakeTimeoutMs = 10_000,
   checkIntervalMs = 5000,
   debounceMs = 2000,
   maxDebounceMs = 10000,
@@ -71,6 +98,7 @@ export function createCollabServer({
     extensions: [extension],
   });
   const sockets = new Set();
+  const held = counter();
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   let closing = null;
 
@@ -90,6 +118,25 @@ export function createCollabServer({
     if (sockets.size >= maxConnections) return refuse(socket, 503);
     wss.handleUpgrade(request, socket, head, (ws) => {
       sockets.add(ws);
+      // The login session by its cookie (hashed: no token is kept), before any message.
+      const token = readCookie(request.headers.cookie, cookieName);
+      const session = token && createHash("sha256").update(token).digest("base64");
+      const keys = session ? [`s:${session}`, `p:${session}:${page[1]}`] : [];
+      const taken = [];
+      if (session) {
+        if (held.take(keys[0], maxPerSession)) taken.push(keys[0]);
+        if (taken.length === 1 && held.take(keys[1], maxPerPage)) taken.push(keys[1]);
+      }
+      const release = () => taken.splice(0).forEach((key) => held.give(key));
+      if (taken.length !== keys.length) {
+        release();
+        ws.on("close", () => sockets.delete(ws));
+        return ws.close(4429, "too_many_connections");
+      }
+      const joining = setTimeout(() => {
+        if (!extension.joined.has(ws)) ws.close(4408, "handshake_timeout");
+      }, handshakeTimeoutMs);
+      joining.unref();
       const headers = new Headers();
       for (const name of ["cookie", "origin"]) {
         if (request.headers[name]) headers.set(name, request.headers[name]);
@@ -104,6 +151,8 @@ export function createCollabServer({
       ws.on("pong", () => client.touch?.());
       ws.on("error", () => ws.terminate());
       ws.on("close", (code, reason) => {
+        clearTimeout(joining);
+        release();
         sockets.delete(ws);
         client.handleClose({ code, reason: reason.toString() });
       });
@@ -146,6 +195,11 @@ export function createCollabServer({
   };
 }
 
+function positive(value, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : fallback;
+}
+
 async function main(env) {
   if (!env.HERD_INTERNAL_TOKEN) {
     console.error("HERD_INTERNAL_TOKEN is not set: live editing needs it");
@@ -156,6 +210,8 @@ async function main(env) {
     token: env.HERD_INTERNAL_TOKEN,
     publicUrl: env.HERD_PUBLIC_URL || null,
     cookieName: env.HERD_SESSION_COOKIE_NAME || "herd_session",
+    maxPerSession: positive(env.HERD_COLLAB_MAX_PER_SESSION, 10),
+    maxPerPage: positive(env.HERD_COLLAB_MAX_PER_PAGE, 3),
   });
   const host =
     env.HERD_COLLAB_HOST || ((env.HERD_ROLE || "all") === "all" ? "127.0.0.1" : "0.0.0.0");

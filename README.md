@@ -216,8 +216,13 @@ kennen.
   Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
   beendet: Seite neu laden), 4413 (Zustand zu groß), 4422 (`collab.not_roundtrip_safe`:
   der Live-Editor würde die Bedeutung des Markdowns ändern, siehe `docs/WIKI.md`; der
-  Browser bietet den Markdown-Editor an), 4502/4503 (Collab-Prozess nicht
-  erreichbar bzw. aus), 1013 (später erneut versuchen). Gespeichert wird höchstens alle
+  Browser bietet den Markdown-Editor an), 4429 (zu viele Verbindungen dieser
+  Anmeldung: höchstens 3 je Seite und 10 insgesamt, im Collab-Prozess einstellbar mit
+  `HERD_COLLAB_MAX_PER_PAGE` und `HERD_COLLAB_MAX_PER_SESSION`), 4502/4503
+  (Collab-Prozess nicht erreichbar bzw. aus), 4504 (Prüfen und Verbinden dauerten
+  länger als 10 s), 4408 (der Browser ist dem Dokument nicht binnen 10 s
+  beigetreten), 1013 (später erneut versuchen); bei 4408, 4504 und 1013 verbindet
+  sich der Browser selbst neu. Gespeichert wird höchstens alle
   2 s, spätestens nach 10 s; alle 5 s prüft der Collab-Prozess Generation und Rechte.
   Eine Speicherung im Markdown-Modus, Wiederherstellen, Verschieben und Papierkorb
   beenden die laufende Live-Sitzung (4409). Endet nur die Anmeldung (Abmelden,

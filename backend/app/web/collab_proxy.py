@@ -46,6 +46,9 @@ router = APIRouter()
 
 MAX_MESSAGE_BYTES = 1024 * 1024
 OPEN_TIMEOUT_SECONDS = 5.0
+# Checking and dialling together; then the collab process gives the browser 10 s to
+# join its document (4408), so no socket idles before it is live (review M2 R7).
+HANDSHAKE_TIMEOUT_SECONDS = 10.0
 
 
 def origin_allowed(origin: str | None, host: str | None, public_url: str | None) -> bool:
@@ -98,12 +101,37 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
     if not token:
         return await _deny(websocket, 401, "auth.required")
     generation = int(raw_generation)
-    refused = await _authorize(token, page_id, generation)
-    if refused is not None:
-        status = 409 if refused.code == "collab.generation_ended" else refused.status_code
-        return await _deny(websocket, status, refused.code)
     try:
-        upstream = await connect(
+        async with asyncio.timeout(HANDSHAKE_TIMEOUT_SECONDS):
+            refused = await _authorize(token, page_id, generation)
+            if refused is not None:
+                status = 409 if refused.code == "collab.generation_ended" else refused.status_code
+                return await _deny(websocket, status, refused.code)
+            upstream = await _dial(websocket, settings, token, host, page_id, generation)
+    except TimeoutError:
+        logger.warning("collab handshake timed out")
+        return await _deny(websocket, 504, "collab.timeout")
+    if upstream is None:
+        return await _deny(websocket, 502, "collab.unavailable")
+    await websocket.accept()
+    COLLAB_CONNECTIONS.inc()
+    try:
+        await _relay(websocket, upstream)
+    finally:
+        COLLAB_CONNECTIONS.dec()
+
+
+async def _dial(
+    websocket: WebSocket,
+    settings: Settings,
+    token: str,
+    host: str | None,
+    page_id: uuid.UUID,
+    generation: int,
+) -> ClientConnection | None:
+    """The collab process for this page; None when it cannot be reached."""
+    try:
+        return await connect(
             f"{settings.collab_url}/collab/{page_id}?generation={generation}",
             additional_headers=_upstream_headers(websocket, settings, token, host),
             max_size=MAX_MESSAGE_BYTES,
@@ -112,13 +140,7 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
         )
     except (OSError, InvalidHandshake, TimeoutError) as exc:
         logger.warning("collab unreachable", extra={"error": type(exc).__name__})
-        return await _deny(websocket, 502, "collab.unavailable")
-    await websocket.accept()
-    COLLAB_CONNECTIONS.inc()
-    try:
-        await _relay(websocket, upstream)
-    finally:
-        COLLAB_CONNECTIONS.dec()
+        return None
 
 
 def _upstream_headers(

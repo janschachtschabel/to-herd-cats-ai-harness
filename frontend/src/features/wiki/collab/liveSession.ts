@@ -6,6 +6,7 @@ export type StopReason =
   | 'not_found'
   | 'too_large'
   | 'not_roundtrip_safe'
+  | 'connection_limit'
   | 'off'
   | 'invalid'
 
@@ -28,6 +29,7 @@ const STOPS: Record<number, StopReason> = {
   4404: 'not_found',
   4413: 'too_large',
   4422: 'not_roundtrip_safe',
+  4429: 'connection_limit',
   4503: 'off',
 }
 

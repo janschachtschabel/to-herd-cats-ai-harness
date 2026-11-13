@@ -38,6 +38,8 @@ export const CLOSE = {
   notFound: [4404, "not_found"],
   tooLarge: [4413, "too_large"],
   notRoundTripSafe: [4422, "collab.not_roundtrip_safe"],
+  // Set by server.mjs at the socket: too many connections of one login session (4429),
+  // no document joined in time (4408).
   retry: [1013, "retry"],
 };
 
@@ -72,6 +74,7 @@ function deny(context, close) {
 
 export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} }) {
   const live = new Map(); // document name -> { pageId, generation, sessionKey, dirty, seen, ... }
+  const joined = new WeakSet(); // sockets that completed the handshake and joined a document
   const ending = new Set(); // document names whose generation must end before anyone joins
 
   function discard(document, state, close) {
@@ -181,6 +184,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
   return {
     extensionName: "herd-live",
     live,
+    joined,
 
     async onAuthenticate({ documentName, requestHeaders, context }) {
       if (documentName !== `page:${context.pageId}`) throw deny(context, CLOSE.forbidden);
@@ -241,6 +245,7 @@ export function liveExtension({ api, cookieName, retryMs = 5000, log = () => {} 
         if (document) discard(document, state, CLOSE.generationEnded);
         return closeSocket(context, CLOSE.retry);
       }
+      joined.add(context.socket);
     },
 
     async beforeHandleMessage({ context, documentName }) {
