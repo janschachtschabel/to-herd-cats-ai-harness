@@ -3,24 +3,21 @@
 // is micromark with the GFM extensions; the same parser builds the syntax tree here.
 // Two Markdown texts mean the same when their trees are equal after dropping what does
 // not change the rendered page: source positions, runs of whitespace inside text,
-// tight/loose lists. Wiki links (`[[Titel]]`) are resolved on the source text by the
-// page view (frontend/src/features/wiki/markdown.ts `resolveWikiLinks`), so they are
-// turned into links with the raw title first, the way the page view does it.
+// tight/loose lists. Wiki links (`[[Titel]]`) are turned into links first, found the
+// way the page view finds them (`wikilinks.mjs`).
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 
-import { WIKI_LINK, outsideCode } from "./syntax.mjs";
+import { linkText, replaceWikiLinks } from "./wikilinks.mjs";
 
 const IGNORED = new Set(["position", "spread"]);
 
-/** `[[Titel]]` → `[Titel](wiki:Titel)`, outside code (as the page view does). */
+/** `[[Titel]]` → `[Titel](wiki:Titel)` (as the page view does). */
 export function markWikiLinks(markdown) {
-  return outsideCode(markdown, (text) =>
-    text.replace(WIKI_LINK, (_, raw) => {
-      const title = raw.trim();
-      return `[${title}](wiki:${encodeURIComponent(title)})`;
-    }),
+  return replaceWikiLinks(
+    markdown,
+    ({ title }) => `[${linkText(title)}](wiki:${encodeURIComponent(title)})`,
   );
 }
 
@@ -38,9 +35,28 @@ function normalize(node) {
   return out;
 }
 
+const MARKS = new Set(["emphasis", "strong", "delete"]);
+
+/** Bold, italic and strike wrapped directly around each other look the same in any
+ * order (`~~**x**~~`, `**~~x~~**`): such a chain is put in one order. */
+function sortChain(node) {
+  const types = [];
+  let inner = node;
+  while (MARKS.has(inner.type)) {
+    types.push(inner.type);
+    if (inner.children?.length !== 1 || !MARKS.has(inner.children[0].type)) break;
+    inner = inner.children[0];
+  }
+  if (types.length < 2) return node;
+  const sorted = [...types].sort();
+  let out = { type: sorted.at(-1), children: inner.children };
+  for (const type of sorted.slice(0, -1).reverse()) out = { type, children: [out] };
+  return out;
+}
+
 function normalizeChildren(children) {
   const out = [];
-  for (const child of children.map(normalize)) {
+  for (const child of children.map(normalize).map(sortChain)) {
     const last = out.at(-1);
     if (child.type === "text" && last?.type === "text") {
       last.value = `${last.value}${child.value}`.replace(/ +/g, " ");

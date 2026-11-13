@@ -19,30 +19,45 @@ const ODD_SPACE = /[\p{White_Space}\p{Cc}]/u;
 const reference = (char) =>
   char === " " ? "&nbsp;" : `&#x${char.codePointAt(0).toString(16).toUpperCase()};`;
 
+const WORD = /[\p{L}\p{N}]/u;
+
+/** One character of text as Markdown. */
+function escaped(chars, i) {
+  const char = chars[i];
+  if (char === " ") return " ";
+  // `_` between two letters or digits can neither open nor close emphasis.
+  if (char === "_" && WORD.test(chars[i - 1] ?? "") && WORD.test(chars[i + 1] ?? "")) return char;
+  if (SPECIAL.test(char)) return `\\${char}`;
+  if (ODD_SPACE.test(char)) return reference(char);
+  // Autolink literals the editor shows as text: `https\://`, `www\.`.
+  if (char === ":" && chars[i + 1] === "/" && chars[i + 2] === "/") return "\\:";
+  if (char === "." && /www$/i.test(chars.slice(Math.max(0, i - 3), i).join(""))) return "\\.";
+  return char;
+}
+
+/** A wiki link as one run of text the page view finds as such (`wikilinks.mjs`): what
+ * would be Markdown inside it is escaped; other characters stay as they are. */
+function wikiLink(text) {
+  const chars = [...text.slice(2, -2)];
+  const inner = chars
+    .map((char, i) => (char !== " " && ODD_SPACE.test(char) ? char : escaped(chars, i)))
+    .join("");
+  return `[[${inner}]]`;
+}
+
 /** Escaped text as units, one per character, so a unit next to a delimiter can be
- * written as a reference afterwards. Wiki links (`[[Titel]]`) stay as written, except
- * in a link's text (a link cannot hold another; there they are text). */
+ * written as a reference afterwards. A wiki link (`[[Titel]]`) is one unit, except in a
+ * link's text (a link cannot hold another; there it is text). */
 function textUnits(text, inLink) {
   const units = [];
   let last = 0;
   const plain = (part) => {
     const chars = [...part];
-    chars.forEach((char, i) => {
-      let out = char;
-      if (char === " ") out = " ";
-      else if (ODD_SPACE.test(char)) out = reference(char);
-      else if (SPECIAL.test(char)) out = `\\${char}`;
-      // Autolink literals the editor shows as text: `https\://`, `www\.`.
-      else if (char === ":" && chars[i + 1] === "/" && chars[i + 2] === "/") out = "\\:";
-      else if (char === "." && /www$/i.test(chars.slice(Math.max(0, i - 3), i).join(""))) {
-        out = "\\.";
-      }
-      units.push({ char, out });
-    });
+    chars.forEach((char, i) => units.push({ char, out: escaped(chars, i) }));
   };
   for (const match of inLink ? [] : text.matchAll(WIKI_LINK)) {
     plain(text.slice(last, match.index));
-    units.push({ char: null, out: match[0] });
+    units.push({ char: null, out: wikiLink(match[0]) });
     last = match.index + match[0].length;
   }
   plain(text.slice(last));

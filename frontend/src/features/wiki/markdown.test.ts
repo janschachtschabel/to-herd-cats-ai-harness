@@ -23,6 +23,26 @@ describe('markdown helpers', () => {
     expect(resolveWikiLinks('```\n[[Handbuch]]\n```', lookup)).toBe('```\n[[Handbuch]]\n```')
   })
 
+  test('wiki links only in text: not in code spans, fences in quotes or links', () => {
+    const lookup = new Map([['a_b', 'a-b']])
+    for (const md of [
+      '`[[A_b]]`',
+      '> ```\n> [[A_b]]\n> ```',
+      '[see [[A_b]]](x)',
+      '\\[\\[A_b\\]\\]',
+    ]) {
+      expect(resolveWikiLinks(md, lookup), md).toBe(md)
+    }
+    // A fence inside a code block does not end it for the wiki links after it.
+    expect(resolveWikiLinks('````\n```\n````\n\n[[A_b]]', lookup)).toBe(
+      '````\n```\n````\n\n[A\\_b](wiki:a-b)',
+    )
+    // Escaped Markdown in the title names the title without escapes.
+    expect(resolveWikiLinks('[[a \\*b\\*]] [[A_b]]', new Map([['a *b*', 'x']]))).toBe(
+      '[a \\*b\\*](wiki:x) [A\\_b](wiki-missing:A_b)',
+    )
+  })
+
   test('only http, https, mailto and relative targets survive', () => {
     expect(safeUrl('https://example.com/a')).toBe('https://example.com/a')
     expect(safeUrl('mailto:a@b.de')).toBe('mailto:a@b.de')

@@ -2,36 +2,8 @@
 // (`serialize.mjs`, `inline.mjs`). Plain ESM without dependencies; the browser's live
 // editor uses them too.
 
-/** `[[Titel]]`: a link to another page, resolved by the page view on the source text
- * outside code (frontend/src/features/wiki/markdown.ts `resolveWikiLinks`). */
+/** `[[Titel]]`: a link to another page by its title (found by `wikilinks.mjs`). */
 export const WIKI_LINK = /\[\[([^\]\n]+)\]\]/g;
-
-const FENCE = /^\s*(```|~~~)/;
-const CODE_SPAN = /(?<!\\)(`+)[^`][\s\S]*?(?<!`)\1(?!`)|(`+)/g;
-
-/** The Markdown with `replace` applied to the text outside fenced code and code spans,
- * line by line, the way the page view finds wiki links. */
-export function outsideCode(markdown, replace) {
-  let inFence = false;
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (FENCE.test(line)) {
-        inFence = !inFence;
-        return line;
-      }
-      if (inFence) return line;
-      let out = "";
-      let last = 0;
-      for (const match of line.matchAll(CODE_SPAN)) {
-        if (match[2]) continue; // a lone backtick run is text
-        out += replace(line.slice(last, match.index)) + match[0];
-        last = match.index + match[0].length;
-      }
-      return out + replace(line.slice(last));
-    })
-    .join("\n");
-}
 
 /** A link mark as one string (canonical form, `canonical.mjs`): href and title. */
 export function linkKey(attrs) {

@@ -13,3 +13,14 @@ declare module '@collab/serialize.mjs' {
 
   export function jsonToMarkdown(json: JSONContent): string
 }
+
+declare module '@collab/wikilinks.mjs' {
+  export interface WikiLink {
+    start: number
+    end: number
+    title: string
+  }
+  export function wikiLinks(markdown: string): WikiLink[]
+  export function replaceWikiLinks(markdown: string, replace: (link: WikiLink) => string): string
+  export function linkText(title: string): string
+}

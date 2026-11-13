@@ -18,8 +18,9 @@ const start = async (markdown) => (live = await liveFixture({ markdown, createCo
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("a page that would change its meaning is not opened (4422)", async () => {
-  // A wiki link holding `|` in a table row: the page view reads no table there.
-  await start("a\n| [[A|B]] |\n|---|");
+  // The parser reads the second line as a paragraph; written after the code block as a
+  // block of its own (raw, for its HTML) it would be a list.
+  await start("    b\n0. <x>");
   const c = live.open({ cookie: "herd_session=token-a" });
   await until(() => c.closes.includes(4422));
   assert.ok(!c.provider.synced);

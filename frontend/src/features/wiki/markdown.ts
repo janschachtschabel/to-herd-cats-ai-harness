@@ -1,4 +1,6 @@
 // Ported-from: to-herd-cats-ai@46352bb:frontend/src/features/wiki/markdown-utils.ts
+import { linkText, replaceWikiLinks } from '@collab/wikilinks.mjs'
+
 export interface Heading {
   level: 1 | 2 | 3
   text: string
@@ -38,21 +40,15 @@ export function extractHeadings(markdown: string): Heading[] {
 }
 
 /** `[[Title]]` → a link to the page of that title (`wiki:<path>`), or to
- *  `wiki-missing:<title>` when no page has it. Fenced code is left alone. */
+ *  `wiki-missing:<title>` when no page has it. Found in the page's text only, never in
+ *  code, HTML or a link (one rule with the live editor, collab/wikilinks.mjs). */
 export function resolveWikiLinks(markdown: string, lookup: Map<string, string>): string {
-  return lines(markdown)
-    .map(({ line, code }) =>
-      code
-        ? line
-        : line.replace(/\[\[([^\]\n]+)\]\]/g, (_, raw: string) => {
-            const title = raw.trim()
-            const path = lookup.get(title.toLowerCase())
-            return path
-              ? `[${title}](wiki:${encodeURIComponent(path)})`
-              : `[${title}](wiki-missing:${encodeURIComponent(title)})`
-          }),
-    )
-    .join('\n')
+  return replaceWikiLinks(markdown, ({ title }) => {
+    const path = lookup.get(title.toLowerCase())
+    return path
+      ? `[${linkText(title)}](wiki:${encodeURIComponent(path)})`
+      : `[${linkText(title)}](wiki-missing:${encodeURIComponent(title)})`
+  })
 }
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])

@@ -11,13 +11,14 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
 import { RAW_MARKDOWN } from "./schema.mjs";
-import { WIKI_LINK, outsideCode } from "./syntax.mjs";
+import { replaceWikiLinks } from "./wikilinks.mjs";
 
 // `[[Titel]]` while parsing: a link `[…]()` of the same length whose text is
 // private-use characters. Like the page view's `[Titel](wiki:…)` it is a link of its
 // own (it ends the text around it, so an address before it is linked the same way) and
 // punctuation at both ends; it is restored as the title's text afterwards.
 const HOLE = "\ue000";
+const ESCAPE = /\\([!-/:-@[-`{-~])/g;
 
 const UNSUPPORTED = new Set([
   "html",
@@ -35,14 +36,16 @@ export function supported(node) {
   return (node.children ?? []).every(supported);
 }
 
-/** The page view resolves `[[Titel]]` before parsing (outside code): the title is
- * literal text for it. Each one is replaced by a placeholder of the same length, so
- * source positions stay valid: the placeholder's position in the original Markdown is
- * the wiki link's text. */
+/** The page view turns wiki links into links before parsing (`wikilinks.mjs`). Each is
+ * replaced by a placeholder of the same length, so source positions stay valid: the
+ * placeholder's position in the original Markdown is the wiki link. */
 function hideWikiLinks(markdown) {
-  return outsideCode(markdown, (text) =>
-    text.replace(WIKI_LINK, (match) => `[${HOLE.repeat(match.length - 4)}]()`),
-  );
+  return replaceWikiLinks(markdown, ({ start, end }) => `[${HOLE.repeat(end - start - 4)}]()`);
+}
+
+/** The editor's text for a wiki link: as written, without backslash escapes. */
+function wikiText(written) {
+  return `[[${written.slice(2, -2).replace(ESCAPE, "$1")}]]`;
 }
 
 /** A placeholder link (see HOLE). */
@@ -83,7 +86,7 @@ function inline(nodes, source) {
       case "link":
         if (isHole(node)) {
           const { start, end } = node.position;
-          out.push({ type: "text", text: source.slice(start.offset, end.offset) });
+          out.push({ type: "text", text: wikiText(source.slice(start.offset, end.offset)) });
           break;
         }
         out.push(
@@ -207,7 +210,9 @@ export function parseMarkdown(markdown, keepRaw = () => false) {
   const sources = [];
   const content = [];
   tree.children.forEach((node, index) => {
-    const source = markdown.slice(node.position.start.offset, node.position.end.offset);
+    // From the start of its line: the indentation before a block is part of it.
+    const { start, end } = node.position;
+    const source = markdown.slice(start.offset - (start.column - 1), end.offset);
     sources.push(source);
     if (!supported(node) || keepRaw(index, source)) {
       content.push(rawBlock(source));

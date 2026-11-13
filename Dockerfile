@@ -19,8 +19,10 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-# The live editor imports the collab process's editor schema (one schema for both).
-COPY collab/schema.mjs collab/syntax.mjs collab/serialize.mjs collab/canonical.mjs collab/inline.mjs /src/collab/
+# The live editor and the page view import the collab process's editor schema, its
+# serializer and its wiki-link finder (one rule for both sides).
+COPY collab/schema.mjs collab/syntax.mjs collab/serialize.mjs collab/canonical.mjs collab/inline.mjs \
+     collab/wikilinks.mjs /src/collab/
 RUN npm run build
 
 # --- collab: the live-editing process with its production dependencies -------------

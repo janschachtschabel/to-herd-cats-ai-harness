@@ -108,6 +108,19 @@ test("two lists in a row stay two lists", () => {
   }
 });
 
+test("marks around each other keep their meaning in any order", () => {
+  for (const markdown of ["~~**x**~~ und ***y*** und _~~z~~_", " 0. ~~**x**~~\n\n       )"]) {
+    assertKeepsMeaning(markdown, markdown);
+    assert.equal(rawBlocks(liveSave(markdown).json), 0, markdown);
+  }
+});
+
+test("a raw block keeps the indentation of its first line", () => {
+  const markdown = " 0. <b>x</b>\n\n       )";
+  assertKeepsMeaning(markdown, markdown);
+  assert.equal(liveSave(markdown).markdown, markdown);
+});
+
 test("a table is read the way the page view reads it", () => {
   // A `|` inside code ends the cell for the page view; the editor reads it the same way
   // (one parser for both), so the table is rich text and keeps its meaning.
@@ -123,7 +136,9 @@ test("the comparison sees what the page view sees", () => {
   assert.ok(sameMeaning("&copy; 2026", "© 2026"));
   assert.ok(!sameMeaning("&copy;", "&amp;copy;"));
   assert.ok(!sameMeaning("\\# kein Titel", "# kein Titel"));
-  assert.ok(!sameMeaning("[[API_Keys]]", "[[API\\_Keys]]"), "wiki links by their written title");
+  assert.ok(sameMeaning("[[API_Keys]]", "[[API\\_Keys]]"), "wiki links by their title");
+  assert.ok(!sameMeaning("[[A]]", "\\[\\[A\\]\\]"), "an escaped wiki link is text");
+  assert.ok(!sameMeaning("`[[A]]`", "`[A](wiki:A)`"), "no wiki links in code");
   assert.ok(!sameMeaning("[a](<b c>)", "[a](b c)"));
   assert.ok(!sameMeaning("[![a](x.png)](https://example.org)", "![a](x.png)"));
 });

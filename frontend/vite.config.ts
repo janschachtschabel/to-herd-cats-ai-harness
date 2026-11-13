@@ -22,6 +22,9 @@ const SHARED = [
   '@tiptap/extension-link',
   '@tiptap/extension-code',
   '@tiptap/extension-heading',
+  'mdast-util-from-markdown',
+  'mdast-util-gfm',
+  'micromark-extension-gfm',
   'yjs',
 ]
 
