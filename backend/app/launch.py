@@ -19,8 +19,9 @@ import asyncio
 import logging
 import os
 import signal
+import socket
 import sys
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Literal, Protocol
 
@@ -32,6 +33,7 @@ from app.core.db import get_database
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
 from app.core.spool import remove_stale_spools
+from app.modules.messaging.live import LiveHub
 from app.modules.orgs.service import ensure_bootstrap
 from app.web.collab_proxy import MAX_MESSAGE_BYTES
 from app.web.internal import create_internal_app
@@ -65,11 +67,31 @@ class _Server(uvicorn.Server):
 
     Each uvicorn.Server installs its own SIGTERM handler; with two of them the second
     replaces the first, and only one server would ever hear the signal.
+
+    `before_shutdown` runs when the server begins to stop: uvicorn waits for open
+    responses to finish, and live streams (`/api/stream`) never do unless told to.
     """
+
+    def __init__(
+        self, config: uvicorn.Config, before_shutdown: Callable[[], None] | None = None
+    ) -> None:
+        super().__init__(config)
+        self.before_shutdown = before_shutdown
 
     @contextmanager
     def capture_signals(self) -> Iterator[None]:
         yield
+
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        if self.before_shutdown is not None:
+            self.before_shutdown()
+        await super().shutdown(sockets)
+
+
+def _closing_streams(app: object) -> Callable[[], None] | None:
+    """What ends the live streams of the public app `app` (its hub), if it has one."""
+    hub = getattr(getattr(app, "state", None), "live", None)
+    return hub.close_all if isinstance(hub, LiveHub) else None
 
 
 def steps_for(role: str) -> tuple[Step, ...]:
@@ -247,7 +269,10 @@ async def serve(settings: Settings) -> int:
     remove_stale_spools(settings.data_dir)
     await bootstrap(settings)
     worker = create_worker(get_database()) if settings.role == "all" else None
-    servers: list[Server] = [_Server(config) for config in server_configs(settings, worker)]
+    servers: list[Server] = [
+        _Server(config, before_shutdown=_closing_streams(config.app))
+        for config in server_configs(settings, worker)
+    ]
     if worker is not None:
         servers.append(worker)
     if settings.role == "all":

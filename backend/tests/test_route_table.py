@@ -104,6 +104,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/admin/dm-inspect", "admin"),
     ("POST", "/api/admin/dm-inspect", "admin"),
     ("GET", "/api/admin/dm-inspect/{inspection_id}/messages", "admin"),
+    ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),

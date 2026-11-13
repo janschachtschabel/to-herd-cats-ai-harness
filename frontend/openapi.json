@@ -7673,6 +7673,26 @@
         ]
       }
     },
+    "/api/stream": {
+      "get": {
+        "operationId": "stream_api_stream_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-sent events"
+          },
+          "429": {
+            "description": "Too many streams of this login session"
+          }
+        },
+        "summary": "Stream",
+        "tags": [
+          "live"
+        ]
+      }
+    },
     "/api/tags": {
       "get": {
         "operationId": "list_tags_api_tags_get",

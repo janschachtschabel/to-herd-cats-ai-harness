@@ -1,11 +1,14 @@
 """The public application (port HERD_PUBLIC_PORT)."""
 
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI
 
 from app.core.body_limit import BodyLimitMiddleware, RouteLimit
 from app.core.config import Settings, get_settings
+from app.core.db import get_database
 from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from app.core.nul_guard import NulGuardMiddleware
 from app.core.request_context import RequestContextMiddleware
@@ -20,7 +23,9 @@ from app.modules.groups.router import router as groups_router
 from app.modules.messaging import router as messaging
 from app.modules.messaging import router_activity as messaging_activity
 from app.modules.messaging import router_dms as messaging_dms
+from app.modules.messaging import router_live as messaging_live
 from app.modules.messaging import router_social as messaging_social
+from app.modules.messaging.live import LiveHub
 from app.modules.search.router import router as search_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
@@ -59,6 +64,7 @@ def api_router() -> APIRouter:
     api.include_router(messaging_activity.activity)
     api.include_router(messaging_dms.dms)
     api.include_router(messaging_dms.dm_inspect)
+    api.include_router(messaging_live.live)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
@@ -75,10 +81,24 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
     ]
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """The live hub (`app.state.live`) listens while the app serves. Uvicorn runs
+    this; apps driven without a lifespan (ASGI tests) have a hub that is not running,
+    and `/api/stream` answers 503 there."""
+    hub: LiveHub = app.state.live
+    await hub.start(get_database())
+    try:
+        yield
+    finally:
+        await hub.stop()
+
+
 def create_public_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
         title="to-herd-cats-ai",
+        lifespan=_lifespan,
         openapi_url="/api/openapi.json",
         # Swagger UI loads its scripts from a CDN: never in production, where the
         # browser makes no third-party requests. /api/openapi.json stays.
@@ -96,6 +116,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestLogMiddleware)
     install_error_handlers(app)
     configure_tracing(app, settings)
+    app.state.live = LiveHub()
     app.include_router(api_router())
     app.include_router(collab_relay)  # WebSocket /collab/{page_id}
 
