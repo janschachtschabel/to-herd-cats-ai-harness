@@ -117,3 +117,38 @@ class ExpectedVersion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int
+
+
+class PageMove(BaseModel):
+    """`parent_id` null: the top level. `position` among the new siblings, 0 first;
+    left out: at the end, or where the page is if its parent stays."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_id: uuid.UUID | None
+    position: int | None = Field(default=None, ge=0, le=1_000_000)
+    version: int
+
+
+class TrashedPageOut(BaseModel):
+    """A page that went into the trash on its own or with the pages below it; `path`
+    and `parent_id` are where it was."""
+
+    id: uuid.UUID
+    parent_id: uuid.UUID | None
+    title: str
+    path: str
+    status: PageStatus
+    trashed_at: datetime
+
+    @classmethod
+    def of(cls, page: Page) -> "TrashedPageOut":
+        assert page.trashed_at is not None
+        return cls(
+            id=page.id,
+            parent_id=page.parent_id,
+            title=page.title,
+            path=page.path,
+            status=page.status,
+            trashed_at=page.trashed_at,
+        )

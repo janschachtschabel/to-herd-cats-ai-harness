@@ -49,6 +49,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/pages/{page_id}", "page"),
     ("PATCH", "/api/pages/{page_id}", "page"),
     ("POST", "/api/pages/{page_id}/publish", "page"),
+    ("POST", "/api/pages/{page_id}/move", "page"),
+    ("POST", "/api/pages/{page_id}/trash", "page"),
+    ("POST", "/api/pages/{page_id}/restore", "page"),
+    ("GET", "/api/spaces/{space_id}/trash", "space"),
+    ("DELETE", "/api/pages/{page_id}", "admin"),  # purge: page.purge (system admins)
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -123,6 +128,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/spaces/{space_id}/pages"): {"title": "X"},
     ("PATCH", "/api/pages/{page_id}"): {"title": "X", "version": 1},
     ("POST", "/api/pages/{page_id}/publish"): {"version": 1},
+    ("POST", "/api/pages/{page_id}/move"): {"parent_id": None, "version": 1},
+    ("POST", "/api/pages/{page_id}/trash"): {"version": 1},
 }
 
 

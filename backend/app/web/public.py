@@ -30,6 +30,7 @@ def api_router() -> APIRouter:
     api.include_router(spaces_router)
     api.include_router(wiki.space_pages)
     api.include_router(wiki.pages)
+    api.include_router(wiki.space_trash)
     api.include_router(directory_router)
     api.include_router(audit_router)
     return api

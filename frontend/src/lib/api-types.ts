@@ -260,11 +260,32 @@ export interface paths {
         get: operations["get_page_api_pages__page_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Purge Page
+         * @description Delete a page in the trash for good, with everything below it (system admins).
+         */
+        delete: operations["purge_page_api_pages__page_id__delete"];
         options?: never;
         head?: never;
         /** Update Page */
         patch: operations["update_page_api_pages__page_id__patch"];
+        trace?: never;
+    };
+    "/api/pages/{page_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move Page */
+        post: operations["move_page_api_pages__page_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/pages/{page_id}/publish": {
@@ -278,6 +299,40 @@ export interface paths {
         put?: never;
         /** Publish Page */
         post: operations["publish_page_api_pages__page_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pages/{page_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Page */
+        post: operations["restore_page_api_pages__page_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pages/{page_id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trash Page */
+        post: operations["trash_page_api_pages__page_id__trash_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -406,6 +461,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Trash */
+        get: operations["list_trash_api_spaces__space_id__trash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -414,7 +486,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge";
         /**
          * AuditOut
          * @description `actor_name`: the acting person's display name (None for other principals).
@@ -590,6 +662,19 @@ export interface components {
             title: string;
         };
         /**
+         * PageMove
+         * @description `parent_id` null: the top level. `position` among the new siblings, 0 first;
+         *     left out: at the end, or where the page is if its parent stays.
+         */
+        PageMove: {
+            /** Parent Id */
+            parent_id: string | null;
+            /** Position */
+            position?: number | null;
+            /** Version */
+            version: number;
+        };
+        /**
          * PageOut
          * @description `version` guards writes (send it back; stale → 409). `collab_generation` changes
          *     whenever open live-editing sessions of the page end.
@@ -693,6 +778,13 @@ export interface components {
         Page_SpaceOut_: {
             /** Items */
             items: components["schemas"]["SpaceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[TrashedPageOut] */
+        Page_TrashedPageOut_: {
+            /** Items */
+            items: components["schemas"]["TrashedPageOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -835,6 +927,30 @@ export interface components {
          * @enum {string}
          */
         SystemRole: "owner" | "admin" | "member" | "guest";
+        /**
+         * TrashedPageOut
+         * @description A page that went into the trash on its own or with the pages below it; `path`
+         *     and `parent_id` are where it was.
+         */
+        TrashedPageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Path */
+            path: string;
+            status: components["schemas"]["PageStatus"];
+            /** Title */
+            title: string;
+            /**
+             * Trashed At
+             * Format: date-time
+             */
+            trashed_at: string;
+        };
         /**
          * TreeNodeOut
          * @description A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
@@ -1584,6 +1700,35 @@ export interface operations {
             };
         };
     };
+    purge_page_api_pages__page_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_page_api_pages__page_id__patch: {
         parameters: {
             query?: never;
@@ -1596,6 +1741,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_page_api_pages__page_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageMove"];
             };
         };
         responses: {
@@ -1642,6 +1822,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PageOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_page_api_pages__page_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trash_page_api_pages__page_id__trash_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1977,6 +2221,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TreeNodeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trash_api_spaces__space_id__trash_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TrashedPageOut_"];
                 };
             };
             /** @description Validation Error */

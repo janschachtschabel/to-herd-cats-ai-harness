@@ -15,7 +15,14 @@ from tests.factories_spaces import personal_space_of
 from tests.test_access import actor_of
 
 SPACES = "/api/spaces"
-ALL_SYSTEM = ["audit.read", "directory.read", "group.manage", "space.create", "user.manage"]
+ALL_SYSTEM = [
+    "audit.read",
+    "directory.read",
+    "group.manage",
+    "page.purge",
+    "space.create",
+    "user.manage",
+]
 
 
 @pytest.mark.parametrize(

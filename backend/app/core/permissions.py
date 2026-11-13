@@ -21,6 +21,7 @@ class Action(StrEnum):
     USER_MANAGE = "user.manage"
     GROUP_MANAGE = "group.manage"
     AUDIT_READ = "audit.read"
+    PAGE_PURGE = "page.purge"  # delete a trashed page for good (system admins)
 
 
 class SpaceRole(StrEnum):

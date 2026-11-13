@@ -14,7 +14,8 @@
           "directory.read",
           "user.manage",
           "group.manage",
-          "audit.read"
+          "audit.read",
+          "page.purge"
         ],
         "title": "Action",
         "type": "string"
@@ -407,6 +408,47 @@
         "title": "PageCreate",
         "type": "object"
       },
+      "PageMove": {
+        "additionalProperties": false,
+        "description": "`parent_id` null: the top level. `position` among the new siblings, 0 first;\nleft out: at the end, or where the page is if its parent stays.",
+        "properties": {
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "parent_id",
+          "version"
+        ],
+        "title": "PageMove",
+        "type": "object"
+      },
       "PageOut": {
         "description": "`version` guards writes (send it back; stale \u2192 409). `collab_generation` changes\nwhenever open live-editing sessions of the page end.",
         "properties": {
@@ -721,6 +763,33 @@
           "items"
         ],
         "title": "Page[SpaceOut]",
+        "type": "object"
+      },
+      "Page_TrashedPageOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrashedPageOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TrashedPageOut]",
         "type": "object"
       },
       "Page_TreeNodeOut_": {
@@ -1105,6 +1174,54 @@
         ],
         "title": "SystemRole",
         "type": "string"
+      },
+      "TrashedPageOut": {
+        "description": "A page that went into the trash on its own or with the pages below it; `path`\nand `parent_id` are where it was.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "trashed_at": {
+            "format": "date-time",
+            "title": "Trashed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parent_id",
+          "title",
+          "path",
+          "status",
+          "trashed_at"
+        ],
+        "title": "TrashedPageOut",
+        "type": "object"
       },
       "TreeNodeOut": {
         "description": "A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.",
@@ -2332,6 +2449,41 @@
       }
     },
     "/api/pages/{page_id}": {
+      "delete": {
+        "description": "Delete a page in the trash for good, with everything below it (system admins).",
+        "operationId": "purge_page_api_pages__page_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Page",
+        "tags": [
+          "wiki"
+        ]
+      },
       "get": {
         "operationId": "get_page_api_pages__page_id__get",
         "parameters": [
@@ -2425,6 +2577,59 @@
         ]
       }
     },
+    "/api/pages/{page_id}/move": {
+      "post": {
+        "operationId": "move_page_api_pages__page_id__move_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
     "/api/pages/{page_id}/publish": {
       "post": {
         "operationId": "publish_page_api_pages__page_id__publish_post",
@@ -2473,6 +2678,95 @@
           }
         },
         "summary": "Publish Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/restore": {
+      "post": {
+        "operationId": "restore_page_api_pages__page_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Page",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/pages/{page_id}/trash": {
+      "post": {
+        "operationId": "trash_page_api_pages__page_id__trash_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Page Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trash Page",
         "tags": [
           "wiki"
         ]
@@ -3040,6 +3334,77 @@
           }
         },
         "summary": "Page Tree",
+        "tags": [
+          "wiki"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/trash": {
+      "get": {
+        "operationId": "list_trash_api_spaces__space_id__trash_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TrashedPageOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Trash",
         "tags": [
           "wiki"
         ]

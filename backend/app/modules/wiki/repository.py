@@ -1,6 +1,10 @@
 """The SQL of wiki pages. Every statement is scoped by the actor's organisation and the
 spaces it may read (`PageScope`, built from `access.visible_space_ids`), so a page in a
-space the actor cannot see is never even loaded."""
+space the actor cannot see is never even loaded. Statements over whole subtrees (moves,
+the trash, purging) are in `subtree_repository.py`.
+
+Reads refresh rows already in the session (`populate_existing`): subtree statements
+change rows in bulk, behind the session's back."""
 
 import uuid
 from dataclasses import dataclass
@@ -48,9 +52,13 @@ class PageRepository:
     async def live(self, page_id: uuid.UUID, *, lock: bool = False) -> Page | None:
         """A page outside the trash; with `lock`, the row as committed now, locked
         until the transaction ends."""
-        stmt = select(Page).where(self._live(), Page.id == page_id)
+        stmt = (
+            select(Page)
+            .where(self._live(), Page.id == page_id)
+            .execution_options(populate_existing=True)
+        )
         if lock:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+            stmt = stmt.with_for_update()
         return await self.session.scalar(stmt)
 
     async def live_in_space(self, space_id: uuid.UUID, page_id: uuid.UUID) -> Page | None:
@@ -62,7 +70,11 @@ class PageRepository:
         return await self.session.scalar(stmt)
 
     async def by_path(self, space_id: uuid.UUID, path: str) -> Page | None:
-        stmt = select(Page).where(self._live(), Page.space_id == space_id, Page.path == path)
+        stmt = (
+            select(Page)
+            .where(self._live(), Page.space_id == space_id, Page.path == path)
+            .execution_options(populate_existing=True)
+        )
         return await self.session.scalar(stmt)
 
     async def tree_page(
@@ -79,6 +91,7 @@ class PageRepository:
             .where(self._live(), Page.space_id == space_id)
             .order_by(Page.path, Page.id)
             .limit(limit)
+            .execution_options(populate_existing=True)
         )
         if not drafts:
             stmt = stmt.where(Page.status == PageStatus.PUBLISHED)
@@ -89,6 +102,16 @@ class PageRepository:
     async def sibling_slugs(self, space_id: uuid.UUID, parent_id: uuid.UUID | None) -> set[str]:
         stmt = select(Page.slug).where(self._live(), Page.space_id == space_id, under(parent_id))
         return set((await self.session.scalars(stmt)).all())
+
+    async def children(self, space_id: uuid.UUID, parent_id: uuid.UUID | None) -> list[Page]:
+        """Siblings outside the trash, in their order."""
+        stmt = (
+            select(Page)
+            .where(self._live(), Page.space_id == space_id, under(parent_id))
+            .order_by(Page.sort_order, Page.id)
+            .execution_options(populate_existing=True)
+        )
+        return list((await self.session.scalars(stmt)).all())
 
     async def next_sort_order(self, space_id: uuid.UUID, parent_id: uuid.UUID | None) -> int:
         stmt = select(func.max(Page.sort_order)).where(
