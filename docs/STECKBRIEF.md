@@ -457,7 +457,7 @@ Aus den Messwerten mit 20–30 % Puffer:
 | Container | CPU Request | CPU Limit | Speicher Request | Speicher Limit | Chart-Standard heute |
 |---|---|---|---|---|---|
 | api (je Pod, ohne Collab-Prozess) | 250m | 3500m oder keins | 256Mi | 330Mi | Request 100m / 256Mi, Limit 512Mi |
-| collab (eine Replika) | 50m | 500m | 128Mi | 256Mi | Request 50m / 128Mi, Limit 512Mi |
+| collab (eine Replika) | 50m | 500m | 128Mi | 1Gi | Request 50m / 128Mi, Limit 1Gi |
 | worker (je Replika) | 50m | 300m | 128Mi | 140Mi | Request 50m / 192Mi, Limit 384Mi |
 | db (mitgeliefert) | 100m | keins | 100Mi | 105Mi | Request 100m / 256Mi, Limit 1Gi |
 
@@ -470,8 +470,15 @@ Aus den Messwerten mit 20–30 % Puffer:
   behält 256Mi/512Mi.
 - **collab:** CPU beim Tippen von 10 Personen bis 0,4 Kerne für den ganzen Container
   (API, Weiterleitung und Collab-Prozess zusammen), Speicher (RSS) 92 MiB mit einem
-  Dokument. Mehr gleichzeitige Seiten brauchen mehr Speicher (je Dokument der Yjs-Zustand,
-  höchstens 5 MiB, nicht gemessen). Das Chart behält 128Mi/512Mi.
+  kleinen Dokument. Große Seiten kosten viel mehr (Prüfung M4-1 P12, gemessen im
+  Browser über die Weiterleitung, RSS des Collab-Prozesses): 8 Seiten mit je 4.998
+  Tabellenzellen zugleich geöffnet 438 MB, 8 Textseiten mit 190.000 Zeichen 401 MB, 16
+  Tabellen-Seiten 508 MB (11 geöffnet, 5 abgewiesen als „ausgelastet“), 20 Textseiten
+  521 MB (17 geöffnet, 3 abgewiesen), 8 Tabellen-Seiten mit Tippen und Speichern 493 MB;
+  20 s nach dem Verlassen 113–136 MB. Der Collab-Prozess hält seine geladenen Dokumente
+  unter `HERD_COLLAB_MEMORY_BUDGET_MB` (400, Schätzung, `docs/WIKI.md`); Faustregel
+  Limit ≥ (130 MB + 250 MB je Prüf-Thread + Budget) / 0,8 = 975 MB. Das Chart setzt
+  128Mi/1Gi (vorher 512Mi: drei bis fünf große Tabellen-Seiten brachten ihn darüber).
 - **worker:** RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU 20–24 %
   (ohne Image gemessen). Request = 106 MiB + 20 %, Limit = 107 MiB + 30 %, CPU-Limit =
   24 % + Reserve. Das Chart setzt mehr (192Mi/384Mi); das bleibt, bis eine Messung im
