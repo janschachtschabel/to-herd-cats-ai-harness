@@ -122,3 +122,29 @@ test("Enter in a table cell keeps the table", async () => {
   await expect(article.locator("table tbody td").nth(1)).toHaveText("y");
   expect(stored).toBe("| A | B |\n| --- | --- |\n| xz | y |");
 });
+
+test("a state that cannot be saved as Markdown is shown, and saved once it can", async () => {
+  // Code in a table cell with a backslash right before `|`: no Markdown says that.
+  const table = "| Befehl |\n| --- |\n| `a\\|b` |";
+  const doc = await publishedPage(context, space.id, "Unsagbar", table);
+  const tab = await context.newPage();
+  await tab.goto(pageUrl(space, doc, "live"));
+  const editor = tab.getByRole("textbox", { name: "Inhalt von „Unsagbar“" });
+  await expect(tab.getByRole("status")).toHaveText("Synchronisiert");
+  await editor.getByText("a|b").click();
+  await tab.keyboard.press("Home");
+  await tab.keyboard.press("ArrowRight");
+  await tab.keyboard.type("\\");
+  const notice = tab.getByText("lässt sich so nicht als Markdown speichern");
+  await expect(notice).toBeVisible();
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  let stored = await call(context, "GET", `/api/pages/${doc.id}`);
+  expect(stored.content_md).toBe(table);
+  await tab.keyboard.press("Backspace");
+  await tab.keyboard.type("x");
+  await expect(notice).toBeHidden();
+  await tab.getByRole("button", { name: "Fertig" }).click();
+  await expect(tab).toHaveURL(new RegExp(`/p/${doc.path}$`));
+  stored = await call(context, "GET", `/api/pages/${doc.id}`);
+  expect(stored.content_md).toBe("| Befehl |\n| --- |\n| `ax\\|b` |");
+});
