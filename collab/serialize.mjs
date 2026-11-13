@@ -68,9 +68,18 @@ function tightPair(previous, next) {
   if (previous.type === "codeBlock" && previous.language === RAW_MARKDOWN) return false;
   if (next.type === "codeBlock") return next.language !== RAW_MARKDOWN;
   if (next.type === "heading") return true;
-  if (!LIST_FAMILY[next.type] || !next.content[0]?.content.length) return false;
-  // Only a bullet list or one starting at 1 can interrupt a paragraph.
-  return previous.type !== "paragraph" || next.type !== "orderedList" || next.start === 1;
+  if (!LIST_FAMILY[next.type]) return false;
+  return previous.type !== "paragraph" ? next.content[0]?.content.length > 0 : interrupts(next);
+}
+
+/** Whether a list may start on the line right after a line of text: its first item
+ * holds something, a bullet list or one starting at 1, and so is every list that starts
+ * on that same line (`- 1. a`: each of them would interrupt the text). */
+function interrupts(list) {
+  const first = list.content[0]?.content ?? [];
+  if (first.length === 0) return false;
+  if (list.type === "orderedList" && (list.start ?? 1) !== 1) return false;
+  return !LIST_FAMILY[first[0].type] || interrupts(first[0]);
 }
 
 function list(block, variant) {

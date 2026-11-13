@@ -44,7 +44,7 @@ function atoms(content) {
       const marks = markKeys(node.marks);
       const code = marks.includes("code");
       for (const char of String(node.text ?? "").replace(CONTROL, "")) {
-        if (!code && SPACE.test(char)) out.push({ t: "space", marks: [] });
+        if (!code && SPACE.test(char)) out.push({ t: "space", marks });
         else out.push({ t: "char", char: code && /[\n\r]/.test(char) ? " " : char, marks });
       }
     } else if (node.type === "hardBreak") {
@@ -72,7 +72,7 @@ const shared = (a, b) => a.filter((key) => b.includes(key));
 const isGap = (atom) => atom.t === "space" || atom.t === "br";
 
 /** Spaces collapsed and trimmed, trailing hard breaks dropped, the marks of spaces and
- * hard breaks taken from their neighbours. */
+ * hard breaks taken from their neighbours (a link only if the space has it too). */
 function tidy(list) {
   const out = [];
   for (const atom of list) {
@@ -92,7 +92,11 @@ function tidy(list) {
     while (j < out.length && isGap(out[j])) j++;
     const after = out[j];
     const marks = before && after ? shared(before.marks, after.marks) : [];
-    out[i] = { ...out[i], marks: marks.filter((key) => key !== "code") };
+    // A space between two links to the same target joins them only if it is linked
+    // itself (`[a](u) [b](u)` are two links); a hard break carries no marks of its own
+    // in the Y.Doc, so it takes them from its neighbours.
+    const own = (key) => !key.startsWith("link") || out[i].t === "br" || out[i].marks.includes(key);
+    out[i] = { ...out[i], marks: marks.filter((key) => key !== "code" && own(key)) };
   }
   return out;
 }

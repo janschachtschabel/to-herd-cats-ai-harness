@@ -106,6 +106,43 @@ const CASES = {
     doc(paragraph(text("e"), text("a", "bold"), text("(", "bold", "strike"))),
     "&#x65;**&#x61;~~(~~**",
   ],
+  "two links to one address with a space between": [
+    doc(paragraph(text("a", link("u")), text(" "), text("b", link("u")))),
+    "[a](u) [b](u)",
+  ],
+  "a link whose space is where italic ends": [
+    doc(paragraph(text("x", "italic", link("u")), text(" ", link("u")), text("y", link("u")))),
+    "[_x_ y](u)",
+  ],
+  "a link split by marks that overlap it, with a space at the split": [
+    doc(
+      paragraph(
+        text("[", "italic"),
+        text("# ", "italic", link("u")),
+        text("=", "strike", link("u")),
+      ),
+    ),
+    "_\\[[#](u)_[ ~~=~~](u)",
+  ],
+  "a list that starts with a list under a line of text": [
+    doc({
+      type: "bulletList",
+      content: [
+        item(paragraph(text("v")), {
+          type: "orderedList",
+          attrs: { start: 1 },
+          content: [
+            item(paragraph(), {
+              type: "orderedList",
+              attrs: { start: 3 },
+              content: [item(paragraph(text("w")))],
+            }),
+          ],
+        }),
+      ],
+    }),
+    "- v\n\n  1. 3. w",
+  ],
   "a table cell with a pipe": [
     doc({
       type: "table",

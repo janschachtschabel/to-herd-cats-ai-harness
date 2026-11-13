@@ -189,13 +189,16 @@ const closes = (piece) => piece?.kind === "close" || piece?.gap === "close";
 
 /** Spaces and hard breaks just inside a delimiter or a link's brackets are moved
  * outside: a delimiter next to a space would not work, and the marks of a space or a
- * hard break are those of the text around it anyway (`canonical.mjs`). */
+ * hard break are those of the text around it anyway (`canonical.mjs`). A space stays
+ * inside a link's brackets: it is linked only if it was (`[a](u) [b](u)` are two). */
 function moveGaps(list) {
+  const movable = (gap, other) => !(gap.kind === "text" && other.gap);
   for (let moved = true; moved;) {
     moved = false;
     for (let i = 0; i + 1 < list.length; i++) {
+      const [a, b] = [list[i], list[i + 1]];
       const swap =
-        (opens(list[i]) && gapAt(list[i + 1])) || (gapAt(list[i]) && closes(list[i + 1]));
+        (opens(a) && gapAt(b) && movable(b, a)) || (gapAt(a) && closes(b) && movable(a, b));
       if (swap) {
         [list[i], list[i + 1]] = [list[i + 1], list[i]];
         moved = true;
