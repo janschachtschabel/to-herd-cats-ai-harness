@@ -487,6 +487,6 @@ stehen nie in Labels.
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL) | 812 | alle grün (13.11.2026, 6:26 min), dazu ruff, ruff format, mypy (strict) sauber |
-| Frontend (`vitest`) | 175 in 35 Dateien | alle grün (13.11.2026) |
-| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 17 in 5 Dateien, davon 5 zu Nachrichten | die 5 Nachrichten-Tests hier in 3 Läufen grün; die 12 der Live-Bearbeitung hier nicht neu gelaufen |
+| Backend (`pytest`, echtes PostgreSQL) | 833 | alle grün (13.11.2026, nach der Review-Welle 1: 6:18 min), dazu ruff, ruff format, mypy (strict) sauber |
+| Frontend (`vitest`) | 180 in 36 Dateien | alle grün (13.11.2026) |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 17 in 5 Dateien, davon 5 zu Nachrichten | die 5 Nachrichten-Tests hier in 4 Läufen grün (zuletzt nach der Review-Welle 1); die 12 der Live-Bearbeitung hier nicht neu gelaufen |
