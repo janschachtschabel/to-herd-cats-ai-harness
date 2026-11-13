@@ -6,6 +6,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import UnhandledErrorMiddleware, install_error_handlers
 from app.core.request_context import RequestContextMiddleware
 from app.core.request_log import RequestLogMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.telemetry import configure_tracing
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
@@ -39,6 +40,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     )
     # Added first is innermost: errors are answered before the request line is written.
     app.add_middleware(UnhandledErrorMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RequestLogMiddleware)
     install_error_handlers(app)

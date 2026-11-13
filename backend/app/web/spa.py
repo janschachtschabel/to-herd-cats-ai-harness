@@ -8,7 +8,8 @@
   else (index.html, favicon) is revalidated on every use.
 - No path can reach outside the directory: `..` segments are refused and the
   resolved file (symlinks followed) must lie inside it.
-- Every response here carries the SPA's security headers. The policy is
+- Every response here carries the SPA's Content-Security-Policy (the other security
+  headers come from `core.security_headers` for every response). The policy is
   `default-src 'self'` (own scripts, styles, fonts, images and API; no eval) plus
   the one thing the built app was shown to need (Playwright, console clean):
   `<style>` elements, which Radix dialogs and menus inject to lock scrolling, with
@@ -32,11 +33,7 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "form-action 'self'",
     ]
 )
-SECURITY_HEADERS = {
-    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "same-origin",
-}
+SECURITY_HEADERS = {"Content-Security-Policy": CONTENT_SECURITY_POLICY}
 _ALL_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 IMMUTABLE = "public, max-age=31536000, immutable"
 REVALIDATE = "no-cache"
