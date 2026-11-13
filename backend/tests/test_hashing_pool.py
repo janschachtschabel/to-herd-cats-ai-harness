@@ -12,11 +12,12 @@ from weakref import WeakKeyDictionary
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.core import security
 from app.core.config import Settings, get_settings
 from app.core.db import Database, set_database
+from app.core.ratelimit import RateLimitHit
 from app.core.security import hash_password
 from app.modules.auth import service as auth_service
 from app.modules.users import profile
@@ -118,6 +119,10 @@ async def test_a_full_hashing_queue_answers_429_at_once(
     assert response.status_code == 429 and took < FAST_ENOUGH  # type: ignore[attr-defined]
     assert response.headers["retry-after"] == "1"  # type: ignore[attr-defined]
     assert response.json()["error"]["code"] == "server.busy"  # type: ignore[attr-defined]
+    # Refused before any database work: not even the per-address counter was touched.
+    async with real_db.database.session_factory() as s:
+        hit = select(RateLimitHit.id).where(RateLimitHit.key == "login-ip:198.51.100.2")
+        assert await s.scalar(hit) is None
     assert await asyncio.gather(*first) == [401, 401]
     # A refused attempt does not count as a failure: the person logs in right after.
     later = {"email": real_db.member_email, "password": PASSWORD}

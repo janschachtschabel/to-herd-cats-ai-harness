@@ -4,8 +4,9 @@ argon2 is slow and memory-hard on purpose (~65 ms, 64 MiB each). Request code us
 `*_async` helpers: they run it in a worker thread (argon2-cffi releases the GIL), at
 most `HERD_PASSWORD_HASH_CONCURRENCY` at a time per process, so the event loop stays
 responsive and memory stays bounded (concurrency × 64 MiB). At most
-`HERD_PASSWORD_HASH_QUEUE` more wait for a slot; beyond that a request is answered at
-once with 429 `server.busy` and `Retry-After` (`HashingBusy`).
+`HERD_PASSWORD_HASH_QUEUE` more are admitted to wait; beyond that a request is answered
+at once with 429 `server.busy` and `Retry-After` (`HashingBusy`). A login is admitted
+before its first query (`password_work`), so a refused one costs no database work.
 
 Callers hold no database connection and no lock while they wait or hash (they commit
 first and re-read afterwards), so a flood of logins cannot exhaust the pool.
@@ -16,6 +17,7 @@ import hashlib
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextvars import ContextVar
 from functools import cache
 from weakref import WeakKeyDictionary
 
@@ -54,33 +56,42 @@ class HashingBusy(RateLimited):
 
 
 class _Gate:
-    """`slots` hashing at a time; at most `queue` more wait, the rest are refused."""
+    """`slots` hashing at a time; at most `queue` more admitted to wait, the rest are
+    refused at once. Admission is per task (`_admitted`): an operation admitted once
+    (a login, from its first database query on) is not counted again for its hash."""
 
     def __init__(self, slots: int, queue: int) -> None:
         self._slots = asyncio.Semaphore(slots)
-        self._queue = queue
-        self._waiting = 0
+        self._capacity = slots + queue
+        self._inside = 0
 
     @asynccontextmanager
-    async def slot(self) -> AsyncIterator[None]:
-        if self._slots.locked() and self._waiting >= self._queue:
+    async def admit(self) -> AsyncIterator[None]:
+        if _admitted.get():
+            yield
+            return
+        if self._inside >= self._capacity:
             raise HashingBusy()
-        self._waiting += 1
-        try:
-            await self._slots.acquire()
-        finally:
-            self._waiting -= 1
+        self._inside += 1
+        token = _admitted.set(True)
         try:
             yield
         finally:
-            self._slots.release()
+            _admitted.reset(token)
+            self._inside -= 1
+
+    @asynccontextmanager
+    async def slot(self) -> AsyncIterator[None]:
+        async with self.admit(), self._slots:
+            yield
 
 
+_admitted: ContextVar[bool] = ContextVar("herd_hashing_admitted", default=False)
 _gates: "WeakKeyDictionary[asyncio.AbstractEventLoop, _Gate]" = WeakKeyDictionary()
 
 
-def _slot() -> AbstractAsyncContextManager[None]:
-    """A hashing slot of this process (one gate per event loop)."""
+def _gate() -> _Gate:
+    """The process's hashing gate (one per event loop)."""
     loop = asyncio.get_running_loop()
     gate = _gates.get(loop)
     if gate is None:
@@ -88,22 +99,29 @@ def _slot() -> AbstractAsyncContextManager[None]:
         gate = _gates[loop] = _Gate(
             settings.password_hash_concurrency, settings.password_hash_queue
         )
-    return gate.slot()
+    return gate
+
+
+def password_work() -> AbstractAsyncContextManager[None]:
+    """Admission for an operation that will hash: refused at once with `HashingBusy`
+    when the queue is full, before the operation does any other work (a refused login
+    costs no database query). The `*_async` helpers admit themselves if needed."""
+    return _gate().admit()
 
 
 async def hash_password_async(password: str) -> str:
-    async with _slot():
+    async with _gate().slot():
         return await asyncio.to_thread(hash_password, password)
 
 
 async def verify_password_async(password_hash: str, password: str) -> bool:
-    async with _slot():
+    async with _gate().slot():
         return await asyncio.to_thread(verify_password, password_hash, password)
 
 
 async def verify_against_dummy(password: str) -> bool:
     """The work of a verification without an account (always False)."""
-    async with _slot():
+    async with _gate().slot():
         return await asyncio.to_thread(lambda: verify_password(dummy_password_hash(), password))
 
 

@@ -51,7 +51,16 @@ Passwortänderung, Anlegen und Zurücksetzen durch die Administration); höchste
 sofort 429 `server.busy` mit `Retry-After: 1`. Eine Anmeldeflut füllt so nicht mehr
 den Verbindungspool: Ein Test mit einem Pool von einer Verbindung zeigt, dass `/ready`
 und angemeldete Anfragen bedient werden, während Prüfungen warten
-(`backend/tests/test_hashing_pool.py`). Live unter Last gemessen ist das nicht. Je
+(`backend/tests/test_hashing_pool.py`). Eine Anmeldung wird vor ihrer ersten
+Datenbankabfrage zugelassen; eine abgewiesene kostet keine Abfrage. Live gemessen
+(Entwicklungsrechner, 4 Kerne, Last-Client auf derselben Maschine, ein Prozess, Pool
+5 + 10): 200 gleichzeitige Fehlanmeldungen von 200 Adressen → 18 × 401, 182 × 429
+`server.busy` in 2,0 s; dabei `GET /api/auth/me` höchstens 665 ms, `/ready` höchstens
+649 ms, kein 503 (vor fix wave 2: 3,2 s und 503 in 5 von 25 Proben). Bei 300
+gleichzeitigen Anfragen bleibt `/ready` bei höchstens 1,5 s, genauso wie bei 300
+gleichzeitigen `GET /api/nope` (1,4 s): Das ist die Arbeit je Anfrage in einem
+Event-Loop, nicht die Anmeldung; dagegen helfen ein Ratenlimit am Ingress und mehr
+Replikas. Je
 Client-Adresse (IPv6: je /64) sind
 höchstens `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard 30) Anmeldeversuche je
 Minute erlaubt, gleich mit welcher E-Mail; fehlgeschlagene Versuche je Adresse und

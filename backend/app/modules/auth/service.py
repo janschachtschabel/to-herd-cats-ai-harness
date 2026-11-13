@@ -11,9 +11,9 @@ from app.core.failure_limit import FailureLimiter
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.security import (
-    HashingBusy,
     hash_token,
     new_session_token,
+    password_work,
     verify_against_dummy,
     verify_password_async,
 )
@@ -37,6 +37,10 @@ class AuthService:
         self.settings = settings
 
     async def login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
+        async with password_work():  # refused at once, before any query, when full
+            return await self._login(email, password, ip)
+
+    async def _login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
         """A new session for the person; the token goes into the cookie and nowhere else.
 
         Two limits, both checked before any password is hashed: attempts per client
@@ -63,12 +67,7 @@ class AuthService:
         user = await self.users.get_by_email(org.id, email) if org else None
         checked = user.password_hash if user is not None and user.is_active else None
         await self.session.commit()  # no connection is held while hashing
-        try:
-            valid = await _verify(checked, password)
-        except HashingBusy:  # refused before any check: not an attempt
-            await per_account.end(attempt)
-            await self.session.commit()
-            raise
+        valid = await _verify(checked, password)  # admitted already: never refused
         if user is None or not valid:
             await per_account.fail(attempt)
             raise Unauthorized(code="auth.invalid_credentials")
