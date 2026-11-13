@@ -1,12 +1,48 @@
-"""Conversations as a whole: reading one, and what the caller may do there."""
+"""Conversations as a whole, and their messages: post, edit, delete, list.
+
+Writing needs the right to post in the conversation (`ConversationReader.
+require_post`); editing only one's own message; deleting one's own or, with
+`channel.manage`, anyone's. Deleting is soft: the text is emptied, replies stay.
+A message whose conversation the actor cannot see is 404 `message.not_found`.
+
+Posting is idempotent per author and `client_id`: a resend returns the first message
+(`Posted.created` false), and nothing else happens. Every change is emitted
+(`message.created|updated|deleted`, payload ids only) in its transaction; message
+text never goes into events or logs.
+"""
 
 import uuid
+from typing import NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Actor
-from app.modules.messaging.models import Conversation
+from app.core.access import Action, Actor, can
+from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from app.core.models_base import utcnow
+from app.core.outbox import emit
+from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
+from app.modules.audit.recorder import record
+from app.modules.messaging import threads
+from app.modules.messaging.message_repository import MessageRepository
+from app.modules.messaging.models import MAX_BODY_CHARS, Conversation, Message, MessageKind
 from app.modules.messaging.visibility import ConversationReader
+
+
+class Posted(NamedTuple):
+    message: Message
+    created: bool  # False: a resend with a known `client_id`
+
+
+def message_not_found() -> NotFound:
+    return NotFound(code="message.not_found")
+
+
+def checked_body(body_md: str) -> str:
+    if not body_md.strip() or len(body_md) > MAX_BODY_CHARS:
+        raise ValidationFailed(
+            f"1 to {MAX_BODY_CHARS} characters, not only spaces", code="message.body_invalid"
+        )
+    return body_md
 
 
 class ConversationService:
@@ -20,3 +56,153 @@ class ConversationService:
     async def can_post(self, actor: Actor, conversation: Conversation) -> bool:
         """For display; writes check again (`ConversationReader.require_post`)."""
         return await self.reader.can_post(actor, conversation)
+
+
+class MessageService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.reader = ConversationReader(session)
+
+    def repo(self, actor: Actor) -> MessageRepository:
+        """The actor's view of the messages."""
+        return MessageRepository(self.session, self.reader.scope(actor))
+
+    async def post(
+        self,
+        actor: Actor,
+        conversation_id: uuid.UUID,
+        body_md: str,
+        parent_id: uuid.UUID | None = None,
+        client_id: uuid.UUID | None = None,
+    ) -> Posted:
+        conversation = await self.reader.readable(actor, conversation_id)
+        await self.reader.require_post(actor, conversation)
+        body_md = checked_body(body_md)
+        repo = self.repo(actor)
+        parent = await threads.lock_parent(repo, conversation, parent_id) if parent_id else None
+        message = await repo.insert(
+            {
+                "conversation_id": conversation.id,
+                "parent_id": parent_id,
+                "author_type": actor.principal.type,
+                "author_id": actor.principal.id,
+                "kind": MessageKind.HUMAN,
+                "body_md": body_md,
+                "client_id": client_id,
+                "created_at": utcnow(),
+            }
+        )
+        if message is None:  # only with a client_id: its author sent it before
+            assert client_id is not None
+            first = await repo.by_client_id(actor.principal.id, client_id)
+            if first is None or (first.conversation_id, first.parent_id) != (
+                conversation.id,
+                parent_id,
+            ):
+                raise Conflict(code="message.client_id_conflict")
+            return Posted(first, created=False)
+        if parent is not None:
+            threads.count_reply(parent, message)
+            await self.session.flush()
+        await self._emit(actor, conversation, message, "message.created")
+        return Posted(message, created=True)
+
+    async def edit(self, actor: Actor, message_id: uuid.UUID, body_md: str) -> Message:
+        message, conversation = await self._readable(actor, message_id, lock=True)
+        await self.reader.require_post(actor, conversation)
+        if not _by(message, actor):
+            raise Forbidden(code="message.not_author")
+        if message.deleted_at is not None:
+            raise Conflict(code="message.deleted")
+        message.body_md = checked_body(body_md)
+        message.edited_at = utcnow()
+        await self.session.flush()
+        await self._emit(actor, conversation, message, "message.updated")
+        return message
+
+    async def delete(self, actor: Actor, message_id: uuid.UUID) -> None:
+        message, conversation = await self._readable(actor, message_id, lock=True)
+        await self.reader.require_post(actor, conversation)
+        own = _by(message, actor)
+        if not own and not await self._may_manage(actor, conversation):
+            raise Forbidden(code="message.not_author")
+        if message.deleted_at is not None:
+            return
+        message.deleted_at = utcnow()
+        message.body_md = ""
+        await self.session.flush()
+        await self._emit(actor, conversation, message, "message.deleted")
+        if not own:
+            details = {"conversation_id": str(conversation.id), "author_id": str(message.author_id)}
+            await record(self.session, actor, "message.moderated", "message", message.id, details)
+
+    async def list(
+        self,
+        actor: Actor,
+        conversation_id: uuid.UUID,
+        params: PageParams,
+        before: uuid.UUID | None = None,
+        after: uuid.UUID | None = None,
+    ) -> Page[Message]:
+        """Top-level messages with their reply counts: newest first (older ones page
+        by page; `before` starts below a message); with `after`, oldest first from just
+        after a message."""
+        if before is not None and after is not None:
+            raise ValidationFailed("before or after, not both", code="validation_failed")
+        conversation = await self.reader.readable(actor, conversation_id)
+        position = decode_id_cursor(params.cursor) if params.cursor else None
+        rows = await self.repo(actor).top_page(
+            conversation.id,
+            params.limit + 1,
+            older_than=None if after else position or before,
+            newer_than=position or after if after else None,
+        )
+        return id_page(rows, params.limit, lambda m: m.id)
+
+    async def replies(
+        self, actor: Actor, message_id: uuid.UUID, params: PageParams
+    ) -> Page[Message]:
+        """The replies to a message, oldest first."""
+        message, _ = await self._readable(actor, message_id)
+        after = decode_id_cursor(params.cursor) if params.cursor else None
+        rows = await self.repo(actor).reply_page(message.id, after, params.limit + 1)
+        return id_page(rows, params.limit, lambda m: m.id)
+
+    async def _readable(
+        self, actor: Actor, message_id: uuid.UUID, *, lock: bool = False
+    ) -> tuple[Message, Conversation]:
+        message = await self.repo(actor).get(message_id, lock=lock)
+        if message is None:
+            raise message_not_found()
+        try:
+            conversation = await self.reader.readable(actor, message.conversation_id)
+        except NotFound:
+            raise message_not_found() from None
+        return message, conversation
+
+    async def _may_manage(self, actor: Actor, conversation: Conversation) -> bool:
+        if conversation.space_id is None:
+            return False
+        return await can(self.session, actor, Action.CHANNEL_MANAGE, conversation.space_id)
+
+    async def _emit(
+        self, actor: Actor, conversation: Conversation, message: Message, type_: str
+    ) -> None:
+        parent = str(message.parent_id) if message.parent_id else None
+        await emit(
+            self.session,
+            type=type_,
+            actor=actor,
+            space_id=conversation.space_id,
+            subject_type="message",
+            subject_id=message.id,
+            payload={
+                "conversation_id": str(conversation.id),
+                "message_id": str(message.id),
+                "parent_id": parent,
+            },
+        )
+
+
+def _by(message: Message, actor: Actor) -> bool:
+    return message.author_type == actor.principal.type and message.author_id == actor.principal.id

@@ -9,7 +9,7 @@ os.environ["HERD_ENVIRONMENT"] = "test"  # before any app import: enables /api/_
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
-from sqlalchemy import MetaData  # noqa: E402
+from sqlalchemy import MetaData, text  # noqa: E402
 from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
@@ -32,6 +32,7 @@ from tests.factories import (  # noqa: E402, F401
 )
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
+from tests.factories_messaging import chat  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_wiki import wiki  # noqa: E402, F401
 from tests.real_db import make_real_client, real_app, real_db  # noqa: E402, F401
@@ -62,10 +63,20 @@ def last_line(capsys: pytest.CaptureFixture[str], message: str) -> str:
 
 
 def _drop_everything(connection: Connection) -> None:
-    """Whatever an earlier run left behind, including alembic_version."""
+    """Whatever an earlier run left behind, including alembic_version and the
+    migrations' trigger functions (which dropping the tables leaves in place)."""
     existing = MetaData()
     existing.reflect(connection)
     existing.drop_all(connection)
+    functions = connection.execute(
+        text(
+            "SELECT p.oid::regprocedure::text FROM pg_proc p"
+            " JOIN pg_namespace n ON n.oid = p.pronamespace"
+            " WHERE n.nspname = current_schema() AND p.proname LIKE 'herd\\_%'"
+        )
+    ).scalars()
+    for signature in list(functions):
+        connection.execute(text(f"DROP FUNCTION {signature}"))
 
 
 @pytest.fixture(autouse=True)

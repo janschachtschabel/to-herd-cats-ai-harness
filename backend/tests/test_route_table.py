@@ -13,6 +13,8 @@ ship without a decision on who may call it. Guards:
   404 `page.not_found`, as for an unknown page.
 - `conversation`: whoever may see the conversation (a channel: its space); a member
   without a role in a team space gets 404 `conversation.not_found`.
+- `message`: whoever may see the message's conversation; otherwise 404
+  `message.not_found`.
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -24,6 +26,7 @@ from uuid_utils.compat import uuid7
 from app.core.actor import Actor
 from app.core.principal import Principal, SystemRole
 from app.modules.messaging.channels import ChannelService
+from app.modules.messaging.service import MessageService
 from app.modules.spaces.models import Space
 from app.modules.users.models import User
 from app.modules.wiki.service import PageService
@@ -82,6 +85,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/conversations/{conversation_id}", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/archive", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/unarchive", "conversation"),
+    ("GET", "/api/conversations/{conversation_id}/messages", "conversation"),
+    ("POST", "/api/conversations/{conversation_id}/messages", "conversation"),
+    ("GET", "/api/messages/{message_id}/replies", "message"),
+    ("PATCH", "/api/messages/{message_id}", "message"),
+    ("DELETE", "/api/messages/{message_id}", "message"),
     ("GET", "/api/admin/audit", "admin"),
     ("GET", "/api/admin/users", "admin"),
     ("POST", "/api/admin/users", "admin"),
@@ -114,8 +122,10 @@ def _concrete(
     space_id: object | None = None,
     page_id: object | None = None,
     conversation_id: object | None = None,
+    message_id: object | None = None,
 ) -> str:
     ids = {
+        "{message_id}": str(message_id or uuid7()),
         "{conversation_id}": str(conversation_id or uuid7()),
         "{space_id}": str(space_id or uuid7()),
         "{page_id}": str(page_id or uuid7()),
@@ -175,6 +185,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/conversations/{conversation_id}"): {"topic": "x", "version": 1},
     ("POST", "/api/conversations/{conversation_id}/archive"): {"version": 1},
     ("POST", "/api/conversations/{conversation_id}/unarchive"): {"version": 1},
+    ("POST", "/api/conversations/{conversation_id}/messages"): {"body_md": "x"},
+    ("PATCH", "/api/messages/{message_id}"): {"body_md": "x"},
 }
 
 
@@ -209,10 +221,13 @@ async def test_conversation_routes_hide_conversations_without_a_role(
 ) -> None:
     actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
     channel = await ChannelService(session).create(actor, team_space.id, "geheim", None)
+    message, _ = await MessageService(session).post(actor, channel.id, "Geheim")
     for method, template, guard in ROUTES:
-        if guard == "conversation":
-            path = _concrete(template, team_space.id, conversation_id=channel.id)
+        if guard in ("conversation", "message"):
+            path = _concrete(
+                template, team_space.id, conversation_id=channel.id, message_id=message.id
+            )
             body = BODIES.get((method, template))
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
-            assert response.json()["error"]["code"] == "conversation.not_found"
+            assert response.json()["error"]["code"] == f"{guard}.not_found"

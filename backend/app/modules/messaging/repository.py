@@ -5,7 +5,8 @@ never even loaded:
 - a channel: its space is one the actor may read (`access.visible_space_ids`).
 
 Direct messages (participants) and page threads (the page's visibility) add their
-clause to `_visible` (Tasks 4 and 8).
+clause to `visible_conversations` (Tasks 4 and 8); messages are seen where their
+conversation is (`message_repository.py`).
 """
 
 import uuid
@@ -25,6 +26,15 @@ class ConversationScope:
     post_space_ids: Select[uuid.UUID]  # the spaces where it holds `channel.post` (SQL)
 
 
+def visible_conversations(scope: ConversationScope) -> ColumnElement[bool]:
+    """The conversations of the scope's organisation its actor may see (SQL)."""
+    channel = and_(
+        Conversation.kind == ConversationKind.CHANNEL,
+        Conversation.space_id.in_(scope.space_ids),
+    )
+    return and_(Conversation.org_id == scope.org_id, or_(false(), channel))
+
+
 @dataclass(frozen=True, slots=True)
 class ListedConversation:
     conversation: Conversation
@@ -37,11 +47,7 @@ class ConversationRepository:
         self.scope = scope
 
     def _visible(self) -> ColumnElement[bool]:
-        channel = and_(
-            Conversation.kind == ConversationKind.CHANNEL,
-            Conversation.space_id.in_(self.scope.space_ids),
-        )
-        return and_(Conversation.org_id == self.scope.org_id, or_(false(), channel))
+        return visible_conversations(self.scope)
 
     def _can_post(self) -> ColumnElement[bool]:
         """The right to post, before the archive (callers add that)."""

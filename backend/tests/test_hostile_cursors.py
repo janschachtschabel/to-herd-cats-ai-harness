@@ -56,16 +56,33 @@ def _list_endpoints() -> list[str]:
 
 
 def test_the_list_endpoints_are_found() -> None:
-    assert len(_list_endpoints()) >= 7
+    endpoints = _list_endpoints()
+    assert len(endpoints) >= 11
+    assert {
+        "/api/channels",
+        "/api/spaces/{space_id}/channels",
+        "/api/conversations/{conversation_id}/messages",
+        "/api/messages/{message_id}/replies",
+    } <= set(endpoints)
 
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
 async def test_hostile_cursors_answer_422_everywhere(
     name: str, owner: AsyncClient, group: Group
 ) -> None:
-    space_id = (await owner.get("/api/spaces")).json()["items"][0]["id"]
+    space_id = (await owner.post("/api/spaces", json={"kind": "team", "name": "T"})).json()["id"]
     page = await owner.post(f"/api/spaces/{space_id}/pages", json={"title": "Seite"})
-    ids = {"{space_id}": space_id, "{group_id}": str(group.id), "{page_id}": page.json()["id"]}
+    channel = await owner.post(f"/api/spaces/{space_id}/channels", json={"name": "k"})
+    message = await owner.post(
+        f"/api/conversations/{channel.json()['id']}/messages", json={"body_md": "m"}
+    )
+    ids = {
+        "{space_id}": space_id,
+        "{group_id}": str(group.id),
+        "{page_id}": page.json()["id"],
+        "{conversation_id}": channel.json()["id"],
+        "{message_id}": message.json()["id"],
+    }
     for template in _list_endpoints():
         path = template
         for placeholder, value in ids.items():

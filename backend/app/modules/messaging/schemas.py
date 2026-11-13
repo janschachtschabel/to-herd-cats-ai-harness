@@ -4,12 +4,15 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from app.core.principal import Principal, PrincipalType
+from app.core.principal import PrincipalType
 from app.modules.messaging.models import (
+    MAX_BODY_CHARS,
     MAX_CHANNEL_NAME_CHARS,
     MAX_TOPIC_CHARS,
     Conversation,
     ConversationKind,
+    Message,
+    MessageKind,
 )
 
 # No line breaks or other control characters: a name is one line in the sidebar.
@@ -23,15 +26,12 @@ ChannelName = Annotated[
     ),
 ]
 Topic = Annotated[str, Field(max_length=MAX_TOPIC_CHARS)]
+Body = Annotated[str, Field(min_length=1, max_length=MAX_BODY_CHARS, description="Markdown")]
 
 
 class PrincipalRef(BaseModel):
     type: PrincipalType
     id: uuid.UUID
-
-    @classmethod
-    def of(cls, principal: Principal) -> "PrincipalRef":
-        return cls(type=principal.type, id=principal.id)
 
 
 class ExpectedVersion(BaseModel):
@@ -92,4 +92,71 @@ class ConversationOut(BaseModel):
             created_at=conversation.created_at,
             version=conversation.version,
             can_post=can_post,
+        )
+
+
+def _not_blank(value: str) -> str:
+    if not value.strip():
+        raise ValueError("a message needs more than spaces")
+    return value
+
+
+class MessageCreate(BaseModel):
+    """`parent_id`: a top-level message of the same conversation, to reply in its
+    thread. `client_id`: the client's key for this message; sending again with the
+    same key returns the first message (200) instead of a second one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    body_md: Body
+    parent_id: uuid.UUID | None = None
+    client_id: uuid.UUID | None = None
+
+    _body = field_validator("body_md")(_not_blank)
+
+
+class MessageUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body_md: Body
+
+    _body = field_validator("body_md")(_not_blank)
+
+
+class MessageOut(BaseModel):
+    """`author` is null for system messages. A deleted message keeps its place with
+    `deleted_at` set and an empty `body_md`. `reply_count` and `last_reply_at` belong
+    to top-level messages (their thread)."""
+
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    parent_id: uuid.UUID | None
+    author: PrincipalRef | None
+    kind: MessageKind
+    body_md: str
+    client_id: uuid.UUID | None
+    created_at: datetime
+    edited_at: datetime | None
+    deleted_at: datetime | None
+    reply_count: int
+    last_reply_at: datetime | None
+
+    @classmethod
+    def of(cls, message: Message) -> "MessageOut":
+        author = None
+        if message.author_id is not None:
+            author = PrincipalRef(type=PrincipalType(message.author_type), id=message.author_id)
+        return cls(
+            id=message.id,
+            conversation_id=message.conversation_id,
+            parent_id=message.parent_id,
+            author=author,
+            kind=message.kind,
+            body_md=message.body_md,
+            client_id=message.client_id,
+            created_at=message.created_at,
+            edited_at=message.edited_at,
+            deleted_at=message.deleted_at,
+            reply_count=message.reply_count,
+            last_reply_at=message.last_reply_at,
         )

@@ -49,6 +49,7 @@ def api_router() -> APIRouter:
     api.include_router(messaging.space_channels)
     api.include_router(messaging.channels)
     api.include_router(messaging.conversations)
+    api.include_router(messaging.messages)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
