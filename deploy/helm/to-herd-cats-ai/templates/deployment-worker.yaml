@@ -1,0 +1,103 @@
+# The worker (HERD_ROLE=worker): the outbox dispatcher (spec 4.3). It hands the events
+# that the API writes with its changes to their handlers (notifications, page timelines,
+# live updates over NOTIFY to every API pod). It talks only to PostgreSQL and serves
+# only the internal port (/health, /ready, /metrics). Several replicas are safe: they
+# claim disjoint batches (FOR NO KEY UPDATE SKIP LOCKED), and every handler is
+# idempotent. On SIGTERM the batch in progress finishes, then the process exits.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "herd.fullname" . }}-worker
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "herd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "herd.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        # The API's container name: the HerdNotReady alert covers the worker too.
+        - name: to-herd-cats-ai
+          image: {{ include "herd.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "herd.databaseEnv" (dict "root" . "role" "worker") | nindent 12 }}
+            {{- with .Values.tracing.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- range $name, $value := .Values.worker.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: internal
+              containerPort: 9090
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Ready: the database answers, its schema is this release's or newer, and the
+          # dispatcher's last pass reached it.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: internal
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- include "herd.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            {{- include "herd.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "herd.volumes" . | nindent 8 }}
+---
+# The worker's internal port, for the metrics scrape only (headless: nothing else
+# connects to it). The ServiceMonitor selects it by app.kubernetes.io/endpoint.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}-worker
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/endpoint: internal
+spec:
+  clusterIP: None
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  ports:
+    - name: internal
+      port: 9090
+      targetPort: internal
+      protocol: TCP

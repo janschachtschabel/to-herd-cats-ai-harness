@@ -1,7 +1,11 @@
 to-herd-cats-ai {{ .Chart.AppVersion }} is installed as {{ include "herd.fullname" . }}.
 
 Public port 8080: service {{ include "herd.fullname" . }}{{ if .Values.ingress.enabled }} (Ingress: {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}){{ end }}.
-Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal.
+Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal (API pods) and {{ include "herd.fullname" . }}-worker (worker pods).
+Worker (outbox: notifications, page timelines, live updates): {{ .Values.worker.replicas }} replica(s){{ if eq (int .Values.worker.replicas) 0 }}; with none, nothing of this is delivered{{ end }}.
+{{- if .Values.ingress.enabled }}
+Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the Ingress must not buffer them and must allow a long read timeout (see ingress.annotations in values.yaml).
+{{- end }}
 {{- if .Values.collab.enabled }}
 Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab (one replica, by design).
 {{- with include "herd.publicUrl" . }} Browsers must open the app at {{ . }}.{{ else }} No publicUrl: WebSocket Origins must match the host the request came to.{{ end }}

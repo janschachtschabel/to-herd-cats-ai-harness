@@ -78,8 +78,8 @@ seccompProfile:
   type: RuntimeDefault
 {{- end -}}
 
-{{/* Environment shared by the API and the migration job; `role` is api or migrate. */}}
-{{- define "herd.env" -}}
+{{/* The role and the database, for every Python pod (API, migration job, worker). */}}
+{{- define "herd.databaseEnv" -}}
 {{- $root := .root -}}
 - name: HERD_ROLE
   value: {{ .role }}
@@ -89,6 +89,12 @@ seccompProfile:
 - name: HERD_DATABASE_PASSWORD_FILE
   value: /var/run/secrets/herd/database/password
 {{- end }}
+{{- end -}}
+
+{{/* Environment shared by the API and the migration job; `role` is api or migrate. */}}
+{{- define "herd.env" -}}
+{{- $root := .root -}}
+{{ include "herd.databaseEnv" . }}
 - name: HERD_COOKIE_SECURE
   value: {{ $root.Values.api.cookieSecure | quote }}
 {{- with $root.Values.api.forwardedAllowIps }}

@@ -115,6 +115,53 @@ spec:
         - port: 9090
           protocol: TCP
 {{- end }}
+---
+# The worker: out only DNS and the database (the bundled PostgreSQL or, through
+# networkPolicy.egress, an external one); in only 9090 from internalFrom (metrics; the
+# probes are kubelet traffic). It never talks to the API or the collab process: live
+# updates reach the API pods through PostgreSQL (NOTIFY).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" . }}-worker
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  policyTypes: [Ingress, Egress]
+  {{- with .Values.networkPolicy.internalFrom }}
+  ingress:
+    - ports:
+        - port: 9090
+          protocol: TCP
+      from:
+        {{- toYaml . | nindent 8 }}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    {{- if .Values.postgresql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- end }}
+    {{- with .Values.networkPolicy.egress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
 # The bundled PostgreSQL: reachable only from the app pods, no egress at all.
@@ -139,7 +186,7 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/component
                 operator: In
-                values: [api, migrate]
+                values: [api, migrate, worker]
       ports:
         - port: 5432
           protocol: TCP

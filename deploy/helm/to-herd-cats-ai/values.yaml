@@ -18,7 +18,7 @@ imagePullSecrets: []
 
 ## @section API (HERD_ROLE=api)
 
-## @param api.replicas Number of API pods; the processes are stateless
+## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops)
 ## @param api.resources Resource requests and limits of the API container
 ## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
 ## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
@@ -33,6 +33,21 @@ api:
       memory: 512Mi
   cookieSecure: true
   forwardedAllowIps: ""
+  env: {}
+
+## @section Worker (HERD_ROLE=worker)
+
+## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these
+## @param worker.resources Resource requests and limits of the worker container
+## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here)
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
   env: {}
 
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
@@ -109,12 +124,17 @@ postgresql:
 
 ## @param ingress.enabled Create an Ingress for the public port
 ## @param ingress.className IngressClass name; empty: the cluster default
-## @param ingress.annotations Annotations of the Ingress
+## @param ingress.annotations Annotations of the Ingress. Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the controller must not buffer them and must allow a read timeout of at least 1 h. The app sends `X-Accel-Buffering: no` (ingress-nginx then passes the stream through unbuffered) and a comment line every 15 s; a proxy that ignores that header needs response buffering switched off for /api/stream. ingress-nginx: see the example below and ci/production-values.yaml
 ## @param ingress.hosts Hosts and paths, e.g. [{host: herd.example.com, paths: [{path: /, pathType: Prefix}]}]
 ## @param ingress.tls TLS entries, e.g. [{secretName: herd-tls, hosts: [herd.example.com]}]
 ingress:
   enabled: false
   className: ""
+  # ingress-nginx, for live updates (Server-Sent Events, /api/stream) and live editing
+  # (WebSockets, /collab/); uploads and imports need the body size:
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  #   nginx.ingress.kubernetes.io/proxy-body-size: 100m
   annotations: {}
   hosts:
     - host: herd.example.com
@@ -140,7 +160,7 @@ networkPolicy:
 ## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
 ## @param metrics.serviceMonitor.interval Scrape interval
 ## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
-## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics) and HerdHigh5xx
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog and HerdOutboxFailed (the last two need the worker pods scraped: metrics.serviceMonitor or an equivalent scrape of the worker Service)
 ## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
 metrics:
   serviceMonitor:

@@ -87,6 +87,30 @@
       "required": ["enabled", "existingClaim", "size", "storageClass", "accessModes"],
       "description": "The files volume (attachments) of the API pods"
     },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The worker Deployment (HERD_ROLE=worker, the outbox dispatcher)",
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of worker pods; more than one is safe"},
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {"type": "object", "additionalProperties": {"type": ["string", "integer", "number"]}},
+            "limits": {"type": "object", "additionalProperties": {"type": ["string", "integer", "number"]}}
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra environment variables (name: value)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "additionalProperties": {"type": "string"}
+        }
+      },
+      "required": ["replicas", "resources", "env"]
+    },
     "collab": {
       "type": "object",
       "additionalProperties": false,
@@ -316,5 +340,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

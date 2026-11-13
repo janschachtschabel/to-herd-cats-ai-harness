@@ -7,6 +7,11 @@
 # the collab process): the controller must pass the Upgrade (ingress-nginx and
 # Traefik do by default). The connection stays open while someone edits; the API
 # pings it every 20 s, within the usual read timeouts of 60 s.
+# Live updates are Server-Sent Events on GET /api/stream: one response per browser tab
+# that stays open for hours. The app sends `X-Accel-Buffering: no` (nginx does not
+# buffer it) and a comment line every 15 s; set the controller's read timeout to at
+# least 1 h (ingress-nginx: proxy-read-timeout and proxy-send-timeout "3600", see
+# ingress.annotations), so streams are not cut and reopened every minute.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
