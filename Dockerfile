@@ -17,6 +17,8 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# The live editor imports the collab process's editor schema (one schema for both).
+COPY collab/schema.mjs /src/collab/schema.mjs
 RUN npm run build
 
 # --- python: the locked dependencies in /app/.venv ----------------------------------

@@ -14,6 +14,9 @@ export type PageMode = 'edit' | 'live' | 'versions'
 const MarkdownEditor = lazy(() =>
   import('./editor/MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })),
 )
+const LiveEditor = lazy(() =>
+  import('./collab/LiveEditor').then((m) => ({ default: m.LiveEditor })),
+)
 const VersionsPanel = lazy(() =>
   import('./versions/VersionsPanel').then((m) => ({ default: m.VersionsPanel })),
 )
@@ -44,6 +47,8 @@ export function PageScreen({ path, mode }: { path: string; mode?: PageMode }) {
         <VersionsPanel page={data} />
       ) : mode === 'edit' && abilities.edit ? (
         <MarkdownEditor key={data.id} page={data} />
+      ) : mode === 'live' && abilities.edit ? (
+        <LiveEditor key={data.id} page={data} />
       ) : (
         <PageView page={data} />
       )}

@@ -246,3 +246,17 @@ test("origin check without HERD_PUBLIC_URL compares hosts", () => {
   assert.ok(!originAllowed({ origin: "https://wiki.example:8443", host: "wiki.example" }, null));
   assert.ok(!originAllowed({ origin: "http://wiki.example" }, "https://wiki.example"));
 });
+
+test("presence colours carry white text at WCAG AA contrast", async () => {
+  const { colorFor } = await import("../live.mjs");
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  };
+  const colours = new Set(Array.from({ length: 200 }, (_, i) => colorFor(`user-${i}`)));
+  assert.ok(colours.size > 3);
+  for (const colour of colours) {
+    assert.ok(1.05 / (luminance(colour) + 0.05) >= 4.5, colour);
+  }
+});

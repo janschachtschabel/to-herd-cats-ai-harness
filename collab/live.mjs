@@ -32,7 +32,9 @@ export const CLOSE = {
 };
 
 const DENIAL = { 401: CLOSE.unauthorized, 403: CLOSE.forbidden, 404: CLOSE.notFound };
-const COLORS = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#dc2626"];
+// Tailwind's 700 shades: white text on each has at least 4.5:1 (WCAG AA), and the
+// browser shows initials in white on them.
+const COLORS = ["#1d4ed8", "#be185d", "#15803d", "#b45309", "#6d28d9", "#0e7490", "#b91c1c"];
 
 export function colorFor(id) {
   let hash = 0;

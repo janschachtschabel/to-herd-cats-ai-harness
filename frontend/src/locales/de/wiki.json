@@ -11,7 +11,9 @@
     "shortcut": "Strg K"
   },
   "wiki": {
-    "space": { "settings": "Mitglieder" },
+    "space": {
+      "settings": "Mitglieder"
+    },
     "tree": {
       "title": "Seiten",
       "empty": "Noch keine Seiten.",
@@ -26,8 +28,13 @@
       "children_one": "{{count}} Unterseite",
       "children_other": "{{count}} Unterseiten"
     },
-    "fields": { "title": "Titel", "parent": "Übergeordnete Seite" },
-    "parent": { "top": "Keine (oberste Ebene)" },
+    "fields": {
+      "title": "Titel",
+      "parent": "Übergeordnete Seite"
+    },
+    "parent": {
+      "top": "Keine (oberste Ebene)"
+    },
     "create": {
       "open": "Neue Seite",
       "title": "Neue Seite",
@@ -63,7 +70,9 @@
     "conflict": {
       "reloaded": "Jemand hat die Seite inzwischen geändert. Die aktuelle Fassung ist geladen – prüfe sie und versuche es erneut."
     },
-    "rename": { "title": "Seite umbenennen" },
+    "rename": {
+      "title": "Seite umbenennen"
+    },
     "move": {
       "title": "Seite verschieben",
       "description": "Wohin soll „{{title}}“? Unterseiten wandern mit.",
@@ -112,7 +121,11 @@
         "restore": "Wiederhergestellt",
         "collab": "Live"
       },
-      "kind": { "insert": "hinzugefügt:", "delete": "entfernt:", "equal": "" },
+      "kind": {
+        "insert": "hinzugefügt:",
+        "delete": "entfernt:",
+        "equal": ""
+      },
       "pickTwo": "Wähle zwei verschiedene Versionen, um sie zu vergleichen.",
       "diffLabel": "Unterschiede von Version {{from}} zu Version {{to}}",
       "titleChanged": "Titel: „{{from}}“ → „{{to}}“",
@@ -182,12 +195,57 @@
         "filename_invalid": "ungültiger Dateiname",
         "invalid_manifest": "Verzeichnis der Anhänge ungültig"
       }
+    },
+    "live": {
+      "toolbar": "Formatierung",
+      "label": "Inhalt von „{{title}}“",
+      "present": "Ebenfalls in der Seite",
+      "alone": "Niemand sonst ist gerade hier.",
+      "done": "Fertig",
+      "hint": "Änderungen werden automatisch gespeichert (spätestens nach 10 Sekunden) und erscheinen bei allen, die die Seite gerade bearbeiten.",
+      "leaveConfirm": "Noch nicht alle Änderungen sind beim Server angekommen. Trotzdem verlassen?",
+      "regenerated": "Die Seite wurde außerhalb der Live-Sitzung geändert (gespeichert, wiederhergestellt oder verschoben). Der aktuelle Stand ist geladen.",
+      "copy": "Meinen Text als Markdown kopieren",
+      "copied": "Kopiert",
+      "reload": "Neu laden",
+      "status": {
+        "connecting": "Verbindet …",
+        "synced": "Synchronisiert",
+        "saving": "Speichert …",
+        "offline": "Getrennt – neuer Versuch …",
+        "stopped": "Beendet"
+      },
+      "stop": {
+        "unauthorized": "Deine Sitzung ist abgelaufen. Bitte melde dich neu an.",
+        "forbidden": "Dir fehlt das Schreibrecht für diese Seite. Der Text ist schreibgeschützt.",
+        "not_found": "Diese Seite ist nicht mehr sichtbar (verschoben, gelöscht oder Rechte geändert).",
+        "too_large": "Die Seite ist zu groß für die Live-Bearbeitung. Bearbeite sie im Markdown-Editor.",
+        "off": "Die Live-Bearbeitung ist auf diesem Server ausgeschaltet.",
+        "invalid": "Die Live-Sitzung wurde beendet."
+      },
+      "tools": {
+        "bold": "Fett",
+        "italic": "Kursiv",
+        "strike": "Durchgestrichen",
+        "code": "Code",
+        "h1": "Überschrift 1",
+        "h2": "Überschrift 2",
+        "h3": "Überschrift 3",
+        "bulletList": "Aufzählung",
+        "orderedList": "Nummerierte Liste",
+        "taskList": "Aufgabenliste",
+        "quote": "Zitat",
+        "codeBlock": "Codeblock",
+        "rule": "Trennlinie"
+      }
     }
   },
   "errors": {
     "tooLarge": "Das ist zu groß.",
     "unsupportedType": "Diese Art von Datei wird nicht angenommen.",
-    "request": { "too_large": "Das ist zu groß für eine Anfrage." },
+    "request": {
+      "too_large": "Das ist zu groß für eine Anfrage."
+    },
     "page": {
       "not_found": "Diese Seite gibt es nicht (mehr).",
       "version_conflict": "Jemand hat die Seite inzwischen geändert.",

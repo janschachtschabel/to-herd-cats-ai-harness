@@ -11,7 +11,9 @@
     "shortcut": "Ctrl K"
   },
   "wiki": {
-    "space": { "settings": "Members" },
+    "space": {
+      "settings": "Members"
+    },
     "tree": {
       "title": "Pages",
       "empty": "No pages yet.",
@@ -26,8 +28,13 @@
       "children_one": "{{count}} subpage",
       "children_other": "{{count}} subpages"
     },
-    "fields": { "title": "Title", "parent": "Parent page" },
-    "parent": { "top": "None (top level)" },
+    "fields": {
+      "title": "Title",
+      "parent": "Parent page"
+    },
+    "parent": {
+      "top": "None (top level)"
+    },
     "create": {
       "open": "New page",
       "title": "New page",
@@ -63,7 +70,9 @@
     "conflict": {
       "reloaded": "Someone changed the page in the meantime. The current version is loaded – check it and try again."
     },
-    "rename": { "title": "Rename page" },
+    "rename": {
+      "title": "Rename page"
+    },
     "move": {
       "title": "Move page",
       "description": "Where should “{{title}}” go? Subpages move along.",
@@ -112,7 +121,11 @@
         "restore": "Restored",
         "collab": "Live"
       },
-      "kind": { "insert": "added:", "delete": "removed:", "equal": "" },
+      "kind": {
+        "insert": "added:",
+        "delete": "removed:",
+        "equal": ""
+      },
       "pickTwo": "Choose two different versions to compare them.",
       "diffLabel": "Differences from version {{from}} to version {{to}}",
       "titleChanged": "Title: “{{from}}” → “{{to}}”",
@@ -182,12 +195,57 @@
         "filename_invalid": "invalid file name",
         "invalid_manifest": "invalid attachment list"
       }
+    },
+    "live": {
+      "toolbar": "Formatting",
+      "label": "Content of “{{title}}”",
+      "present": "Also on the page",
+      "alone": "Nobody else is here right now.",
+      "done": "Done",
+      "hint": "Changes are saved automatically (within 10 seconds at most) and appear for everyone editing the page right now.",
+      "leaveConfirm": "Not all changes have reached the server yet. Leave anyway?",
+      "regenerated": "The page was changed outside the live session (saved, restored or moved). The current version is loaded.",
+      "copy": "Copy my text as Markdown",
+      "copied": "Copied",
+      "reload": "Reload",
+      "status": {
+        "connecting": "Connecting …",
+        "synced": "Synchronised",
+        "saving": "Saving …",
+        "offline": "Disconnected – retrying …",
+        "stopped": "Ended"
+      },
+      "stop": {
+        "unauthorized": "Your session has expired. Please log in again.",
+        "forbidden": "You may not edit this page. The text is read-only.",
+        "not_found": "This page is no longer visible (moved, deleted or rights changed).",
+        "too_large": "The page is too large for live editing. Edit it in the Markdown editor.",
+        "off": "Live editing is turned off on this server.",
+        "invalid": "The live session has ended."
+      },
+      "tools": {
+        "bold": "Bold",
+        "italic": "Italic",
+        "strike": "Strikethrough",
+        "code": "Code",
+        "h1": "Heading 1",
+        "h2": "Heading 2",
+        "h3": "Heading 3",
+        "bulletList": "Bullet list",
+        "orderedList": "Numbered list",
+        "taskList": "Task list",
+        "quote": "Quote",
+        "codeBlock": "Code block",
+        "rule": "Divider"
+      }
     }
   },
   "errors": {
     "tooLarge": "That is too large.",
     "unsupportedType": "This kind of file is not accepted.",
-    "request": { "too_large": "That is too large for one request." },
+    "request": {
+      "too_large": "That is too large for one request."
+    },
     "page": {
       "not_found": "This page does not exist (any more).",
       "version_conflict": "Someone changed the page in the meantime.",

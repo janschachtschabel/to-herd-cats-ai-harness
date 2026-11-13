@@ -10,6 +10,7 @@ import {
   Tags,
   TextCursorInput,
   Trash2,
+  Users,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -55,6 +56,12 @@ export function PageActions({ page }: { page: WikiPage }) {
               <Link to="/spaces/$spaceId/p/$" params={params} search={{ view: 'edit' }}>
                 <Pencil aria-hidden />
                 {t('wiki.actions.edit')}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/spaces/$spaceId/p/$" params={params} search={{ view: 'live' }}>
+                <Users aria-hidden />
+                {t('wiki.actions.live')}
               </Link>
             </Button>
           </>
