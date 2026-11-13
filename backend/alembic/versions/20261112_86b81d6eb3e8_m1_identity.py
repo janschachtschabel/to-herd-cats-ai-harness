@@ -82,9 +82,13 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_user_session_org_id"), "user_session", ["org_id"], unique=False)
     op.create_index(op.f("ix_user_session_user_id"), "user_session", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_user_session_expires_at"), "user_session", ["expires_at"], unique=False
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(op.f("ix_user_session_expires_at"), table_name="user_session")
     op.drop_index(op.f("ix_user_session_user_id"), table_name="user_session")
     op.drop_index(op.f("ix_user_session_org_id"), table_name="user_session")
     op.drop_table("user_session")

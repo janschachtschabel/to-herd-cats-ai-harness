@@ -18,6 +18,8 @@ class UserSession(UuidPk, OrgScoped, Base):
         PG_UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE"), index=True
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=False
+    )
 
     user: Mapped[User] = relationship(lazy="joined")

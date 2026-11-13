@@ -25,16 +25,16 @@ class SessionRepository:
     async def delete_by_hash(self, token_hash: str) -> None:
         await self.session.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
 
-    async def delete_expired_for_user(
-        self, org_id: uuid.UUID, user_id: uuid.UUID, now: datetime
-    ) -> None:
-        await self.session.execute(
-            delete(UserSession).where(
-                UserSession.org_id == org_id,
-                UserSession.user_id == user_id,
-                UserSession.expires_at <= now,
-            )
+    async def delete_expired(self, org_id: uuid.UUID, now: datetime, limit: int) -> None:
+        """Up to `limit` expired sessions of the organisation, oldest first."""
+        expired = (
+            select(UserSession.id)
+            .where(UserSession.org_id == org_id, UserSession.expires_at <= now)
+            .order_by(UserSession.expires_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
         )
+        await self.session.execute(delete(UserSession).where(UserSession.id.in_(expired)))
 
     async def delete_for_user(
         self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None

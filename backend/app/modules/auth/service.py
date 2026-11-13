@@ -23,6 +23,8 @@ from app.modules.orgs.repository import OrganizationRepository
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 
+EXPIRED_SESSION_BATCH = 500
+
 
 class AuthService:
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
@@ -60,7 +62,9 @@ class AuthService:
         await per_account.release(attempt)  # a success is not a failed attempt
         token = new_session_token()
         now = utcnow()
-        await self.sessions.delete_expired_for_user(user.org_id, user.id, now)
+        # Housekeeping without a background task: every login removes a bounded batch
+        # of expired sessions, anyone's (people who never return included).
+        await self.sessions.delete_expired(user.org_id, now, EXPIRED_SESSION_BATCH)
         await self.sessions.add(
             UserSession(
                 org_id=user.org_id,

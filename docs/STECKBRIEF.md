@@ -78,8 +78,8 @@ Keine ausgehenden Verbindungen zu Dritten, keine Drittanbieter-Anfragen im Brows
 
 ## Zeitpläne
 
-Keine. M1 hat weder Cronjobs noch Hintergrundaufträge. Abgelaufene Sitzungen einer
-Person werden bei ihrer nächsten Anmeldung gelöscht. Alte Ratenlimit-Einträge (jedes
+Keine. M1 hat weder Cronjobs noch Hintergrundaufträge. Abgelaufene Sitzungen (jeder
+Person) löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
 Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Der Sicherungs-CronJob (Spezifikation 12.6) ist
 noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
 `deploy/compose/README.md`).

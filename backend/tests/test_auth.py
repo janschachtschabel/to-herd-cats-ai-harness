@@ -19,6 +19,7 @@ from app.core.security import (
     new_session_token,
     verify_password,
 )
+from app.modules.auth import service as auth_service
 from app.modules.auth.models import UserSession
 from app.modules.orgs.models import Organization
 from app.modules.orgs.service import ensure_bootstrap
@@ -155,29 +156,42 @@ async def test_login_without_a_usable_account_still_verifies_a_hash(
     assert calls == [dummy_password_hash()]
 
 
-async def test_login_deletes_the_users_expired_sessions(
+async def _expired_session(session: AsyncSession, user: User) -> None:
+    session.add(
+        UserSession(
+            org_id=user.org_id,
+            user_id=user.id,
+            token_hash=hash_token(new_session_token()),
+            expires_at=utcnow() - timedelta(minutes=1),
+        )
+    )
+    await session.flush()
+
+
+async def test_login_deletes_expired_sessions_of_anyone(
     owner: AsyncClient, owner_user: User, member: User, session: AsyncSession, make_client
 ) -> None:
-    past = utcnow() - timedelta(minutes=1)
     for user in (owner_user, member):
-        session.add(
-            UserSession(
-                org_id=user.org_id,
-                user_id=user.id,
-                token_hash=hash_token(new_session_token()),
-                expires_at=past,
-            )
-        )
-    await session.flush()
+        await _expired_session(session, user)
     await login(await make_client(csrf=True), owner_user.email)
     rows = (await session.execute(select(UserSession.user_id, UserSession.expires_at))).all()
-    # The owner's expired one is gone; their two live ones (fixture, new login) and the
-    # other person's expired one are untouched.
+    # Both expired ones are gone (also the other person's, who may never log in again);
+    # the owner's two live ones (fixture, new login) stay.
     assert sorted((uid == owner_user.id, exp > utcnow()) for uid, exp in rows) == [
-        (False, False),
         (True, True),
         (True, True),
     ]
+
+
+async def test_expired_sessions_are_deleted_in_bounded_batches(
+    owner_user: User, member: User, session: AsyncSession, make_client, monkeypatch
+) -> None:
+    monkeypatch.setattr(auth_service, "EXPIRED_SESSION_BATCH", 2)
+    for _ in range(3):
+        await _expired_session(session, member)
+    await login(await make_client(csrf=True), owner_user.email)
+    expired = select(func.count()).select_from(UserSession).where(UserSession.expires_at < utcnow())
+    assert await session.scalar(expired) == 1
 
 
 async def test_expired_session_is_rejected(owner: AsyncClient, session: AsyncSession) -> None:
