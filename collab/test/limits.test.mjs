@@ -85,6 +85,26 @@ test("one person holds a limited number of connections across their logins", asy
   await synced(again);
 });
 
+test("connections closed while being authenticated give their person's slot back (T7)", async () => {
+  live = await liveFixture({ createCollabServer, maxPerPerson: 4 });
+  live.api.authDelayMs = 30;
+  for (let round = 0; round < 500 / 3; round++) {
+    const calls = live.api.authCalls;
+    const batch = [0, 1, 2].map(() => live.open(anna));
+    await until(() => live.api.authCalls >= calls + 3);
+    for (const c of batch) c.destroy(); // closed while the API is still answering
+    await until(() => live.server.connections() === 0);
+  }
+  live.api.authDelayMs = 0;
+  await new Promise((resolve) => setTimeout(resolve, 60)); // the last answers arrive
+  const again = [0, 1, 2].map(() => live.open(anna));
+  await until(() => again.every((c) => c.provider.synced));
+  assert.deepEqual(
+    again.flatMap((c) => c.closes),
+    [],
+  );
+});
+
 test("one person never holds more than a quarter of all connections", async () => {
   live = await liveFixture({ createCollabServer, maxConnections: 8 });
   const two = [0, 1].map(() => live.open(anna));

@@ -21,6 +21,8 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
     checks: [],
     unrepresentable: 0,
     loadMutations: 0,
+    authDelayMs: 0, // how long the API takes to answer an authentication
+    authCalls: 0,
     saveAnswer: () => [200, { generation: state.generation, version: 2 }],
     checkAnswer: () => [
       200,
@@ -44,6 +46,8 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       response.end(JSON.stringify(payload));
     };
     if (url.pathname === "/internal/collab/auth") {
+      state.authCalls++;
+      if (state.authDelayMs) await new Promise((resolve) => setTimeout(resolve, state.authDelayMs));
       const user = state.users[json.session_token];
       if (!user) return reply([401, { error: { code: "collab.session_invalid" } }]);
       return reply([

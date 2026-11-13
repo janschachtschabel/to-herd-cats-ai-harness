@@ -108,6 +108,9 @@ export function createCollabServer({
     log,
     person(context, userId) {
       if (people.has(context.socket)) return true;
+      // Closed while the API was answering: its close handler has run already and would
+      // never give the slot back (review M2 T7).
+      if (!sockets.has(context.socket)) return false;
       const key = `u:${userId}`;
       if (!held.take(key, perPerson)) return false;
       people.set(context.socket, key);
