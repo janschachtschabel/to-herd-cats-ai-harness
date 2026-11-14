@@ -99,6 +99,38 @@
         "exists": "This name exists here already.",
         "unknown": "Not taken."
       }
+    },
+    "proposals": {
+      "views": "Skills and proposals",
+      "tab": "Proposals",
+      "title": "Skill proposals",
+      "hint": "New skills and changes that agents proposed. An accepted proposal becomes a new version of the skill.",
+      "empty": {
+        "open": "No open skill proposals.",
+        "accepted": "No accepted proposals yet.",
+        "rejected": "No rejected proposals yet."
+      },
+      "someSkill": "a skill",
+      "newSkill": "New skill “{{name}}”",
+      "change": "Change to “{{name}}”",
+      "back": "All proposals",
+      "outdated": "The skill has changed since the proposal. When accepting you see both versions and settle the text.",
+      "openSkill": "Open “{{name}}”",
+      "openVersion": "Open “{{name}}” (version {{number}})",
+      "proposedText": "Proposed skill",
+      "against": "Compared with the skill now (version {{number}}).",
+      "sameText": "The text stays the same.",
+      "rejectHint": "The skill stays as it is. Whoever made the proposal sees the reason.",
+      "merge": {
+        "title": "The skill has changed",
+        "hint": "The skill was edited since the proposal. Compare both versions, settle the text and accept it.",
+        "again": "The skill has changed once more meanwhile. Check the new version.",
+        "current": "Skill now",
+        "proposed": "Proposal",
+        "takeCurrent": "Take the skill now",
+        "takeProposed": "Take the proposal",
+        "submit": "Accept this text"
+      }
     }
   },
   "errors": {
@@ -110,6 +142,16 @@
       "name_taken": "A skill with this name exists here already (perhaps archived).",
       "state_conflict": "The skill is in this state already.",
       "version_not_found": "This version does not exist."
+    },
+    "skill_proposal": {
+      "not_found": "This skill proposal does not exist (any more).",
+      "not_open": "This proposal has already been decided.",
+      "version_conflict": "The proposal has changed meanwhile; it was reloaded.",
+      "base_outdated": "The skill has changed since the proposal.",
+      "skill_archived": "The skill is archived; the proposal cannot be accepted.",
+      "no_change": "The proposal changes nothing in the skill.",
+      "invalid_reason": "The reason is missing or too long (at most 300 characters).",
+      "bad_author": "Only an agent or the acting person can make this proposal."
     }
   }
 }

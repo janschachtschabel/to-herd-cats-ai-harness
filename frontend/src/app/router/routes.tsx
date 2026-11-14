@@ -5,7 +5,7 @@ import { adminTree } from './adminRoutes'
 import { aiWorkRoutes } from './aiRoutes'
 import { appRoute, loginRoute, rootRoute } from './base'
 import { messageSearch } from './search'
-import { skillRoute, spaceTree } from './spaceRoutes'
+import { skillProposalRoute, skillRoute, spaceTree } from './spaceRoutes'
 
 export type { RouterContext } from './base'
 
@@ -144,6 +144,7 @@ export const routeTree = rootRoute.addChildren([
     spacesRoute,
     spaceTree,
     skillRoute,
+    skillProposalRoute,
     pageByIdRoute,
     conversationRoute,
     ticketsRoute,

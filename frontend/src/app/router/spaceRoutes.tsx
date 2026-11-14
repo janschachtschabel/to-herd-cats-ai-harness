@@ -1,7 +1,7 @@
 import { createRoute, lazyRouteComponent } from '@tanstack/react-router'
 import { boardSearch } from '@/features/tickets/board/search'
 import { appRoute } from './base'
-import { pageSearch } from './search'
+import { pageSearch, skillsSearch } from './search'
 
 // A space and what it holds; every view is its own chunk (as in routes.tsx).
 const WikiLayout = lazyRouteComponent(() => import('@/features/wiki/WikiLayout'), 'WikiLayout')
@@ -38,6 +38,10 @@ const ProposalScreen = lazyRouteComponent(
   'ProposalScreen',
 )
 const SkillPage = lazyRouteComponent(() => import('@/features/skills/SkillPage'), 'SkillPage')
+const SkillProposalScreen = lazyRouteComponent(
+  () => import('@/features/skills/proposals/SkillProposalScreen'),
+  'SkillProposalScreen',
+)
 
 /** A space: its wiki (tree on the left), with the pages, the trash and the settings. */
 const spaceRoute = createRoute({
@@ -140,11 +144,16 @@ const proposalRoute = createRoute({
   },
 })
 
-/** A space's skills (`ai.use` or `skill.manage`, and a role in the space). */
+/** A space's skills (`ai.use` or `skill.manage`, and a role in the space);
+ *  `?view=proposals`: the proposals for them, for those who decide. */
 const skillsRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/skills',
-  component: SpaceSkillsView,
+  validateSearch: skillsSearch,
+  component: function SkillsRoute() {
+    const { view } = skillsRoute.useSearch()
+    return <SpaceSkillsView view={view ?? 'skills'} />
+  },
 })
 
 /** One skill, wherever it belongs (the API answers 404 to whoever may not read it). */
@@ -155,6 +164,17 @@ export const skillRoute = createRoute({
   component: function SkillRoute() {
     const { skillId } = skillRoute.useParams()
     return <SkillPage skillId={skillId} />
+  },
+})
+
+/** One proposal for a skill, wherever it belongs (404 to whoever may not see it). */
+export const skillProposalRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/skill-proposals/$proposalId',
+  loader: () => SkillProposalScreen.preload?.(),
+  component: function SkillProposalRoute() {
+    const { proposalId } = skillProposalRoute.useParams()
+    return <SkillProposalScreen proposalId={proposalId} />
   },
 })
 

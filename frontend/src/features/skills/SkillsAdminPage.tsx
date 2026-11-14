@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Plus, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,12 +13,17 @@ import { ScopeSelect } from './ScopeSelect'
 import { SkillFormDialog } from './SkillFormDialog'
 import { SkillList } from './SkillList'
 import { SkillToolbar } from './SkillToolbar'
+import { SkillProposalList } from './proposals/SkillProposalList'
+import { useSkillProposals } from './proposals/queries'
+import { SkillsViewTabs, type SkillsView } from './proposals/SkillsViewTabs'
 
 /** Every skill of the organisation (`skill.manage`): organisation-wide and per space,
- *  filtered and searched; create and import anywhere. */
-export function SkillsAdminPage() {
+ *  filtered and searched; create and import anywhere. The second view: agents'
+ *  proposals for skills, everywhere, to decide. */
+export function SkillsAdminPage({ view = 'skills' }: { view?: SkillsView }) {
   const { t } = useTranslation()
   const spaces = useSpaces()
+  const openProposals = useSkillProposals({ state: 'open' })
   const [scope, setScope] = useState<Scope>('all')
   const [state, setState] = useState<Schemas['SkillState']>('active')
   const [search, setSearch] = useState('')
@@ -40,6 +46,16 @@ export function SkillsAdminPage() {
     />
   )
 
+  const scopeSelect = (
+    <ScopeSelect
+      label={t('skills.scope.filter')}
+      value={scope}
+      spaces={spaces.items}
+      withAll
+      onChange={setScope}
+    />
+  )
+
   return (
     <div>
       <PageHeader
@@ -58,16 +74,31 @@ export function SkillsAdminPage() {
           </>
         }
       />
-      <SkillToolbar search={search} state={state} onSearch={setSearch} onState={setState}>
-        <ScopeSelect
-          label={t('skills.scope.filter')}
-          value={scope}
-          spaces={spaces.items}
-          withAll
-          onChange={setScope}
-        />
-      </SkillToolbar>
-      <SkillList filter={{ ...scopeFilter(scope), state, q }} spaceNames={names} />
+      <SkillsViewTabs
+        view={view}
+        open={openProposals.items.length}
+        more={openProposals.hasMore}
+        link={(name, props) => (
+          <Link
+            to="/admin/skills"
+            search={name === 'proposals' ? { view: 'proposals' } : {}}
+            aria-current={name === view ? 'page' : undefined}
+            {...props}
+          />
+        )}
+      />
+      {view === 'proposals' ? (
+        <SkillProposalList filter={scopeFilter(scope)} spaceNames={names}>
+          {scopeSelect}
+        </SkillProposalList>
+      ) : (
+        <>
+          <SkillToolbar search={search} state={state} onSearch={setSearch} onState={setState}>
+            {scopeSelect}
+          </SkillToolbar>
+          <SkillList filter={{ ...scopeFilter(scope), state, q }} spaceNames={names} />
+        </>
+      )}
       <SkillFormDialog
         open={creating}
         spaceId={targetSpace(target)}

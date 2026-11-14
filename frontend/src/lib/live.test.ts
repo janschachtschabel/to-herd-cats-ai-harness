@@ -115,6 +115,15 @@ describe('live stream', () => {
     })
   })
 
+  test('a skill proposal event carries the proposal (plan M6)', () => {
+    expect(
+      parseLiveEvent(
+        'skill_proposal.changed',
+        '{"conversation_id":null,"message_id":null,"parent_id":null,"proposal_id":"p1"}',
+      ),
+    ).toMatchObject({ type: 'skill_proposal.changed', proposalId: 'p1' })
+  })
+
   test('a sprint event carries its space (plan M4b)', () => {
     expect(parseLiveEvent('sprint.changed', '{"space_id":"s1","sprint_id":"r1"}')).toMatchObject({
       type: 'sprint.changed',

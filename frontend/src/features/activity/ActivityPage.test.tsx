@@ -47,6 +47,53 @@ describe('activity', () => {
     expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
   })
 
+  test("an agent's skill proposal names where it belongs and opens the proposal", async () => {
+    const entry = makeActivity({
+      reason: 'skill_proposal',
+      conversation: null,
+      message_id: null,
+      author: { type: 'agent', id: 'hilda', name: 'Hilda' },
+      snippet: '',
+      skill_proposal: { id: 'sp-1', space_id: null },
+    })
+    mockApi({
+      ...shellRoutes(makeMe(['ai.use'])),
+      'GET /api/activity': page([entry]),
+      'POST /api/activity/:id/read': { status: 204 },
+      'GET /api/skill-proposals/:id': { status: 404, body: { error: { code: 'x' } } },
+    })
+    const { user, router } = await renderApp('/activity')
+    const item = (await screen.findByText('Hilda')).closest('li')!
+    expect(item).toHaveTextContent(
+      'hat einen Skill vorgeschlagen oder einen Vorschlag entschieden (organisationsweit)',
+    )
+    expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+    await user.click(within(item).getByRole('button', { name: 'Öffnen' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/skill-proposals/sp-1'))
+  })
+
+  test('a proposal for a new page at the top level opens the proposal', async () => {
+    const entry = makeActivity({
+      reason: 'proposal',
+      conversation: null,
+      message_id: null,
+      snippet: '',
+      proposal: { id: 'pr-1', space_id: 'space-1' },
+    })
+    mockApi({
+      ...shellRoutes(makeMe([])),
+      'GET /api/activity': page([entry]),
+      'POST /api/activity/:id/read': { status: 204 },
+      'GET /api/spaces/:id': { status: 404, body: { error: { code: 'space.not_found' } } },
+    })
+    const { user, router } = await renderApp('/activity')
+    const item = (await screen.findByText('Lea Löwe')).closest('li')!
+    await user.click(within(item).getByRole('button', { name: 'Öffnen' }))
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/spaces/space-1/proposals/pr-1'),
+    )
+  })
+
   test('nothing for me says so', async () => {
     mockApi({ ...shellRoutes(makeMe([])), 'GET /api/activity': page([]) })
     await renderApp('/activity')

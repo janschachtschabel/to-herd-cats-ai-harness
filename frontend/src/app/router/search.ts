@@ -44,3 +44,12 @@ export function safeRedirect(value: unknown): string | undefined {
     ? value
     : undefined
 }
+
+export interface SkillsSearch {
+  /** The proposals beside the skills (for those who decide them). */
+  view?: 'proposals'
+}
+
+export function skillsSearch(search: Record<string, unknown>): SkillsSearch {
+  return search.view === 'proposals' ? { view: 'proposals' } : {}
+}

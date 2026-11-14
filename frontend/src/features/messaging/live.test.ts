@@ -3,6 +3,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
+import { skillProposalKeys } from '@/features/skills/proposals/queries'
+import { skillKeys } from '@/features/skills/queries'
 import { ticketKeys } from '@/features/tickets/keys'
 import { activityKeys, messagingKeys } from './keys'
 import { COALESCE_MS, createCoalescer, invalidateFor } from './live'
@@ -45,6 +47,9 @@ const KEYS = {
   approval: approvalKeys.detail('ap-1'),
   question: approvalKeys.question('q-1'),
   myApprovals: [...approvalKeys.mine, 'pending'],
+  skillProposals: skillProposalKeys.list({ state: 'open' }),
+  skillProposal: skillProposalKeys.detail('sp-1'),
+  skills: skillKeys.list({}),
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -113,6 +118,16 @@ describe('live invalidation', () => {
       'approval',
       'question',
       'myApprovals',
+      'skillProposals',
+      'skillProposal',
+    ])
+  })
+
+  test('a skill proposal made or decided refreshes the proposals and the skills', () => {
+    expect(staleAfter({ type: 'skill_proposal.changed', proposalId: 'sp-1' })).toEqual([
+      'skillProposals',
+      'skillProposal',
+      'skills',
     ])
   })
 

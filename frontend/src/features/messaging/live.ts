@@ -6,6 +6,8 @@ import { approvalKeys } from '@/features/approvals/queries'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
+import { skillProposalKeys } from '@/features/skills/proposals/queries'
+import { skillKeys } from '@/features/skills/queries'
 import { ticketKeys } from '@/features/tickets/keys'
 import { sprintEventKeys, ticketEventKeys } from '@/features/tickets/live'
 import { useLive, type LiveEvent } from '@/lib/live'
@@ -39,6 +41,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         agentKeys.allRunEvents,
         proposalKeys.all,
         approvalKeys.all,
+        skillProposalKeys.all,
       ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
@@ -86,6 +89,10 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return event.runId ? [agentKeys.run(event.runId), agentKeys.runEvents(event.runId)] : []
     case 'proposal.changed':
       return proposalEventKeys(event)
+    case 'skill_proposal.changed':
+      // Made or decided (for whoever decides it, or its author): the proposals, and the
+      // skills an accepted one changed.
+      return [skillProposalKeys.all, skillKeys.all]
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the
       // run, and their messages.

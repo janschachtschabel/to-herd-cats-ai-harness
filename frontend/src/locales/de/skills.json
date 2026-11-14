@@ -99,6 +99,38 @@
         "exists": "Diesen Namen gibt es hier schon.",
         "unknown": "Nicht übernommen."
       }
+    },
+    "proposals": {
+      "views": "Skills und Vorschläge",
+      "tab": "Vorschläge",
+      "title": "Vorschläge für Skills",
+      "hint": "Neue Skills und Änderungen, die Agenten vorgeschlagen haben. Ein angenommener Vorschlag wird zu einer neuen Version des Skills.",
+      "empty": {
+        "open": "Keine offenen Vorschläge für Skills.",
+        "accepted": "Noch keine angenommenen Vorschläge.",
+        "rejected": "Noch keine abgelehnten Vorschläge."
+      },
+      "someSkill": "einem Skill",
+      "newSkill": "Neuer Skill „{{name}}“",
+      "change": "Änderung an „{{name}}“",
+      "back": "Alle Vorschläge",
+      "outdated": "Der Skill hat sich seit dem Vorschlag geändert. Beim Annehmen siehst du beide Fassungen und legst den Text fest.",
+      "openSkill": "„{{name}}“ öffnen",
+      "openVersion": "„{{name}}“ öffnen (Version {{number}})",
+      "proposedText": "Vorgeschlagener Skill",
+      "against": "Verglichen mit dem Skill jetzt (Version {{number}}).",
+      "sameText": "Der Text bleibt gleich.",
+      "rejectHint": "Der Skill bleibt, wie er ist. Wer den Vorschlag gemacht hat, sieht die Begründung.",
+      "merge": {
+        "title": "Der Skill hat sich geändert",
+        "hint": "Seit dem Vorschlag wurde der Skill bearbeitet. Vergleiche beide Fassungen, lege den Text fest und nimm ihn an.",
+        "again": "Der Skill hat sich inzwischen noch einmal geändert. Prüfe die neue Fassung.",
+        "current": "Skill jetzt",
+        "proposed": "Vorschlag",
+        "takeCurrent": "Skill jetzt übernehmen",
+        "takeProposed": "Vorschlag übernehmen",
+        "submit": "So annehmen"
+      }
     }
   },
   "errors": {
@@ -110,6 +142,16 @@
       "name_taken": "Einen Skill mit diesem Namen gibt es hier schon (auch archiviert).",
       "state_conflict": "Der Skill ist schon in diesem Zustand.",
       "version_not_found": "Diese Version gibt es nicht."
+    },
+    "skill_proposal": {
+      "not_found": "Diesen Vorschlag für einen Skill gibt es nicht (mehr).",
+      "not_open": "Über diesen Vorschlag wurde schon entschieden.",
+      "version_conflict": "Der Vorschlag hat sich inzwischen geändert; er wurde neu geladen.",
+      "base_outdated": "Der Skill hat sich seit dem Vorschlag geändert.",
+      "skill_archived": "Der Skill ist archiviert; der Vorschlag lässt sich nicht annehmen.",
+      "no_change": "Der Vorschlag ändert nichts am Skill.",
+      "invalid_reason": "Die Begründung fehlt oder ist zu lang (höchstens 300 Zeichen).",
+      "bad_author": "Diesen Vorschlag kann nur ein Agent oder die handelnde Person machen."
     }
   }
 }

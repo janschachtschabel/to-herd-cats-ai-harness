@@ -11,7 +11,9 @@ import {
   ShieldCheck,
   UserCheck,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +22,7 @@ import { useMe } from '@/features/auth/queries'
 import { conversationLabel } from '@/features/messaging/display'
 import { plainMentions } from '@/features/messaging/mentions'
 import { messageTarget, useOpenMessage } from '@/features/messaging/targets'
+import { useSpaces } from '@/features/spaces/queries'
 import {
   EmptyState,
   ErrorState,
@@ -45,6 +48,11 @@ export function ActivityPage() {
   const [includeDone, setIncludeDone] = useState(false)
   const activity = useActivity(includeDone)
   const readAll = useReadAllActivity()
+  const spaces = useSpaces()
+  const spaceNames = useMemo(
+    () => new Map(spaces.items.map((space) => [space.id, space.name])),
+    [spaces.items],
+  )
   return (
     <div>
       <PageHeader
@@ -87,7 +95,7 @@ export function ActivityPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {activity.items.map((entry) => (
-            <ActivityItem key={entry.id} entry={entry} />
+            <ActivityItem key={entry.id} entry={entry} spaceNames={spaceNames} />
           ))}
         </ul>
       )}
@@ -112,23 +120,54 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   skill_proposal: ScrollText,
 }
 
-function ActivityItem({ entry }: { entry: ActivityEntry }) {
+/** Where an entry happened, for its sentence: its conversation, or where a proposal
+ *  without a thread belongs. */
+function whereOf(
+  t: TFunction,
+  entry: ActivityEntry,
+  meId: string | undefined,
+  spaceNames: ReadonlyMap<string, string>,
+): string {
+  if (entry.conversation) return conversationLabel(t, entry.conversation, meId)
+  if (entry.skill_proposal) {
+    const spaceId = entry.skill_proposal.space_id
+    if (!spaceId) return t('activity.skillProposalWhere.org')
+    return spaceNames.get(spaceId) ?? t('activity.skillProposalWhere.space')
+  }
+  return t('activity.proposalWhere')
+}
+
+function ActivityItem({
+  entry,
+  spaceNames,
+}: {
+  entry: ActivityEntry
+  spaceNames: ReadonlyMap<string, string>
+}) {
   const { t, i18n } = useTranslation()
   const me = useMe()
   const open = useOpenMessage()
+  const navigate = useNavigate()
   const read = useMarkActivityRead(entry.id)
   const done = useMarkActivityDone(entry.id)
   const unread = !entry.read_at && !entry.done_at
   const Icon = REASON_ICONS[entry.reason]
-  const where = entry.conversation
-    ? conversationLabel(t, entry.conversation, me?.user.id)
-    : t('activity.proposalWhere')
+  const where = whereOf(t, entry, me?.user.id, spaceNames)
   const author = entry.author?.name ?? t('messaging.message.unknownAuthor')
 
   const go = () => {
     if (!entry.read_at) read.mutate()
     if (entry.conversation && entry.message_id) {
       open(messageTarget(entry.conversation, entry.message_id, entry.parent_id))
+    } else if (entry.skill_proposal) {
+      const proposalId = entry.skill_proposal.id
+      void navigate({ to: '/skill-proposals/$proposalId', params: { proposalId } })
+    } else if (entry.proposal) {
+      const { id: proposalId, space_id: spaceId } = entry.proposal
+      void navigate({
+        to: '/spaces/$spaceId/proposals/$proposalId',
+        params: { spaceId, proposalId },
+      })
     }
   }
 

@@ -335,6 +335,10 @@
       "question": "hat dir in {{where}} eine Frage gestellt",
       "run_stopped": "meldet in {{where}}, dass ein Lauf nicht zu Ende kam",
       "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})"
+    },
+    "skillProposalWhere": {
+      "org": "organisationsweit",
+      "space": "einem Bereich"
     }
   }
 }

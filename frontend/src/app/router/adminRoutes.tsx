@@ -3,6 +3,7 @@ import { adminLinks } from '@/app/shell/nav'
 import { hasPermission } from '@/features/auth/queries'
 import type { Me, Permission } from '@/lib/api'
 import { appRoute } from './base'
+import { skillsSearch } from './search'
 
 const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
 const GroupsPage = lazyRouteComponent(
@@ -150,12 +151,17 @@ const agentRoute = createRoute({
   },
 })
 
-/** Every skill of the organisation (`skill.manage`). */
+/** Every skill of the organisation (`skill.manage`); `?view=proposals`: the
+ *  proposals for skills. */
 const skillsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/skills',
+  validateSearch: skillsSearch,
   loader: ({ context }) => requirePermission(context.me, 'skill.manage'),
-  component: SkillsAdminPage,
+  component: function SkillsRoute() {
+    const { view } = skillsRoute.useSearch()
+    return <SkillsAdminPage view={view ?? 'skills'} />
+  },
 })
 
 /** The administration (`/admin/...`): each page only for those with its right. */
