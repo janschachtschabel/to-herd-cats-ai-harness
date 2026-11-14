@@ -39,9 +39,10 @@ export function NextTerm({ automation }: { automation: Automation }) {
   const { t, i18n } = useTranslation()
   if (automation.kind === 'event') return <span>{t('automations.list.onEvent')}</span>
   if (!automation.next_due_at) return <span>{t('automations.list.noNext')}</span>
+  const term = termText(t, automation.next_due_at, i18n.language, automation.time_zone, true)
   return (
     <time dateTime={automation.next_due_at}>
-      {termText(t, automation.next_due_at, i18n.language, automation.time_zone, true)}
+      {automation.state === 'paused' ? t('automations.list.afterResume', { term }) : term}
     </time>
   )
 }

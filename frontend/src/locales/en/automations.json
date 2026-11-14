@@ -25,6 +25,7 @@
       "next": "Next term",
       "noNext": "no further term",
       "onEvent": "on each matching event",
+      "afterResume": "after a resume; due {{term}}",
       "lastRun": "Last run",
       "noRun": "none yet",
       "openRun": "View run",

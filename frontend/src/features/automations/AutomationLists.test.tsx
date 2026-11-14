@@ -97,9 +97,11 @@ describe('my automations', () => {
     expect(within(second!).getByText('Prüfe offene Tickets ohne Bearbeitung.')).toBeInTheDocument()
     expect(within(second!).getByText('Alle 30 Minuten, Mo–Fr, 09:00–17:00')).toBeInTheDocument()
     expect(within(second!).getByText(/Kanal #support/)).toBeInTheDocument()
-    // My time, and the automation's own where it differs.
+    // My time, and the automation's own where it differs; paused, it waits for a resume.
     expect(
-      within(second!).getByText('16.11.2026, 15:00 (dort 09:00, America/New_York)'),
+      within(second!).getByText(
+        'nach dem Fortsetzen; fällig 16.11.2026, 15:00 (dort 09:00, America/New_York)',
+      ),
     ).toBeInTheDocument()
     expect(
       within(second!).getByText('Angehalten: Die Eigentümerin darf sie nicht mehr ausführen'),

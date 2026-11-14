@@ -25,6 +25,7 @@
       "next": "Nächster Termin",
       "noNext": "kein weiterer Termin",
       "onEvent": "bei jedem passenden Ereignis",
+      "afterResume": "nach dem Fortsetzen; fällig {{term}}",
       "lastRun": "Letzter Lauf",
       "noRun": "noch keiner",
       "openRun": "Lauf ansehen",
