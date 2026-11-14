@@ -165,6 +165,16 @@ def test_public_url_must_be_an_origin_and_empty_means_unset(
         Settings()
 
 
+def test_an_empty_egress_proxy_means_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compose and the chart pass `HERD_AI_EGRESS_PROXY: ${HERD_AI_EGRESS_PROXY:-}`:
+    empty is "no proxy", not a proxy URL every provider call would fail to parse."""
+    monkeypatch.setenv("HERD_AI_EGRESS_PROXY", "")
+    assert Settings().ai_egress_proxy is None
+    monkeypatch.setenv("HERD_AI_EGRESS_PROXY", "http://proxy.internal:3128")
+    proxy = Settings().ai_egress_proxy
+    assert proxy is not None and proxy.get_secret_value() == "http://proxy.internal:3128"
+
+
 def test_bootstrap_password_is_hidden(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

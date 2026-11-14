@@ -57,6 +57,17 @@ def test_env_references_are_limited_to_the_ai_prefix() -> None:
         assert caught.value.code == "secrets.env_name_invalid"
 
 
+def test_no_own_ai_setting_can_be_a_key_reference() -> None:
+    """Every setting of the app with the `HERD_AI_` prefix is refused as a key, the
+    ones added after M5 (approval hours, personal-agent limit) included."""
+    own = [f"HERD_{name.upper()}" for name in Settings.model_fields if name.startswith("ai_")]
+    assert {"HERD_AI_APPROVAL_HOURS", "HERD_AI_PERSONAL_AGENTS_MAX"} <= set(own)
+    for name in own:
+        with pytest.raises(ValidationFailed) as caught:
+            secrets.env_ref(name)
+        assert caught.value.code == "secrets.env_name_invalid"
+
+
 def test_resolving_a_disallowed_or_unset_env_reference_fails_without_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

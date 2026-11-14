@@ -23,15 +23,17 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from pydantic import SecretStr
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.errors import ValidationFailed
 
 ENV_PREFIX = "env:"
 ENC_PREFIX = "enc:"
 ENV_NAME = re.compile(r"HERD_AI_[A-Z0-9_]{1,100}")
-# The app's own settings with that prefix (`core/config.py`): never a connection's key
-# (the egress proxy's URL may carry the proxy's credentials).
-RESERVED_NAMES = frozenset({"HERD_AI_EGRESS_PROXY", "HERD_AI_CHECK_TIMEOUT_SECONDS"})
+# The app's own settings with that prefix (`core/config.py`, every `ai_*` field): never
+# a connection's key (the egress proxy's URL may carry the proxy's credentials).
+RESERVED_NAMES = frozenset(
+    f"HERD_{name.upper()}" for name in Settings.model_fields if name.startswith("ai_")
+)
 MAX_VALUE_CHARS = 4096
 # Visible ASCII only: the value goes into an HTTP header.
 _VALUE = re.compile(r"[\x21-\x7e]+")

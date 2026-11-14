@@ -156,6 +156,12 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _empty_egress_proxy_is_none(self) -> Self:
+        if self.ai_egress_proxy is not None and not self.ai_egress_proxy.get_secret_value():
+            self.ai_egress_proxy = None  # compose: `${HERD_AI_EGRESS_PROXY:-}`
+        return self
+
+    @model_validator(mode="after")
     def _public_url_is_an_origin(self) -> Self:
         if self.public_url == "":
             self.public_url = None  # compose: `${HERD_PUBLIC_URL:-}`
