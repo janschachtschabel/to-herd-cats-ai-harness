@@ -16,6 +16,15 @@ const DmInspectPage = lazyRouteComponent(
   () => import('@/features/admin/dm-inspect/DmInspectPage'),
   'DmInspectPage',
 )
+const ConnectionsPage = lazyRouteComponent(
+  () => import('@/features/ai/connections/ConnectionsPage'),
+  'ConnectionsPage',
+)
+const AssignmentsPage = lazyRouteComponent(
+  () => import('@/features/ai/assignments/AssignmentsPage'),
+  'AssignmentsPage',
+)
+const UsagePage = lazyRouteComponent(() => import('@/features/ai/usage/UsagePage'), 'UsagePage')
 
 /** A page someone without the right must not even learn exists: not found. */
 function requirePermission(me: Me, permission: Permission): void {
@@ -89,6 +98,27 @@ const dmInspectRoute = createRoute({
   component: DmInspectPage,
 })
 
+const aiRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: ConnectionsPage,
+})
+
+const aiAssignmentsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/assignments',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: AssignmentsPage,
+})
+
+const aiUsageRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/usage',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: UsagePage,
+})
+
 /** The administration (`/admin/...`): each page only for those with its right. */
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
@@ -98,4 +128,7 @@ export const adminTree = adminRoute.addChildren([
   tagsRoute,
   auditRoute,
   dmInspectRoute,
+  aiRoute,
+  aiAssignmentsRoute,
+  aiUsageRoute,
 ])

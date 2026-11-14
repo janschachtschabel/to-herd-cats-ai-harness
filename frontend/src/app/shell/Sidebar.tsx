@@ -1,5 +1,15 @@
 import { Link } from '@tanstack/react-router'
-import { Eye, History, Search, Shield, Tags, UserRound, UsersRound } from 'lucide-react'
+import {
+  Bot,
+  Eye,
+  History,
+  Search,
+  Shield,
+  Sparkles,
+  Tags,
+  UserRound,
+  UsersRound,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMe } from '@/features/auth/queries'
@@ -17,6 +27,7 @@ const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/tags': Tags,
   '/admin/audit': History,
   '/admin/dm-inspect': Eye,
+  '/admin/ai': Sparkles,
 }
 
 function AdminSection() {

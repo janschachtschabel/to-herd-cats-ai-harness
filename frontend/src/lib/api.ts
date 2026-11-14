@@ -70,8 +70,9 @@ export class ApiError extends Error {
     this.traceId = traceId ?? null
   }
 
+  /** `<area>.version_conflict`, or a named one such as `ai.connection_version_conflict`. */
   get isVersionConflict(): boolean {
-    return this.status === 409 && this.code.endsWith('.version_conflict')
+    return this.status === 409 && /[._]version_conflict$/.test(this.code)
   }
 }
 

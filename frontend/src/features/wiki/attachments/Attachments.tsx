@@ -1,7 +1,10 @@
-import { Copy, Paperclip, Trash2, Upload } from 'lucide-react'
+import { Bot, BotOff, Copy, Paperclip, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { seesAiSettings } from '@/features/ai/display'
+import { useSetAttachmentAiLock } from '@/features/ai/lockQueries'
+import { AiLockBadge } from '@/features/ai/policy/AiLockBadge'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { ErrorState, LoadMore } from '@/features/shared/states'
 import type { Attachment, WikiPage } from '@/lib/api'
@@ -13,7 +16,9 @@ import { useAttachments, useDeleteAttachment, useUploadAttachment } from './quer
 
 export function Attachments({ page }: { page: WikiPage }) {
   const { t, i18n } = useTranslation()
-  const { abilities } = useWiki()
+  const { abilities, me } = useWiki()
+  const aiLock = useSetAttachmentAiLock(page.id)
+  const canLockAi = abilities.moderate && seesAiSettings(me)
   const list = useAttachments(page.id)
   const upload = useUploadAttachment(page.id)
   const remove = useDeleteAttachment(page.id)
@@ -60,6 +65,7 @@ export function Attachments({ page }: { page: WikiPage }) {
         )}
       </div>
       <WikiError error={upload.error} />
+      <WikiError error={aiLock.error} />
       {list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : list.isPending ? null : list.items.length === 0 ? (
@@ -75,6 +81,7 @@ export function Attachments({ page }: { page: WikiPage }) {
               >
                 {attachment.filename}
               </a>
+              {attachment.no_ai && <AiLockBadge />}
               <span className="text-xs text-muted-foreground">
                 {formatBytes(attachment.size, i18n.language)} ·{' '}
                 {formatDateTime(attachment.created_at, i18n.language)}
@@ -91,6 +98,19 @@ export function Attachments({ page }: { page: WikiPage }) {
                 <span role="status" className="text-xs text-muted-foreground">
                   {t('wiki.attachments.copied')}
                 </span>
+              )}
+              {canLockAi && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={aiLock.isPending}
+                  aria-label={t(attachment.no_ai ? 'ai.lock.unlockFile' : 'ai.lock.lockFile', {
+                    name: attachment.filename,
+                  })}
+                  onClick={() => aiLock.mutate(attachment)}
+                >
+                  {attachment.no_ai ? <Bot aria-hidden /> : <BotOff aria-hidden />}
+                </Button>
               )}
               {abilities.edit && (
                 <Button

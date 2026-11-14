@@ -1,0 +1,302 @@
+{
+  "nav": {
+    "ai": "KI",
+    "agents": "Agenten"
+  },
+  "ai": {
+    "title": "KI",
+    "tabs": {
+      "label": "KI-Verwaltung",
+      "connections": "Verbindungen",
+      "assignments": "Zuordnung",
+      "usage": "Verbrauch"
+    },
+    "kinds": {
+      "openai": "OpenAI",
+      "openai_compatible": "OpenAI-kompatibel",
+      "b_api": "b-api",
+      "local": "Lokal"
+    },
+    "locations": {
+      "local": "Lokal",
+      "eu": "EU",
+      "external": "Extern"
+    },
+    "purposes": {
+      "chat": "Chat",
+      "embedding": "Embedding",
+      "both": "Chat und Embedding"
+    },
+    "connections": {
+      "description": "Anbieter, die das OpenAI-Protokoll sprechen. Schlüssel werden nur geschrieben, nie angezeigt.",
+      "empty": "Noch keine Verbindung eingerichtet. Ohne Verbindung hat niemand KI.",
+      "listLabel": "Verbindungen",
+      "secretNote": "Ein eingegebener Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.",
+      "kindHint": "Lässt sich später nicht ändern. „Lokal“ darf http und interne Adressen nutzen.",
+      "kindFixed": "Die Art einer Verbindung ist fest.",
+      "baseUrlHint": "Zum Beispiel https://api.openai.com/v1. Leer: die Adresse der Art.",
+      "secretStored": "Ein Schlüssel ist gespeichert. Er wird nicht angezeigt.",
+      "secretMissing": "Kein Schlüssel gespeichert.",
+      "secretEnvHint": "Name einer Umgebungsvariablen des Servers mit dem Präfix HERD_AI_.",
+      "secretEnvPlaceholder": "HERD_AI_…",
+      "modelsHint": "Ein Modell je Zeile; das erste ist das Standardmodell. Leer: die Modelle der Art.",
+      "dataLocationHint": "Entscheidet mit der KI-Richtlinie eines Bereichs, ob Inhalte hierher dürfen.",
+      "paramFamilyAuto": "Automatisch",
+      "on": "Eingeschaltet",
+      "off": "Ausgeschaltet",
+      "noModels": "Keine Modelle",
+      "test": "Testen",
+      "testing": "Teste …",
+      "enable": "Einschalten",
+      "disable": "Ausschalten",
+      "fetchModels": "Modelle abrufen",
+      "deleteNamed": "Verbindung {{name}} löschen",
+      "deleteTitle": "Verbindung löschen?",
+      "deleteText": "„{{name}}“ wird gelöscht. Wird sie noch zugeordnet oder von einem Agenten genutzt, geht das nicht.",
+      "create": {
+        "open": "Verbindung einrichten",
+        "title": "Verbindung einrichten",
+        "submit": "Einrichten"
+      },
+      "edit": {
+        "title": "Verbindung bearbeiten"
+      },
+      "fields": {
+        "name": "Name",
+        "kind": "Art",
+        "baseUrl": "Adresse (Basis-URL)",
+        "secret": "Schlüssel",
+        "secretValue": "Schlüssel (wird verschlüsselt gespeichert)",
+        "secretEnv": "Umgebungsvariable",
+        "models": "Modelle",
+        "dataLocation": "Datenort",
+        "purpose": "Zweck",
+        "paramFamily": "Token-Parameter",
+        "maxConcurrency": "Gleichzeitige Läufe",
+        "requestsPerMinute": "Anfragen je Minute",
+        "enabled": "Eingeschaltet"
+      },
+      "secretModes": {
+        "keep": "Beibehalten",
+        "value": "Schlüssel eingeben",
+        "env": "Umgebungsvariable",
+        "none": "Ohne Schlüssel"
+      },
+      "secretKinds": {
+        "env": "Aus einer Umgebungsvariablen",
+        "enc": "Verschlüsselt gespeichert"
+      }
+    },
+    "check": {
+      "ok": "Verbindung funktioniert ({{model}}, {{ms}} ms).",
+      "unauthorized": "Anbieter lehnt ab: Schlüssel ungültig (401).",
+      "payment_required": "Anbieter lehnt ab: Zahlung oder Guthaben nötig (402).",
+      "forbidden": "Anbieter lehnt ab: kein Zugriff auf dieses Modell (403).",
+      "not_found": "Modell oder Adresse beim Anbieter nicht gefunden (404).",
+      "rate_limited": "Anbieter lehnt ab: Anfragegrenze erreicht (429).",
+      "provider_error": "Fehler beim Anbieter.",
+      "redirect": "Der Anbieter leitet weiter; Weiterleitungen sind gesperrt.",
+      "timeout": "Keine Antwort in der vorgesehenen Zeit.",
+      "unreachable": "Anbieter nicht erreichbar.",
+      "blocked": "Adresse gesperrt (private oder interne Adresse).",
+      "invalid_response": "Unverständliche Antwort des Anbieters.",
+      "secret_unavailable": "Schlüssel nicht verfügbar (Umgebungsvariable oder Server-Schlüssel fehlt).",
+      "no_model": "Kein Modell eingetragen."
+    },
+    "assignments": {
+      "description": "Wer welches Modell nutzt: die Person vor ihrer Gruppe vor dem Standard. Ohne Zuordnung keine KI.",
+      "connection": "Verbindung",
+      "model": "Modell",
+      "disabledConnection": "{{name}} (ausgeschaltet)",
+      "defaultTitle": "Standard der Organisation",
+      "defaultHint": "Gilt für alle ohne eigene oder Gruppen-Zuordnung. Leer: nur Zugeordnete haben KI.",
+      "noDefault": "Kein Standard (keine KI)",
+      "saved": "Gespeichert.",
+      "groupsTitle": "Gruppen",
+      "groupsHint": "Wer in mehreren Gruppen ist, bekommt die Zuordnung der ersten.",
+      "groupsEmpty": "Keine Gruppen-Zuordnungen.",
+      "moveUp": "{{name}} nach oben",
+      "moveDown": "{{name}} nach unten",
+      "removeGroup": "{{name}} entfernen",
+      "addGroup": "Gruppe hinzufügen",
+      "saveGroups": "Reihenfolge speichern",
+      "usersTitle": "Einzelne Personen",
+      "usersHint": "Ein eigenes Modell oder ausdrücklich keine KI; das gilt vor Gruppe und Standard.",
+      "usersEmpty": "Keine Personen-Zuordnungen.",
+      "noAi": "Keine KI",
+      "targetText": "{{connection}} · {{model}}",
+      "removePerson": "Zuordnung von {{name}} entfernen",
+      "person": "Person",
+      "addPerson": "Zuordnen"
+    },
+    "usage": {
+      "description": "Verbrauch je Tag (UTC). Kosten nur, wo ein Preis hinterlegt ist.",
+      "groupBy": "Aufteilen nach",
+      "groups": {
+        "day": "Nur Tag",
+        "user": "Person",
+        "space": "Bereich",
+        "connection": "Verbindung"
+      },
+      "from": "Von",
+      "to": "Bis",
+      "empty": "Kein Verbrauch in diesem Zeitraum.",
+      "day": "Tag",
+      "calls": "Aufrufe",
+      "tokensIn": "Token ein",
+      "tokensOut": "Token aus",
+      "cost": "Kosten",
+      "unknown": "(unbekannt)",
+      "noPrice": "ohne Preis"
+    },
+    "mine": {
+      "title": "Meine KI",
+      "model": "Dein Modell: {{model}}",
+      "period": "Zeitraum {{from}} bis {{to}} (UTC)."
+    },
+    "policy": {
+      "title": "KI-Richtlinie",
+      "hint": "Was KI-Verbindungen von diesem Bereich erhalten dürfen.",
+      "values": {
+        "any": "Jede Verbindung",
+        "restricted": "Nur bestimmte Datenorte",
+        "none": "Keine KI"
+      },
+      "explain": {
+        "any": "Inhalte dürfen an jede eingerichtete Verbindung gehen.",
+        "restricted": "Inhalte gehen nur an Verbindungen mit einem der gewählten Datenorte; sonst stoppt der Lauf.",
+        "none": "KI sieht diesen Bereich nicht: keine Treffer, kein Lesen."
+      },
+      "locations": "Erlaubte Datenorte",
+      "locationsRequired": "Bitte mindestens einen Datenort wählen."
+    },
+    "lock": {
+      "locked": "Für KI gesperrt",
+      "lockPage": "Für KI sperren",
+      "unlockPage": "KI-Sperre aufheben",
+      "lockFile": "{{name}} für KI sperren",
+      "unlockFile": "KI-Sperre von {{name}} aufheben"
+    }
+  },
+  "agents": {
+    "title": "Agenten",
+    "description": "KI-Mitarbeiter, mit denen Personen mit KI in einer Direktnachricht sprechen. In M5 lesen Agenten nur.",
+    "noConnection": "Erst eine KI-Verbindung einrichten: Ein Agent braucht ein Modell.",
+    "empty": "Noch keine Agenten.",
+    "listLabel": "Agenten",
+    "pause": "Pausieren",
+    "activate": "Aktivieren",
+    "deleteNamed": "Agent {{name}} löschen",
+    "deleteTitle": "Agent löschen?",
+    "deleteText": "„{{name}}“ wird gelöscht. Wer schon gesprochen hat, bleibt erhalten: dann lieber pausieren.",
+    "create": {
+      "open": "Agent anlegen",
+      "title": "Agent anlegen",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "title": "{{name}} bearbeiten"
+    },
+    "card": {
+      "model": "Modell {{model}} über {{connection}}",
+      "limits": "höchstens {{steps}} Schritte, {{seconds}} s"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "active": "Aktiv",
+      "paused": "Pausiert"
+    },
+    "fields": {
+      "name": "Name",
+      "intro": "Kurzvorstellung",
+      "introHint": "Sehen alle mit KI im Profil und in der Direktnachricht.",
+      "instructions": "Anweisungen",
+      "instructionsHint": "{{count}} von {{max}} Zeichen. Nur Verwaltende sehen sie.",
+      "model": "Modell",
+      "modelRequired": "Bitte eine Verbindung und ein Modell wählen.",
+      "responsible": "Verantwortliche Person",
+      "responsibleHint": "Ist sie deaktiviert, antwortet der Agent nicht.",
+      "responsibleRequired": "Bitte eine Person wählen.",
+      "currentResponsible": "(bisherige Person)",
+      "status": "Status",
+      "statusHint": "Nur aktive Agenten antworten.",
+      "maxSteps": "Höchstens Schritte",
+      "maxRuntime": "Höchstens Sekunden"
+    },
+    "badge": {
+      "short": "KI",
+      "title": "Von einer KI geschrieben"
+    },
+    "stop": {
+      "title": "Keine Antwort:",
+      "completed": "Der Lauf ist abgeschlossen.",
+      "max_steps": "Der Agent hat die Höchstzahl an Schritten erreicht.",
+      "deadline": "Die Zeit für diesen Lauf ist abgelaufen.",
+      "no_progress": "Der Agent kam nicht weiter (dieselbe Abfrage wiederholt).",
+      "rights_revoked": "Rechte haben sich geändert; der Lauf wurde beendet.",
+      "policy_blocked": "Durch die KI-Richtlinie eines Bereichs gestoppt: Gelesenes darf nicht an diese Verbindung gehen.",
+      "provider_refused": "Der Anbieter lehnt ab (Zugang, Guthaben oder Anfragegrenze).",
+      "error": "Ein Fehler ist aufgetreten. Bitte später erneut versuchen.",
+      "unknown": "Der Lauf wurde beendet."
+    },
+    "noRun": {
+      "ai_unavailable": "Du hast keine KI-Zuordnung (mehr); der Agent antwortet nicht.",
+      "agent_draft": "Dieser Agent ist ein Entwurf und antwortet nicht.",
+      "agent_paused": "Dieser Agent ist pausiert und antwortet gerade nicht. Deine Nachricht ist gespeichert.",
+      "agent_responsible_inactive": "Die verantwortliche Person des Agenten ist deaktiviert; er antwortet nicht.",
+      "agent_connection_unavailable": "Keine Verbindung verfügbar: Die KI-Verbindung des Agenten ist ausgeschaltet oder bietet das Modell nicht mehr an.",
+      "run_thread_reply": "Antworten in Threads beantwortet der Agent nicht; schreib ins Gespräch.",
+      "unknown": "Der Agent antwortet auf diese Nachricht nicht."
+    },
+    "progress": {
+      "queued": "{{name}} beginnt gleich …",
+      "working_one": "{{name}} arbeitet … (Schritt {{count}})",
+      "working_other": "{{name}} arbeitet … (Schritt {{count}})"
+    },
+    "header": {
+      "paused": "Dieser Agent ist pausiert und antwortet gerade nicht."
+    },
+    "dm": {
+      "title": "Mit einem Agenten sprechen",
+      "agent": "Agent",
+      "hint": "Ein Gespräch nur zwischen dir und dem Agenten.",
+      "open": "Gespräch öffnen"
+    },
+    "sources": {
+      "show": "Quellen anzeigen",
+      "none": "Keine Quellen gelesen.",
+      "title": "Gelesen:",
+      "page": "Seite"
+    }
+  },
+  "errors": {
+    "ai": {
+      "not_found": "Nicht gefunden.",
+      "connection_name_taken": "Eine Verbindung mit diesem Namen gibt es schon.",
+      "connection_in_use": "Die Verbindung wird noch zugeordnet oder von einem Agenten genutzt.",
+      "connection_not_found": "Diese Verbindung gibt es nicht mehr.",
+      "base_url_not_allowed": "Diese Adresse ist nicht erlaubt (nur https; interne Adressen nur bei „Lokal“).",
+      "connection_not_chat": "Diese Verbindung kann nicht chatten.",
+      "model_unknown": "Diese Verbindung bietet das Modell nicht an.",
+      "group_twice": "Eine Gruppe steht zweimal in der Liste.",
+      "group_not_found": "Diese Gruppe gibt es nicht mehr.",
+      "guest_not_assignable": "Gäste bekommen keine KI.",
+      "usage_period_invalid": "Der Zeitraum ist ungültig (höchstens 365 Tage).",
+      "provider_failed": "Der Anbieter hat die Modellliste nicht geliefert."
+    },
+    "agent": {
+      "not_found": "Diesen Agenten gibt es nicht (mehr).",
+      "in_use": "Dieser Agent hat schon gesprochen und bleibt erhalten. Pausiere ihn stattdessen.",
+      "responsible_invalid": "Die verantwortliche Person muss aktiv und kein Gast sein.",
+      "connection_and_model": "Verbindung und Modell gehören zusammen."
+    },
+    "secrets": {
+      "key_missing": "Der Server hat keinen Schlüssel (HERD_SECRET_KEY): nur Umgebungsvariablen sind möglich.",
+      "env_name_invalid": "Nur Umgebungsvariablen mit dem Präfix HERD_AI_ sind erlaubt.",
+      "value_invalid": "Dieser Schlüssel ist ungültig."
+    },
+    "dm": {
+      "agent_pair_only": "Mit einem Agenten spricht man nur zu zweit."
+    }
+  }
+}

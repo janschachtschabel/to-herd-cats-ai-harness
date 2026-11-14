@@ -24,13 +24,19 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'admin',
     milestone: 1,
-    anyOf: ['user.manage', 'group.manage', 'tag.manage', 'audit.read', 'dm.inspect'],
+    anyOf: ['user.manage', 'group.manage', 'tag.manage', 'audit.read', 'dm.inspect', 'ai.manage'],
   },
 ]
 
 export interface AdminLink {
-  to: '/admin/users' | '/admin/groups' | '/admin/tags' | '/admin/audit' | '/admin/dm-inspect'
-  labelKey: 'nav.users' | 'nav.groups' | 'nav.tags' | 'nav.audit' | 'nav.dmInspect'
+  to:
+    | '/admin/users'
+    | '/admin/groups'
+    | '/admin/tags'
+    | '/admin/audit'
+    | '/admin/dm-inspect'
+    | '/admin/ai'
+  labelKey: 'nav.users' | 'nav.groups' | 'nav.tags' | 'nav.audit' | 'nav.dmInspect' | 'nav.ai'
   permission: Permission
 }
 
@@ -40,6 +46,7 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/tags', labelKey: 'nav.tags', permission: 'tag.manage' },
   { to: '/admin/audit', labelKey: 'nav.audit', permission: 'audit.read' },
   { to: '/admin/dm-inspect', labelKey: 'nav.dmInspect', permission: 'dm.inspect' },
+  { to: '/admin/ai', labelKey: 'nav.ai', permission: 'ai.manage' },
 ]
 
 function holds(me: Me | null, permission: Permission): boolean {

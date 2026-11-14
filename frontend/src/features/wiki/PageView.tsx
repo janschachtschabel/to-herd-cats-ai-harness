@@ -8,6 +8,7 @@ import { LoadingState } from '@/features/shared/states'
 import { formatDateTime } from '@/lib/format'
 import type { WikiPage } from '@/lib/api'
 import { PageTickets } from '@/features/tickets/links/PageTickets'
+import { AiLockBadge } from '@/features/ai/policy/AiLockBadge'
 import { Attachments } from './attachments/Attachments'
 import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
@@ -41,6 +42,7 @@ export function PageView({ page }: { page: WikiPage }) {
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {page.status === 'draft' && <Badge variant="secondary">{t('wiki.page.draft')}</Badge>}
+            {page.no_ai && <AiLockBadge />}
             <PageTags page={page} />
             <span>
               {t('wiki.page.updated', { when: formatDateTime(page.updated_at, i18n.language) })}

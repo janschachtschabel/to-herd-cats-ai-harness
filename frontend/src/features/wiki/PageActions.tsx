@@ -1,5 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
+  Bot,
+  BotOff,
   Download,
   FilePlus,
   FolderInput,
@@ -21,6 +23,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { seesAiSettings } from '@/features/ai/display'
+import { useSetPageAiLock } from '@/features/ai/lockQueries'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import type { WikiPage } from '@/lib/api'
 import { canPublish } from './abilities'
@@ -42,6 +46,8 @@ export function PageActions({ page }: { page: WikiPage }) {
   const [open, setOpen] = useState<Open>(null)
   const publish = usePublishPage(page)
   const trash = useTrashPage(page)
+  const aiLock = useSetPageAiLock(page)
+  const canLockAi = abilities.moderate && seesAiSettings(me)
   const close = (next: boolean) => !next && setOpen(null)
   const params = { spaceId: space.id, _splat: page.path }
 
@@ -110,6 +116,15 @@ export function PageActions({ page }: { page: WikiPage }) {
                 </DropdownMenuItem>
               </>
             )}
+            {canLockAi && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => aiLock.mutate(!page.no_ai)}>
+                  {page.no_ai ? <Bot aria-hidden /> : <BotOff aria-hidden />}
+                  {page.no_ai ? t('ai.lock.unlockPage') : t('ai.lock.lockPage')}
+                </DropdownMenuItem>
+              </>
+            )}
             {abilities.trash && (
               <>
                 <DropdownMenuSeparator />
@@ -123,6 +138,7 @@ export function PageActions({ page }: { page: WikiPage }) {
         </DropdownMenu>
       </div>
       <WikiError error={publish.error} />
+      <WikiError error={aiLock.error} />
       {abilities.edit && (
         <>
           <RenamePageDialog page={page} open={open === 'rename'} onOpenChange={close} />

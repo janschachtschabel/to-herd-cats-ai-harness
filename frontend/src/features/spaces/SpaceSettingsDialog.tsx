@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useMe } from '@/features/auth/queries'
+import { seesAiSettings } from '@/features/ai/display'
+import { missingLocations, withAiPolicy } from '@/features/ai/policy/policy'
+import { SpaceAiPolicyFields } from '@/features/ai/policy/SpaceAiPolicyFields'
 import { Field, FormActions, SaveError } from '@/features/shared/forms'
 import type { Schemas, Space } from '@/lib/api'
 import { blankToNull, bodySchema } from '@/lib/schemas'
@@ -27,7 +31,7 @@ export function SpaceSettingsDialog({
   const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('spaces.settings.title')}</DialogTitle>
         </DialogHeader>
@@ -43,6 +47,7 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const update = useUpdateSpace(space.id)
+  const showAi = seesAiSettings(useMe())
   const [version, setVersion] = useState(space.version)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -51,6 +56,8 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
       description: space.description,
       icon: space.icon,
       version: space.version,
+      ai_policy: space.ai_policy,
+      allowed_locations: space.allowed_locations,
     },
   })
   const errors = form.formState.errors
@@ -61,9 +68,13 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
     update.reset()
   }
 
-  const onSubmit = form.handleSubmit((values) =>
-    update.mutate({ ...values, version }, { onSuccess: onDone }),
-  )
+  const onSubmit = form.handleSubmit((values) => {
+    if (missingLocations(values, showAi)) {
+      form.setError('allowed_locations', { message: t('ai.policy.locationsRequired') })
+      return
+    }
+    update.mutate({ ...withAiPolicy(values, showAi), version }, { onSuccess: onDone })
+  })
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
@@ -84,6 +95,7 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
           />
         )}
       </Field>
+      {showAi && <SpaceAiPolicyFields form={form} />}
       <SaveError error={update.error} onReload={() => void reload()} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onDone}>
