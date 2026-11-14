@@ -16,8 +16,14 @@ const STOP_REASONS = [
   'policy_blocked',
   'provider_refused',
   'error',
+  'cancelled',
+  'waiting_timeout',
   'approval_expired',
 ] as const
+
+export type StopReason = Schemas['StopReason']
+/** Every stop reason, for filters (the order of the run view's filter). */
+export const STOP_REASONS_ALL: readonly StopReason[] = STOP_REASONS
 
 /** Why a run ended, in words (an unknown reason gets a general sentence). */
 export function stopText(t: TFunction, reason: string | null | undefined): string {
@@ -32,12 +38,26 @@ const NO_RUN_REASONS = [
   'agent.responsible_inactive',
   'agent.connection_unavailable',
   'run.thread_reply',
+  'run.waiting',
+  'run.handover_limit',
+  'agent.not_found',
+  'agent.personal_disabled',
 ] as const
 
 /** Why sending started no run (`agent_run.reason`), in words. */
 export function noRunText(t: TFunction, reason: string): string {
   const known = (NO_RUN_REASONS as readonly string[]).includes(reason)
   return t(`agents.noRun.${known ? reason.replace('.', '_') : 'unknown'}`)
+}
+
+/** Whether a message is an agent's (an answer, a card): what carries the AI mark. */
+export function byAgent(message: { kind: string; author?: { type: string } | null }): boolean {
+  return (
+    message.kind === 'agent' ||
+    message.kind === 'approval' ||
+    message.kind === 'question' ||
+    message.author?.type === 'agent'
+  )
 }
 
 /** The agent of a direct message with one, else null. */

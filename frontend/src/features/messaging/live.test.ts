@@ -227,6 +227,7 @@ describe('coalescing', () => {
         messagingKeys.messages('a'),
         messagingKeys.message('a'),
         agentKeys.runs,
+        agentKeys.allRunEvents,
       ]
         .map((key) => JSON.stringify(key))
         .sort(),

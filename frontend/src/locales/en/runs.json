@@ -1,0 +1,127 @@
+{
+  "nav": {
+    "agentWork": "With agents",
+    "myRuns": "My runs"
+  },
+  "runs": {
+    "link": "View run",
+    "states": {
+      "queued": "Waiting to start",
+      "running": "Running",
+      "waiting": "Waiting for an answer",
+      "done": "Finished",
+      "completed": "Completed",
+      "stopped": "Stopped"
+    },
+    "stopReasons": {
+      "completed": "Completed",
+      "max_steps": "Step limit",
+      "deadline": "Out of time",
+      "no_progress": "No progress",
+      "rights_revoked": "Rights revoked",
+      "policy_blocked": "AI policy",
+      "provider_refused": "Provider refused",
+      "error": "Error",
+      "cancelled": "Cancelled",
+      "waiting_timeout": "No answer in time",
+      "approval_expired": "Release expired"
+    },
+    "places": {
+      "dm": "Direct message",
+      "channel": "Channel",
+      "thread_page": "Page thread",
+      "thread_ticket": "Ticket thread"
+    },
+    "duration": {
+      "ms_one": "{{count}} ms",
+      "ms_other": "{{count}} ms",
+      "s_one": "{{count}} s",
+      "s_other": "{{count}} s",
+      "min": "{{minutes}} min {{seconds}} s",
+      "h": "{{hours}} h {{minutes}} min"
+    },
+    "filters": {
+      "state": "State",
+      "stopReason": "Stop reason",
+      "all": "All"
+    },
+    "list": {
+      "label": "Runs",
+      "title": "{{agent}} · {{place}}",
+      "titleNoAgent": "{{place}} · asked by {{asker}}",
+      "steps_one": "{{count}} step",
+      "steps_other": "{{count}} steps",
+      "cost": "Cost {{cost}}"
+    },
+    "mine": {
+      "title": "My runs",
+      "description": "What agents did or are doing for you: from direct messages, mentions and tickets you gave them.",
+      "empty": "No runs yet."
+    },
+    "agent": {
+      "title": "Runs of {{name}}",
+      "titleUnnamed": "Runs of the agent",
+      "description": "Every run of this agent, newest first.",
+      "empty": "This agent has had no runs yet.",
+      "open": "Runs"
+    },
+    "page": {
+      "title": "Run of {{name}}",
+      "back": "My runs"
+    },
+    "header": {
+      "agent": "Agent",
+      "asker": "Asked by",
+      "place": "Place",
+      "state": "State",
+      "stopReason": "Stop reason",
+      "waitUntil": "Waits until",
+      "started": "Started",
+      "duration": "Duration",
+      "attempts": "Attempts",
+      "attemptsValue_one": "{{count}} attempt, {{recoveries}} recoveries",
+      "attemptsValue_other": "{{count}} attempts, {{recoveries}} recoveries",
+      "steps": "Model steps",
+      "tokens": "Tokens",
+      "tokensValue": "{{tokensIn}} in ({{cached}} cached), {{tokensOut}} out",
+      "cost": "Cost",
+      "noPrice": "no price stored",
+      "chain": "Handovers",
+      "chainNone": "None: a person asked",
+      "chainDepth_one": "{{count}} handover from agent to agent",
+      "chainDepth_other": "{{count}} handovers from agent to agent"
+    },
+    "timeline": {
+      "title": "Steps",
+      "label": "Steps of the run",
+      "empty": "No steps yet.",
+      "model": "Model step {{step}}",
+      "tokens": "{{tokensIn}} tokens in, {{tokensOut}} out",
+      "calls": "Calls: {{tools}}",
+      "args": "Arguments",
+      "result": "Result",
+      "hidden": "Not visible to you.",
+      "final": "Handed in the result.",
+      "stop": "End",
+      "waitingApproval": "Waiting for a release: {{tool}}",
+      "waitingAnswer": "Waiting for an answer to its question",
+      "approval": {
+        "rejected": "The release was rejected; the step did not run.",
+        "stale": "The content changed after the release; the step did not run."
+      }
+    },
+    "cancel": {
+      "open": "Cancel run",
+      "title": "Cancel the run?",
+      "text": "The agent stops before its next step. What it already wrote stays; it will not write an answer.",
+      "confirm": "Yes, cancel the run",
+      "requested": "Cancellation requested: the run ends before its next step."
+    }
+  },
+  "errors": {
+    "run": {
+      "not_found": "This run does not exist, or you may not see it.",
+      "finished": "The run has already ended."
+    }
+  }
+}

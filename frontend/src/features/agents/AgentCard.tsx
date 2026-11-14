@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Bot, Pause, Pencil, Play, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Activity, Bot, Pause, Pencil, Play, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +53,12 @@ export function AgentCard({
           <Link to="/admin/agents/$agentId" params={{ agentId: agent.id }}>
             <SlidersHorizontal aria-hidden />
             {t('agents.admin.open')}
+          </Link>
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/agents/$agentId/runs" params={{ agentId: agent.id }}>
+            <Activity aria-hidden />
+            {t('runs.agent.open')}
           </Link>
         </Button>
         <Button

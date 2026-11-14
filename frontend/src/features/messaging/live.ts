@@ -30,7 +30,14 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
   const conversation = event.conversationId
   switch (event.type) {
     case 'resync':
-      return [messagingKeys.all, activityKeys.all, ticketKeys.all, agentKeys.runs, proposalKeys.all]
+      return [
+        messagingKeys.all,
+        activityKeys.all,
+        ticketKeys.all,
+        agentKeys.runs,
+        agentKeys.allRunEvents,
+        proposalKeys.all,
+      ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
       return [EVERYTHING]
@@ -44,7 +51,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       // A direct message moves up its list (or appears: someone wrote to me first).
       if (!isKnownChannel(queryClient, conversation)) keys.push(messagingKeys.dms)
       // An agent's answer or stop notice: the run shown with progress is done.
-      if (event.type === 'message.created') keys.push(agentKeys.runs)
+      if (event.type === 'message.created') keys.push(agentKeys.runs, agentKeys.allRunEvents)
       return keys
     }
     case 'reaction.changed':
@@ -72,7 +79,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'sprint.changed':
       return sprintEventKeys(queryClient, event.spaceId)
     case 'run.progress':
-      return event.runId ? [agentKeys.run(event.runId)] : []
+      return event.runId ? [agentKeys.run(event.runId), agentKeys.runEvents(event.runId)] : []
     case 'proposal.changed':
       return proposalEventKeys(event)
   }

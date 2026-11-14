@@ -239,6 +239,8 @@
       "provider_refused": "Der Anbieter lehnt ab (Zugang, Guthaben oder Anfragegrenze).",
       "error": "Ein Fehler ist aufgetreten. Bitte später erneut versuchen.",
       "approval_expired": "Niemand hat die Freigabe rechtzeitig erteilt; der Lauf wurde beendet.",
+      "cancelled": "Der Lauf wurde abgebrochen.",
+      "waiting_timeout": "Niemand hat rechtzeitig geantwortet; der Lauf wurde beendet.",
       "unknown": "Der Lauf wurde beendet."
     },
     "noRun": {
@@ -248,6 +250,10 @@
       "agent_responsible_inactive": "Die verantwortliche Person des Agenten ist deaktiviert; er antwortet nicht.",
       "agent_connection_unavailable": "Keine Verbindung verfügbar: Die KI-Verbindung des Agenten ist ausgeschaltet oder bietet das Modell nicht mehr an.",
       "run_thread_reply": "Antworten in Threads beantwortet der Agent nicht; schreib ins Gespräch.",
+      "run_waiting": "Der Agent arbeitet hier schon an einem Auftrag oder wartet auf eine Antwort. Er antwortet, wenn der fertig ist.",
+      "run_handover_limit": "Die Kette der Übergaben ist zu lang (höchstens 3); der Agent übergibt nicht weiter.",
+      "agent_not_found": "Diesen Agenten gibt es nicht (mehr), oder du darfst ihn nicht fragen.",
+      "agent_personal_disabled": "Persönliche Agenten sind in dieser Organisation ausgeschaltet; der Agent antwortet nicht.",
       "unknown": "Der Agent antwortet auf diese Nachricht nicht."
     },
     "progress": {

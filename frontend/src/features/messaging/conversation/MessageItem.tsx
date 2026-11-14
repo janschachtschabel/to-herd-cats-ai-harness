@@ -81,8 +81,8 @@ function HumanMessage({ message }: { message: Message }) {
         <>
           <MessageMarkdown markdown={message.body_md} meId={meId} />
           <TicketCards markdown={message.body_md} />
-          {message.kind === 'agent' && message.client_id && (
-            <AnswerSources runId={message.client_id} />
+          {message.kind === 'agent' && (message.run_id ?? message.client_id) && (
+            <AnswerSources runId={(message.run_id ?? message.client_id) as string} />
           )}
         </>
       )}

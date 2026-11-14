@@ -19,6 +19,7 @@ import { navLinkActive, navLinkClass } from './navStyles'
 import { adminLinks, visibleSections, type AdminLink, type SectionId } from './nav'
 import { SectionHeading } from './SectionHeading'
 import { ActivitySection, ChannelsSection, DirectSection } from './SidebarMessaging'
+import { AgentsSection } from './SidebarAgents'
 import { SidebarSpaces } from './SidebarSpaces'
 import { WorkSection } from './SidebarWork'
 
@@ -99,6 +100,7 @@ const SECTIONS: Partial<Record<SectionId, () => ReactNode>> = {
   direct: DirectSection,
   spaces: SpacesSection,
   work: WorkSection,
+  agents: AgentsSection,
   admin: AdminSection,
 }
 

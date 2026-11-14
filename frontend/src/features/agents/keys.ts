@@ -8,6 +8,8 @@ export const agentKeys = {
   runs: ['agents', 'run'] as const,
   run: (id: string) => ['agents', 'run', id] as const,
   runEvents: (id: string) => ['agents', 'run-events', id] as const,
+  /** Every run's steps (refreshed with the runs when something happened). */
+  allRunEvents: ['agents', 'run-events'] as const,
   /** The run of a direct message the page knows about: never fetched, only set (from
    *  the answer to sending, and from `run.progress`). */
   activeRun: (conversationId: string) => ['agents', 'active-run', conversationId] as const,

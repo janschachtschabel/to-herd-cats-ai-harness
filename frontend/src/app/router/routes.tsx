@@ -2,6 +2,7 @@ import { createRoute, lazyRouteComponent, notFound, redirect } from '@tanstack/r
 import { pageQuery } from '@/features/wiki/queries'
 import { ticketSearch } from '@/features/tickets/filters'
 import { adminTree } from './adminRoutes'
+import { aiWorkRoutes } from './aiRoutes'
 import { appRoute, loginRoute, rootRoute } from './base'
 import { messageSearch } from './search'
 import { skillRoute, spaceTree } from './spaceRoutes'
@@ -150,6 +151,7 @@ export const routeTree = rootRoute.addChildren([
     ticketRoute,
     activityRoute,
     profileRoute,
+    ...aiWorkRoutes,
     adminTree,
   ]),
 ])

@@ -239,6 +239,8 @@
       "provider_refused": "The provider refuses (access, credit or rate limit).",
       "error": "Something went wrong. Please try again later.",
       "approval_expired": "Nobody gave the release in time; the run was ended.",
+      "cancelled": "The run was cancelled.",
+      "waiting_timeout": "Nobody answered in time; the run was ended.",
       "unknown": "The run was ended."
     },
     "noRun": {
@@ -248,6 +250,10 @@
       "agent_responsible_inactive": "The agent's responsible person is deactivated; it does not answer.",
       "agent_connection_unavailable": "No connection available: the agent's AI connection is disabled or no longer offers the model.",
       "run_thread_reply": "The agent does not answer thread replies; write in the conversation.",
+      "run_waiting": "The agent is already working on something here or waiting for an answer. It answers once that is done.",
+      "run_handover_limit": "The chain of handovers is too long (at most 3); the agent hands over no further.",
+      "agent_not_found": "This agent does not exist (any more), or you may not ask it.",
+      "agent_personal_disabled": "Personal agents are switched off in this organisation; the agent does not answer.",
       "unknown": "The agent does not answer this message."
     },
     "progress": {

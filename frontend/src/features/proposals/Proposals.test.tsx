@@ -4,6 +4,7 @@ import type { SpaceRole } from '@/lib/api'
 import { apiError, makeMe, makePage, makeSpace, mockApi, nodeOf, page } from '@/test/api'
 import { makeProposal, makeProposalDetail } from '@/test/proposals'
 import { renderApp } from '@/test/render'
+import { makeRun } from '@/test/runs'
 
 const space = makeSpace({ name: 'Handbuch', my_role: 'moderator' })
 const urlaub = makePage({ id: 'page-1', space_id: space.id, title: 'Urlaub', path: 'urlaub' })
@@ -70,6 +71,21 @@ describe('proposals', () => {
       expect(api.find('POST', `/api/proposals/${detail.id}/accept`)[0]?.body).toEqual({
         version: 1,
       }),
+    )
+  })
+
+  test('a proposal from a run the reader may see links the run', async () => {
+    const run = makeRun({ state: 'waiting', stop_reason: null, steps: 3 })
+    const detail = makeProposalDetail({ space_id: space.id, run_id: run.id })
+    proposalApi('moderator', {
+      'GET /api/spaces/:id/proposals': page([detail]),
+      'GET /api/proposals/:id': detail,
+      'GET /api/runs/:id': run,
+    })
+    await renderApp(`/spaces/${space.id}/proposals/${detail.id}`)
+    expect(await screen.findByRole('link', { name: 'Lauf ansehen' })).toHaveAttribute(
+      'href',
+      `/runs/${run.id}`,
     )
   })
 

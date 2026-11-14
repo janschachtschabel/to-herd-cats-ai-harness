@@ -1,9 +1,10 @@
 import type { Me, Permission } from '@/lib/api'
 
 /** The milestone this build is at; sections of later milestones stay hidden. */
-export const CURRENT_MILESTONE = 4
+export const CURRENT_MILESTONE = 6
 
-export type SectionId = 'activity' | 'search' | 'channels' | 'direct' | 'spaces' | 'work' | 'admin'
+export type SectionId =
+  'activity' | 'search' | 'channels' | 'direct' | 'spaces' | 'work' | 'agents' | 'admin'
 
 export interface NavSection {
   id: SectionId
@@ -21,6 +22,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   { id: 'direct', milestone: 3 },
   { id: 'spaces', milestone: 1 },
   { id: 'work', milestone: 4 },
+  // Working with agents (plan M6): releases, runs, one's own agents.
+  { id: 'agents', milestone: 6, anyOf: ['ai.use', 'agent.manage'] },
   {
     id: 'admin',
     milestone: 1,

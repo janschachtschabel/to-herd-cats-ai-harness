@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/features/auth/queries'
 import { usesAi } from '@/features/ai/display'
+import { RunLink } from '@/features/runs/RunBits'
 import { pageQuery } from '@/features/wiki/queries'
 import { keyNumber } from '@/features/tickets/refs'
 import { errorMessage } from '@/lib/errors'
@@ -12,8 +13,9 @@ import { sourcesOf, type Source } from './display'
 import { useRunEvents } from './queries'
 
 /** Under an agent's answer: the pages and tickets its run read, loaded when asked
- *  (the run's steps are readable by whom it concerns; others see nothing). A result
- *  from a space the reader may not read comes redacted and is only counted. */
+ *  (the run's steps are readable by whom it concerns; others see nothing), and a link
+ *  to the run. A result from a space the reader may not read comes redacted and is
+ *  only counted. */
 export function AnswerSources({ runId }: { runId: string }) {
   const { t } = useTranslation()
   const me = useMe()
@@ -55,6 +57,7 @@ export function AnswerSources({ runId }: { runId: string }) {
           </ul>
         </>
       )}
+      <RunLink runId={runId} className="mt-1" />
     </div>
   )
 }

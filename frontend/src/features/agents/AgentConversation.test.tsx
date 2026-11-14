@@ -122,7 +122,12 @@ describe('a direct message with an agent', () => {
     expect(
       await within(answer).findByText('1 Quelle ist für dich nicht sichtbar.'),
     ).toBeInTheDocument()
-    expect(within(answer).queryByRole('link')).toBeNull()
+    // No source is linked; only the run itself is (the reader may see the run).
+    expect(
+      within(answer)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Lauf ansehen'])
     expect(within(answer).queryByText('Keine Quellen gelesen.')).toBeNull()
   })
 
