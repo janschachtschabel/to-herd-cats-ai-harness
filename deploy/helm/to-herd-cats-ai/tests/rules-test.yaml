@@ -368,3 +368,57 @@ tests:
       - eval_time: 9m
         alertname: HerdRunsQueued
         exp_alerts: []
+
+  # HerdRunsFailing: more than half of the runs finished in 15 minutes failed (at least
+  # 3), for 5 minutes. Two workers count their own runs; the alert sums them per job.
+  - name: HerdRunsFailing fires when most runs are refused by the provider, then clears
+    interval: 1m
+    input_series:
+      # worker a: 1 refused run a minute from minute 1 to 20, worker b: 1 completed a minute
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="provider_refused"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-b", reason="provider_refused"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-b", reason="completed"}'
+        values: "0+1x50"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HerdRunsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Most agent runs of herd/herd-worker fail (66.67% in 15 minutes)"
+              description: "Runs stop with provider_refused or error. Test the agents' connections in the AI administration (unauthorized, payment_required, rate_limited, timeout, unreachable, blocked); look at the stop reasons in the run view and for runs.failed in the workers' logs. With networkPolicy.enabled the provider must be allowed in networkPolicy.aiEgress."
+      - eval_time: 45m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+
+  - name: HerdRunsFailing stays quiet for a few failures among many runs and for cancels
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="error"}'
+        values: "0+1x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="completed"}'
+        values: "0+2x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="cancelled"}'
+        values: "0+5x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+
+  - name: HerdRunsFailing stays quiet for fewer than 3 failed runs
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="error"}'
+        values: "0 0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HerdRunsFailing
+        exp_alerts: []

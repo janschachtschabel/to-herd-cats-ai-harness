@@ -5,7 +5,8 @@
 # default, and needs up to about 800 MB with it, docs/WIKI.md. If the child dies, the
 # app exits and `restart: unless-stopped` starts it again).
 # compose.nodes.yml runs the roles in separate containers instead (two API nodes).
-# Secrets come from .env next to this file (see .env.example). Only the public port
+# Secrets come from .env next to this file (see .env.example), the AI keys from the
+# optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
 # the collab port stay inside. Attachments live on the volume app-data (/data).
 name: to-herd-cats-ai
@@ -49,6 +50,19 @@ services:
       HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
       HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+      # AI and agents (docs/AGENTEN.md): test call timeout, personal agents per person,
+      # hours a run waits for a release or an answer, runs at once, a run's lease.
+      HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
+      HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
+      HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
+      HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
+      HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
+    # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
+    # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
+    # default would hide them.
+    env_file:
+      - path: ai.env
+        required: false
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
     read_only: true

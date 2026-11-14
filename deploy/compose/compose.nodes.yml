@@ -7,7 +7,7 @@
 # `app` (role all) is switched off. `migrate` migrates once and exits; `api-a` and
 # `api-b` serve (role api, published on HERD_HOST_PORT and HERD_HOST_PORT_B); `worker`
 # is the only outbox dispatcher (role worker: notifications, page timelines, live
-# updates); `collab` runs live editing (role collab) and calls the API nodes' internal
+# updates) and works on the agent runs; `collab` runs live editing (role collab) and calls the API nodes' internal
 # port under the alias `api`. Both API nodes share the files volume (one host). Only the
 # two public ports are published; 9090 and the collab port stay inside.
 
@@ -40,6 +40,14 @@ x-api-env: &api-env
   HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
   HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
   HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+  HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
+  HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
+
+# AI keys for the processes that call providers: the API nodes (connection tests, model
+# lists) and the worker (agent runs). See compose.yml.
+x-ai-keys: &ai-keys
+  - path: ai.env
+    required: false
 
 x-after-migrate: &after-migrate
   db:
@@ -66,6 +74,7 @@ services:
   api-a:
     <<: *node
     environment: *api-env
+    env_file: *ai-keys
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
@@ -79,6 +88,7 @@ services:
   api-b:
     <<: *node
     environment: *api-env
+    env_file: *ai-keys
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT_B:-8081}:8080"
@@ -94,6 +104,10 @@ services:
     environment:
       <<: *database
       HERD_ROLE: worker
+      HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
+      HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
+      HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
+    env_file: *ai-keys
     depends_on: *after-migrate
     stop_grace_period: 30s
 

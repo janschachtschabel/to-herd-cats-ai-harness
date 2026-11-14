@@ -35,6 +35,19 @@ location /api/stream {
 A cut stream is no data loss: the browser reconnects after 5 s and reloads what it
 shows.
 
+AI and agents (`docs/KI.md`, `docs/AGENTEN.md`) need no extra service: in `all` the
+agent runs work in the same process, in `compose.nodes.yml` in `worker`. Their keys go
+into the optional file `ai.env` next to `compose.yml` (copy `ai.env.example`; it is
+ignored by git): `HERD_SECRET_KEY` (at least 32 characters; needed to store a
+connection's key encrypted), `HERD_SECRET_KEY_PREVIOUS` (only during a key rotation),
+`HERD_AI_EGRESS_PROXY` (optional proxy for provider calls; `HTTPS_PROXY` and the like
+are ignored on purpose) and the provider keys that connections reference as
+`env:HERD_AI_<NAME>`. The services that call providers read it whole as their
+environment (`app`; in `compose.nodes.yml` `api-a`, `api-b` and `worker`, never
+`migrate` or `collab`). Without `ai.env` the app starts as before. The tunables of
+runs are ordinary variables in `.env` (table below). To try agents without a provider,
+see "KI ausprobieren" in the main README (the local stub provider).
+
 ## Start
 
 ```bash
@@ -138,3 +151,12 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_COOKIE_SECURE` | no | `false` | Always mark the session cookie `Secure` (it is anyway when the request came over https) |
 | `HERD_LOG_LEVEL` | no | `INFO` | Log level |
 | `HERD_IMAGE_TAG` | no | `local` | Tag of the `to-herd-cats-ai` image to run |
+| `HERD_AI_CHECK_TIMEOUT_SECONDS` | no | `20` | Longest wait (s) for a provider when a connection is tested or its models listed (`app`, API nodes) |
+| `HERD_AI_PERSONAL_AGENTS_MAX` | no | `5` | Personal agents per person, 0 to 100 (`app`, API nodes) |
+| `HERD_AI_APPROVAL_HOURS` | no | `72` | Hours a run waits for a release or an answer before it ends (`app`, `worker`) |
+| `HERD_RUN_CONCURRENCY` | no | `4` | Agent runs one process works on at once, 1 to 64 (`app`, `worker`) |
+| `HERD_RUN_LEASE_SECONDS` | no | `30` | A running run's lease (s), at least 3; after a crash another process takes the run up after it (`app`, `worker`) |
+
+The AI keys (`HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS`, `HERD_AI_EGRESS_PROXY`,
+`HERD_AI_<NAME>`) belong in `ai.env`, not in `.env`: they are passed to the containers
+as they are, not through `environment`.

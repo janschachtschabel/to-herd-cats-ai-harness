@@ -1,9 +1,13 @@
-# The worker (HERD_ROLE=worker): the outbox dispatcher (spec 4.3). It hands the events
-# that the API writes with its changes to their handlers (notifications, page timelines,
-# live updates over NOTIFY to every API pod). It talks only to PostgreSQL and serves
-# only the internal port (/health, /ready, /metrics). Several replicas are safe: they
-# claim disjoint batches (FOR NO KEY UPDATE SKIP LOCKED), and every handler is
-# idempotent. On SIGTERM the batch in progress finishes, then the process exits.
+# The worker (HERD_ROLE=worker): the outbox dispatcher (spec 4.3) and the agent runs
+# (M5, M6). It hands the events that the API writes with its changes to their handlers
+# (notifications, page timelines, live updates over NOTIFY to every API pod), and works
+# on queued agent runs, calling the AI providers of their connections (the only traffic
+# that leaves the cluster; networkPolicy.aiEgress). It serves only the internal port
+# (/health, /ready, /metrics). Several replicas are safe: they claim disjoint batches
+# and runs (FOR NO KEY UPDATE SKIP LOCKED), every handler is idempotent, and a run's
+# effects are committed with its journal. On SIGTERM the batch in progress finishes and
+# runs in progress are dropped; another worker takes them up after their lease and
+# goes on from their journal.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,10 +46,17 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ . | quote }}
             {{- end }}
+            {{- include "herd.aiWorkerEnv" . | nindent 12 }}
             {{- range $name, $value := .Values.worker.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
+          {{- with .Values.ai.existingSecret }}
+          # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
           ports:
             - name: internal
               containerPort: 9090

@@ -125,3 +125,24 @@ groups:
         annotations:
           summary: "An agent run of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes for a worker"
           description: "The workers are busy with other runs (HERD_RUN_CONCURRENCY, the connection's max_concurrency, its requests_per_minute) or claim nothing (runs.claim_failed in their logs). People wait for an answer."
+      # Most agent runs end in failure: in 15 minutes more than half of the runs the
+      # workers finished stopped with `provider_refused` (the provider answered 401, 402,
+      # 403 or 429: a wrong or revoked key, an exhausted quota or rate limit) or `error`
+      # (the provider failed or timed out, a tool failed, a step could not be stored),
+      # and at least 3 of them, sustained for 5 minutes. herd_runs_total counts per
+      # worker and stop reason; a person's cancel, a missing answer or a stop by the
+      # space's AI policy are not failures of the installation and do not count.
+      - alert: HerdRunsFailing
+        expr: |
+          (
+            sum by (namespace, job) (increase(herd_runs_total{reason=~"provider_refused|error"}[15m]))
+              / sum by (namespace, job) (increase(herd_runs_total[15m]))
+          ) > 0.5
+          and
+          sum by (namespace, job) (increase(herd_runs_total{reason=~"provider_refused|error"}[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Most agent runs of {{ $labels.namespace }}/{{ $labels.job }} fail ({{ $value | humanizePercentage }} in 15 minutes)"
+          description: "Runs stop with provider_refused or error. Test the agents' connections in the AI administration (unauthorized, payment_required, rate_limited, timeout, unreachable, blocked); look at the stop reasons in the run view and for runs.failed in the workers' logs. With networkPolicy.enabled the provider must be allowed in networkPolicy.aiEgress."

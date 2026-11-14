@@ -35,6 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
+            {{- include "herd.aiApiEnv" . | nindent 12 }}
             {{- if include "herd.publicUrl" . }}
             {{- include "herd.publicUrlEnv" . | nindent 12 }}
             {{- end }}
@@ -45,10 +46,17 @@ spec:
             - name: HERD_COLLAB_URL
               value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
             {{- end }}
-          {{- with .Values.secrets.existingSecret }}
+          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret }}
           envFrom:
+            {{- with .Values.secrets.existingSecret }}
             - secretRef:
                 name: {{ . }}
+            {{- end }}
+            {{- with .Values.ai.existingSecret }}
+            # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           {{- end }}
           ports:
             - name: http

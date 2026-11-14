@@ -125,8 +125,9 @@ spec:
 {{- end }}
 ---
 # The worker: out only DNS and the database (the bundled PostgreSQL or, through
-# networkPolicy.egress, an external one); in only 9090 from internalFrom (metrics; the
-# probes are kubelet traffic). It never talks to the API or the collab process: live
+# networkPolicy.egress, an external one), and AI providers through the policy of
+# networkPolicy.aiEgress; in only 9090 from internalFrom (metrics; the probes are
+# kubelet traffic). It never talks to the API or the collab process: live
 # updates reach the API pods through PostgreSQL (NOTIFY).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -170,6 +171,30 @@ spec:
     {{- with .Values.networkPolicy.egress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+{{- with .Values.networkPolicy.aiEgress }}
+---
+# AI providers (or the proxy in HERD_AI_EGRESS_PROXY): the API pods test connections
+# and list models, the worker pods run agents. NetworkPolicies add up, so this opens
+# exactly these rules for those two components; empty, it is not rendered and no
+# provider is reachable.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" $ }}-ai-egress
+  labels:
+    {{- include "herd.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" $ | nindent 6 }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, worker]
+  policyTypes: [Egress]
+  egress:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
 # The bundled PostgreSQL: reachable only from the app pods, no egress at all.

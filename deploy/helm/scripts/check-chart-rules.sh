@@ -160,12 +160,57 @@ out=$(render --set networkPolicy.enabled=true \
 policy=$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")
 grep -B6 "team: monitoring" <<<"$policy" | grep -q "port: 9090" || fail "internalFrom does not reach the worker's 9090"
 
+# AI and agents (M5, M6): the settings reach the pods that read them (API: connection
+# tests and personal agents; worker: runs), the keys come only from the Secret named in
+# ai.existingSecret (API and worker, never the migration job, never a ConfigMap or a
+# value), and providers are reachable only through networkPolicy.aiEgress.
+out=$(render --set ai.runConcurrency=8 --set ai.approvalHours=24 --set ai.personalAgentsMax=2)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+grep -A1 -- "- name: HERD_AI_CHECK_TIMEOUT_SECONDS" <<<"$api" | grep -q 'value: "20"' \
+  || fail "the API has no HERD_AI_CHECK_TIMEOUT_SECONDS"
+grep -A1 -- "- name: HERD_AI_PERSONAL_AGENTS_MAX" <<<"$api" | grep -q 'value: "2"' \
+  || fail "ai.personalAgentsMax does not reach the API"
+grep -A1 -- "- name: HERD_RUN_CONCURRENCY" <<<"$worker" | grep -q 'value: "8"' \
+  || fail "ai.runConcurrency does not reach the worker"
+grep -A1 -- "- name: HERD_AI_APPROVAL_HOURS" <<<"$worker" | grep -q 'value: "24"' \
+  || fail "ai.approvalHours does not reach the worker"
+grep -A1 -- "- name: HERD_RUN_LEASE_SECONDS" <<<"$worker" | grep -q 'value: "30"' \
+  || fail "the worker has no HERD_RUN_LEASE_SECONDS"
+grep -q "HERD_RUN_CONCURRENCY\|HERD_RUN_LEASE_SECONDS" <<<"$api" && fail "the API gets the worker's run settings"
+grep -q "envFrom" <<<"$worker" && fail "the worker gets a Secret without ai.existingSecret"
+grep -E "^\s+(HERD_SECRET_KEY|HERD_AI_EGRESS_PROXY|secretKey|egressProxy):" "$chart/values.yaml" \
+  && fail "values.yaml carries an AI secret"
+out=$(render --set ai.existingSecret=herd-ai --set secrets.existingSecret=herd-app)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+for workload in "$api" "$worker"; do
+  grep -A6 "envFrom:" <<<"$workload" | grep -q "name: herd-ai" || fail "ai.existingSecret is not given to the API and the worker"
+done
+grep -A6 "envFrom:" <<<"$api" | grep -q "name: herd-app" || fail "secrets.existingSecret is lost beside ai.existingSecret"
+grep -q "name: herd-app" <<<"$worker" && fail "the worker gets the bootstrap Secret"
+grep -q "herd-ai" <<<"$(doc Job t-to-herd-cats-ai-migrate-1 "$out")" && fail "the migration job gets the AI keys"
+grep -q "^kind: ConfigMap" <<<"$out" && fail "a ConfigMap appeared (secrets must stay in Secrets)"
+out=$(render --set networkPolicy.enabled=true)
+[[ -z $(doc NetworkPolicy t-to-herd-cats-ai-ai-egress "$out") ]] || fail "AI egress is open without networkPolicy.aiEgress"
+grep -q "port: 443" <<<"$out" && fail "a NetworkPolicy opens port 443 by default"
+out=$(render --set networkPolicy.enabled=true --set 'networkPolicy.aiEgress[0].to[0].ipBlock.cidr=203.0.113.0/24' \
+  --set 'networkPolicy.aiEgress[0].ports[0].port=443')
+policy=$(doc NetworkPolicy t-to-herd-cats-ai-ai-egress "$out")
+[[ -n $policy ]] || fail "no NetworkPolicy for networkPolicy.aiEgress"
+grep -q "values: \[api, worker\]" <<<"$policy" || fail "AI egress is not for exactly the API and the worker"
+grep -q "cidr: 203.0.113.0/24" <<<"$policy" || fail "networkPolicy.aiEgress is not passed on"
+grep -q "policyTypes: \[Egress\]" <<<"$policy" || fail "the AI egress policy restricts more than egress"
+grep -q "203.0.113.0/24" <<<"$(doc NetworkPolicy t-to-herd-cats-ai "$out")$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")" \
+  && fail "networkPolicy.aiEgress leaks into the general policies (the migration job)"
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.
 out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMonitor.enabled=true)
 rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
-for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent; do
+for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
+  HerdRunsStuck HerdRunsQueued HerdRunsFailing; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \

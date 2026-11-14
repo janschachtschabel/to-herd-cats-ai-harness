@@ -50,6 +50,22 @@ worker:
       memory: 384Mi
   env: {}
 
+## @section AI and agents (M5, M6; docs/KI.md, docs/AGENTEN.md)
+
+## @param ai.existingSecret Name of an existing Secret whose keys are environment variables of the API and the worker (both call AI providers: the API to test connections and list models, the worker for agent runs): HERD_SECRET_KEY (at least 32 characters, `openssl rand -hex 32`; needed for keys stored encrypted as `enc:`), HERD_SECRET_KEY_PREVIOUS (only during a key rotation), HERD_AI_EGRESS_PROXY (optional, `http://[user:password@]host:port`: the proxy provider calls go through; the URL may carry credentials, so it is a secret) and the provider keys that connections reference as `env:HERD_AI_<NAME>`. Empty: none; connections then cannot store keys encrypted, and `env:` keys must come from api.env/worker.env (plaintext in the Deployment: avoid)
+## @param ai.checkTimeoutSeconds Longest wait for a provider when an admin tests a connection or lists its models (HERD_AI_CHECK_TIMEOUT_SECONDS; API)
+## @param ai.personalAgentsMax Personal agents one person may have at most, 0 to 100 (HERD_AI_PERSONAL_AGENTS_MAX; API); the organisation switch in the AI administration turns them off altogether
+## @param ai.approvalHours How long a run waits for a release or an answer before it ends with approval_expired or waiting_timeout, in hours, at most 720 (HERD_AI_APPROVAL_HOURS; worker)
+## @param ai.runConcurrency Agent runs one worker pod works on at once, 1 to 64 (HERD_RUN_CONCURRENCY; worker). Each run uses one database connection only during its short step transactions, never during a provider call; a worker needs up to runConcurrency + 3 connections for runs, besides those of the outbox. The connection's own max_concurrency still caps runs across all workers
+## @param ai.runLeaseSeconds Lease a running run holds, renewed every third of it (HERD_RUN_LEASE_SECONDS, at least 3; worker). When a worker dies, another one takes its runs up after the lease ran out and goes on from their journal
+ai:
+  existingSecret: ""
+  checkTimeoutSeconds: 20
+  personalAgentsMax: 5
+  approvalHours: 72
+  runConcurrency: 4
+  runLeaseSeconds: 30
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 
@@ -149,18 +165,26 @@ ingress:
 ## @param networkPolicy.publicFrom Peers allowed on the public port 8080 (NetworkPolicyPeer list, e.g. the ingress controller's namespace); empty: everyone
 ## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 and on the collab process's port 1234 for its /metrics (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
 ## @param networkPolicy.egress Extra egress rules (NetworkPolicyEgressRule list), e.g. to an external database or OTLP collector; DNS and the bundled PostgreSQL are always allowed
+## @param networkPolicy.aiEgress Egress rules (NetworkPolicyEgressRule list) for the API and worker pods only, to the AI providers of your connections or to the proxy in HERD_AI_EGRESS_PROXY (then only the proxy). Empty: with networkPolicy.enabled no provider is reachable (connection tests answer `timeout` or `unreachable`, runs stop with `error`); see the example below
 networkPolicy:
   enabled: false
   publicFrom: []
   internalFrom: []
   egress: []
+  # AI providers, e.g. through a proxy in the cluster:
+  #   - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: egress-proxy}}}]
+  #     ports: [{port: 3128, protocol: TCP}]
+  # or directly (NetworkPolicy knows no host names: the provider's address ranges):
+  #   - to: [{ipBlock: {cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]}}]
+  #     ports: [{port: 443, protocol: TCP}]
+  aiEgress: []
 
 ## @section Metrics (internal port 9090, /metrics)
 
 ## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
 ## @param metrics.serviceMonitor.interval Scrape interval
 ## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
-## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape)
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), and for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing (from the worker's metrics)
 ## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
 metrics:
   serviceMonitor:

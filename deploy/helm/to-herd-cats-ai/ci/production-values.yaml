@@ -1,6 +1,6 @@
 # A production-like configuration for CI (helm lint/template, kubeconform): external
 # database, secrets by reference, Ingress with TLS and the timeouts live updates need,
-# two workers, NetworkPolicy, ServiceMonitor, PrometheusRule, tracing and a
+# AI keys by reference and provider egress through a proxy, two workers, NetworkPolicy, ServiceMonitor, PrometheusRule, tracing and a
 # digest-pinned image.
 image:
   tag: "0.1.0"
@@ -18,6 +18,13 @@ worker:
     HERD_LOG_LEVEL: INFO
 secrets:
   existingSecret: herd-app
+ai:
+  existingSecret: herd-ai
+  checkTimeoutSeconds: 20
+  personalAgentsMax: 3
+  approvalHours: 48
+  runConcurrency: 8
+  runLeaseSeconds: 30
 database:
   url: postgresql+asyncpg://herd@db.example.internal:5432/herd
   existingSecret: herd-db
@@ -63,6 +70,15 @@ networkPolicy:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 4318
+          protocol: TCP
+  # AI providers only through the egress proxy in HERD_AI_EGRESS_PROXY (ai.existingSecret).
+  aiEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: egress-proxy
+      ports:
+        - port: 3128
           protocol: TCP
 metrics:
   serviceMonitor:

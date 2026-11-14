@@ -111,6 +111,20 @@
       },
       "required": ["replicas", "resources", "env"]
     },
+    "ai": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": {"type": "string", "description": "Existing Secret whose keys are environment variables of the API and the worker (HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY, HERD_AI_<NAME> provider keys); empty: none"},
+        "checkTimeoutSeconds": {"type": "number", "exclusiveMinimum": 0, "description": "HERD_AI_CHECK_TIMEOUT_SECONDS (API)"},
+        "personalAgentsMax": {"type": "integer", "minimum": 0, "maximum": 100, "description": "HERD_AI_PERSONAL_AGENTS_MAX (API)"},
+        "approvalHours": {"type": "number", "exclusiveMinimum": 0, "maximum": 720, "description": "HERD_AI_APPROVAL_HOURS (worker)"},
+        "runConcurrency": {"type": "integer", "minimum": 1, "maximum": 64, "description": "HERD_RUN_CONCURRENCY (worker)"},
+        "runLeaseSeconds": {"type": "number", "minimum": 3, "description": "HERD_RUN_LEASE_SECONDS (worker)"}
+      },
+      "required": ["existingSecret", "checkTimeoutSeconds", "personalAgentsMax", "approvalHours", "runConcurrency", "runLeaseSeconds"],
+      "description": "AI connections and agent runs"
+    },
     "collab": {
       "type": "object",
       "additionalProperties": false,
@@ -290,9 +304,14 @@
           "type": "array",
           "description": "Extra NetworkPolicyEgressRules",
           "items": {"type": "object"}
+        },
+        "aiEgress": {
+          "type": "array",
+          "description": "NetworkPolicyEgressRules of the API and worker pods to AI providers or their proxy; empty: none",
+          "items": {"type": "object"}
         }
       },
-      "required": ["enabled", "publicFrom", "internalFrom", "egress"],
+      "required": ["enabled", "publicFrom", "internalFrom", "egress", "aiEgress"],
       "description": "NetworkPolicy"
     },
     "metrics": {
@@ -340,5 +359,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

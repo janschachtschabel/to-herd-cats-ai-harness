@@ -22,3 +22,13 @@ secrets.existingSecret is empty: no first owner is created. Create a Secret with
 HERD_BOOTSTRAP_ADMIN_EMAIL and HERD_BOOTSTRAP_ADMIN_PASSWORD and set
 secrets.existingSecret to its name.
 {{- end }}
+{{- if not .Values.ai.existingSecret }}
+
+ai.existingSecret is empty: connections cannot store AI keys encrypted (HERD_SECRET_KEY),
+and provider keys (env:HERD_AI_<NAME>) have no Secret to come from. See docs/KI.md.
+{{- end }}
+{{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.aiEgress) }}
+
+networkPolicy.aiEgress is empty: the API and worker pods reach no AI provider (connection
+tests answer "timeout" or "unreachable", agent runs stop with "error"). See docs/AGENTEN.md.
+{{- end }}

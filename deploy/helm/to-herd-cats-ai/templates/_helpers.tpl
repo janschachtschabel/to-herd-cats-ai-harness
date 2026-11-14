@@ -167,3 +167,21 @@ seccompProfile:
       name: {{ include "herd.internalTokenSecret" . }}
       key: token
 {{- end -}}
+
+{{/* AI settings of the API pods (connection tests, personal agents). */}}
+{{- define "herd.aiApiEnv" -}}
+- name: HERD_AI_CHECK_TIMEOUT_SECONDS
+  value: {{ .Values.ai.checkTimeoutSeconds | quote }}
+- name: HERD_AI_PERSONAL_AGENTS_MAX
+  value: {{ .Values.ai.personalAgentsMax | quote }}
+{{- end -}}
+
+{{/* AI settings of the worker pods (agent runs). */}}
+{{- define "herd.aiWorkerEnv" -}}
+- name: HERD_AI_APPROVAL_HOURS
+  value: {{ .Values.ai.approvalHours | quote }}
+- name: HERD_RUN_CONCURRENCY
+  value: {{ .Values.ai.runConcurrency | quote }}
+- name: HERD_RUN_LEASE_SECONDS
+  value: {{ .Values.ai.runLeaseSeconds | quote }}
+{{- end -}}
