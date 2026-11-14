@@ -74,6 +74,7 @@ STEP_LOCK_TIMEOUT_SECONDS = 5.0
 STEP_STATEMENT_TIMEOUT_SECONDS = 20.0
 MAX_LEVEL = 3  # level 4 (external tools) comes with M8
 MAX_CHAIN_DEPTH = 3  # handovers from agent to agent that led to a run (plan M6 task 8)
+MAX_HANDOVERS_PER_RUN = 5  # tickets one run hands to agents (review M6 finding 16c)
 DEFAULT_LEVEL = 2
 
 

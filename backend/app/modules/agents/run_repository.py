@@ -118,6 +118,28 @@ class RunRepository:
         )
         return await self.session.scalar(stmt)
 
+    async def open_on_ticket(self, agent_id: uuid.UUID, work_item_id: uuid.UUID) -> list[uuid.UUID]:
+        """The agent's runs on the ticket (its assignment's, a handover's) not done."""
+        stmt = select(Run.id).where(
+            Run.org_id == self.org_id,
+            Run.agent_id == agent_id,
+            Run.work_item_id == work_item_id,
+            Run.state != RunState.DONE,
+        )
+        return list(await self.session.scalars(stmt))
+
+    async def handed_over(self, run_id: uuid.UUID) -> int:
+        """How many tickets the run handed to agents (its `assign_ticket` results
+        marked `handover`)."""
+        key = RunEvent.content["attrs"]["key"].astext
+        stmt = select(func.count(func.distinct(key))).where(
+            RunEvent.org_id == self.org_id,
+            RunEvent.run_id == run_id,
+            RunEvent.content["name"].astext == "assign_ticket",
+            RunEvent.content["attrs"]["handover"].astext == "agent",
+        )
+        return int(await self.session.scalar(stmt) or 0)
+
     async def of_run(self, run_id: uuid.UUID) -> Run | None:
         stmt = select(Run).where(Run.org_id == self.org_id, Run.id == run_id)
         return await self.session.scalar(stmt)

@@ -11,7 +11,10 @@ person's answer (`run.waiting`: that run answers first, and when it ends it queu
 run for what came meanwhile).
 
 A person's new message elsewhere that mentions an agent, and a ticket assigned to an
-agent, start runs too (`triggers.py`, plan M6 task 8).
+agent, start runs too (`triggers.py`, plan M6 task 8). A ticket taken from an agent
+(given to someone else or nobody) asks that agent's open runs on it to stop, in the
+same transaction, through their cancel request (`control.request_cancel`); the run
+that hands it over itself goes on (review M6 finding 16b).
 
 Tickets go to an agent (plan M6 decision 7) only from someone with `ai.use`, and only
 to an agent that is no draft and a member of the ticket's space with a role that may
@@ -29,7 +32,7 @@ from app.core.actor import Actor
 from app.core.authorship import Authorship
 from app.core.permissions import SPACE_ACTION_MIN_ROLE
 from app.core.principal import PrincipalType
-from app.modules.agents import triggers
+from app.modules.agents import control, triggers
 from app.modules.agents.models import AgentStatus
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
@@ -95,6 +98,19 @@ class _Assignees:
         self, session: AsyncSession, actor: Actor, ticket: WorkItem, by: Authorship | None
     ) -> None:
         await triggers.on_assignment(session, actor, ticket, by)
+
+    async def unassigned(
+        self,
+        session: AsyncSession,
+        actor: Actor,
+        ticket: WorkItem,
+        former: uuid.UUID,
+        by: Authorship | None,
+    ) -> None:
+        handing = by.run_id if by is not None else None
+        for run_id in await RunRepository(session, actor.org_id).open_on_ticket(former, ticket.id):
+            if run_id != handing:
+                await control.request_cancel(session, actor.org_id, run_id, actor.principal.id)
 
 
 register_agent_hooks(_Hooks())

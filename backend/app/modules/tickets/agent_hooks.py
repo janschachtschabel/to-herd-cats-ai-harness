@@ -32,6 +32,19 @@ class AssigneeHooks(Protocol):
         (`agents/triggers.py`)."""
         ...
 
+    async def unassigned(
+        self,
+        session: AsyncSession,
+        actor: Actor,
+        ticket: WorkItem,
+        former: uuid.UUID,
+        by: Authorship | None,
+    ) -> None:
+        """The ticket was just taken from `former` (to someone else or nobody): if it
+        is an agent, ask its open runs on the ticket to stop, except the run that did
+        it (`by`)."""
+        ...
+
 
 _registered: list[AssigneeHooks] = []
 

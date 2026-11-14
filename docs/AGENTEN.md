@@ -836,7 +836,12 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   Person (mit `ai.use`) und `agent.manage`; sonst 404 `agent.not_found` wie für einen
   unbekannten Agenten. Dieselben Filter außer `agent_id`.
 - `GET /api/runs/{id}`: wer den Lauf sehen darf (siehe oben), sonst 404
-  `run.not_found`. Listen und Einzelansicht zeigen dieselbe Form: Agent (ID, Name),
+  `run.not_found`. Auch ein Lauf, den die Antwort auf eine Nachricht schon genannt hat,
+  kann danach 404 antworten: Ein Lauf einer Direktnachricht, der noch in der
+  Warteschlange stand, entfällt, wenn ein wartender Lauf desselben Gesprächs nach
+  Freigabe oder Antwort weitermacht (`control_repository.drop_queued`); was er
+  beantwortet hätte, beantwortet ein neuer Lauf nach dessen Ende. Clients behandeln
+  das 404 wie einen beendeten Lauf ohne eigene Antwort. Listen und Einzelansicht zeigen dieselbe Form: Agent (ID, Name),
   fragende Person (ID, Name; alle, die einen Lauf sehen, dürfen Personen nach Namen
   finden), Ort (`place`: Art des Gesprächs `dm`, `channel`, `thread_page`,
   `thread_ticket`, seine ID; Bereich, Seite und Ticketnummer nur, wenn die lesende
@@ -902,6 +907,15 @@ Direktnachricht starten Läufe so:
   den ersten fragte), eine Stufe tiefer (`run.chain_depth`, höchstens 3); er folgt dem
   übergebenden Lauf im selben Thread. Ein Lauf auf Stufe 3 übergibt nicht mehr: das
   Werkzeug lehnt ab (`run.handover_limit`), der Thread vermerkt es (`run.refused`).
+  Ein Lauf übergibt höchstens 5 Tickets an Agenten (`MAX_HANDOVERS_PER_RUN`, neben der
+  Tiefengrenze in `agents/models.py`; gezählt im Journal des Laufs); darüber hinaus
+  lehnt das Werkzeug ab (`run.handovers`), nur als Fehler für das Modell.
+- **Zuweisung zurückgenommen**: Wird ein Ticket einem Agenten weggenommen (jemand
+  anderem zugewiesen oder niemandem), bittet dieselbe Transaktion dessen offene Läufe
+  an diesem Ticket (Zuweisung, Übergabe) über `run_cancel_request` aufzuhören; ein
+  laufender hält vor seinem nächsten Schritt, ein wartender oder noch nicht begonnener
+  endet `cancelled`, wenn die Laufschleife ihn als Nächstes sieht. Der Lauf, der das
+  Ticket selbst übergibt, arbeitet weiter.
 - Je Thread ist höchstens ein Lauf offen: [Ein offener Lauf je
   Thread](#ein-offener-lauf-je-thread).
 - Laufansicht: `trigger_message_id` ist bei Ticket-Läufen `null`, `chain_depth` zeigt

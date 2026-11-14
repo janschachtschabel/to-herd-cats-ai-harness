@@ -248,12 +248,15 @@ class TicketService:
         by: Authorship | None,
     ) -> None:
         """Assignments and cancellations go into the audit log; a ticket assigned to
-        an agent is handed over to it (`agent_hooks.AssigneeHooks.assigned`)."""
+        an agent is handed over to it, one taken from an agent stops its run there
+        (`agent_hooks.AssigneeHooks`)."""
         if Field.ASSIGNEE in changes:
             old, new = changes[Field.ASSIGNEE]
             details = {"from": str(old) if old else None, "to": str(new) if new else None}
             await self._audit(actor, "ticket.assigned", ticket, details)
             hooks = assignee_hooks()
+            if isinstance(old, uuid.UUID) and hooks:
+                await hooks.unassigned(self.session, actor, ticket, old, by)
             if new is not None and ticket.assignee_type == PrincipalType.AGENT and hooks:
                 await hooks.assigned(self.session, actor, ticket, by)
         if status is not None and status.category == StatusCategory.CANCELLED:

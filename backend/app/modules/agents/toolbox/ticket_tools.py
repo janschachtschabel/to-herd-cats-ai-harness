@@ -14,8 +14,8 @@ ticket's events and timeline entries name the agent and the run.
 - `assign_ticket` (level 3): to a person or an agent (`ticket.assign`), with a reason
   that goes into the ticket's thread as the agent's comment. To an agent it hands the
   ticket over: that agent's run starts on it (`agents/triggers.py`). A run that came
-  through `MAX_CHAIN_DEPTH` handovers hands over no more: the tool refuses
-  (`run.handover_limit`) and the thread notes it (`run.refused`).
+  through `MAX_CHAIN_DEPTH` handovers, or that handed `MAX_HANDOVERS_PER_RUN` tickets
+  to agents already, hands over no more (`toolbox/handover.py`).
 
 Every write goes through `writing.effect` (one savepoint; the audience check first,
 except for a link, which shows nothing of either side to whoever cannot see it).
@@ -30,9 +30,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import Action, can
 from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal, PrincipalType
-from app.modules.agents.models import MAX_CHAIN_DEPTH
-from app.modules.agents.notices import notice
-from app.modules.agents.standing import Refusal
+from app.modules.agents.toolbox import handover
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.reading import ticket_scope
 from app.modules.agents.toolbox.writing import (
@@ -42,9 +40,7 @@ from app.modules.agents.toolbox.writing import (
     effect,
     key_for,
     leaks_into,
-    refused,
 )
-from app.modules.agents.triggers import REFUSED_KEY
 from app.modules.messaging.models import MAX_BODY_CHARS
 from app.modules.messaging.service import MessageService
 from app.modules.tickets.base import readable
@@ -221,31 +217,19 @@ async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
     if await leaks_into(ctx, ticket.space_id):
         return ToolResult("ticket", LEAKS, attrs)
     assignee = Principal(PrincipalType(args.assignee_type), args.assignee_id)
-    if assignee.type == PrincipalType.AGENT and ctx.run.chain_depth >= MAX_CHAIN_DEPTH:
-        return await _handover_refused(ctx, ticket, assignee.id)
+    to_agent = assignee.type == PrincipalType.AGENT
+    if to_agent and (refusal := await handover.refusal(ctx, ticket, assignee.id)):
+        return refusal
 
     async def write() -> ToolResult:
         await TicketService(ctx.session).update(
             ctx.actor, ticket.number, ticket.version, {"assignee": assignee}, by(ctx)
         )
         await _comment(ctx, ticket, args.reason, "assign")
-        return ToolResult("ticket", f"Assigned {ticket_key(ticket.number)}.", attrs)
+        done = {**attrs, "handover": "agent"} if to_agent else attrs
+        return ToolResult("ticket", f"Assigned {ticket_key(ticket.number)}.", done)
 
     return await effect(ctx, "ticket", attrs, write)
-
-
-async def _handover_refused(ctx: ToolContext, ticket: WorkItem, agent_id: uuid.UUID) -> ToolResult:
-    """The ticket stays as it is; its thread notes the handover that did not happen
-    (the handing agent as the entry's actor)."""
-    thread = await TicketService(ctx.session).thread(ctx.actor, ticket)
-    content = {
-        "key": REFUSED_KEY,
-        "actor": str(ctx.run.agent_id),
-        "to": Refusal.HANDOVER_LIMIT.value,
-    }
-    key = key_for(ctx, "handover", ticket.id, agent_id)
-    await notice(ctx.session, ctx.run.org_id, ctx.run.agent_id, thread, key, content)
-    return refused("ticket", Refusal.HANDOVER_LIMIT.value, {"key": ticket_key(ticket.number)})
 
 
 # --- what a call changes (a release is bound to it, `approvals/gate.py`) -------------
