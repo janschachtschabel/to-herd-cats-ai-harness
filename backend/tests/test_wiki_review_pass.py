@@ -223,7 +223,7 @@ async def test_a_space_gets_at_most_its_daily_reminders_oldest_review_first(
     pages = [await _published(wiki, f"Seite {n}") for n in range(5)]
     for age, page in enumerate(pages):
         await _age(session, page["id"], 10 + age)  # the last one reviewed longest ago
-    now = utcnow()
+    now = utcnow().replace(hour=12, minute=0, second=0, microsecond=0)  # "later today" stays today
     assert await _pass(session, now, batch=2) == [2, 1]
     oldest_first = [p["id"] for p in reversed(pages)]
     assert set(await _reminded(session)) == set(oldest_first[:3])
