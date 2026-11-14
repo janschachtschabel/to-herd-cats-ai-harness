@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, UuidPk, utcnow
-from app.core.repository import advisory_xact_lock
+from app.core.repository import advisory_xact_lock, locked_batch
 
 WINDOW = timedelta(seconds=60)
 PRUNE_BATCH = 500
@@ -89,10 +89,11 @@ class RateLimiter:
 async def prune_stale(session: AsyncSession, cutoff: datetime) -> None:
     """Delete up to `PRUNE_BATCH` rows older than `cutoff`, of any key; rows another
     transaction is pruning are skipped."""
-    stale = (
+    stale = locked_batch(
         select(RateLimitHit.id)
         .where(RateLimitHit.hit_at < cutoff)
         .limit(PRUNE_BATCH)
-        .with_for_update(skip_locked=True)
+        .with_for_update(skip_locked=True),
+        "stale",
     )
-    await session.execute(delete(RateLimitHit).where(RateLimitHit.id.in_(stale)))
+    await session.execute(delete(RateLimitHit).where(RateLimitHit.id == stale.c.id))

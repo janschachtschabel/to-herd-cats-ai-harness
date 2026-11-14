@@ -8,19 +8,22 @@
 
 import asyncio
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import ratelimit
 from app.core.config import Settings, get_settings
 from app.core.failure_limit import PENDING, FailureLimiter
 from app.core.models_base import utcnow
-from app.core.ratelimit import PRUNE_BATCH, WINDOW, RateLimitHit, limit_key
+from app.core.ratelimit import PRUNE_BATCH, WINDOW, RateLimitHit, limit_key, prune_stale
 from app.modules.audit.models import AuditLog
 from tests.factories import CSRF, PASSWORD
 from tests.real_db import MakeRealClient, RealDb
+from tests.support.plans import force_nested_loops
 
 
 def _limits(app: FastAPI, *, account: int = 5, per_ip: int = 1000) -> None:
@@ -108,6 +111,23 @@ async def test_stale_counters_of_any_key_are_pruned(
         )
         assert await s.scalar(stale) == 0
     assert PRUNE_BATCH >= 50
+
+
+async def test_one_prune_removes_at_most_its_batch_whatever_the_plan(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A batch over `IN (subquery … LIMIT n FOR UPDATE SKIP LOCKED)` removes more
+    than n under a nested-loop plan; it must hold whatever plan is picked."""
+    monkeypatch.setattr(ratelimit, "PRUNE_BATCH", 2)
+    long_ago = datetime(2001, 1, 1, tzinfo=UTC)
+    session.add_all(RateLimitHit(key=f"prune-bound:{i}", hit_at=long_ago) for i in range(5))
+    await session.flush()
+    await force_nested_loops(session)
+    await prune_stale(session, long_ago + timedelta(days=1))
+    left = (
+        select(func.count()).select_from(RateLimitHit).where(RateLimitHit.key.like("prune-bound:%"))
+    )
+    assert await session.scalar(left) == 3
 
 
 async def test_an_ipv6_prefix_counts_as_one_address(

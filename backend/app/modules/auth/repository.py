@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.repository import locked_batch
 from app.modules.auth.models import UserSession
 
 
@@ -41,14 +42,15 @@ class SessionRepository:
     async def delete_expired(self, org_id: uuid.UUID, before: datetime, limit: int) -> None:
         """Up to `limit` sessions of the organisation that ended before `before`,
         oldest first."""
-        expired = (
+        doomed = locked_batch(
             select(UserSession.id)
             .where(UserSession.org_id == org_id, UserSession.expires_at <= before)
             .order_by(UserSession.expires_at)
             .limit(limit)
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True),
+            "doomed",
         )
-        await self.session.execute(delete(UserSession).where(UserSession.id.in_(expired)))
+        await self.session.execute(delete(UserSession).where(UserSession.id == doomed.c.id))
 
     async def delete_for_user(
         self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None

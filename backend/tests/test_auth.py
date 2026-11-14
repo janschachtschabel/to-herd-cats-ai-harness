@@ -21,11 +21,13 @@ from app.core.security import (
 )
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import UserSession
+from app.modules.auth.repository import SessionRepository
 from app.modules.orgs.models import Organization
 from app.modules.orgs.service import ensure_bootstrap
 from app.modules.users.models import User
 from tests.conftest import json_lines
 from tests.factories import CSRF, PASSWORD, login
+from tests.support.plans import force_nested_loops
 
 bad_creds = {"email": "nobody@example.com", "password": "wrong-password"}
 
@@ -196,6 +198,20 @@ async def test_expired_sessions_are_deleted_in_bounded_batches(
     await login(await make_client(csrf=True), owner_user.email)
     expired = select(func.count()).select_from(UserSession).where(UserSession.expires_at < utcnow())
     assert await session.scalar(expired) == 1
+
+
+async def test_one_batch_deletes_at_most_its_limit_whatever_the_plan(
+    member: User, session: AsyncSession
+) -> None:
+    """With `IN (subquery … LIMIT n FOR UPDATE SKIP LOCKED)` a nested-loop semi-join
+    runs the subquery again per outer row and deletes more than n; the batch must hold
+    whatever plan the planner picks (here forced to a nested loop)."""
+    for _ in range(5):
+        await _expired_session(session, member)
+    await force_nested_loops(session)
+    await SessionRepository(session).delete_expired(member.org_id, utcnow(), 2)
+    expired = select(func.count()).select_from(UserSession).where(UserSession.expires_at < utcnow())
+    assert await session.scalar(expired) == 3
 
 
 async def test_expired_session_is_rejected(owner: AsyncClient, session: AsyncSession) -> None:

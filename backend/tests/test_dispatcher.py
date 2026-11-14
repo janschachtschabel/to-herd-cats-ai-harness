@@ -6,19 +6,24 @@ Real commits and separate connections throughout (tests/real_db.py).
 """
 
 import asyncio
+import uuid
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import Database
 from app.core.metrics import render_metrics
-from app.core.outbox import Event, EventOutbox
+from app.core.outbox import Event, EventActor, EventOutbox, emit
+from app.core.principal import Principal
+from app.modules.orgs.models import Organization
 from app.worker.dispatcher import MAX_ATTEMPTS, Dispatcher
 from app.worker.registry import HandlerRegistry
+from app.worker.repository import OutboxRepository
 from tests.conftest import json_lines
 from tests.outbox_helpers import (
     Calls,
@@ -32,6 +37,7 @@ from tests.outbox_helpers import (
     write_effect,
 )
 from tests.real_db import RealDb
+from tests.support.plans import force_nested_loops
 
 BACKEND = Path(__file__).resolve().parent.parent
 
@@ -215,6 +221,36 @@ async def test_dispatched_events_are_removed_after_seven_days(real_db: RealDb) -
         assert await session.get(EventOutbox, recent) is not None
         assert await session.get(EventOutbox, pending) is not None
     assert await delivered(real_db.database, old) == set()  # its records went with it
+
+
+async def test_one_cleanup_batch_removes_at_most_its_limit_whatever_the_plan(
+    session: AsyncSession, org: Organization
+) -> None:
+    """A batch over `IN (subquery … LIMIT n FOR UPDATE SKIP LOCKED)` removes more
+    than n under a nested-loop plan; it must hold whatever plan is picked."""
+    actor = EventActor(org.id, Principal.user(uuid.uuid4()))
+    ids = []
+    for _ in range(5):
+        event = await emit(
+            session,
+            type="test.happened",
+            actor=actor,
+            space_id=None,
+            subject_type="test",
+            subject_id=uuid.uuid4(),
+            payload={},
+        )
+        ids.append(event.id)
+    long_ago = datetime(2001, 1, 1, tzinfo=UTC)
+    await session.execute(
+        update(EventOutbox).where(EventOutbox.id.in_(ids)).values(dispatched_at=long_ago)
+    )
+    await force_nested_loops(session)
+    removed = await OutboxRepository(session).delete_dispatched_before(
+        long_ago + timedelta(days=1), 2
+    )
+    left = select(func.count()).select_from(EventOutbox).where(EventOutbox.id.in_(ids))
+    assert (removed, await session.scalar(left)) == (2, 3)
 
 
 async def test_metrics_show_backlog_and_results(real_db: RealDb) -> None:

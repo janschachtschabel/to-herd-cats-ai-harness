@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import MAX_HANDLER_CHARS, EventDelivery, EventLane, EventOutbox
+from app.core.repository import locked_batch
 
 
 def _pending() -> tuple[ColumnElement[bool], ...]:
@@ -233,13 +234,14 @@ class OutboxRepository:
     async def delete_dispatched_before(self, cutoff: datetime, limit: int) -> int:
         """Up to `limit` events dispatched before `cutoff`, with their delivery records
         (cascade); events another dispatcher is deleting are skipped."""
-        doomed = (
+        doomed = locked_batch(
             select(EventOutbox.id)
             .where(EventOutbox.dispatched_at < cutoff)
             .limit(limit)
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True),
+            "doomed",
         )
-        stmt = delete(EventOutbox).where(EventOutbox.id.in_(doomed.scalar_subquery()))
+        stmt = delete(EventOutbox).where(EventOutbox.id == doomed.c.id)
         result = await self.session.execute(stmt)
         return int(result.rowcount)  # type: ignore[attr-defined]
 
