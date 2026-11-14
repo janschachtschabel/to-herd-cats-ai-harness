@@ -60,7 +60,7 @@ async def test_a_hanging_handler_does_not_delay_the_others(real_db: RealDb) -> N
         # wait (bounded) for the committed records, not for the handler's side effect.
         async with asyncio.timeout(5):
             for event_id in ids:
-                while await delivered(real_db.database, event_id) != {"prompt"}:
+                while await delivered(real_db.database, event_id) != {"prompt"}:  # noqa: ASYNC110
                     await asyncio.sleep(0.02)
     finally:
         worker.should_exit = True
