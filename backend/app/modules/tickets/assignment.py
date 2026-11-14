@@ -18,11 +18,11 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, require
+from app.core.access import Action, Actor, require, space_ids_with
 from app.core.errors import ValidationFailed
 from app.core.principal import Principal, PrincipalType
 from app.modules.tickets.agent_hooks import assignee_hooks
-from app.modules.tickets.repository import TicketRepository
+from app.modules.tickets.repository import TicketRepository, TicketScope
 
 
 async def check_assignment(
@@ -33,11 +33,31 @@ async def check_assignment(
     old: Principal | None,
     new: Principal | None,
 ) -> None:
-    me = actor.principal
-    own = (new == me and old in (None, me)) or (new is None and old == me)
-    await require(session, actor, Action.TICKET_EDIT if own else Action.TICKET_ASSIGN, space_id)
+    await require(session, actor, assignment_action(actor.principal, old, new), space_id)
     if new is not None and not await _assignable(session, actor, repo, space_id, new):
         raise ValidationFailed("Cannot be assigned here", code="ticket.assignee_invalid")
+
+
+def assignment_action(me: Principal, old: Principal | None, new: Principal | None) -> Action:
+    """The right a change of assignee from `old` to `new` needs from `me`: the one rule,
+    for the service and for an agent's released `assign_ticket` (`approvals/gate.py`)."""
+    own = (new == me and old in (None, me)) or (new is None and old == me)
+    return Action.TICKET_EDIT if own else Action.TICKET_ASSIGN
+
+
+async def needed_to_assign(
+    session: AsyncSession, actor: Actor, number: int, new: Principal | None
+) -> Action:
+    """`assignment_action` for the ticket as it is now (`ticket.assign`, the stricter,
+    for one the actor does not see)."""
+    scope = TicketScope(actor.org_id, space_ids_with(actor, Action.TICKET_READ))
+    ticket = await TicketRepository(session, scope).by_number(number)
+    if ticket is None:
+        return Action.TICKET_ASSIGN
+    old = None
+    if ticket.assignee_type is not None and ticket.assignee_id is not None:
+        old = Principal(ticket.assignee_type, ticket.assignee_id)
+    return assignment_action(actor.principal, old, new)
 
 
 async def _assignable(

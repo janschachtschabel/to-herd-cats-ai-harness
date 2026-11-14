@@ -1348,7 +1348,9 @@ erst nach der Freigabe einer Person:
 - `POST /api/approvals/{id}/decide` (`decision: approve|reject`, `reason`, `version`):
   nur die fragende Person, und nur, wenn sie die Wirkung jetzt selbst ausführen dürfte
   (die Aktion des Werkzeugs in jedem betroffenen Bereich, mit ihren eigenen Rechten;
-  403 `approval.not_permitted`; andere, die die Freigabe sehen: 403
+  bei `assign_ticket` dieselbe Regel wie im Ticket-Service: ein freies Ticket sich
+  selbst zuweisen oder die eigene Zuweisung lösen braucht `ticket.edit`, alles andere
+  `ticket.assign`; 403 `approval.not_permitted`; andere, die die Freigabe sehen: 403
   `approval.not_addressed`). 409: `approval.decided` (schon entschieden),
   `approval.expired`, `approval.run_ended` (Lauf beendet oder Abbruch angefordert),
   `approval.version_conflict`. Die Entscheidung setzt den Lauf in ihrer Transaktion

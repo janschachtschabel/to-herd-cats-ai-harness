@@ -108,12 +108,10 @@ class ApprovalService:
         spec = CATALOG.get(approval.tool)
         if spec is None:
             raise Forbidden(code="approval.not_permitted")
-        if spec.action is not None:
+        if (action := await spec.needs(self.session, actor, approval.args)) is not None:
             for subject in approval.subjects:
                 space_id = subject.get("space_id")
-                if space_id and not await can(
-                    self.session, actor, spec.action, uuid.UUID(space_id)
-                ):
+                if space_id and not await can(self.session, actor, action, uuid.UUID(space_id)):
                     raise Forbidden(code="approval.not_permitted")
         run = await _locked(self.session, actor, shown.run.id)
         repo = WaitedRepository(self.session, actor.org_id)

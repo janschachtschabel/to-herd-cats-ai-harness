@@ -244,7 +244,7 @@ CATALOG: dict[str, ToolSpec] = {
             3,
             WRITE,
             ticket_tools.ticket_subjects,
-            Action.TICKET_ASSIGN,
+            action_of=ticket_tools.assign_action,
         ),
         ToolSpec(
             "post_message",

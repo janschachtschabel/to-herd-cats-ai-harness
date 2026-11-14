@@ -17,7 +17,8 @@ calls it, the host asks the gate first, in the call's transaction (`step_host.py
   - `approved`: the fingerprint is computed anew from the objects as they are now.
     If it differs (an object changed or is gone), the tool does not run and its
     result is `approval_stale`: the model may call it again and so ask anew. Then the
-    run's rights are checked again for each object (`ToolSpec.action` where it is;
+    run's rights are checked again for each object (`ToolSpec.needs` where it names
+    an action;
     the host checked the grant, the person and the agent before): if they are gone,
     the run ends `rights_revoked`. Then the tool runs, checking its rights itself
     (`outcome = ran`, with its effect; a step that times out is rolled back and
@@ -90,10 +91,10 @@ async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult 
     if subjects is None or fingerprint(spec.name, canonical, subjects) != found.fingerprint:
         await _settle(ctx, found, ApprovalOutcome.STALE)
         return ToolResult("approval", STALE, {"tool": spec.name})
-    if spec.action is not None:
+    if (action := await spec.needs(ctx.session, ctx.actor, canonical)) is not None:
         for subject in subjects:
             if subject.space_id is not None and not await can(
-                ctx.session, ctx.actor, spec.action, subject.space_id
+                ctx.session, ctx.actor, action, subject.space_id
             ):
                 raise Halt("rights_revoked")
     await _settle(ctx, found, ApprovalOutcome.RAN)

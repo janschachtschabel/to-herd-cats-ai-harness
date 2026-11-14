@@ -22,7 +22,9 @@ it, and the event records it for a replay).
 A tool an agent may use only with a person's release (`confirm`, plan M6 decision 4)
 names what a call would change (`subjects`: each object with its version and space;
 None for a call that changes nothing, such as `update_page`'s preview) and what a
-person must be able to do there to release it (`action`); see `approvals/gate.py`.
+person must be able to do there to release it (`action`, or `action_of` where that
+depends on the call: `assign_ticket` asks the ticket service's rule); see
+`approvals/gate.py`.
 """
 
 import uuid
@@ -116,6 +118,8 @@ class Wait:
 
 Runner = Callable[[ToolContext, Any], Awaitable[ToolResult | Wait]]
 Subjects = Callable[[ToolContext, Any], Awaitable[list[Subject] | None]]
+# The action a call needs, from its canonical arguments, for this actor (`action_of`).
+ActionOf = Callable[[AsyncSession, Actor, dict[str, Any]], Awaitable[Action]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,3 +134,12 @@ class ToolSpec:
     effect: Effect = Effect.READ
     subjects: Subjects | None = None  # None: the call changes no object (release: args)
     action: Action | None = None  # what the releasing person must be able to do there
+    action_of: ActionOf | None = None  # instead of `action`, where the call decides it
+
+    async def needs(
+        self, session: AsyncSession, actor: Actor, args: dict[str, Any]
+    ) -> Action | None:
+        """What `actor` must be able to do in each object's space to release the call."""
+        if self.action_of is not None:
+            return await self.action_of(session, actor, args)
+        return self.action

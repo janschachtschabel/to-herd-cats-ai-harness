@@ -11,7 +11,8 @@ ticket's events and timeline entries name the agent and the run.
   `active` or at most `review`; `done` and `cancelled` are a person's (spec 10), a
   clear refusal otherwise (checked again on the status as the change holds it).
 - `create_ticket` (level 2), `link_ticket_page` (level 2: a page AI may read).
-- `assign_ticket` (level 3): to a person or an agent (`ticket.assign`), with a reason
+- `assign_ticket` (level 3): to a person or an agent (the service's rule: `ticket.edit`
+  to take an unassigned ticket for oneself, else `ticket.assign`), with a reason
   that goes into the ticket's thread as the agent's comment. To an agent it hands the
   ticket over: that agent's run starts on it (`agents/triggers.py`). A run that came
   through `MAX_CHAIN_DEPTH` handovers, or that handed `MAX_HANDOVERS_PER_RUN` tickets
@@ -23,11 +24,12 @@ except for a link, which shows nothing of either side to whoever cannot see it).
 
 import hashlib
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, can
+from app.core.access import Action, Actor, can
 from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents.toolbox import handover
@@ -43,6 +45,7 @@ from app.modules.agents.toolbox.writing import (
 )
 from app.modules.messaging.models import MAX_BODY_CHARS
 from app.modules.messaging.service import MessageService
+from app.modules.tickets.assignment import needed_to_assign
 from app.modules.tickets.base import readable
 from app.modules.tickets.links import TicketLinks
 from app.modules.tickets.models import (
@@ -237,6 +240,16 @@ async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
 
 
 # --- what a call changes (a release is bound to it, `approvals/gate.py`) -------------
+
+
+async def assign_action(session: AsyncSession, actor: Actor, args: dict[str, Any]) -> Action:
+    """What releasing an `assign_ticket` call needs: the ticket service's rule."""
+    parsed = AssignTicketArgs.model_validate(args)
+    new = Principal(PrincipalType(parsed.assignee_type), parsed.assignee_id)
+    number = key_number(parsed.key)
+    if number is None:
+        return Action.TICKET_ASSIGN
+    return await needed_to_assign(session, actor, number, new)
 
 
 async def ticket_subjects(ctx: ToolContext, args: CommentTicketArgs) -> list[Subject] | None:
