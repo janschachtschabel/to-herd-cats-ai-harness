@@ -1,0 +1,253 @@
+{
+  "nav": {
+    "myAutomations": "My automations"
+  },
+  "automations": {
+    "mine": {
+      "title": "My automations",
+      "description": "What agents do for you at a set time, on a schedule or when something happens. Each automation runs with your rights.",
+      "empty": "You have not created an automation yet."
+    },
+    "agent": {
+      "title": "Automations",
+      "description": "The automations this agent carries out for people of the organisation.",
+      "empty": "This agent has no automations."
+    },
+    "space": {
+      "tab": "Automations",
+      "title": "Automations in this space",
+      "description": "Automations and event rules at channels and tickets of the space, as far as you see them.",
+      "empty": "There is no automation here that you see."
+    },
+    "create": "New automation",
+    "list": {
+      "label": "Automations",
+      "next": "Next term",
+      "noNext": "no further term",
+      "lastRun": "Last run",
+      "noRun": "none yet",
+      "openRun": "View run",
+      "owner": "Owner: {{name}}",
+      "unknownAgent": "a removed agent",
+      "unknownOwner": "a former person"
+    },
+    "kinds": {
+      "once": "Once",
+      "recurring": "Recurring",
+      "heartbeat": "Heartbeat",
+      "event": "Event rule"
+    },
+    "kindHints": {
+      "once": "Once, at a set time.",
+      "recurring": "On a schedule, such as every weekday at 9.",
+      "heartbeat": "Go through a checklist at fixed intervals within active hours.",
+      "event": "When something happens in the space, such as a new ticket."
+    },
+    "states": {
+      "active": "Active",
+      "done": "Done",
+      "paused": "Paused"
+    },
+    "paused": {
+      "manual": "Paused by hand",
+      "owner": "Paused: its owner may no longer run it",
+      "failing": "Paused: three runs in a row did not finish"
+    },
+    "place": {
+      "dm": "Direct message with {{agent}}",
+      "channel": "Channel #{{name}}",
+      "ticket": "Ticket {{key}}",
+      "unnamed": "a channel"
+    },
+    "schedule": {
+      "once": "Once on {{at}}",
+      "hourly": "Hourly at minute {{minute}}",
+      "daily": "Daily at {{time}}",
+      "weekdays": "Weekdays at {{time}}",
+      "weekly": "Every {{day}} at {{time}}",
+      "monthly": "Monthly on day {{day}} at {{time}}",
+      "custom": "Cron “{{cron}}”",
+      "heartbeat_one": "Every minute, {{days}}, {{from}}–{{until}}",
+      "heartbeat_other": "Every {{count}} minutes, {{days}}, {{from}}–{{until}}",
+      "event": "On: {{event}}",
+      "zone": "Time zone {{zone}}"
+    },
+    "term": {
+      "there": "{{time}} there, {{zone}}",
+      "zone": "{{zone}}"
+    },
+    "weekdays": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "weekdaysShort": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun"
+    },
+    "events": {
+      "page_published": "Page published",
+      "ticket_created": "Ticket created",
+      "attachment_uploaded": "Attachment uploaded",
+      "page_review_due": "A page's review is due"
+    },
+    "outcomes": {
+      "started": "Started",
+      "heartbeatOk": "Nothing to report (HEARTBEAT_OK, silent)",
+      "skipped_busy": "Skipped: the previous run was still working",
+      "skipped_paused_agent": "Skipped: the agent was paused or unavailable",
+      "skipped_budget": "Skipped: a daily budget was reached",
+      "skipped_policy": "Skipped: the place was archived or closed to this AI",
+      "skipped_off_hours": "Skipped: outside the active hours",
+      "skipped_depth": "Skipped: the chain was too deep (depth 3)"
+    },
+    "detail": {
+      "back": "My automations",
+      "instruction": "Instruction",
+      "checklist": "Checklist",
+      "agent": "Agent",
+      "owner": "Owner",
+      "place": "Place",
+      "schedule": "Schedule",
+      "state": "State",
+      "next": "Next term",
+      "upcoming": "The next terms",
+      "lastRun": "Last run",
+      "quiet_one": "Quiet time: {{count}} minute",
+      "quiet_other": "Quiet time: {{count}} minutes",
+      "filterTag": "Only with tag",
+      "filterKind": "Only tickets of kind {{kind}}",
+      "log": "Log",
+      "logLabel": "Log of the terms",
+      "logEmpty": "No term yet.",
+      "due": "Term",
+      "notFound": "This automation does not exist, or you may not see it."
+    },
+    "actions": {
+      "label": "Actions",
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "run": "Run now",
+      "delete": "Delete",
+      "takeOver": "Take over",
+      "ran": "Term fired: {{outcome}}",
+      "open": "View automation"
+    },
+    "delete": {
+      "title": "Delete the automation?",
+      "text": "It will not run again. Its past runs stay as history; a run working right now ends as it would have."
+    },
+    "takeOver": {
+      "title": "Take over the automation?",
+      "text": "You become its owner: it then runs with your rights and in your name, its runs use your budget, and approvals and questions come to you. A paused automation runs again.",
+      "confirm": "Take over",
+      "ownerUnable": "Its owner may no longer run this automation, so it cannot be resumed. Whoever could create it can take it over."
+    },
+    "form": {
+      "createTitle": "New automation",
+      "editTitle": "Edit automation",
+      "description": "An agent carries it out without being asked in a conversation, with your rights at the chosen place.",
+      "agent": "Agent",
+      "agentHint": "An agent you can reach.",
+      "place": "Place",
+      "placeHint": "Where the result goes.",
+      "places": {
+        "dm": "My direct message with the agent",
+        "channel": "A channel",
+        "ticket": "A ticket"
+      },
+      "channel": "Channel",
+      "channelNone": "Choose a channel …",
+      "channelHint": "Each term opens a thread of its own there. The agent must be a member of the space.",
+      "channelOption": "#{{name}} ({{space}})",
+      "ticket": "Ticket",
+      "ticketHint": "Such as HC-12. The ticket's thread is created on saving if it does not exist yet.",
+      "instruction": "Instruction",
+      "instructionHint": "What the agent should do. The thread shows “automation started”, not the wording.",
+      "checklist": "Checklist",
+      "checklistHint": "What the agent checks at every term.",
+      "kind": "Kind",
+      "kindFixed": "The kind cannot be changed after creation.",
+      "date": "Date",
+      "time": "Time",
+      "preset": "Schedule",
+      "presets": {
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "weekdays": "Weekdays (Monday to Friday)",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "custom": "Own cron expression (expert field)"
+      },
+      "minute": "Minute",
+      "weekday": "Weekday",
+      "monthDay": "Day of the month",
+      "monthDayHint": "1 to 28, so that every month has it.",
+      "cron": "Cron expression",
+      "cronHint": "Five fields: minute, hour, day, month, weekday – in the automation's time zone. At most every 15 minutes.",
+      "zone": "Time zone",
+      "interval": "Interval in minutes",
+      "intervalHint": "15 to 1440 minutes.",
+      "days": "Active weekdays",
+      "from": "Active from",
+      "until": "Active until",
+      "hoursHint": "If “until” is before “from”, the active hours run past midnight; if both are equal, the whole day is active.",
+      "heartbeatOk": "If the agent answers exactly HEARTBEAT_OK, it stays silent: nothing is delivered, only the log notes it.",
+      "event": "Event",
+      "tag": "Only tickets with tag",
+      "anyTag": "Any tag",
+      "ticketKind": "Only tickets of kind",
+      "anyKind": "Any kind",
+      "quiet": "Quiet time in minutes",
+      "quietHint": "Within the quiet time at most one run starts; further events are counted and handed to the next run as a number.",
+      "eventRights": "The run acts with your rights at the rule's place and writes only into this space.",
+      "eventSight": "It reads only what a viewer of the space sees. Whoever causes the event gains no rights by it.",
+      "preview": "The next terms",
+      "previewHint": "In your local time; where different, the time in the automation's time zone.",
+      "previewWaiting": "Appears once the schedule is complete.",
+      "previewNone": "No term.",
+      "create": "Create",
+      "errors": {
+        "agent": "Please choose an agent.",
+        "channel": "Please choose a channel.",
+        "ticket": "Please give a ticket number, such as HC-12.",
+        "once": "Please give a date and a time.",
+        "interval": "Between {{min}} and {{max}} minutes.",
+        "days": "Choose at least one weekday.",
+        "quiet": "Between {{min}} and {{max}} minutes."
+      }
+    }
+  },
+  "errors": {
+    "automation": {
+      "not_found": "This automation does not exist, or you may not see it.",
+      "version_conflict": "Someone has changed this automation in the meantime.",
+      "not_allowed": "You may not do that with this automation.",
+      "not_active": "The automation is not active.",
+      "not_paused": "The automation is not paused.",
+      "owner_unable": "Its owner may no longer run this automation. Whoever could create it can take it over.",
+      "not_runnable": "An event rule runs only when its event happens.",
+      "limit": "You already have as many automations as allowed. Delete one before creating another.",
+      "kind_immutable": "The kind of an automation cannot be changed.",
+      "invalid_place": "Not at this place: event rules need a channel or a ticket of a space.",
+      "agent_not_member": "The agent is not a member of this place's space.",
+      "invalid_filter": "This filter does not fit: tag and kind exist only for “ticket created”, and the tag must belong to the space.",
+      "in_the_past": "This time lies in the past.",
+      "too_frequent": "Too frequent: at least 15 minutes must lie between two terms.",
+      "invalid_cron": "We do not understand this cron expression. It needs five fields.",
+      "invalid_time_zone": "This time zone is unknown.",
+      "invalid_interval": "The interval must be between 15 and 1440 minutes.",
+      "invalid_hours": "These active hours do not fit."
+    }
+  }
+}
