@@ -4,11 +4,11 @@ Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brain
 
 Knowledge & agent cockpit for companies. The authority is the design spec
 `docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4, M4b,
-M5 Tasks 1–7 and M6 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`,
+M5 Tasks 1–7, M6 and M7 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`,
 `…-m2-wiki.md`, `2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
 `2026-11-13-m4b-boards-sprints.md`, `2026-11-13-m5-ki-grundlage.md`,
-`2026-11-14-m6-agenten-als-mitarbeiter.md`) are built; next are M5 Tasks 8–12 and M7
-(spec 14). Present: identity, groups, spaces, roles,
+`2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`) are
+built; next are M5 Tasks 8–12 and M8 (spec 14). Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -29,15 +29,18 @@ the worker (M5 Tasks 1–7); agents as colleagues: levels 1–3 and a 22-tool ca
 per-agent grants, the read and write scope per place, mention/ticket/handover triggers,
 one open run per thread, approvals and questions, the run journal with replay after a
 lost worker, run view and cancel, page and skill proposals, skills (SKILL.md only),
-memory pages per agent and space, personal agents (M6). Planned, not present:
-embeddings, hybrid search, Docling conversion (M5 Tasks 8–11), schedules, events and
-budgets (M7; DBOS is not used, spec E10), external tools/MCP (M8), S3, collab with
-Redis. Operations: `README.md` (Betriebshinweise),
+memory pages per agent and space, personal agents (M6); automations: one-off,
+recurring (cron in the automation's time zone), heartbeat and event-rule kinds fired
+exactly once by the worker's due loop (no DBOS, spec E10), a log of every term, pausing
+and take-over, budgets per org/person/agent and UTC day, the wiki's review interval and
+its daily pass (M7). Planned, not present: embeddings, hybrid search, Docling
+conversion (M5 Tasks 8–11), external tools/MCP (M8), S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
 boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
-`docs/AGENTEN.md` (agents: use, admin, worker runs, limits, metrics and alerts).
+`docs/AGENTEN.md` (agents and automations: use, admin, worker runs and the due loop,
+limits, metrics and alerts).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -68,7 +71,9 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `core/egress.py` or `HERD_AI_EGRESS_PROXY`), secrets (`core/secrets.py`: `env:HERD_AI_*`
   or `enc:` under `HERD_SECRET_KEY`; `scripts/rotate_secrets.py`), assignments and the
   derived `ai.use`, usage per call (`usage_record`), policy (`policy.py`,
-  `policy_filters.py`: what AI may read, filtered in SQL with the rights).
+  `policy_filters.py`: what AI may read, filtered in SQL with the rights), budgets
+  (`budgets.py` checks before every model call, `budget_repository.py` sums the UTC
+  day's usage).
 - Agents (`modules/agents`): agents and personal agents, the read and write scope per
   place (`scope.py`), triggers and places (`triggers.py`, `place.py`), runs (`runs.py`,
   `executor.py`, `step_host.py`, journal `journal.py`, cancel and waiting
@@ -76,6 +81,15 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   and questions (`approvals/`), memory (`memory.py`), run view (`run_view.py`), gauges
   (`gauge_repository.py`). The worker's run loop is `app/worker/runs.py` (claims with
   `SKIP LOCKED` and a lease, renewed every third).
+- Automations (`modules/automations`): terms and schedules (`term.py`, `terms.py`,
+  `schedule.py`, `heartbeat_terms.py`), firing one term (`firing.py`, `runs.py`),
+  heartbeats, event rules (`event_rules.py`, handler in `handlers.py`), pausing and
+  take-over (`pausing.py`, `takeover.py`, `standing.py`), `sight.py` (who sees one),
+  gauges and retention SQL (`metrics.py`, `upkeep_repository.py`). The due loop is
+  `app/worker/due.py` (`SKIP LOCKED`, one transaction per term, unique
+  `(automation_id, due_at)`; it also runs the wiki's review pass,
+  `modules/wiki/review_pass.py`, and the log's retention). Time comes from
+  `core/clock.py`. Frontend `features/automations`.
 - Runtime (`app/runtime/`): the only code that imports Pydantic AI (`loop.py` drives one
   step, `tools.py`, `models.py`, `context.py`; `untrusted.py` frames tool results);
   `tests/test_runtime_imports.py` enforces it.
@@ -240,6 +254,19 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   - New settings with the `HERD_AI_` prefix are refused as `env:` key references
     automatically (`RESERVED_NAMES`); add every new AI setting to Compose, the chart and
     `docs/AGENTEN.md`.
+- Automations:
+  - Code that schedules reads the time from a `Clock` (`core/clock.py`), never
+    `datetime.now()`; tests pass a `SettableClock` (`tests/support/clock.py`) and never
+    sleep for a term to come due.
+  - One transaction per term: the term's log row, its run (or skip), the next due time
+    and its events commit together, or not at all.
+  - Events written inside a run's step carry the run (`caused_by(run_id)`, column
+    `event_outbox.run_id`); event rules read it for chain depth and the own-effect
+    rule.
+  - `automations/sight.py` is the one rule for who sees an automation (routes, activity,
+    live events); do not restate it.
+  - A handler's `after_commit` actions (metrics, live notes) run once its lane batch has
+    committed, never for a rolled-back savepoint.
 - Test databases: backend tests drop and recreate every table per session, so never run
   two pytest sessions on one database; parallel work uses its own database (`createdb`,
   then `HERD_TEST_DATABASE_URL`).

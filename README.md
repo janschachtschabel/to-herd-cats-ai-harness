@@ -5,7 +5,7 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 6 (Agenten als Mitarbeiter) ist gebaut, dazu aus M5 die
+**Stand: Meilenstein 7 (Automatisierung) ist gebaut, dazu M6 und aus M5 die
 KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5 Tasks 8 bis 11) fehlen
 noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
@@ -104,15 +104,28 @@ Aus M6 Agenten als Mitarbeiter:
   Export); **Gedächtnis** je Agent und Bereich als normale Wiki-Seite; **persönliche
   Agenten** je Person; alles, was ein Agent schreibt, trägt das KI-Kennzeichen.
 
+Aus M7 Automatisierung:
+
+- **Aufgaben**: Ein Agent arbeitet ohne Anstoß, einmalig zu einem Zeitpunkt,
+  wiederkehrend nach Zeitplan (in der Zeitzone der Aufgabe), als **Herzschlag** (meldet
+  sich nur, wenn es etwas zu sagen gibt) oder als **Ereignisregel** (etwa „Ticket
+  angelegt“, mit Ruhezeit und Ketten-Tiefe). Jede Aufgabe gehört einer Person und
+  einem Ort, schreibt einen Verlauf jedes Termins und pausiert nach wiederholten
+  Fehlschlägen; „Jetzt ausführen“, Pausieren und Übernehmen in der Oberfläche.
+- **Budgets** je Organisation, Person oder Agent (Token oder Euro je UTC-Tag); ein Lauf
+  über dem Budget endet mit dem Grund `budget`.
+- **Prüffrist** je Bereich: Seiten, die zu lange nicht geprüft wurden, tragen „Prüfung
+  fällig“; die Verantwortlichen bekommen eine Erinnerung.
+
 Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
 [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
 [`docs/TICKETS.md`](docs/TICKETS.md), der KI-Anbindung (Verbindungen, Schlüssel,
 Zuordnung, Verbrauch, Richtlinie): [`docs/KI.md`](docs/KI.md), der Agenten (Bedienung,
-Verwaltung, Worker, Metriken): [`docs/AGENTEN.md`](docs/AGENTEN.md).
+Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
-[Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md),
+[Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md), [Demo M6](docs/demo/m6.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
@@ -214,14 +227,16 @@ Chart setzt keine Annotation dafür (Controller unterscheiden sich), `values.yam
 beschreibt sie und `ci/production-values.yaml` setzt für ingress-nginx
 `proxy-read-timeout` und `proxy-send-timeout` auf 3600.
 
-Seit M5/M6 arbeitet der Worker auch die Läufe der Agenten ab. Die KI-Schlüssel kommen
+Seit M5/M6 arbeitet der Worker auch die Läufe der Agenten ab, seit M7 auch die fälligen
+Aufgaben. Die KI-Schlüssel kommen
 aus einem eigenen Secret `ai.existingSecret` (Schlüssel = Variablennamen, etwa
 `HERD_SECRET_KEY`, `HERD_AI_OPENAI_KEY`); es geht an API und Worker, nie an den
 Migrations-Job. Die Grenzen stehen unter `ai.*` (`checkTimeoutSeconds`,
 `personalAgentsMax` und `automationsMax` für die API; `approvalHours`, `runConcurrency`, `runLeaseSeconds`
 für den Worker). Mit `networkPolicy.enabled` erreichen API und Worker keinen Anbieter,
 bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter oder zum Proxy). Drei Alarme
-kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing` (alle Warnung).
+kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing`, mit M7 zwei
+weitere: `HerdAutomationsLagging` und `HerdAutomationsFailing` (alle Warnung).
 Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
 
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
@@ -255,7 +270,8 @@ cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http:/
 ```
 
 `HERD_ROLE` wählt, was der Prozess tut: `all` (Standard: migrieren, dann bedienen),
-`api`, `migrate`, `worker` (der Verteiler der Outbox, die Läufe der Agenten und der
+`api`, `migrate`, `worker` (der Verteiler der Outbox, die Läufe der Agenten, die
+fälligen Aufgaben und der
 interne Port 9090; mehrere Worker nebeneinander sind sicher) oder `collab` (nur der
 Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. In
 `all` startet die API den Collab-Prozess als Kindprozess auf
@@ -344,7 +360,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M6. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M7. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -380,6 +396,20 @@ kennen.
   mit Läufen mehr Speicher (gemessen 173 MiB im Leerlauf, bis rund 250 MiB unter Last,
   [Steckbrief](docs/STECKBRIEF.md#agenten-m6)). Alarme, Metriken, bekannte Grenzen und
   das Rolling Update: [`docs/AGENTEN.md`](docs/AGENTEN.md#betrieb).
+- **Aufgaben, Budgets, Prüffrist** (M7): Die Fälligkeits-Schleife jedes Workers sieht
+  alle 5 Sekunden nach fälligen Aufgaben; mehrere Worker feuern jeden Termin genau
+  einmal (Zeilensperre, eine Transaktion je Termin, eindeutiger Termin). Sie teilt sich
+  den Prozess mit den Läufen: 1.000 gleichzeitig fällige Aufgaben waren mit einem
+  Worker nach rund 100 Sekunden alle gefeuert, mit drei nach rund 50 bis 65
+  ([Steckbrief](docs/STECKBRIEF.md#automatisierung-m7)); `HerdAutomationsLagging` meldet
+  mehr als drei Minuten Rückstand. Höchstens `HERD_AI_AUTOMATIONS_MAX` Aufgaben je
+  Person. Der Verlauf der Termine bleibt 90 Tage, aufgenommene Ereignisse 7 Tage;
+  Ereignisse, die noch auf das Ende ihrer Ruhezeit warten, und alles, was ein offener
+  Lauf noch liest, bleiben. Budgets gelten je UTC-Tag; jeder laufende Lauf kann eine
+  Grenze um einen Aufruf überschreiten. Beim Update Worker zuerst ersetzen: Ein Worker
+  des vorigen Releases lässt Herzschläge und Ereignisregeln fällig liegen. Einzelheiten:
+  [`docs/AGENTEN.md`](docs/AGENTEN.md#aufgaben-im-worker-m7), [`docs/KI.md`](docs/KI.md),
+  [`docs/WIKI.md`](docs/WIKI.md).
 - **Mitgeliefertes PostgreSQL im Chart** (`postgresql.enabled`, Standard `true`) ist
   zum Ausprobieren gedacht: ein Pod, keine Replikation, keine Sicherung. In Produktion
   `postgresql.enabled=false` und eine externe Datenbank setzen.
@@ -593,7 +623,7 @@ kennen.
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
-  Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M6 ohne DBOS (Plan
+  Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M7 ohne DBOS (Plan
   M3, Entscheidung 1). `HERD_ROLE=worker` hat nur den internen Port (`/ready` meldet, ob
   seine Schleife läuft, die Datenbank erreicht und innerhalb von vier Zeitgrenzen
   vorankommt); `HERD_ROLE=all` enthält den Worker und teilt
