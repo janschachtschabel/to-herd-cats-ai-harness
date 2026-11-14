@@ -16,7 +16,8 @@ CostPerDay = Annotated[Decimal, Field(gt=0, le=1_000_000_000, max_digits=12, dec
 
 
 class BudgetIn(BaseModel):
-    """At least one limit (422 `ai.budget_limit_missing`); `version` None creates."""
+    """At least one limit (422 `ai.budget_limit_missing`); `version`: the one read, or
+    null to create (409 `ai.budget_version_conflict` if the subject has one meanwhile)."""
 
     model_config = ConfigDict(extra="forbid")
 

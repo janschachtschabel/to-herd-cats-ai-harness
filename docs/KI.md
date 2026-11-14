@@ -1,7 +1,8 @@
-# KI-Grundlage: Verbindungen, Zuordnung, Verbrauch, Richtlinie
+# KI-Grundlage: Verbindungen, Zuordnung, Verbrauch, Budgets, Richtlinie
 
 Betrieb und Verwaltung der KI-Anbindung. Stand: M5 Tasks 1 bis 7 (mit den Korrekturen
-aus Modul-Review 1) und M6. Hybride Suche und Embeddings (M5 Tasks 8 bis 11) folgen.
+aus Modul-Review 1), M6 und die Budgets aus M7. Hybride Suche und Embeddings (M5 Tasks
+8 bis 11) folgen.
 
 Agenten, Läufe, Werkzeuge, Freigaben, Skills, Gedächtnis und ihr Betrieb (Worker,
 Metriken, Alarme) stehen in [`AGENTEN.md`](AGENTEN.md).
@@ -110,6 +111,10 @@ Kosten, wenn ein Preis hinterlegt ist; gecachte Token zählen als Eingabe).
   Laufs).
 - `GET /api/ai/usage/me` (`ai.use`): die eigenen Summen, ohne Verbindungsnamen.
 
+Ein Lauf bucht seinen Verbrauch auf die auslösende Person, den Agenten und den Bereich
+seines Ortes (Kanal, Seiten- oder Ticket-Thread; eine Direktnachricht hat keinen
+Bereich), sodass `by=space` seit M7 auch die Läufe zeigt.
+
 Bekannte Untererfassung (beides selten, beides nur zu wenig gezählt, nie doppelt):
 
 - Stirbt ein Worker während eines Anbieteraufrufs oder verliert er seine Sperrfrist,
@@ -120,6 +125,50 @@ Bekannte Untererfassung (beides selten, beides nur zu wenig gezählt, nie doppel
   einer eigenen Transaktion nachgebucht. Scheitert auch das, fehlt dieser eine Aufruf.
   Zeichen, die die Datenbank nicht speichern kann (NUL, einzelne Surrogate), entfernt
   der Server vorher aus Text und Argumenten des Modells, damit es dazu nicht kommt.
+
+## Budgets (`/api/ai/budgets`, `ai.manage`)
+
+Ein Budget begrenzt den Verbrauch je **UTC-Tag** (wie die Tagesansicht des Boards):
+für die ganze Organisation, für eine Person oder für einen Agenten, je Geltung höchstens
+eins. Das Limit steht in Token (ein + aus; gecachte Token sind Teil der Eingabe) oder in
+Euro oder in beidem; mindestens eins muss gesetzt sein.
+
+- `GET /api/ai/budgets` (seitenweise): alle Budgets mit `scope` (`organisation`,
+  `user`, `agent`), `subject_id` und `name` der Person bzw. des Agenten und dem
+  Verbrauch des Tages in `today` (`tokens`, `cost` der Aufrufe mit Preis,
+  `unpriced_calls`, `exhausted`).
+- `PUT /api/ai/budgets/organisation`, `PUT /api/ai/budgets/users/{user_id}`,
+  `PUT /api/ai/budgets/agents/{agent_id}` mit `{"tokens_per_day", "cost_per_day",
+  "version"}`: `version` `null` legt an, sonst die gelesene Version (409
+  `ai.budget_version_conflict` mit `details.current_version`, auch wenn zwei zugleich
+  anlegen). Ohne Limit 422 `ai.budget_limit_missing`; Token 1 bis 10¹², Euro größer 0
+  mit höchstens zwei Nachkommastellen. Eine unbekannte Person oder ein unbekannter
+  Agent: 404 `users.not_found` bzw. `agent.not_found`.
+- `DELETE /api/ai/budgets/{id}?version=n` (404 `ai.budget_not_found`, 409 wie oben).
+- Setzen und Entfernen stehen im Audit (`ai_budget.set`, `ai_budget.removed`, mit den
+  Limits). Wer `ai.manage` nicht hat, bekommt auf allen Wegen 404 `ai.not_found`.
+  Wird eine Person oder ein Agent gelöscht, verschwindet ihr Budget mit.
+
+**Wirkung.** Vor **jedem** Modellaufruf eines Laufs prüft der Schritt-Host die Budgets
+der Organisation, der auslösenden Person und des Agenten gegen die Summen des Tages aus
+`usage_record` (alle Aufrufe dieser Geltung, egal welcher Lauf; Indizes nach
+Organisation, Person bzw. Agent und Zeit). Jedes erreichte Limit zählt, also gewinnt das
+engste. Ist eins erreicht (Verbrauch ≥ Limit), endet der Lauf mit dem Stopgrund
+`budget`; im Journal steht als Detail die Geltung (`user`, `agent` oder
+`organisation`, bei mehreren die speziellste), im Gespräch bzw. Thread der übliche
+Hinweis „Lauf beendet“ mit `budget`. Eine Änderung des Budgets gilt ab dem nächsten
+Aufruf, auch mitten im Lauf.
+
+- **Euro nur mit Preis:** Ein Euro-Limit summiert nur Aufrufe mit hinterlegtem Preis und
+  greift nur für Aufrufe, deren Modell an der Verbindung einen Preis hat. Ohne Preis
+  zählt allein das Token-Limit (ein Budget nur in Euro hält einen Agenten ohne Preis
+  also nicht auf).
+- **Ein Aufruf darüber:** Ein schon gesendeter Aufruf wird nicht abgebrochen. Ein Lauf
+  kann ein Limit daher um einen Aufruf überschreiten, mehrere Läufe zugleich um je
+  einen; danach macht keiner mehr einen Aufruf.
+- Die Prüfung kostet ohne Budgets eine Abfrage je Aufruf, mit Budgets eine Summe je
+  Geltung dazu. Andere Teile (fällige Aufgaben aus M7) fragen dieselbe Funktion
+  (`app/modules/ai/budgets.budget_exhausted`).
 
 ## KI-Richtlinie je Bereich und KI-Sperre
 

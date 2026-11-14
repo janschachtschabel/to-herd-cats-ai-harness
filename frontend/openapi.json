@@ -1639,6 +1639,142 @@
         "title": "BoardRowOut",
         "type": "object"
       },
+      "BudgetIn": {
+        "additionalProperties": false,
+        "description": "At least one limit (422 `ai.budget_limit_missing`); `version`: the one read, or\nnull to create (409 `ai.budget_version_conflict` if the subject has one meanwhile).",
+        "properties": {
+          "cost_per_day": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000000000.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Day"
+          },
+          "tokens_per_day": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000000000000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Day"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "BudgetIn",
+        "type": "object"
+      },
+      "BudgetOut": {
+        "properties": {
+          "cost_per_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Day"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/BudgetScope"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "today": {
+            "$ref": "#/components/schemas/TodayOut"
+          },
+          "tokens_per_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Day"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "subject_id",
+          "name",
+          "tokens_per_day",
+          "cost_per_day",
+          "version",
+          "today"
+        ],
+        "title": "BudgetOut",
+        "type": "object"
+      },
+      "BudgetScope": {
+        "enum": [
+          "organisation",
+          "user",
+          "agent"
+        ],
+        "title": "BudgetScope",
+        "type": "string"
+      },
       "CardOut": {
         "description": "A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by\nid (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see\nit). The message's `body_md` is the card's summary or the question.",
         "properties": {
@@ -4943,6 +5079,33 @@
           "items"
         ],
         "title": "Page[AuditOut]",
+        "type": "object"
+      },
+      "Page_BudgetOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[BudgetOut]",
         "type": "object"
       },
       "Page_ConnectionOut_": {
@@ -8916,7 +9079,8 @@
           "error",
           "cancelled",
           "waiting_timeout",
-          "approval_expired"
+          "approval_expired",
+          "budget"
         ],
         "title": "StopReason",
         "type": "string"
@@ -9835,6 +9999,35 @@
           "version"
         ],
         "title": "TicketUpdate",
+        "type": "object"
+      },
+      "TodayOut": {
+        "description": "Today's use (UTC day) in the budget's scope; `exhausted`: a limit is reached\nfor a priced call.",
+        "properties": {
+          "cost": {
+            "title": "Cost",
+            "type": "string"
+          },
+          "exhausted": {
+            "title": "Exhausted",
+            "type": "boolean"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "title": "Unpriced Calls",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tokens",
+          "cost",
+          "unpriced_calls",
+          "exhausted"
+        ],
+        "title": "TodayOut",
         "type": "object"
       },
       "TrashedPageOut": {
@@ -12731,6 +12924,260 @@
           }
         },
         "summary": "Set User Assignment",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets": {
+      "get": {
+        "description": "Every budget with today's use (UTC day).",
+        "operationId": "list_budgets_api_ai_budgets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BudgetOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Budgets",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets/agents/{agent_id}": {
+      "put": {
+        "operationId": "set_agent_budget_api_ai_budgets_agents__agent_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Agent Budget",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets/organisation": {
+      "put": {
+        "operationId": "set_organisation_budget_api_ai_budgets_organisation_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Organisation Budget",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets/users/{user_id}": {
+      "put": {
+        "operationId": "set_user_budget_api_ai_budgets_users__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set User Budget",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets/{budget_id}": {
+      "delete": {
+        "operationId": "delete_budget_api_ai_budgets__budget_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "budget_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Budget Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Budget",
         "tags": [
           "ai"
         ]

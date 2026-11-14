@@ -97,7 +97,9 @@ async def test_admins_set_list_and_remove_budgets(bench: Bench) -> None:
     ],
 )
 async def test_a_budget_needs_a_sane_limit(bench: Bench, body: dict[str, Any]) -> None:
-    await put(bench, "organisation", 422, **body)
+    refused = await put(bench, "organisation", 422, **body)
+    if all(v is None for v in body.values()):
+        assert refused["error"]["code"] == "ai.budget_limit_missing"
 
 
 async def test_writes_name_the_version(bench: Bench) -> None:

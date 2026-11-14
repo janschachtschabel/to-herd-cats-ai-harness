@@ -552,6 +552,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Budgets
+         * @description Every budget with today's use (UTC day).
+         */
+        get: operations["list_budgets_api_ai_budgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/budgets/agents/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Agent Budget */
+        put: operations["set_agent_budget_api_ai_budgets_agents__agent_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/budgets/organisation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Organisation Budget */
+        put: operations["set_organisation_budget_api_ai_budgets_organisation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/budgets/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set User Budget */
+        put: operations["set_user_budget_api_ai_budgets_users__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/budgets/{budget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Budget */
+        delete: operations["delete_budget_api_ai_budgets__budget_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/connections": {
         parameters: {
             query?: never;
@@ -3213,6 +3301,44 @@ export interface components {
             cells: components["schemas"]["BoardCellOut"][];
         };
         /**
+         * BudgetIn
+         * @description At least one limit (422 `ai.budget_limit_missing`); `version`: the one read, or
+         *     null to create (409 `ai.budget_version_conflict` if the subject has one meanwhile).
+         */
+        BudgetIn: {
+            /** Cost Per Day */
+            cost_per_day?: number | string | null;
+            /** Tokens Per Day */
+            tokens_per_day?: number | null;
+            /** Version */
+            version: number | null;
+        };
+        /** BudgetOut */
+        BudgetOut: {
+            /** Cost Per Day */
+            cost_per_day: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            scope: components["schemas"]["BudgetScope"];
+            /** Subject Id */
+            subject_id: string | null;
+            today: components["schemas"]["TodayOut"];
+            /** Tokens Per Day */
+            tokens_per_day: number | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * BudgetScope
+         * @enum {string}
+         */
+        BudgetScope: "organisation" | "user" | "agent";
+        /**
          * CardOut
          * @description A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by
          *     id (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see
@@ -4487,6 +4613,13 @@ export interface components {
         Page_AuditOut_: {
             /** Items */
             items: components["schemas"]["AuditOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[BudgetOut] */
+        Page_BudgetOut_: {
+            /** Items */
+            items: components["schemas"]["BudgetOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -5920,7 +6053,7 @@ export interface components {
          * StopReason
          * @enum {string}
          */
-        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error" | "cancelled" | "waiting_timeout" | "approval_expired";
+        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error" | "cancelled" | "waiting_timeout" | "approval_expired" | "budget";
         /**
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page or
@@ -6279,6 +6412,21 @@ export interface components {
             title?: string | null;
             /** Version */
             version: number;
+        };
+        /**
+         * TodayOut
+         * @description Today's use (UTC day) in the budget's scope; `exhausted`: a limit is reached
+         *     for a priced call.
+         */
+        TodayOut: {
+            /** Cost */
+            cost: string;
+            /** Exhausted */
+            exhausted: boolean;
+            /** Tokens */
+            tokens: number;
+            /** Unpriced Calls */
+            unpriced_calls: number;
         };
         /**
          * TrashedPageOut
@@ -7883,6 +8031,172 @@ export interface operations {
             header?: never;
             path: {
                 user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_budgets_api_ai_budgets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BudgetOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_agent_budget_api_ai_budgets_agents__agent_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_organisation_budget_api_ai_budgets_organisation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_budget_api_ai_budgets_users__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_budget_api_ai_budgets__budget_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                budget_id: string;
             };
             cookie?: never;
         };

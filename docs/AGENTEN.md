@@ -634,7 +634,8 @@ ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schri
   in der Transaktion des Abschlusses (Abbruch und Abschluss sperren dieselbe Zeile).
 - **Stopgründe:** `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
   Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402, 403,
-  429; ohne Wiederholung), `error`, `cancelled`, `waiting_timeout`, `approval_expired`.
+  429; ohne Wiederholung), `error`, `cancelled`, `waiting_timeout`, `approval_expired`,
+  `budget` (ein Tagesbudget ist erreicht, siehe [KI.md](KI.md#budgets-apiaibudgets-aimanage)).
   Die Antwort ist genau eine Nachricht `kind: agent`; jeder andere Stopp steht als
   Hinweis im Gespräch bzw. Thread.
 - Während eines Anbieteraufrufs hält ein Lauf weder eine Transaktion noch eine
@@ -1226,6 +1227,10 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   Nachricht (Ticket-Läufe), Systemmeldungen als Antworten in Kanal-Threads. Ein Pod des
   vorigen Releases liest solche Zeilen nicht (Versionsliste, Aktivität, Laufansicht
   scheitern dort), bis er ersetzt ist.
+- M7: Stopgrund `budget` (Migration `e7a9c1b3d5f7`, nur die Prüfung erweitert, dazu die
+  neue Tabelle `ai_budget` und ein Index). Ein Pod ohne M7 schreibt ihn nie und prüft
+  keine Budgets; Laufansicht und Laufliste scheitern dort an einem solchen Lauf, bis er
+  ersetzt ist.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen
