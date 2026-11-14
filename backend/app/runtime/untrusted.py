@@ -2,9 +2,14 @@
 so the model can tell content apart from the conversation, cut to MAX_TOOL_CHARS for
 the prompt (the run's event keeps all of it), and the instructions say so.
 
-A frame cannot be closed from inside: the closing tag in the content is defused, so a
-page that writes `</untrusted>` stays inside its frame.
+A frame cannot be closed from inside: the closing tag in the content is defused in any
+spelling (case, trailing space), so a page that writes `</untrusted>` stays inside its
+frame.
 """
+
+import re
+
+CLOSING_TAG = re.compile(r"</(untrusted)", re.IGNORECASE)
 
 MAX_TOOL_CHARS = 8_000
 CUT_NOTE = "\n[… cut: the rest is not shown]"
@@ -21,7 +26,7 @@ def frame_untrusted(source: str, text: str, **attrs: str) -> str:
     if len(text) > MAX_TOOL_CHARS:
         text = text[: MAX_TOOL_CHARS - len(CUT_NOTE)] + CUT_NOTE
     extra = "".join(f' {key}="{_escape(value)}"' for key, value in attrs.items())
-    body = text.replace("</untrusted", "<\\/untrusted")
+    body = CLOSING_TAG.sub(r"<\\/\1", text)
     return f'<untrusted source="{_escape(source)}"{extra}>\n{body}\n</untrusted>'
 
 
