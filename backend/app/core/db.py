@@ -80,6 +80,18 @@ def discard_after_commit(session: AsyncSession) -> None:
     session.info.pop(_AFTER_COMMIT, None)
 
 
+def after_commit_mark(session: AsyncSession) -> int:
+    """How many actions are registered: a mark to go back to when a savepoint is rolled
+    back (`discard_after_commit_since`)."""
+    return len(session.info.get(_AFTER_COMMIT, []))
+
+
+def discard_after_commit_since(session: AsyncSession, mark: int) -> None:
+    """Drop the actions registered after `mark` (their savepoint was rolled back)."""
+    actions: list[AfterCommit] = session.info.get(_AFTER_COMMIT, [])
+    del actions[mark:]
+
+
 async def run_after_commit(session: AsyncSession) -> None:
     """The registered actions, each in its own transaction (a savepoint when the
     session is still inside one, as in tests); a failing action is logged and rolled

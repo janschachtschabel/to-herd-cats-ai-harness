@@ -8,6 +8,10 @@ runs again from its start with a savepoint per event, so the failing event's
 neighbours keep their effects (the failed one is not run again). A timeout ends the
 batch at its event: the events after it stay due, without an attempt counted.
 
+A handler's after-commit actions (`core.db.after_commit`, e.g. counting a metric) run
+once the batch has committed (`Dispatcher.dispatch_lane`); those of a call whose
+savepoint was rolled back are dropped with it.
+
 Every handler call has `timeout` seconds (asyncio, with a small grace so that the
 transaction's own `lock_timeout`/`statement_timeout` end a database wait first). A
 failure takes its delivery record back and makes the lane wait 2^attempts seconds
@@ -23,6 +27,7 @@ from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import db_errors
+from app.core.db import after_commit_mark, discard_after_commit_since
 from app.core.metrics import OUTBOX_DISPATCHES
 from app.core.outbox import Event, one_notify
 from app.worker.registry import Handler
@@ -86,6 +91,7 @@ class LaneBatch:
             if event.id not in fresh:  # had it already
                 OUTBOX_DISPATCHES.labels(handler=self.handler.name, result="duplicate").inc()
                 self.done.append(event)
+        mark = after_commit_mark(self.session)
         try:
             async with self.session.begin_nested():
                 for index, item in enumerate(todo):
@@ -94,6 +100,7 @@ class LaneBatch:
                         raise _Failure(index, outcome)
             self._succeeded([event for event, _ in todo])
         except _Failure as failure:  # rolled back: settle it, the rest one by one
+            discard_after_commit_since(self.session, mark)
             await self._settle(todo[failure.index])
             rest = todo[: failure.index]
             if failure.outcome is Outcome.TIMED_OUT:
@@ -104,10 +111,12 @@ class LaneBatch:
 
     async def _one_by_one(self, todo: list[Claimed]) -> None:
         for index, item in enumerate(todo):
+            mark = after_commit_mark(self.session)
             outcome = await self._call(item, savepoint=True)
             if outcome is Outcome.OK:
                 self._succeeded([item[0]])
                 continue
+            discard_after_commit_since(self.session, mark)
             await self._settle(item)
             if outcome is Outcome.TIMED_OUT:  # the rest waits for the next batch
                 await self._take_back(todo[index + 1 :])

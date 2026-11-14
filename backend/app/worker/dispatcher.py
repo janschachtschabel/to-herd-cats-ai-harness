@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import app.models_registry  # noqa: F401 -- every model: handlers write to any table
-from app.core.db import Database
+from app.core.db import Database, run_after_commit
 from app.worker import registry as handler_registry
 from app.worker.lane import MAX_ATTEMPTS, Claimed, LaneBatch, count_failure, log_failure
 from app.worker.metrics import worker_metrics
@@ -112,9 +112,12 @@ class Dispatcher:
         """One batch of the handler's lane; how many events it held."""
         broken: list[Claimed] = []  # the call during which the transaction broke
         try:
-            async with self.database.session_factory() as session, session.begin():
-                batch = LaneBatch(session, handler, self.handler_timeout, broken)
-                return await batch.run(self.batch_size)
+            async with self.database.session_factory() as session:
+                async with session.begin():
+                    batch = LaneBatch(session, handler, self.handler_timeout, broken)
+                    count = await batch.run(self.batch_size)
+                await run_after_commit(session)  # the handlers' (committed) actions
+                return count
         except Exception as exc:
             if not broken:
                 raise
