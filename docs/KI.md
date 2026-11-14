@@ -46,8 +46,10 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
 - `HERD_SECRET_KEY_PREVIOUS`: nur während eines Schlüsselwechsels. Ablauf: neuen Wert
   in `HERD_SECRET_KEY`, alten in `HERD_SECRET_KEY_PREVIOUS`, ausrollen,
   `cd backend && uv run python -m scripts.rotate_secrets`, danach
-  `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript schlüsselt alle `enc:`-Werte in einer
-  Transaktion neu um (alles oder nichts) und nennt nur ihre Zahl. Das Image enthält
+  `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript schlüsselt alle `enc:`-Werte (der
+  KI-Verbindungen und der Konnektoren, geteilter wie persönlicher, siehe
+  [`MCP.md`](MCP.md#konnektoren)) in einer Transaktion neu um (alles oder nichts) und
+  nennt nur ihre Zahl. Das Image enthält
   `backend/scripts/` nicht: den Wechsel aus einem Quellstand desselben Release starten,
   mit derselben Datenbank und beiden Schlüsseln in der Umgebung.
 - `env:`-Verweise dürfen nur Variablen mit dem Präfix `HERD_AI_` nennen, damit kein

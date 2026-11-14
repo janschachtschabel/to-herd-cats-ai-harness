@@ -40,6 +40,7 @@ from tests.factories_ai import (  # noqa: E402, F401
     stub_network,
 )
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
+from tests.factories_connectors import ai_people, secret_key  # noqa: E402, F401
 from tests.factories_dms import people  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_messaging import chat  # noqa: E402, F401

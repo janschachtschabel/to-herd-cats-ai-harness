@@ -10,7 +10,9 @@ from app.core.config import Settings, get_settings
 from app.core.errors import ValidationFailed
 from app.modules.ai.models import AiConnection
 from app.modules.ai.secret_rotation import RotationFailed, rotate_secrets
+from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
 from app.modules.orgs.models import Organization
+from app.modules.users.models import User
 
 KEY = "k" * 40
 OTHER_KEY = "o" * 40
@@ -151,4 +153,50 @@ async def test_stored_secrets_are_rotated_all_or_nothing(
     await session.flush()
     with pytest.raises(RotationFailed) as caught:
         await rotate_secrets(session)
-    assert caught.value.connection_id == row.id and PLAIN not in str(caught.value)
+    assert caught.value.row_id == row.id and PLAIN not in str(caught.value)
+    assert caught.value.table == "ai_connection"
+
+
+async def test_connector_secrets_are_rotated_too(
+    session: AsyncSession, org: Organization, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Connectors (plan M8 task 5) keep `enc:` secrets as well; personal ones of every
+    person are rotated, `env:` references stay as they are."""
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    owner = User(
+        org_id=org.id, email="c@example.com", name="C", password_hash="x", system_role="member"
+    )
+    session.add(owner)
+    await session.flush()
+    rows = [
+        Connector(
+            org_id=org.id,
+            scope=scope,
+            owner_id=owner.id if scope == ConnectorScope.PERSONAL else None,
+            name=f"C{n}",
+            auth_kind=AuthKind.BEARER,
+            secret_ref=ref,
+        )
+        for n, (scope, ref) in enumerate(
+            [
+                (ConnectorScope.SHARED, secrets.encrypt(PLAIN)),
+                (ConnectorScope.PERSONAL, secrets.encrypt(PLAIN)),
+                (ConnectorScope.SHARED, "env:HERD_AI_X"),
+            ]
+        )
+    ]
+    session.add_all(rows)
+    await session.flush()
+    old = [r.secret_ref for r in rows]
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(OTHER_KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", SecretStr(KEY))
+    assert await rotate_secrets(session) == 2
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    assert [r.secret_ref != o for r, o in zip(rows, old, strict=True)] == [True, True, False]
+    assert all(secrets.resolve(r.secret_ref).get_secret_value() == PLAIN for r in rows[:2])
+    rows[1].secret_ref = old[1]
+    await session.flush()
+    with pytest.raises(RotationFailed) as caught:
+        await rotate_secrets(session)
+    assert caught.value.row_id == rows[1].id and caught.value.table == "connector"

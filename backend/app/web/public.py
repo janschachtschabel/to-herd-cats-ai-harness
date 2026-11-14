@@ -27,6 +27,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
 from app.modules.automations import router as automations_router
+from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
 from app.modules.messaging import router as messaging
@@ -106,6 +107,8 @@ def api_router() -> APIRouter:
     api.include_router(directory_router)
     api.include_router(audit_router)
     api.include_router(ai.connections)
+    api.include_router(connectors.shared)
+    api.include_router(connectors.personal)
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
     api.include_router(ai_budgets.budgets)

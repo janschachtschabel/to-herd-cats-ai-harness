@@ -86,6 +86,7 @@ NEED_A_RUN = {
     "/api/agents/{agent_id}/spaces",
     "/api/agents/{agent_id}/automations",
     "/api/automations/{automation_id}/firings",
+    "/api/ai/my-connectors",  # needs `ai.use`
 }
 
 
@@ -138,7 +139,8 @@ async def test_hostile_cursors_answer_422_everywhere(
 
 
 async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
-    """The lists that need a run (an agent, a connection, a DM) or an automation."""
+    """The lists that need a run (an agent, a connection, a DM), an automation or
+    `ai.use`."""
     posted = await bench.say("Hi")
     assert await bench.run_next() == StopReason.COMPLETED
     run_id = posted["agent_run"]["id"]
