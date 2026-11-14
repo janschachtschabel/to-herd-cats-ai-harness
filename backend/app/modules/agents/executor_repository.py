@@ -4,8 +4,9 @@ the steps' records, and the end (what a run reads: `read_repository.py`).
 Claiming is the worker's, across organisations (like the outbox dispatcher; nothing in
 it is shown to anyone); everything after is scoped by the run's organisation.
 
-- A run is claimed when it is queued and its conversation has no active run (running
-  or waiting), or when it is running and its lease has run out (its worker died: it is
+- A run is claimed when it is queued and its lane (`models.LANE`: a channel
+  thread, else the conversation) has no active run (running or waiting), or when
+  it is running and its lease has run out (its worker died: it is
   taken up again and goes on from its journal, `recoveries` + 1). Every take-up counts
   in `attempt`; `started_at` stays that of the first. A connection's running runs
   (with a live lease) stay below its `max_concurrency`. Claims take a
@@ -29,7 +30,6 @@ from sqlalchemy.orm import aliased
 from app.core.models_base import utcnow
 from app.core.principal import PrincipalType
 from app.modules.agents.models import (
-    MAX_RUNTIME_SECONDS,
     Agent,
     EventKind,
     RateWindow,
@@ -42,7 +42,6 @@ from app.modules.messaging.models import Conversation, Message, MessageKind
 
 CLAIM_LOCK = 0x4845_5244_5255_4E53 & 0x7FFF_FFFF_FFFF_FFFF  # "HERDRUNS"
 RATE_WINDOW = timedelta(minutes=1)
-STUCK_GRACE_SECONDS = 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +82,8 @@ async def claim(session: AsyncSession, lease: float) -> Claimed | None:
     now = utcnow()
     other = aliased(Run)
     busy = exists().where(
-        other.conversation_id == Run.conversation_id,
+        func.coalesce(other.lane_id, other.conversation_id)
+        == func.coalesce(Run.lane_id, Run.conversation_id),
         other.state.in_((RunState.RUNNING, RunState.WAITING)),
     )
     mine = aliased(Run)
@@ -277,30 +277,3 @@ class RunSteps:
         run.wait_until = None
         run.finished_at = utcnow()
         await self.session.flush()
-
-
-@dataclass(frozen=True, slots=True)
-class OpenRuns:
-    queued: int
-    oldest_queued: float
-    stuck: int
-    waiting: int
-
-
-async def open_runs(session: AsyncSession) -> OpenRuns:
-    """For the gauges, across organisations: queued runs, the age of the oldest one
-    (seconds, 0 without one), stuck runs (running with a lease that ran out, no worker
-    took them up again, or for longer than any run may) and waiting runs."""
-    now = utcnow()
-    queued = select(func.count(), func.min(Run.created_at)).where(Run.state == RunState.QUEUED)
-    count, oldest = (await session.execute(queued)).one()
-    overdue = now - timedelta(seconds=MAX_RUNTIME_SECONDS + STUCK_GRACE_SECONDS)
-    stuck = await session.scalar(
-        select(func.count()).where(
-            Run.state == RunState.RUNNING,
-            or_(Run.lease_until < now, Run.started_at < overdue),
-        )
-    )
-    waiting = await session.scalar(select(func.count()).where(Run.state == RunState.WAITING))
-    age = (now - oldest).total_seconds() if oldest is not None else 0.0
-    return OpenRuns(int(count), max(age, 0.0), int(stuck or 0), int(waiting or 0))

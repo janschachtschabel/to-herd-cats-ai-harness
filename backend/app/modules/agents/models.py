@@ -25,10 +25,15 @@ takes it (`running`, with a lease it renews) and ends it (`done`, with `stop_rea
 A run that needs an answer from a person (a release, a question: plan M6 decision 1)
 is `waiting` until `wait_until`, holding nothing; the answer makes it `queued` again
 (`control.resume_waiting`), the run loop ends it with `waiting_timeout` once
-`wait_until` has passed. A conversation has at most one queued
-run and at most one active run, running or waiting (unique partial indexes): a
-message that arrives while one is queued is answered by it, one that arrives while one
-runs gets the next, one that arrives while one waits gets none (`run.waiting`).
+`wait_until` has passed. A lane has at most one active run, running or waiting, and
+at most one queued run per agent (unique partial indexes over `LANE`): a message that
+arrives while one is queued is answered by it, one that arrives while one runs gets
+the next, one that arrives while one waits gets none (`run.waiting`). The lane is the
+thread of the mentioning message in a channel (`lane_id`, its root), else the
+conversation (a DM, a page thread, a ticket thread: one per ticket), so a run waiting
+for a release holds its thread, not the whole channel. Queued runs count per agent
+because of handovers: the next agent's run waits queued behind the run that handed
+the ticket over, and that run may itself wait and be queued again.
 
 Every take-up by a worker counts in `attempt`; `recoveries` counts those after a lost
 lease (its worker died), which are limited. `started_at` is the first take-up: the
@@ -100,6 +105,11 @@ class EventKind(StrEnum):
     STOP = "stop"
 
 
+# Where "one open run" counts: a channel thread's root (`Run.lane_id`), else the
+# conversation.
+LANE = text("COALESCE(lane_id, conversation_id)")
+
+
 def _in(column: str, values: type[StrEnum]) -> str:
     return f"{column} IN ({', '.join(repr(v.value) for v in values)})"
 
@@ -167,20 +177,21 @@ class Run(UuidPk, OrgScoped, Base):
         CheckConstraint("(state = 'running') = (lease_until IS NOT NULL)", name="lease"),
         CheckConstraint("(state = 'waiting') = (wait_until IS NOT NULL)", name="wait"),
         Index(
-            "uq_run_queued_per_conversation",
-            "conversation_id",
+            "uq_run_queued_per_lane",
+            LANE,
+            "agent_id",
             unique=True,
             postgresql_where=text("state = 'queued'"),
         ),
         Index(
-            "uq_run_running_per_conversation",
-            "conversation_id",
+            "uq_run_running_per_lane",
+            LANE,
             unique=True,
             postgresql_where=text("state = 'running'"),
         ),
         Index(
-            "uq_run_active_per_conversation",
-            "conversation_id",
+            "uq_run_active_per_lane",
+            LANE,
             unique=True,
             postgresql_where=text("state IN ('running', 'waiting')"),
         ),
@@ -213,6 +224,11 @@ class Run(UuidPk, OrgScoped, Base):
     )
     chain_depth: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
+    )
+    # The root of the channel thread a mention's run answers in: its lane. NULL: the
+    # conversation is the lane (a DM, a page thread, a ticket thread).
+    lane_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE")
     )
     state: Mapped[RunState] = mapped_column(String(16), nullable=False)
     stop_reason: Mapped[StopReason | None] = mapped_column(String(32))

@@ -4,9 +4,11 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
 - `resume_waiting`, for the answer to what a run waits for (a release, a question:
   M6 tasks 7 and later), in the transaction that records the answer: the run is
   `queued` again and keeps its journal; the next take-up replays it and runs the tool
-  call it waited on once more, which now finds its answer. A queued run that had come
-  in behind it and never started is dropped; what it would have answered, the run
-  queues when it ends (`executor.close`). Nothing wakes the workers here: the answer's
+  call it waited on once more, which now finds its answer. A DM's queued run that had
+  come in behind it and never started is dropped; what it would have answered, the
+  run queues when it ends (`executor.close`). Nothing else is dropped: another
+  thread's run in a channel has its own lane, and a ticket handed over to another
+  agent keeps the run that follows. Nothing wakes the workers here: the answer's
   own outbox event does, else they look within a second.
 - `request_cancel` records the request once (`run_cancel_request`). Who may ask is the
   caller's rule. The run's row is locked first, so a run that ends at the same moment
@@ -44,7 +46,7 @@ async def resume_waiting(session: AsyncSession, org_id: uuid.UUID, run_id: uuid.
     run = await repo.lock(run_id)
     if run is None or run.state != RunState.WAITING:
         return False
-    await repo.drop_queued(run.conversation_id)
+    await repo.drop_queued(run)
     run.state = RunState.QUEUED
     run.wait_until = None
     await session.flush()

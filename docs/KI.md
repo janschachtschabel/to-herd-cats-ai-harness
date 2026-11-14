@@ -238,7 +238,8 @@ legt in derselben Transaktion einen Lauf an. Die Antwort auf das Senden nennt ih
 `agent.connection_unavailable`, `run.thread_reply`, `run.waiting` (der Lauf des
 Gesprächs wartet auf eine Antwort, siehe unten); `agent_id` nennt den Agenten. Läufe
 aus Erwähnungen und Ticket-Zuweisungen: siehe „Auslöser“. Je Gespräch läuft höchstens ein
-Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam.
+Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam
+(in Kanälen gilt das je Thread, siehe „Ein offener Lauf je Thread“).
 
 Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
 `backend/app/modules/agents/executor.py`, Schleife `backend/app/runtime/loop.py`):
@@ -458,7 +459,7 @@ Direktnachricht starten Läufe so:
   nichts und die Antwort verrät nichts (`agent_run: null`, die ID steht wie jede
   Unbekannte in `not_notified`; das Verzeichnis zeigt solchen Personen ohnehin keine
   Agenten). Sonst nennt `agent_run` den Lauf oder den Grund (`agent.paused`, …,
-  `run.waiting`: im Gespräch ist schon ein Lauf offen, je Gespräch einer) und
+  `run.waiting`: im Thread ist schon ein Lauf offen, siehe „Ein offener Lauf“) und
   `agent_id`. Der Lauf liest den Thread der erwähnenden Nachricht (Wurzel und
   Antworten bis zu seinem Start) und antwortet dort als Antwort; seine Stopp-Meldung
   steht ebenfalls im Thread. Eine Bearbeitung, die einen Agenten neu erwähnt, startet
@@ -483,11 +484,32 @@ Direktnachricht starten Läufe so:
   den ersten fragte), eine Stufe tiefer (`run.chain_depth`, höchstens 3); er folgt dem
   übergebenden Lauf im selben Thread. Ein Lauf auf Stufe 3 übergibt nicht mehr: das
   Werkzeug lehnt ab (`run.handover_limit`), der Thread vermerkt es (`run.refused`).
+- **Ein offener Lauf je Thread** (Entscheidung zu Task 9): Höchstens ein Lauf ist je
+  „Bahn“ offen (in der Warteschlange, laufend oder wartend). Die Bahn ist in einem
+  Kanal der Thread der erwähnenden Nachricht (`run.lane_id` = seine Wurzel; eine
+  Erwähnung auf oberster Ebene beginnt ihren eigenen Thread), in einer
+  Direktnachricht das Gespräch, in einem Seiten-Thread die Seite und in einem
+  Ticket-Thread das Ticket (Zuweisung, Übergabe und Erwähnungen dort teilen sich die
+  Bahn). Ein Lauf, der in einem Kanal-Thread auf eine Freigabe wartet, hält also nur
+  diesen Thread; Erwähnungen in anderen Threads desselben Kanals starten und laufen
+  gleichzeitig (jeweils bis zur `max_concurrency` der Verbindung). Eine weitere
+  Erwähnung im selben Thread antwortet `run.waiting`. Die Datenbank sichert das mit
+  eindeutigen Teilindizes über `COALESCE(lane_id, conversation_id)`: je Bahn ein
+  laufender und ein aktiver (laufend oder wartend) Lauf, einer in der Warteschlange je
+  Bahn und Agent (der Lauf nach einer Übergabe steht hinter dem übergebenden; wird dieser
+  nach einer Freigabe wieder eingereiht, bleibt der übergebene Lauf erhalten und
+  folgt ihm).
 - Laufansicht: `trigger_message_id` ist bei Ticket-Läufen `null`, `chain_depth` zeigt
   die Stufe.
 - Rolling Update: Ein Lauf ohne auslösende Nachricht, Systemmeldungen als Antworten
   in Kanal-Threads und der Grund `run_stopped` entstehen erst durch dieses Release; das
-  vorige liest sie nicht, solange sie nicht geschrieben wurden.
+  vorige liest sie nicht, solange sie nicht geschrieben wurden. Die Migration der
+  Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der Warteschlange je
+  Gespräch“, auf den
+  sich das Einreihen eines Releases vor ihr beruft (`ON CONFLICT (conversation_id)`):
+  Während ein solcher Pod noch läuft, schlagen Direktnachrichten an Agenten und
+  Erwähnungen über ihn fehl, bis er ersetzt ist (kein Index kann beides; bisher ist
+  kein Release mit dem alten Index erschienen).
 
 ### Freigaben und Rückfragen (M6)
 

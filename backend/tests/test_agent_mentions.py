@@ -154,18 +154,23 @@ async def test_an_agent_outside_the_space_or_a_draft_is_not_asked(work: Work) ->
     assert await _runs(work) == 0
 
 
-async def test_one_run_per_conversation_and_refusals_name_their_code(work: Work) -> None:
+async def test_one_run_per_thread_and_refusals_name_their_code(work: Work) -> None:
+    """Ruling for task 9: in a channel one run per thread of the mentioning message."""
     bench, channel = work.bench, await _channel(work)
     body = {"body_md": "@Ava eins", "mentions": [str(bench.agent.id)]}
     first = await bench.people.alice.post(f"/api/conversations/{channel}/messages", json=body)
     assert first.json()["agent_run"]["id"] is not None
-    again = await bench.people.admin.post(f"/api/conversations/{channel}/messages", json=body)
+    reply = {**body, "parent_id": first.json()["id"]}
+    again = await bench.people.admin.post(f"/api/conversations/{channel}/messages", json=reply)
     assert again.json()["agent_run"] == {
         "id": None,
         "reason": "run.waiting",
         "agent_id": str(bench.agent.id),
     }
     assert await _runs(work) == 1
+    other = await bench.people.admin.post(f"/api/conversations/{channel}/messages", json=body)
+    assert other.json()["agent_run"]["id"] is not None  # another thread, its own run
+    assert await _runs(work) == 2
     bench.agent.status = AgentStatus.PAUSED
     await bench.session.flush()
     paused = await bench.people.alice.post(f"/api/conversations/{channel}/messages", json=body)

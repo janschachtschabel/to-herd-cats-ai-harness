@@ -46,13 +46,16 @@ class ControlRepository:
         )
         await self.session.execute(stmt)
 
-    async def drop_queued(self, conversation_id: uuid.UUID) -> None:
-        """The conversation's queued run that never started, if one waits behind the
-        run being resumed (what it would have answered, the follow-up answers)."""
+    async def drop_queued(self, run: Run) -> None:
+        """A DM's queued run that never started, if one waits behind the run being
+        resumed in its lane (what it would have answered, the follow-up answers). A
+        ticket's run (a handover waiting behind the run that handed over) is kept."""
         await self.session.execute(
             delete(Run).where(
                 Run.org_id == self.org_id,
-                Run.conversation_id == conversation_id,
+                Run.conversation_id == run.conversation_id,
+                Run.lane_id.is_not_distinct_from(run.lane_id),
+                Run.work_item_id.is_(None),
                 Run.state == RunState.QUEUED,
                 Run.attempt == 0,
             )

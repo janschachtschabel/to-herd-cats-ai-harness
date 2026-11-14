@@ -33,7 +33,8 @@ from app.core.db import Database
 from app.core.metrics import REGISTRY
 from app.modules.agents.control import sweep_waiting
 from app.modules.agents.executor import Executor
-from app.modules.agents.executor_repository import Claimed, claim, open_runs, renew
+from app.modules.agents.executor_repository import Claimed, claim, renew
+from app.modules.agents.gauge_repository import open_runs
 from app.modules.agents.step_host import units_of
 
 logger = logging.getLogger(__name__)

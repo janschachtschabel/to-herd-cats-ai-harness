@@ -8,9 +8,12 @@ task 8); a DM's runs: `hooks.py`.
   nothing starts and the answer says nothing (`agent_run` stays null, the id is "not
   notified" like any id that is no person). Otherwise a refusal names its code
   (`standing.Refusal`: the agent paused, its responsible person inactive, its
-  connection unavailable; `run.waiting` while the conversation has a run queued,
-  running or waiting: one run per conversation). The run answers in the thread of the
-  mentioning message (`place.reply_to`). An agent's message mentions nobody, so
+  connection unavailable; `run.waiting` while its lane has a run queued, running or
+  waiting). The lane, where one run may be open at a time, is the thread of the
+  mentioning message in a channel (`run.lane_id`, its root), so a run waiting for a
+  release holds its thread, not the channel; in a page or a ticket thread it is the
+  whole conversation (one run per page, one per ticket). The run answers in the
+  thread of the mentioning message (`place.reply_to`). An agent's message mentions nobody, so
   agents mentioning agents start nothing; editing a message to mention an agent
   starts nothing either.
 - **Ticket assignment**: a ticket assigned to an agent (`tickets/assignment.py` let
@@ -40,7 +43,7 @@ from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import Refusal, refusal
 from app.modules.messaging.agent_hooks import RunStart
-from app.modules.messaging.models import Conversation, Message
+from app.modules.messaging.models import Conversation, ConversationKind, Message
 from app.modules.messaging.notification_models import NotificationReason
 from app.modules.tickets.models import WorkItem
 from app.modules.tickets.thread_repository import TicketThreadRepository
@@ -69,8 +72,13 @@ async def on_mention(
         return None
     if why is not None:
         return RunStart(None, why.value, agent.id)
+    channel = conversation.kind == ConversationKind.CHANNEL
     run_id = await RunRepository(session, actor.org_id).start(
-        agent.id, actor.principal.id, conversation.id, message_id=message.id
+        agent.id,
+        actor.principal.id,
+        conversation.id,
+        message_id=message.id,
+        lane_id=(message.parent_id or message.id) if channel else None,
     )
     if run_id is None:
         return RunStart(None, Refusal.RUN_WAITING.value, agent.id)
