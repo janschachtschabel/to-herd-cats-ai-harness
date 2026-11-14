@@ -22,6 +22,7 @@ from enum import Enum
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import db_errors
 from app.core.metrics import OUTBOX_DISPATCHES
 from app.core.outbox import Event, one_notify
 from app.worker.registry import Handler
@@ -171,16 +172,8 @@ async def count_failure(
 
 
 def is_timeout(exc: BaseException) -> bool:
-    """Postgres' lock_timeout or statement_timeout (SQLSTATE 55P03, 57014), however
-    the driver and SQLAlchemy wrap it."""
-    seen: BaseException | None = exc
-    for _ in range(5):  # a few layers of wrapping at most
-        if seen is None:
-            break
-        if getattr(seen, "sqlstate", None) in ("55P03", "57014"):
-            return True
-        seen = seen.__cause__ or getattr(seen, "orig", None)
-    return False
+    """Postgres' lock_timeout or statement_timeout (SQLSTATE 55P03, 57014)."""
+    return db_errors.is_timeout(exc)
 
 
 def log_failure(message: str, event: Event, handler: Handler, error: str) -> None:

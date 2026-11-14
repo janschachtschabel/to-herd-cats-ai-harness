@@ -40,3 +40,14 @@ def locked_batch(rows: Select[Any], name: str) -> CTE:
     semi-join that runs the subquery again per outer row, each time locking further
     rows, so the statement would touch more than LIMIT rows."""
     return rows.cte(name).prefix_with("MATERIALIZED")
+
+
+async def limit_time(session: AsyncSession, lock_ms: int, statement_ms: int) -> None:
+    """Until the transaction ends, a lock wait ends after `lock_ms` and a statement
+    after `statement_ms` (SQLSTATE 55P03, 57014: `db_errors.is_timeout`)."""
+    await session.execute(
+        select(
+            func.set_config("lock_timeout", f"{max(1, lock_ms)}ms", True),
+            func.set_config("statement_timeout", f"{max(1, statement_ms)}ms", True),
+        )
+    )

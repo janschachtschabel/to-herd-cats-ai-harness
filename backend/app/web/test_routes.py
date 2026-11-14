@@ -56,3 +56,15 @@ async def db_error(payload: dict[str, str], session: SessionDep) -> None:
     # A statement the database rejects, with a value from the body as its parameter:
     # neither the parameter nor the database's message (which quotes it) may be logged.
     await session.execute(text("SELECT CAST(CAST(:v AS text) AS integer)"), {"v": payload["v"]})
+
+
+_SQLSTATES = {"deadlock": "40P01", "serialization": "40001"}
+
+
+@router.post("/db-conflict/{kind}")
+async def db_conflict(kind: str, session: SessionDep) -> None:
+    # The database rolls the transaction back as it does a deadlock's victim.
+    state = _SQLSTATES[kind]
+    await session.execute(
+        text(f"DO $$ BEGIN RAISE EXCEPTION 'conflict' USING ERRCODE = '{state}'; END $$")
+    )

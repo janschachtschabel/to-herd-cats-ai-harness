@@ -34,7 +34,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import MAX_HANDLER_CHARS, EventDelivery, EventLane, EventOutbox
-from app.core.repository import locked_batch
+from app.core.repository import limit_time, locked_batch
 
 
 def _pending() -> tuple[ColumnElement[bool], ...]:
@@ -221,13 +221,7 @@ class OutboxRepository:
 
     async def limit_time(self, milliseconds: int) -> None:
         """Lock waits and statements of this transaction end after `milliseconds`."""
-        value = f"{milliseconds}ms"
-        await self.session.execute(
-            select(
-                func.set_config("lock_timeout", value, True),
-                func.set_config("statement_timeout", value, True),
-            )
-        )
+        await limit_time(self.session, milliseconds, milliseconds)
 
     # --- upkeep and gauges --------------------------------------------------------
 

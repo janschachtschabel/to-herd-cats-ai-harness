@@ -1,3 +1,4 @@
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings
@@ -17,6 +18,24 @@ async def test_unhandled_exception_is_500_with_generic_message(client):
     assert r.status_code == 500
     assert r.json()["error"]["code"] == "internal"
     assert "boom" not in r.text
+
+
+@pytest.mark.parametrize("kind", ["deadlock", "serialization"])
+async def test_a_deadlock_or_serialization_failure_asks_to_try_again(client, kind):
+    """SQLSTATE 40P01 and 40001: Postgres rolled the transaction back whole, so the
+    request may simply be sent again (409 `conflict.retry`, not 500)."""
+    r = await client.post(f"/api/_test/db-conflict/{kind}")
+    assert r.status_code == 409
+    body = r.json()["error"]
+    assert body["code"] == "conflict.retry"
+    assert len(body["trace_id"]) == 32
+    assert r.headers["retry-after"] == "1"
+
+
+async def test_any_other_database_error_stays_a_500(client):
+    r = await client.post("/api/_test/db-error", json={"v": "x"})
+    assert r.status_code == 500
+    assert r.json()["error"]["code"] == "internal"
 
 
 async def test_validation_error_uses_error_shape(client):

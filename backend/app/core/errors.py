@@ -1,6 +1,8 @@
 """Application errors and their JSON shape: {"error": {"code", "message", "trace_id"}},
 plus `details` where an error carries data the client acts on (the current version
-after a conflict)."""
+after a conflict). A deadlock or a serialization failure (SQLSTATE 40P01, 40001:
+Postgres rolled the request's transaction back whole) answers 409 `conflict.retry`
+with `Retry-After: 1`; the client may send the request again."""
 
 import logging
 from typing import Any
@@ -8,9 +10,11 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.core.db_errors import is_retryable, sqlstate_of
 from app.core.telemetry import current_trace_ids
 
 logger = logging.getLogger(__name__)
@@ -88,6 +92,18 @@ def install_error_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=error_body(exc.code, exc.message, exc.details),
             headers=headers,
+        )
+
+    @app.exception_handler(DBAPIError)
+    async def _handle_database(request: Request, exc: DBAPIError) -> JSONResponse:
+        if not is_retryable(exc):
+            raise exc  # answered as any other error (UnhandledErrorMiddleware: 500)
+        logger.warning("db.conflict_retry", extra={"sqlstate": sqlstate_of(exc)})
+        message = "The request met a concurrent change; send it again."
+        return JSONResponse(
+            status_code=409,
+            content=error_body("conflict.retry", message),
+            headers={"Retry-After": "1"},
         )
 
     @app.exception_handler(StarletteHTTPException)
