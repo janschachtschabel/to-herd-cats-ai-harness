@@ -936,7 +936,11 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   Outbox-Ereignis des Hinweises weckt die Laufschleife ohnehin. Abbruch und Abschluss
   sperren beide die Zeile des Laufs: Entweder sieht der Abschluss den Abbruch
   (`cancelled`, keine Antwort), oder der Abbruch findet den Lauf beendet (409); ebenso
-  gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs.
+  gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs. Auf die Zeile wartet
+  der Abbruch wie die Rücknahme einer Zuweisung höchstens 0,5 s
+  (`REASSIGN_LOCK_TIMEOUT_SECONDS`): Hält ein Schritt des Laufs sie gerade, antwortet er
+  409 `conflict.retry` mit `Retry-After: 1` (seit M7, Plan-Entscheidung 15); die
+  Weboberfläche schickt ihn einmal von selbst erneut.
 
 #### Auslöser: Erwähnung, Ticket-Zuweisung, Übergabe
 

@@ -19,6 +19,8 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
   request, and a run nobody works on (queued or waiting) ends `cancelled` at once, in
   the same transaction, with its notice; a running one stops before its next step or
   at its end. Asking again answers the same; a run that ended otherwise first: False.
+  It waits for the run's row as briefly as `request_cancel` (409 `conflict.retry`;
+  plan M7 decision 15).
   No worker needs waking: the run that ends here needs none, and the notice's outbox
   event wakes the loops anyway.
 - `sweep_waiting`, from the run loop: waiting runs past `wait_until` end with
@@ -75,9 +77,10 @@ async def request_cancel(
 async def cancel(
     session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """Stop the run, now if nobody works on it (False: it ended otherwise first)."""
+    """Stop the run, now if nobody works on it (False: it ended otherwise first). The
+    run's row is waited for briefly, as in `request_cancel` (plan M7 decision 15)."""
     repo = ControlRepository(session, org_id)
-    run = await repo.lock(run_id)
+    run = await repo.lock_briefly(run_id, REASSIGN_LOCK_TIMEOUT_SECONDS)
     if run is None:
         return False
     if run.state == RunState.DONE:
