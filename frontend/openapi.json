@@ -1053,7 +1053,7 @@
         "type": "object"
       },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text.",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (where a reader of\nthe run finds what became of the call once released: it ran, or it was stale).",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1071,6 +1071,10 @@
               }
             ],
             "title": "Args"
+          },
+          "call_id": {
+            "title": "Call Id",
+            "type": "string"
           },
           "conversation_id": {
             "format": "uuid",
@@ -1158,6 +1162,10 @@
           "state": {
             "$ref": "#/components/schemas/ApprovalState"
           },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
           "summary": {
             "title": "Summary",
             "type": "string"
@@ -1176,6 +1184,8 @@
           "run_id",
           "conversation_id",
           "message_id",
+          "step",
+          "call_id",
           "tool",
           "summary",
           "state",

@@ -98,6 +98,9 @@ async def test_a_confirm_tool_is_offered_and_its_call_waits_for_a_release(work: 
     # The fingerprint: tool, canonical arguments and the page's version.
     row = await work.bench.session.get(Approval, uuid.UUID(approval["id"]))
     assert row is not None and row.subjects[0]["kind"] == "page"
+    # The call it waits for, as the run's journal names it (the client finds the call's
+    # result there: run, rejected or stale).
+    assert (approval["step"], approval["call_id"]) == (row.step, row.call_id)
     page = await work.bench.session.get(Page, uuid.UUID(page_id))
     assert page is not None and row.subjects[0]["version"] == page.version
 

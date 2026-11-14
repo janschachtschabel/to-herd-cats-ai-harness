@@ -2866,7 +2866,9 @@ export interface components {
          * @description A tool call waiting for (or given) a person's release. `summary`: the tool and
          *     the ids the call names. `args`: the call's arguments, only for the person asked
          *     (null for others). `diff_url`: for a page's new content, where that person reads
-         *     the diff against the page as it is now (`GET`), instead of the text.
+         *     the diff against the page as it is now (`GET`), instead of the text. `step` and
+         *     `call_id`: the call it waits for, as the run's journal names it (where a reader of
+         *     the run finds what became of the call once released: it ran, or it was stale).
          */
         ApprovalOut: {
             /**
@@ -2878,6 +2880,8 @@ export interface components {
             args: {
                 [key: string]: unknown;
             } | null;
+            /** Call Id */
+            call_id: string;
             /**
              * Conversation Id
              * Format: uuid
@@ -2914,6 +2918,8 @@ export interface components {
              */
             run_id: string;
             state: components["schemas"]["ApprovalState"];
+            /** Step */
+            step: number;
             /** Summary */
             summary: string;
             /** Tool */

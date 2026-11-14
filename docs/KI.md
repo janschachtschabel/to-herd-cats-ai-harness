@@ -529,6 +529,9 @@ erst nach der Freigabe einer Person:
   `approval.not_found`; die Argumente (`args`) und `diff_url` nur für die fragende
   Person. `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
   (nur für die fragende Person, bei Seitenwerkzeugen).
+  `step` und `call_id` nennen den Aufruf wie das Protokoll des Laufs: Dort liest die
+  Oberfläche, was nach der Freigabe aus ihm wurde (ausgeführt oder veraltet, weil sich
+  das Objekt geändert hat).
 - **Rückfragen**: `ask_user` legt `run_question` an, postet die Frage als Karte
   (`kind: question`, Aktivität `question`), der Lauf wartet. `POST
   /api/questions/{id}/answer` (`text` bis 4.000 Zeichen, `version`) nur durch die
