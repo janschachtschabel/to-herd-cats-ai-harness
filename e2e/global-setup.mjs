@@ -11,9 +11,18 @@
 // runs in progress keep their lease), starts the app again on the same database and
 // answers once it is ready (`restartApp()` in tests/ai-helpers.mjs). The runs' lease is
 // 5 s here (HERD_RUN_LEASE_SECONDS), so the new worker takes a crashed run up soon.
+//
+// Moving the app's time (plan M7 task 10): the app starts through
+// `python -m tests.support.e2e_clock`, which makes the clock that schedules
+// (`app.core.clock.SYSTEM_CLOCK`) the system time plus an offset read from a file in
+// the scratch data directory, then runs `app.launch` as usual. `POST /clock` on the
+// control port with `{"offset_seconds": n}` writes that offset (`GET /clock` reads it),
+// so a term comes due at once instead of in minutes or days (`clockTo()` in
+// tests/automations-helpers.mjs). The launcher lives in the backend's test tree,
+// which the image never contains; nothing under `app/` knows it.
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +62,7 @@ export default async function globalSetup() {
   psql(adminUrl, `DROP DATABASE IF EXISTS ${database}`);
   psql(adminUrl, `CREATE DATABASE ${database}`);
   const dataDir = mkdtempSync(join(tmpdir(), "herd-e2e-"));
+  const clockFile = join(dataDir, "clock-offset");
   const databaseUrl = `postgresql+asyncpg://${url.username}:${url.password}@${url.host}/${database}`;
   // For what the tests make through the backend itself (`seedProposal`): the workers
   // inherit this process's environment.
@@ -74,9 +84,10 @@ export default async function globalSetup() {
     HERD_LOG_FORMAT: "text",
     HERD_SECRET_KEY: SECRET_KEY,
     HERD_RUN_LEASE_SECONDS: "5",
+    HERD_E2E_CLOCK_FILE: clockFile,
   };
   const startApp = () => {
-    const child = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
+    const child = spawn("uv", ["run", "--no-sync", "python", "-m", "tests.support.e2e_clock"], {
       cwd: BACKEND,
       stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore",
       env: appEnv,
@@ -101,7 +112,28 @@ export default async function globalSetup() {
     await ready(`http://127.0.0.1:${port + 2}/health`, deadline);
   };
   let restarting = Promise.resolve();
+  const offset = () => (existsSync(clockFile) ? Number(readFileSync(clockFile, "utf8")) : 0);
+  const clock = (request, response) => {
+    const answer = () => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ offset_seconds: offset() }));
+    };
+    if (request.method === "GET") return answer();
+    let body = "";
+    request.on("data", (chunk) => (body += chunk));
+    request.on("end", () => {
+      const seconds = Number(JSON.parse(body || "{}").offset_seconds);
+      if (!Number.isFinite(seconds)) return response.writeHead(400).end();
+      writeFileSync(`${clockFile}.next`, String(seconds));
+      renameSync(`${clockFile}.next`, clockFile); // the app never reads half a number
+      answer();
+    });
+  };
   const control = createServer((request, response) => {
+    if (request.url === "/clock" && ["GET", "POST"].includes(request.method)) {
+      clock(request, response);
+      return;
+    }
     if (request.method !== "POST" || request.url !== "/restart-app") {
       response.writeHead(404).end();
       return;
