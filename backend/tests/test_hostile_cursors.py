@@ -84,6 +84,8 @@ NEED_A_RUN = {
     "/api/runs/{run_id}/events",
     "/api/agents/{agent_id}/runs",
     "/api/agents/{agent_id}/spaces",
+    "/api/agents/{agent_id}/automations",
+    "/api/automations/{automation_id}/firings",
 }
 
 
@@ -136,12 +138,30 @@ async def test_hostile_cursors_answer_422_everywhere(
 
 
 async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
-    """The lists that need a run (an agent, a connection, a DM) to exist."""
+    """The lists that need a run (an agent, a connection, a DM) or an automation."""
     posted = await bench.say("Hi")
     assert await bench.run_next() == StopReason.COMPLETED
     run_id = posted["agent_run"]["id"]
+    daily = {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"}
+    automation = await bench.people.admin.post(
+        "/api/automations",
+        json={
+            "agent_id": str(bench.agent.id),
+            "place": {"type": "dm"},
+            "instruction": "x",
+            "schedule": daily,
+        },
+    )
+    assert automation.status_code == 201, automation.text
+    ids = {
+        "{run_id}": run_id,
+        "{agent_id}": str(bench.agent.id),
+        "{automation_id}": automation.json()["id"],
+    }
     for template in NEED_A_RUN:
-        path = template.replace("{run_id}", run_id).replace("{agent_id}", str(bench.agent.id))
+        path = template
+        for placeholder, value in ids.items():
+            path = path.replace(placeholder, value)
         for name, cursor in HOSTILE.items():
             response = await bench.people.admin.get(path, params={"cursor": cursor})
             if name == "empty":
