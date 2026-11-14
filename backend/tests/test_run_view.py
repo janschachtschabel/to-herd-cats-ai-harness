@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
 from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_repository import RunRepository
 from app.modules.messaging.models import Message
 from tests.factories_agents import Bench
 
@@ -151,6 +152,21 @@ async def test_my_runs_page_by_cursor(bench: Bench) -> None:
         if (cursor := r.json()["next_cursor"]) is None:
             break
     assert seen == [str(r.id) for r in reversed(runs)] + [first]
+
+
+async def test_a_run_started_by_a_trigger_lists_by_when_it_was_made(bench: Bench) -> None:
+    """Mentions and ticket assignments start runs through `RunRepository.start`; their
+    ids are UUIDv7 like every other, so lists stay newest first and pages exact."""
+    first = await answered(bench)
+    alice = bench.people.users["alice"]
+    trigger = await bench.session.scalar(
+        select(Message.id).where(Message.conversation_id == bench.dm["id"]).limit(1)
+    )
+    started = await RunRepository(bench.session, bench.agent.org_id).start(
+        bench.agent.id, alice.id, bench.dm["id"], message_id=trigger
+    )
+    assert started is not None and started.version == 7
+    assert [i["id"] for i in await listed(bench.people.alice)] == [str(started), first]
 
 
 async def test_an_agents_runs_for_its_responsible_person_and_agent_manage(

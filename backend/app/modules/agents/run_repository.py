@@ -6,6 +6,7 @@ import uuid
 from sqlalchemy import exists, func, literal, select, text, true
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
 from app.core.models_base import utcnow
 from app.modules.agents.models import LANE, Agent, Run, RunEvent, RunState
@@ -88,7 +89,7 @@ class RunRepository:
         run follows it). None: it has one; two at once: one wins, the unique index of
         queued runs keeps the other out."""
         values = {
-            "id": uuid.uuid4(),
+            "id": uuid7(),  # like every id: lists page newest first by it
             "org_id": self.org_id,
             "agent_id": agent_id,
             "user_id": user_id,
