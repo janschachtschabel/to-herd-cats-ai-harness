@@ -1,6 +1,7 @@
 """The demo data (scripts/demo_seed.py): people, a team space with pages, channels with
 messages, thread replies, mentions and reactions, a direct message, a page discussion
-that starts with the worker's system entries, and tickets (scripts/demo_tickets.py).
+that starts with the worker's system entries, and tickets (scripts/demo_tickets.py; the
+sprints in test_demo_sprints).
 
 The script talks to the public API as the browser does; here to the test app. The
 worker's handlers run in the test's transaction (`settle`), as in test_page_threads.
@@ -155,7 +156,7 @@ async def test_tickets_fill_the_board_in_several_statuses(demo: dict[str, Any]) 
         "Verworfen",
     ]
     assert {name: len(titles) for name, titles in columns.items()} == {
-        "Neu": 5,
+        "Neu": 7,
         "In Arbeit": 1,
         "Blockiert": 1,
         "Zur Prüfung": 1,
@@ -211,6 +212,8 @@ async def test_ticket_threads_hold_the_timeline_then_comments(demo: dict[str, An
         "ticket.created",
         "ticket.assigned",
         "ticket.status_changed",
+        "ticket.sprint_changed",  # into Sprint 45
+        "ticket.sprint_changed",  # carried on into Sprint 46
     ]
     assert items[-1]["mentions"] == [str(seeded.ids["anna"])]
     assert items[-1]["reply_count"] == 1

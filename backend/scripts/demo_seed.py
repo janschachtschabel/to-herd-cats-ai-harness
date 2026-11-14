@@ -1,9 +1,10 @@
-"""Demo data for a fresh test installation (M1 to M4), through the public API as the
+"""Demo data for a fresh test installation (M1 to M4b), through the public API as the
 browser uses it: three people, the team space "Team Nord" with two pages, two channels
 with messages, thread replies, mentions and reactions, a direct message, a page
 discussion that starts with the worker's system entries, and tickets (an epic with
 stories, tasks and a bug in several statuses, assignments, tags, a linked page,
-comments, a ticket key in a channel; see scripts/demo_tickets.py).
+comments, a ticket key in a channel; see scripts/demo_tickets.py) and sprints (one
+closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
@@ -26,7 +27,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from scripts import demo_tickets
+from scripts import demo_sprints, demo_tickets
 from scripts.demo_api import DemoFailed, call, mention, post
 from scripts.demo_tickets import SeededTickets
 
@@ -53,6 +54,7 @@ class Seeded:
     channels: dict[str, str] = field(default_factory=dict)
     dm_id: str = ""
     tickets: SeededTickets = field(default_factory=SeededTickets)
+    sprints: dict[str, str] = field(default_factory=dict)  # ids by name
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -204,6 +206,9 @@ async def seed(
         ids=seeded.ids,
         channel_id=seeded.channels["projekt-kranich"],
     )
+    seeded.sprints = await demo_sprints.build(
+        people, space_id=seeded.space_id, seeded=seeded.tickets
+    )
     await demo_tickets.comment(
         people, seeded.tickets, seeded.ids, settle=settle, wait_seconds=wait_seconds
     )
@@ -260,7 +265,11 @@ async def _main(base: str, admin_email: str) -> int:
             await client.aclose()
     people = ", ".join(seeded.emails.values())
     tickets = len(seeded.tickets.numbers)
-    print(f"demo ready: space Team Nord ({seeded.space_id}), {tickets} tickets, people {people}")
+    sprints = len(seeded.sprints)
+    print(
+        f"demo ready: space Team Nord ({seeded.space_id}), {tickets} tickets, "
+        f"{sprints} sprints, people {people}"
+    )
     return 0
 
 
