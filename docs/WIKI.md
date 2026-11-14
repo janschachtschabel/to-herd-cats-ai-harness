@@ -176,9 +176,12 @@ Prüfprotokoll (`space.updated`).
   geprüft, bei 30 Tagen fällig ab 0 Uhr UTC am Tag D + 30, gleich zu welcher Uhrzeit.
   Nie fällig sind Entwürfe, Seiten im Papierkorb, Seiten in Bereichen ohne Frist und
   das Gedächtnis von Agenten (die Gedächtnisseiten und die Ordner `_agenten/…`).
-- **Anzeige:** Jede Seite hat `reviewed_at` und `review_due`, die Einträge des
-  Seitenbaums `review_due`. Der Seitenbaum filtert mit `?review_due=true` auf fällige
-  Seiten (paginiert wie der Baum, nur was man sieht).
+- **Anzeige:** Eine fällige Seite trägt das Kennzeichen „Prüfung fällig“ (an der Seite
+  und im Seitenbaum) und nennt, wann sie zuletzt geprüft wurde; wer sie bearbeiten darf,
+  sieht „Als geprüft markieren“. Der Seitenbaum hat den Filter „Nur Seiten mit fälliger
+  Prüfung“. In der API hat jede Seite `reviewed_at` und `review_due`, die Einträge des
+  Seitenbaums `review_due`; der Baum filtert mit `?review_due=true` (paginiert wie der
+  Baum, nur was man sieht).
 - **Täglicher Durchlauf im Worker:** Die Fälligkeits-Schleife des Workers (dieselbe,
   die Aufgaben auslöst, alle 5 Sekunden) geht einmal je UTC-Tag durch jeden Bereich mit
   Frist und meldet jede fällige Seite **einmal je Frist** mit dem Ereignis
@@ -196,7 +199,15 @@ Prüfprotokoll (`space.updated`).
   nicht) bekommen einen Eintrag in ihrer Aktivität (Grund `review_due`), nur wenn sie
   die Seite sehen. Ist die Seite inzwischen geprüft oder im Papierkorb, entsteht nichts.
   In Kanälen erscheint nichts. Ereignis-Regeln für Agenten können auf `page.review_due`
-  reagieren (Ereignis-Auslöser, [`AGENTEN.md`](AGENTEN.md)).
+  reagieren ([`AGENTEN.md`](AGENTEN.md#aufgaben-agenten-arbeiten-ohne-anstoß-seit-m7)),
+  etwa um eine fällige Seite zusammenzufassen oder zu prüfen; der Agent liest sie mit
+  seinen eigenen Rechten.
+- **Betrieb:** `herd_wiki_review_reminders_total` zählt die gemeldeten Seiten,
+  `herd_wiki_review_spaces_unchecked` die Bereiche, die der Durchlauf heute noch nicht
+  gesehen hat (tagsüber 0; bleibt die Zahl stehen, läuft kein Worker oder der Durchlauf
+  scheitert: `automations.pass_failed` im Log). Gemessen (Steckbrief, lokal): 10.000
+  fällige Seiten in 10 Bereichen meldet ein Worker in rund 6 s; die Einträge und
+  Aktivitäten dazu arbeitet die Outbox in knapp 3 Minuten ab.
 - **Rolling Update:** Ein Pod des vorigen Release, der eine Aktivität mit Grund
   `review_due` liest, scheitert daran, bis er ersetzt ist (wie bei anderen neuen
   Gründen eines Release).

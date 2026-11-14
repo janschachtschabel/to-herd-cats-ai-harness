@@ -4,9 +4,10 @@ Agenten arbeiten wie Kolleginnen und Kollegen: Sie sind Mitglied in Bereichen, l
 sich ansprechen und erwähnen, bekommen Tickets, schlagen Änderungen vor oder schreiben
 sie selbst (je nach Stufe), fragen bei kritischen Schritten nach einer Freigabe und
 führen je Bereich ein Gedächtnis. Jeder Lauf ist Schritt für Schritt einsehbar und
-lässt sich abbrechen. Stand: M6 (Spezifikation 5.4, 5.6, 6.3, 8, 9 und 11, soweit
-gebaut; Zeitpläne, Ereignisse und Budgets kommen mit M7, bisher Lauf und API, noch ohne
-Oberfläche; externe Werkzeuge mit M8).
+lässt sich abbrechen. Seit M7 arbeiten sie auch ohne Anstoß im Gespräch: als Aufgabe
+einer Person zu einem Zeitpunkt, wiederkehrend, als Heartbeat oder auf Ereignisse im
+Bereich hin, begrenzt durch Tagesbudgets. Stand: M7 (Spezifikation 5.4, 5.6, 6.3, 7.4,
+8, 9 und 11, soweit gebaut; externe Werkzeuge kommen mit M8).
 
 Die KI-Anbindung selbst (Verbindungen, Schlüssel, ausgehende Aufrufe, wer welches
 Modell nutzt, Verbrauch, KI-Richtlinie je Bereich und KI-Sperre) steht in
@@ -149,6 +150,67 @@ eigene Modell, arbeitet höchstens auf Stufe 2, ist nur Mitglied im eigenen pers
 Bereich und nur für seine Eigentümerin erreichbar (Direktnachricht, Erwähnung,
 Zuweisung); alle anderen sehen ihn nicht. Admins sehen ihn in der Verwaltung, mit
 Vermerk im Audit.
+
+### Aufgaben: Agenten arbeiten ohne Anstoß (seit M7)
+
+Eine **Aufgabe** lässt einen Agenten arbeiten, ohne dass ihn jemand im Gespräch
+anspricht. Es gibt vier Arten:
+
+| Art | wann der Agent arbeitet |
+|---|---|
+| Einmalig | einmal zu einem Zeitpunkt |
+| Wiederkehrend | nach einem Zeitplan (Cron) in einer Zeitzone, etwa werktags um 9 Uhr; höchstens alle 15 Minuten |
+| Heartbeat | alle 15 bis 1.440 Minuten innerhalb aktiver Stunden (Wochentage, von–bis, Zeitzone) geht er eine Checkliste durch |
+| Ereignis-Regel | wenn im Bereich etwas geschieht: eine Seite veröffentlicht, ein Ticket angelegt (wahlweise nur mit einem Tag oder einer Art), ein Anhang hochgeladen, die Prüffrist einer Seite abgelaufen |
+
+**Meine Aufgaben** (Seitenleiste) listet die eigenen mit nächstem Termin und letztem
+Lauf; der Reiter **Aufgaben** eines Bereichs zeigt die an seinen Kanälen und Tickets,
+soweit man sie sieht; die Verwaltung zeigt sie je Agent. Die Ansicht einer Aufgabe nennt
+die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: gestartet
+(mit Link zum Lauf), still (`HEARTBEAT_OK`) oder übersprungen mit Grund.
+
+- **Jede Aufgabe gehört einer Person**, der Eigentümerin. Ihr Lauf läuft in ihrem
+  Auftrag: Es gelten ihre Rechte ∩ die des Agenten ∩ das Publikum des Ortes (wie bei
+  jedem Lauf, siehe [Die Publikumsregel](#die-publikumsregel-wer-liest-mit)); ihr wird
+  der Verbrauch gebucht, an sie gehen Freigaben und Rückfragen.
+- **Jede Aufgabe hat einen Ort**, an den das Ergebnis geht: die Direktnachricht der
+  Eigentümerin mit dem Agenten, ein Kanal eines Bereichs (jeder Termin eröffnet dort
+  einen eigenen Thread mit dem Eintrag „Aufgabe … gestartet“, in dem man auch antworten
+  kann) oder ein Ticket. Im Kanal liest der Agent wie ein Betrachter des Bereichs,
+  Entwürfe nur in der Direktnachricht. Der Auftrag selbst erscheint am Ort nicht.
+- **Heartbeat:** Ist nichts zu tun, antwortet der Agent genau `HEARTBEAT_OK`; dann
+  erscheint nirgends etwas (keine Nachricht, keine Aktivität), nur das Protokoll
+  vermerkt „nichts zu melden“. Alles andere kommt an den Ort.
+- **Ereignis-Regeln** legen nur die Verwaltenden eines Bereichs an, an einem Kanal oder
+  Ticket dieses Bereichs. Der Agent erfährt nur Art und Kennung des Objekts und liest es
+  selbst, mit den Rechten der Eigentümerin am Ort: Wer das Ereignis ausgelöst hat,
+  gewinnt nichts, und über ein Objekt, das der Lauf nicht lesen dürfte (ein Entwurf,
+  eine für KI gesperrte Seite), erfährt er nichts. **Ruhezeit** (Standard 5 Minuten,
+  mindestens 1): Nach einem Lauf startet die Regel frühestens nach der Ruhezeit
+  wieder; was dazwischen geschieht, bekommt der nächste Lauf als Anzahl, nicht einzeln.
+  **Tiefe:** Lösen Agenten mit ihren Läufen weitere Regeln aus, endet die Kette bei
+  Tiefe 3 (Übergaben zählen mit); eine Regel reagiert nie auf das, was ihr eigener Lauf
+  an seinem Objekt getan hat.
+- **Angehalten:** von Hand, oder vom System: wenn die Eigentümerin die Aufgabe nicht mehr
+  ausführen darf (nicht mehr aktiv, keine KI mehr, erreicht Agent oder Ort nicht mehr)
+  oder wenn drei Läufe in Folge nicht zu Ende kamen. Wer betroffen ist, bekommt eine
+  Aktivität (die verantwortliche Person des Agenten und die Verwaltenden des Bereichs
+  bzw. bei Fehlschlägen die Eigentümerin). Rechte wandern nie still: Wer die Aufgabe
+  selbst anlegen dürfte, kann sie **übernehmen** und wird Eigentümerin.
+- **Fortsetzen** holt einen verpassten Termin einmal nach. **Jetzt ausführen** (nur die
+  Eigentümerin, nicht für Ereignis-Regeln) löst einen Termin außer der Reihe aus, mit
+  denselben Prüfungen. **Löschen** entfernt die Aufgabe; ihre Läufe bleiben einsehbar.
+- **Übersprungen** wird ein Termin, wenn der vorige Lauf noch arbeitet, der Agent
+  angehalten ist, der Ort archiviert oder für diese KI gesperrt ist, ein Tagesbudget
+  erreicht ist, ein Heartbeat nach einem Ausfall außerhalb seiner Stunden käme oder eine
+  Kette zu tief wäre. Nach einem Ausfall läuft eine Aufgabe einmal nach, nicht einmal je
+  verpasstem Termin.
+
+**Tagesbudgets** (seit M7) setzen Admins für die Organisation, eine Person oder einen
+Agenten ([`KI.md`](KI.md#budgets-apiaibudgets-aimanage)). Ist eines erreicht, endet ein
+Lauf vor seinem nächsten Modellaufruf mit dem Hinweis „Tagesbudget erreicht“ (der Lauf
+nennt, wessen Limit), und fällige Termine werden übersprungen, bis der nächste UTC-Tag
+beginnt.
 
 ### Das KI-Kennzeichen
 
@@ -404,6 +466,33 @@ Ein persönlicher Agent gehört einer Person (`owner_user_id`).
   `GET /api/agents/{id}/runs`) jeden Agenten mit seinen Anweisungen („Admins dürfen
   alles sehen“); dass sie einen persönlichen Agenten einer anderen Person gezeigt
   bekamen, steht im Audit (`agent.admin_access`, einmal je Admin, Agent und UTC-Tag).
+
+### Aufgaben verwalten (seit M7)
+
+**Wer sieht eine Aufgabe:** wer `agent.manage` hat, alle der Organisation; sonst nur mit
+`ai.use`, und dann die eigenen, die der Agenten, für die man verantwortlich ist, und die
+mit einem Ort in einem Bereich, den man verwaltet (`space.manage`). Dieselbe Regel
+(`automations/sight.py`) gilt für die API, die Live-Ereignisse und die Aktivitäten zu
+einer Aufgabe. Was man nicht sieht, antwortet wie eine unbekannte ID (404).
+
+| Aktion | wer |
+|---|---|
+| anlegen | wer `ai.use` hat, den Agenten erreicht und am Ort schreiben darf; im Kanal und am Ticket muss der Agent Mitglied des Bereichs sein; Ereignis-Regeln nur, wer den Bereich verwaltet; persönliche Agenten nur ihre Eigentümerin, in ihrer Direktnachricht oder ihrem persönlichen Bereich |
+| ändern, jetzt ausführen | nur die Eigentümerin (wer ändert, verantwortet den Auftrag) |
+| anhalten, fortsetzen, löschen | die Eigentümerin, die Verwaltenden des Bereichs ihres Ortes, `agent.manage` |
+| übernehmen | wer sie sieht und sie selbst anlegen dürfte |
+| ansehen, Protokoll | wer sie sieht |
+
+Wer sie sieht, aber die Aktion nicht darf (etwa die verantwortliche Person des Agenten),
+bekommt 403 `automation.not_allowed`; die Oberfläche bietet nur an, was die Antwort in
+`abilities` nennt. Fortsetzen geht nur, solange die Eigentümerin die Aufgabe wieder
+ausführen dürfte; sonst bleibt nur die Übernahme.
+
+**Obergrenze:** höchstens `HERD_AI_AUTOMATIONS_MAX` (Standard 20, 0 bis 1.000) aktive
+oder angehaltene Aufgaben je Eigentümerin; erledigte und gelöschte zählen nicht.
+**Budgets** begrenzen den Verbrauch je Tag für die Organisation, eine Person oder einen
+Agenten ([`KI.md`](KI.md#budgets-apiaibudgets-aimanage)); Aufgaben haben kein eigenes
+Budget, ihr Verbrauch zählt bei ihrer Eigentümerin und ihrem Agenten.
 
 ### Skills verwalten (`/api/skills`)
 
@@ -664,7 +753,8 @@ ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schri
 Warum kein DBOS: Ein Werkzeug und sein Journaleintrag stehen in derselben Transaktion
 der Anwendungsdatenbank; damit ist jede Wirkung innerhalb der Datenbank genau einmal. Ein
 Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht zu
-(Spezifikation E10, geändert in M6). Zeitpläne entscheidet M7 neu.
+(Spezifikation E10, geändert in M6). Auch die Zeitpläne der Aufgaben (M7) kommen ohne
+DBOS aus: [Aufgaben im Worker](#aufgaben-im-worker-m7).
 
 ### Was bei einem Neustart des Workers passiert
 
@@ -686,189 +776,152 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
 
-### Aufgaben: Fälligkeits-Schleife, Lauf, Heartbeat und Ereignis-Regel (M7, im Aufbau)
+### Aufgaben im Worker (M7)
 
-Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
-IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
-Eigentümerin mit dem Agenten, einen Kanal oder einen Ticket-Thread). Angelegt und
-verwaltet werden sie über die API ([Aufgaben verwalten](#aufgaben-verwalten-api-m7));
-die Oberfläche folgt. Der Worker arbeitet fällige so ab:
+**Die Fälligkeits-Schleife.** Jeder Worker (auch in `all`, nicht Teil von `/ready`)
+sieht alle 5 s nach fälligen Terminen und arbeitet ohne Pause weiter, solange er volle
+Stapel (50) findet. Je Termin **eine** Transaktion: die Aufgabe mit
+`FOR UPDATE SKIP LOCKED` gesperrt (die fälligste zuerst), der Lauf (`queued`, auslösende
+Person = die Eigentümerin, Bahn `lane_id` = die Aufgabe) oder der Vermerk
+„übersprungen“, die Zeile im Protokoll `automation_firing` und der nächste Termin.
 
-- Eine eigene Schleife im Worker (auch in `all`, nicht Teil von `/ready`) sieht alle
-  5 s nach. Je fälligem Termin **eine** Transaktion: die Aufgabe mit
-  `FOR UPDATE SKIP LOCKED` gesperrt, der Lauf (`queued`, auslösende Person = die
-  Eigentümerin, Bahn = die Aufgabe) oder der Vermerk „übersprungen“, die Zeile im
-  Protokoll `automation_firing` (eindeutig je Aufgabe und Termin) und der nächste
-  Termin. So läuft ein Termin bei beliebig vielen Workern genau einmal; stürzt ein
-  Worker vor dem Commit ab, bleibt der Termin fällig und der nächste Durchlauf holt ihn.
-  Dieselbe Schleife geht einmal je UTC-Tag die Prüffristen der Seiten durch
-  (`page.review_due`, [`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)).
-- Der nächste Termin wird aus „jetzt“ berechnet: Nach einem Ausfall läuft eine Aufgabe
-  einmal nach, nicht einmal je verpasstem Termin. Zeitumstellung: Eine Ortszeit, die es
-  nicht gibt, fällt auf den nächsten gültigen Zeitpunkt (02:30 → 03:00), eine doppelte
-  läuft einmal (beim ersten Mal); stündliche Termine laufen in beiden doppelten Stunden,
-  sie liegen eine echte Stunde auseinander. Termine näher als 15 Minuten werden beim
-  Speichern an den nächsten fünf Terminen abgelehnt.
-- Vor dem Lauf prüft der Termin, in dieser Reihenfolge: Agent nicht aktiv →
-  `skipped_paused_agent`; die Eigentümerin darf die Aufgabe nicht mehr ausführen (siehe
-  unten) → die Aufgabe wird **angehalten**; der Agent darf aus anderem Grund nicht
-  laufen (verantwortliche Person inaktiv, Verbindung nicht verfügbar, persönliche
-  Agenten abgeschaltet) → `skipped_paused_agent`; der Ort ist archiviert oder seine
-  KI-Richtlinie lässt die Verbindung des Agenten nicht zu (`none`, `restricted` ohne
-  ihren Datenort) → `skipped_policy`; ein Tagesbudget der Eigentümerin, des Agenten
-  oder der Organisation ist erreicht → `skipped_budget`; der vorige Lauf der Aufgabe ist
-  noch offen (in der Warteschlange, laufend oder wartend auf eine Antwort) →
-  `skipped_busy`. Eine angehaltene Aufgabe löst nichts aus. Eine einmalige Aufgabe ist
-  nach ihrem Termin erledigt, auch wenn er übersprungen wurde.
-- Die Schleife braucht eine Datenbankverbindung; Fehler im Log als
-  `automations.pass_failed` (nur der Fehlertyp).
+- **Genau einmal, ohne DBOS:** Ein Termin, den ein anderer Worker gerade hält, wird
+  übergangen (`SKIP LOCKED`); einer, den er inzwischen gefeuert und festgeschrieben hat,
+  ist beim Sperren nicht mehr fällig (Postgres prüft die Bedingung an der neuesten
+  Zeile erneut). Lauf, Protokoll und nächster Termin stehen in derselben Transaktion:
+  Stürzt ein Worker vor dem Commit ab, bleibt der Termin fällig und der nächste
+  Durchlauf (hier oder in einem anderen Worker) feuert ihn; nichts doppelt, nichts
+  verloren. Der eindeutige Index `(automation_id, due_at)` des Protokolls sichert es
+  zusätzlich. Geprüft mit drei Schleifen und echten Commits (Tests) und mit drei
+  Worker-Prozessen und 1.000 zugleich fälligen Terminen ([Steckbrief](STECKBRIEF.md#automatisierung-m7)).
+  Es braucht weder einen Leader noch einen Zeitplaner außerhalb der Datenbank.
+- **Termine** werden aus „jetzt“ berechnet: Nach einem Ausfall läuft eine Aufgabe einmal
+  nach. Zeitumstellung: Eine Ortszeit, die es nicht gibt, fällt auf den nächsten gültigen
+  Zeitpunkt (02:30 → 03:00), eine doppelte läuft einmal (beim ersten Mal); stündliche
+  Termine laufen in beiden doppelten Stunden, sie liegen eine echte Stunde auseinander.
+  Zwei der nächsten fünf Termine näher als 15 Minuten lehnt das Speichern ab. Die Zeit
+  kommt von einer Uhr (`core/clock.py`), die Tests stellen.
+- **Prüfungen eines Termins**, in dieser Reihenfolge: Agent nicht aktiv →
+  `skipped_paused_agent`; die Eigentümerin darf die Aufgabe nicht mehr ausführen →
+  **angehalten** (`owner`; der Termin wird nicht protokolliert und bleibt fällig); der
+  Agent darf aus anderem Grund nicht laufen (verantwortliche Person inaktiv, Verbindung
+  nicht verfügbar, persönliche Agenten abgeschaltet) → `skipped_paused_agent`; der Ort ist
+  archiviert oder seine KI-Richtlinie lässt die Verbindung nicht zu → `skipped_policy`;
+  ein Tagesbudget der Eigentümerin, des Agenten oder der Organisation ist erreicht →
+  `skipped_budget`; der vorige Lauf der Aufgabe ist noch offen (in der Warteschlange,
+  laufend oder auf eine Antwort wartend) → `skipped_busy`. Eine einmalige Aufgabe ist nach ihrem
+  Termin erledigt, auch wenn er übersprungen wurde.
+- „Darf ausführen“ (`automations/standing.py`): `ai.use`; der Agent nicht im Entwurf und
+  erreichbar (ein persönlicher nur für seine Eigentümerin); Direktnachricht: die
+  Eigentümerin allein mit genau diesem Agenten; Kanal und Ticket-Thread: lesen,
+  `channel.post` im Bereich (am Ticket dazu `ticket.read`) und der Agent Mitglied des
+  Bereichs.
+- Dieselbe Schleife geht in jeder Runde bis zu 20 Schritte des täglichen
+  Prüfdurchlaufs der Wiki-Seiten ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7))
+  und löscht einmal je Minute alte Protokollzeilen ([Aufbewahrung](#aufbewahrung)).
+- Sie teilt sich die Event-Loop des Workers mit der Laufschleife: Allein feuert sie einen
+  Termin in rund 21 ms; während die eben gestarteten Läufe rechnen, in rund 100 ms. 1.000
+  zugleich fällige Termine brauchten mit einem Worker 104 s, mit dreien 48–65 s
+  (Steckbrief). Mehr Worker teilen sich die Termine.
+- Bis zu zwei Datenbankverbindungen (Feuern, Gauges); Fehler im Log als
+  `automations.pass_failed` bzw. `automations.metrics_failed` (nur der Fehlertyp).
 
 **Der Lauf einer Aufgabe** ist ein Lauf wie jeder andere (Journal, Freigaben,
-Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
+Rückfragen, Abbruch, Grenzen, Wiederaufnahme), mit diesen Besonderheiten:
 
-- Er beginnt mit dem Auftrag als Wort der Eigentümerin, als einzigem Zug; Früheres am
-  Ort bekommt er nicht mit (seine Werkzeuge lesen den Ort wie bei jedem Lauf, als nicht
-  vertrauenswürdige Angabe gerahmt). Die Anweisungen sagen, dass eine geplante Aufgabe
-  der Eigentümerin fragt. Den Auftrag liest er aus dem Protokoll seines Termins
-  (`automation_firing.instruction`, beim Auslösen kopiert): Ändert die Eigentümerin den
-  Auftrag, während der Lauf wartet oder nach einem verlorenen Worker wieder aufgenommen
-  wird, arbeitet er mit dem alten weiter.
-- Ort der Antwort: in der Direktnachricht der Eigentümerin mit dem Agenten oben; in
-  einem Kanal eröffnet jeder Termin einen eigenen Thread, dessen Wurzel ein
-  Systemeintrag `automation.started` ist (die Eigentümerin als Akteurin, die Aufgabe
-  per `automation_id`, nie der Auftragstext), und der Lauf antwortet darin (auch seine
-  Freigabe- und Rückfragekarten stehen dort, und Personen können im Thread antworten:
-  ein Systemeintrag oben in einem Kanal nimmt Antworten an, jeder andere nicht); in einem
-  Ticket-Thread steht derselbe Eintrag oben und die Antwort ebenfalls oben. Lese- und
-  Schreibbereich folgen dem Ort wie in M6 (im Kanal liest der Lauf Seiten wie ein
-  Betrachter des Bereichs, Entwürfe nur in der Direktnachricht). Der Ort der Antwort
-  wird nie aus der Bahn (`lane_id`, die Aufgabe) abgeleitet.
-- Freigaben und Rückfragen gehen an die Eigentümerin (`run.user_id`), nur sie
-  entscheidet. Ein Lauf einer Aufgabe reiht nach seinem Ende keinen Folgelauf für
-  Nachrichten ein, die währenddessen kamen (er hat keine Nachricht beantwortet); ebenso
-  kein Lauf, den ein Tagesbudget gestoppt hat (der nächste stoppte sofort wieder).
-- **Angehalten** (`paused_reason`): `owner`, wenn die Eigentümerin bei einem Termin
-  nicht mehr aktiv ist, `ai.use` verloren hat, den Agenten nicht mehr erreicht (ein
-  persönlicher Agent nur für seine Eigentümerin; in Kanal und Ticket-Thread muss der
-  Agent Mitglied des Bereichs sein) oder am Ort nicht mehr schreiben darf (Kanal und
-  Ticket-Thread: lesen und `channel.post`; Direktnachricht: sie allein mit dem Agenten).
-  Der Termin wird dann nicht protokolliert und bleibt fällig; die verantwortliche Person
-  des Agenten und die Verwaltenden des Bereichs (Rolle `admin` über eine Mitgliedschaft)
-  bekommen eine Aktivität, bei einer Direktnachricht nur die verantwortliche Person.
-  `failing`, wenn drei Läufe in Folge nicht mit `completed` enden
-  (`automation.failures` zählt sie, ein abgeschlossener Lauf setzt den Zähler zurück;
-  ein abgebrochener Lauf und einer, den ein Tagesbudget gestoppt hat, zählen nicht und
-  setzen auch nicht zurück); die Eigentümerin bekommt eine Aktivität. Aktivitäten zu
-  Aufgaben haben den Grund `automation`, nennen die Aufgabe (`automation: {id,
-  paused_reason}`) und den Agenten als Autor, aber kein Gespräch; das Ereignis trägt
-  nur IDs. Gelistet (und gezählt) wird eine solche Aktivität nur, solange die Person
-  die Aufgabe noch sehen darf: als Eigentümerin, verantwortliche Person des Agenten
-  oder Verwaltende (`space.manage`) des Bereichs ihres Ortes, jeweils mit `ai.use`,
-  oder mit `agent.manage`.
-- **Übernehmen**: Wer die Aufgabe selbst anlegen dürfte (`ai.use`, erreicht den Agenten,
-  schreibt am Ort), kann sie übernehmen und wird Eigentümerin; die Aufgabe läuft wieder
-  (ein verpasster Termin einmal sofort), `version` schützt vor gleichzeitigen
-  Änderungen (409 `automation.version_conflict`), wer es nicht darf, bekommt 403
-  `automation.not_allowed`, wer kein `ai.use` hat, 404. Auditiert als
-  `automation.taken_over`. Route: `POST /api/automations/{id}/take-over`.
+- Er beginnt mit dem Auftrag als Wort der Eigentümerin, als einzigem Zug; Früheres am Ort
+  bekommt er nicht mit (seine Werkzeuge lesen den Ort, als nicht vertrauenswürdige
+  Angabe gerahmt). Die Anweisungen sagen, dass eine geplante Aufgabe der Eigentümerin
+  fragt. Den Auftrag liest er aus seinem Termin (`automation_firing.instruction`, beim
+  Feuern kopiert): Ändert die Eigentümerin den Auftrag, während der Lauf wartet oder
+  wieder aufgenommen wird, arbeitet er mit dem alten weiter.
+- Ort der Antwort: in der Direktnachricht oben; im Kanal ist die Wurzel des Threads je
+  Termin ein Systemeintrag `automation.started` (die Eigentümerin als Akteurin, die
+  Aufgabe per `automation_id`, nie der Auftragstext; die Trigger-Funktion der
+  Nachrichten lässt ihn oben im Kanal nur zu, wenn er einen Termin einer Aufgabe dieses
+  Kanals nennt, und er nimmt Antworten an), darin die Antwort und die Karten; im
+  Ticket-Thread steht derselbe Eintrag oben und die Antwort ebenfalls oben. Der Ort der
+  Antwort wird nie aus der Bahn abgeleitet.
+- Freigaben und Rückfragen gehen an die Eigentümerin (`run.user_id`). Ein Lauf einer
+  Aufgabe reiht nach seinem Ende keinen Folgelauf für Nachrichten ein, die währenddessen
+  kamen; ebenso kein Lauf, den ein Tagesbudget gestoppt hat.
+- Fehlschläge: `automation.failures` zählt Läufe in Folge, die nicht `completed` enden;
+  ein abgeschlossener setzt zurück, ein abgebrochener oder von einem Budget gestoppter
+  zählt nicht und setzt nicht zurück; beim dritten hält die Aufgabe an (`failing`).
+  Fortsetzen und Übernehmen setzen den Zähler zurück.
+- Aktivitäten zum Anhalten: Grund `automation`, gebunden an die Aufgabe
+  (`notification.automation_id`; jedes Anhalten meldet sich neu), der Agent als Autor,
+  kein Gespräch; `owner` an die verantwortliche Person des Agenten und die Verwaltenden
+  des Bereichs (Rolle `admin` über eine Mitgliedschaft; bei einer Direktnachricht nur
+  die verantwortliche Person), `failing` an die Eigentümerin. Gelistet wird ein Eintrag
+  nur, solange die Person die Aufgabe noch sieht.
+- Übernehmen (`POST /api/automations/{id}/take-over`): sperrt die Aufgabe, prüft
+  `version` und „dürfte sie anlegen“, setzt die Eigentümerin, lässt sie wieder laufen
+  (ein verpasster Termin einmal), auditiert `automation.taken_over` (von, an).
 
-**Heartbeat** (Art `heartbeat`): Der Agent geht in einem Abstand von 15 bis 1.440
-Minuten eine Checkliste durch (der Auftrag der Aufgabe), nur in den aktiven Stunden:
-Wochentage und eine Ortszeit von–bis in einer IANA-Zeitzone (`active_days`,
-`active_from`, `active_until`, `time_zone`).
+**Heartbeat.** Ein Fenster der aktiven Stunden gehört zum Wochentag, an dem es öffnet;
+ist „bis“ nicht später als „von“, geht es über Mitternacht (Freitag 22:00–06:00 reicht
+bis Samstagmorgen), „von“ = „bis“ ist der ganze Tag, aneinanderstoßende Tage sind ein
+Fenster. Der nächste Termin liegt einen Abstand nach „jetzt“, solange er im Fenster
+liegt, sonst bei der nächsten Öffnung; außerhalb entsteht keiner. Eine Öffnung, deren
+Ortszeit es nicht gibt, fällt auf den nächsten gültigen Zeitpunkt; ein Fenster über die
+doppelte Stunde dauert seine echten Stunden. Ein Termin, den die Schleife mehr als
+15 Minuten zu spät und außerhalb der Stunden holt, wird `skipped_off_hours`. Die
+Anweisungen nennen dem Modell die Regel `HEARTBEAT_OK`; eine solche Antwort (nach
+Trimmen) wird nirgends zugestellt, nur `automation_firing.heartbeat_ok` vermerkt sie,
+und der Lauf endet `completed`. Deshalb schreibt der Termin eines Heartbeats den
+Systemeintrag `automation.started` nicht beim Feuern, sondern erst der Lauf, wenn er
+etwas zuzustellen hat (Antwort, Karte, den Hinweis seines Endes).
 
-- Ein Fenster gehört zum Wochentag, an dem es öffnet; ist „bis“ nicht später als
-  „von“, geht es über Mitternacht (Freitag 22:00–06:00 reicht bis Samstagmorgen),
-  „von“ = „bis“ ist der ganze Tag, aneinanderstoßende Tage sind ein Fenster. Der
-  nächste Termin liegt einen Abstand nach „jetzt“, solange er noch im Fenster liegt;
-  sonst ist er die nächste Öffnung. Außerhalb der aktiven Stunden entsteht kein Termin.
-  Zeitumstellung: Eine Öffnung, deren Ortszeit es nicht gibt, fällt auf den nächsten
-  gültigen Zeitpunkt; ein Fenster über die doppelte Stunde dauert seine echten Stunden.
-- Holt die Schleife einen Termin erst mehr als 15 Minuten nach seiner Zeit und
-  außerhalb der aktiven Stunden (nach einem Ausfall), wird er mit `skipped_off_hours`
-  übersprungen; der nächste Termin ist die nächste Öffnung.
-- Die Anweisungen nennen dem Modell die Regel: Braucht nichts Aufmerksamkeit, antwortet
-  es genau `HEARTBEAT_OK`. Eine solche Antwort (nach Trimmen) wird **nirgends**
-  zugestellt: keine Nachricht, kein Thread, keine Aktivität, keine Benachrichtigung,
-  kein Live-Ereignis einer Nachricht; nur die Zeile des Termins im Protokoll vermerkt
-  es (`automation_firing.heartbeat_ok`). Der Lauf endet `completed` (setzt den Zähler
-  der Fehlschläge zurück). Jede andere Antwort und jedes andere Ende (der Hinweis
-  `run.stopped`) wird zugestellt wie bei jeder Aufgabe. Deshalb eröffnet ein Termin
-  eines Heartbeats beim Auslösen noch nichts: Den Systemeintrag `automation.started`
-  (im Kanal die Wurzel des Threads) schreibt erst der Lauf, wenn er etwas zuzustellen
-  hat (seine Antwort, eine Karte, den Hinweis seines Endes).
+**Ereignis-Regel.** Ein Outbox-Handler (`automation_events`) gibt jedes Ereignis der Arten
+`page.published`, `ticket.created`, `attachment.uploaded` (ein Upload über die Route;
+ein Import sendet keines) und `page.review_due` an die aktiven Regeln seiner Art im
+Bereich des Ereignisses, je Regel gesperrt in fester Reihenfolge:
 
-**Ereignis-Regel** (Art `event`): hängt an einem Bereich; ihr Ort ist ein Kanal oder ein
-Ticket-Thread dieses Bereichs. Sie hört auf eine Ereignisart (`event_type`):
-`page.published`, `ticket.created` (wahlweise gefiltert nach einem Tag und einer Art,
-gelesen am Ticket, wie es beim Zustellen des Ereignisses ist; ein gelöschtes Tag passt
-auf nichts), `attachment.uploaded` (neu: ein Upload über die Route, nur IDs; ein Import
-sendet keines) und `page.review_due`. Ein Outbox-Handler (`automation_events`, im
-Worker) gibt jedes solche Ereignis an die aktiven Regeln seiner Art im Bereich des
-Ereignisses; Regeln anderer Bereiche und Organisationen bekommen nichts, eine
-angehaltene Regel verpasst, was in ihrer Pause geschieht.
+1. Ein Ereignis, das ihr eigener Lauf an einem Objekt verursacht hat, um das es in
+   diesem Lauf ging, startet nichts.
+2. Die Filter (`ticket.created`: Tag, Art) werden am Ticket gelesen, wie es beim
+   Zustellen ist (ein Tag, das kurz nach dem Anlegen gesetzt wird, zählt vielleicht
+   nicht; ein gelöschtes Tag passt auf nichts).
+3. Ein Objekt, das der Lauf am Ort nicht lesen dürfte, wird nicht aufgenommen: kein
+   Lauf, keine Zählung, kein Protokolleintrag (`event_sight.py`). Ist der Ort selbst
+   gesperrt oder archiviert, protokolliert der Termin `skipped_policy`.
+4. Jedes Ereignis wird je Regel einmal aufgenommen (`automation_event`, Schlüssel Regel +
+   Ereignis): Eine zweite Zustellung bewirkt nichts.
+5. **Tiefe:** Ereignisse, die ein Schritt eines Laufs verursacht, nennen den Lauf
+   (`event_outbox.run_id`, gesetzt vom Schritt-Host für alles, was das Werkzeug des
+   Schritts auslöst; die Schlussantwort eines Laufs ist kein Schritt). Ein Lauf daraus
+   bekommt `chain_depth` + 1 (dasselbe Feld zählt Übergaben); ein Ereignis eines Laufs
+   der Tiefe 3 wird `skipped_depth`. So enden auch zwei Regeln im Kreis.
+6. **Ruhezeit:** Liegt der letzte Termin der Regel weniger als `quiet_seconds` zurück,
+   wartet das Ereignis, und `next_due_at` wird das Ende der Ruhezeit
+   (`automation.quiet_until`); dann feuert die Fälligkeits-Schleife alle wartenden als
+   **einen** Termin, mit der größten Tiefe, und der Lauf erfährt Art, Anzahl und die
+   IDs der neuesten 20 Objekte (`<untrusted source="event">`, ein Ticket mit
+   Schlüssel), nie, wer es verursacht hat. Sonst feuert der Handler den Termin sofort
+   (mit allen noch wartenden). Jeder Termin beginnt eine neue Ruhezeit; ohne wartende
+   Ereignisse hat eine Regel keinen Termin und ist nie erledigt. Eine angehaltene Regel
+   verpasst, was in ihrer Pause geschieht; Ereignisse, die schon warteten, behält sie.
 
-- **Nur IDs, nur der eigene Blick:** Der Lauf bekommt nach dem Auftrag der Eigentümerin
-  nur die Art, die Anzahl und die IDs der Objekte (ein Ticket auch mit Schlüssel), als
-  nicht vertrauenswürdige Angabe gerahmt (`<untrusted source="event">`), und liest sie
-  mit seinen Werkzeugen. Er läuft als Eigentümerin am Ort der Regel (ihre Rechte ∩ die
-  des Agenten ∩ das Publikum des Ortes: im Kanal die Sicht eines Betrachters, Schreiben
-  nur in diesen Bereich). Wer das Ereignis verursacht hat, spielt keine Rolle und
-  gewinnt nichts. Ein Ereignis über ein Objekt, das der Lauf selbst nicht lesen dürfte
-  (ein Entwurf, eine für KI gesperrte Seite oder Datei, ein Ticket außerhalb seiner
-  Sicht), wird gar nicht aufgenommen: kein Lauf, keine Zählung, kein Protokolleintrag.
-  Ist der Ort selbst für KI gesperrt oder archiviert, wird der Termin wie jeder andere
-  mit `skipped_policy` protokolliert; auch die übrigen Prüfungen eines Termins gelten
-  unverändert (Eigentümerin, Agent, Budget, `skipped_busy`).
-- **Ruhezeit** (`quiet_seconds`, Standard 300, mindestens 60): Innerhalb der Ruhezeit
-  nach einem Termin entsteht höchstens ein Lauf. Weitere Ereignisse warten
-  (`automation_event`), und `next_due_at` wird das Ende der Ruhezeit; dann löst die
-  Fälligkeits-Schleife alle wartenden als **einen** Termin aus, und der Lauf erfährt
-  ihre Anzahl (und die IDs der neuesten 20 Objekte), statt sie einzeln nachzuholen.
-  Kommt nach dem Ende der Ruhezeit ein Ereignis, bevor die Schleife sie abgeholt hat,
-  nimmt sein Termin die wartenden mit. Jeder Termin beginnt eine neue Ruhezeit. Ohne
-  wartende Ereignisse hat eine Ereignis-Regel keinen Termin (`next_due_at` leer) und
-  ist nie „erledigt“.
-- **Einmal:** Die Regel ist während der Aufnahme gesperrt (in fester Reihenfolge), und
-  jedes Ereignis wird je Regel einmal aufgenommen (Schlüssel Regel + Ereignis): Ein
-  erneut zugestelltes Ereignis bewirkt nichts mehr, auch bei mehreren Workern.
-- **Tiefe:** Ein Ereignis, das ein Schritt eines Laufs verursacht hat, nennt den Lauf
-  (`event_outbox.run_id`, gesetzt vom Schritt-Host für alles, was das Werkzeug des
-  Schritts auslöst). Ein Lauf daraus bekommt `chain_depth` = Tiefe des verursachenden
-  Laufs + 1; dasselbe Feld zählt Übergaben und Ereignisse zusammen. Ein Ereignis eines
-  Laufs der Tiefe 3 startet nichts mehr und wird als `skipped_depth` protokolliert; so
-  enden auch zwei Regeln, die einander im Kreis auslösen. Warten mehrere Ereignisse,
-  zählt die größte Tiefe. Eine Regel reagiert nie auf ein Ereignis, das ihr eigener
-  Lauf an einem Objekt verursacht hat, um das es in diesem Lauf ging.
+Die Termine, die der Handler feuert, gehen durch dieselben Prüfungen (`term.fire`) und
+zählen in derselben Metrik, sobald seine Zustellung festgeschrieben ist.
 
-### Aufgaben verwalten (API, M7)
+**Live.** Jede Änderung einer Aufgabe (API, Anhalten durch das System, Übernahme) und
+jeder protokollierte Termin schreiben in ihrer Transaktion ein Outbox-Ereignis
+`automation.updated` (nur die ID); der Handler `automation_live` macht daraus je Person,
+die die Aufgabe jetzt sieht, ein SSE-Ereignis `automation.changed` (`automation_id`,
+`space_id`, bei einer Direktnachricht `null`), auch für eine gelöschte. Ein Ereignis,
+das in einer Ruhezeit wartet, meldet nichts.
+
+### Aufgaben-API (M7)
 
 Alle Routen unter `/api/automations`; Listen seitenweise (`limit` ≤ 100, `cursor`,
 neueste zuerst). Jede Änderung nennt die gelesene `version` (sonst 409
 `automation.version_conflict` mit `details.current_version`) und steht im Audit nur mit
 IDs, Arten und Feldnamen, nie mit dem Auftragstext (`automation.created`,
 `automation.updated`, `automation.paused`, `automation.resumed`, `automation.deleted`,
-`automation.run_now`, `automation.taken_over`).
-
-**Wer sieht und wer darf was.** Sehen wie bei den Aktivitäten oben: wer
-`agent.manage` hat, sieht alle Aufgaben der Organisation; sonst nur mit `ai.use`, und
-dann die eigenen, die der Agenten, für die man verantwortlich ist, und die mit einem Ort
-in einem Bereich, den man verwaltet (`space.manage`). Was man nicht sieht, antwortet
-wie eine unbekannte ID: 404 `automation.not_found`.
-
-| Aktion | wer |
-|---|---|
-| anlegen | wer `ai.use` hat, den Agenten erreicht und am Ort schreibt; Ereignis-Regeln nur, wer den Bereich verwaltet |
-| ändern (`PATCH`), jetzt ausführen | nur die Eigentümerin |
-| anhalten, fortsetzen, löschen | die Eigentümerin, die Verwaltenden des Bereichs ihres Ortes, `agent.manage` |
-| übernehmen | wer sie sieht und sie selbst anlegen dürfte |
-| ansehen, Protokoll | wer sie sieht |
-
-Wer sie sieht, aber die Aktion nicht darf (etwa die verantwortliche Person des
-Agenten), bekommt 403 `automation.not_allowed`. Jede Antwort mit einer Aufgabe nennt
-`abilities` (`edit`, `pause`, `resume`, `delete`, `run`, `take_over`): was die Person jetzt
-damit tun darf, nach denselben Regeln wie die Aktionen (fortsetzen nur, solange die
-Eigentümerin sie wieder ausführen dürfte; übernehmen nur für andere, die sie anlegen dürften).
+`automation.run_now`, `automation.taken_over`). Wer was darf:
+[Aufgaben verwalten](#aufgaben-verwalten-seit-m7).
 
 **Routen.**
 
@@ -895,8 +948,9 @@ Eigentümerin sie wieder ausführen dürfte; übernehmen nur für andere, die si
 - `GET /api/automations/{id}`: die Aufgabe mit Agent, Eigentümerin, Ort (`type`,
   `conversation_id`, `space_id`, `name`, `ticket_number`), Zeitplanfeldern,
   `next_due_at`, den nächsten fünf Terminen (`upcoming`), dem letzten Termin
-  (`last_run`: Ergebnis, Lauf, dessen Zustand und Stopgrund, `heartbeat_ok`) und
-  `version`.
+  (`last_run`: Ergebnis, Lauf, dessen Zustand und Stopgrund, `heartbeat_ok`), `version`
+  und `abilities` (`edit`, `pause`, `resume`, `delete`, `run`, `take_over`: was die
+  fragende Person jetzt damit tun darf).
 - `PATCH /api/automations/{id}` mit `{"version", "instruction"?, "schedule"?}`: Die Art
   bleibt (422 `automation.kind_immutable`); ein neuer Zeitplan berechnet den nächsten
   Termin neu, eine erledigte einmalige Aufgabe mit neuem Zeitpunkt wird wieder aktiv.
@@ -913,10 +967,13 @@ Eigentümerin sie wieder ausführen dürfte; übernehmen nur für andere, die si
   mehr ausführen, wird sie angehalten. Nicht für Ereignis-Regeln (409
   `automation.not_runnable`) und nicht für angehaltene oder erledigte (409
   `automation.not_active`). Die Antwort zeigt das Ergebnis in `last_run`.
-- `POST /api/automations/{id}/take-over` mit `{"version"}`: siehe oben.
+- `POST /api/automations/{id}/take-over` mit `{"version"}`: siehe
+  [Aufgaben im Worker](#aufgaben-im-worker-m7); 403 `automation.not_allowed`, wer sie
+  nicht anlegen dürfte.
 - `DELETE /api/automations/{id}?version=n` (204): Die Aufgabe bekommt den Zustand
-  `deleted` und ist für die API und die Aktivitäten verschwunden; ihre Läufe, deren
-  Journal und das Protokoll bleiben als Geschichte. Ein offener Lauf wird nicht
+  `deleted` und ist für die API und die Aktivitäten verschwunden; ihre Läufe und deren
+  Journal bleiben als Geschichte, das Protokoll bis zu seiner
+  [Aufbewahrungsfrist](#aufbewahrung). Ein offener Lauf wird nicht
   abgebrochen, er endet, wie er geendet hätte (abbrechen über die Laufansicht).
 - `GET /api/automations/{id}/firings`: das Protokoll, je Termin `due_at`, `fired_at`,
   `outcome`, `run_id`, `heartbeat_ok`, neueste zuerst.
@@ -930,15 +987,6 @@ Termine näher als 15 Minuten), `automation.invalid_interval`, `automation.inval
 Bereichs noch systemweit); 403 `automation.not_allowed`; ein unbekannter oder nicht
 erreichbarer Agent 404 `agent.not_found`, ein nicht lesbarer Kanal 404
 `conversation.not_found`, ein nicht lesbares Ticket 404 `ticket.not_found`.
-
-**Live.** Jede Änderung (auch das Anhalten durch das System und eine Übernahme)
-schreibt in ihrer Transaktion ein Outbox-Ereignis `automation.updated` (nur die ID);
-der Worker (Handler `automation_live`) macht daraus je Person, die die Aufgabe jetzt
-sehen darf (Eigentümerin, verantwortliche Person, Verwaltende des Bereichs,
-`agent.manage`), ein SSE-Ereignis `automation.changed` mit `automation_id` und
-`space_id` (bei einer Direktnachricht `null`), auch für eine gelöschte. Die Oberfläche
-lädt daraufhin ihre Listen neu. Termine der Fälligkeits-Schleife senden keins (den
-neuen Lauf zeigen `run.progress` und die Laufliste).
 
 ### Läufe im Einzelnen
 
@@ -1294,7 +1342,9 @@ erst nach der Freigabe einer Person:
   `question.answered`, `message.created` der Karte, `notification.created`).
 - Die verantwortliche Person springt für die fragende nicht ein: Ein Lauf, dessen
   Person nicht mehr aktiv ist, endet vor jedem Werkzeugaufruf mit `rights_revoked`,
-  fragt also nie (Läufe ohne fragende Person kommen erst mit M7).
+  fragt also nie. Auch Läufe von Aufgaben haben eine fragende Person (die Eigentümerin);
+  kann sie die Aufgabe nicht mehr ausführen, hält die Aufgabe an, statt Freigaben
+  weiterzugeben ([Aufgaben im Worker](#aufgaben-im-worker-m7)).
 
 ### Grenzen
 
@@ -1356,7 +1406,13 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
-| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `skipped_depth`, `paused_owner`; Ereignis-Regeln zählen hier nur die Termine, die die Schleife am Ende einer Ruhezeit auslöst) |
+| `herd_automation_firings_total{outcome}` | Zähler | Termine von Aufgaben, die dieser Worker gefeuert hat (Fälligkeits-Schleife und Handler der Ereignis-Regeln, gezählt nach dem Commit), je Ergebnis: `started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `skipped_depth`, `paused_owner` |
+| `herd_automations_due` | Gauge | aktive Aufgaben, deren Termin gekommen ist und die noch kein Worker gefeuert hat |
+| `herd_automations_oldest_due_seconds` | Gauge | Wartezeit des ältesten fälligen Termins (0 ohne einen) |
+| `herd_automations_paused{reason}` | Gauge | angehaltene Aufgaben je Grund (`manual`, `owner`, `failing`) |
+| `herd_budget_stops_total{scope}` | Zähler | Läufe, die dieser Worker an einem erreichten Tagesbudget beendet hat, je Geltung (`user`, `agent`, `organisation`); übersprungene Termine zählen als `skipped_budget` oben |
+| `herd_wiki_review_reminders_total` | Zähler | Seiten, deren Prüffrist der tägliche Durchlauf dieses Workers gemeldet hat ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)) |
+| `herd_wiki_review_spaces_unchecked` | Gauge | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat; tagsüber 0 |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1368,7 +1424,19 @@ Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 - `HerdRunsFailing`: mehr als die Hälfte der Läufe der letzten 15 Minuten (mindestens
   3) endete mit `provider_refused` oder `error`, 5 Minuten lang. Meist ein Schlüssel,
   ein Kontingent oder die Netzfreigabe: Verbindung in der KI-Verwaltung testen.
-- Dazu wie bisher `HerdWorkerAbsent`, `HerdWorkerStalled`, `HerdNotReady`.
+- `HerdAutomationsLagging` (seit M7): der älteste fällige Termin wartet seit über
+  3 Minuten, 5 Minuten lang. Die Fälligkeits-Schleife kommt nicht nach (viele Termine
+  zugleich bei wenigen Workern, siehe [Steckbrief](STECKBRIEF.md#automatisierung-m7):
+  1.000 zugleich brauchten mit einem Worker rund 100 s) oder scheitert immer wieder an
+  einem Termin (`automations.pass_failed`; der Termin bleibt fällig). Ein Worker eines
+  älteren Releases kann Heartbeats und Ereignis-Regeln nicht feuern. Abhilfe: mehr
+  Worker, Log lesen.
+- `HerdAutomationsFailing` (seit M7): mindestens 5 Aufgaben mehr binnen einer Stunde
+  wegen dreier Fehlschläge in Folge angehalten. Meist eine gemeinsame Ursache (Anbieter,
+  Schlüssel, Werkzeug; siehe `HerdRunsFailing`); danach setzen die Eigentümerinnen oder
+  die Verwaltenden der Bereiche sie fort.
+- Dazu wie bisher `HerdWorkerAbsent` (deckt auch „kein Worker feuert Aufgaben“ ab: dann
+  fehlen die Gauges), `HerdWorkerStalled`, `HerdNotReady`.
 
 Einen Alarm für wartende Läufe, deren Frist abgelaufen ist, ohne dass die Laufschleife
 sie beendet hat (`HerdRunsWaitingExpired`), gibt es nicht: Keine Metrik zählt solche
@@ -1376,8 +1444,8 @@ Läufe (`herd_runs_waiting` zählt alle wartenden). Die Schleife beendet sie in 
 Runde (etwa jede Sekunde); bleibt sie aus, melden `HerdWorkerAbsent` oder
 `HerdWorkerStalled` den Worker.
 
-Die Läufe zählen nicht zur Bereitschaft (`/ready`) des Workers: Ein langsamer Anbieter
-soll den Worker nicht als hängend erscheinen lassen.
+Die Läufe und die Fälligkeits-Schleife zählen nicht zur Bereitschaft (`/ready`) des
+Workers: Ein langsamer Anbieter soll den Worker nicht als hängend erscheinen lassen.
 
 ### Was wo gespeichert ist
 
@@ -1394,8 +1462,27 @@ soll den Worker nicht als hängend erscheinen lassen.
 | Aufgaben und ihr Protokoll | `automation` (Auftrag bzw. Checkliste, Termin, Zustand, Fehlschläge in Folge, beim Heartbeat Abstand und aktive Stunden, bei der Ereignis-Regel Art, Filter und Ruhezeit), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs, ob ein Heartbeat `HEARTBEAT_OK` antwortete); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`); die aufgenommenen Ereignisse einer Ereignis-Regel (`automation_event`: Objekt, IDs, Tiefe, der Termin, der sie nahm); der verursachende Lauf eines Ereignisses (`event_outbox.run_id`) |
 
 Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
-bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur
-IDs, Zähler und Codes.
+bzw. Ticket (eine gelöschte Aufgabe behält ihre Läufe). Inhalte stehen nie in Logs,
+Outbox, `NOTIFY` oder Metriken: Dort stehen nur IDs, Zähler und Codes.
+
+### Aufbewahrung
+
+Das Protokoll der Aufgaben wächst mit jedem Termin (`automation_firing`) und jedem
+aufgenommenen Ereignis (`automation_event`). Die Fälligkeits-Schleife jedes Workers
+löscht einmal je Minute, in Stapeln von höchstens 1.000 Zeilen (je eine Transaktion,
+Zeilen eines anderen Workers übersprungen):
+
+- aufgenommene Ereignisse 7 Tage nach ihrem Termin (`EVENT_RETENTION`);
+- Termine nach 90 Tagen (`FIRING_RETENTION`), mit ihren Ereignissen (Index auf
+  `automation_firing.fired_at`, Migration `a3d5f7b9c1e2`);
+- nie einen Termin, dessen Lauf noch offen ist, und nie seine Ereignisse (der Lauf liest
+  seinen Auftrag aus dem Termin, die Regel „nicht auf die eigene Wirkung“ seine
+  Ereignisse); nie ein Ereignis, das noch auf das Ende einer Ruhezeit wartet, wie alt es
+  auch ist.
+
+Die Fristen sind Konstanten in `app/worker/due.py`, keine Einstellungen. Folge: Eine
+Aufgabe, die 90 Tage nicht gefeuert hat, zeigt keinen letzten Lauf mehr (ihre Läufe
+bleiben in der Laufliste).
 
 ### API im Überblick
 
@@ -1409,7 +1496,8 @@ IDs, Zähler und Codes.
   Gründe ohne Lauf: `ai.unavailable`, `agent.paused`, `agent.draft`,
   `agent.responsible_inactive`, `agent.connection_unavailable`,
   `agent.personal_disabled`, `run.thread_reply`, `run.waiting`.
-- Aufgaben: [Aufgaben verwalten (API, M7)](#aufgaben-verwalten-api-m7).
+- Aufgaben: [Aufgaben-API (M7)](#aufgaben-api-m7); Budgets:
+  [`KI.md`](KI.md#budgets-apiaibudgets-aimanage).
 - Live: `run.progress` (`conversation_id`, `run_id`, `step`), `card.changed`,
   `proposal.changed`, `skill_proposal.changed`, `automation.changed`
   (`automation_id`, `space_id`), Aktivitätsgründe `approval`, `question`,
@@ -1432,10 +1520,29 @@ IDs, Zähler und Codes.
   bezahlt, aber nicht gebucht; und scheitern beim Abschluss eines Schritts sowohl das
   Speichern des Schritts als auch das Nachbuchen in eigener Transaktion, fehlt dieser
   eine Aufruf ([`KI.md`](KI.md#verbrauch-apiaiusage)).
-- **Freigaben gehen nur an die fragende Person.** Die Spezifikation (5.4) nennt die
-  verantwortliche Person als Ersatz; das kommt mit M7, wo Läufe ohne fragende Person
-  (Zeitpläne) entstehen. Ist die fragende Person nicht mehr aktiv, endet der Lauf vor
-  dem nächsten Werkzeugaufruf mit `rights_revoked`.
+- **Freigaben gehen nur an die fragende Person**, auch bei Aufgaben (die Eigentümerin).
+  Einen Ersatz durch die verantwortliche Person gibt es nicht (Spezifikation 5.4,
+  geändert in M7): Kann die Eigentümerin die Aufgabe nicht mehr ausführen, hält sie an,
+  und jemand übernimmt sie ausdrücklich. Ist die fragende Person nicht mehr aktiv, endet
+  ein laufender Lauf vor dem nächsten Werkzeugaufruf mit `rights_revoked`.
+- **Aufgaben (M7):**
+  - Eine Regel reagiert nur dann nicht auf ihre eigene Wirkung, wenn ihr Lauf dasselbe
+    Objekt betrifft; die Wirkung auf ein anderes Objekt kann sie erneut auslösen, bis die
+    Tiefe 3 die Kette beendet.
+  - Filter von `ticket.created` lesen das Ticket beim Zustellen; ein Tag, das erst danach
+    gesetzt wird, zählt nicht.
+  - Eine angehaltene Ereignis-Regel verpasst die Ereignisse ihrer Pause.
+  - Ein Tagesbudget kann je gleichzeitig laufendem Lauf um einen Modellaufruf
+    überschritten werden; ein Euro-Limit gilt nur für Aufrufe mit hinterlegtem Preis.
+  - Die Fälligkeits-Schleife teilt sich die Event-Loop mit den Läufen; viele zugleich
+    fällige Termine kommen je Worker nacheinander (1.000 in rund 100 s mit einem Worker).
+  - Die Budgetprüfung mit einem Budget der Organisation liest jede Verbrauchszeile des
+    Tages (bei 100.000 Zeilen rund 60–80 ms je Modellaufruf, Steckbrief); eine
+    Tagessumme gibt es nicht.
+  - Eine Aufgabe in einer Direktnachricht hält an, sobald die Eigentümerin dort nicht
+    mehr allein mit dem Agenten ist.
+  - Eine gelöschte Aufgabe bricht ihren offenen Lauf nicht ab (das geht in der
+    Laufansicht).
 - **Skills sind nur ihre SKILL.md**: zusätzliche Dateien (Referenzen, Vorlagen, Skripte)
   werden beim Import nicht übernommen, und Felder wie `license` gehen beim Export
   verloren.
@@ -1449,9 +1556,9 @@ IDs, Zähler und Codes.
 - Für Agenten aus anderen Systemen (agentskills.io) sind Skripte in Skills nur Text;
   ein Werkzeug, das Code ausführt, gibt es nicht.
 
-### Rolling Update (aus M5 und M6)
+### Rolling Update (aus M5, M6 und M7)
 
-Bisher ist kein Release mit M5 oder M6 erschienen; die Hinweise gelten, sobald eins auf
+Bisher ist kein Release mit M5, M6 oder M7 erschienen; die Hinweise gelten, sobald eins auf
 ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
 
 - Neue Aufzählungswerte entstehen erst durch dieses Release: Zustand `waiting`,
@@ -1491,6 +1598,18 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   nicht aktiv), aber seine
   Aktivitätsansicht listet Einträge zu gelöschten Aufgaben noch. Ein Downgrade löscht
   gelöschte Aufgaben endgültig.
+- M7, Prüffrist (Migration `d4f6b8a0c2e4`): Felder an Bereich und Seite, der
+  Aktivitätsgrund `review_due` ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7));
+  die Aktivitätsansicht eines Pods des vorigen Releases scheitert an einem solchen
+  Eintrag, bis er ersetzt ist.
+- M7, Aufbewahrung (Migration `a3d5f7b9c1e2`): nur ein Index. Ein Worker des vorigen
+  Releases löscht nichts aus dem Protokoll; das holt der erste Worker dieses Releases
+  nach.
+- M7 zusammengefasst: Worker zuerst und zügig ersetzen. Ein Worker des vorigen Releases
+  greift Termine, die er nicht kennt, und rollt sie zurück (sie bleiben fällig, bis ein
+  neuer Worker sie feuert); `HerdAutomationsLagging` meldet es, wenn es dauert. Während
+  des Rollouts können API-Pods des vorigen Releases Aktivitäten zu Aufgaben, zur
+  Prüffrist und Läufe mit Stopgrund `budget` nicht anzeigen.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen
@@ -1513,6 +1632,10 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   ([`KI.md`](KI.md)).
 - **Viele wartende Läufe** (`herd_runs_waiting`): Freigaben bleiben liegen; die Liste
   „Freigaben“ der fragenden Personen zeigt sie.
+- **Aufgabe läuft nicht:** das Protokoll der Aufgabe (übersprungen mit Grund?), ihr
+  Zustand (angehalten mit Grund?), dann `herd_automations_oldest_due_seconds` und
+  `automations.pass_failed` im Log der Worker. „Übersprungen: Tagesbudget“: die Budgets in
+  der KI-Verwaltung; der Verbrauch des Tages steht dort.
 - Logs der Läufe: `runs.claim_failed`, `runs.failed`, `runs.renew_failed`,
   `runs.metrics_failed` (mit Lauf-ID und Fehlerklasse, nie Inhalt), dazu
   `ai.provider_call` (Pfad, Zustand, Dauer) bei Verbindungstests. Die HTTP-Clients

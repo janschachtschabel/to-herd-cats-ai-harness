@@ -1,7 +1,7 @@
 # KI-Grundlage: Verbindungen, Zuordnung, Verbrauch, Budgets, Richtlinie
 
 Betrieb und Verwaltung der KI-Anbindung. Stand: M5 Tasks 1 bis 7 (mit den Korrekturen
-aus Modul-Review 1), M6 und die Budgets aus M7. Hybride Suche und Embeddings (M5 Tasks
+aus Modul-Review 1), M6 und M7 (Budgets). Hybride Suche und Embeddings (M5 Tasks
 8 bis 11) folgen.
 
 Agenten, Läufe, Werkzeuge, Freigaben, Skills, Gedächtnis und ihr Betrieb (Worker,
@@ -173,9 +173,19 @@ Aufruf, auch mitten im Lauf.
 - **Ein Aufruf darüber:** Ein schon gesendeter Aufruf wird nicht abgebrochen. Ein Lauf
   kann ein Limit daher um einen Aufruf überschreiten, mehrere Läufe zugleich um je
   einen; danach macht keiner mehr einen Aufruf.
-- Die Prüfung kostet ohne Budgets eine Abfrage je Aufruf, mit Budgets eine Summe je
-  Geltung dazu. Andere Teile (fällige Aufgaben aus M7) fragen dieselbe Funktion
-  (`app/modules/ai/budgets.budget_exhausted`).
+- **Aufgaben** (M7, [`AGENTEN.md`](AGENTEN.md#aufgaben-agenten-arbeiten-ohne-anstoß-seit-m7)):
+  Ein fälliger Termin fragt dieselbe Funktion
+  (`app/modules/ai/budgets.budget_exhausted`, für die Eigentümerin und den Agenten der
+  Aufgabe) und wird mit `skipped_budget` übersprungen, statt einen Lauf zu starten, der
+  sofort stoppte. Aufgaben haben kein eigenes Budget.
+- **Kosten der Prüfung** (Steckbrief, lokale Messung mit 100.000 Verbrauchszeilen des
+  Tages): ohne Budget eine Abfrage, rund 1 ms je Aufruf; mit Budgets für Person und
+  Agent rund 14 ms; mit einem Budget der Organisation 60–80 ms, denn ihre Summe liest
+  jede Zeile des Tages. Eine Tagessumme als eigene Tabelle gibt es nicht; sie lohnt sich
+  erst bei deutlich mehr Aufrufen am Tag mit einem Budget der Organisation.
+- **Metrik:** `herd_budget_stops_total{scope}` zählt die Läufe, die ein Budget beendet
+  hat ([`AGENTEN.md`](AGENTEN.md#metriken-und-alarme)).
+- **Nicht in M7:** Budgets je Bereich oder je Monat.
 
 ## KI-Richtlinie je Bereich und KI-Sperre
 
