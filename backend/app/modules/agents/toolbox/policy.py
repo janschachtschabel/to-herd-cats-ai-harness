@@ -8,17 +8,15 @@
 - A run offers the model the tools whose effective grant is `allow` or `confirm`; a
   call of a `confirm` tool waits for a person's release (`approvals/gate.py`, plan M6
   task 7). `block` is never offered.
-- A level above 2 is given only by an admin, or by someone who manages every space the
-  agent is a member of (an agent without spaces: admins only).
+- A level above 2 is given only by an admin. (Spec 8.2 also names whoever manages every
+  space of the agent; but changing an organisation's agent at all needs
+  `agent.manage`, which only admins hold, and a personal agent stays at 2, so that
+  rule has no caller here.)
 """
 
-import uuid
 from collections.abc import Mapping
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.access import Action, Actor, can
-from app.modules.agents.repository import AgentRepository
+from app.core.access import Actor
 from app.modules.agents.toolbox.base import Effect, Grant, ToolSpec
 
 __all__ = [
@@ -51,18 +49,6 @@ def allowed(level: int, specs: list[ToolSpec], entries: Mapping[str, Grant]) -> 
     return [s for s in specs if effective(level, s, entries.get(s.name)) != Grant.BLOCK]
 
 
-async def may_grant_level(
-    session: AsyncSession, actor: Actor, agent_id: uuid.UUID | None, level: int
-) -> bool:
-    """Whether the actor may give the agent (None: one being created) the level."""
-    if level <= FREE_LEVEL or actor.is_admin:
-        return True
-    if agent_id is None:
-        return False
-    spaces = await AgentRepository(session, actor.org_id).member_space_ids(agent_id)
-    if not spaces:
-        return False
-    for space_id in spaces:
-        if not await can(session, actor, Action.SPACE_MANAGE, space_id):
-            return False
-    return True
+def may_grant_level(actor: Actor, level: int) -> bool:
+    """Whether the actor may give an agent the level."""
+    return level <= FREE_LEVEL or actor.is_admin

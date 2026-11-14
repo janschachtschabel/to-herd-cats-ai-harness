@@ -155,26 +155,22 @@ async def test_only_agent_managers_see_and_set_tools(bench: Bench) -> None:
         assert r.status_code == 404 and r.json()["error"]["code"] == "agent.not_found"
 
 
-async def test_who_may_give_a_level_above_two(
+async def test_only_admins_give_a_level_above_two(
     bench: Bench, make_space: MakeSpace, make_user: Any
 ) -> None:
-    """Spec 8.2: whoever manages every space of the agent, or an admin. Org agents
-    need `agent.manage` (owner, admin) to be changed at all, so through the API only
-    admins ever get here; the rule itself is held to both conditions."""
+    """Org agents need `agent.manage` (owner, admin) to be changed at all, and personal
+    agents stay at 2: a level above 2 is the admins' alone, even for someone who
+    manages every space of the agent."""
     session = bench.session
     lead = await make_user(SystemRole.MEMBER)
     a = await make_space(SpaceKind.TEAM, members=[(lead, SpaceRole.ADMIN)])
-    b = await make_space(SpaceKind.TEAM, members=[(lead, SpaceRole.EDITOR)])
     leader = await actor_of(session, lead)
     admin = await actor_of(session, bench.people.users["admin"])
     agent = bench.agent
-    assert await may_grant_level(session, leader, agent.id, 2)  # up to 2: no question
-    assert not await may_grant_level(session, leader, agent.id, 3)  # an agent without spaces
     await bench.join(a)
-    assert await may_grant_level(session, leader, agent.id, 3)  # manages its one space
-    await bench.join(b)
-    assert not await may_grant_level(session, leader, agent.id, 3)  # not b
-    assert await may_grant_level(session, admin, agent.id, 3)
+    assert may_grant_level(leader, 2)  # up to 2: no question
+    assert not may_grant_level(leader, 3)  # manages the agent's one space: still no
+    assert may_grant_level(admin, 3)
     # Through the API the space admin is no agent manager: 404 before the level rule.
     r = await bench.people.alice.patch(
         f"{AGENTS}/{agent.id}", json={"level": 3, "version": agent.version}

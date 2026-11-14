@@ -85,12 +85,9 @@ class GrantService:
                     effective(agent.level, spec, entry),
                 )
             )
-        return AgentTools(agent, tools, await self.max_level(actor, agent))
+        return AgentTools(agent, tools, self.max_level(actor, agent))
 
-    async def max_level(self, actor: Actor, agent: Agent) -> int:
+    def max_level(self, actor: Actor, agent: Agent) -> int:
         if agent.owner_user_id is not None:  # personal agents stay at 2 (`personal.py`)
             return FREE_LEVEL
-        for level in range(MAX_LEVEL, FREE_LEVEL, -1):
-            if await may_grant_level(self.session, actor, agent.id, level):
-                return level
-        return FREE_LEVEL
+        return MAX_LEVEL if may_grant_level(actor, MAX_LEVEL) else FREE_LEVEL

@@ -123,7 +123,7 @@ class AgentService:
                 raise ValidationFailed(code="agent.responsible_invalid")
             connection_id, model = data.connection_id, data.model
             responsible = data.responsible_user_id
-            await self._level(actor, None, data.level)
+            self._level(actor, data.level)
         await self._usable_connection(actor, connection_id, model)
         await self._responsible(actor, responsible)
         if owner is not None:
@@ -175,7 +175,7 @@ class AgentService:
         if data.responsible_user_id is not None:
             await self._responsible(actor, data.responsible_user_id)
         if data.level is not None and data.level > agent.level:
-            await self._level(actor, agent.id, data.level)
+            self._level(actor, data.level)
         before = snapshot(agent, _FIELDS)
         for name in given:
             value = getattr(data, name)
@@ -218,8 +218,8 @@ class AgentService:
             raise agent_not_found()
         return agent
 
-    async def _level(self, actor: Actor, agent_id: uuid.UUID | None, level: int) -> None:
-        if not await may_grant_level(self.session, actor, agent_id, level):
+    def _level(self, actor: Actor, level: int) -> None:
+        if not may_grant_level(actor, level):
             raise Forbidden(code="agent.level_denied")
 
     async def _usable_connection(self, actor: Actor, connection_id: uuid.UUID, model: str) -> None:
