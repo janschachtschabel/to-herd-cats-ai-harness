@@ -3,12 +3,13 @@ import remarkGfm from 'remark-gfm'
 import { safeUrl } from '@/features/wiki/markdown'
 
 const MENTION = 'user:'
-const TOKEN = /@\[([^\]\n]*)\]\((user:[0-9a-fA-F-]{36})\)/g
+const AGENT = 'agent:'
+const TOKEN = /@\[([^\]\n]*)\]\(((?:user|agent):[0-9a-fA-F-]{36})\)/g
 
-/** A mention keeps its `user:` target (rendered as a name, never as a link); every
- *  other target passes the wiki's check (http, https, mailto, relative). */
+/** A mention keeps its `user:` or `agent:` target (rendered as a name, never as a
+ *  link); every other target passes the wiki's check (http, https, mailto, relative). */
 function urlTransform(url: string): string {
-  return url.startsWith(MENTION) ? url : safeUrl(url)
+  return url.startsWith(MENTION) || url.startsWith(AGENT) ? url : safeUrl(url)
 }
 
 function isLocal(src: string): boolean {
@@ -22,6 +23,7 @@ export function MessageMarkdown({ markdown, meId }: { markdown: string; meId?: s
   const components: Components = {
     a: ({ href, children }) => {
       if (!href) return <span>{children}</span>
+      if (href.startsWith(AGENT)) return <span className="mention">{children}</span>
       if (href.startsWith(MENTION)) {
         const mine = href.slice(MENTION.length).toLowerCase() === meId?.toLowerCase()
         return <span className={mine ? 'mention mention-me' : 'mention'}>{children}</span>

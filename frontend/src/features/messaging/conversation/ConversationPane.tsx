@@ -72,7 +72,10 @@ export function ConversationPane({
               newBefore={newBefore}
               emptyText={emptyText}
             />
-            {agent && <RunProgress conversationId={conversation.id} agentName={agent.name} />}
+            <RunProgress
+              conversationId={conversation.id}
+              place={agent ? { kind: 'dm' } : { kind: 'conversation', onOpenThread: onThread }}
+            />
             {abilities.post ? (
               <Composer
                 key={conversation.id}

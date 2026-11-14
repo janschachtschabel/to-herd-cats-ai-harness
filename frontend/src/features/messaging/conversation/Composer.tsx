@@ -17,9 +17,11 @@ const MAX_CHARS = 20_000
 
 /**
  * Writes a message in Markdown: Enter sends, Shift+Enter starts a new line. `@` opens
- * the people picker (only people who can see the conversation); a pick inserts `@[Name](user:<id>)` and the id is sent as a
- * mention. What one types stays as this conversation's draft while the tab lives.
- * After sending, the people who were mentioned but not told are named.
+ * the picker (only people who can see the conversation, and the agents the directory
+ * offers there); a pick inserts `@[Name](user:<id>)` or `@[Name](agent:<id>)` and the
+ * id is sent as a mention. What one types stays as this conversation's draft while the
+ * tab lives. After sending, the people who were mentioned but not told are named, and
+ * why an agent that was asked does not answer.
  */
 export function Composer({
   conversationId,
@@ -40,7 +42,7 @@ export function Composer({
   const [active, setActive] = useState(0)
   const [notNotified, setNotNotified] = useState<Mentioned[]>([])
   const [noRun, setNoRun] = useState<string | null>(null)
-  const noteRun = useNoteAgentRun(conversationId)
+  const noteRun = useNoteAgentRun(conversationId, conversation.kind !== 'dm')
   const area = useRef<HTMLTextAreaElement>(null)
   const listId = useId()
   const hintId = useId()

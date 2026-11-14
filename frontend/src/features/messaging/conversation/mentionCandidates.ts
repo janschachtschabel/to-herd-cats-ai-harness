@@ -13,8 +13,10 @@ export interface MentionCandidates {
 }
 
 /** Whom `@query` may name in a conversation: in a direct message its other active
- *  participants; elsewhere the people who may read the conversation's space (the
- *  server tells no one else, so no one else is offered). */
+ *  participants; elsewhere the people who may read the conversation's space and, for
+ *  people with AI, the agents that are its members (the directory decides: it offers
+ *  agents only to people with `ai.use`, someone's personal agent only to its owner;
+ *  the server tells and asks no one else, so no one else is offered). */
 export function useMentionCandidates(
   conversation: Conversation,
   query: string,
@@ -27,7 +29,7 @@ export function useMentionCandidates(
     query,
     NOBODY,
     enabled && !dm && spaceId !== undefined,
-    'user',
+    undefined,
     spaceId,
   )
   const participants = useMemo(() => {

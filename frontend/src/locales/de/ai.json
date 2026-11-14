@@ -259,7 +259,13 @@
     "progress": {
       "queued": "{{name}} beginnt gleich …",
       "working_one": "{{name}} arbeitet … (Schritt {{count}})",
-      "working_other": "{{name}} arbeitet … (Schritt {{count}})"
+      "working_other": "{{name}} arbeitet … (Schritt {{count}})",
+      "label": "{{name}} arbeitet",
+      "queuedThread": "{{name}} beginnt gleich im Thread der Nachricht …",
+      "workingThread_one": "{{name}} arbeitet im Thread der Nachricht … (Schritt {{count}})",
+      "workingThread_other": "{{name}} arbeitet im Thread der Nachricht … (Schritt {{count}})",
+      "waiting": "{{name}} wartet auf eine Freigabe oder eine Antwort.",
+      "openThread": "Thread öffnen"
     },
     "header": {
       "paused": "Dieser Agent ist pausiert und antwortet gerade nicht."

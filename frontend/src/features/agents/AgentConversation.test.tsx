@@ -154,6 +154,7 @@ describe('a direct message with an agent', () => {
     const run = {
       id: RUN,
       agent_id: AGENT.id,
+      agent_name: AGENT.name,
       conversation_id: 'x',
       trigger_message_id: 'm',
       state: 'running',
@@ -174,7 +175,12 @@ describe('a direct message with an agent', () => {
     const { user } = await renderApp(`/c/${dm.id}`)
     const box = await screen.findByRole('combobox', { name: 'Nachricht an Direktnachricht' })
     await user.type(box, 'Wie viele Urlaubstage?{Enter}')
-    expect(await screen.findByText('Hilda arbeitet … (Schritt 3)')).toBeInTheDocument()
+    const card = await screen.findByRole('status', { name: 'Hilda arbeitet' })
+    expect(within(card).getByText('Hilda arbeitet … (Schritt 3)')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Lauf ansehen' })).toHaveAttribute(
+      'href',
+      `/runs/${RUN}`,
+    )
     expect(api.find('GET', `/api/runs/${RUN}`)).toHaveLength(1)
   })
 

@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { RunProgress } from '@/features/agents/RunProgress'
 import { ErrorState, LoadMore, LoadingState } from '@/features/shared/states'
 import type { Message } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -13,7 +14,7 @@ import { useMessage, useReplies } from './queries'
 import { CannotPost } from './CannotPost'
 
 /** A message's thread beside the conversation: the message, its replies (oldest
- *  first), and a composer for one more. */
+ *  first), the progress of an agent's run that answers here, and a composer. */
 export function ThreadPanel({
   parentId,
   parent,
@@ -86,6 +87,10 @@ export function ThreadPanel({
             </>
           )}
         </div>
+        <RunProgress
+          conversationId={conversation.id}
+          place={{ kind: 'thread', threadId: parentId }}
+        />
         {view.abilities.post ? (
           <Composer
             key={parentId}

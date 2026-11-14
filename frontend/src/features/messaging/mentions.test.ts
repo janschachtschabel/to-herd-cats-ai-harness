@@ -26,6 +26,15 @@ describe('mentions', () => {
     expect(result.caret).toBe(3 + mentionToken(LEA).length + 1)
   })
 
+  test('an agent is mentioned as an agent, and counted among the mentioned', () => {
+    const hilda = { type: 'agent', id: '00000000-0000-7000-8000-0000000000a1', name: 'Hilda' }
+    expect(mentionToken(hilda)).toBe(`@[Hilda](agent:${hilda.id})`)
+    expect(
+      mentionsIn(`Frag ${mentionToken(hilda)} und ${mentionToken(LEA)}`).map((m) => m.id),
+    ).toEqual([hilda.id, LEA.id.toLowerCase()])
+    expect(plainMentions(`Frag ${mentionToken(hilda)}`)).toBe('Frag @Hilda')
+  })
+
   test('tokens read as @Name in short texts', () => {
     expect(plainMentions(`Frage an ${mentionToken(LEA)}`)).toBe('Frage an @Lea Team Löwe')
   })

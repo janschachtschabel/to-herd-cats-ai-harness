@@ -135,15 +135,17 @@ export function useActiveRun(conversationId: string): ActiveRun | null {
   )
 }
 
-/** After sending in a direct message with an agent: follows the run it started, or
- *  returns why none started (`agent_run.reason`, to be put in words). */
-export function useNoteAgentRun(conversationId: string) {
+/** After sending (to an agent in a direct message, or mentioning one elsewhere):
+ *  follows the run it started, or returns why none started (`agent_run.reason`, to be
+ *  put in words). Outside a direct message the run answers in the message's thread. */
+export function useNoteAgentRun(conversationId: string, inThreads: boolean) {
   const queryClient = useQueryClient()
   return (written: Schemas['MessageWriteOut'] | null): string | null => {
     const run = written?.agent_run
-    if (!run) return null
+    if (!written || !run) return null
     if (run.id) {
-      setActiveRun(queryClient, conversationId, { runId: run.id, step: null })
+      const threadId = inThreads ? (written.parent_id ?? written.id) : null
+      setActiveRun(queryClient, conversationId, { runId: run.id, step: null, threadId })
       return null
     }
     return run.reason

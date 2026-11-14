@@ -1,10 +1,11 @@
-import { Loader2, UserRound } from 'lucide-react'
+import { Bot, Loader2, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import type { MentionCandidates } from './mentionCandidates'
 
-/** The people one can mention, above the composer while `@name` is being typed.
+/** The people (and, for people with AI, the space's agents, marked) one can mention, above the composer while `@name` is being typed.
  *  Arrows move, Enter or Tab picks, Escape closes (handled by the composer). */
 export function MentionPicker({
   id,
@@ -38,8 +39,13 @@ export function MentionPicker({
             }}
             onMouseEnter={() => onHover(index)}
           >
-            <UserRound className="size-4 text-muted-foreground" aria-hidden />
-            {entry.name}
+            {entry.type === 'agent' ? (
+              <Bot className="size-4 text-muted-foreground" aria-hidden />
+            ) : (
+              <UserRound className="size-4 text-muted-foreground" aria-hidden />
+            )}
+            <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+            {entry.type === 'agent' && <AgentBadge />}
           </li>
         ))}
       </ul>

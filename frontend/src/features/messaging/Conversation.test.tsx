@@ -136,7 +136,7 @@ describe('conversation', () => {
       extra: {
         'GET /api/directory': (call: Call) =>
           page(
-            call.query.get('type') === 'user' && 'lea löwe'.includes(call.query.get('q') ?? '')
+            call.query.get('type') !== 'group' && 'lea löwe'.includes(call.query.get('q') ?? '')
               ? [lea]
               : [],
           ),

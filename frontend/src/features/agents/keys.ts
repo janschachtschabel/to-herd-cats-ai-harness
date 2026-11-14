@@ -18,4 +18,8 @@ export const agentKeys = {
 export interface ActiveRun {
   runId: string
   step: number | null
+  /** Where a run of a channel or a page's or ticket's thread answers: the thread of the
+   *  message that asked (its root's id); null in a direct message, or not known (heard
+   *  of through `run.progress` only: the run's trigger message then tells). */
+  threadId?: string | null
 }

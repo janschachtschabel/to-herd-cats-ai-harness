@@ -259,7 +259,13 @@
     "progress": {
       "queued": "{{name}} is about to start …",
       "working_one": "{{name}} is working … (step {{count}})",
-      "working_other": "{{name}} is working … (step {{count}})"
+      "working_other": "{{name}} is working … (step {{count}})",
+      "label": "{{name}} is working",
+      "queuedThread": "{{name}} is about to start in the message's thread …",
+      "workingThread_one": "{{name}} is working in the message's thread … (step {{count}})",
+      "workingThread_other": "{{name}} is working in the message's thread … (step {{count}})",
+      "waiting": "{{name}} is waiting for a release or an answer.",
+      "openThread": "Open thread"
     },
     "header": {
       "paused": "This agent is paused and does not answer now."
