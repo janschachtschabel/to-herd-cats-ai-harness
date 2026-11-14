@@ -22,6 +22,7 @@ ai:
   existingSecret: herd-ai
   checkTimeoutSeconds: 20
   personalAgentsMax: 3
+  automationsMax: 30
   approvalHours: 48
   runConcurrency: 8
   runLeaseSeconds: 30

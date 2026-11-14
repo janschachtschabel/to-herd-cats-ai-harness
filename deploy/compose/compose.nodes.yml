@@ -42,6 +42,7 @@ x-api-env: &api-env
   HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
   HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
   HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
+  HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.

@@ -164,13 +164,16 @@ grep -B6 "team: monitoring" <<<"$policy" | grep -q "port: 9090" || fail "interna
 # tests and personal agents; worker: runs), the keys come only from the Secret named in
 # ai.existingSecret (API and worker, never the migration job, never a ConfigMap or a
 # value), and providers are reachable only through networkPolicy.aiEgress.
-out=$(render --set ai.runConcurrency=8 --set ai.approvalHours=24 --set ai.personalAgentsMax=2)
+out=$(render --set ai.runConcurrency=8 --set ai.approvalHours=24 --set ai.personalAgentsMax=2 \
+  --set ai.automationsMax=7)
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
 worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
 grep -A1 -- "- name: HERD_AI_CHECK_TIMEOUT_SECONDS" <<<"$api" | grep -q 'value: "20"' \
   || fail "the API has no HERD_AI_CHECK_TIMEOUT_SECONDS"
 grep -A1 -- "- name: HERD_AI_PERSONAL_AGENTS_MAX" <<<"$api" | grep -q 'value: "2"' \
   || fail "ai.personalAgentsMax does not reach the API"
+grep -A1 -- "- name: HERD_AI_AUTOMATIONS_MAX" <<<"$api" | grep -q 'value: "7"' \
+  || fail "ai.automationsMax does not reach the API"
 grep -A1 -- "- name: HERD_RUN_CONCURRENCY" <<<"$worker" | grep -q 'value: "8"' \
   || fail "ai.runConcurrency does not reach the worker"
 grep -A1 -- "- name: HERD_AI_APPROVAL_HOURS" <<<"$worker" | grep -q 'value: "24"' \

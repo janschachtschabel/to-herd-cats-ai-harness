@@ -218,7 +218,7 @@ Seit M5/M6 arbeitet der Worker auch die Läufe der Agenten ab. Die KI-Schlüssel
 aus einem eigenen Secret `ai.existingSecret` (Schlüssel = Variablennamen, etwa
 `HERD_SECRET_KEY`, `HERD_AI_OPENAI_KEY`); es geht an API und Worker, nie an den
 Migrations-Job. Die Grenzen stehen unter `ai.*` (`checkTimeoutSeconds`,
-`personalAgentsMax` für die API; `approvalHours`, `runConcurrency`, `runLeaseSeconds`
+`personalAgentsMax` und `automationsMax` für die API; `approvalHours`, `runConcurrency`, `runLeaseSeconds`
 für den Worker). Mit `networkPolicy.enabled` erreichen API und Worker keinen Anbieter,
 bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter oder zum Proxy). Drei Alarme
 kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing` (alle Warnung).

@@ -55,6 +55,7 @@ worker:
 ## @param ai.existingSecret Name of an existing Secret whose keys are environment variables of the API and the worker (both call AI providers: the API to test connections and list models, the worker for agent runs): HERD_SECRET_KEY (at least 32 characters, `openssl rand -hex 32`; needed for keys stored encrypted as `enc:`), HERD_SECRET_KEY_PREVIOUS (only during a key rotation), HERD_AI_EGRESS_PROXY (optional, `http://[user:password@]host:port`: the proxy provider calls go through; the URL may carry credentials, so it is a secret) and the provider keys that connections reference as `env:HERD_AI_<NAME>`. Empty: none; connections then cannot store keys encrypted, and `env:` keys must come from api.env/worker.env (plaintext in the Deployment: avoid)
 ## @param ai.checkTimeoutSeconds Longest wait for a provider when an admin tests a connection or lists its models (HERD_AI_CHECK_TIMEOUT_SECONDS; API)
 ## @param ai.personalAgentsMax Personal agents one person may have at most, 0 to 100 (HERD_AI_PERSONAL_AGENTS_MAX; API); the organisation switch in the AI administration turns them off altogether
+## @param ai.automationsMax Automations one person may own at most, not counting done or deleted ones, 0 to 1000 (HERD_AI_AUTOMATIONS_MAX; API)
 ## @param ai.approvalHours How long a run waits for a release or an answer before it ends with approval_expired or waiting_timeout, in hours, at most 720 (HERD_AI_APPROVAL_HOURS; worker)
 ## @param ai.runConcurrency Agent runs one worker pod works on at once, 1 to 64 (HERD_RUN_CONCURRENCY; worker). Each run uses one database connection only during its short step transactions, never during a provider call; a worker needs up to runConcurrency + 3 connections for runs, besides those of the outbox. The connection's own max_concurrency still caps runs across all workers
 ## @param ai.runLeaseSeconds Lease a running run holds, renewed every third of it (HERD_RUN_LEASE_SECONDS, at least 3; worker). When a worker dies, another one takes its runs up after the lease ran out and goes on from their journal
@@ -62,6 +63,7 @@ ai:
   existingSecret: ""
   checkTimeoutSeconds: 20
   personalAgentsMax: 5
+  automationsMax: 20
   approvalHours: 72
   runConcurrency: 4
   runLeaseSeconds: 30

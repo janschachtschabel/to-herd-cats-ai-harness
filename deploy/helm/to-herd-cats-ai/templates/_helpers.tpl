@@ -168,12 +168,14 @@ seccompProfile:
       key: token
 {{- end -}}
 
-{{/* AI settings of the API pods (connection tests, personal agents). */}}
+{{/* AI settings of the API pods (connection tests, personal agents, automations). */}}
 {{- define "herd.aiApiEnv" -}}
 - name: HERD_AI_CHECK_TIMEOUT_SECONDS
   value: {{ .Values.ai.checkTimeoutSeconds | quote }}
 - name: HERD_AI_PERSONAL_AGENTS_MAX
   value: {{ .Values.ai.personalAgentsMax | quote }}
+- name: HERD_AI_AUTOMATIONS_MAX
+  value: {{ .Values.ai.automationsMax | quote }}
 {{- end -}}
 
 {{/* AI settings of the worker pods (agent runs). */}}

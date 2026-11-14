@@ -118,11 +118,12 @@
         "existingSecret": {"type": "string", "description": "Existing Secret whose keys are environment variables of the API and the worker (HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY, HERD_AI_<NAME> provider keys); empty: none"},
         "checkTimeoutSeconds": {"type": "number", "exclusiveMinimum": 0, "description": "HERD_AI_CHECK_TIMEOUT_SECONDS (API)"},
         "personalAgentsMax": {"type": "integer", "minimum": 0, "maximum": 100, "description": "HERD_AI_PERSONAL_AGENTS_MAX (API)"},
+        "automationsMax": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_AI_AUTOMATIONS_MAX (API)"},
         "approvalHours": {"type": "number", "exclusiveMinimum": 0, "maximum": 720, "description": "HERD_AI_APPROVAL_HOURS (worker)"},
         "runConcurrency": {"type": "integer", "minimum": 1, "maximum": 64, "description": "HERD_RUN_CONCURRENCY (worker)"},
         "runLeaseSeconds": {"type": "number", "minimum": 3, "description": "HERD_RUN_LEASE_SECONDS (worker)"}
       },
-      "required": ["existingSecret", "checkTimeoutSeconds", "personalAgentsMax", "approvalHours", "runConcurrency", "runLeaseSeconds"],
+      "required": ["existingSecret", "checkTimeoutSeconds", "personalAgentsMax", "automationsMax", "approvalHours", "runConcurrency", "runLeaseSeconds"],
       "description": "AI connections and agent runs"
     },
     "collab": {

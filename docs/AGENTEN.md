@@ -1213,6 +1213,7 @@ erst nach der Freigabe einer Person:
 | Gedächtnis | 8.000 Zeichen je Seite, 4.000 Zeichen zusammen im Kontext |
 | Rückfrage-Antwort | 4.000 Zeichen |
 | persönliche Agenten | `HERD_AI_PERSONAL_AGENTS_MAX`, Standard 5, 0 bis 100 |
+| Aufgaben je Person | `HERD_AI_AUTOMATIONS_MAX`, Standard 20, 0 bis 1.000 (erledigte und gelöschte zählen nicht) |
 | offene Läufe | einer je Thread, Gespräch, Seite oder Ticket |
 | Werkzeugschritt | 5 s Warten auf eine Sperre, 20 s je Anweisung (dann `tool_timeout` für das Modell) |
 
@@ -1224,6 +1225,7 @@ erst nach der Freigabe einer Person:
 | `HERD_RUN_LEASE_SECONDS` | 30 | Worker | Sperrfrist eines laufenden Laufs (mindestens 3), alle Drittel erneuert; bestimmt, wie schnell ein Absturz aufgefangen wird |
 | `HERD_AI_APPROVAL_HOURS` | 72 | Worker | Wartezeit auf eine Freigabe oder Antwort (höchstens 720) |
 | `HERD_AI_PERSONAL_AGENTS_MAX` | 5 | API | persönliche Agenten je Person (0 bis 100) |
+| `HERD_AI_AUTOMATIONS_MAX` | 20 | API | Aufgaben je Eigentümerin (0 bis 1.000; erledigte und gelöschte zählen nicht) |
 | `HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS` | – | API, Worker | Schlüssel für `enc:`-Geheimnisse ([`KI.md`](KI.md#schlüssel)) |
 | `HERD_AI_EGRESS_PROXY` | – | API, Worker | Proxy für Anbieteraufrufe ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)) |
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | 20 | API | Zeitlimit für Verbindungstest und Modellliste |
@@ -1233,7 +1235,7 @@ erst nach der Freigabe einer Person:
 `ai.env.example`), die übrigen in `.env`; siehe [`deploy/compose/README.md`](../deploy/compose/README.md).
 **Helm:** `ai.existingSecret` (ein Secret, dessen Schlüssel diese Variablen sind; geht an
 API und Worker, nie an den Migrations-Job), `ai.checkTimeoutSeconds`,
-`ai.personalAgentsMax` (API), `ai.approvalHours`, `ai.runConcurrency`,
+`ai.personalAgentsMax`, `ai.automationsMax` (API), `ai.approvalHours`, `ai.runConcurrency`,
 `ai.runLeaseSeconds` (Worker). Mit `networkPolicy.enabled` erreichen API und Worker
 **keinen Anbieter**, bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter, oder nur
 zum Proxy aus `HERD_AI_EGRESS_PROXY`); das Chart legt dafür eine eigene NetworkPolicy

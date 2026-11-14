@@ -153,6 +153,7 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_IMAGE_TAG` | no | `local` | Tag of the `to-herd-cats-ai` image to run |
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | no | `20` | Longest wait (s) for a provider when a connection is tested or its models listed (`app`, API nodes) |
 | `HERD_AI_PERSONAL_AGENTS_MAX` | no | `5` | Personal agents per person, 0 to 100 (`app`, API nodes) |
+| `HERD_AI_AUTOMATIONS_MAX` | no | `20` | Automations per person (not counting done or deleted ones), 0 to 1000 (`app`, API nodes) |
 | `HERD_AI_APPROVAL_HOURS` | no | `72` | Hours a run waits for a release or an answer before it ends (`app`, `worker`) |
 | `HERD_RUN_CONCURRENCY` | no | `4` | Agent runs one process works on at once, 1 to 64 (`app`, `worker`) |
 | `HERD_RUN_LEASE_SECONDS` | no | `30` | A running run's lease (s), at least 3; after a crash another process takes the run up after it (`app`, `worker`) |
