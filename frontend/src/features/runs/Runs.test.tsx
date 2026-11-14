@@ -106,7 +106,7 @@ describe('the run page', () => {
     expect(await screen.findByRole('heading', { name: 'Lauf von Hilda' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'HC-7' })).toHaveAttribute('href', '/tickets/7')
     expect(screen.getByText('Jan Jansen')).toBeInTheDocument()
-    expect(screen.getByText('2 Versuche, 1 Wiederaufnahmen')).toBeInTheDocument()
+    expect(screen.getByText('2 Versuche, 1 Wiederaufnahme')).toBeInTheDocument()
     expect(screen.getByText('1 Übergabe von Agent zu Agent')).toBeInTheDocument()
     expect(
       screen.getByText('1.200 ein (200 aus dem Zwischenspeicher), 300 aus'),

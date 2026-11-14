@@ -80,7 +80,10 @@ export function RunHeader({ run, meId, now }: { run: Run; meId: string | undefin
       </Item>
       <Item label={t('runs.header.duration')}>{formatDuration(t, durationMs(run, now))}</Item>
       <Item label={t('runs.header.attempts')}>
-        {t('runs.header.attemptsValue', { count: run.attempt, recoveries: run.recoveries })}
+        {t('runs.header.attemptsValue', {
+          attempts: t('runs.header.attemptsCount', { count: run.attempt }),
+          recoveries: t('runs.header.recoveriesCount', { count: run.recoveries }),
+        })}
       </Item>
       <Item label={t('runs.header.steps')}>{run.steps}</Item>
       <Item label={t('runs.header.tokens')}>
