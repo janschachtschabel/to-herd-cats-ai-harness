@@ -150,7 +150,8 @@
     "unreadCount_other": "{{count}} unread entries",
     "reasons": {
       "mention": "mentioned you in {{where}}",
-      "reply": "replied to a thread in {{where}}"
+      "reply": "replied to a thread in {{where}}",
+      "review_due": "reports: the review of {{where}} is due"
     }
   },
   "dmInspect": {

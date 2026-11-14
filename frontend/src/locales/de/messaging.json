@@ -150,7 +150,8 @@
     "unreadCount_other": "{{count}} ungelesene Einträge",
     "reasons": {
       "mention": "hat dich in {{where}} erwähnt",
-      "reply": "hat in {{where}} auf einen Thread geantwortet"
+      "reply": "hat in {{where}} auf einen Thread geantwortet",
+      "review_due": "meldet: Die Prüffrist von {{where}} ist abgelaufen"
     }
   },
   "dmInspect": {

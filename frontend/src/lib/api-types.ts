@@ -1341,6 +1341,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pages/{page_id}/reviewed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Page Reviewed
+         * @description Mark a published page as reviewed now (`page.edit`); takes and bumps no version.
+         */
+        post: operations["mark_page_reviewed_api_pages__page_id__reviewed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pages/{page_id}/tags": {
         parameters: {
             query?: never;
@@ -4450,7 +4470,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due";
         /** OrgOut */
         OrgOut: {
             /**
@@ -4522,7 +4542,9 @@ export interface components {
          * PageOut
          * @description `version` guards writes (send it back; stale → 409). `collab_generation` changes
          *     whenever open live-editing sessions of the page end. `tags`: tag ids, by name.
-         *     `no_ai`: locked for AI (spec 11).
+         *     `no_ai`: locked for AI (spec 11). `reviewed_at`: the last review (publishing or
+         *     "mark as reviewed"; null for a draft); `review_due`: the space's review interval
+         *     has passed since (plan M7 decision 11).
          */
         PageOut: {
             /** Collab Generation */
@@ -4548,6 +4570,10 @@ export interface components {
             path: string;
             /** Published At */
             published_at: string | null;
+            /** Review Due */
+            review_due: boolean;
+            /** Reviewed At */
+            reviewed_at: string | null;
             /** Slug */
             slug: string;
             /** Sort Order */
@@ -5844,7 +5870,8 @@ export interface components {
          * @description `my_role` is the caller's role there, for display (system admins: `admin`).
          *     `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).
          *     `agent_write_policy`: whether agents propose page changes (`propose`) or may write
-         *     pages directly (`direct`, plan M6 decision 8).
+         *     pages directly (`direct`, plan M6 decision 8). `review_interval_days`: pages not
+         *     reviewed for that many days are due for review (null: off; plan M7 decision 11).
          */
         SpaceOut: {
             agent_write_policy: components["schemas"]["AgentWritePolicy"];
@@ -5866,6 +5893,8 @@ export interface components {
             name: string;
             /** Owner User Id */
             owner_user_id: string | null;
+            /** Review Interval Days */
+            review_interval_days: number | null;
             /** Version */
             version: number;
         };
@@ -5888,6 +5917,8 @@ export interface components {
             icon?: string | null;
             /** Name */
             name?: string | null;
+            /** Review Interval Days */
+            review_interval_days?: number | null;
             /** Version */
             version: number;
         };
@@ -6475,7 +6506,7 @@ export interface components {
         /**
          * TreeNodeOut
          * @description A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
-         *     `tags`: tag ids, by name.
+         *     `tags`: tag ids, by name. `review_due`: as on the page.
          */
         TreeNodeOut: {
             /**
@@ -6487,6 +6518,8 @@ export interface components {
             parent_id: string | null;
             /** Path */
             path: string;
+            /** Review Due */
+            review_due: boolean;
             /** Slug */
             slug: string;
             /** Sort Order */
@@ -9901,6 +9934,37 @@ export interface operations {
             };
         };
     };
+    mark_page_reviewed_api_pages__page_id__reviewed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_page_tags_api_pages__page_id__tags_put: {
         parameters: {
             query?: never;
@@ -11598,6 +11662,8 @@ export interface operations {
                 cursor?: string | null;
                 /** @description only pages with this tag */
                 tag?: string | null;
+                /** @description only pages whose review is due (plan M7 decision 11) */
+                review_due?: boolean;
             };
             header?: never;
             path: {

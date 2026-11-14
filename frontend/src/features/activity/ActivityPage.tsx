@@ -3,6 +3,7 @@ import {
   CalendarClock,
   Check,
   CheckCheck,
+  ClipboardCheck,
   FilePen,
   MessageCircleQuestion,
   MessageSquare,
@@ -120,6 +121,7 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   run_stopped: OctagonAlert,
   skill_proposal: ScrollText,
   automation: CalendarClock,
+  review_due: ClipboardCheck,
 }
 
 /** Where an entry happened, for its sentence: its conversation, where a proposal

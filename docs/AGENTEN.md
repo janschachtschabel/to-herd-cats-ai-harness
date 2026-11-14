@@ -699,6 +699,8 @@ sich noch nicht (API und Oberfläche folgen); der Worker arbeitet fällige aber 
   Protokoll `automation_firing` (eindeutig je Aufgabe und Termin) und der nächste
   Termin. So läuft ein Termin bei beliebig vielen Workern genau einmal; stürzt ein
   Worker vor dem Commit ab, bleibt der Termin fällig und der nächste Durchlauf holt ihn.
+  Dieselbe Schleife geht einmal je UTC-Tag die Prüffristen der Seiten durch
+  (`page.review_due`, [`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)).
 - Der nächste Termin wird aus „jetzt“ berechnet: Nach einem Ausfall läuft eine Aufgabe
   einmal nach, nicht einmal je verpasstem Termin. Zeitumstellung: Eine Ortszeit, die es
   nicht gibt, fällt auf den nächsten gültigen Zeitpunkt (02:30 → 03:00), eine doppelte

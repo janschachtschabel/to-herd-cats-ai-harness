@@ -154,6 +154,51 @@ Begründung, die beim Annehmen zum Änderungstext der Version wird.
 Vorschläge von Menschen (`human_review`) gibt es noch nicht; der Dienst nimmt sie an,
 eine Oberfläche oder Route dafür nicht.
 
+### Prüffrist: veraltete Seiten (seit M7)
+
+Ein Bereich kann eine **Prüffrist** haben (`review_interval_days`, 7 bis 730 Tage;
+Voreinstellung: aus). Sie wird in den Einstellungen des Bereichs gesetzt (`PATCH
+/api/spaces/{id}` mit der `version` des Bereichs, veraltet: 409; nur wer den Bereich
+verwaltet, `space.manage`; `null` schaltet sie aus). Die Änderung steht im
+Prüfprotokoll (`space.updated`).
+
+- **Geprüft** ist eine Seite, wenn sie veröffentlicht wird und wenn jemand, der sie
+  bearbeiten darf (`page.edit`), sie **als geprüft markiert** (`POST
+  /api/pages/{id}/reviewed`, Prüfprotokoll `page.reviewed`). Das Markieren ändert die
+  Seite nicht: keine neue Version, `version` und `updated_at` bleiben, es braucht
+  keine `version`. Entwürfe lassen sich nicht markieren (409 `page.not_published`);
+  eine Seite, die man nicht sieht, antwortet 404 `page.not_found`. Seiten, die vor M7
+  veröffentlicht wurden, gelten als zuletzt bei ihrer Veröffentlichung geprüft.
+- **Fällig** ist eine veröffentlichte Seite außerhalb des Papierkorbs, wenn seit ihrer
+  letzten Prüfung die Frist vergangen ist, gezählt in ganzen UTC-Tagen: am Tag D
+  geprüft, bei 30 Tagen fällig ab 0 Uhr UTC am Tag D + 30, gleich zu welcher Uhrzeit.
+  Nie fällig sind Entwürfe, Seiten im Papierkorb, Seiten in Bereichen ohne Frist und
+  das Gedächtnis von Agenten (die Gedächtnisseiten und die Ordner `_agenten/…`).
+- **Anzeige:** Jede Seite hat `reviewed_at` und `review_due`, die Einträge des
+  Seitenbaums `review_due`. Der Seitenbaum filtert mit `?review_due=true` auf fällige
+  Seiten (paginiert wie der Baum, nur was man sieht).
+- **Täglicher Durchlauf im Worker:** Die Fälligkeits-Schleife des Workers (dieselbe,
+  die Aufgaben auslöst, alle 5 Sekunden) geht einmal je UTC-Tag durch jeden Bereich mit
+  Frist und meldet jede fällige Seite **einmal je Frist** mit dem Ereignis
+  `page.review_due` (nur IDs). Bleibt eine Meldung unbeantwortet, kommt die nächste
+  erst nach einer weiteren Frist; Markieren oder Veröffentlichen setzt die Uhr zurück.
+  Ein Bereich wird immer nur von einem Worker bearbeitet (Sperre auf der Zeile des
+  Bereichs, andere Worker überspringen ihn), in Schritten von höchstens 100 Seiten je
+  Transaktion; erst nach dem letzten Schritt ist er für den Tag erledigt
+  (`space.review_checked_on`). Das gilt bei beliebig vielen Worker-Replikas genau
+  einmal. Wird die Frist geändert, schaut der nächste Durchlauf sofort wieder hin: Eine
+  kürzere Frist macht Seiten noch am selben Tag fällig.
+- **Mitteilung:** Zu jedem `page.review_due` bekommt der Thread der Seite einen
+  Systemeintrag „Prüfung fällig“ ohne Inhalt, und die Moderatoren des Bereichs (über
+  ihre Mitgliedschaft, direkt oder über eine Gruppe; Administratoren ohne Mitgliedschaft
+  nicht) bekommen einen Eintrag in ihrer Aktivität (Grund `review_due`), nur wenn sie
+  die Seite sehen. Ist die Seite inzwischen geprüft oder im Papierkorb, entsteht nichts.
+  In Kanälen erscheint nichts. Ereignis-Regeln für Agenten können auf `page.review_due`
+  reagieren (Ereignis-Auslöser, [`AGENTEN.md`](AGENTEN.md)).
+- **Rolling Update:** Ein Pod des vorigen Release, der eine Aktivität mit Grund
+  `review_due` liest, scheitert daran, bis er ersetzt ist (wie bei anderen neuen
+  Gründen eines Release).
+
 ## Grenzen der Markdown-Abbildung im Live-Editor
 
 Markdown ist das gespeicherte Format; der Live-Editor arbeitet auf einem Dokumentbaum

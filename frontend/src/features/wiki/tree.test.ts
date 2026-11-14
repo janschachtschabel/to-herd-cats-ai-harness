@@ -12,6 +12,7 @@ function node(id: string, parent: string | null, sort: number, title = id, path 
     sort_order: sort,
     status: 'published',
     tags: [],
+    review_due: false,
   }
 }
 

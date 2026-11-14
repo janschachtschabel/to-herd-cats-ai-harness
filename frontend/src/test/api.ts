@@ -162,6 +162,7 @@ export function makeSpace(overrides: Partial<Space> = {}): Space {
     ai_policy: 'any',
     allowed_locations: [],
     agent_write_policy: 'propose',
+    review_interval_days: null,
     ...overrides,
   }
 }
@@ -185,6 +186,8 @@ export function makePage(overrides: Partial<WikiPage> = {}): WikiPage {
     created_at: '2026-11-12T10:00:00Z',
     updated_at: '2026-11-12T10:00:00Z',
     published_at: '2026-11-12T10:00:00Z',
+    reviewed_at: '2026-11-12T10:00:00Z',
+    review_due: false,
     created_by: { type: 'user', id: 'author' },
     updated_by: { type: 'user', id: 'author' },
     ...overrides,
@@ -193,8 +196,8 @@ export function makePage(overrides: Partial<WikiPage> = {}): WikiPage {
 
 /** The tree entry of a page. */
 export function nodeOf(page: WikiPage): TreeNode {
-  const { id, parent_id, title, slug, path, status, sort_order, tags } = page
-  return { id, parent_id, title, slug, path, status, sort_order, tags }
+  const { id, parent_id, title, slug, path, status, sort_order, tags, review_due } = page
+  return { id, parent_id, title, slug, path, status, sort_order, tags, review_due }
 }
 
 export function makeTag(overrides: Partial<Tag> = {}): Tag {
