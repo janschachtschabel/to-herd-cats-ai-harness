@@ -11,11 +11,14 @@ Stops: `completed` (an answer without tool calls), `max_steps` (that many model 
 without an answer), `no_progress` (the third identical tool call), `provider_refused`
 (401, 402, 403, 429), `error` (anything else the provider or the network does, an
 answer that is no use, or a tool the model invented three times in a row), and what
-the host decides (`deadline`, `rights_revoked`, `policy_blocked`). The deadline also
-cuts a call in flight.
+the host decides (`deadline`, `rights_revoked`, `policy_blocked`, and `error` when a
+step cannot be recorded or a tool fails: at once, never a blind retry). The deadline
+also cuts a call in flight. The model's text and arguments come without what the
+database cannot store (`storable`).
 """
 
 import asyncio
+import re
 import time
 from collections import Counter
 from collections.abc import Sequence
@@ -38,6 +41,8 @@ from app.runtime import tools
 from app.runtime.models import BuiltModel
 from app.runtime.untrusted import frame_untrusted
 
+# What Postgres cannot store in text or JSONB: NUL and lone UTF-16 surrogates.
+UNSTORABLE = re.compile("[\x00\ud800-\udfff]")
 REFUSED_STATUSES = frozenset({401, 402, 403, 429})
 MAX_BAD_CALLS = 3
 SAME_CALL_LIMIT = 3  # the third identical call stops the run
@@ -55,8 +60,9 @@ Stop = Literal[
 
 
 class Halt(Exception):  # noqa: N818 (a decision, raised by the host)
-    def __init__(self, reason: Stop) -> None:
+    def __init__(self, reason: Stop, detail: str | None = None) -> None:
         self.reason = reason
+        self.detail = detail
         super().__init__(reason)
 
 
@@ -128,7 +134,7 @@ async def run_loop(
             await host.before_model_call(step)
             response = await _request(built, history, params, host)
         except Halt as halt:
-            return Outcome(halt.reason)
+            return Outcome(halt.reason, detail=halt.detail)
         except ModelHTTPError as exc:
             reason: Stop = "provider_refused" if exc.status_code in REFUSED_STATUSES else "error"
             return Outcome(reason, detail=f"status {exc.status_code}")
@@ -137,7 +143,10 @@ async def run_loop(
         except Exception as exc:  # the provider or the network; never its text
             return Outcome("error", detail=type(exc).__name__)
         reply = response.reply
-        await host.after_model_call(step, reply)
+        try:
+            await host.after_model_call(step, reply)
+        except Halt as halt:
+            return Outcome(halt.reason, detail=halt.detail)
         history.append(response.message)
         if not reply.tool_calls:
             if not reply.text.strip():
@@ -159,7 +168,7 @@ async def run_loop(
             try:
                 result = await host.call_tool(step, call, args)
             except Halt as halt:
-                return Outcome(halt.reason)
+                return Outcome(halt.reason, detail=halt.detail)
             framed = frame_untrusted(result.source, result.text, **result.attrs)
             returns.append(ToolReturnPart(call.name, framed, tool_call_id=call.id))
         history.append(ModelRequest(parts=returns, instructions=instructions))
@@ -188,9 +197,9 @@ async def _request(
             built.model, history, model_settings=built.settings, model_request_parameters=params
         )
     duration_ms = round((time.monotonic() - started) * 1000)
-    text = "".join(p.content for p in response.parts if isinstance(p, TextPart))
+    text = storable("".join(p.content for p in response.parts if isinstance(p, TextPart)))
     calls = [
-        ToolCall(p.tool_call_id, p.tool_name, p.args_as_dict())
+        ToolCall(p.tool_call_id, p.tool_name, storable(p.args_as_dict()))
         for p in response.parts
         if isinstance(p, ToolCallPart)
     ]
@@ -205,3 +214,15 @@ async def _request(
         model=response.model_name,
     )
     return _Response(response, reply)
+
+
+def storable[T](value: T) -> T:
+    """The model's text and arguments without what the database cannot store (it may
+    be asked to write such characters), so a step can always be recorded."""
+    if isinstance(value, str):
+        return UNSTORABLE.sub("", value)  # type: ignore[return-value]
+    if isinstance(value, dict):
+        return {storable(k): storable(v) for k, v in value.items()}  # type: ignore[return-value]
+    if isinstance(value, list):
+        return [storable(v) for v in value]  # type: ignore[return-value]
+    return value

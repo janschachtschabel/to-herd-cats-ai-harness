@@ -84,42 +84,42 @@ class RunHost:
             await asyncio.sleep(wait)
 
     async def after_model_call(self, step: int, reply: Reply) -> None:
-        claimed = self.run.claimed
-        async with self.unit() as session:
-            steps, run, _ = await self._owned(session)
-            await steps.event(self._seq(), EventKind.MODEL_CALL, _reply_content(step, reply))
-            await record_usage(
-                session,
-                org_id=claimed.org_id,
-                connection_id=self.run.connection_id,
-                model=self.run.agent.model,
-                tokens_in=reply.tokens_in,
-                tokens_out=reply.tokens_out,
-                tokens_cached=reply.tokens_cached,
-                duration_ms=reply.duration_ms,
-                user_id=claimed.user_id,
-                agent_id=claimed.agent_id,
-                run_id=claimed.id,
-            )
-            run.steps += 1
-            await _progress(session, claimed, run.steps)
+        try:
+            async with self.unit() as session:
+                steps, run, _ = await self._owned(session)
+                await steps.event(self._seq(), EventKind.MODEL_CALL, _reply_content(step, reply))
+                await self._usage(session, reply)
+                run.steps += 1
+                await _progress(session, self.run.claimed, run.steps)
+        except (Lost, Halt):
+            raise
+        except Exception as exc:  # the step cannot be recorded: count the call, stop now
+            async with self.unit() as session:
+                await self._owned(session)
+                await self._usage(session, reply)
+            raise Halt("error", detail=type(exc).__name__) from exc
 
     async def call_tool(self, step: int, call: ToolCall, args: tool_defs.ToolArgs) -> ToolResult:
-        async with self.unit() as session:
-            steps, _, agent = await self._owned(session)
-            actor = await self._actor(session, agent)
-            location = await self._location(steps)
-            result = await RunTools(session, actor, location, self.run.reads).run(args)
-            content = {
-                "step": step,
-                "call_id": call.id,
-                "name": call.name,
-                "args": args.model_dump(mode="json"),
-                "source": result.source,
-                "attrs": result.attrs,
-                "text": result.text,
-            }
-            await steps.event(self._seq(), EventKind.TOOL_CALL, content)
+        try:
+            async with self.unit() as session:
+                steps, _, agent = await self._owned(session)
+                actor = await self._actor(session, agent)
+                location = await self._location(steps)
+                result = await RunTools(session, actor, location, self.run.reads).run(args)
+                content = {
+                    "step": step,
+                    "call_id": call.id,
+                    "name": call.name,
+                    "args": args.model_dump(mode="json"),
+                    "source": result.source,
+                    "attrs": result.attrs,
+                    "text": result.text,
+                }
+                await steps.event(self._seq(), EventKind.TOOL_CALL, content)
+        except (Lost, Halt):
+            raise
+        except Exception as exc:  # a tool that fails ends the run, never retried blind
+            raise Halt("error", detail=type(exc).__name__) from exc
         return result
 
     # --- checks ----------------------------------------------------------------------
@@ -154,6 +154,22 @@ class RunHost:
         if connection is None:
             raise Halt("rights_revoked")
         return DataLocation(connection.data_location)
+
+    async def _usage(self, session: AsyncSession, reply: Reply) -> None:
+        claimed = self.run.claimed
+        await record_usage(
+            session,
+            org_id=claimed.org_id,
+            connection_id=self.run.connection_id,
+            model=self.run.agent.model,
+            tokens_in=reply.tokens_in,
+            tokens_out=reply.tokens_out,
+            tokens_cached=reply.tokens_cached,
+            duration_ms=reply.duration_ms,
+            user_id=claimed.user_id,
+            agent_id=claimed.agent_id,
+            run_id=claimed.id,
+        )
 
     def _seq(self) -> int:
         self.run.seq += 1

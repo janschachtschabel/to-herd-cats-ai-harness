@@ -19,7 +19,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from app.runtime import context, tools
-from app.runtime.loop import Halt, Reply, ToolCall, ToolResult, run_loop
+from app.runtime.loop import Halt, Reply, ToolCall, ToolResult, run_loop, storable
 from app.runtime.models import wrap_model
 from app.runtime.untrusted import MAX_TOOL_CHARS
 
@@ -198,3 +198,43 @@ def test_history_keeps_the_newest_turn_and_drops_old_ones_whole() -> None:
     assert isinstance(messages[1], ModelResponse)
     assert isinstance(messages[2], ModelRequest)
     assert isinstance(messages[2].parts[0], UserPromptPart)
+
+
+async def test_what_cannot_be_stored_is_left_out_of_the_reply() -> None:
+    """NUL and lone surrogates (finding 2): Postgres refuses them in text and JSONB."""
+    odd = ModelResponse(parts=[ToolCallPart("search", {"query": "v\x00pn"}, tool_call_id="c1")])
+    model, _ = _model([odd, ModelResponse(parts=[TextPart("a\x00b\x00c")])])
+    host = Host()
+    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3)
+    assert (outcome.reason, outcome.answer) == ("completed", "abc")
+    assert host.replies[0].tool_calls[0].args == {"query": "vpn"}
+    assert host.tool_calls == [("search", tools.SearchArgs(query="vpn"))]
+    assert host.replies[1].text == "abc"
+    # a lone surrogate (JSON may carry one; FunctionModel cannot serialise it)
+    assert storable({"q\ud800": ["a\udc00b", 1]}) == {"q": ["ab", 1]}
+
+
+class FailingHost(Host):
+    def __init__(self, where: str) -> None:
+        super().__init__()
+        self.where = where
+
+    async def after_model_call(self, step: int, reply: Reply) -> None:
+        await super().after_model_call(step, reply)
+        if self.where == "record":
+            raise Halt("error", detail="RuntimeError")
+
+    async def call_tool(self, step: int, call: ToolCall, args: tools.ToolArgs) -> ToolResult:
+        if self.where == "tool":
+            raise Halt("error", detail="ValueError")
+        return await super().call_tool(step, call, args)
+
+
+@pytest.mark.parametrize("where", ["record", "tool"])
+async def test_a_halt_after_the_call_keeps_its_detail(where: str) -> None:
+    model, seen = _model([_search("vpn"), ModelResponse(parts=[TextPart("never")])])
+    host = FailingHost(where)
+    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3)
+    expected = "RuntimeError" if where == "record" else "ValueError"
+    assert (outcome.reason, outcome.detail) == ("error", expected)
+    assert len(seen) == 1
