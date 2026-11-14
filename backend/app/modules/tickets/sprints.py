@@ -44,8 +44,9 @@ from app.modules.tickets.events import (
     SPRINT_UPDATED,
     TICKET_UPDATED,
     Field,
+    TicketChange,
     sprint_event,
-    ticket_event,
+    ticket_events,
 )
 from app.modules.tickets.models import (
     FIRST_SPRINT_DAY,
@@ -215,16 +216,13 @@ class SprintService:
         sprint.version += 1
         await self.session.flush()
         threads = await TicketThreadRepository(self.session, actor.org_id).thread_ids(open_)
-        for ticket_id in open_:  # each moved ticket changed: one event each
-            await ticket_event(
-                self.session,
-                actor,
-                TICKET_UPDATED,
-                ticket_id=ticket_id,
-                space_id=sprint.space_id,
-                conversation_id=threads.get(ticket_id),
-                changes={Field.SPRINT: (sprint.id, target.id if target else None)},
-            )
+        moved = {Field.SPRINT: (sprint.id, target.id if target else None)}
+        await ticket_events(  # each moved ticket changed: one event each, one INSERT
+            self.session,
+            actor,
+            TICKET_UPDATED,
+            [TicketChange(t, sprint.space_id, threads.get(t), moved) for t in open_],
+        )
         await self._event(actor, SPRINT_CLOSED, sprint, ["state"])
         tally = {"planned": len(tickets), "done": done, "carried": len(open_)}
         await self._audit(

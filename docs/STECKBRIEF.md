@@ -227,7 +227,9 @@ günstiger.
 
 **Sprint abschließen** (3.000 Tickets im Sprint, 590 erledigt, 628 verworfen, **1.782
 unerledigte in den nächsten Sprint**): Die Anfrage dauerte **2,9 s** (eine Transaktion;
-die Tickets des Sprints sind so lange gesperrt). Sie schreibt 1.783 Ereignisse (je
+die Tickets des Sprints sind so lange gesperrt). Nachbesserung nach dem Modul-Review:
+Die Ereignisse gehen in einem INSERT (`emit_many`); 2.000 verschobene Tickets brauchten
+im Test (ein Prozess, ASGI ohne Netz) **0,16 bis 0,21 s statt 2,9 bis 3,3 s**. Sie schreibt 1.783 Ereignisse (je
 verschobenem Ticket ein `ticket.updated`, dazu `sprint.closed`); daraus schreibt der
 Worker 1.782 Systemmeldungen, also noch einmal so viele `message.created`. **Ein
 Worker-Prozess hatte alle rund 3.570 Ereignisse 8,5 s nach dem Ende der Anfrage

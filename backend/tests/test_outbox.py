@@ -5,10 +5,10 @@ import asyncio
 import uuid
 
 import asyncpg
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 
 from app.core.config import get_settings
-from app.core.outbox import OUTBOX_CHANNEL, EventActor, EventOutbox, emit
+from app.core.outbox import OUTBOX_CHANNEL, EventActor, EventOutbox, NewEvent, emit, emit_many
 from app.core.principal import Principal
 from tests.real_db import RealDb
 
@@ -104,3 +104,54 @@ async def test_a_delivery_record_holds_only_what_is_read(real_db: RealDb) -> Non
             )
         )
         assert sorted(columns) == ["event_id", "handler"]
+
+
+async def test_emit_many_writes_its_events_in_one_insert_and_wakes_once(
+    real_db: RealDb,
+) -> None:
+    """Module review M4b, finding 6: a sprint closed with many tickets writes one
+    event per ticket; `emit_many` writes them with one multi-row INSERT and one NOTIFY,
+    in the caller's transaction, as `emit` does for one."""
+    subjects = [uuid.uuid4() for _ in range(250)]
+    connection, received = await _listener()
+    try:
+        async with real_db.database.session_factory() as session:
+            sync_conn = (await session.connection()).sync_connection
+            assert sync_conn is not None
+            statements: list[str] = []
+
+            def _seen(conn, cursor, statement, *args) -> None:  # type: ignore[no-untyped-def]
+                statements.append(statement)
+
+            event.listen(sync_conn, "before_cursor_execute", _seen)
+            try:
+                written = await emit_many(
+                    session,
+                    actor=_actor(real_db),
+                    events=[
+                        NewEvent("test.many", None, "test", subject, {"i": i})
+                        for i, subject in enumerate(subjects)
+                    ],
+                )
+            finally:
+                event.remove(sync_conn, "before_cursor_execute", _seen)
+            assert [e.subject_id for e in written] == subjects
+            inserts = [s for s in statements if s.startswith("INSERT INTO event_outbox")]
+            assert len(inserts) == 1 and len(statements) == 2  # the INSERT, one NOTIFY
+            await asyncio.sleep(0.2)
+            assert received.empty()  # not before the commit
+            await session.commit()
+        await asyncio.wait_for(received.get(), timeout=5)
+        await asyncio.sleep(0.2)
+        assert received.empty()  # one wake-up for all of them
+        async with real_db.database.session_factory() as session:
+            rows = await session.execute(
+                select(EventOutbox.subject_id, EventOutbox.payload).where(
+                    EventOutbox.type == "test.many"
+                )
+            )
+            assert {(s, p["i"]) for s, p in rows} == {(s, i) for i, s in enumerate(subjects)}
+        async with real_db.database.session_factory() as session:
+            assert await emit_many(session, actor=_actor(real_db), events=[]) == []
+    finally:
+        await connection.close()

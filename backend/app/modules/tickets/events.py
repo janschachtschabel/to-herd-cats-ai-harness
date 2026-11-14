@@ -18,14 +18,15 @@ Subject: the ticket; space: its space.
 """
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.outbox import Acting, emit
+from app.core.outbox import Acting, NewEvent, emit, emit_many
 
 TICKET_CREATED = "ticket.created"
 TICKET_UPDATED = "ticket.updated"
@@ -111,6 +112,36 @@ async def ticket_event(
         subject_type="ticket",
         subject_id=ticket_id,
         payload=payload(ticket_id, conversation_id, changes),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TicketChange:
+    """One ticket's change, for `ticket_events`."""
+
+    ticket_id: uuid.UUID
+    space_id: uuid.UUID
+    conversation_id: uuid.UUID | None
+    changes: Changes
+
+
+async def ticket_events(
+    session: AsyncSession, actor: Acting, type_: str, items: Sequence[TicketChange]
+) -> None:
+    """One event per ticket, written together (one INSERT, `emit_many`)."""
+    await emit_many(
+        session,
+        actor=actor,
+        events=[
+            NewEvent(
+                type_,
+                item.space_id,
+                "ticket",
+                item.ticket_id,
+                payload(item.ticket_id, item.conversation_id, item.changes),
+            )
+            for item in items
+        ],
     )
 
 

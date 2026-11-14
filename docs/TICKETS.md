@@ -430,7 +430,9 @@ Ticket** (und daraus je eine Systemmeldung, also ein `message.created`). Die Han
 arbeiten in eigenen Bahnen: Die Systemmeldungen eines großen Abschlusses halten
 Erwähnungen, Benachrichtigungen und Live-Ereignisse anderer Handler nicht auf. Gemessen
 (siehe [`docs/STECKBRIEF.md`](STECKBRIEF.md#sprints-und-boards-m4b)): Ein Abschluss mit
-1.782 verschobenen Tickets dauerte 2,9 s; ein Worker hatte die rund 3.570 Ereignisse
+1.782 verschobenen Tickets dauerte 2,9 s (seit der Nachbesserung schreibt er die
+Ereignisse in einem INSERT: 2.000 verschobene Tickets 0,2 s statt 3,1 s, im Test
+gemessen); ein Worker hatte die rund 3.570 Ereignisse
 8,5 s danach verteilt. Eine Erwähnung kam in dieser Zeit nach 0,2 s an, die erste
 Systemmeldung eines gleichzeitig angelegten Tickets erst nach knapp 8 s (dieselbe Bahn).
 Ohne laufenden Worker geht nichts verloren, aber Systemmeldungen, Zuweisungs-

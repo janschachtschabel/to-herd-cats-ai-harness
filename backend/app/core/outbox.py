@@ -2,8 +2,9 @@
 event in its own transaction with `emit`; the worker's dispatcher hands each event to
 the handlers registered for its type (`app.worker`).
 
-- `emit` adds the row and calls `NOTIFY herd_outbox`, which Postgres delivers when the
-  caller's transaction commits (never for a rolled-back one), waking the dispatchers.
+- `emit` adds the row (`emit_many` several, in one INSERT) and calls `NOTIFY
+  herd_outbox`, which Postgres delivers when the caller's transaction commits (never
+  for a rolled-back one), waking the dispatchers.
   Inside `one_notify` (a worker's lane batch) the NOTIFY is sent once at its end.
 - The worker routes each new event into one `event_lane` row per handler that wants
   it (`routed_at`); each handler works off its own lane (`app/worker/dispatcher.py`).
@@ -15,7 +16,7 @@ the handlers registered for its type (`app.worker`).
 """
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -206,6 +207,17 @@ async def one_notify(session: AsyncSession) -> AsyncIterator[None]:
         await _notify(session)
 
 
+@dataclass(frozen=True, slots=True)
+class NewEvent:
+    """An event to write with `emit_many` (all of one actor)."""
+
+    type: str
+    space_id: uuid.UUID | None
+    subject_type: str
+    subject_id: uuid.UUID
+    payload: dict[str, Any]
+
+
 async def emit(
     session: AsyncSession,
     *,
@@ -217,21 +229,37 @@ async def emit(
     payload: dict[str, Any],
 ) -> EventOutbox:
     """Write an event in the caller's transaction (the caller commits)."""
-    event = EventOutbox(
-        org_id=actor.org_id,
-        type=type,
-        actor_type=actor.principal.type,
-        actor_id=actor.principal.id,
-        space_id=space_id,
-        subject_type=subject_type,
-        subject_id=subject_id,
-        payload=payload,
-    )
-    session.add(event)
+    new = NewEvent(type, space_id, subject_type, subject_id, payload)
+    (event,) = await emit_many(session, actor=actor, events=[new])
+    return event
+
+
+async def emit_many(
+    session: AsyncSession, *, actor: Acting, events: Sequence[NewEvent]
+) -> list[EventOutbox]:
+    """Write events in the caller's transaction, as one multi-row INSERT and one
+    NOTIFY (a sprint closed with many tickets: one event per ticket, module review
+    M4b finding 6)."""
+    if not events:
+        return []
+    rows = [
+        EventOutbox(
+            org_id=actor.org_id,
+            type=new.type,
+            actor_type=actor.principal.type,
+            actor_id=actor.principal.id,
+            space_id=new.space_id,
+            subject_type=new.subject_type,
+            subject_id=new.subject_id,
+            payload=new.payload,
+        )
+        for new in events
+    ]
+    session.add_all(rows)
     await session.flush()
     deferred = _deferred.get()
     if deferred is None:
         await _notify(session)
     else:
         deferred.append(True)
-    return event
+    return rows
