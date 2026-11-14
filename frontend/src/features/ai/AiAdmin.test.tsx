@@ -71,7 +71,7 @@ describe('ai administration', () => {
         return { status: 201, body: created }
       },
     })
-    const { user } = await renderApp('/admin/ai')
+    const { user, queryClient } = await renderApp('/admin/ai')
     expect(await screen.findByText(/Noch keine Verbindung eingerichtet/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'KI' })).toBeInTheDocument()
 
@@ -103,6 +103,17 @@ describe('ai administration', () => {
     const card = await screen.findByRole('article', { name: 'Stub' })
     expect(within(card).getByText('Verschlüsselt gespeichert')).toBeInTheDocument()
     expect(screen.queryByText(/sk-secret-123/)).not.toBeInTheDocument()
+    // nor kept in memory with the finished mutation (TanStack keeps variables 5 min)
+    await waitFor(() =>
+      expect(
+        JSON.stringify(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((m) => m.state.variables),
+        ),
+      ).not.toContain('sk-secret-123'),
+    )
   })
 
   test('editing keeps the key unless a new one is given; a stale version says so', async () => {

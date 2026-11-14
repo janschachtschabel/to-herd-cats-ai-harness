@@ -33,9 +33,14 @@ function useRefreshConnections() {
   }
 }
 
+/** A mutation that may carry a typed key: dropped from the cache once it has no
+ *  observer, so the key does not stay in memory (TanStack keeps variables 5 min). */
+const FORGET_VARIABLES = { gcTime: 0 } as const
+
 export function useCreateConnection() {
   const refresh = useRefreshConnections()
   return useMutation({
+    ...FORGET_VARIABLES,
     mutationFn: async (body: Schemas['ConnectionCreate']) =>
       unwrap(await api.POST('/api/ai/connections', { body })),
     onSuccess: refresh,
@@ -46,6 +51,7 @@ export function useUpdateConnection(connectionId: string) {
   const queryClient = useQueryClient()
   const refresh = useRefreshConnections()
   return useMutation({
+    ...FORGET_VARIABLES,
     mutationFn: async (body: Schemas['ConnectionUpdate']) =>
       unwrap(
         await api.PATCH('/api/ai/connections/{connection_id}', {
