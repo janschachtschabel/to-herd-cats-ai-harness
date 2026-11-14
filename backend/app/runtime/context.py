@@ -43,6 +43,14 @@ AUTOMATION = (
     " The request comes from a scheduled automation of {owner}: nobody wrote it just "
     "now, and your answer is posted where the automation reports."
 )
+HEARTBEAT_OK = "HEARTBEAT_OK"
+HEARTBEAT = (
+    " The request is the checklist of a heartbeat, an automation of {owner} that "
+    "comes again and again: nobody wrote it just now. Go through the checklist with "
+    "your tools. If nothing needs anyone's attention, answer exactly "
+    f"{HEARTBEAT_OK} and nothing else: then nothing is posted anywhere. Otherwise "
+    "answer with what needs attention; it is posted where the automation reports."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,12 +67,15 @@ def instructions(
     sections: Sequence[str] = (),
     asker: str | None = None,
     automation_of: str | None = None,
+    heartbeat: bool = False,
 ) -> str:
     """The run's instructions; `asker` names the person who asks where others read
     too (None: a DM of the person alone with the agent); `automation_of` the owner
-    of the automation whose run it is (plan M7 decision 3)."""
+    of the automation whose run it is (plan M7 decision 3), `heartbeat` whether that
+    automation is a heartbeat (decision 7: the `HEARTBEAT_OK` rule)."""
     setting = ALONE if asker is None else TOGETHER.format(asker=_quoted(asker))
-    automation = "" if automation_of is None else AUTOMATION.format(owner=_quoted(automation_of))
+    frame = HEARTBEAT if heartbeat else AUTOMATION
+    automation = "" if automation_of is None else frame.format(owner=_quoted(automation_of))
     text = INSTRUCTION_FRAME.format(
         name=name,
         setting=setting,

@@ -5,8 +5,15 @@
 - `assignment`: the instruction the run was given (kept in the log row of the term
   that started it, so every take-up reads the same, whatever the owner edits
   meanwhile) and, in a channel, the thread the term opened (its system entry, the
-  root the run answers in). Never derived from `run.lane_id`, which is the
-  automation.
+  root the run answers in), and whether its automation is a heartbeat. Never
+  derived from `run.lane_id`, which is the automation.
+- `open_thread`: where the run delivers, in a channel the thread its term opened. A
+  heartbeat's term opens nothing when it fires: the first delivery of its run (its
+  answer, a card, the notice of its end) posts the term's entry first
+  (`entries.py`), so a heartbeat that answers `HEARTBEAT_OK` leaves no trace.
+- `silent`: in the transaction that ends the run, whether its answer is a
+  heartbeat's `HEARTBEAT_OK`, which is delivered nowhere; the term's row notes it
+  (`heartbeat_ok`).
 - `ended`: in the transaction that ends the run. A run that did not end `completed`
   counts (`automation.failures`); the third in a row pauses the automation
   (`failing`, the owner learns of it). A completed run starts the count anew. A
@@ -20,10 +27,10 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.agents.models import StopReason
-from app.modules.automations import pausing
-from app.modules.automations.models import AutomationState, PausedReason
+from app.modules.automations import entries, heartbeats, pausing
+from app.modules.automations.models import AutomationKind, AutomationState, PausedReason
 from app.modules.automations.repository import AutomationRepository
-from app.modules.messaging.models import Message
+from app.modules.messaging.models import ConversationKind, Message
 
 FAILING_STREAK = 3
 NOT_COUNTED = frozenset({StopReason.CANCELLED, StopReason.BUDGET})
@@ -33,6 +40,7 @@ NOT_COUNTED = frozenset({StopReason.CANCELLED, StopReason.BUDGET})
 class Assignment:
     instruction: str
     thread: Message | None  # the thread it answers in (None: at the top level)
+    heartbeat: bool = False  # its automation is a heartbeat (decision 7)
 
 
 async def assignment(
@@ -43,7 +51,47 @@ async def assignment(
     firing = await repo.firing_of(run_id)
     if firing is None or firing.instruction is None:
         return None
-    return Assignment(firing.instruction, await repo.thread_of(firing.id, lock=lock))
+    automation = await repo.get(firing.automation_id)
+    heartbeat = automation is not None and automation.kind == AutomationKind.HEARTBEAT
+    return Assignment(firing.instruction, await repo.thread_of(firing.id, lock=lock), heartbeat)
+
+
+async def open_thread(
+    session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID, *, lock: bool = False
+) -> Message | None:
+    """The thread the run delivers in (None: the top level, or no automation's run);
+    a heartbeat's term's entry is posted now if it is not yet."""
+    repo = AutomationRepository(session, org_id)
+    firing = await repo.firing_of(run_id)
+    if firing is None:
+        return None
+    automation = await repo.get(firing.automation_id)
+    if automation is None:
+        return None
+    place = await repo.place(automation)
+    if automation.kind == AutomationKind.HEARTBEAT and place.kind != ConversationKind.DM:
+        if await repo.entry_of(firing.id) is None:
+            await entries.opened(session, automation, place, firing.id)
+    return await repo.thread_of(firing.id, lock=lock)
+
+
+async def silent(
+    session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID, answer: str | None
+) -> bool:
+    """Whether the run's answer is a heartbeat's `HEARTBEAT_OK` (then noted in its
+    term's row, and delivered nowhere)."""
+    if not heartbeats.is_ok(answer):
+        return False
+    repo = AutomationRepository(session, org_id)
+    firing = await repo.firing_of(run_id)
+    if firing is None:
+        return False
+    automation = await repo.get(firing.automation_id)
+    if automation is None or automation.kind != AutomationKind.HEARTBEAT:
+        return False
+    firing.heartbeat_ok = True
+    await session.flush()
+    return True
 
 
 async def ended(

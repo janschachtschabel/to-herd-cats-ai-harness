@@ -6,6 +6,8 @@ row is locked while its term fires (`claim_due`) and the log takes a term once.
 
 In this order:
 
+- A heartbeat's term taken up after its window closed (an outage): no run,
+  `skipped_off_hours` (`heartbeats.py`).
 - The agent not active (paused, or a draft): no run, `skipped_paused_agent`.
 - The owner may no longer run it (`standing.owner_may_run`: deactivated, no
   `ai.use`, the agent or the place out of reach): the automation is paused
@@ -24,14 +26,16 @@ In this order:
   instruction it is given (`runs.py` reads it). In a channel or a ticket's thread
   a system entry `automation.started` (the owner as its actor, the automation's
   id; never the instruction) opens the term: in a channel it is the root of the
-  thread the run answers in, one thread per term (decision 3).
+  thread the run answers in, one thread per term (decision 3). A heartbeat's term
+  opens nothing yet: its run posts the entry only when it has something to deliver
+  (`runs.open_thread`), since an answer `HEARTBEAT_OK` leaves no trace.
 
 A `once` is done after its term, whatever the outcome; a recurring automation takes
-the first term after "now" (`terms.next_term`), so after an outage it fires once
-for all the terms it missed.
+the first term after "now" (`terms.next_term`), a heartbeat the next in its active
+hours (`heartbeat_terms.py`), so after an outage either fires once for all the terms
+it missed.
 """
 
-import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -39,15 +43,13 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
-from app.core.models_base import utcnow
 from app.modules.agents.models import Agent, AgentStatus
-from app.modules.agents.notices import announce
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import agent_refusal, run_target
 from app.modules.ai.budgets import budget_exhausted, has_price
 from app.modules.ai.models import AiConnection
-from app.modules.automations import pausing, terms
+from app.modules.automations import entries, heartbeats, pausing, terms
 from app.modules.automations.models import (
     Automation,
     AutomationKind,
@@ -57,9 +59,6 @@ from app.modules.automations.models import (
 from app.modules.automations.repository import AutomationRepository, claim_due
 from app.modules.automations.standing import owner_may_run, place_closed
 from app.modules.messaging.models import Conversation, ConversationKind
-from app.modules.messaging.thread_repository import ThreadRepository
-
-STARTED_KEY = "automation.started"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +84,11 @@ async def fire_next(session: AsyncSession, now: datetime) -> Fired | None:
     assert automation.next_due_at is not None  # an active automation has a term
     due_at = automation.next_due_at
     automations = AutomationRepository(session, automation.org_id)
+    if heartbeats.off_hours(automation, due_at, now):
+        outcome = FiringOutcome.SKIPPED_OFF_HOURS
+        await automations.log(automation, due_at, now, outcome)
+        await automations.advance(automation, _next_due(automation, now))
+        return Fired(automation.id, due_at, outcome, None)
     place = await automations.place(automation)
     agent = await AgentRepository(session, automation.org_id).get(automation.agent_id)
     assert agent is not None  # the automation goes with its agent
@@ -96,8 +100,9 @@ async def fire_next(session: AsyncSession, now: datetime) -> Fired | None:
     firing_id = uuid7()
     outcome, run_id = await _start(session, automation, agent, place, now)
     await automations.log(automation, due_at, now, outcome, run_id, firing_id=firing_id)
-    if outcome == FiringOutcome.STARTED and place.kind != ConversationKind.DM:
-        await _opened(session, automation, place, firing_id)
+    heartbeat = automation.kind == AutomationKind.HEARTBEAT
+    if outcome == FiringOutcome.STARTED and place.kind != ConversationKind.DM and not heartbeat:
+        await entries.opened(session, automation, place, firing_id)
     await automations.advance(automation, _next_due(automation, now))
     return Fired(automation.id, due_at, outcome, run_id)
 
@@ -129,25 +134,10 @@ async def _start(
     return FiringOutcome.STARTED, run_id
 
 
-async def _opened(
-    session: AsyncSession, automation: Automation, place: Conversation, firing_id: uuid.UUID
-) -> None:
-    """The term's system entry at the place (ids only; `client_id` = the term's row)."""
-    body = json.dumps(
-        {
-            "key": STARTED_KEY,
-            "actor": str(automation.owner_user_id),
-            "automation_id": str(automation.id),
-        }
-    )
-    repo = ThreadRepository(session, automation.org_id)
-    message = await repo.add_system(place, firing_id, body, utcnow())
-    assert message is not None  # a new term's id
-    await announce(session, automation.org_id, automation.agent_id, message, system=True)
-
-
 def _next_due(automation: Automation, now: datetime) -> datetime | None:
     if automation.kind == AutomationKind.ONCE:
         return None
+    if automation.kind == AutomationKind.HEARTBEAT:
+        return heartbeats.next_term(automation, now)
     assert automation.cron is not None and automation.time_zone is not None
     return terms.next_term(automation.cron, automation.time_zone, now)

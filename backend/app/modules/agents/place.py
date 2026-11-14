@@ -50,6 +50,7 @@ class Asked:
     reply_to: uuid.UUID | None = None  # the thread its messages go to (None: top level)
     asker: str | None = None  # the asker's name where others read too (None: alone)
     automation_of: str | None = None  # an automation's run: its owner's name
+    heartbeat: bool = False  # that automation is a heartbeat (the `HEARTBEAT_OK` rule)
 
 
 async def asked(session: AsyncSession, claimed: Claimed) -> Asked | None:
@@ -67,7 +68,8 @@ async def asked(session: AsyncSession, claimed: Claimed) -> Asked | None:
         return found
     name = await reads.person_name(claimed.user_id) or "the person who asked"
     automation_of = name if claimed.automation_id is not None else None
-    return Asked(found.turns, found.reply_to, None if alone else name, automation_of)
+    asker = None if alone else name
+    return Asked(found.turns, found.reply_to, asker, automation_of, found.heartbeat)
 
 
 async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
@@ -75,7 +77,8 @@ async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
     if found is None:
         return None
     reply_to = found.thread.id if found.thread is not None else None
-    return Asked([Turn("person", found.instruction, keep=True)], reply_to)
+    turns = [Turn("person", found.instruction, keep=True)]
+    return Asked(turns, reply_to, heartbeat=found.heartbeat)
 
 
 async def _asked(reads: ReadRepository, claimed: Claimed) -> Asked | None:

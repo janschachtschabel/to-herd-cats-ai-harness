@@ -3,7 +3,10 @@
 second one), or on any other stop a timeline notice (`run.stopped` with the reason,
 for the client to word), where the run answers (`place.py`: the DM, the mentioning
 message's thread, the ticket's thread, an automation's place or the thread its term
-opened); the run `done`. A ticket's run that ends without its answer (not cancelled)
+opened); the run `done`. A heartbeat's answer `HEARTBEAT_OK` is delivered nowhere
+(no message, no thread, no activity; its term's row notes it, plan M7 decision 7);
+anything else a heartbeat's run delivers goes into the thread its term opens only
+then. A ticket's run that ends without its answer (not cancelled)
 gives the agent's responsible person an activity entry (`run_stopped`). A cancel
 request found there wins over any other end (`cancelled`, no answer).
 
@@ -52,9 +55,14 @@ async def close(
     by = await ControlRepository(session, claimed.org_id).cancelled_by(run.id)
     if by is not None:
         reason, answer, detail = StopReason.CANCELLED, None, None
-    root = await _thread(session, claimed)
+    quiet = (
+        claimed.automation_id is not None
+        and reason == StopReason.COMPLETED
+        and await automation_runs.silent(session, claimed.org_id, claimed.id, answer)
+    )
+    root = None if quiet else await _thread(session, claimed)
     if reason == StopReason.COMPLETED:
-        if answer is not None:
+        if answer is not None and not quiet:
             message = await steps.answer(answer[:MAX_BODY_CHARS], root)
             if message is not None:
                 if root is not None:
@@ -84,13 +92,13 @@ async def close(
 
 async def _thread(session: AsyncSession, claimed: Claimed) -> Message | None:
     """The thread the run answers in, locked (None: the top level): a mention's
-    thread, or the one an automation's term opened in a channel."""
+    thread, or the one an automation's term opened in a channel (a heartbeat's term
+    opens it now)."""
     if claimed.trigger_message_id is not None:
         reads = ReadRepository(session, claimed.org_id)
         return await reads.thread_root(claimed.trigger_message_id, lock=True)
     if claimed.automation_id is not None:
-        found = await automation_runs.assignment(session, claimed.org_id, claimed.id, lock=True)
-        return found.thread if found is not None else None
+        return await automation_runs.open_thread(session, claimed.org_id, claimed.id, lock=True)
     return None
 
 

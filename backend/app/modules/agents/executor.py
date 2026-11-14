@@ -148,7 +148,12 @@ class Executor:
                 reply_to=found.reply_to,
             )
         instructions = context.instructions(
-            agent.name, agent.instructions, briefed.sections, found.asker, found.automation_of
+            agent.name,
+            agent.instructions,
+            briefed.sections,
+            found.asker,
+            found.automation_of,
+            found.heartbeat,
         )
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps

@@ -685,7 +685,7 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
 
-### Aufgaben: Fälligkeits-Schleife und Lauf (M7, im Aufbau)
+### Aufgaben: Fälligkeits-Schleife, Lauf und Heartbeat (M7, im Aufbau)
 
 Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
 IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
@@ -769,6 +769,32 @@ Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
   Änderungen (409 `automation.version_conflict`), wer es nicht darf, bekommt 403
   `automation.not_allowed`, wer kein `ai.use` hat, 404. Auditiert als
   `automation.taken_over`. Die Route kommt mit der Verwaltungs-API.
+
+**Heartbeat** (Art `heartbeat`): Der Agent geht in einem Abstand von 15 bis 1.440
+Minuten eine Checkliste durch (der Auftrag der Aufgabe), nur in den aktiven Stunden:
+Wochentage und eine Ortszeit von–bis in einer IANA-Zeitzone (`active_days`,
+`active_from`, `active_until`, `time_zone`).
+
+- Ein Fenster gehört zum Wochentag, an dem es öffnet; ist „bis“ nicht später als
+  „von“, geht es über Mitternacht (Freitag 22:00–06:00 reicht bis Samstagmorgen),
+  „von“ = „bis“ ist der ganze Tag, aneinanderstoßende Tage sind ein Fenster. Der
+  nächste Termin liegt einen Abstand nach „jetzt“, solange er noch im Fenster liegt;
+  sonst ist er die nächste Öffnung. Außerhalb der aktiven Stunden entsteht kein Termin.
+  Zeitumstellung: Eine Öffnung, deren Ortszeit es nicht gibt, fällt auf den nächsten
+  gültigen Zeitpunkt; ein Fenster über die doppelte Stunde dauert seine echten Stunden.
+- Holt die Schleife einen Termin erst mehr als 15 Minuten nach seiner Zeit und
+  außerhalb der aktiven Stunden (nach einem Ausfall), wird er mit `skipped_off_hours`
+  übersprungen; der nächste Termin ist die nächste Öffnung.
+- Die Anweisungen nennen dem Modell die Regel: Braucht nichts Aufmerksamkeit, antwortet
+  es genau `HEARTBEAT_OK`. Eine solche Antwort (nach Trimmen) wird **nirgends**
+  zugestellt: keine Nachricht, kein Thread, keine Aktivität, keine Benachrichtigung,
+  kein Live-Ereignis einer Nachricht; nur die Zeile des Termins im Protokoll vermerkt
+  es (`automation_firing.heartbeat_ok`). Der Lauf endet `completed` (setzt den Zähler
+  der Fehlschläge zurück). Jede andere Antwort und jedes andere Ende (der Hinweis
+  `run.stopped`) wird zugestellt wie bei jeder Aufgabe. Deshalb eröffnet ein Termin
+  eines Heartbeats beim Auslösen noch nichts: Den Systemeintrag `automation.started`
+  (im Kanal die Wurzel des Threads) schreibt erst der Lauf, wenn er etwas zuzustellen
+  hat (seine Antwort, eine Karte, den Hinweis seines Endes).
 
 ### Läufe im Einzelnen
 
@@ -1184,7 +1210,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
-| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `paused_owner`) |
+| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `paused_owner`) |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1219,7 +1245,7 @@ soll den Worker nicht als hängend erscheinen lassen.
 | Vorschläge | `page_proposal`, `skill_proposal` |
 | Skills | `skill`, `skill_version` |
 | Gedächtnis | normale Wiki-Seiten, Zuordnung in `agent_memory` |
-| Aufgaben und ihr Protokoll | `automation` (Auftrag, Termin, Zustand, Fehlschläge in Folge), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`) |
+| Aufgaben und ihr Protokoll | `automation` (Auftrag bzw. Checkliste, Termin, Zustand, Fehlschläge in Folge, beim Heartbeat Abstand und aktive Stunden), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs, ob ein Heartbeat `HEARTBEAT_OK` antwortete); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`) |
 
 Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
 bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur
@@ -1300,6 +1326,11 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   seine Aktivitätsansicht scheitert an einem solchen Eintrag, und ein Worker ohne den
   Lauf von Aufgaben beendet deren Läufe nach seinen Versuchen mit `error`. Aufgaben
   entstehen erst mit diesem Release (Verwaltungs-API); Worker zügig ersetzen.
+- M7, Heartbeats (Migration `c665b1a02d23`): die Art `heartbeat` mit Abstand und aktiven
+  Stunden, das Ergebnis `skipped_off_hours` und `automation_firing.heartbeat_ok`. Ein
+  Worker des vorigen Releases, der einen fälligen Heartbeat greift, scheitert an der
+  Terminberechnung; die Transaktion wird zurückgerollt und der Termin bleibt fällig,
+  bis ein Worker dieses Releases ihn auslöst.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen

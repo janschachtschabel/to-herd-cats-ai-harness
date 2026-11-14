@@ -10,8 +10,13 @@ with an instruction (`instruction`, the owner's words to the agent). Kinds:
   `done`, without a next term.
 - `recurring`: a cron expression (`cron`) in an IANA zone (`time_zone`); after each
   firing `next_due_at` is the first term after "now" (`terms.py`).
+- `heartbeat`: every `interval_minutes` (15 to 1,440) inside its active hours: ISO
+  weekdays (`active_days`) and a local `active_from`–`active_until` in `time_zone` (a
+  window may pass midnight; equal: the whole day; `heartbeat_terms.py`). Its
+  instruction is the checklist the agent goes through; an answer of exactly
+  `HEARTBEAT_OK` is delivered nowhere (decision 7).
 
-Heartbeats and event rules come as further kinds with columns of their own.
+Event rules come as a further kind with columns of its own.
 
 `state`: `active` (fires when due), `paused` (`paused_reason`: `manual`, `owner` (the
 owner lost a right the automation needs, plan M7 decision 2) or `failing` (three runs
@@ -23,7 +28,10 @@ in a row did not end `completed`, decision 13); keeps its next term, fires nothi
 (`run_id`, and the instruction it was given, `instruction`), or why it started none
 (`skipped_busy`: the automation's previous run is still open; `skipped_paused_agent`:
 the agent may not run; `skipped_budget`: a daily budget is reached;
-`skipped_policy`: the place is closed to AI, archived, or its ticket is gone). A
+`skipped_policy`: the place is closed to AI, archived, or its ticket is gone;
+`skipped_off_hours`: a heartbeat's term taken up after its window closed, after an
+outage). A heartbeat's run that answered `HEARTBEAT_OK` marks its row
+(`heartbeat_ok`): nothing was delivered. A
 term at which the owner turned out to have lost a right it needs logs nothing: the
 automation is paused (`paused_reason = owner`) and keeps the term. The unique index per
 term backs up the row lock of the due loop: a term is logged once, whatever runs
@@ -31,14 +39,28 @@ how many times.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    Time,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped, UuidPk
+from app.modules.automations.heartbeat_terms import MAX_INTERVAL_MINUTES, MIN_INTERVAL_MINUTES
 from app.modules.automations.terms import MAX_CRON_CHARS
 
 MAX_INSTRUCTION_CHARS = 4_000
@@ -48,6 +70,7 @@ MAX_ZONE_CHARS = 64
 class AutomationKind(StrEnum):
     ONCE = "once"
     RECURRING = "recurring"
+    HEARTBEAT = "heartbeat"
 
 
 class AutomationState(StrEnum):
@@ -68,6 +91,7 @@ class FiringOutcome(StrEnum):
     SKIPPED_PAUSED_AGENT = "skipped_paused_agent"
     SKIPPED_BUDGET = "skipped_budget"  # a daily budget of the owner, agent or org is reached
     SKIPPED_POLICY = "skipped_policy"  # the place closed to AI, archived, or its ticket gone
+    SKIPPED_OFF_HOURS = "skipped_off_hours"  # a heartbeat's term taken up after its window
 
 
 def _in(column: str, values: type[StrEnum]) -> str:
@@ -93,6 +117,23 @@ class Automation(UuidPk, OrgScoped, Base):
             f"char_length(instruction) BETWEEN 1 AND {MAX_INSTRUCTION_CHARS}", name="instruction"
         ),
         CheckConstraint("failures >= 0", name="failures"),
+        CheckConstraint(
+            "(kind = 'heartbeat') = (interval_minutes IS NOT NULL) AND "
+            "(kind = 'heartbeat') = (active_days IS NOT NULL) AND "
+            "(kind = 'heartbeat') = (active_from IS NOT NULL) AND "
+            "(kind = 'heartbeat') = (active_until IS NOT NULL) AND "
+            "(kind <> 'heartbeat' OR time_zone IS NOT NULL)",
+            name="heartbeat",
+        ),
+        CheckConstraint(
+            f"interval_minutes BETWEEN {MIN_INTERVAL_MINUTES} AND {MAX_INTERVAL_MINUTES}",
+            name="interval_minutes",
+        ),
+        CheckConstraint(
+            "cardinality(active_days) BETWEEN 1 AND 7 AND "
+            "active_days <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]",
+            name="active_days",
+        ),
         Index("ix_automation_due", "next_due_at", postgresql_where=text("state = 'active'")),
         Index("ix_automation_owner_user_id", "owner_user_id"),
         Index("ix_automation_agent_id", "agent_id"),
@@ -121,6 +162,11 @@ class Automation(UuidPk, OrgScoped, Base):
     failures: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
+    # A heartbeat's (decision 7): its interval and active hours (`heartbeat_terms.Hours`).
+    interval_minutes: Mapped[int | None] = mapped_column(Integer)
+    active_days: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
+    active_from: Mapped[time | None] = mapped_column(Time)
+    active_until: Mapped[time | None] = mapped_column(Time)
 
 
 class AutomationFiring(UuidPk, OrgScoped, Base):
@@ -129,6 +175,7 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
         CheckConstraint(_in("outcome", FiringOutcome), name="outcome"),
         CheckConstraint("run_id IS NULL OR outcome = 'started'", name="run"),
         CheckConstraint("(outcome = 'started') = (instruction IS NOT NULL)", name="instruction"),
+        CheckConstraint("NOT heartbeat_ok OR outcome = 'started'", name="heartbeat_ok"),
         Index("uq_automation_firing_term", "automation_id", "due_at", unique=True),
         Index("ix_automation_firing_run_id", "run_id"),
     )
@@ -145,3 +192,7 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
     # What the started run was asked: the automation's instruction as the term fired,
     # so every take-up of the run reads the same, whatever the owner edits meanwhile.
     instruction: Mapped[str | None] = mapped_column(Text)
+    # A heartbeat's run answered `HEARTBEAT_OK`: nothing was delivered (decision 7).
+    heartbeat_ok: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )

@@ -1,7 +1,7 @@
 """Automation rows for tests (the management API comes with plan M7 task 7)."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from typing import Any
 
 from sqlalchemy import select, update
@@ -110,6 +110,44 @@ async def placed(
     person = bench.people.users[owner]
     row = automation_row(
         person.org_id, person.id, bench.agent.id, uuid.UUID(str(conversation_id)), due=due, **fields
+    )
+    bench.session.add(row)
+    await bench.session.flush()
+    return row
+
+
+OFFICE_DAYS = [1, 2, 3, 4, 5]
+
+
+async def beating(
+    bench: Bench,
+    conversation_id: object,
+    *,
+    owner: str = "alice",
+    due: datetime = T0,
+    every: int = 30,
+    days: list[int] | None = None,
+    hours: tuple[time, time] = (time(9), time(17)),
+    time_zone: str = "Europe/Berlin",
+    checklist: str = "Sieh nach, ob Tickets ohne Bearbeitung liegen.",
+) -> Automation:
+    """A heartbeat of the bench's agent at the place: every `every` minutes in the
+    active hours (Monday to Friday, 09:00–17:00 in Berlin unless said), due at `due`."""
+    person = bench.people.users[owner]
+    row = Automation(
+        org_id=person.org_id,
+        owner_user_id=person.id,
+        agent_id=bench.agent.id,
+        conversation_id=uuid.UUID(str(conversation_id)),
+        instruction=checklist,
+        kind=AutomationKind.HEARTBEAT,
+        time_zone=time_zone,
+        interval_minutes=every,
+        active_days=days or OFFICE_DAYS,
+        active_from=hours[0],
+        active_until=hours[1],
+        next_due_at=due,
+        state=AutomationState.ACTIVE,
     )
     bench.session.add(row)
     await bench.session.flush()

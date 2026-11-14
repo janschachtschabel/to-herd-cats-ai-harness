@@ -8,7 +8,7 @@ automation's organisation.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import exists, literal, or_, select
+from sqlalchemy import exists, literal, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
@@ -96,6 +96,39 @@ class AutomationRepository:
         """The term that started the run."""
         stmt = select(AutomationFiring).where(
             AutomationFiring.org_id == self.org_id, AutomationFiring.run_id == run_id
+        )
+        return await self.session.scalar(stmt)
+
+    async def log_page(
+        self, automation_id: uuid.UUID, before: uuid.UUID | None, limit: int
+    ) -> list[AutomationFiring]:
+        """The automation's log, newest term first (`before`: a row's id, the cursor)."""
+        stmt = (
+            select(AutomationFiring)
+            .where(
+                AutomationFiring.org_id == self.org_id,
+                AutomationFiring.automation_id == automation_id,
+            )
+            .order_by(AutomationFiring.due_at.desc(), AutomationFiring.id.desc())
+            .limit(limit)
+        )
+        if before is not None:
+            cursor = select(AutomationFiring.due_at).where(
+                AutomationFiring.org_id == self.org_id, AutomationFiring.id == before
+            )
+            stmt = stmt.where(
+                tuple_(AutomationFiring.due_at, AutomationFiring.id)
+                < tuple_(cursor.scalar_subquery(), literal(before))
+            )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def entry_of(self, firing_id: uuid.UUID) -> Message | None:
+        """The term's system entry at its place, wherever it is (None: not posted)."""
+        stmt = select(Message).where(
+            Message.org_id == self.org_id,
+            Message.author_type == SYSTEM_AUTHOR,
+            Message.client_id == firing_id,
+            Message.parent_id.is_(None),
         )
         return await self.session.scalar(stmt)
 

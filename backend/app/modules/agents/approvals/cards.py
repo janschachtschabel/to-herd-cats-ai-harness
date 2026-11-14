@@ -22,6 +22,7 @@ from app.core.models_base import utcnow
 from app.modules.agents.notices import notify
 from app.modules.agents.toolbox.base import ToolContext
 from app.modules.agents.toolbox.writing import by
+from app.modules.automations import runs as automation_runs
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.notification_models import NotificationReason
 from app.modules.messaging.service import MessageService
@@ -53,12 +54,17 @@ def summary(tool: str, args: dict[str, object]) -> str:
 async def post(
     ctx: ToolContext, kind: MessageKind, card_id: uuid.UUID, text: str, to: uuid.UUID
 ) -> Message:
-    """The card, and the activity entry of the person it asks."""
+    """The card, and the activity entry of the person it asks. Where it answers: a
+    heartbeat's run opens its term's thread only now (`automations/runs.py`)."""
+    thread = ctx.run.reply_to
+    if thread is None:
+        opened = await automation_runs.open_thread(ctx.session, ctx.run.org_id, ctx.run.id)
+        thread = opened.id if opened is not None else None
     posted = await MessageService(ctx.session).post(
         ctx.actor,
         ctx.run.conversation_id,
         text,
-        ctx.run.reply_to,
+        thread,
         client_id=card_id,
         by=by(ctx),
         card=kind,
