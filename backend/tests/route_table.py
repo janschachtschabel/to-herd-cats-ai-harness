@@ -69,6 +69,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/pages/{page_id}", "page"),
     ("POST", "/api/pages/{page_id}/publish", "page"),
     ("PUT", "/api/pages/{page_id}/ai-lock", "page"),
+    ("POST", "/api/pages/{page_id}/reviewed", "page"),
     ("POST", "/api/pages/{page_id}/move", "page"),
     ("POST", "/api/pages/{page_id}/trash", "page"),
     ("POST", "/api/pages/{page_id}/restore", "page"),
