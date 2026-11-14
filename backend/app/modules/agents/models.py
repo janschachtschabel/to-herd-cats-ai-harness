@@ -72,6 +72,10 @@ MAX_RUNTIME_SECONDS = 600
 # A tool's step (`step_host`): its lock waits and each statement end after so long.
 STEP_LOCK_TIMEOUT_SECONDS = 5.0
 STEP_STATEMENT_TIMEOUT_SECONDS = 20.0
+# A person's request that asks a run to stop (a ticket taken away) waits for the run's
+# row at most so long, then answers 409 `conflict.retry` (review M6 2, finding 4); less
+# than Postgres' `deadlock_timeout` (1 s), so it loses a deadlock before detection.
+REASSIGN_LOCK_TIMEOUT_SECONDS = 0.5
 MAX_LEVEL = 3  # level 4 (external tools) comes with M8
 MAX_CHAIN_DEPTH = 3  # handovers from agent to agent that led to a run (plan M6 task 8)
 MAX_HANDOVERS_PER_RUN = 5  # tickets one run hands to agents (review M6 finding 16c)

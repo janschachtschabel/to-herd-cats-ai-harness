@@ -390,8 +390,11 @@ kennen.
 - **Verklemmungen** (Deadlock, Serialisierungsfehler; SQLSTATE `40P01`, `40001`): Die
   Datenbank hat die Transaktion ganz zurückgerollt; die API antwortet 409
   `conflict.retry` mit `Retry-After: 1`, die Anfrage darf einfach wiederholt werden
-  (Log `db.conflict_retry` mit dem SQLSTATE). Ein Schritt eines Agentenlaufs wird in
-  diesem Fall einmal wiederholt (`runs.step_retried`).
+  (Log `db.conflict_retry` mit dem SQLSTATE); die Weboberfläche wiederholt sie einmal
+  von selbst (nach `Retry-After`, höchstens 2 s). Dieselbe Antwort gibt das Wegnehmen
+  eines Tickets von einem Agenten, wenn ein Schritt seines Laufs dessen Zeile länger
+  als 0,5 s hält. Ein Schritt eines Agentenlaufs wird bei einer Verklemmung einmal
+  wiederholt (`runs.step_retried`).
 - **Rollouts**: Ein API-Pod wartet beim Beenden 5 s (`preStop`), bis er aus den
   Endpunkten genommen ist, und hat dann bis zu 30 s, laufende Anfragen zu beenden
   (`terminationGracePeriodSeconds: 35`).

@@ -949,7 +949,13 @@ Direktnachricht starten Läufe so:
   an diesem Ticket (Zuweisung, Übergabe) über `run_cancel_request` aufzuhören; ein
   laufender hält vor seinem nächsten Schritt, ein wartender oder noch nicht begonnener
   endet `cancelled`, wenn die Laufschleife ihn als Nächstes sieht. Der Lauf, der das
-  Ticket selbst übergibt, arbeitet weiter.
+  Ticket selbst übergibt, arbeitet weiter. Auf die Zeile des Laufs (`FOR NO KEY
+  UPDATE`) wartet die Anfrage höchstens 0,5 s (`REASSIGN_LOCK_TIMEOUT_SECONDS`, kürzer
+  als Postgres' `deadlock_timeout`): Hält ein Schritt des Laufs sie gerade, antwortet
+  sie 409 `conflict.retry` mit `Retry-After: 1`, statt bis zum Ende des Schritts zu
+  hängen oder eine Verklemmung abzuwarten. Die Weboberfläche schickt eine solche
+  Anfrage einmal von selbst erneut (nach `Retry-After`, höchstens 2 s;
+  `frontend/src/lib/retry.ts`).
 - Je Thread ist höchstens ein Lauf offen: [Ein offener Lauf je
   Thread](#ein-offener-lauf-je-thread).
 - Laufansicht: `trigger_message_id` ist bei Ticket-Läufen `null`, `chain_depth` zeigt

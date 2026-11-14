@@ -6,10 +6,13 @@ which is the worker's, across organisations (like claiming)."""
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, exists, or_, select
+from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db_errors import is_timeout
+from app.core.errors import RetryConflict
 from app.core.principal import PrincipalType
 from app.modules.agents.models import Run, RunCancelRequest, RunState
 from app.modules.messaging.models import Message, MessageKind
@@ -28,6 +31,30 @@ class ControlRepository:
             .execution_options(populate_existing=True)
         )
         return await self.session.scalar(stmt)
+
+    async def lock_briefly(self, run_id: uuid.UUID, wait_seconds: float) -> Run | None:
+        """The run's row locked `FOR NO KEY UPDATE`, waiting at most `wait_seconds`
+        (else `RetryConflict`); the transaction's lock bound is as before afterwards."""
+        before = await self.session.scalar(select(func.current_setting("lock_timeout")))
+        stmt = (
+            select(Run)
+            .where(Run.org_id == self.org_id, Run.id == run_id)
+            .with_for_update(key_share=True)
+            .execution_options(populate_existing=True)
+        )
+        try:
+            async with self.session.begin_nested():
+                await self._lock_timeout(f"{max(1, int(wait_seconds * 1000))}ms")
+                run = await self.session.scalar(stmt)
+        except DBAPIError as exc:
+            if not is_timeout(exc):
+                raise
+            raise RetryConflict("A run is working on it; send the request again.") from exc
+        await self._lock_timeout(str(before))
+        return run
+
+    async def _lock_timeout(self, value: str) -> None:
+        await self.session.execute(select(func.set_config("lock_timeout", value, True)))
 
     async def cancelled_by(self, run_id: uuid.UUID) -> uuid.UUID | None:
         """Who asked the run to stop, if anyone did."""

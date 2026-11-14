@@ -11,8 +11,9 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
   agent keeps the run that follows. Nothing wakes the workers here: the answer's
   own outbox event does, else they look within a second.
 - `request_cancel` records the request once (`run_cancel_request`). Who may ask is the
-  caller's rule. The run's row is locked first, so a run that ends at the same moment
-  either ends `cancelled` or was done before (False). A running run stops before its
+  caller's rule. The run's row is locked first (`FOR NO KEY UPDATE`, waiting at most
+  `REASSIGN_LOCK_TIMEOUT_SECONDS`, else 409 `conflict.retry`), so a run that ends at
+  the same moment either ends `cancelled` or was done before (False). A running run stops before its
   next step; a queued one when it is taken up; a waiting one at the next sweep.
 - `cancel` (the run view's `POST /api/runs/{id}/cancel`, M6 task 10): the same
   request, and a run nobody works on (queued or waiting) ends `cancelled` at once, in
@@ -37,7 +38,7 @@ from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository, due_waiting
 from app.modules.agents.executor import close
 from app.modules.agents.executor_repository import Claimed, RunSteps
-from app.modules.agents.models import RunState, StopReason
+from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS, RunState, StopReason
 
 SWEEP_BATCH = 50
 
@@ -60,9 +61,11 @@ async def resume_waiting(session: AsyncSession, org_id: uuid.UUID, run_id: uuid.
 async def request_cancel(
     session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """Ask the run to stop (False: it is done already)."""
+    """Ask the run to stop (False: it is done already). The run's row is waited for
+    briefly (a step of the run holds it while it works): 409 `conflict.retry` after
+    `REASSIGN_LOCK_TIMEOUT_SECONDS`, for the person to send the request again."""
     repo = ControlRepository(session, org_id)
-    run = await repo.lock(run_id)
+    run = await repo.lock_briefly(run_id, REASSIGN_LOCK_TIMEOUT_SECONDS)
     if run is None or run.state == RunState.DONE:
         return False
     await repo.add_cancel_request(run.id, user_id)

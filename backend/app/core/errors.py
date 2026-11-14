@@ -49,6 +49,13 @@ class Conflict(AppError):
     code = "conflict"
 
 
+class RetryConflict(Conflict):
+    """A lock a request waited for briefly was held: send it again (`Retry-After`)."""
+
+    code = "conflict.retry"
+    retry_after: int | None = 1
+
+
 class Unauthorized(AppError):
     status_code = 401
     code = "unauthorized"

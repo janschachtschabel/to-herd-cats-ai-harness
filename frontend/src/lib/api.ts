@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { components, paths } from './api-types'
+import { retryingOnConflict } from './retry'
 
 export type Schemas = components['schemas']
 export type Me = Schemas['MeOut']
@@ -114,8 +115,9 @@ export const api = createClient<paths>({
   baseUrl: globalThis.location?.origin ?? 'http://localhost',
   credentials: 'include',
   headers: { 'X-Requested-With': 'herd' },
-  // Resolved at call time, so test doubles are honoured.
-  fetch: (request) => globalThis.fetch(request),
+  // Resolved at call time, so test doubles are honoured. A 409 `conflict.retry` is
+  // sent once more after its `Retry-After` (at most 2 s, `retry.ts`).
+  fetch: retryingOnConflict((request) => globalThis.fetch(request)),
 })
 api.use(sessionGuard)
 
