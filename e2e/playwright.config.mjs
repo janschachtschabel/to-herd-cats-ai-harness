@@ -10,6 +10,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.HERD_E2E_PORT || 18080);
+// The files share one database. `ai-agents` sets AI up from nothing in the UI (its
+// first test expects no connection yet), so it runs first, as a project of its own;
+// every other file runs after it, in name order.
+const AI_FROM_NOTHING = /ai-agents\.spec\.mjs$/;
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined;
 
 export default defineConfig({
@@ -28,7 +32,13 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "ai-from-nothing",
+      testMatch: AI_FROM_NOTHING,
+      use: { ...devices["Desktop Chrome"], launchOptions: { executablePath } },
+    },
+    {
       name: "chromium",
+      testIgnore: AI_FROM_NOTHING,
       use: { ...devices["Desktop Chrome"], launchOptions: { executablePath } },
     },
   ],
