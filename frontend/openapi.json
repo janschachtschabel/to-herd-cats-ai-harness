@@ -56,6 +56,33 @@
         "title": "ActivityAuthor",
         "type": "object"
       },
+      "ActivityAutomation": {
+        "description": "The automation a notification is about (it was paused: plan M7); its agent is\nthe entry's `author`; `paused_reason` why it is paused now (`owner`, `failing`,\n`manual`), null once it runs again.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          }
+        },
+        "required": [
+          "id",
+          "paused_reason"
+        ],
+        "title": "ActivityAutomation",
+        "type": "object"
+      },
       "ActivityConversation": {
         "description": "`name` is null for a direct message and a page or ticket thread; `page_id` names\na page thread's page, `ticket_number` a ticket thread's ticket (null for other\nkinds; the ticket's address is `/tickets/<number>`).",
         "properties": {
@@ -145,12 +172,22 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9); `author` may be an\nagent (`type`).",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7); `author` may be an agent (`type`).",
         "properties": {
           "author": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ActivityAuthor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "automation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityAutomation"
               },
               {
                 "type": "null"
@@ -4588,7 +4625,8 @@
           "approval",
           "question",
           "run_stopped",
-          "skill_proposal"
+          "skill_proposal",
+          "automation"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -9086,7 +9124,7 @@
         "type": "string"
       },
       "SystemEntryOut": {
-        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6).",
+        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6),\n`automation_id` the automation whose term `automation.started` opened (plan M7;\n`actor` is its owner).",
         "properties": {
           "actor": {
             "anyOf": [
@@ -9097,6 +9135,18 @@
                 "type": "null"
               }
             ]
+          },
+          "automation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automation Id"
           },
           "key": {
             "title": "Key",

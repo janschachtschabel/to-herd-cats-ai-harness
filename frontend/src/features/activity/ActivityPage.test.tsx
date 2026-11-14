@@ -72,6 +72,24 @@ describe('activity', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/skill-proposals/sp-1'))
   })
 
+  test('a paused automation names its agent and why it was paused', async () => {
+    const entry = makeActivity({
+      reason: 'automation',
+      conversation: null,
+      message_id: null,
+      author: { type: 'agent', id: 'hilda', name: 'Hilda' },
+      snippet: '',
+      automation: { id: 'au-1', paused_reason: 'owner' },
+    })
+    mockApi({ ...shellRoutes(makeMe(['ai.use'])), 'GET /api/activity': page([entry]) })
+    await renderApp('/activity')
+    const item = (await screen.findByText('Hilda')).closest('li')!
+    expect(item).toHaveTextContent(
+      'hat eine Aufgabe angehalten (die Eigentümerin darf sie nicht mehr ausführen)',
+    )
+    expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+  })
+
   test('a proposal for a new page at the top level opens the proposal', async () => {
     const entry = makeActivity({
       reason: 'proposal',

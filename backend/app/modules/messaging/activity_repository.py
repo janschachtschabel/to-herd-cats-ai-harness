@@ -8,7 +8,10 @@ disappears from the list, the counters and the marking routes at once. A notific
 bound to a proposal instead (a new page at the top level, which has no thread; plan
 M6 task 6) is seen while the person may edit pages in its space (who sees proposals);
 one bound to a skill proposal (plan M6 task 9) while the person sees the proposal
-(`skills/sight.py`, the rule its routes use).
+(`skills/sight.py`, the rule its routes use). One bound to an automation (it was
+paused, plan M7) is the person's while the automation exists: it names only the
+automation, its agent and why it is paused now, which the person was told as its
+owner, its agent's responsible person or a manager of its space.
 """
 
 import uuid
@@ -61,6 +64,15 @@ SKILL_PROPOSAL = table(
     column("author_id", Uuid),
 )
 
+# The same for automations (`automations` builds on messaging): its agent is the
+# entry's author, its pause reason (null once it runs again) what the client words.
+AUTOMATION = table(
+    "automation",
+    column("id", Uuid),
+    column("agent_id", Uuid),
+    column("paused_reason", String),
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ActivityEntry:
@@ -75,6 +87,7 @@ class ActivityEntry:
     author_name: str | None  # a person's; an agent's is named by the service
     snippet: str  # the start of the message's Markdown; empty for a timeline entry
     author_type: str | None = None  # `user` or `agent` (as the message or proposal says)
+    automation_paused: str | None = None  # an automation's: why it is paused now
 
 
 class ActivityRepository:
@@ -111,10 +124,11 @@ class ActivityRepository:
             .correlate_except(skill)
         )
         about_skill = and_(Notification.skill_proposal_id.is_not(None), sees_skill)
+        about_automation = Notification.automation_id.is_not(None)
         return and_(
             Notification.org_id == self.scope.org_id,
             Notification.user_id == self.scope.principal.id,
-            or_(bound, about_proposal, about_skill),
+            or_(bound, about_proposal, about_skill, about_automation),
         )
 
     async def page(
@@ -128,13 +142,16 @@ class ActivityRepository:
         actor = cast(cast(Message.body_md, JSONB)["actor"].astext, Uuid)
         unbound = Notification.message_id.is_(None)
         about_skill = Notification.skill_proposal_id.is_not(None)
+        about_automation = Notification.automation_id.is_not(None)
         author_id = case(
+            (about_automation, AUTOMATION.c.agent_id),
             (about_skill, SKILL_PROPOSAL.c.author_id),
             (unbound, PROPOSAL.c.author_id),
             (system, actor),
             else_=Message.author_id,
         )
         author_type = case(
+            (about_automation, literal("agent", String)),
             (about_skill, SKILL_PROPOSAL.c.author_type),
             (unbound, PROPOSAL.c.author_type),
             (system, literal(None, String)),
@@ -157,11 +174,13 @@ class ActivityRepository:
                 User.name,
                 snippet,
                 author_type,
+                AUTOMATION.c.paused_reason,
             )
             .outerjoin(Conversation, Conversation.id == Notification.conversation_id)
             .outerjoin(Message, Message.id == Notification.message_id)
             .outerjoin(PROPOSAL, PROPOSAL.c.id == Notification.proposal_id)
             .outerjoin(SKILL_PROPOSAL, SKILL_PROPOSAL.c.id == Notification.skill_proposal_id)
+            .outerjoin(AUTOMATION, AUTOMATION.c.id == Notification.automation_id)
             .outerjoin(User, and_(User.id == author_id, User.org_id == Notification.org_id))
             .where(self._mine())
             .order_by(Notification.id.desc())

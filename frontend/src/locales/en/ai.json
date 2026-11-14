@@ -334,11 +334,18 @@
       "approval": "asks you for a release in {{where}}",
       "question": "asked you a question in {{where}}",
       "run_stopped": "reports in {{where}} that a run did not finish",
-      "skill_proposal": "proposed a skill or decided a skill proposal ({{where}})"
+      "skill_proposal": "proposed a skill or decided a skill proposal ({{where}})",
+      "automation": "paused an automation ({{where}})"
     },
     "skillProposalWhere": {
       "org": "organisation-wide",
       "space": "a space"
+    },
+    "automationPaused": {
+      "owner": "its owner may no longer run it",
+      "failing": "three runs in a row did not finish",
+      "manual": "paused by hand",
+      "none": "it runs again"
     }
   }
 }

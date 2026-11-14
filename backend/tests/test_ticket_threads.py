@@ -90,6 +90,7 @@ async def test_every_change_is_one_system_message_however_often_delivered(
         "old": None,
         "new": None,
         "run_id": None,
+        "automation_id": None,
     }
     assert entries[1]["new"] == {"value": desk.id_of("editor"), "name": "Desk editor"}
     assert entries[2]["old"] == {"value": ticket["status"]["id"], "name": "Neu"}

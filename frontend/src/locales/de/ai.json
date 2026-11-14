@@ -334,11 +334,18 @@
       "approval": "bittet dich in {{where}} um eine Freigabe",
       "question": "hat dir in {{where}} eine Frage gestellt",
       "run_stopped": "meldet in {{where}}, dass ein Lauf nicht zu Ende kam",
-      "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})"
+      "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})",
+      "automation": "hat eine Aufgabe angehalten ({{where}})"
     },
     "skillProposalWhere": {
       "org": "organisationsweit",
       "space": "einem Bereich"
+    },
+    "automationPaused": {
+      "owner": "die Eigentümerin darf sie nicht mehr ausführen",
+      "failing": "drei Läufe in Folge kamen nicht zu Ende",
+      "manual": "von Hand angehalten",
+      "none": "sie läuft wieder"
     }
   }
 }

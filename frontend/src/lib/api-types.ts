@@ -2614,6 +2614,21 @@ export interface components {
             type: components["schemas"]["PrincipalType"];
         };
         /**
+         * ActivityAutomation
+         * @description The automation a notification is about (it was paused: plan M7); its agent is
+         *     the entry's `author`; `paused_reason` why it is paused now (`owner`, `failing`,
+         *     `manual`), null once it runs again.
+         */
+        ActivityAutomation: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Paused Reason */
+            paused_reason: string | null;
+        };
+        /**
          * ActivityConversation
          * @description `name` is null for a direct message and a page or ticket thread; `page_id` names
          *     a page thread's page, `ticket_number` a ticket thread's ticket (null for other
@@ -2652,11 +2667,12 @@ export interface components {
          *     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
          *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
          *     level has no conversation and no message, but `proposal` (plan M6); a
-         *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9); `author` may be an
-         *     agent (`type`).
+         *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
+         *     the automation (plan M7); `author` may be an agent (`type`).
          */
         ActivityOut: {
             author: components["schemas"]["ActivityAuthor"] | null;
+            automation?: components["schemas"]["ActivityAutomation"] | null;
             conversation: components["schemas"]["ActivityConversation"] | null;
             /**
              * Created At
@@ -4434,7 +4450,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation";
         /** OrgOut */
         OrgOut: {
             /**
@@ -6061,10 +6077,14 @@ export interface components {
          *     it (null if unknown; an agent with `type` `agent`), `number` the restored version
          *     (only for `page.version_restored`), `old`/`new` what a ticket field changed from
          *     and to (null where there was nothing, and always for title and description),
-         *     `run_id` the agent's run that made a ticket change (plan M6 task 6).
+         *     `run_id` the agent's run that made a ticket change (plan M6 task 6),
+         *     `automation_id` the automation whose term `automation.started` opened (plan M7;
+         *     `actor` is its owner).
          */
         SystemEntryOut: {
             actor: components["schemas"]["PersonNameOut"] | null;
+            /** Automation Id */
+            automation_id?: string | null;
             /** Key */
             key: string;
             new: components["schemas"]["SystemValueOut"] | null;

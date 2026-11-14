@@ -685,7 +685,7 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
 
-### Aufgaben: die Fälligkeits-Schleife (M7, im Aufbau)
+### Aufgaben: Fälligkeits-Schleife und Lauf (M7, im Aufbau)
 
 Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
 IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
@@ -705,13 +705,61 @@ sich noch nicht (API und Oberfläche folgen); der Worker arbeitet fällige aber 
   läuft einmal (beim ersten Mal); stündliche Termine laufen in beiden doppelten Stunden,
   sie liegen eine echte Stunde auseinander. Termine näher als 15 Minuten werden beim
   Speichern an den nächsten fünf Terminen abgelehnt.
-- Ist der vorige Lauf der Aufgabe noch offen (in der Warteschlange, laufend oder
-  wartend auf eine Antwort), wird der Termin übersprungen (`skipped_busy`), ebenso bei
-  einem nicht aktiven Agenten (`skipped_paused_agent`). Eine angehaltene Aufgabe löst nichts aus.
-  Eine einmalige Aufgabe ist nach ihrem Termin erledigt, auch wenn er übersprungen
-  wurde.
+- Vor dem Lauf prüft der Termin, in dieser Reihenfolge: Agent nicht aktiv →
+  `skipped_paused_agent`; die Eigentümerin darf die Aufgabe nicht mehr ausführen (siehe
+  unten) → die Aufgabe wird **angehalten**; der Agent darf aus anderem Grund nicht
+  laufen (verantwortliche Person inaktiv, Verbindung nicht verfügbar, persönliche
+  Agenten abgeschaltet) → `skipped_paused_agent`; der Ort ist archiviert oder seine
+  KI-Richtlinie lässt die Verbindung des Agenten nicht zu (`none`, `restricted` ohne
+  ihren Datenort) → `skipped_policy`; ein Tagesbudget der Eigentümerin, des Agenten
+  oder der Organisation ist erreicht → `skipped_budget`; der vorige Lauf der Aufgabe ist
+  noch offen (in der Warteschlange, laufend oder wartend auf eine Antwort) →
+  `skipped_busy`. Eine angehaltene Aufgabe löst nichts aus. Eine einmalige Aufgabe ist
+  nach ihrem Termin erledigt, auch wenn er übersprungen wurde.
 - Die Schleife braucht eine Datenbankverbindung; Fehler im Log als
   `automations.pass_failed` (nur der Fehlertyp).
+
+**Der Lauf einer Aufgabe** ist ein Lauf wie jeder andere (Journal, Freigaben,
+Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
+
+- Er beginnt mit dem Auftrag als Wort der Eigentümerin, als einzigem Zug; Früheres am
+  Ort bekommt er nicht mit (seine Werkzeuge lesen den Ort wie bei jedem Lauf, als nicht
+  vertrauenswürdige Angabe gerahmt). Die Anweisungen sagen, dass eine geplante Aufgabe
+  der Eigentümerin fragt. Den Auftrag liest er aus dem Protokoll seines Termins
+  (`automation_firing.instruction`, beim Auslösen kopiert): Ändert die Eigentümerin den
+  Auftrag, während der Lauf wartet oder nach einem verlorenen Worker wieder aufgenommen
+  wird, arbeitet er mit dem alten weiter.
+- Ort der Antwort: in der Direktnachricht der Eigentümerin mit dem Agenten oben; in
+  einem Kanal eröffnet jeder Termin einen eigenen Thread, dessen Wurzel ein
+  Systemeintrag `automation.started` ist (die Eigentümerin als Akteurin, die Aufgabe
+  per `automation_id`, nie der Auftragstext), und der Lauf antwortet darin; in einem
+  Ticket-Thread steht derselbe Eintrag oben und die Antwort ebenfalls oben. Lese- und
+  Schreibbereich folgen dem Ort wie in M6 (im Kanal liest der Lauf Seiten wie ein
+  Betrachter des Bereichs, Entwürfe nur in der Direktnachricht). Der Ort der Antwort
+  wird nie aus der Bahn (`lane_id`, die Aufgabe) abgeleitet.
+- Freigaben und Rückfragen gehen an die Eigentümerin (`run.user_id`), nur sie
+  entscheidet. Ein Lauf einer Aufgabe reiht nach seinem Ende keinen Folgelauf für
+  Nachrichten ein, die währenddessen kamen (er hat keine Nachricht beantwortet); ebenso
+  kein Lauf, den ein Tagesbudget gestoppt hat (der nächste stoppte sofort wieder).
+- **Angehalten** (`paused_reason`): `owner`, wenn die Eigentümerin bei einem Termin
+  nicht mehr aktiv ist, `ai.use` verloren hat, den Agenten nicht mehr erreicht (ein
+  persönlicher Agent nur für seine Eigentümerin; in Kanal und Ticket-Thread muss der
+  Agent Mitglied des Bereichs sein) oder am Ort nicht mehr schreiben darf (Kanal und
+  Ticket-Thread: lesen und `channel.post`; Direktnachricht: sie allein mit dem Agenten).
+  Der Termin wird dann nicht protokolliert und bleibt fällig; die verantwortliche Person
+  des Agenten und die Verwaltenden des Bereichs (Rolle `admin` über eine Mitgliedschaft)
+  bekommen eine Aktivität, bei einer Direktnachricht nur die verantwortliche Person.
+  `failing`, wenn drei Läufe in Folge nicht mit `completed` enden
+  (`automation.failures` zählt sie, ein abgeschlossener Lauf setzt den Zähler zurück);
+  die Eigentümerin bekommt eine Aktivität. Aktivitäten zu Aufgaben haben den Grund
+  `automation`, nennen die Aufgabe (`automation: {id, paused_reason}`) und den Agenten
+  als Autor, aber kein Gespräch; das Ereignis trägt nur IDs.
+- **Übernehmen**: Wer die Aufgabe selbst anlegen dürfte (`ai.use`, erreicht den Agenten,
+  schreibt am Ort), kann sie übernehmen und wird Eigentümerin; die Aufgabe läuft wieder
+  (ein verpasster Termin einmal sofort), `version` schützt vor gleichzeitigen
+  Änderungen (409 `automation.version_conflict`), wer es nicht darf, bekommt 403
+  `automation.not_allowed`, wer kein `ai.use` hat, 404. Auditiert als
+  `automation.taken_over`. Die Route kommt mit der Verwaltungs-API.
 
 ### Läufe im Einzelnen
 
@@ -1127,7 +1175,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
-| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`) |
+| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `paused_owner`) |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1162,7 +1210,7 @@ soll den Worker nicht als hängend erscheinen lassen.
 | Vorschläge | `page_proposal`, `skill_proposal` |
 | Skills | `skill`, `skill_version` |
 | Gedächtnis | normale Wiki-Seiten, Zuordnung in `agent_memory` |
-| Aufgaben und ihr Protokoll | `automation` (Auftrag, Termin, Zustand), `automation_firing` (je Termin: Ergebnis, Lauf); der Lauf nennt seine Aufgabe (`run.automation_id`) |
+| Aufgaben und ihr Protokoll | `automation` (Auftrag, Termin, Zustand, Fehlschläge in Folge), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`) |
 
 Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
 bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur
@@ -1235,6 +1283,14 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   neue Tabelle `ai_budget` und ein Index). Ein Pod ohne M7 schreibt ihn nie und prüft
   keine Budgets; Laufansicht und Laufliste scheitern dort an einem solchen Lauf, bis er
   ersetzt ist.
+- M7, Lauf einer Aufgabe (Migration `f2a4c6e8b0d1`): Haltegründe `owner` und `failing`,
+  Protokoll-Ergebnisse `skipped_budget` und `skipped_policy`, der Aktivitätsgrund
+  `automation` (ohne Gespräch) und Systemeinträge `automation.started` oben in einem
+  Kanal (die Trigger-Funktion der Nachrichten lässt sie zu, wenn sie einen Termin einer
+  Aufgabe dieses Kanals nennen). Ein Pod des vorigen Releases schreibt nichts davon;
+  seine Aktivitätsansicht scheitert an einem solchen Eintrag, und ein Worker ohne den
+  Lauf von Aufgaben beendet deren Läufe nach seinen Versuchen mit `error`. Aufgaben
+  entstehen erst mit diesem Release (Verwaltungs-API); Worker zügig ersetzen.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen

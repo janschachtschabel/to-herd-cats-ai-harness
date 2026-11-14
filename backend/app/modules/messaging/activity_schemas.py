@@ -44,14 +44,23 @@ class ActivitySkillProposal(BaseModel):
     space_id: uuid.UUID | None
 
 
+class ActivityAutomation(BaseModel):
+    """The automation a notification is about (it was paused: plan M7); its agent is
+    the entry's `author`; `paused_reason` why it is paused now (`owner`, `failing`,
+    `manual`), null once it runs again."""
+
+    id: uuid.UUID
+    paused_reason: str | None
+
+
 class ActivityOut(BaseModel):
     """A notification: why, where, from whom, and the first 140 characters of the
     message's Markdown. `parent_id`: the thread the message is in (null: top level).
     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
     level has no conversation and no message, but `proposal` (plan M6); a
-    `skill_proposal` has `skill_proposal` instead (plan M6 task 9); `author` may be an
-    agent (`type`)."""
+    `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
+    the automation (plan M7); `author` may be an agent (`type`)."""
 
     id: uuid.UUID
     reason: NotificationReason
@@ -62,6 +71,7 @@ class ActivityOut(BaseModel):
     message_id: uuid.UUID | None
     proposal: ActivityProposal | None = None
     skill_proposal: ActivitySkillProposal | None = None
+    automation: ActivityAutomation | None = None
     parent_id: uuid.UUID | None
     author: ActivityAuthor | None
     snippet: str
@@ -89,6 +99,11 @@ class ActivityOut(BaseModel):
         skill_proposal = None
         if n.skill_proposal_id is not None:
             skill_proposal = ActivitySkillProposal(id=n.skill_proposal_id, space_id=n.space_id)
+        automation = None
+        if n.automation_id is not None:
+            automation = ActivityAutomation(
+                id=n.automation_id, paused_reason=entry.automation_paused
+            )
         return cls(
             id=n.id,
             reason=n.reason,
@@ -98,6 +113,7 @@ class ActivityOut(BaseModel):
             conversation=conversation,
             proposal=proposal,
             skill_proposal=skill_proposal,
+            automation=automation,
             message_id=n.message_id,
             parent_id=entry.parent_id,
             author=author,

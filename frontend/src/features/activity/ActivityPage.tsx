@@ -1,5 +1,6 @@
 import {
   AtSign,
+  CalendarClock,
   Check,
   CheckCheck,
   FilePen,
@@ -118,10 +119,11 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   question: MessageCircleQuestion,
   run_stopped: OctagonAlert,
   skill_proposal: ScrollText,
+  automation: CalendarClock,
 }
 
-/** Where an entry happened, for its sentence: its conversation, or where a proposal
- *  without a thread belongs. */
+/** Where an entry happened, for its sentence: its conversation, where a proposal
+ *  without a thread belongs, or why an automation was paused. */
 function whereOf(
   t: TFunction,
   entry: ActivityEntry,
@@ -129,6 +131,11 @@ function whereOf(
   spaceNames: ReadonlyMap<string, string>,
 ): string {
   if (entry.conversation) return conversationLabel(t, entry.conversation, meId)
+  if (entry.automation) {
+    return t(`activity.automationPaused.${entry.automation.paused_reason ?? 'none'}`, {
+      defaultValue: t('activity.automationPaused.none'),
+    })
+  }
   if (entry.skill_proposal) {
     const spaceId = entry.skill_proposal.space_id
     if (!spaceId) return t('activity.skillProposalWhere.org')
