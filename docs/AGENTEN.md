@@ -684,6 +684,34 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
 
+### Aufgaben: die Fälligkeits-Schleife (M7, im Aufbau)
+
+Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
+IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
+Eigentümerin mit dem Agenten, einen Kanal oder einen Ticket-Thread). Anlegen lassen sie
+sich noch nicht (API und Oberfläche folgen); der Worker arbeitet fällige aber schon ab:
+
+- Eine eigene Schleife im Worker (auch in `all`, nicht Teil von `/ready`) sieht alle
+  5 s nach. Je fälligem Termin **eine** Transaktion: die Aufgabe mit
+  `FOR UPDATE SKIP LOCKED` gesperrt, der Lauf (`queued`, auslösende Person = die
+  Eigentümerin, Bahn = die Aufgabe) oder der Vermerk „übersprungen“, die Zeile im
+  Protokoll `automation_firing` (eindeutig je Aufgabe und Termin) und der nächste
+  Termin. So läuft ein Termin bei beliebig vielen Workern genau einmal; stürzt ein
+  Worker vor dem Commit ab, bleibt der Termin fällig und der nächste Durchlauf holt ihn.
+- Der nächste Termin wird aus „jetzt“ berechnet: Nach einem Ausfall läuft eine Aufgabe
+  einmal nach, nicht einmal je verpasstem Termin. Zeitumstellung: Eine Ortszeit, die es
+  nicht gibt, fällt auf den nächsten gültigen Zeitpunkt (02:30 → 03:00), eine doppelte
+  läuft einmal (beim ersten Mal); stündliche Termine laufen in beiden doppelten Stunden,
+  sie liegen eine echte Stunde auseinander. Termine näher als 15 Minuten werden beim
+  Speichern an den nächsten fünf Terminen abgelehnt.
+- Ist der vorige Lauf der Aufgabe noch offen (in der Warteschlange, laufend oder
+  wartend auf eine Antwort), wird der Termin übersprungen (`skipped_busy`), ebenso bei
+  einem nicht aktiven Agenten (`skipped_paused_agent`). Eine angehaltene Aufgabe löst nichts aus.
+  Eine einmalige Aufgabe ist nach ihrem Termin erledigt, auch wenn er übersprungen
+  wurde.
+- Die Schleife braucht eine Datenbankverbindung; Fehler im Log als
+  `automations.pass_failed` (nur der Fehlertyp).
+
 ### Läufe im Einzelnen
 
 Jede neue Nachricht der Person in einer solchen Direktnachricht (nicht in einem Thread)
@@ -1094,6 +1122,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
+| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`) |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1128,6 +1157,7 @@ soll den Worker nicht als hängend erscheinen lassen.
 | Vorschläge | `page_proposal`, `skill_proposal` |
 | Skills | `skill`, `skill_version` |
 | Gedächtnis | normale Wiki-Seiten, Zuordnung in `agent_memory` |
+| Aufgaben und ihr Protokoll | `automation` (Auftrag, Termin, Zustand), `automation_firing` (je Termin: Ergebnis, Lauf); der Lauf nennt seine Aufgabe (`run.automation_id`) |
 
 Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
 bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur

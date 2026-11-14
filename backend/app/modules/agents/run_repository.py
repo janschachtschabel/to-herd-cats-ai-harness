@@ -1,5 +1,6 @@
-"""The SQL of runs as people see them: start one for a message, a mention or a
-ticket, read one and its events. What the worker does with runs is in `executor_repository.py`."""
+"""The SQL of runs as people see them: start one for a message, a mention, a
+ticket or an automation, read one and its events. What the worker does with runs is
+in `executor_repository.py`."""
 
 import uuid
 
@@ -82,12 +83,13 @@ class RunRepository:
         chain_depth: int = 0,
         besides: uuid.UUID | None = None,
         lane_id: uuid.UUID | None = None,
+        automation_id: uuid.UUID | None = None,
     ) -> uuid.UUID | None:
-        """A new queued run for a mention or a ticket, if its lane (`lane_id`: a
-        channel thread's root; else the conversation) has no run queued, running or
-        waiting other than `besides` (the run handing a ticket over from there: the new
-        run follows it). None: it has one; two at once: one wins, the unique index of
-        queued runs keeps the other out."""
+        """A new queued run for a mention, a ticket or an automation, if its lane
+        (`lane_id`: a channel thread's root or the automation; else the conversation)
+        has no run queued, running or waiting other than `besides` (the run handing a
+        ticket over from there: the new run follows it). None: it has one; two at
+        once: one wins, the unique index of queued runs keeps the other out."""
         values = {
             "id": uuid7(),  # like every id: lists page newest first by it
             "org_id": self.org_id,
@@ -98,6 +100,7 @@ class RunRepository:
             "work_item_id": work_item_id,
             "chain_depth": chain_depth,
             "lane_id": lane_id,
+            "automation_id": automation_id,
             "state": RunState.QUEUED.value,
             "attempt": 0,
             "steps": 0,

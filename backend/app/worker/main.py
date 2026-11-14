@@ -23,7 +23,8 @@ routing and one for the metrics query at a time.
 
 Agent runs (`runs.py`) have a loop of their own beside these, outside `ready`; the
 outbox's NOTIFY wakes it too (a new message to an agent commits with an event). It
-adds up to `HERD_RUN_CONCURRENCY` + 3 database connections.
+adds up to `HERD_RUN_CONCURRENCY` + 3 database connections. Automations that come
+due fire in the due loop (`due.py`), also outside `ready`, with one connection.
 """
 
 import asyncio
@@ -38,6 +39,7 @@ from app.core.db import Database
 from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL
 from app.worker.dispatcher import Dispatcher
+from app.worker.due import DueLoop
 from app.worker.metrics import worker_metrics
 from app.worker.registry import Handler
 from app.worker.runs import RunLoop
@@ -62,9 +64,12 @@ class _Loop:
 
 
 class Worker:
-    def __init__(self, dispatcher: Dispatcher, runs: RunLoop | None = None) -> None:
+    def __init__(
+        self, dispatcher: Dispatcher, runs: RunLoop | None = None, due: DueLoop | None = None
+    ) -> None:
         self.dispatcher = dispatcher
         self.runs = runs
+        self.due = due
         self.metrics = worker_metrics()  # only processes with a worker export these
         self._running = False
         self._stop = asyncio.Event()
@@ -105,6 +110,7 @@ class Worker:
         listening = asyncio.create_task(listener.run(self._stop))
         metering = asyncio.create_task(self._metrics_loop())
         running = asyncio.create_task(self.runs.serve(self._stop)) if self.runs else None
+        firing = asyncio.create_task(self.due.serve(self._stop)) if self.due else None
         loops = [asyncio.create_task(self._loop(ROUTER, self._route_pass))]
         for handler in self.dispatcher.handlers:
             loops.append(asyncio.create_task(self._loop(handler.name, self._lane_pass(handler))))
@@ -117,7 +123,7 @@ class Worker:
             metering.cancel()
             for task in loops:
                 task.cancel()
-            extra = [running] if running is not None else []
+            extra = [task for task in (running, firing) if task is not None]
             for task in (listening, metering, *loops, *extra):
                 with suppress(asyncio.CancelledError):
                     await task
@@ -192,4 +198,4 @@ def create_worker(database: Database) -> Worker:
     settings = get_settings()
     timeout = settings.worker_handler_timeout_seconds
     runs = RunLoop(database, concurrency=settings.run_concurrency, lease=settings.run_lease_seconds)
-    return Worker(Dispatcher(database, handler_timeout=timeout), runs)
+    return Worker(Dispatcher(database, handler_timeout=timeout), runs, DueLoop(database))
