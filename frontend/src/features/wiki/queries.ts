@@ -16,21 +16,34 @@ const MAX_TREE_REQUESTS = 50
 export const wikiKeys = {
   all: ['wiki'] as const,
   tree: (spaceId: string) => ['wiki', 'tree', spaceId] as const,
-  tagged: (spaceId: string, tagId: string) => ['wiki', 'tree', spaceId, 'tag', tagId] as const,
+  filtered: (spaceId: string, filter: TreeFilter) =>
+    ['wiki', 'tree', spaceId, 'filter', filter.tag ?? '', filter.reviewDue] as const,
   page: (pageId: string) => ['wiki', 'page', pageId] as const,
   byPath: (spaceId: string, path: string) => ['wiki', 'path', spaceId, path] as const,
   versions: (pageId: string) => ['wiki', 'versions', pageId] as const,
 }
 
-/** Every page of the tree, or (with `tag`) the pages carrying that tag: the server
- *  filters, the parents of a tagged page are not in the list. */
-async function fetchTree(spaceId: string, tag?: string): Promise<TreeNode[]> {
+/** What the tree is narrowed to: the pages with a tag, those whose review is due, or
+ *  both. */
+export interface TreeFilter {
+  tag: string | null
+  reviewDue: boolean
+}
+
+/** Every page of the tree, or the pages the filter keeps: the server filters, the
+ *  parents of a kept page are not in the list. */
+async function fetchTree(spaceId: string, filter?: TreeFilter): Promise<TreeNode[]> {
+  const tag = filter?.tag ?? undefined
+  const review_due = filter?.reviewDue || undefined
   const nodes: TreeNode[] = []
   let cursor: string | undefined
   for (let i = 0; i < MAX_TREE_REQUESTS; i++) {
     const batch = unwrap(
       await api.GET('/api/spaces/{space_id}/pages/tree', {
-        params: { path: { space_id: spaceId }, query: { cursor, limit: TREE_PAGE_SIZE, tag } },
+        params: {
+          path: { space_id: spaceId },
+          query: { cursor, limit: TREE_PAGE_SIZE, tag, review_due },
+        },
       }),
     )
     nodes.push(...batch.items)
@@ -44,10 +57,10 @@ export const treeQuery = (spaceId: string) =>
   queryOptions({ queryKey: wikiKeys.tree(spaceId), queryFn: () => fetchTree(spaceId) })
 
 /** Under the tree's key, so whatever refreshes the tree refreshes this too. */
-export const taggedTreeQuery = (spaceId: string, tagId: string) =>
+export const filteredTreeQuery = (spaceId: string, filter: TreeFilter) =>
   queryOptions({
-    queryKey: wikiKeys.tagged(spaceId, tagId),
-    queryFn: () => fetchTree(spaceId, tagId),
+    queryKey: wikiKeys.filtered(spaceId, filter),
+    queryFn: () => fetchTree(spaceId, filter),
   })
 
 export const pageByPathQuery = (spaceId: string, path: string) =>
@@ -72,8 +85,8 @@ export function useTree(spaceId: string) {
   return useQuery(treeQuery(spaceId))
 }
 
-export function useTaggedTree(spaceId: string, tagId: string | null) {
-  return useQuery({ ...taggedTreeQuery(spaceId, tagId ?? ''), enabled: tagId !== null })
+export function useFilteredTree(spaceId: string, filter: TreeFilter) {
+  return useQuery(filteredTreeQuery(spaceId, filter))
 }
 
 export function usePageByPath(spaceId: string, path: string) {
@@ -173,7 +186,24 @@ export function useMovePage(page: WikiPage) {
   })
 }
 
-/** Fetches the page as it is on the server now (after a conflict). */
+/** "Mark as reviewed" (`page.edit`): starts the page's review interval again. It
+ *  changes neither the page's version nor its content, so an open editor goes on. */
+export function useMarkReviewed(page: WikiPage) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST('/api/pages/{page_id}/reviewed', {
+          params: { path: { page_id: page.id } },
+        }),
+      ),
+    onSuccess: (updated) => {
+      storePage(queryClient, updated)
+      void invalidateTree(queryClient, page.space_id)
+    },
+  })
+}
+
 /** Changes made elsewhere (the live session saves in the collab process): the page,
  *  its versions and the tree are fetched again (review M2 R3). */
 export function useRefreshPage() {

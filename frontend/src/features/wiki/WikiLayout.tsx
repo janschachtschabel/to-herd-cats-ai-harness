@@ -35,6 +35,7 @@ function WikiFrame({ space }: { space: Space }) {
     null,
   )
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [reviewFilter, setReviewFilter] = useState(false)
   const nodes = useMemo(() => tree.data ?? [], [tree.data])
   const wiki: Wiki = useMemo(
     () => ({
@@ -46,8 +47,10 @@ function WikiFrame({ space }: { space: Space }) {
       createPage: (initial) => setCreating(initial ?? {}),
       tagFilter,
       filterByTag: setTagFilter,
+      reviewFilter,
+      filterByReview: setReviewFilter,
     }),
-    [space, me, nodes, tagFilter],
+    [space, me, nodes, tagFilter, reviewFilter],
   )
   const { abilities } = wiki
   const matchRoute = useMatchRoute()

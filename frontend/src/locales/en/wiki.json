@@ -290,6 +290,19 @@
     "memory": {
       "mark": "Kept by agents",
       "note": "An agent keeps this page as its memory for this space and reads it at the start of every run. You can correct it like any other page."
+    },
+    "review": {
+      "due": "Review due",
+      "last": "Last reviewed on {{date}}.",
+      "never": "Never reviewed.",
+      "interval_one": "The space asks for a review every day.",
+      "interval_other": "The space asks for a review every {{count}} days.",
+      "mark": "Mark as reviewed",
+      "filter": "Only pages whose review is due",
+      "empty": "No page is due for review.",
+      "emptyTagged": "No page with this tag is due for review.",
+      "treeLabel": "Pages whose review is due",
+      "treeLabelTagged": "Pages tagged “{{name}}” whose review is due"
     }
   },
   "errors": {
@@ -310,7 +323,8 @@
       "path_taken": "There already is a page of this name there.",
       "not_trashed": "The page is not in the trash.",
       "version_not_found": "This version does not exist.",
-      "diff_too_large": "The versions are too long to compare."
+      "diff_too_large": "The versions are too long to compare.",
+      "not_published": "Only published pages are reviewed."
     },
     "tags": {
       "not_found": "This tag does not exist.",

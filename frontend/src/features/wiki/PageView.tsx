@@ -16,6 +16,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
 import { PageActions } from './PageActions'
 import { Breadcrumbs, TableOfContents } from './PageNav'
+import { ReviewDueNotice } from './review/ReviewDueNotice'
 import { PageTags } from './tags/PageTags'
 import { useWiki } from './WikiContext'
 
@@ -64,6 +65,7 @@ export function PageView({ page }: { page: WikiPage }) {
         </div>
       </div>
       <MemoryNote page={page} />
+      <ReviewDueNotice page={page} />
       <div
         className={
           discussing

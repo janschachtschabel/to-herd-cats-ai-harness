@@ -1,6 +1,6 @@
 // Ported-from: to-herd-cats-ai@46352bb:frontend/src/features/wiki/PageTree.tsx
 import { Link, useParams } from '@tanstack/react-router'
-import { Bot, ChevronRight, FilePen } from 'lucide-react'
+import { Bot, ChevronRight, ClipboardCheck, FilePen } from 'lucide-react'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TreeNode } from '@/lib/api'
@@ -172,6 +172,13 @@ function Item({ node, spaceId, activePath, collapsed, toggle, depth, tabbable }:
               role="img"
               aria-label={t('wiki.memory.mark')}
               className="size-3.5 shrink-0 text-violet-700 dark:text-violet-300"
+            />
+          )}
+          {node.review_due && (
+            <ClipboardCheck
+              role="img"
+              aria-label={t('wiki.review.due')}
+              className="size-3.5 shrink-0 text-amber-700 dark:text-amber-300"
             />
           )}
           {node.status === 'draft' && (

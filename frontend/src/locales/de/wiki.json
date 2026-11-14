@@ -290,6 +290,19 @@
     "memory": {
       "mark": "Von Agenten geführt",
       "note": "Ein Agent führt diese Seite als sein Gedächtnis für diesen Bereich und liest sie zu Beginn jedes Laufs. Du kannst sie korrigieren wie jede andere Seite."
+    },
+    "review": {
+      "due": "Prüfung fällig",
+      "last": "Zuletzt geprüft am {{date}}.",
+      "never": "Noch nie geprüft.",
+      "interval_one": "Der Bereich verlangt eine Prüfung jeden Tag.",
+      "interval_other": "Der Bereich verlangt eine Prüfung alle {{count}} Tage.",
+      "mark": "Als geprüft markieren",
+      "filter": "Nur Seiten mit fälliger Prüfung",
+      "empty": "Keine Seite ist zur Prüfung fällig.",
+      "emptyTagged": "Keine Seite mit diesem Tag ist zur Prüfung fällig.",
+      "treeLabel": "Seiten mit fälliger Prüfung",
+      "treeLabelTagged": "Seiten mit dem Tag „{{name}}“ und fälliger Prüfung"
     }
   },
   "errors": {
@@ -310,7 +323,8 @@
       "path_taken": "Dort gibt es schon eine Seite mit diesem Namen.",
       "not_trashed": "Die Seite ist nicht im Papierkorb.",
       "version_not_found": "Diese Version gibt es nicht.",
-      "diff_too_large": "Die Versionen sind zu lang für einen Vergleich."
+      "diff_too_large": "Die Versionen sind zu lang für einen Vergleich.",
+      "not_published": "Nur veröffentlichte Seiten werden geprüft."
     },
     "tags": {
       "not_found": "Diesen Tag gibt es nicht.",
