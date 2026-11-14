@@ -37,7 +37,9 @@ the ticket over, and that run may itself wait and be queued again.
 
 Every take-up by a worker counts in `attempt`; `recoveries` counts those after a lost
 lease (its worker died), which are limited. `started_at` is the first take-up: the
-conversation a run answers ends there, whatever take-up works on it.
+conversation a run answers ends there, whatever take-up works on it. `taken_at` is the
+current take-up (set by every claim): a take-up older than any run may run is stuck
+(`gauge_repository`), however long the run waited before it.
 
 `run_event`: the run's journal (plan M6 decision 1), one continuous sequence (`seq`,
 counted on across take-ups; `attempt` notes the take-up that wrote it; the stop is
@@ -243,6 +245,7 @@ class Run(UuidPk, OrgScoped, Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

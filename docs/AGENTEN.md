@@ -974,7 +974,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_run_duration_seconds` | Histogramm | Dauer einer Aufnahme |
 | `herd_runs_queued` | Gauge | Läufe in der Warteschlange |
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
-| `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder länger als jeder Lauf darf |
+| `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
@@ -1053,9 +1053,6 @@ IDs, Zähler und Codes.
   `agent.connection_unavailable`, bis er einmal gespeichert wird.
 - Für Agenten aus anderen Systemen (agentskills.io) sind Skripte in Skills nur Text;
   ein Werkzeug, das Code ausführt, gibt es nicht.
-- `herd_runs_stuck` zählt auch einen Lauf, der nach langem Warten wieder läuft, weil
-  sein `started_at` der erste Start bleibt (ein Fehler der Metrik, noch offen); läuft ein solcher
-  Lauf länger als 5 Minuten, kann `HerdRunsStuck` fälschlich auslösen.
 
 ### Rolling Update (aus M5 und M6)
 

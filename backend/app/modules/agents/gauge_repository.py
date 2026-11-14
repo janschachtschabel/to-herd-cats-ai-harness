@@ -24,7 +24,9 @@ class OpenRuns:
 async def open_runs(session: AsyncSession) -> OpenRuns:
     """For the gauges, across organisations: queued runs, the age of the oldest one
     (seconds, 0 without one), stuck runs (running with a lease that ran out, no worker
-    took them up again, or for longer than any run may) and waiting runs."""
+    took them up again, or taken up longer ago than any run may run: `taken_at`, not
+    the first start, so a run resumed after a long wait is not stuck) and waiting
+    runs."""
     now = utcnow()
     queued = select(func.count(), func.min(Run.created_at)).where(Run.state == RunState.QUEUED)
     count, oldest = (await session.execute(queued)).one()
@@ -32,7 +34,7 @@ async def open_runs(session: AsyncSession) -> OpenRuns:
     stuck = await session.scalar(
         select(func.count()).where(
             Run.state == RunState.RUNNING,
-            or_(Run.lease_until < now, Run.started_at < overdue),
+            or_(Run.lease_until < now, Run.taken_at < overdue),
         )
     )
     waiting = await session.scalar(select(func.count()).where(Run.state == RunState.WAITING))

@@ -8,8 +8,8 @@ it is shown to anyone); everything after is scoped by the run's organisation.
   thread, else the conversation) has no active run (running or waiting), or when
   it is running and its lease has run out (its worker died: it is
   taken up again and goes on from its journal, `recoveries` + 1). Every take-up counts
-  in `attempt`; `started_at` stays that of the first. A connection's running runs
-  (with a live lease) stay below its `max_concurrency`. Claims take a
+  in `attempt` and sets `taken_at`; `started_at` stays that of the first. A
+  connection's running runs (with a live lease) stay below its `max_concurrency`. Claims take a
   transaction-level advisory lock, so two workers never count the same free place
   twice; `SKIP LOCKED` passes over rows a finishing run holds.
 - Every write of a step checks first that the run is still this attempt's
@@ -122,6 +122,7 @@ async def claim(session: AsyncSession, lease: float) -> Claimed | None:
     run.state = RunState.RUNNING
     run.attempt += 1
     run.started_at = run.started_at or now
+    run.taken_at = now
     run.lease_until = now + timedelta(seconds=lease)
     await session.flush()
     return Claimed.of(run)

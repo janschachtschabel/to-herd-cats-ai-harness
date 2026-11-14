@@ -88,8 +88,8 @@ def run_metrics() -> RunMetrics:
             ),
             stuck=Gauge(
                 "herd_runs_stuck",
-                "Agent runs running with a lease no worker renews, or for longer than any "
-                "run may (from the database).",
+                "Agent runs running with a lease no worker renews, or taken up longer ago "
+                "than any run may run (from the database).",
                 registry=REGISTRY,
                 multiprocess_mode="livemax",
             ),
