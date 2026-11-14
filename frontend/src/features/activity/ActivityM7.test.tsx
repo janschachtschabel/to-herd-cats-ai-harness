@@ -18,17 +18,21 @@ function automationEntry(paused_reason: string | null) {
 }
 
 describe('activity entries of M7', () => {
-  test('a paused automation gets a sentence per reason and no link yet', async () => {
+  test('a paused automation gets a sentence per reason and opens the automation', async () => {
+    const owner = automationEntry('owner')
     mockApi({
       ...shellRoutes(makeMe(['ai.use'])),
+      'POST /api/activity/:id/read': { status: 204 },
+      'GET /api/automations/au-owner': apiError(404, 'automation.not_found'),
+      'GET /api/automations/au-owner/firings': page([]),
       'GET /api/activity': page([
-        automationEntry('owner'),
+        owner,
         automationEntry('failing'),
         automationEntry('manual'),
         automationEntry(null),
       ]),
     })
-    await renderApp('/activity')
+    const { user, router } = await renderApp('/activity')
     const sentences = [
       'Eine Aufgabe mit Hilda ist angehalten: Die Eigentümerin darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.',
       'Eine Aufgabe mit Hilda ist angehalten: Drei Läufe in Folge kamen nicht zu Ende.',
@@ -40,11 +44,17 @@ describe('activity entries of M7', () => {
     )
     for (const item of items) {
       expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
-      expect(within(item).queryByRole('button', { name: 'Öffnen' })).toBeNull()
+      expect(within(item).getByRole('button', { name: 'Öffnen' })).toBeInTheDocument()
       expect(
         within(item).getByRole('button', { name: 'Eintrag von Hilda als erledigt markieren' }),
       ).toBeInTheDocument()
     }
+    await user.click(within(items[0]!).getByRole('button', { name: 'Öffnen' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/automations/au-owner'))
+    // Gone or no longer visible: the page says so.
+    expect(
+      await screen.findByText('Diese Aufgabe gibt es nicht, oder du darfst sie nicht sehen.'),
+    ).toBeInTheDocument()
   })
 
   test('a review that came due names the page and no author, and opens its thread', async () => {

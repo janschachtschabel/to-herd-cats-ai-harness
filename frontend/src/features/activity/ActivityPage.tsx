@@ -159,9 +159,11 @@ function ActivityItem({
   const Icon = REASON_ICONS[entry.reason]
   const where = whereOf(t, entry, me?.user.id, spaceNames)
   const author = entry.author?.name ?? null
-  // Entries with no place to open yet (an automation's view comes with its own screen).
   const opens = Boolean(
-    (entry.conversation && entry.message_id) || entry.skill_proposal || entry.proposal,
+    (entry.conversation && entry.message_id) ||
+    entry.skill_proposal ||
+    entry.proposal ||
+    entry.automation,
   )
 
   const go = () => {
@@ -171,6 +173,9 @@ function ActivityItem({
     } else if (entry.skill_proposal) {
       const proposalId = entry.skill_proposal.id
       void navigate({ to: '/skill-proposals/$proposalId', params: { proposalId } })
+    } else if (entry.automation) {
+      const automationId = entry.automation.id
+      void navigate({ to: '/automations/$automationId', params: { automationId } })
     } else if (entry.proposal) {
       const { id: proposalId, space_id: spaceId } = entry.proposal
       void navigate({

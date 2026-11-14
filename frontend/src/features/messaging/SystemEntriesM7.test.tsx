@@ -30,7 +30,7 @@ describe('system entries of M7', () => {
   })
 
   test('in a channel, the started automation is a thread root one can open', async () => {
-    const me = makeMe(['directory.read'])
+    const me = makeMe(['directory.read', 'ai.use'])
     const space = makeSpace({ id: 'space-1', my_role: 'viewer' })
     const channel = makeConversation()
     const root = makeMessage({
@@ -63,6 +63,10 @@ describe('system entries of M7', () => {
     })
     const { user } = await renderApp(`/c/${channel.id}`)
     expect(await screen.findByText('Aufgabe von Mia Muster gestartet.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Aufgabe ansehen' })).toHaveAttribute(
+      'href',
+      '/automations/au-1',
+    )
     await user.click(
       screen.getByRole('button', {
         name: 'Thread „Aufgabe von Mia Muster gestartet.“ öffnen, 1 Antwort',
@@ -70,5 +74,29 @@ describe('system entries of M7', () => {
     )
     const thread = await screen.findByRole('complementary', { name: 'Thread' })
     expect(await within(thread).findByText('Der Wochenbericht ist fertig.')).toBeInTheDocument()
+  })
+
+  test('without AI the started automation leads nowhere (its page would be hidden)', async () => {
+    const me = makeMe(['directory.read'])
+    const channel = makeConversation()
+    const root = makeMessage({
+      conversation_id: channel.id,
+      kind: 'system',
+      author: null,
+      body_md: '',
+      system: {
+        ...entry('automation.started', { id: 'u', name: 'Mia Muster' }),
+        automation_id: 'au-1',
+      },
+    })
+    mockApi({
+      ...shellRoutes(me),
+      'GET /api/conversations/:id': channel,
+      'GET /api/conversations/:id/messages': page([root]),
+      'POST /api/conversations/:id/read': { status: 204 },
+    })
+    await renderApp(`/c/${channel.id}`)
+    expect(await screen.findByText('Aufgabe von Mia Muster gestartet.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Aufgabe ansehen' })).toBeNull()
   })
 })

@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -6,7 +7,9 @@ import { AgentBadge } from '@/features/agents/AgentBadge'
 import { AnswerSources } from '@/features/agents/AnswerSources'
 import { byAgent, isRunNotice } from '@/features/agents/display'
 import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
+import { usesAi } from '@/features/ai/display'
 import { isCard } from '@/features/approvals/display'
+import { useMe } from '@/features/auth/queries'
 import { MessageCard } from '@/features/approvals/MessageCard'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { TicketCards } from '@/features/tickets/TicketCard'
@@ -23,10 +26,12 @@ import { MessageTime } from './MessageTime'
 
 /** A system entry of a page or ticket thread: a grey line on the timeline; an agent's
  *  change carries the AI mark. One with replies (an automation's term in a channel
- *  opens a thread on its entry) leads into its thread. */
+ *  opens a thread on its entry) leads into its thread; an automation's term links to
+ *  the automation for people with AI (only they may see automations). */
 function SystemRow({ message }: { message: Message }) {
   const { t, i18n } = useTranslation()
   const { openThread } = useConversationView()
+  const me = useMe()
   if (!message.system) return null
   const text = systemText(t, message.system, i18n.language)
   const replies = !message.parent_id && openThread && message.reply_count > 0 ? openThread : null
@@ -39,6 +44,15 @@ function SystemRow({ message }: { message: Message }) {
       <span>{text}</span>
       {message.system.actor?.type === 'agent' && <AgentBadge />}
       <MessageTime iso={message.created_at} />
+      {message.system.automation_id && usesAi(me) && (
+        <Link
+          to="/automations/$automationId"
+          params={{ automationId: message.system.automation_id }}
+          className="font-medium text-foreground underline-offset-2 hover:underline"
+        >
+          {t('automations.actions.open')}
+        </Link>
+      )}
       {replies && (
         <Button
           variant="link"
