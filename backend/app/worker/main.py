@@ -20,6 +20,10 @@ they stay current while a pass hangs.
 Several workers (replicas, or `all` next to a worker) are safe: they route and claim
 disjoint rows. The worker needs up to one database connection per handler, one for
 routing and one for the metrics query at a time.
+
+Agent runs (`runs.py`) have a loop of their own beside these, outside `ready`; the
+outbox's NOTIFY wakes it too (a new message to an agent commits with an event). It
+adds up to `HERD_RUN_CONCURRENCY` + 3 database connections.
 """
 
 import asyncio
@@ -36,6 +40,7 @@ from app.core.outbox import OUTBOX_CHANNEL
 from app.worker.dispatcher import Dispatcher
 from app.worker.metrics import worker_metrics
 from app.worker.registry import Handler
+from app.worker.runs import RunLoop
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +62,9 @@ class _Loop:
 
 
 class Worker:
-    def __init__(self, dispatcher: Dispatcher) -> None:
+    def __init__(self, dispatcher: Dispatcher, runs: RunLoop | None = None) -> None:
         self.dispatcher = dispatcher
+        self.runs = runs
         self.metrics = worker_metrics()  # only processes with a worker export these
         self._running = False
         self._stop = asyncio.Event()
@@ -90,15 +96,15 @@ class Worker:
                 loop.wake.set()
 
     async def serve(self) -> None:
-        router = self._loops[ROUTER]
         listener = Listener(
             self.dispatcher.database.engine.url,
             OUTBOX_CHANNEL,
-            on_notify=lambda _payload: router.wake.set(),
-            on_connect=router.wake.set,  # catch up on what was missed while away
+            on_notify=lambda _payload: self._woken(),
+            on_connect=self._woken,  # catch up on what was missed while away
         )
         listening = asyncio.create_task(listener.run(self._stop))
         metering = asyncio.create_task(self._metrics_loop())
+        running = asyncio.create_task(self.runs.serve(self._stop)) if self.runs else None
         loops = [asyncio.create_task(self._loop(ROUTER, self._route_pass))]
         for handler in self.dispatcher.handlers:
             loops.append(asyncio.create_task(self._loop(handler.name, self._lane_pass(handler))))
@@ -111,9 +117,15 @@ class Worker:
             metering.cancel()
             for task in loops:
                 task.cancel()
-            for task in (listening, metering, *loops):
+            extra = [running] if running is not None else []
+            for task in (listening, metering, *loops, *extra):
                 with suppress(asyncio.CancelledError):
                     await task
+
+    def _woken(self) -> None:
+        self._loops[ROUTER].wake.set()
+        if self.runs is not None:
+            self.runs.wake.set()
 
     async def _loop(self, name: str, one_pass: Callable[[], Awaitable[None]]) -> None:
         loop, failures = self._loops[name], 0
@@ -177,5 +189,7 @@ class Worker:
 
 def create_worker(database: Database) -> Worker:
     """The worker with every registered handler (`app.worker.registry.REGISTRY`)."""
-    timeout = get_settings().worker_handler_timeout_seconds
-    return Worker(Dispatcher(database, handler_timeout=timeout))
+    settings = get_settings()
+    timeout = settings.worker_handler_timeout_seconds
+    runs = RunLoop(database, concurrency=settings.run_concurrency, lease=settings.run_lease_seconds)
+    return Worker(Dispatcher(database, handler_timeout=timeout), runs)

@@ -33,6 +33,19 @@ async def test_ai_routes_do_not_exist_for_people_without_the_right(
                 assert response.json()["error"]["code"] == "ai.not_found"
 
 
+async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
+    member_client: AsyncClient, guest_client: AsyncClient
+) -> None:
+    codes = {"agent": "agent.not_found", "run": "run.not_found"}
+    for client in (member_client, guest_client):
+        for method, template, guard in ROUTES:
+            if guard in codes:
+                body = BODIES.get((method, template), {})
+                response = await client.request(method, concrete(template), json=body)
+                assert response.status_code == 404, (method, template, response.text)
+                assert response.json()["error"]["code"] == codes[guard]
+
+
 async def test_space_routes_hide_spaces_without_a_role(
     member_client: AsyncClient, team_space: Space
 ) -> None:

@@ -24,6 +24,10 @@ ship without a decision on who may call it. Guards:
   id nobody has (plan M4b).
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
+- `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
+  gets 404 `agent.not_found`, as for an unknown id (plan M5).
+- `run`: the person who asked, the agent's responsible person (each with `ai.use`) or
+  `agent.manage`; everyone else gets 404 `run.not_found`.
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -162,6 +166,14 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/ai/assignments/users/{user_id}", "ai"),
     ("GET", "/api/ai/usage", "ai"),
     ("GET", "/api/ai/usage/me", "ai"),
+    ("GET", "/api/agents", "agent"),
+    ("POST", "/api/agents", "agent"),
+    ("GET", "/api/agents/{agent_id}", "agent"),
+    ("GET", "/api/agents/{agent_id}/profile", "agent"),
+    ("PATCH", "/api/agents/{agent_id}", "agent"),
+    ("DELETE", "/api/agents/{agent_id}", "agent"),
+    ("GET", "/api/runs/{run_id}", "run"),
+    ("GET", "/api/runs/{run_id}/events", "run"),
 ]
 
 
@@ -177,6 +189,7 @@ def concrete(
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
         "/api/ai/assignments/users/{user_id}",
+        "/api/agents/{agent_id}",
     )
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -197,6 +210,8 @@ def concrete(
         "{status_id}": str(status_id or uuid7()),
         "{connection_id}": str(uuid7()),
         "{sprint_id}": str(sprint_id or uuid7()),
+        "{agent_id}": str(uuid7()),
+        "{run_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -256,4 +271,11 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PUT", "/api/ai/assignments/default"): {"target": None, "version": 1},
     ("PUT", "/api/ai/assignments/groups"): {"items": [], "version": 1},
     ("PUT", "/api/ai/assignments/users/{user_id}"): {"no_ai": True, "version": None},
+    ("POST", "/api/agents"): {
+        "name": "X",
+        "connection_id": str(uuid7()),
+        "model": "m",
+        "responsible_user_id": str(uuid7()),
+    },
+    ("PATCH", "/api/agents/{agent_id}"): {"name": "X", "version": 1},
 }

@@ -1,17 +1,19 @@
 """The directory: the people and groups of the organisation, by name, so that space
 admins without `user.manage` or `group.manage` can add members. Needs `directory.read`
 (everyone but guests); shows only active people. With a space, only the people who may
-read it (and the caller must read it too: otherwise 404, as for an unknown space)."""
+read it (and the caller must read it too: otherwise 404, as for an unknown space).
+Agents (not drafts) appear only for people with `ai.use` (plan M5: whoever has no AI
+sees no agent), and never with a space."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, require
+from app.core.access import Action, Actor, can, require
 from app.core.pagination import Page, decode_key_cursor, encode_key_cursor
 from app.core.principal import PrincipalType
 from app.modules.directory.repository import DirectoryEntry, DirectoryRepository
 from app.modules.directory.schemas import DirectoryQuery
 
-ALL_TYPES = frozenset({PrincipalType.USER, PrincipalType.GROUP})
+ALL_TYPES = frozenset({PrincipalType.USER, PrincipalType.GROUP, PrincipalType.AGENT})
 
 
 class DirectoryService:
@@ -27,6 +29,8 @@ class DirectoryService:
         types = frozenset({query.type}) if query.type else ALL_TYPES
         if query.space_id is not None:
             types = types & {PrincipalType.USER}
+        if PrincipalType.AGENT in types and not await can(self.session, actor, Action.AI_USE):
+            types = types - {PrincipalType.AGENT}
         rows = await self.directory.search(
             actor.org_id, query.q.strip(), types, after, query.limit + 1, query.space_id
         )

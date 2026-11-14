@@ -116,11 +116,12 @@ async def test_new_members_must_exist_in_the_organisation(
         (_entry(stranger, "viewer"), "users.not_found"),
         ({"member_type": "user", "member_id": str(uuid7()), "role": "viewer"}, "users.not_found"),
         ({"member_type": "group", "member_id": str(uuid7()), "role": "viewer"}, "groups.not_found"),
+        ({"member_type": "agent", "member_id": str(uuid7()), "role": "viewer"}, "agent.not_found"),
     ):
         r = await owner.put(base, json=body)
         assert r.status_code == 404 and r.json()["error"]["code"] == code
     for bad in (
-        {"member_type": "agent", "member_id": str(uuid7()), "role": "viewer"},
+        {"member_type": "robot", "member_id": str(uuid7()), "role": "viewer"},
         {"member_type": "user", "member_id": str(stranger.id), "role": "owner"},
     ):
         assert (await owner.put(base, json=bad)).status_code == 422

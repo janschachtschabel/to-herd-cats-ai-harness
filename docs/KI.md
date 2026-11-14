@@ -1,4 +1,4 @@
-# KI-Grundlage (M5): Verbindungen, Zuordnung, Verbrauch, Richtlinie
+# KI-Grundlage (M5): Verbindungen, Zuordnung, Verbrauch, Richtlinie, Agenten
 
 Betrieb und Verwaltung der KI-Anbindung. Stand: M5, Tasks 1 bis 4 (Agenten, Laufschleife
 und Oberfläche folgen).
@@ -28,7 +28,10 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
 - `POST /api/ai/connections/{id}/models` liest die Modellliste des Anbieters
   (`version` nötig); das Standardmodell bleibt vorn.
 - Löschen (`DELETE …?version=`) scheitert mit 409 `ai.connection_in_use`, solange eine
-  Zuordnung die Verbindung nutzt.
+  Zuordnung oder ein Agent die Verbindung nutzt.
+- Abschalten (`enabled: false`), eine Änderung von `models` oder `purpose`, der
+  Standardzuordnung oder der Gruppen-Zuordnungen meldet den Betroffenen
+  `access.changed`: ihre Oberfläche lädt `ai.use` neu.
 - Während des Anbieteraufrufs hält der Server keine Datenbankverbindung.
 
 ## Schlüssel
@@ -41,7 +44,9 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
   `cd backend && uv run python -m scripts.rotate_secrets`, danach
   `HERD_SECRET_KEY_PREVIOUS` entfernen.
 - `env:`-Verweise dürfen nur Variablen mit dem Präfix `HERD_AI_` nennen, damit kein
-  Datenbank-Passwort und nicht der Server-Schlüssel an einen Anbieter gehen.
+  Datenbank-Passwort und nicht der Server-Schlüssel an einen Anbieter gehen; die
+  eigenen Einstellungen `HERD_AI_EGRESS_PROXY` und `HERD_AI_CHECK_TIMEOUT_SECONDS` sind
+  ausgenommen.
 - Schlüssel erscheinen nie in Antworten, Protokollen, Audit-Einträgen oder
   Fehlermeldungen; Fehlerkörper der Anbieter werden verworfen.
 - `HERD_AI_CHECK_TIMEOUT_SECONDS` (Standard 20): Zeitlimit für Test und Modellliste.
@@ -58,7 +63,11 @@ Adresse und wählt nur geprüfte Adressen an (TLS weiterhin auf den Namen):
   (IPv4-mapped, 6to4, NAT64) zählen wie die eingebettete Adresse;
 - keine Weiterleitungen (Zustand `redirect`), Antworten höchstens 2 MiB;
 - Proxy-Variablen der Umgebung (`HTTPS_PROXY`) werden nicht beachtet. Wer Anbieter nur
-  über einen Proxy erreicht, kann M5 so noch nicht nutzen.
+  über einen Proxy erreicht, setzt `HERD_AI_EGRESS_PROXY` (`http://[user:pass@]host:port`
+  oder `https://…`, vom Betrieb gesetzt und vertraut): Aufrufe an Verbindungen außer
+  `local` gehen dann per `CONNECT` durch ihn; die Adressprüfung gilt weiter für das Ziel
+  (Adressliterale werden auch über den Proxy geprüft), TLS bleibt Ende zu Ende auf den
+  Namen des Anbieters. `local`-Verbindungen gehen nie über den Proxy.
 
 ## Wer nutzt welches Modell (`/api/ai/assignments`, `ai.manage`)
 
@@ -100,6 +109,80 @@ Kosten, wenn ein Preis hinterlegt ist; gecachte Token zählen als Eingabe).
   Richtlinien (`app/modules/ai/policy.py`); was KI lesen darf, filtern
   `ai_space_ids` und `ai_readable` (`app/modules/ai/policy_filters.py`) in SQL, in
   derselben Abfrage wie die Rechte.
+
+## Agenten (`/api/agents`, Recht `agent.manage`)
+
+Agenten sind Principals wie Personen: Mitglied von Bereichen (`PUT
+/api/spaces/{id}/members` mit `member_type: agent`), Teilnehmer einer Direktnachricht,
+Urheber von Nachrichten (`kind: agent`). In M5 ist jeder Agent Stufe 1: er liest nur.
+
+- `GET/POST /api/agents`, `GET/PATCH/DELETE /api/agents/{id}` (nur `owner`/`admin`,
+  sonst 404 `agent.not_found`): Name, Kurzvorstellung, Anweisungen (höchstens 20.000
+  Zeichen), Verbindung und Modell (eine Chat-Verbindung, die das Modell anbietet; 422
+  `ai.connection_not_chat`, `ai.model_unknown`), verantwortliche Person (aktiv, kein
+  Gast; 422 `agent.responsible_invalid`), Status `draft|active|paused`, Grenzen
+  `max_steps` (1–25) und `max_runtime_seconds` (10–600). Änderungen mit `version`
+  (409 `agent.version_conflict`), Audit ohne den Text der Anweisungen. Wer schon
+  gesprochen oder gelaufen ist, wird nicht gelöscht (409 `agent.in_use`), sondern
+  pausiert.
+- `GET /api/agents/{id}/profile` (`ai.use`): Name, Kurzvorstellung, Status; Entwürfe
+  sind für alle ohne `agent.manage` unsichtbar. Das Verzeichnis (`/api/directory`)
+  nennt Agenten nur Personen mit `ai.use`.
+- `POST /api/dms` mit `{"agent_id": …}` (ohne weitere Personen, sonst 422
+  `dm.agent_pair_only`): die Direktnachricht der Person mit dem Agenten; ohne `ai.use`
+  404 `agent.not_found`.
+
+## Läufe
+
+Jede neue Nachricht der Person in einer solchen Direktnachricht (nicht in einem Thread)
+legt in derselben Transaktion einen Lauf an. Die Antwort auf das Senden nennt ihn in
+`agent_run: {"id", "reason"}`; ohne Lauf steht der Grund in `reason`:
+`ai.unavailable`, `agent.paused`, `agent.draft`, `agent.responsible_inactive`,
+`agent.connection_unavailable`, `run.thread_reply`. Je Gespräch läuft höchstens ein
+Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam.
+
+Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
+`backend/app/modules/agents/executor.py`, Schleife `backend/app/runtime/loop.py`):
+
+- Er liest mit den Rechten der Person, begrenzt auf die Bereiche des Agenten
+  (`read_scope`): seine Mitgliedschaften und die offenen Bereiche. Vor jedem
+  Modell- und Werkzeugaufruf wird das neu bestimmt; wer `ai.use` oder den Zugang zu
+  einem schon gelesenen Bereich verliert, beendet den Lauf (`rights_revoked`).
+- Werkzeuge: `search` (Volltext über Seiten und Tickets, nur in Bereichen, deren
+  Richtlinie die Verbindung zulässt, ohne gesperrte Seiten), `read_page`,
+  `read_ticket`. Ergebnisse gehen gerahmt (`<untrusted>`) und auf 8.000 Zeichen gekürzt
+  an das Modell und vollständig in `run_event`.
+- Vor jedem Modellaufruf: die strengste Richtlinie aller gelesenen Bereiche (das
+  Gespräch selbst zählt als `any`) muss den `data_location` der Verbindung erlauben,
+  sonst endet der Lauf mit `policy_blocked`, bevor etwas gesendet wird.
+- Stopgründe: `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
+  Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402,
+  403, 429; ohne Wiederholung), `error`. Die Antwort ist eine Nachricht `kind: agent`
+  mit `client_id` = Lauf-ID (genau einmal); bei jedem anderen Stopp steht im Gespräch
+  ein Zeitleisten-Eintrag `system.key = "run.stopped"` mit dem Grund in
+  `system.new.value`.
+- Live: `run.progress` (`conversation_id`, `run_id`, `step`) nach jedem Modellaufruf,
+  an die Person im Gespräch.
+- `GET /api/runs/{id}` und `GET /api/runs/{id}/events` (seitenweise): für die Person,
+  die gefragt hat, und die verantwortliche Person (je mit `ai.use`) und für
+  `agent.manage`; sonst 404 `run.not_found`.
+- Verbrauch wird je Modellaufruf einmal gebucht, in derselben Transaktion wie der
+  Schritt (`run_event`, eindeutig je Lauf, Versuch und Schritt).
+
+Betrieb:
+
+- `HERD_RUN_CONCURRENCY` (Standard 4): Läufe je Worker zugleich; dazu begrenzt
+  `max_concurrency` der Verbindung über alle Worker, `requests_per_minute` die Aufrufe
+  je Minute (Fenster in der Datenbank). Der Worker braucht dafür bis zu
+  `HERD_RUN_CONCURRENCY` + 3 Datenbankverbindungen; während eines Anbieteraufrufs hält
+  ein Lauf keine.
+- `HERD_RUN_LEASE_SECONDS` (Standard 30): Sperrfrist eines Laufs, alle 10 s erneuert.
+  Stirbt ein Worker, nimmt ein anderer den Lauf nach Ablauf neu auf (Versuch + 1;
+  nach drei Versuchen `error`).
+- Die Läufe zählen nicht zur Bereitschaft (`/ready`) des Workers. Metriken:
+  `herd_runs_total{reason}`, `herd_run_duration_seconds`, `herd_runs_queued`,
+  `herd_runs_oldest_queued_seconds`, `herd_runs_stuck`; Alarme `HerdRunsStuck` und
+  `HerdRunsQueued`.
 
 ## Testen ohne Anbieter
 

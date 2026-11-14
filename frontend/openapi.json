@@ -25,6 +25,7 @@
           "tag.manage",
           "dm.inspect",
           "ai.manage",
+          "agent.manage",
           "ai.use"
         ],
         "title": "Action",
@@ -229,6 +230,351 @@
           "snippet"
         ],
         "title": "ActivityOut",
+        "type": "object"
+      },
+      "AgentCreate": {
+        "additionalProperties": false,
+        "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.",
+        "properties": {
+          "connection_id": {
+            "format": "uuid",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "instructions": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Instructions",
+            "type": "string"
+          },
+          "intro": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Intro",
+            "type": "string"
+          },
+          "max_runtime_seconds": {
+            "default": 600,
+            "description": "seconds",
+            "maximum": 600.0,
+            "minimum": 10.0,
+            "title": "Max Runtime Seconds",
+            "type": "integer"
+          },
+          "max_steps": {
+            "default": 25,
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "type": "integer"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "responsible_user_id": {
+            "format": "uuid",
+            "title": "Responsible User Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentStatus",
+            "default": "draft"
+          }
+        },
+        "required": [
+          "name",
+          "connection_id",
+          "model",
+          "responsible_user_id"
+        ],
+        "title": "AgentCreate",
+        "type": "object"
+      },
+      "AgentOut": {
+        "description": "An agent as those with `agent.manage` see it.",
+        "properties": {
+          "connection_id": {
+            "format": "uuid",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "intro": {
+            "title": "Intro",
+            "type": "string"
+          },
+          "max_runtime_seconds": {
+            "title": "Max Runtime Seconds",
+            "type": "integer"
+          },
+          "max_steps": {
+            "title": "Max Steps",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "responsible_user_id": {
+            "format": "uuid",
+            "title": "Responsible User Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "intro",
+          "instructions",
+          "connection_id",
+          "model",
+          "responsible_user_id",
+          "status",
+          "max_steps",
+          "max_runtime_seconds",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentOut",
+        "type": "object"
+      },
+      "AgentProfileOut": {
+        "description": "What a person with `ai.use` learns of an agent to talk to: no instructions, no\nconnection.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intro": {
+            "title": "Intro",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentStatus"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "intro",
+          "status"
+        ],
+        "title": "AgentProfileOut",
+        "type": "object"
+      },
+      "AgentRunOut": {
+        "description": "What a message to an agent started: its run (`id`; possibly one already waiting,\nwhich answers this message too), or no run and why (`reason`: `ai.unavailable`,\n`agent.draft`, `agent.paused`, `agent.responsible_inactive`,\n`agent.connection_unavailable`, `run.thread_reply`).",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ],
+        "title": "AgentRunOut",
+        "type": "object"
+      },
+      "AgentStatus": {
+        "enum": [
+          "draft",
+          "active",
+          "paused"
+        ],
+        "title": "AgentStatus",
+        "type": "string"
+      },
+      "AgentUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are; `connection_id` and `model` go together.",
+        "properties": {
+          "connection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "intro": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intro"
+          },
+          "max_runtime_seconds": {
+            "anyOf": [
+              {
+                "description": "seconds",
+                "maximum": 600.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime Seconds"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "maximum": 25.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "responsible_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible User Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AgentUpdate",
         "type": "object"
       },
       "AiLockIn": {
@@ -1570,7 +1916,7 @@
         "type": "object"
       },
       "DirectoryEntryOut": {
-        "description": "Who can be added to a space. Deliberately no email or role: any member may read it.",
+        "description": "Who can be added to a space or written to. Deliberately no email or role: any\nmember may read it.",
         "properties": {
           "id": {
             "format": "uuid",
@@ -1584,7 +1930,8 @@
           "type": {
             "enum": [
               "user",
-              "group"
+              "group",
+              "agent"
             ],
             "title": "Type",
             "type": "string"
@@ -1600,22 +1947,30 @@
       },
       "DmOpen": {
         "additionalProperties": false,
-        "description": "The other people (the caller is added); 2 to 9 people in all.",
+        "description": "The other people (the caller is added); 2 to 9 people in all. Or, with\n`agent_id` and no `user_ids`, the caller's conversation with that agent.",
         "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
           "user_ids": {
             "items": {
               "format": "uuid",
               "type": "string"
             },
             "maxItems": 9,
-            "minItems": 1,
             "title": "User Ids",
             "type": "array"
           }
         },
-        "required": [
-          "user_ids"
-        ],
         "title": "DmOpen",
         "type": "object"
       },
@@ -1889,6 +2244,15 @@
         ],
         "title": "EpicOut",
         "type": "object"
+      },
+      "EventKind": {
+        "enum": [
+          "model_call",
+          "tool_call",
+          "stop"
+        ],
+        "title": "EventKind",
+        "type": "string"
       },
       "GroupAssignmentOut": {
         "properties": {
@@ -2658,7 +3022,8 @@
       "MessageKind": {
         "enum": [
           "human",
-          "system"
+          "system",
+          "agent"
         ],
         "title": "MessageKind",
         "type": "string"
@@ -2844,8 +3209,18 @@
         "type": "object"
       },
       "MessageWriteOut": {
-        "description": "`not_notified`: the mentioned ids that were not stored: people who may not see\nthe conversation, and ids of nobody (indistinguishable on purpose).",
+        "description": "`not_notified`: the mentioned ids that were not stored: people who may not see\nthe conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:\nfor a new message in a DM with an agent, the run it started or why none (null\notherwise, and for a resend).",
         "properties": {
+          "agent_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "author": {
             "anyOf": [
               {
@@ -3669,6 +4044,33 @@
         "title": "Page[ActivityOut]",
         "type": "object"
       },
+      "Page_AgentOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AgentOut]",
+        "type": "object"
+      },
       "Page_AttachmentOut_": {
         "properties": {
           "items": {
@@ -4018,6 +4420,33 @@
           "items"
         ],
         "title": "Page[MessageOut]",
+        "type": "object"
+      },
+      "Page_RunEventOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunEventOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[RunEventOut]",
         "type": "object"
       },
       "Page_SpaceMemberOut_": {
@@ -4413,7 +4842,7 @@
         "type": "object"
       },
       "ParticipantOut": {
-        "description": "A person in a direct message; one who was deactivated stays listed.",
+        "description": "A person in a direct message (one who was deactivated stays listed), or its\nagent (`type` `agent`, listed after the people).",
         "properties": {
           "id": {
             "format": "uuid",
@@ -4427,6 +4856,10 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType",
+            "default": "user"
           }
         },
         "required": [
@@ -4674,6 +5107,146 @@
         "title": "ReadPosition",
         "type": "object"
       },
+      "RunEventOut": {
+        "description": "One step of a run, with its full content (model call: usage and the answer's\nparts; tool call: name, arguments, result; stop: the reason).",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "attempt",
+          "seq",
+          "kind",
+          "content",
+          "created_at"
+        ],
+        "title": "RunEventOut",
+        "type": "object"
+      },
+      "RunOut": {
+        "description": "`steps`: model calls of the current attempt; `stop_reason` once `done`.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "steps": {
+            "title": "Steps",
+            "type": "integer"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trigger_message_id": {
+            "format": "uuid",
+            "title": "Trigger Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agent_id",
+          "conversation_id",
+          "trigger_message_id",
+          "state",
+          "stop_reason",
+          "attempt",
+          "steps",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "RunState": {
+        "enum": [
+          "queued",
+          "running",
+          "done"
+        ],
+        "title": "RunState",
+        "type": "string"
+      },
       "SearchResults": {
         "description": "A page of hits of every kind, told apart by `type`.",
         "properties": {
@@ -4877,7 +5450,8 @@
           "member_type": {
             "enum": [
               "user",
-              "group"
+              "group",
+              "agent"
             ],
             "title": "Member Type",
             "type": "string"
@@ -4895,7 +5469,7 @@
         "type": "object"
       },
       "SpaceMemberOut": {
-        "description": "`name`: the person's or group's display name.",
+        "description": "`name`: the person's, group's or agent's display name.",
         "properties": {
           "member_id": {
             "format": "uuid",
@@ -5487,6 +6061,20 @@
         ],
         "title": "StatusUpdate",
         "type": "object"
+      },
+      "StopReason": {
+        "enum": [
+          "completed",
+          "max_steps",
+          "deadline",
+          "no_progress",
+          "rights_revoked",
+          "policy_blocked",
+          "provider_refused",
+          "error"
+        ],
+        "title": "StopReason",
+        "type": "string"
       },
       "SystemEntryOut": {
         "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown), `number` the restored version (only for\n`page.version_restored`), `old`/`new` what a ticket field changed from and to\n(null where there was nothing, and always for title and description).",
@@ -8172,6 +8760,288 @@
         ]
       }
     },
+    "/api/agents": {
+      "get": {
+        "operationId": "list_agents_api_agents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agents",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent_api_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}": {
+      "delete": {
+        "description": "Only an agent that never talked or ran (409 `agent.in_use`: pause it instead).",
+        "operationId": "delete_agent_api_agents__agent_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Agent",
+        "tags": [
+          "agents"
+        ]
+      },
+      "get": {
+        "operationId": "get_agent_api_agents__agent_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent",
+        "tags": [
+          "agents"
+        ]
+      },
+      "patch": {
+        "operationId": "update_agent_api_agents__agent_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/profile": {
+      "get": {
+        "description": "For a person with `ai.use`: name, introduction and status (no draft).",
+        "operationId": "agent_profile_api_agents__agent_id__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Profile",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/ai/assignments": {
       "get": {
         "operationId": "get_assignments_api_ai_assignments_get",
@@ -9956,7 +10826,8 @@
                 {
                   "enum": [
                     "user",
-                    "group"
+                    "group",
+                    "agent"
                   ],
                   "type": "string"
                 },
@@ -10077,7 +10948,7 @@
         ]
       },
       "post": {
-        "description": "The caller's conversation with these people: new (201) or the one they have.",
+        "description": "The caller's conversation with these people, or with an agent (`ai.use`): new\n(201) or the one they have.",
         "operationId": "open_dm_api_dms_post",
         "requestBody": {
           "content": {
@@ -11482,6 +12353,120 @@
         ]
       }
     },
+    "/api/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_api_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/events": {
+      "get": {
+        "operationId": "run_events_api_runs__run_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunEventOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Events",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/search": {
       "get": {
         "description": "Pages, messages and tickets the caller may see, best first; empty `q` gives an\nempty list. Tags narrow to pages and tickets.",
@@ -12606,7 +13591,8 @@
             "schema": {
               "enum": [
                 "user",
-                "group"
+                "group",
+                "agent"
               ],
               "title": "Member Type",
               "type": "string"

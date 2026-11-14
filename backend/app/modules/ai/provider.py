@@ -19,6 +19,7 @@ from typing import Any
 import httpx
 
 from app.core import egress, secrets
+from app.core.config import get_settings
 from app.core.egress import EgressBlocked, EgressRules
 from app.modules.ai.models import ConnectionKind, ParamFamily, Purpose
 
@@ -76,6 +77,12 @@ class Target:
 def rules_for(kind: ConnectionKind) -> EgressRules:
     local = kind == ConnectionKind.LOCAL
     return EgressRules(allow_private=local, allow_http=local)
+
+
+def egress_proxy() -> str | None:
+    """The operator's proxy for provider calls, if one is set (`HERD_AI_EGRESS_PROXY`)."""
+    proxy = get_settings().ai_egress_proxy
+    return proxy.get_secret_value() if proxy is not None else None
 
 
 def streams(kind: ConnectionKind) -> bool:
@@ -159,7 +166,9 @@ async def _send(
 ) -> Any:
     failure: CheckStatus
     try:
-        async with egress.client(rules_for(target.kind), timeout=seconds) as http:
+        async with egress.client(
+            rules_for(target.kind), timeout=seconds, proxy=egress_proxy()
+        ) as http:
             request = http.build_request(method, target.base_url + path, json=body, headers=headers)
             response = await http.send(request, stream=True)
             try:

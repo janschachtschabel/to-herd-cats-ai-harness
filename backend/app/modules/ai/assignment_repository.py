@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.principal import PrincipalType
 from app.core.repository import advisory_xact_lock
+from app.modules.agents.models import Agent
 from app.modules.ai.models import AiConnection, GroupAssignment, OrgAssignment, UserAssignment
 from app.modules.groups.models import Group, GroupMember
 from app.modules.users.models import User
@@ -131,11 +132,17 @@ class AssignmentRepository:
         await self.session.flush()
 
     async def connection_in_use(self, connection_id: uuid.UUID) -> bool:
+        """Whether an assignment or an agent (M5 task 5) uses the connection."""
         uses = [
             exists().where(table.org_id == self.org_id, table.connection_id == connection_id)
-            for table in (OrgAssignment, GroupAssignment, UserAssignment)
+            for table in (OrgAssignment, GroupAssignment, UserAssignment, Agent)
         ]
         return bool(await self.session.scalar(select(or_(*uses))))
+
+    async def group_ids(self) -> list[uuid.UUID]:
+        """The groups that have an assignment now."""
+        stmt = select(GroupAssignment.group_id).where(GroupAssignment.org_id == self.org_id)
+        return list(await self.session.scalars(stmt))
 
     async def resolve(self, user_id: uuid.UUID) -> Resolved | None:
         """Person before group (lowest position first) before the standard, and the

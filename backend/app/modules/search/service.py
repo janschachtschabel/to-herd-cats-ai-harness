@@ -8,6 +8,7 @@ their conversation is visible; tickets in the spaces where it holds `ticket.read
 space filter the actor may not read is 404 `space.not_found`, as for an unknown id;
 with a space, messages come from its channels and threads only. Tags narrow to pages
 and tickets (messages carry none). Empty input is an empty result, not an error.
+An agent's `search` tool uses `for_ai` (pages and tickets AI may read, no messages).
 
 Every kind is fetched best first below the cursor, `limit + 1` each, and merged by
 (score descending, id): every hit of the merged page is ranked before every hit left
@@ -19,13 +20,17 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
 from app.core.access import Action, Actor, require, space_ids_with, visible_space_ids
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
+from app.modules.ai.models import DataLocation
+from app.modules.ai.policy_filters import ai_space_ids
 from app.modules.messaging.search import MessageHit, MessageSearch
 from app.modules.search.repository import SearchRepository, SearchScope
+from app.modules.spaces.models import Space
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.tickets.search import TicketHit, TicketSearch
@@ -99,6 +104,27 @@ class SearchService:
         cursor = encode_score_cursor(items[-1].score, _id(items[-1])) if more else None
         return pagination.Page[AnyHit](items=items, next_cursor=cursor)
 
+    async def for_ai(
+        self, actor: Actor, q: str, *, location: DataLocation, limit: int
+    ) -> list[SearchHit | TicketHit]:
+        """For an agent's `search` tool (spec 7.3, 11): pages and tickets, best first,
+        only in spaces whose policy lets a connection at `location` receive them, and
+        no page locked for AI; both in the statements that apply the rights, so
+        nothing else shows up, not even as a title or a snippet."""
+        q = q.strip()[:MAX_QUERY_CHARS]
+        if not q:
+            return []
+        spaces = ai_space_ids(actor.org_id, location)
+        hits: list[SearchHit | TicketHit] = []
+        hits.extend(await self._pages(actor, q, None, [], None, limit, ai_spaces=spaces))
+        hits.extend(
+            await TicketSearch(self.session).find(
+                actor, q, space_id=None, tag_ids=[], after=None, limit=limit, within=spaces
+            )
+        )
+        hits.sort(key=lambda hit: (-hit.score, hit.id))
+        return hits[:limit]
+
     async def _pages(
         self,
         actor: Actor,
@@ -107,12 +133,17 @@ class SearchService:
         tag_ids: list[uuid.UUID],
         after: tuple[float, uuid.UUID] | None,
         limit: int,
+        *,
+        ai_spaces: Select[uuid.UUID] | None = None,
     ) -> list[SearchHit]:
         tags = tag_repository(self.session, actor)
         among = [tags.subject_ids(SubjectType.PAGE, [t]) for t in tag_ids]
-        scope = SearchScope(
-            actor.org_id, visible_space_ids(actor), space_ids_with(actor, Action.PAGE_EDIT)
-        )
+        readable = visible_space_ids(actor)
+        drafts = space_ids_with(actor, Action.PAGE_EDIT)
+        if ai_spaces is not None:
+            readable = readable.where(Space.id.in_(ai_spaces))
+            drafts = drafts.where(Space.id.in_(ai_spaces))
+        scope = SearchScope(actor.org_id, readable, drafts, ai=ai_spaces is not None)
         rows = await SearchRepository(self.session, scope).pages(
             q, space_id=space_id, among=among, after=after, limit=limit
         )

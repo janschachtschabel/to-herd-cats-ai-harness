@@ -88,7 +88,7 @@ class SpaceUpdateIn(SpaceUpdate):
     version: int
 
 
-MemberType = Literal[PrincipalType.USER, PrincipalType.GROUP]
+MemberType = Literal[PrincipalType.USER, PrincipalType.GROUP, PrincipalType.AGENT]
 
 
 class SpaceMemberIn(BaseModel):
@@ -98,7 +98,7 @@ class SpaceMemberIn(BaseModel):
 
 
 class SpaceMemberOut(BaseModel):
-    """`name`: the person's or group's display name."""
+    """`name`: the person's, group's or agent's display name."""
 
     member_type: PrincipalType
     member_id: uuid.UUID

@@ -1,6 +1,6 @@
 """Who acts and in which system role.
 
-A principal is whoever can act or be granted something: a person, an AI agent (M6)
+A principal is whoever can act or be granted something: a person, an AI agent (M5)
 or a group. Authorship and memberships store `(type, id)`; ACL logic never
 special-cases agents.
 """
@@ -37,6 +37,10 @@ class Principal:
     @classmethod
     def group(cls, group_id: uuid.UUID) -> "Principal":
         return cls(PrincipalType.GROUP, group_id)
+
+    @classmethod
+    def agent(cls, agent_id: uuid.UUID) -> "Principal":
+        return cls(PrincipalType.AGENT, agent_id)
 
     def __str__(self) -> str:
         """`user:<id>`: the form of the `actor` log field."""

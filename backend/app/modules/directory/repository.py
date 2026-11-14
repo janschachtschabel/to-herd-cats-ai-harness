@@ -1,4 +1,5 @@
-"""People and groups by name, for pickers: one query over both, sorted by name."""
+"""People, groups and (for those with `ai.use`) agents by name, for pickers: one query
+over all of them, sorted by name."""
 
 import uuid
 from typing import NamedTuple
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access_repository import person_reads_space
 from app.core.principal import PrincipalType
+from app.modules.agents.models import Agent, AgentStatus
 from app.modules.groups.models import Group
 from app.modules.users.models import User
 
@@ -32,8 +34,9 @@ class DirectoryRepository:
         limit: int,
         space_id: uuid.UUID | None = None,
     ) -> list[DirectoryEntry]:
-        """Active people and groups whose name contains `text`; case-insensitive, `%`
-        and `_` taken literally. Never the email: members must not probe addresses.
+        """Active people, groups and agents that are not drafts, whose name contains
+        `text`; case-insensitive, `%` and `_` taken literally. Never the email: members
+        must not probe addresses.
         With `space_id`, only the people who may read that space."""
         parts = []
         if PrincipalType.USER in types:
@@ -49,6 +52,18 @@ class DirectoryRepository:
             if space_id is not None:
                 people = people.where(person_reads_space(literal(space_id)))
             parts.append(people)
+        if PrincipalType.AGENT in types:
+            parts.append(
+                select(
+                    literal(PrincipalType.AGENT.value, String).label("type"),
+                    Agent.id.label("id"),
+                    Agent.name.label("name"),
+                ).where(
+                    Agent.org_id == org_id,
+                    Agent.status != AgentStatus.DRAFT,
+                    Agent.name.icontains(text, autoescape=True),
+                )
+            )
         if PrincipalType.GROUP in types:
             parts.append(
                 select(

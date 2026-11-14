@@ -2,7 +2,9 @@
 
 Kinds: `open` and `team` are created through the API by anyone with `space.create`, who
 becomes the space's admin; `personal` is created only here, once per person, with that
-person as its one fixed member. Names need not be unique; URLs use ids. Changes made
+person as its one fixed member. Agents (M5) become members like people; only someone
+who may see agents (`ai.use` or `agent.manage`) adds them or sees them in the member
+list. Names need not be unique; URLs use ids. Changes made
 by someone are audited in their transaction, and a membership change is announced to the
 people concerned (`access.changed`); the personal space of a new person and the general
 space of a new installation come with `user.created` and bootstrap.
@@ -14,12 +16,13 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, my_roles, require, visible_space_ids
+from app.core.access import Action, Actor, can, my_roles, require, visible_space_ids
 from app.core.access_events import access_changed
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
+from app.modules.agents.repository import AgentRepository
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import Space, SpaceKind
@@ -118,7 +121,9 @@ class SpaceService:
     ) -> Page[NamedMember]:
         await require(self.session, actor, Action.SPACE_READ, space_id)
         after = decode_id_cursor(params.cursor) if params.cursor else None
-        rows = await self.spaces.member_page(space_id, after, params.limit + 1)
+        rows = await self.spaces.member_page(
+            space_id, after, params.limit + 1, with_agents=await self._sees_agents(actor)
+        )
         return id_page(rows, params.limit, lambda row: row.member.member_id)
 
     async def set_member(
@@ -129,10 +134,10 @@ class SpaceService:
         member_id: uuid.UUID,
         role: SpaceRole,
     ) -> NamedMember:
-        """Add a person or a group, or change their role."""
+        """Add a person, a group or an agent, or change their role."""
         await self._members_changeable(actor, space_id)
         principal = Principal(member_type, member_id)
-        name = await self._name_of(actor.org_id, principal)
+        name = await self._name_of(actor, principal)
         member = await self.spaces.set_member(space_id, principal, role)
         await self._audit(actor, "space.member_set", space_id, {**_member(principal), "role": role})
         await self._access_changed(actor, space_id, principal)
@@ -151,7 +156,10 @@ class SpaceService:
     async def _access_changed(
         self, actor: Actor, space_id: uuid.UUID, principal: Principal
     ) -> None:
-        """The person, or the group's people, may see more or less now."""
+        """The person, or the group's people, may see more or less now (an agent's
+        runs read its memberships afresh at every step)."""
+        if principal.type == PrincipalType.AGENT:
+            return
         if principal.type == PrincipalType.GROUP:
             people = await self.groups.user_ids(principal.id)
         else:
@@ -172,12 +180,24 @@ class SpaceService:
         if space.kind == SpaceKind.PERSONAL:
             raise Conflict(code="spaces.personal_members_fixed")
 
-    async def _name_of(self, org_id: uuid.UUID, principal: Principal) -> str:
-        """The person's or group's name; 404 unless it exists in the organisation."""
+    async def _sees_agents(self, actor: Actor) -> bool:
+        return await can(self.session, actor, Action.AI_USE) or await can(
+            self.session, actor, Action.AGENT_MANAGE
+        )
+
+    async def _name_of(self, actor: Actor, principal: Principal) -> str:
+        """The person's, group's or agent's name; 404 unless it exists in the
+        organisation (an agent also for someone who may not see agents)."""
+        org_id = actor.org_id
         if principal.type == PrincipalType.USER:
             if (user := await self.users.get(org_id, principal.id)) is None:
                 raise NotFound(code="users.not_found")
             return user.name
+        if principal.type == PrincipalType.AGENT:
+            agent = await AgentRepository(self.session, org_id).get(principal.id)
+            if agent is None or not await self._sees_agents(actor):
+                raise NotFound(code="agent.not_found")
+            return agent.name
         # Under the groups lock: a deletion running now finishes first (and then the
         # group is gone), or waits until this membership is committed and deletes it.
         await self.groups.lock_writes(org_id)

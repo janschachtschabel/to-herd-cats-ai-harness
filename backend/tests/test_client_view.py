@@ -16,6 +16,7 @@ from tests.test_access import actor_of
 
 SPACES = "/api/spaces"
 ALL_SYSTEM = [
+    "agent.manage",
     "ai.manage",
     "audit.read",
     "directory.read",

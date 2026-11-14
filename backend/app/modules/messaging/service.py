@@ -6,9 +6,11 @@ require_post`); editing only one's own message; deleting one's own or, with
 A message whose conversation the actor cannot see is 404 `message.not_found`.
 
 Posting is idempotent per author and `client_id`: a resend returns the first message
-(`Posted.created` false), and nothing else happens. Posting and editing take the
-ids the message mentions (`mentions.py`); those who may not see the conversation
-come back in `not_notified`. Every change is emitted
+(`Posted.created` false), and nothing else happens. A new top-level message in a DM
+with an agent queues the agent's run in the same transaction, if the person and the
+agent may (`agent_hooks.after_post`; `Posted.agent_run` says which run, or why none).
+Posting and editing take the ids the message mentions (`mentions.py`); those who may
+not see the conversation come back in `not_notified`. Every change is emitted
 (`message.created|updated|deleted`, payload ids only) in its transaction; message
 text never goes into events or logs.
 """
@@ -28,6 +30,7 @@ from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
 from app.modules.messaging import mentions as mentioning
 from app.modules.messaging import threads
+from app.modules.messaging.agent_hooks import RunStart, agent_hooks
 from app.modules.messaging.dm_repository import DmRepository, InspectionNote, Participant
 from app.modules.messaging.message_repository import MessageRepository
 from app.modules.messaging.models import (
@@ -44,6 +47,7 @@ class Posted(NamedTuple):
     message: Message
     created: bool  # False: a resend with a known `client_id`
     not_notified: list[uuid.UUID]  # mentioned ids that were not stored (see mentions.py)
+    agent_run: RunStart | None = None  # in a DM with an agent: the run, or why none
 
 
 class Edited(NamedTuple):
@@ -150,7 +154,10 @@ class MessageService:
             self.session, actor.org_id, conversation, message.id, asked
         )
         await self._emit(actor, conversation, message, "message.created")
-        return Posted(message, True, missed)
+        run = None
+        if conversation.kind == ConversationKind.DM:
+            run = await agent_hooks().after_post(self.session, actor, conversation, message)
+        return Posted(message, True, missed, run)
 
     async def edit(
         self,

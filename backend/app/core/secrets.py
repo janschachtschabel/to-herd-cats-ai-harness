@@ -3,7 +3,8 @@ never as plaintext.
 
 - `env:NAME`: read from the process environment when used. Only names starting with
   `HERD_AI_`, so a connection cannot be pointed at the database password or the secret
-  key itself and send it to a URL of the admin's choosing.
+  key itself and send it to a URL of the admin's choosing; the app's own `HERD_AI_`
+  settings (`RESERVED_NAMES`, the egress proxy among them) are refused too.
 - `enc:<token>`: a Fernet token under a key derived from `HERD_SECRET_KEY`; tokens of
   `HERD_SECRET_KEY_PREVIOUS` still decrypt during a rotation (`rotate`).
 
@@ -28,6 +29,9 @@ from app.core.errors import ValidationFailed
 ENV_PREFIX = "env:"
 ENC_PREFIX = "enc:"
 ENV_NAME = re.compile(r"HERD_AI_[A-Z0-9_]{1,100}")
+# The app's own settings with that prefix (`core/config.py`): never a connection's key
+# (the egress proxy's URL may carry the proxy's credentials).
+RESERVED_NAMES = frozenset({"HERD_AI_EGRESS_PROXY", "HERD_AI_CHECK_TIMEOUT_SECONDS"})
 MAX_VALUE_CHARS = 4096
 # Visible ASCII only: the value goes into an HTTP header.
 _VALUE = re.compile(r"[\x21-\x7e]+")
@@ -48,7 +52,7 @@ class SecretUnavailable(Exception):  # noqa: N818 (a state, not an error class n
 
 def env_ref(name: str) -> str:
     """`env:NAME` for an allowed variable name; 422 otherwise."""
-    if not ENV_NAME.fullmatch(name):
+    if not _allowed_name(name):
         raise ValidationFailed(code="secrets.env_name_invalid")
     return ENV_PREFIX + name
 
@@ -92,7 +96,7 @@ def rotate(ref: str) -> str:
 def _resolve(ref: str) -> str | None:
     if ref.startswith(ENV_PREFIX):
         name = ref[len(ENV_PREFIX) :]
-        value = os.environ.get(name) if ENV_NAME.fullmatch(name) else None
+        value = os.environ.get(name) if _allowed_name(name) else None
         return value or None
     if ref.startswith(ENC_PREFIX) and (keys := _keys()) is not None:
         try:
@@ -113,3 +117,7 @@ def _keys() -> MultiFernet | None:
 def _fernet(material: str) -> Fernet:
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=_KDF_INFO)
     return Fernet(base64.urlsafe_b64encode(hkdf.derive(material.encode())))
+
+
+def _allowed_name(name: str) -> bool:
+    return ENV_NAME.fullmatch(name) is not None and name not in RESERVED_NAMES

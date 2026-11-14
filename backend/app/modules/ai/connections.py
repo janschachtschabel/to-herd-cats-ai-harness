@@ -9,6 +9,7 @@
 - Checking a connection and listing its models talk to the provider with no
   transaction open (no pooled connection held while a provider answers slowly).
 - Every write names the version it read (409 `ai.connection_version_conflict`).
+- A connection an assignment or an agent uses is not deleted (409 `ai.connection_in_use`).
 """
 
 import time
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import egress, secrets
 from app.core.access import Action, Actor
+from app.core.access_events import access_changed
 from app.core.config import get_settings
 from app.core.errors import AppError, Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
@@ -38,6 +40,7 @@ from app.modules.ai.provider import CheckStatus, ProviderFailure, Target
 from app.modules.ai.repository import ConnectionRepository
 from app.modules.ai.schemas import ConnectionCreate, ConnectionUpdate, SecretIn, stored_prices
 from app.modules.audit.recorder import changes, record, snapshot
+from app.modules.users.repository import UserRepository
 
 # Fields an update may change, besides the secret; audited by name and value.
 _FIELDS = (
@@ -54,6 +57,11 @@ _FIELDS = (
     "enabled",
     "prices",
 )
+
+
+# Fields on which `ai.use` depends (`effective.judge`): a change is announced to every
+# active person (`access.changed`, ruling M5 (c)).
+_DECIDES_AI_USE = frozenset({"enabled", "models", "purpose"})
 
 
 class ProviderFailed(AppError):
@@ -144,6 +152,9 @@ class ConnectionService:
         connection.version += 1
         await self.session.flush()
         await self._audit(actor, "ai_connection.updated", connection, details)
+        if details["changes"].keys() & _DECIDES_AI_USE:
+            everyone = await UserRepository(self.session).active_ids(actor.org_id)
+            await access_changed(self.session, actor, everyone, space_id=None)
         return connection
 
     async def delete(self, actor: Actor, connection_id: uuid.UUID, version: int) -> None:

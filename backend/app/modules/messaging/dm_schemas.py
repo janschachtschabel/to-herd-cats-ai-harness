@@ -19,11 +19,13 @@ Reason = Annotated[
 
 
 class DmOpen(BaseModel):
-    """The other people (the caller is added); 2 to 9 people in all."""
+    """The other people (the caller is added); 2 to 9 people in all. Or, with
+    `agent_id` and no `user_ids`, the caller's conversation with that agent."""
 
     model_config = ConfigDict(extra="forbid")
 
-    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_DM_PEOPLE)
+    user_ids: list[uuid.UUID] = Field(default_factory=list, max_length=MAX_DM_PEOPLE)
+    agent_id: uuid.UUID | None = None
 
 
 class DmOut(ConversationOut):

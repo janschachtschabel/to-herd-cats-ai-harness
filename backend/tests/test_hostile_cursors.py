@@ -10,9 +10,11 @@ import json
 import pytest
 from httpx import AsyncClient
 
+from app.modules.agents.models import StopReason
 from app.modules.groups.models import Group
 from app.modules.users.models import User
 from app.web.public import create_public_app
+from tests.factories_agents import Bench
 
 UUID = "0190f0f0-0000-7000-8000-000000000000"
 
@@ -72,6 +74,9 @@ def test_the_list_endpoints_are_found() -> None:
     } <= set(endpoints)
 
 
+NEED_A_RUN = {"/api/runs/{run_id}/events"}
+
+
 @pytest.mark.parametrize("name", sorted(HOSTILE))
 async def test_hostile_cursors_answer_422_everywhere(
     name: str, owner: AsyncClient, group: Group, member: User
@@ -100,9 +105,12 @@ async def test_hostile_cursors_answer_422_everywhere(
         "{message_id}": message.json()["id"],
     }
     for template in _list_endpoints():
+        if template in NEED_A_RUN:
+            continue  # test_hostile_cursors_on_a_runs_events
         path = template
         for placeholder, value in ids.items():
             path = path.replace(placeholder, value)
+        assert "{" not in path, f"no id for {path}: add one above"
         # Lists that need more than a cursor.
         extra = {"user_id": str(member.id)} if template == "/api/admin/dm-inspect" else {}
         response = await owner.get(path, params={"cursor": HOSTILE[name], **extra})
@@ -113,3 +121,19 @@ async def test_hostile_cursors_answer_422_everywhere(
         assert response.status_code == 422, (path, response.text)
         error = response.json()["error"]
         assert error["code"] == "validation_failed" and len(error["trace_id"]) == 32
+
+
+async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
+    """The lists that need a run (an agent, a connection, a DM) to exist."""
+    posted = await bench.say("Hi")
+    assert await bench.run_next() == StopReason.COMPLETED
+    run_id = posted["agent_run"]["id"]
+    for template in NEED_A_RUN:
+        path = template.replace("{run_id}", run_id)
+        for name, cursor in HOSTILE.items():
+            response = await bench.people.alice.get(path, params={"cursor": cursor})
+            if name == "empty":
+                assert response.status_code == 200, (name, response.text)
+                continue
+            assert response.status_code == 422, (name, response.text)
+            assert response.json()["error"]["code"] == "validation_failed"

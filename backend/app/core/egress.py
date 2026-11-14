@@ -12,7 +12,13 @@ a URL someone configured goes through it).
   answer that changes between a check and the call (rebinding) cannot slip through,
   because there is no separate check. TLS still verifies the name in the URL (SNI).
 - Redirects are never followed; proxy and other settings from the environment are
-  ignored (a proxy would dial on our behalf, past the guard).
+  ignored (a proxy would dial on our behalf, past the guard). Only a proxy the
+  operator names for AI calls (`HERD_AI_EGRESS_PROXY`, ruling M5 (a)) is used, for
+  connections that are not `local`: it is trusted to dial, and a host written as an
+  address is still checked here.
+- Two clients: `client` (httpx) for our own calls, `egress_x2.client` (httpx2, the
+  library of the OpenAI SDK under Pydantic AI) for model calls; both use the same
+  checks (`checked_addresses`, `check_request_target`).
 
 Tests point the guard at a local stub through `Network` (resolver, trusted TLS
 context, extra allowed networks), handed in or set as the module's `_network`; there
@@ -30,6 +36,8 @@ from urllib.parse import urlsplit
 
 import httpcore
 import httpx
+
+from app.core.egress_proxy import ProxyTarget, proxy_for
 
 type IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 type IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
@@ -154,6 +162,48 @@ def _literal(host: str) -> IPAddress | None:
         return None
 
 
+async def checked_addresses(
+    rules: EgressRules,
+    network: Network,
+    host: str,
+    port: int,
+    seconds: float | None,
+    timeout_error: type[Exception],
+    connect_error: type[Exception],
+) -> list[IPAddress]:
+    """`host` resolved, every answer checked (one forbidden answer blocks the name). The
+    two error types are the HTTP core's own, so its client maps them as usual."""
+    try:
+        async with asyncio.timeout(seconds):
+            answers = await network.resolver(host, port)
+    except TimeoutError:
+        raise timeout_error("name resolution timed out") from None
+    except OSError:
+        raise connect_error("name resolution failed") from None
+    addresses: list[IPAddress] = []
+    for answer in answers:
+        try:
+            address = ipaddress.ip_address(answer)
+        except ValueError:
+            raise EgressBlocked("unresolvable") from None
+        check_address(address, rules, network.extra_allowed)
+        if address not in addresses:
+            addresses.append(address)
+    if not addresses:
+        raise EgressBlocked("unresolvable")
+    return addresses
+
+
+def check_request_target(scheme: str, host: str, rules: EgressRules) -> None:
+    """At call time: the scheme, and a host written as an address (with a proxy, the
+    proxy resolves names; addresses we can still judge here)."""
+    schemes = {"https", "http"} if rules.allow_http else {"https"}
+    if scheme not in schemes:
+        raise EgressBlocked("scheme")
+    if (literal := _literal(host.strip("[]"))) is not None:
+        check_address(literal, rules)
+
+
 class GuardedBackend(httpcore.AsyncNetworkBackend):
     """Resolves, checks every answer, and dials only a checked address."""
 
@@ -175,7 +225,15 @@ class GuardedBackend(httpcore.AsyncNetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[Any] | None = None,
     ) -> httpcore.AsyncNetworkStream:
-        addresses = await self._resolve(host, port, timeout)
+        addresses = await checked_addresses(
+            self.rules,
+            self.network,
+            host,
+            port,
+            timeout,
+            httpcore.ConnectTimeout,
+            httpcore.ConnectError,
+        )
         failure: httpcore.ConnectError | None = None
         for address in addresses:
             try:
@@ -186,27 +244,6 @@ class GuardedBackend(httpcore.AsyncNetworkBackend):
                 failure = exc
         assert failure is not None
         raise failure
-
-    async def _resolve(self, host: str, port: int, seconds: float | None) -> list[IPAddress]:
-        try:
-            async with asyncio.timeout(seconds):
-                answers = await self.network.resolver(host, port)
-        except TimeoutError:
-            raise httpcore.ConnectTimeout("name resolution timed out") from None
-        except OSError:
-            raise httpcore.ConnectError("name resolution failed") from None
-        addresses: list[IPAddress] = []
-        for answer in answers:
-            try:
-                address = ipaddress.ip_address(answer)
-            except ValueError:
-                raise EgressBlocked("unresolvable") from None
-            check_address(address, self.rules, self.network.extra_allowed)
-            if address not in addresses:
-                addresses.append(address)
-        if not addresses:
-            raise EgressBlocked("unresolvable")
-        return addresses
 
     async def connect_unix_socket(
         self,
@@ -221,32 +258,45 @@ class GuardedBackend(httpcore.AsyncNetworkBackend):
 
 
 class _GuardedTransport(httpx.AsyncHTTPTransport):
-    def __init__(self, rules: EgressRules, network: Network) -> None:
+    def __init__(self, rules: EgressRules, network: Network, proxy: ProxyTarget | None) -> None:
         context = network.ssl_context or httpx.create_ssl_context(trust_env=True)
         super().__init__(verify=context, trust_env=False)
         # httpx takes no network backend; its pool does. Our pool replaces the one built
         # above (no connection made yet); test_egress proves the guard is in the path.
-        self._pool = httpcore.AsyncConnectionPool(
-            ssl_context=context,
-            network_backend=GuardedBackend(rules, network),
-            max_connections=20,
-            max_keepalive_connections=5,
+        self._pool: httpcore.AsyncConnectionPool = (
+            httpcore.AsyncHTTPProxy(
+                proxy_url=proxy.url,
+                proxy_auth=proxy.auth,
+                ssl_context=context,
+                max_connections=20,
+                max_keepalive_connections=5,
+            )
+            if proxy is not None
+            else httpcore.AsyncConnectionPool(
+                ssl_context=context,
+                network_backend=GuardedBackend(rules, network),
+                max_connections=20,
+                max_keepalive_connections=5,
+            )
         )
         self.rules = rules
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        schemes = {"https", "http"} if self.rules.allow_http else {"https"}
-        if request.url.scheme not in schemes:
-            raise EgressBlocked("scheme")
+        check_request_target(request.url.scheme, request.url.host, self.rules)
         return await super().handle_async_request(request)
 
 
 def client(
-    rules: EgressRules, *, timeout: float, network: Network | None = None
+    rules: EgressRules,
+    *,
+    timeout: float,
+    network: Network | None = None,
+    proxy: str | None = None,
 ) -> httpx.AsyncClient:
-    """An HTTP client whose every connection goes through the guard."""
+    """An HTTP client whose every connection goes through the guard, or, given an
+    operator's proxy and a non-local connection, through that proxy."""
     return httpx.AsyncClient(
-        transport=_GuardedTransport(rules, network or _network),
+        transport=_GuardedTransport(rules, network or _network, proxy_for(rules, proxy)),
         timeout=timeout,
         follow_redirects=False,
         trust_env=False,

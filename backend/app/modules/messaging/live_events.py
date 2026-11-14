@@ -7,7 +7,8 @@ only, never content:
     {"t": <SSE event name>, "o": <org_id>, "c": <conversation_id|null>,
      "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>,
      "w": <ticket_id>, "s": <space_id> (ticket events only),
-     "r": <sprint_id> (sprint events only, with "s")}
+     "r": <sprint_id> (sprint events only, with "s"),
+     "n": <run_id>, "k": <step> (`run.progress` only)}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -18,7 +19,9 @@ ticket's space, gets them, the ticket as `w` and its space as `s` (a client refr
 that ticket and that space's lists only, review M4 P4). Sprint events
 (`sprint.created|updated|started|closed`, plan M4b) are one `sprint.changed` for the
 space `s`: whoever may read tickets there gets it, with the space's and the sprint's
-id (and nothing else). Every API process's hub
+id (and nothing else). `run.progress` (plan M5 task 6) names an agent's run in a DM
+as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person).
+Every API process's hub
 (`live.py`) decodes it again; anything it cannot use is dropped. Payloads stay far
 below Postgres' 8000-byte limit (about 330 bytes).
 """
@@ -57,6 +60,7 @@ LIVE_TYPES: dict[str, str] = {
     "sprint.updated": "sprint.changed",
     "sprint.started": "sprint.changed",
     "sprint.closed": "sprint.changed",
+    "run.progress": "run.progress",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
@@ -79,6 +83,8 @@ class LiveEvent:
     ticket_id: uuid.UUID | None = None
     space_id: uuid.UUID | None = None  # ticket and sprint events only
     sprint_id: uuid.UUID | None = None  # sprint events only
+    run_id: uuid.UUID | None = None  # run.progress only, with `step`
+    step: int | None = None
 
     @property
     def for_space(self) -> bool:
@@ -86,7 +92,7 @@ class LiveEvent:
         return self.conversation_id is None and self.user_id is None and self.space_id is not None
 
     def payload(self) -> str:
-        data = {
+        data: dict[str, object] = {
             "t": self.name,
             "o": str(self.org_id),
             "c": _text(self.conversation_id),
@@ -100,6 +106,9 @@ class LiveEvent:
             data["s"] = str(self.space_id)
         if self.sprint_id is not None:
             data["r"] = str(self.sprint_id)
+        if self.run_id is not None:
+            data["n"] = str(self.run_id)
+            data["k"] = self.step
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
@@ -110,7 +119,7 @@ class LiveEvent:
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "sprint_id": _text(self.sprint_id)}
             )
-        data = {
+        data: dict[str, object] = {
             "conversation_id": _text(self.conversation_id),
             "message_id": _text(self.message_id),
             "parent_id": _text(self.parent_id),
@@ -119,6 +128,9 @@ class LiveEvent:
             data["ticket_id"] = str(self.ticket_id)
         if self.space_id is not None:
             data["space_id"] = str(self.space_id)
+        if self.run_id is not None:
+            data["run_id"] = str(self.run_id)
+            data["step"] = self.step
         return sse_frame(self.name, data)
 
 
@@ -150,6 +162,8 @@ def of_event(event: Event) -> LiveEvent | None:
             space_id=event.space_id,
             sprint_id=_uuid(payload.get("sprint_id")),
         )
+    run = event.type == "run.progress"
+    step = payload.get("step")
     return LiveEvent(
         name=name,
         org_id=event.org_id,
@@ -159,6 +173,8 @@ def of_event(event: Event) -> LiveEvent | None:
         user_id=_uuid(payload.get("user_id")) if event.type in FOR_ONE_PERSON else None,
         ticket_id=_uuid(payload.get("ticket_id")) if ticket else None,
         space_id=event.space_id if ticket else None,
+        run_id=_uuid(payload.get("run_id")) if run else None,
+        step=step if run and isinstance(step, int) else None,
     )
 
 
@@ -184,14 +200,28 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        ids = {key: _strict_uuid(data.get(key)) for key in ("c", "m", "p", "u", "w", "s", "r")}
+        keys = ("c", "m", "p", "u", "w", "s", "r", "n")
+        ids = {key: _strict_uuid(data.get(key)) for key in keys}
         org_id = _strict_uuid(data.get("o"))
+        step = data.get("k")
+        if step is not None and (not isinstance(step, int) or isinstance(step, bool)):
+            raise TypeError("not a step")
     except (ValueError, TypeError, RecursionError):
         return None
     if org_id is None:
         return None
     return LiveEvent(
-        data["t"], org_id, ids["c"], ids["m"], ids["p"], ids["u"], ids["w"], ids["s"], ids["r"]
+        data["t"],
+        org_id,
+        ids["c"],
+        ids["m"],
+        ids["p"],
+        ids["u"],
+        ids["w"],
+        ids["s"],
+        ids["r"],
+        ids["n"],
+        step,
     )
 
 

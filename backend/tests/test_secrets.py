@@ -50,7 +50,8 @@ def test_env_references_are_limited_to_the_ai_prefix() -> None:
     """An admin must not point a connection at the database password or the secret key
     and send it to a URL of their choosing."""
     assert secrets.env_ref("HERD_AI_OPENAI") == "env:HERD_AI_OPENAI"
-    for name in ("HERD_DATABASE_PASSWORD", "HERD_SECRET_KEY", "PATH", "HERD_AI_", "herd_ai_x"):
+    names = ("HERD_DATABASE_PASSWORD", "HERD_SECRET_KEY", "PATH", "HERD_AI_", "herd_ai_x")
+    for name in (*names, "HERD_AI_EGRESS_PROXY", "HERD_AI_CHECK_TIMEOUT_SECONDS"):
         with pytest.raises(ValidationFailed) as caught:
             secrets.env_ref(name)
         assert caught.value.code == "secrets.env_name_invalid"
@@ -60,7 +61,9 @@ def test_resolving_a_disallowed_or_unset_env_reference_fails_without_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("HERD_DATABASE_PASSWORD", PLAIN)
-    for ref in ("env:HERD_DATABASE_PASSWORD", "env:HERD_AI_UNSET_X", "plain", "enc:"):
+    monkeypatch.setenv("HERD_AI_EGRESS_PROXY", f"http://user:{PLAIN}@proxy:3128")
+    refs = ("env:HERD_DATABASE_PASSWORD", "env:HERD_AI_EGRESS_PROXY", "env:HERD_AI_UNSET_X")
+    for ref in (*refs, "plain", "enc:"):
         with pytest.raises(secrets.SecretUnavailable) as caught:
             secrets.resolve(ref)
         assert PLAIN not in str(caught.value) and caught.value.__context__ is None

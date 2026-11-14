@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
 from app.core.repository import BaseRepository
+from app.modules.agents.models import Agent
 from app.modules.groups.models import Group
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.modules.users.models import User
@@ -19,14 +20,19 @@ class NamedMember(NamedTuple):
 
 
 def _member_name() -> ColumnElement[str]:
-    """The display name of a membership's person or group (correlated)."""
+    """The display name of a membership's person, group or agent (correlated)."""
     user = select(User.name).where(
         SpaceMember.member_type == PrincipalType.USER, User.id == SpaceMember.member_id
     )
     group = select(Group.name).where(
         SpaceMember.member_type == PrincipalType.GROUP, Group.id == SpaceMember.member_id
     )
-    return func.coalesce(user.scalar_subquery(), group.scalar_subquery(), "")
+    agent = select(Agent.name).where(
+        SpaceMember.member_type == PrincipalType.AGENT, Agent.id == SpaceMember.member_id
+    )
+    return func.coalesce(
+        user.scalar_subquery(), group.scalar_subquery(), agent.scalar_subquery(), ""
+    )
 
 
 def held_by(principals: Sequence[Principal]) -> ColumnElement[bool]:
@@ -84,7 +90,12 @@ class SpaceRepository(BaseRepository[Space]):
         return list((await self.session.scalars(stmt)).all())
 
     async def member_page(
-        self, space_id: uuid.UUID, after: uuid.UUID | None, limit: int
+        self,
+        space_id: uuid.UUID,
+        after: uuid.UUID | None,
+        limit: int,
+        *,
+        with_agents: bool = True,
     ) -> list[NamedMember]:
         stmt = (
             select(SpaceMember, _member_name())
@@ -92,6 +103,8 @@ class SpaceRepository(BaseRepository[Space]):
             .order_by(SpaceMember.member_id)
             .limit(limit)
         )
+        if not with_agents:
+            stmt = stmt.where(SpaceMember.member_type != PrincipalType.AGENT)
         if after is not None:
             stmt = stmt.where(SpaceMember.member_id > after)
         return [NamedMember(m, name) for m, name in (await self.session.execute(stmt)).all()]

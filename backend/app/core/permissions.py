@@ -31,6 +31,7 @@ class Action(StrEnum):
     TAG_MANAGE = "tag.manage"  # system-wide tags (space tags: `page.moderate`)
     DM_INSPECT = "dm.inspect"  # read others' direct messages: audited, with a reason, 60 min
     AI_MANAGE = "ai.manage"  # AI connections, assignments and usage (spec 7)
+    AGENT_MANAGE = "agent.manage"  # create and change the organisation's agents (spec 8.1)
     AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
 
 

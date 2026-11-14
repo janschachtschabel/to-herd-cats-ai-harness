@@ -23,6 +23,8 @@ dependencies = [
     "argon2-cffi>=25.1",
     "websockets>=15",
     "cryptography>=46",
+    "pydantic-ai-slim>=2.68",
+    "openai>=3.31",
 ]
 
 [dependency-groups]

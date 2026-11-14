@@ -19,9 +19,11 @@ Messages: top level (`parent_id` NULL) or a reply to a top-level message of the 
 conversation (one level; the services check it). A top-level message counts its
 replies (`reply_count`, `last_reply_at`), kept in the reply's transaction under a row
 lock on the parent. Deleting is soft: `deleted_at` is set and the text emptied.
-`system` messages (spec 6.2) exist only in page and ticket threads; database triggers
-(migrations m3 messages, m4 ticket threads) refuse them anywhere else and refuse to
-change a conversation's kind.
+`system` messages (spec 6.2) exist only in page and ticket threads and (M5) in a DM
+with an agent, where they say why a run stopped; `agent` messages (an agent's answer)
+only in a DM the agent takes part in. Database triggers (migrations m3 messages, m4
+ticket threads, m5 agents) refuse them anywhere else and refuse to change a
+conversation's kind.
 """
 
 import uuid
@@ -137,11 +139,11 @@ Index(
 
 
 class ConversationParticipant(OrgScoped, Base):
-    """A person in a direct message (M3: people only; agents widen the CHECK in M5)."""
+    """A person in a direct message, or (M5) the one agent of a DM with one person."""
 
     __tablename__ = "conversation_participant"
     __table_args__ = (
-        CheckConstraint("principal_type IN ('user')", name="principal_type"),
+        CheckConstraint("principal_type IN ('user', 'agent')", name="principal_type"),
         Index("ix_conversation_participant_principal", "principal_type", "principal_id"),
     )
 
@@ -182,7 +184,9 @@ SEARCHABLE_SQL = "kind = 'human' AND deleted_at IS NULL"
 
 class MessageKind(StrEnum):
     HUMAN = "human"
-    SYSTEM = "system"  # page and ticket threads only (database triggers)
+    # Page and ticket threads, and a DM with an agent (a run's stop; database triggers).
+    SYSTEM = "system"
+    AGENT = "agent"  # an agent's answer, in a DM it takes part in; `client_id` = the run
 
 
 SYSTEM_AUTHOR = "system"  # `author_type` of system messages, which have no author id
@@ -193,13 +197,16 @@ class Message(UuidPk, OrgScoped, Base):
     __table_args__ = (
         # A resend with the same key returns the first message (idempotent posting).
         UniqueConstraint("author_id", "client_id"),
-        CheckConstraint("kind IN ('human', 'system')", name="kind"),
-        CheckConstraint("author_type IN ('user', 'system')", name="author_type"),
+        CheckConstraint("kind IN ('human', 'system', 'agent')", name="kind"),
+        CheckConstraint("author_type IN ('user', 'system', 'agent')", name="author_type"),
         CheckConstraint(
             "(kind = 'system') = (author_type = 'system')"
-            " AND (author_type = 'system') = (author_id IS NULL)",
+            " AND (author_type = 'system') = (author_id IS NULL)"
+            " AND (kind = 'agent') = (author_type = 'agent')",
             name="author",
         ),
+        # An agent's answer names its run (`client_id`), once (with the unique key above).
+        CheckConstraint("kind <> 'agent' OR client_id IS NOT NULL", name="agent_run"),
         CheckConstraint(f"char_length(body_md) <= {MAX_BODY_CHARS}", name="body_length"),
         # A system message names the event it was written for (`client_id`), once.
         CheckConstraint("author_type <> 'system' OR client_id IS NOT NULL", name="system_event"),

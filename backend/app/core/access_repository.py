@@ -2,8 +2,9 @@
 statement, and the filter of the spaces an actor may read.
 
 Both are built from the same pieces (`_subject_role`, `_in_scope`, `held_by`), so the
-single check and the list filter cannot drift apart. A later `read_scope` on the actor
-(spec 5.6) narrows `_in_scope` and with it both.
+single check and the list filter cannot drift apart. An actor's `read_scope` (spec
+5.6) narrows `_in_scope`, and with it both, to the spaces it lists with at least the
+role asked for; the check also caps the actor's role there (`AccessFacts.cap`).
 """
 
 import uuid
@@ -41,12 +42,14 @@ _RANK = case({role.value: role.rank for role in SpaceRole}, value=SpaceMember.ro
 class AccessFacts:
     """`system_role` is None when the actor no longer acts (deactivated, gone);
     `kind` is None when the space does not exist in the actor's organisation;
-    `member_role` is the highest role the actor or one of its groups holds there."""
+    `member_role` is the highest role the actor or one of its groups holds there;
+    `cap` the most its `read_scope` allows there (None: no read scope)."""
 
     system_role: SystemRole | None
     kind: SpaceKind | None = None
     member_role: SpaceRole | None = None
     readable: bool = False
+    cap: SpaceRole | None = None
 
 
 _REMEMBERED = "herd.access_facts"
@@ -110,6 +113,7 @@ class AccessRepository:
             kind=SpaceKind(row[1]) if row[1] else None,
             member_role=SpaceRole.from_rank(row[2]) if row[2] is not None else None,
             readable=bool(row[3]),
+            cap=_cap(actor, space_id),
         )
 
     async def facts_in(
@@ -131,6 +135,7 @@ class AccessRepository:
                 system_role=SystemRole(row[1]) if row[1] else None,
                 kind=SpaceKind(row[2]),
                 member_role=SpaceRole.from_rank(row[3]) if row[3] is not None else None,
+                cap=_cap(actor, row[0]),
             )
             for row in await self.session.execute(stmt)
         }
@@ -228,7 +233,7 @@ def ids_with_role_stmt(actor: Actor, min_role: SpaceRole) -> Select[uuid.UUID]:
         _RANK >= min_role.rank,
     )
     return select(Space.id).where(
-        _in_scope(actor), role.is_not(None), or_(role.in_(ADMIN_ROLES), member)
+        _in_scope(actor, min_role), role.is_not(None), or_(role.in_(ADMIN_ROLES), member)
     )
 
 
@@ -246,6 +251,14 @@ def _subject_role(actor: Actor) -> ScalarSelect[str]:
     )
 
 
-def _in_scope(actor: Actor) -> ColumnElement[bool]:
-    """The spaces a check considers at all: the actor's organisation."""
-    return Space.org_id == actor.org_id
+def _in_scope(actor: Actor, min_role: SpaceRole = SpaceRole.VIEWER) -> ColumnElement[bool]:
+    """The spaces a check considers at all: the actor's organisation, and, with a read
+    scope, only the spaces it allows at least `min_role` in."""
+    in_org = Space.org_id == actor.org_id
+    if actor.read_scope is None:
+        return in_org
+    return and_(in_org, Space.id.in_(actor.read_scope.ids(min_role)))
+
+
+def _cap(actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:
+    return actor.read_scope.cap(space_id) if actor.read_scope is not None else None

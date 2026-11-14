@@ -44,6 +44,11 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User.id, User.name).where(User.org_id == org_id, User.id.in_(user_ids))
         return {user_id: name for user_id, name in await self.session.execute(stmt)}
 
+    async def active_ids(self, org_id: uuid.UUID) -> list[uuid.UUID]:
+        """Every active person of the organisation (for announcements to all)."""
+        stmt = select(User.id).where(User.org_id == org_id, User.is_active.is_(True))
+        return list(await self.session.scalars(stmt.order_by(User.id)))
+
     async def exists_any(self) -> bool:
         return bool(await self.session.scalar(select(select(User.id).exists())))
 

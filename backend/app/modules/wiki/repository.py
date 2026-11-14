@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Select, and_, func, or_, select, tuple_
+from sqlalchemy import ColumnElement, Select, and_, false, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
@@ -64,14 +64,19 @@ class PageRepository:
         writers before have committed."""
         await advisory_xact_lock(self.session, f"wiki.tree:{space_id}")
 
-    async def live(self, page_id: uuid.UUID, *, lock: bool = False) -> Page | None:
+    async def live(
+        self, page_id: uuid.UUID, *, lock: bool = False, ai: bool = False
+    ) -> Page | None:
         """A page outside the trash; with `lock`, the row as committed now, locked
-        until the transaction ends."""
+        until the transaction ends; with `ai`, only if it is not locked for AI
+        (`no_ai`, in the same statement)."""
         stmt = (
             select(Page)
             .where(self._live(), Page.id == page_id)
             .execution_options(populate_existing=True)
         )
+        if ai:
+            stmt = stmt.where(Page.no_ai.is_(false()))
         if lock:
             stmt = stmt.with_for_update()
         return await self.session.scalar(stmt)

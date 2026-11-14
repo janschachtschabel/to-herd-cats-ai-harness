@@ -58,7 +58,9 @@ async def test_type_filter(member_client: AsyncClient, make_user, make_group) ->
     await make_group("Redaktion")
     assert {e["type"] for e in await _entries(member_client, q="Redak", type="user")} == {"user"}
     assert {e["type"] for e in await _entries(member_client, q="Redak", type="group")} == {"group"}
-    assert (await member_client.get(DIRECTORY, params={"type": "agent"})).status_code == 422
+    # Agents are a type now (M5), but someone without `ai.use` finds none.
+    assert await _entries(member_client, type="agent") == []
+    assert (await member_client.get(DIRECTORY, params={"type": "robot"})).status_code == 422
 
 
 async def test_inactive_people_and_other_organisations_are_left_out(

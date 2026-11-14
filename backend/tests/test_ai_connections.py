@@ -136,7 +136,9 @@ async def test_update_replaces_or_removes_the_secret_and_audits_only_its_kind(
     removed = await owner.patch(path, json={"secret": None, "version": 3})
     assert removed.json()["secret"] == {"set": False, "kind": None}
     rows = (
-        await session.scalars(select(AuditLog).where(AuditLog.action == "ai_connection.updated"))
+        await session.scalars(
+            select(AuditLog).where(AuditLog.action == "ai_connection.updated").order_by(AuditLog.id)
+        )
     ).all()
     assert [r.details.get("secret", "-") for r in rows if r.details] == ["enc", "-", None]
     assert KEY not in json.dumps([r.details for r in rows])

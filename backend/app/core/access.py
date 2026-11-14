@@ -9,6 +9,8 @@ is no other place that decides who may do what.
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
   an unknown id, and 403 only where the space is visible but the right is missing.
+- An actor with a `read_scope` (an agent's run, spec 5.6) sees only the spaces it
+  lists, and holds at most the role it gives there, admins included.
 - When an admin gets into a team or personal space only through admin power (no
   membership of their own or through a group), `require` notes it in the audit log
   (spec 5.5), at most once per admin, space and UTC day. `can` only answers.
@@ -162,7 +164,7 @@ def _by_admin_power(facts: AccessFacts) -> bool:
 
 def _shown_role(facts: AccessFacts) -> SpaceRole | None:
     if facts.system_role in ADMIN_ROLES:
-        return SpaceRole.ADMIN
+        return _capped(SpaceRole.ADMIN, facts)
     return _effective_role(facts)
 
 
@@ -171,7 +173,13 @@ def _effective_role(facts: AccessFacts) -> SpaceRole | None:
         return None
     opens = facts.kind == SpaceKind.OPEN and facts.system_role in OPEN_SPACE_READERS
     roles = [r for r in (facts.member_role, OPEN_SPACE_FLOOR if opens else None) if r]
-    return max(roles, default=None)
+    return _capped(max(roles, default=None), facts)
+
+
+def _capped(role: SpaceRole | None, facts: AccessFacts) -> SpaceRole | None:
+    if role is None or facts.cap is None:
+        return role
+    return min(role, facts.cap)
 
 
 def _allows(facts: AccessFacts, action: Action) -> bool:
@@ -182,6 +190,7 @@ def _allows(facts: AccessFacts, action: Action) -> bool:
     if not facts.readable:
         return False
     if facts.system_role in ADMIN_ROLES:
-        return True
-    role = _effective_role(facts)
+        role: SpaceRole | None = _capped(SpaceRole.ADMIN, facts)
+    else:
+        role = _effective_role(facts)
     return role is not None and role >= SPACE_ACTION_MIN_ROLE[action]

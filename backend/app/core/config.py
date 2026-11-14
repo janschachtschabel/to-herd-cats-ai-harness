@@ -95,6 +95,15 @@ class Settings(BaseSettings):
     secret_key_previous: SecretStr | None = None
     # Longest wait (seconds) for a provider when testing a connection or listing models.
     ai_check_timeout_seconds: float = Field(default=20.0, gt=0)
+    # An explicit proxy for calls to AI providers (`http://[user:password@]host:port`),
+    # set by the operator where providers are reachable only through one (ruling M5 (a));
+    # `local` connections never use it. HTTPS_PROXY and the like stay ignored.
+    ai_egress_proxy: SecretStr | None = None
+    # Agent runs (M5 task 6): how many runs one worker process works on at once; the
+    # lease (seconds) a running run holds, renewed while it works (a crashed worker's
+    # run is taken up again after it).
+    run_concurrency: int = Field(default=4, ge=1, le=64)
+    run_lease_seconds: float = Field(default=30.0, ge=3)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

@@ -62,15 +62,22 @@ class ChannelUpdate(BaseModel):
 
 
 class ParticipantOut(BaseModel):
-    """A person in a direct message; one who was deactivated stays listed."""
+    """A person in a direct message (one who was deactivated stays listed), or its
+    agent (`type` `agent`, listed after the people)."""
 
     id: uuid.UUID
     name: str
     is_active: bool
+    type: PrincipalType = PrincipalType.USER
 
     @classmethod
     def of(cls, participant: Participant) -> "ParticipantOut":
-        return cls(id=participant.id, name=participant.name, is_active=participant.is_active)
+        return cls(
+            id=participant.id,
+            name=participant.name,
+            is_active=participant.is_active,
+            type=participant.type,
+        )
 
 
 class InspectionNoteOut(BaseModel):

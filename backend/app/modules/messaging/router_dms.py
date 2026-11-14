@@ -35,8 +35,9 @@ dm_inspect = APIRouter(prefix="/admin/dm-inspect", tags=["messaging"])
 async def open_dm(
     body: DmOpen, response: Response, actor: ActorDep, session: SessionDep
 ) -> ConversationOut:
-    """The caller's conversation with these people: new (201) or the one they have."""
-    opened = await DmService(session).open(actor, body.user_ids)
+    """The caller's conversation with these people, or with an agent (`ai.use`): new
+    (201) or the one they have."""
+    opened = await DmService(session).open(actor, body.user_ids, body.agent_id)
     if not opened.created:
         response.status_code = 200
     return ConversationOut.of(opened.conversation, can_post=True, participants=opened.participants)

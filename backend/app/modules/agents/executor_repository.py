@@ -1,0 +1,251 @@
+"""The SQL of the run executor (`executor.py`): claiming runs, keeping their lease,
+the steps' records, and the end (what a run reads: `read_repository.py`).
+
+Claiming is the worker's, across organisations (like the outbox dispatcher; nothing in
+it is shown to anyone); everything after is scoped by the run's organisation.
+
+- A run is claimed when it is queued and its conversation has no running run, or when
+  it is running and its lease has run out (its worker died: it starts again, attempt
+  + 1). A connection's running runs (with a live lease) stay below its
+  `max_concurrency`. Claims take a transaction-level advisory lock, so two workers
+  never count the same free place twice; `SKIP LOCKED` passes over rows a finishing
+  run holds.
+- Every write of a step checks first that the run is still this attempt's
+  (`owned`: the row locked, state `running`, the same attempt). A worker that lost its
+  lease finds out there and stops without writing anything.
+"""
+
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from sqlalchemy import and_, exists, func, or_, select, text, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
+
+from app.core.models_base import utcnow
+from app.core.principal import PrincipalType
+from app.modules.agents.models import (
+    MAX_RUNTIME_SECONDS,
+    Agent,
+    EventKind,
+    RateWindow,
+    Run,
+    RunEvent,
+    RunState,
+)
+from app.modules.ai.models import AiConnection
+from app.modules.messaging.models import Conversation, Message, MessageKind
+
+CLAIM_LOCK = 0x4845_5244_5255_4E53 & 0x7FFF_FFFF_FFFF_FFFF  # "HERDRUNS"
+RATE_WINDOW = timedelta(minutes=1)
+STUCK_GRACE_SECONDS = 60
+
+
+@dataclass(frozen=True, slots=True)
+class Claimed:
+    id: uuid.UUID
+    org_id: uuid.UUID
+    agent_id: uuid.UUID
+    user_id: uuid.UUID
+    conversation_id: uuid.UUID
+    attempt: int
+    started_at: datetime
+
+
+async def claim(session: AsyncSession, lease: float) -> Claimed | None:
+    """The next run to work on, now this worker's (the caller commits)."""
+    await session.execute(select(func.pg_advisory_xact_lock(CLAIM_LOCK)))
+    now = utcnow()
+    other = aliased(Run)
+    busy = exists().where(
+        other.conversation_id == Run.conversation_id, other.state == RunState.RUNNING
+    )
+    mine = aliased(Run)
+    theirs = aliased(Agent)
+    running_here = (
+        select(func.count())
+        .select_from(mine)
+        .join(theirs, theirs.id == mine.agent_id)
+        .where(
+            theirs.connection_id == Agent.connection_id,
+            mine.state == RunState.RUNNING,
+            mine.lease_until >= now,
+        )
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Run)
+        .join(Agent, Agent.id == Run.agent_id)
+        .join(AiConnection, AiConnection.id == Agent.connection_id)
+        .where(
+            or_(
+                and_(Run.state == RunState.QUEUED, ~busy),
+                and_(Run.state == RunState.RUNNING, Run.lease_until < now),
+            ),
+            running_here < AiConnection.max_concurrency,
+        )
+        .order_by(Run.created_at, Run.id)
+        .limit(1)
+        .with_for_update(of=Run, skip_locked=True, key_share=False)
+    )
+    run = await session.scalar(stmt)
+    if run is None:
+        return None
+    run.state = RunState.RUNNING
+    run.attempt += 1
+    run.started_at = now
+    run.lease_until = now + timedelta(seconds=lease)
+    await session.flush()
+    return Claimed(
+        run.id, run.org_id, run.agent_id, run.user_id, run.conversation_id, run.attempt, now
+    )
+
+
+async def renew(session: AsyncSession, held: dict[uuid.UUID, int], lease: float) -> set[uuid.UUID]:
+    """A new lease for the runs this worker holds (id → attempt); the ids still its."""
+    if not held:
+        return set()
+    until = utcnow() + timedelta(seconds=lease)
+    pairs = [and_(Run.id == run_id, Run.attempt == attempt) for run_id, attempt in held.items()]
+    stmt = (
+        update(Run)
+        .where(Run.state == RunState.RUNNING, or_(*pairs))
+        .values(lease_until=until)
+        .returning(Run.id)
+    )
+    return set(await session.scalars(stmt))
+
+
+class RunSteps:
+    """One run's records, in the run's organisation, for one attempt."""
+
+    def __init__(self, session: AsyncSession, run: Claimed) -> None:
+        self.session = session
+        self.run = run
+
+    async def owned(self) -> Run | None:
+        """The run, locked, if it is still this attempt's."""
+        stmt = (
+            select(Run)
+            .where(
+                Run.org_id == self.run.org_id,
+                Run.id == self.run.id,
+                Run.attempt == self.run.attempt,
+                Run.state == RunState.RUNNING,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
+    async def event(self, seq: int, kind: EventKind, content: Mapping[str, object]) -> None:
+        """The step's event; a second write of the same step fails (unique)."""
+        self.session.add(
+            RunEvent(
+                org_id=self.run.org_id,
+                run_id=self.run.id,
+                attempt=self.run.attempt,
+                seq=seq,
+                kind=kind,
+                content=dict(content),
+                created_at=utcnow(),
+            )
+        )
+        await self.session.flush()
+
+    async def agent(self) -> Agent | None:
+        stmt = select(Agent).where(Agent.org_id == self.run.org_id, Agent.id == self.run.agent_id)
+        return await self.session.scalar(stmt.execution_options(populate_existing=True))
+
+    async def connection(self, connection_id: uuid.UUID) -> AiConnection | None:
+        stmt = select(AiConnection).where(
+            AiConnection.org_id == self.run.org_id, AiConnection.id == connection_id
+        )
+        return await self.session.scalar(stmt.execution_options(populate_existing=True))
+
+    async def take_rate(self, connection_id: uuid.UUID, per_minute: int) -> float:
+        """A place in the connection's `requests_per_minute` (0.0), or the seconds until
+        its window ends (nothing taken)."""
+        now = utcnow()
+        fresh = RateWindow.window_start <= now - RATE_WINDOW
+        stmt = (
+            insert(RateWindow)
+            .values(org_id=self.run.org_id, connection_id=connection_id, window_start=now, calls=1)
+            .on_conflict_do_update(
+                index_elements=[RateWindow.connection_id],
+                set_={
+                    "window_start": text(
+                        "CASE WHEN ai_rate_window.window_start <= :cut THEN :now "
+                        "ELSE ai_rate_window.window_start END"
+                    ).bindparams(cut=now - RATE_WINDOW, now=now),
+                    "calls": text(
+                        "CASE WHEN ai_rate_window.window_start <= :cut THEN 1 "
+                        "ELSE ai_rate_window.calls + 1 END"
+                    ).bindparams(cut=now - RATE_WINDOW),
+                },
+                where=or_(fresh, RateWindow.calls < per_minute),
+            )
+            .returning(RateWindow.connection_id)
+        )
+        if await self.session.scalar(stmt) is not None:
+            return 0.0
+        start = await self.session.scalar(
+            select(RateWindow.window_start).where(RateWindow.connection_id == connection_id)
+        )
+        if start is None:
+            return 0.0
+        return max((start + RATE_WINDOW - now).total_seconds(), 0.05)
+
+    async def answer(self, text_md: str) -> Message | None:
+        """The agent's answer, once per run (`client_id` = the run; None if written)."""
+        stmt = (
+            insert(Message)
+            .values(
+                org_id=self.run.org_id,
+                conversation_id=self.run.conversation_id,
+                parent_id=None,
+                author_type=PrincipalType.AGENT,
+                author_id=self.run.agent_id,
+                kind=MessageKind.AGENT,
+                body_md=text_md,
+                client_id=self.run.id,
+                created_at=utcnow(),
+            )
+            .on_conflict_do_nothing(index_elements=["author_id", "client_id"])
+            .returning(Message)
+        )
+        return (await self.session.scalars(stmt)).one_or_none()
+
+    async def conversation(self) -> Conversation:
+        stmt = select(Conversation).where(
+            Conversation.org_id == self.run.org_id, Conversation.id == self.run.conversation_id
+        )
+        return (await self.session.scalars(stmt)).one()
+
+    async def done(self, run: Run, reason: str) -> None:
+        run.state = RunState.DONE
+        run.stop_reason = reason  # type: ignore[assignment]
+        run.lease_until = None
+        run.finished_at = utcnow()
+        await self.session.flush()
+
+
+async def open_runs(session: AsyncSession) -> tuple[int, float, int]:
+    """For the gauges, across organisations: queued runs, the age of the oldest one
+    (seconds, 0 without one), and stuck runs: running with a lease that ran out (no
+    worker took them up again), or for longer than any run may."""
+    now = utcnow()
+    queued = select(func.count(), func.min(Run.created_at)).where(Run.state == RunState.QUEUED)
+    count, oldest = (await session.execute(queued)).one()
+    overdue = now - timedelta(seconds=MAX_RUNTIME_SECONDS + STUCK_GRACE_SECONDS)
+    stuck = await session.scalar(
+        select(func.count()).where(
+            Run.state == RunState.RUNNING,
+            or_(Run.lease_until < now, Run.started_at < overdue),
+        )
+    )
+    age = (now - oldest).total_seconds() if oldest is not None else 0.0
+    return int(count), max(age, 0.0), int(stuck or 0)

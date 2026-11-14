@@ -7,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.actor import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.messaging.agent_hooks import RunStart
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.message_schemas import (
+    AgentRunOut,
     MessageCreate,
     MessageOut,
     MessageUpdate,
@@ -130,10 +132,18 @@ async def message_page(
 
 
 async def _written(
-    session: AsyncSession, actor: Actor, message: Message, not_notified: list[uuid.UUID]
+    session: AsyncSession,
+    actor: Actor,
+    message: Message,
+    not_notified: list[uuid.UUID],
+    agent_run: RunStart | None = None,
 ) -> MessageWriteOut:
     (view,) = await message_views(session, actor, [message])
-    return MessageWriteOut(**MessageOut.of(view).model_dump(), not_notified=not_notified)
+    return MessageWriteOut(
+        **MessageOut.of(view).model_dump(),
+        not_notified=not_notified,
+        agent_run=AgentRunOut.of(agent_run),
+    )
 
 
 @conversations.get("/{conversation_id}/messages", response_model=Page[MessageOut])
@@ -182,7 +192,7 @@ async def post_message(
     )
     if not posted.created:
         response.status_code = 200
-    return await _written(session, actor, posted.message, posted.not_notified)
+    return await _written(session, actor, posted.message, posted.not_notified, posted.agent_run)
 
 
 @messages.get("/{message_id}", response_model=MessageOut)

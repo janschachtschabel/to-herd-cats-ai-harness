@@ -30,6 +30,7 @@ from tests.factories import (  # noqa: E402, F401
     owner,
     owner_user,
 )
+from tests.factories_agents import bench  # noqa: E402, F401
 from tests.factories_ai import (  # noqa: E402, F401
     _plain_stub,
     _tls_stub,

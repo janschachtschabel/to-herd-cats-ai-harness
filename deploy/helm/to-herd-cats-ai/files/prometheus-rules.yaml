@@ -103,3 +103,25 @@ groups:
         annotations:
           summary: "No worker reports for {{ $labels.namespace }}/{{ $labels.job }} while its API runs"
           description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+      # Agent runs (plan M5 task 6). Every worker reads from the database how many runs are
+      # stuck (running with a lease no worker renews, or for longer than any run may: its
+      # 10 minutes and one more) and how long the oldest run has waited for a worker. A
+      # lease that just ran out (a worker died) is taken over within seconds; 5 minutes
+      # of it means no worker takes runs.
+      - alert: HerdRunsStuck
+        expr: |
+          max by (namespace, job) (herd_runs_stuck) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} agent runs of {{ $labels.namespace }}/{{ $labels.job }} are stuck"
+          description: "Runs hold a lease no worker renews, or run longer than any run may; people wait for an answer. Look for runs.failed, runs.renew_failed and runs.claim_failed in the workers' logs."
+      - alert: HerdRunsQueued
+        expr: |
+          max by (namespace, job) (herd_runs_oldest_queued_seconds) > 300
+        labels:
+          severity: warning
+        annotations:
+          summary: "An agent run of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes for a worker"
+          description: "The workers are busy with other runs (HERD_RUN_CONCURRENCY, the connection's max_concurrency, its requests_per_minute) or claim nothing (runs.claim_failed in their logs). People wait for an answer."

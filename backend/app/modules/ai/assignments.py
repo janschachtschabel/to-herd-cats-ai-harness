@@ -3,8 +3,10 @@
 row); a person's own assignment has its own. A target must be a chat connection of the
 organisation and one of its models; while an assignment uses a connection, the
 connection cannot be deleted (409 `ai.connection_in_use`): writes here lock the
-connection shared, its deletion locks it exclusively. A change to a person's own
-assignment is announced to them (`access.changed`), so their client reloads `ai.use`.
+connection shared, its deletion locks it exclusively. A change is announced
+(`access.changed`) to whom it may concern, so their clients reload `ai.use` at once
+(ruling M5 (c)): a person's own assignment to them, the group list to the people of
+every group in the old or the new list, the standard to every active person.
 """
 
 import uuid
@@ -52,6 +54,8 @@ class AssignmentService:
         await record(
             self.session, actor, "ai_assignment.default_set", "organization", actor.org_id, details
         )
+        everyone = await UserRepository(self.session).active_ids(actor.org_id)
+        await access_changed(self.session, actor, everyone, space_id=None)
 
     async def groups(self, actor: Actor, params: PageParams) -> Page[Named[GroupAssignment]]:
         await require_ai(self.session, actor, Action.AI_MANAGE)
@@ -83,6 +87,7 @@ class AssignmentService:
             )
             for index, item in enumerate(items)
         ]
+        before = await self.repo(actor).group_ids()
         await self.repo(actor).replace_groups(rows)
         org.version += 1
         await self.session.flush()
@@ -90,6 +95,10 @@ class AssignmentService:
         await record(
             self.session, actor, "ai_assignment.groups_set", "organization", actor.org_id, details
         )
+        people: list[uuid.UUID] = []
+        for group_id in dict.fromkeys([*before, *(i.group_id for i in items)]):
+            people += await groups.user_ids(group_id)
+        await access_changed(self.session, actor, people, space_id=None)
 
     async def users(self, actor: Actor, params: PageParams) -> Page[Named[UserAssignment]]:
         await require_ai(self.session, actor, Action.AI_MANAGE)

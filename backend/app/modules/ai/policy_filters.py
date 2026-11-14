@@ -32,7 +32,8 @@ def ai_space_ids(org_id: uuid.UUID, location: DataLocation | None = None) -> Sel
                 literal(DataLocation(location).value) == Space.allowed_locations.any_(),
             ),
         )
-    return select(Space.id).where(Space.org_id == org_id, allowed)
+    # Never correlated: it is also nested in statements over `space` (the tools' filters).
+    return select(Space.id).where(Space.org_id == org_id, allowed).correlate(None)
 
 
 def ai_readable(

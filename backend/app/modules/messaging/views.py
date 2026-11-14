@@ -1,5 +1,6 @@
 """Messages as their reader is shown them: with whom they mention, their reactions
-summed up (`mine` from the reader's side), the author's name, and a system message's
+summed up (`mine` from the reader's side), the author's name (a person's, or an
+agent's through `agent_hooks`), and a system message's
 timeline entry read from its body (a key with parameters, for the client to word),
 the ids in it named (people, ticket statuses, parent tickets, sprints, linked pages). For
 messages the reader has been allowed to see; at most seven queries for a whole page. A
@@ -16,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, space_ids_with
 from app.core.actor import Actor
+from app.core.principal import PrincipalType
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.social_repository import (
     MentionRepository,
@@ -148,6 +151,12 @@ async def message_views(
     bodies = {m.id: _system_body(m) for m in messages}
     present = [b for b in bodies.values() if b is not None]
     people = {m.author_id for m in messages if m.author_id is not None}
+    agents = {
+        m.author_id
+        for m in messages
+        if m.author_id is not None and m.author_type == PrincipalType.AGENT
+    }
+    agent_names = await agent_hooks().names(session, actor.org_id, agents) if agents else {}
     people |= {a for b in present if (a := _uuid(b.get("actor"))) is not None}
     people |= _refs(present, PERSON_KEYS)
     hooks = ticket_hooks()
@@ -165,8 +174,18 @@ async def message_views(
             m,
             mentions.get(m.id, []),
             reactions.get(m.id, []),
-            author_name=names.people.get(m.author_id) if m.author_id else None,
+            author_name=_author_name(m, names.people, agent_names),
             system=_system_entry(bodies[m.id], names),
         )
         for m in messages
     ]
+
+
+def _author_name(
+    message: Message, people: dict[uuid.UUID, str], agents: dict[uuid.UUID, str]
+) -> str | None:
+    if message.author_id is None:
+        return None
+    if message.author_type == PrincipalType.AGENT:
+        return agents.get(message.author_id)
+    return people.get(message.author_id)

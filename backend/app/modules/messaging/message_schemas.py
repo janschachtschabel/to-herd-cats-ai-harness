@@ -8,6 +8,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.principal import PrincipalType
+from app.modules.messaging.agent_hooks import RunStart
 from app.modules.messaging.mentions import MAX_MENTIONS
 from app.modules.messaging.models import MAX_BODY_CHARS, MessageKind
 from app.modules.messaging.social_repository import ReactionSummary
@@ -172,11 +173,28 @@ class MessageOut(BaseModel):
         )
 
 
+class AgentRunOut(BaseModel):
+    """What a message to an agent started: its run (`id`; possibly one already waiting,
+    which answers this message too), or no run and why (`reason`: `ai.unavailable`,
+    `agent.draft`, `agent.paused`, `agent.responsible_inactive`,
+    `agent.connection_unavailable`, `run.thread_reply`)."""
+
+    id: uuid.UUID | None
+    reason: str | None
+
+    @classmethod
+    def of(cls, start: RunStart | None) -> "AgentRunOut | None":
+        return None if start is None else cls(id=start.run_id, reason=start.reason)
+
+
 class MessageWriteOut(MessageOut):
     """`not_notified`: the mentioned ids that were not stored: people who may not see
-    the conversation, and ids of nobody (indistinguishable on purpose)."""
+    the conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:
+    for a new message in a DM with an agent, the run it started or why none (null
+    otherwise, and for a resend)."""
 
     not_notified: list[uuid.UUID]
+    agent_run: AgentRunOut | None = None
 
 
 class ReadPosition(BaseModel):

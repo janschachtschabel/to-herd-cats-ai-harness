@@ -56,12 +56,13 @@ class Space(UuidPk, OrgScoped, Base):
 
 
 class SpaceMember(Base):
-    """A principal's role in a space. `member_id` points at a person or a group, so there
-    is no foreign key: deleting a group removes its rows in the same transaction."""
+    """A principal's role in a space. `member_id` points at a person, a group or (M5) an
+    agent, so there is no foreign key: deleting a group or an agent removes its rows in
+    the same transaction."""
 
     __tablename__ = "space_member"
     __table_args__ = (
-        CheckConstraint("member_type IN ('user', 'group')", name="member_type"),
+        CheckConstraint("member_type IN ('user', 'group', 'agent')", name="member_type"),
         CheckConstraint("role IN ('viewer', 'editor', 'moderator', 'admin')", name="role"),
         Index("ix_space_member_principal", "member_type", "member_id"),
     )

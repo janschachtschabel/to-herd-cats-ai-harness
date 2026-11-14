@@ -2,6 +2,9 @@
 
 A DM has 2 to 9 people, the opener included; all of them active people of the
 organisation (anything else is 422 `dm.participants_invalid`, unknown ids included).
+Or (M5) one person and one agent: the opener and an agent they may address (`ai.use`,
+not a draft; otherwise 404 `agent.not_found`); an agent is never in a DM with more
+people (422 `dm.agent_pair_only`).
 Guests answer in DMs but do not open them (403 `dm.guest_cannot_open`). Participants
 never change: another group is another conversation. The same group always gets the
 same conversation, also when two of them open it at once: its key (`dm_key`, a hash
@@ -28,7 +31,8 @@ from app.core.pagination import (
     decode_id_pair_cursor,
     encode_id_pair_cursor,
 )
-from app.core.principal import SystemRole
+from app.core.principal import Principal, SystemRole
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.dm_repository import DmRepository, ListedDm, Participant
 from app.modules.messaging.models import MAX_DM_PEOPLE, MIN_DM_PEOPLE, Conversation
 from app.modules.messaging.visibility import ConversationReader
@@ -47,9 +51,12 @@ class DmEntry:
     participants: list[Participant]
 
 
-def dm_key(user_ids: Iterable[uuid.UUID]) -> str:
-    """The same for the same people, whatever their order."""
-    joined = "\n".join(sorted(f"user:{user_id}" for user_id in set(user_ids)))
+def dm_key(user_ids: Iterable[uuid.UUID], agent_ids: Iterable[uuid.UUID] = ()) -> str:
+    """The same for the same participants, whatever their order (people only: as
+    before agents could take part)."""
+    principals = [Principal.user(u) for u in set(user_ids)]
+    principals += [Principal.agent(a) for a in set(agent_ids)]
+    joined = "\n".join(sorted(str(p) for p in principals))
     return hashlib.sha256(joined.encode()).hexdigest()
 
 
@@ -84,17 +91,25 @@ class DmService:
     def repo(self, actor: Actor) -> DmRepository:
         return DmRepository(self.session, self.reader.scope(actor))
 
-    async def open(self, actor: Actor, user_ids: Iterable[uuid.UUID]) -> Opened:
-        """The conversation of the actor and `user_ids`, opened if it is new."""
+    async def open(
+        self, actor: Actor, user_ids: Iterable[uuid.UUID], agent_id: uuid.UUID | None = None
+    ) -> Opened:
+        """The conversation of the actor and `user_ids` (or the agent), opened if it is
+        new."""
         if actor.system_role == SystemRole.GUEST:
             raise Forbidden(code="dm.guest_cannot_open")
         people = {actor.principal.id, *user_ids}
-        if not MIN_DM_PEOPLE <= len(people) <= MAX_DM_PEOPLE:
-            raise participants_invalid()
         repo = self.repo(actor)
+        if agent_id is not None:
+            if len(people) != 1:
+                raise ValidationFailed(code="dm.agent_pair_only")
+            await agent_hooks().require_addressable(self.session, actor, agent_id)
+        elif not MIN_DM_PEOPLE <= len(people) <= MAX_DM_PEOPLE:
+            raise participants_invalid()
         if await repo.active_people(people) != people:
             raise participants_invalid()
-        key = dm_key(people)
+        agents = [agent_id] if agent_id is not None else []
+        key = dm_key(people, agents)
         conversation = await repo.insert(
             {
                 "dm_key": key,
@@ -108,7 +123,9 @@ class DmService:
             existing = await repo.by_key(key)
             assert existing is not None  # the conflict was with a committed row
             return Opened(existing, False, (await repo.participants([existing.id]))[existing.id])
-        await repo.add_participants(conversation.id, sorted(people))
+        principals = [Principal.user(u) for u in sorted(people)]
+        principals += [Principal.agent(a) for a in agents]
+        await repo.add_participants(conversation.id, principals)
         await emit(
             self.session,
             type="dm.created",

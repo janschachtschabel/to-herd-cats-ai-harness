@@ -298,3 +298,73 @@ tests:
             exp_annotations:
               summary: "No worker reports for herd/herd-internal while its API runs"
               description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+
+  # HerdRunsStuck: a run has been stuck (lease not renewed, or past any run's time) for
+  # 5 minutes. Every worker reports the same count, read from the database.
+  - name: HerdRunsStuck fires once per job after 5 minutes, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 1x10 0x5"
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 1x10 0x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: HerdRunsStuck
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "1 agent runs of herd/herd-worker are stuck"
+              description: "Runs hold a lease no worker renews, or run longer than any run may; people wait for an answer. Look for runs.failed, runs.renew_failed and runs.claim_failed in the workers' logs."
+      - eval_time: 15m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+
+  - name: HerdRunsStuck stays quiet when a dead worker's run is taken over
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 1 1 0 0 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+
+  # HerdRunsQueued: the oldest waiting run is older than 5 minutes.
+  - name: HerdRunsQueued fires once per job when a run waits more than 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 60 120 180 240 300 360 420"
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 60 120 180 240 300 360 420"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HerdRunsQueued
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: HerdRunsQueued
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "An agent run of herd/herd-worker has waited more than 5 minutes for a worker"
+              description: "The workers are busy with other runs (HERD_RUN_CONCURRENCY, the connection's max_concurrency, its requests_per_minute) or claim nothing (runs.claim_failed in their logs). People wait for an answer."
+
+  - name: HerdRunsQueued stays quiet while runs are taken within 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 30 90 150 0 20 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdRunsQueued
+        exp_alerts: []

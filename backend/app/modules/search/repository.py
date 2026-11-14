@@ -11,7 +11,19 @@ Snippets come from `ts_headline` for the returned rows only.
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Float, Select, and_, case, cast, func, literal, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Float,
+    Select,
+    and_,
+    case,
+    cast,
+    false,
+    func,
+    literal,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import REGCONFIG
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +46,7 @@ class SearchScope:
     org_id: uuid.UUID
     readable: Select[uuid.UUID]  # spaces the actor may read (SQL)
     drafts: Select[uuid.UUID]  # spaces where it may see drafts (SQL)
+    ai: bool = False  # for an agent's tool: pages locked for AI (`no_ai`) left out
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +77,8 @@ class SearchRepository:
         self.scope = scope
 
     def _allowed(self) -> ColumnElement[bool]:
-        return page_seen(self.scope.org_id, self.scope.readable, self.scope.drafts)
+        seen = page_seen(self.scope.org_id, self.scope.readable, self.scope.drafts)
+        return and_(seen, Page.no_ai.is_(false())) if self.scope.ai else seen
 
     async def pages(
         self,

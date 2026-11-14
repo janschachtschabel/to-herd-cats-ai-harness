@@ -1,0 +1,185 @@
+"""Agents and their runs (spec 5.1, 8.1, 8.3; plan M5 decision 2).
+
+`agent`: a principal (`agent:<id>`) with the fields M5 reads: name, a short
+introduction for colleagues, instructions, the connection and model it talks to, the
+person responsible for it, a status (`draft`: not offered to anyone; `active`;
+`paused`: kept, but starts no runs) and its limits per run (steps, runtime), capped
+from above. Every agent is level 1 (reads only) in M5.
+
+`run`: one answer to a direct message. Created `queued` in the transaction of the
+message that asks; a worker takes it (`running`, with a lease it renews) and ends it
+(`done`, with `stop_reason`). A conversation has at most one queued and at most one
+running run (unique partial indexes): a message that arrives while one is queued is
+answered by it, one that arrives while one runs gets the next. A run whose lease ran
+out (its worker died) is taken up again from the start, as `attempt` + 1.
+
+`run_event`: what a run did, step by step (`seq` within an `attempt`): model calls
+with their usage, tool calls with their full arguments and results, the stop. Content
+lives only here, never in logs or metrics; readable by the person who asked, the
+person responsible and those with `agent.manage`.
+"""
+
+import uuid
+from datetime import datetime
+from enum import StrEnum
+from typing import Any
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
+
+MAX_NAME_CHARS = 120
+MAX_INTRO_CHARS = 500
+MAX_INSTRUCTIONS_CHARS = 20_000
+MAX_STEPS = 25
+MAX_RUNTIME_SECONDS = 600
+
+
+class AgentStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+
+
+class RunState(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+
+
+class StopReason(StrEnum):
+    COMPLETED = "completed"
+    MAX_STEPS = "max_steps"
+    DEADLINE = "deadline"
+    NO_PROGRESS = "no_progress"  # the third identical tool call
+    RIGHTS_REVOKED = "rights_revoked"
+    POLICY_BLOCKED = "policy_blocked"
+    PROVIDER_REFUSED = "provider_refused"  # 401, 402, 403, 429
+    ERROR = "error"
+
+
+class EventKind(StrEnum):
+    MODEL_CALL = "model_call"
+    TOOL_CALL = "tool_call"
+    STOP = "stop"
+
+
+def _in(column: str, values: type[StrEnum]) -> str:
+    return f"{column} IN ({', '.join(repr(v.value) for v in values)})"
+
+
+class Agent(UuidPk, OrgScoped, Timestamps, Base):
+    __tablename__ = "agent"
+    __table_args__ = (
+        CheckConstraint(_in("status", AgentStatus), name="status"),
+        CheckConstraint(f"char_length(instructions) <= {MAX_INSTRUCTIONS_CHARS}", name="instr"),
+        CheckConstraint(f"max_steps BETWEEN 1 AND {MAX_STEPS}", name="max_steps"),
+        CheckConstraint(
+            f"max_runtime_seconds BETWEEN 10 AND {MAX_RUNTIME_SECONDS}", name="max_runtime"
+        ),
+        Index("ix_agent_connection_id", "connection_id"),
+    )
+
+    name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
+    intro: Mapped[str] = mapped_column(String(MAX_INTRO_CHARS), nullable=False, default="")
+    instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT"), nullable=False
+    )
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    responsible_user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
+    )
+    status: Mapped[AgentStatus] = mapped_column(String(16), nullable=False)
+    max_steps: Mapped[int] = mapped_column(Integer, nullable=False, default=MAX_STEPS)
+    max_runtime_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=MAX_RUNTIME_SECONDS
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class Run(UuidPk, OrgScoped, Base):
+    __tablename__ = "run"
+    __table_args__ = (
+        CheckConstraint(_in("state", RunState), name="state"),
+        CheckConstraint(
+            f"(state = 'done') = (stop_reason IS NOT NULL) AND "
+            f"(stop_reason IS NULL OR {_in('stop_reason', StopReason)})",
+            name="stop_reason",
+        ),
+        CheckConstraint("(state = 'running') = (lease_until IS NOT NULL)", name="lease"),
+        Index(
+            "uq_run_queued_per_conversation",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("state = 'queued'"),
+        ),
+        Index(
+            "uq_run_running_per_conversation",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("state = 'running'"),
+        ),
+        Index("ix_run_open", "created_at", postgresql_where=text("state <> 'done'")),
+        Index("ix_run_agent_id", "agent_id"),
+        Index("ix_run_trigger_message_id", "trigger_message_id"),
+    )
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("agent.id", ondelete="CASCADE"), nullable=False
+    )
+    # Who asked: whose rights the run reads with, who is billed (spec 5.4).
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False
+    )
+    trigger_message_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE"), nullable=False
+    )
+    state: Mapped[RunState] = mapped_column(String(16), nullable=False)
+    stop_reason: Mapped[StopReason | None] = mapped_column(String(32))
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    steps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RunEvent(UuidPk, OrgScoped, Base):
+    __tablename__ = "run_event"
+    __table_args__ = (
+        CheckConstraint(_in("kind", EventKind), name="kind"),
+        Index("uq_run_event_step", "run_id", "attempt", "seq", unique=True),
+    )
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("run.id", ondelete="CASCADE"), nullable=False
+    )
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[EventKind] = mapped_column(String(16), nullable=False)
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class RateWindow(OrgScoped, Base):
+    """`requests_per_minute` of a connection, across workers: the calls started in the
+    current window (spec 12.4: no such state in memory)."""
+
+    __tablename__ = "ai_rate_window"
+
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="CASCADE"), primary_key=True
+    )
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    calls: Mapped[int] = mapped_column(Integer, nullable=False)

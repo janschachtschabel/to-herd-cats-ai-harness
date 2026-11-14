@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute
 
 from app.core.principal import Principal, PrincipalType
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.models import (
     Conversation,
     ConversationKind,
@@ -37,6 +38,7 @@ class Participant:
     id: uuid.UUID
     name: str
     is_active: bool
+    type: PrincipalType = PrincipalType.USER
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +93,7 @@ async def _dm_page(
 async def participants_of(
     session: AsyncSession, org_id: uuid.UUID, conversation_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, list[Participant]]:
-    """The people of each conversation, by name."""
+    """The people of each conversation, by name, and then its agent, if it has one."""
     if not conversation_ids:
         return {}
     stmt = (
@@ -107,6 +109,19 @@ async def participants_of(
     found: dict[uuid.UUID, list[Participant]] = {id_: [] for id_ in conversation_ids}
     for conversation_id, user_id, name, active in await session.execute(stmt):
         found[conversation_id].append(Participant(user_id, name, active))
+    agents = select(
+        ConversationParticipant.conversation_id, ConversationParticipant.principal_id
+    ).where(
+        ConversationParticipant.org_id == org_id,
+        ConversationParticipant.conversation_id.in_(conversation_ids),
+        ConversationParticipant.principal_type == PrincipalType.AGENT,
+    )
+    rows = (await session.execute(agents)).all()
+    if rows:
+        names = await agent_hooks().names(session, org_id, {agent_id for _, agent_id in rows})
+        for conversation_id, agent_id in rows:
+            name = names.get(agent_id, "")
+            found[conversation_id].append(Participant(agent_id, name, True, PrincipalType.AGENT))
     return found
 
 
@@ -143,16 +158,16 @@ class DmRepository:
         return await self.session.scalar(stmt)
 
     async def add_participants(
-        self, conversation_id: uuid.UUID, user_ids: Iterable[uuid.UUID]
+        self, conversation_id: uuid.UUID, principals: Iterable[Principal]
     ) -> None:
         rows = [
             {
                 "org_id": self.scope.org_id,
                 "conversation_id": conversation_id,
-                "principal_type": PrincipalType.USER,
-                "principal_id": user_id,
+                "principal_type": principal.type,
+                "principal_id": principal.id,
             }
-            for user_id in user_ids
+            for principal in principals
         ]
         await self.session.execute(insert(ConversationParticipant).values(rows))
 

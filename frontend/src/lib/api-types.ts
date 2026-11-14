@@ -291,6 +291,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agents */
+        get: operations["list_agents_api_agents_get"];
+        put?: never;
+        /** Create Agent */
+        post: operations["create_agent_api_agents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{agent_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent */
+        get: operations["get_agent_api_agents__agent_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Agent
+         * @description Only an agent that never talked or ran (409 `agent.in_use`: pause it instead).
+         */
+        delete: operations["delete_agent_api_agents__agent_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Agent */
+        patch: operations["update_agent_api_agents__agent_id__patch"];
+        trace?: never;
+    };
+    "/api/agents/{agent_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Profile
+         * @description For a person with `ai.use`: name, introduction and status (no draft).
+         */
+        get: operations["agent_profile_api_agents__agent_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/assignments": {
         parameters: {
             query?: never;
@@ -783,7 +843,8 @@ export interface paths {
         put?: never;
         /**
          * Open Dm
-         * @description The caller's conversation with these people: new (201) or the one they have.
+         * @description The caller's conversation with these people, or with an agent (`ai.use`): new
+         *     (201) or the one they have.
          */
         post: operations["open_dm_api_dms_post"];
         delete?: never;
@@ -1133,6 +1194,40 @@ export interface paths {
         put?: never;
         /** Restore Version */
         post: operations["restore_version_api_pages__page_id__versions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_api_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Events */
+        get: operations["run_events_api_runs__run_id__events_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1824,7 +1919,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "ai.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "ai.use";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -1902,6 +1997,156 @@ export interface components {
             reason: components["schemas"]["NotificationReason"];
             /** Snippet */
             snippet: string;
+        };
+        /**
+         * AgentCreate
+         * @description `connection_id`/`model`: a chat connection of the organisation and one of its
+         *     models. `responsible_user_id`: an active person (no guest) who answers for it.
+         */
+        AgentCreate: {
+            /**
+             * Connection Id
+             * Format: uuid
+             */
+            connection_id: string;
+            /**
+             * Instructions
+             * @default
+             */
+            instructions?: string;
+            /**
+             * Intro
+             * @default
+             */
+            intro?: string;
+            /**
+             * Max Runtime Seconds
+             * @description seconds
+             * @default 600
+             */
+            max_runtime_seconds?: number;
+            /**
+             * Max Steps
+             * @default 25
+             */
+            max_steps?: number;
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /**
+             * Responsible User Id
+             * Format: uuid
+             */
+            responsible_user_id: string;
+            /** @default draft */
+            status?: components["schemas"]["AgentStatus"];
+        };
+        /**
+         * AgentOut
+         * @description An agent as those with `agent.manage` see it.
+         */
+        AgentOut: {
+            /**
+             * Connection Id
+             * Format: uuid
+             */
+            connection_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instructions */
+            instructions: string;
+            /** Intro */
+            intro: string;
+            /** Max Runtime Seconds */
+            max_runtime_seconds: number;
+            /** Max Steps */
+            max_steps: number;
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /**
+             * Responsible User Id
+             * Format: uuid
+             */
+            responsible_user_id: string;
+            status: components["schemas"]["AgentStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AgentProfileOut
+         * @description What a person with `ai.use` learns of an agent to talk to: no instructions, no
+         *     connection.
+         */
+        AgentProfileOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Intro */
+            intro: string;
+            /** Name */
+            name: string;
+            status: components["schemas"]["AgentStatus"];
+        };
+        /**
+         * AgentRunOut
+         * @description What a message to an agent started: its run (`id`; possibly one already waiting,
+         *     which answers this message too), or no run and why (`reason`: `ai.unavailable`,
+         *     `agent.draft`, `agent.paused`, `agent.responsible_inactive`,
+         *     `agent.connection_unavailable`, `run.thread_reply`).
+         */
+        AgentRunOut: {
+            /** Id */
+            id: string | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * AgentStatus
+         * @enum {string}
+         */
+        AgentStatus: "draft" | "active" | "paused";
+        /**
+         * AgentUpdate
+         * @description Fields left out stay as they are; `connection_id` and `model` go together.
+         */
+        AgentUpdate: {
+            /** Connection Id */
+            connection_id?: string | null;
+            /** Instructions */
+            instructions?: string | null;
+            /** Intro */
+            intro?: string | null;
+            /** Max Runtime Seconds */
+            max_runtime_seconds?: number | null;
+            /** Max Steps */
+            max_steps?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            status?: components["schemas"]["AgentStatus"] | null;
+            /** Version */
+            version: number;
         };
         /**
          * AiLockIn
@@ -2426,7 +2671,8 @@ export interface components {
         };
         /**
          * DirectoryEntryOut
-         * @description Who can be added to a space. Deliberately no email or role: any member may read it.
+         * @description Who can be added to a space or written to. Deliberately no email or role: any
+         *     member may read it.
          */
         DirectoryEntryOut: {
             /**
@@ -2440,15 +2686,18 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "user" | "group";
+            type: "user" | "group" | "agent";
         };
         /**
          * DmOpen
-         * @description The other people (the caller is added); 2 to 9 people in all.
+         * @description The other people (the caller is added); 2 to 9 people in all. Or, with
+         *     `agent_id` and no `user_ids`, the caller's conversation with that agent.
          */
         DmOpen: {
+            /** Agent Id */
+            agent_id?: string | null;
             /** User Ids */
-            user_ids: string[];
+            user_ids?: string[];
         };
         /**
          * DmOut
@@ -2541,6 +2790,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * EventKind
+         * @enum {string}
+         */
+        EventKind: "model_call" | "tool_call" | "stop";
         /** GroupAssignmentOut */
         GroupAssignmentOut: {
             /**
@@ -2898,7 +3152,7 @@ export interface components {
          * MessageKind
          * @enum {string}
          */
-        MessageKind: "human" | "system";
+        MessageKind: "human" | "system" | "agent";
         /**
          * MessageOut
          * @description `author` is null for system messages; those carry `system` instead (null for
@@ -2963,9 +3217,12 @@ export interface components {
         /**
          * MessageWriteOut
          * @description `not_notified`: the mentioned ids that were not stored: people who may not see
-         *     the conversation, and ids of nobody (indistinguishable on purpose).
+         *     the conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:
+         *     for a new message in a DM with an agent, the run it started or why none (null
+         *     otherwise, and for a resend).
          */
         MessageWriteOut: {
+            agent_run?: components["schemas"]["AgentRunOut"] | null;
             author: components["schemas"]["MessageAuthorOut"] | null;
             /** Body Md */
             body_md: string;
@@ -3285,6 +3542,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AgentOut] */
+        Page_AgentOut_: {
+            /** Items */
+            items: components["schemas"]["AgentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AttachmentOut] */
         Page_AttachmentOut_: {
             /** Items */
@@ -3373,6 +3637,13 @@ export interface components {
         Page_MessageOut_: {
             /** Items */
             items: components["schemas"]["MessageOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[RunEventOut] */
+        Page_RunEventOut_: {
+            /** Items */
+            items: components["schemas"]["RunEventOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3489,7 +3760,8 @@ export interface components {
         };
         /**
          * ParticipantOut
-         * @description A person in a direct message; one who was deactivated stays listed.
+         * @description A person in a direct message (one who was deactivated stays listed), or its
+         *     agent (`type` `agent`, listed after the people).
          */
         ParticipantOut: {
             /**
@@ -3501,6 +3773,8 @@ export interface components {
             is_active: boolean;
             /** Name */
             name: string;
+            /** @default user */
+            type?: components["schemas"]["PrincipalType"];
         };
         /**
          * PasswordChangeIn
@@ -3608,6 +3882,78 @@ export interface components {
             message_id: string;
         };
         /**
+         * RunEventOut
+         * @description One step of a run, with its full content (model call: usage and the answer's
+         *     parts; tool call: name, arguments, result; stop: the reason).
+         */
+        RunEventOut: {
+            /** Attempt */
+            attempt: number;
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["EventKind"];
+            /** Seq */
+            seq: number;
+        };
+        /**
+         * RunOut
+         * @description `steps`: model calls of the current attempt; `stop_reason` once `done`.
+         */
+        RunOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Attempt */
+            attempt: number;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Started At */
+            started_at: string | null;
+            state: components["schemas"]["RunState"];
+            /** Steps */
+            steps: number;
+            stop_reason: components["schemas"]["StopReason"] | null;
+            /**
+             * Trigger Message Id
+             * Format: uuid
+             */
+            trigger_message_id: string;
+        };
+        /**
+         * RunState
+         * @enum {string}
+         */
+        RunState: "queued" | "running" | "done";
+        /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
          */
@@ -3685,12 +4031,12 @@ export interface components {
              * Member Type
              * @enum {string}
              */
-            member_type: "user" | "group";
+            member_type: "user" | "group" | "agent";
             role: components["schemas"]["SpaceRole"];
         };
         /**
          * SpaceMemberOut
-         * @description `name`: the person's or group's display name.
+         * @description `name`: the person's, group's or agent's display name.
          */
         SpaceMemberOut: {
             /**
@@ -3924,6 +4270,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * StopReason
+         * @enum {string}
+         */
+        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error";
         /**
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page or
@@ -5235,6 +5586,199 @@ export interface operations {
             };
         };
     };
+    list_agents_api_agents_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_api_agents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_api_agents__agent_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_api_agents__agent_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agent_api_agents__agent_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_profile_api_agents__agent_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_assignments_api_ai_assignments_get: {
         parameters: {
             query?: never;
@@ -6315,7 +6859,7 @@ export interface operations {
                 limit?: number;
                 cursor?: string | null;
                 q?: string;
-                type?: ("user" | "group") | null;
+                type?: ("user" | "group" | "agent") | null;
                 /** @description only people who read this space */
                 space_id?: string | null;
             };
@@ -7252,6 +7796,71 @@ export interface operations {
             };
         };
     };
+    get_run_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_events_api_runs__run_id__events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunEventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_api_search_get: {
         parameters: {
             query?: {
@@ -7759,7 +8368,7 @@ export interface operations {
             header?: never;
             path: {
                 space_id: string;
-                member_type: "user" | "group";
+                member_type: "user" | "group" | "agent";
                 member_id: string;
             };
             cookie?: never;

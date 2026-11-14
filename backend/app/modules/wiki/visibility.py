@@ -6,6 +6,7 @@ Rights (spec 5.3) come only from `core/access.py`:
   repository is scoped by `visible_space_ids`, so such a page is never even loaded.
 - Drafts are seen by whoever holds `page.edit` in the space; everyone else sees only
   published pages, and a draft they cannot see is 404 too.
+- An agent's tool reads through `for_ai`: pages AI may read only (spec 7.3).
 """
 
 import uuid
@@ -16,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can, require, space_ids_with, visible_space_ids
 from app.core.errors import Conflict, NotFound
+from app.modules.ai.policy_filters import ai_space_ids
+from app.modules.spaces.models import Space
 from app.modules.wiki.models import Page, PageStatus
 from app.modules.wiki.repository import PageRepository, PageScope, page_seen
 from app.modules.wiki.subtree_repository import SubtreeRepository
@@ -73,6 +76,23 @@ class PageReader:
         """The page outside the trash if the actor may see it, else 404; with `lock`,
         as committed now and locked until the transaction ends."""
         page = await self.repo(actor).live(page_id, lock=lock)
+        if page is None:
+            raise page_not_found()
+        await self.require_in_space(actor, Action.SPACE_READ, page)
+        if not await self.may_see(actor, page):
+            raise page_not_found()
+        return page
+
+    async def for_ai(self, actor: Actor, page_id: uuid.UUID) -> Page:
+        """`readable`, for an agent's tool (spec 7.3): also 404 for a page locked for AI
+        (`no_ai`) or in a space whose policy is `none`, both in the statement that
+        applies the rights. Whether the run's connection may receive the page is the
+        run's check, before its next model call."""
+        scope = PageScope(
+            actor.org_id,
+            visible_space_ids(actor).where(Space.id.in_(ai_space_ids(actor.org_id))),
+        )
+        page = await PageRepository(self.session, scope).live(page_id, ai=True)
         if page is None:
             raise page_not_found()
         await self.require_in_space(actor, Action.SPACE_READ, page)
