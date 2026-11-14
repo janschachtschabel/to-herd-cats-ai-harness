@@ -153,7 +153,7 @@ class Executor:
             briefed.sections,
             found.asker,
             found.automation_of,
-            found.heartbeat,
+            found.automation_kind,
         )
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps

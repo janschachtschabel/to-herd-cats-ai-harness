@@ -685,7 +685,7 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
 
-### Aufgaben: Fälligkeits-Schleife, Lauf und Heartbeat (M7, im Aufbau)
+### Aufgaben: Fälligkeits-Schleife, Lauf, Heartbeat und Ereignis-Regel (M7, im Aufbau)
 
 Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
 IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
@@ -795,6 +795,49 @@ Wochentage und eine Ortszeit von–bis in einer IANA-Zeitzone (`active_days`,
   eines Heartbeats beim Auslösen noch nichts: Den Systemeintrag `automation.started`
   (im Kanal die Wurzel des Threads) schreibt erst der Lauf, wenn er etwas zuzustellen
   hat (seine Antwort, eine Karte, den Hinweis seines Endes).
+
+**Ereignis-Regel** (Art `event`): hängt an einem Bereich; ihr Ort ist ein Kanal oder ein
+Ticket-Thread dieses Bereichs. Sie hört auf eine Ereignisart (`event_type`):
+`page.published`, `ticket.created` (wahlweise gefiltert nach einem Tag und einer Art,
+gelesen am Ticket, wie es beim Zustellen des Ereignisses ist; ein gelöschtes Tag passt
+auf nichts), `attachment.uploaded` (neu: ein Upload über die Route, nur IDs; ein Import
+sendet keines) und `page.review_due`. Ein Outbox-Handler (`automation_events`, im
+Worker) gibt jedes solche Ereignis an die aktiven Regeln seiner Art im Bereich des
+Ereignisses; Regeln anderer Bereiche und Organisationen bekommen nichts, eine
+angehaltene Regel verpasst, was in ihrer Pause geschieht.
+
+- **Nur IDs, nur der eigene Blick:** Der Lauf bekommt nach dem Auftrag der Eigentümerin
+  nur die Art, die Anzahl und die IDs der Objekte (ein Ticket auch mit Schlüssel), als
+  nicht vertrauenswürdige Angabe gerahmt (`<untrusted source="event">`), und liest sie
+  mit seinen Werkzeugen. Er läuft als Eigentümerin am Ort der Regel (ihre Rechte ∩ die
+  des Agenten ∩ das Publikum des Ortes: im Kanal die Sicht eines Betrachters, Schreiben
+  nur in diesen Bereich). Wer das Ereignis verursacht hat, spielt keine Rolle und
+  gewinnt nichts. Ein Ereignis über ein Objekt, das der Lauf selbst nicht lesen dürfte
+  (ein Entwurf, eine für KI gesperrte Seite oder Datei, ein Ticket außerhalb seiner
+  Sicht), wird gar nicht aufgenommen: kein Lauf, keine Zählung, kein Protokolleintrag.
+  Ist der Ort selbst für KI gesperrt oder archiviert, wird der Termin wie jeder andere
+  mit `skipped_policy` protokolliert; auch die übrigen Prüfungen eines Termins gelten
+  unverändert (Eigentümerin, Agent, Budget, `skipped_busy`).
+- **Ruhezeit** (`quiet_seconds`, Standard 300, mindestens 60): Innerhalb der Ruhezeit
+  nach einem Termin entsteht höchstens ein Lauf. Weitere Ereignisse warten
+  (`automation_event`), und `next_due_at` wird das Ende der Ruhezeit; dann löst die
+  Fälligkeits-Schleife alle wartenden als **einen** Termin aus, und der Lauf erfährt
+  ihre Anzahl (und die IDs der neuesten 20 Objekte), statt sie einzeln nachzuholen.
+  Kommt nach dem Ende der Ruhezeit ein Ereignis, bevor die Schleife sie abgeholt hat,
+  nimmt sein Termin die wartenden mit. Jeder Termin beginnt eine neue Ruhezeit. Ohne
+  wartende Ereignisse hat eine Ereignis-Regel keinen Termin (`next_due_at` leer) und
+  ist nie „erledigt“.
+- **Einmal:** Die Regel ist während der Aufnahme gesperrt (in fester Reihenfolge), und
+  jedes Ereignis wird je Regel einmal aufgenommen (Schlüssel Regel + Ereignis): Ein
+  erneut zugestelltes Ereignis bewirkt nichts mehr, auch bei mehreren Workern.
+- **Tiefe:** Ein Ereignis, das ein Schritt eines Laufs verursacht hat, nennt den Lauf
+  (`event_outbox.run_id`, gesetzt vom Schritt-Host für alles, was das Werkzeug des
+  Schritts auslöst). Ein Lauf daraus bekommt `chain_depth` = Tiefe des verursachenden
+  Laufs + 1; dasselbe Feld zählt Übergaben und Ereignisse zusammen. Ein Ereignis eines
+  Laufs der Tiefe 3 startet nichts mehr und wird als `skipped_depth` protokolliert; so
+  enden auch zwei Regeln, die einander im Kreis auslösen. Warten mehrere Ereignisse,
+  zählt die größte Tiefe. Eine Regel reagiert nie auf ein Ereignis, das ihr eigener
+  Lauf an einem Objekt verursacht hat, um das es in diesem Lauf ging.
 
 ### Läufe im Einzelnen
 
@@ -1210,7 +1253,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
-| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `paused_owner`) |
+| `herd_automation_firings_total{outcome}` | Zähler | fällige Termine von Aufgaben, die dieser Worker ausgelöst hat, je Ergebnis (`started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `skipped_depth`, `paused_owner`; Ereignis-Regeln zählen hier nur die Termine, die die Schleife am Ende einer Ruhezeit auslöst) |
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1245,7 +1288,7 @@ soll den Worker nicht als hängend erscheinen lassen.
 | Vorschläge | `page_proposal`, `skill_proposal` |
 | Skills | `skill`, `skill_version` |
 | Gedächtnis | normale Wiki-Seiten, Zuordnung in `agent_memory` |
-| Aufgaben und ihr Protokoll | `automation` (Auftrag bzw. Checkliste, Termin, Zustand, Fehlschläge in Folge, beim Heartbeat Abstand und aktive Stunden), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs, ob ein Heartbeat `HEARTBEAT_OK` antwortete); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`) |
+| Aufgaben und ihr Protokoll | `automation` (Auftrag bzw. Checkliste, Termin, Zustand, Fehlschläge in Folge, beim Heartbeat Abstand und aktive Stunden, bei der Ereignis-Regel Art, Filter und Ruhezeit), `automation_firing` (je Termin: Ergebnis, Lauf, der Auftrag des gestarteten Laufs, ob ein Heartbeat `HEARTBEAT_OK` antwortete); der Lauf nennt seine Aufgabe (`run.automation_id`); Aktivitäten zu angehaltenen Aufgaben (`notification.automation_id`); die aufgenommenen Ereignisse einer Ereignis-Regel (`automation_event`: Objekt, IDs, Tiefe, der Termin, der sie nahm); der verursachende Lauf eines Ereignisses (`event_outbox.run_id`) |
 
 Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
 bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur
@@ -1331,6 +1374,12 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   Worker des vorigen Releases, der einen fälligen Heartbeat greift, scheitert an der
   Terminberechnung; die Transaktion wird zurückgerollt und der Termin bleibt fällig,
   bis ein Worker dieses Releases ihn auslöst.
+- M7, Ereignis-Regeln (Migration `5e2b9c7d4a18`): `event_outbox.run_id`, die Art `event`
+  mit ihren Feldern, `automation_event` und das Ergebnis `skipped_depth`. Ein Pod des
+  vorigen Releases schreibt `run_id` nicht (seine Läufe verursachen dann Ereignisse
+  ohne Tiefe) und hat den Handler nicht; ein Worker des vorigen Releases, der eine
+  Regel mit wartenden Ereignissen greift, scheitert an der Terminberechnung, und der
+  Termin bleibt fällig. Worker zügig ersetzen.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen

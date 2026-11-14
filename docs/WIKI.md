@@ -92,7 +92,9 @@ zählt sie nicht mit.
   ein gelöschter Tag verschwindet von allen Seiten.
 - **Anhänge:** bis 25 MiB, erkannt am Inhalt: PNG, JPEG, GIF, WebP (inline angezeigt),
   PDF, TXT, Markdown, CSV, JSON, DOCX, XLSX, PPTX, ZIP (als Download). SVG und HTML
-  werden abgelehnt, auch umbenannt.
+  werden abgelehnt, auch umbenannt. Ein Upload sendet das Ereignis
+  `attachment.uploaded` (nur IDs; seit M7, für Ereignis-Regeln von Agenten,
+  [`AGENTEN.md`](AGENTEN.md)); ein Import sendet keines.
 - **Suche:** Strg+K (oder „Suche“ in der Seitenleiste) durchsucht Titel und Inhalt
   aller Seiten, die man lesen darf, optional nur im aktuellen Bereich. Entwürfe findet
   nur, wer sie sehen darf.

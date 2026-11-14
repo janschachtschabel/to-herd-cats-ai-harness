@@ -36,6 +36,7 @@ from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.automations import runs as automation_runs
 from app.modules.tickets.models import ticket_key
 from app.runtime.context import Turn
+from app.runtime.untrusted import frame_untrusted
 
 TASK = (
     "The ticket {key} was assigned to you. Read it (read_ticket), work on it with your "
@@ -50,7 +51,7 @@ class Asked:
     reply_to: uuid.UUID | None = None  # the thread its messages go to (None: top level)
     asker: str | None = None  # the asker's name where others read too (None: alone)
     automation_of: str | None = None  # an automation's run: its owner's name
-    heartbeat: bool = False  # that automation is a heartbeat (the `HEARTBEAT_OK` rule)
+    automation_kind: str | None = None  # that automation's kind (its frame)
 
 
 async def asked(session: AsyncSession, claimed: Claimed) -> Asked | None:
@@ -69,7 +70,7 @@ async def asked(session: AsyncSession, claimed: Claimed) -> Asked | None:
     name = await reads.person_name(claimed.user_id) or "the person who asked"
     automation_of = name if claimed.automation_id is not None else None
     asker = None if alone else name
-    return Asked(found.turns, found.reply_to, asker, automation_of, found.heartbeat)
+    return Asked(found.turns, found.reply_to, asker, automation_of, found.automation_kind)
 
 
 async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
@@ -77,8 +78,28 @@ async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
     if found is None:
         return None
     reply_to = found.thread.id if found.thread is not None else None
-    turns = [Turn("person", found.instruction, keep=True)]
-    return Asked(turns, reply_to, heartbeat=found.heartbeat)
+    text = found.instruction
+    if found.event is not None:
+        reads = ReadRepository(session, claimed.org_id)
+        text = f"{text}\n\n{await _event_frame(reads, found.event)}"
+    turns = [Turn("person", text, keep=True)]
+    kind = str(found.kind) if found.kind is not None else None
+    return Asked(turns, reply_to, automation_kind=kind)
+
+
+async def _event_frame(reads: ReadRepository, note: automation_runs.EventNote) -> str:
+    """The events an event rule's run was started for, as untrusted data: their kind,
+    how many, and the ids of what they are about (a ticket also by its key, which its
+    tools take); never anything of the objects themselves."""
+    blocks = [f"events: {note.count}"]
+    for ids in note.objects:
+        lines = [f"{name}: {value}" for name, value in sorted(ids.items())]
+        if "ticket_id" in ids:
+            number = await reads.ticket_number(uuid.UUID(ids["ticket_id"]))
+            if number is not None:
+                lines.append(f"key: {ticket_key(number)}")
+        blocks.append("\n".join(lines))
+    return frame_untrusted("event", "\n\n".join(blocks), type=note.type)
 
 
 async def _asked(reads: ReadRepository, claimed: Claimed) -> Asked | None:

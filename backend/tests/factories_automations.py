@@ -154,6 +154,38 @@ async def beating(
     return row
 
 
+async def ruled(
+    bench: Bench,
+    conversation_id: object,
+    event_type: str = "ticket.created",
+    *,
+    owner: str = "alice",
+    quiet: int = 300,
+    tag_id: uuid.UUID | None = None,
+    ticket_kind: str | None = None,
+    instruction: str = "Sieh dir an, was neu ist.",
+) -> Automation:
+    """An event rule of the bench's agent at the place (a channel or a ticket's thread),
+    owned by `owner`."""
+    person = bench.people.users[owner]
+    row = Automation(
+        org_id=person.org_id,
+        owner_user_id=person.id,
+        agent_id=bench.agent.id,
+        conversation_id=uuid.UUID(str(conversation_id)),
+        instruction=instruction,
+        kind=AutomationKind.EVENT,
+        event_type=event_type,
+        quiet_seconds=quiet,
+        filter_tag_id=tag_id,
+        filter_ticket_kind=ticket_kind,
+        state=AutomationState.ACTIVE,
+    )
+    bench.session.add(row)
+    await bench.session.flush()
+    return row
+
+
 async def fire(bench: Bench, at: datetime = T0) -> Fired:
     fired = await fire_next(bench.session, at)
     assert fired is not None, "nothing was due"
