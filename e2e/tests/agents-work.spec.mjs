@@ -213,8 +213,8 @@ test("a worker killed in the middle of a run is started again; the run ends once
   const events = await runEvents(anna, run.id);
   const calls = events.filter((e) => e.kind === "tool_call");
   expect(calls.map((e) => e.content.name)).toEqual(["create_ticket"]);
-  const steps = events.filter((e) => e.kind === "model_response").map((e) => e.content.step);
-  expect(new Set(steps).size).toBe(steps.length);
+  const steps = events.filter((e) => e.kind === "model_call").map((e) => e.content.step);
+  expect(steps).toEqual([1, 2]);
   // The provider: step 1 once, step 2 twice (lost with the worker, then again).
   const chats = chatRequests(JSON.parse(await stubLog(anna.request)));
   expect(chats).toHaveLength(3);
