@@ -5,7 +5,9 @@ core's repositories import).
 A new top-level message of the person in a DM with an agent queues a run in the
 message's own transaction, if the person and the agent may (`standing.refusal`);
 otherwise the message stays without one and the answer says why. Replies in a thread
-start nothing.
+start nothing, and so does a message while the conversation's run waits for a
+person's answer (`run.waiting`: that run answers first, and when it ends it queues a
+run for what came meanwhile).
 """
 
 import uuid
@@ -41,9 +43,10 @@ class _Hooks:
         why = await refusal(session, actor, agent)
         if why is not None:
             return RunStart(None, why.value)
-        run_id = await RunRepository(session, actor.org_id).enqueue(
-            agent.id, actor.principal.id, conversation.id, message.id
-        )
+        runs = RunRepository(session, actor.org_id)
+        if await runs.waiting(conversation.id):
+            return RunStart(None, Refusal.RUN_WAITING.value)
+        run_id = await runs.enqueue(agent.id, actor.principal.id, conversation.id, message.id)
         return RunStart(run_id, None)
 
     async def names(

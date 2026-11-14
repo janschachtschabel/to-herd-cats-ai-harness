@@ -163,7 +163,8 @@ Jede neue Nachricht der Person in einer solchen Direktnachricht (nicht in einem 
 legt in derselben Transaktion einen Lauf an. Die Antwort auf das Senden nennt ihn in
 `agent_run: {"id", "reason"}`; ohne Lauf steht der Grund in `reason`:
 `ai.unavailable`, `agent.paused`, `agent.draft`, `agent.responsible_inactive`,
-`agent.connection_unavailable`, `run.thread_reply`. Je Gespräch läuft höchstens ein
+`agent.connection_unavailable`, `run.thread_reply`, `run.waiting` (der Lauf des
+Gesprächs wartet auf eine Antwort, siehe unten). Je Gespräch läuft höchstens ein
 Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam.
 
 Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
@@ -199,7 +200,9 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
 - Stopgründe: `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
   Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402,
   403, 429; ohne Wiederholung), `error` (auch sofort, wenn ein Schritt nicht
-  gespeichert werden kann oder ein Werkzeug scheitert; kein blindes Wiederholen). Die
+  gespeichert werden kann oder ein Werkzeug scheitert; kein blindes Wiederholen),
+  `cancelled` (Abbruch angefordert), `waiting_timeout` (niemand hat rechtzeitig
+  geantwortet). Die
   Antwort ist eine Nachricht `kind: agent`
   mit `client_id` = Lauf-ID (genau einmal); bei jedem anderen Stopp steht im Gespräch
   ein Zeitleisten-Eintrag `system.key = "run.stopped"` mit dem Grund in
@@ -224,6 +227,44 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   Schritt (`run_event`, eindeutig je Lauf, Versuch und Schritt); Ausnahmen siehe
   „Bekannte Untererfassung“.
 
+### Journal, Wiederaufnahme, Warten, Abbruch (M6)
+
+- **Journal**: `run_event` ist das Laufprotokoll. `seq` zählt über alle Aufnahmen eines
+  Laufs fort (der Stopp hat `seq` 0), `attempt` nennt die Aufnahme, die den Schritt
+  geschrieben hat. Jede Modellantwort (Text, Werkzeugaufrufe mit Argumenten, Verbrauch)
+  und jedes Werkzeugergebnis (vollständig, mit den Bereichen und den gelesenen Seiten
+  und Tickets) steht dort.
+- **Wiederaufnahme**: Stirbt ein Worker, nimmt ein anderer den Lauf nach Ablauf der
+  Sperrfrist wieder auf. Er spielt das Journal ein, ohne den Anbieter erneut zu fragen
+  und ohne ein Werkzeug erneut auszuführen, und setzt nach dem letzten gespeicherten
+  Schritt fort; was der Lauf gelesen hatte, zählt für Richtlinie und Rechte wie zuvor.
+  Ein gespeicherter Werkzeugaufruf ohne Ergebnis (der Worker starb dazwischen) wird
+  jetzt ausgeführt. Verloren geht höchstens ein Modellaufruf, dessen Antwort noch nicht
+  gespeichert war (er wird wiederholt; Kosten, keine Wirkung). Der Lauf beantwortet das
+  Gespräch bis zu seinem ersten Start (`started_at`), gleich in welcher Aufnahme.
+- **Schreibende Werkzeuge** schreiben ihre Wirkung und ihren Journaleintrag in
+  derselben Transaktion: entweder beides oder nichts. Eine Wirkung entsteht daher
+  innerhalb der Datenbank genau einmal, auch wenn der Worker vor, während oder nach
+  dem Schreiben stirbt.
+- `attempt` zählt jede Aufnahme (auch nach dem Warten), `recoveries` nur die nach
+  einem verlorenen Worker; nach der dritten solchen (`recoveries` > 2) endet der Lauf
+  mit `error` (Detail `attempts`).
+- **Warten**: Braucht ein Lauf eine Antwort (Freigabe, Rückfrage; ab M6 Task 7), steht
+  er auf `waiting` bis `wait_until` (Freigaben: 72 Stunden). Dabei hält er nichts: keine
+  Sperrfrist, keinen Worker. Das Gespräch bleibt belegt: Eine neue Nachricht startet
+  keinen Lauf (`run.waiting`); wenn der wartende Lauf endet, legt er für die
+  Nachrichten, die seit seinem Start gekommen sind, einen neuen Lauf an. Die Antwort
+  setzt den Lauf in ihrer Transaktion wieder auf `queued`; er spielt sein Journal ein
+  und führt den Werkzeugaufruf, auf den er wartete, erneut aus. Läuft `wait_until` ab,
+  beendet die Laufschleife ihn mit `waiting_timeout` und einem Hinweis im Gespräch.
+  `GET /api/runs/{id}` nennt `wait_until`.
+- **Abbruch**: ein eigener Datensatz `run_cancel_request` (einmal je Lauf, mit der
+  anfragenden Person). Geprüft wird vor jedem Schritt und in der Transaktion des
+  Abschlusses; er gewinnt dort auch gegen eine fertige Antwort (`cancelled`, keine
+  Antwort, ein Hinweis). Ein wartender Lauf endet bei der nächsten Runde der
+  Laufschleife, ein Lauf in der Warteschlange, sobald er aufgenommen wird. Ein schon
+  beendeter Lauf bleibt, wie er ist. Der Endpunkt dafür kommt mit der Laufansicht.
+
 Betrieb:
 
 - Protokolle: Die HTTP-Clients (`httpx`, `httpcore`, `httpx2`, `httpcore2`, `openai`)
@@ -235,12 +276,12 @@ Betrieb:
   `HERD_RUN_CONCURRENCY` + 3 Datenbankverbindungen; während eines Anbieteraufrufs hält
   ein Lauf keine.
 - `HERD_RUN_LEASE_SECONDS` (Standard 30): Sperrfrist eines Laufs, alle 10 s erneuert.
-  Stirbt ein Worker, nimmt ein anderer den Lauf nach Ablauf neu auf (Versuch + 1;
-  nach drei Versuchen `error`).
+  Stirbt ein Worker, nimmt ein anderer den Lauf nach Ablauf wieder auf und setzt ihn
+  aus dem Journal fort (nach der dritten Wiederaufnahme dieser Art `error`).
 - Die Läufe zählen nicht zur Bereitschaft (`/ready`) des Workers. Metriken:
   `herd_runs_total{reason}`, `herd_run_duration_seconds`, `herd_runs_queued`,
-  `herd_runs_oldest_queued_seconds`, `herd_runs_stuck`; Alarme `HerdRunsStuck` und
-  `HerdRunsQueued`.
+  `herd_runs_oldest_queued_seconds`, `herd_runs_stuck`, `herd_runs_waiting` (Läufe, die
+  auf eine Antwort warten); Alarme `HerdRunsStuck` und `HerdRunsQueued`.
 
 ## Testen ohne Anbieter
 

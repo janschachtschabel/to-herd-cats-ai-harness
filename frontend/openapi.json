@@ -5166,7 +5166,7 @@
         "type": "object"
       },
       "RunOut": {
-        "description": "`steps`: model calls of the current attempt; `stop_reason` once `done`.",
+        "description": "`steps`: model calls of the run; `attempt`: its take-ups by a worker;\n`wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);\n`stop_reason` once `done`.",
         "properties": {
           "agent_id": {
             "format": "uuid",
@@ -5237,6 +5237,18 @@
             "format": "uuid",
             "title": "Trigger Message Id",
             "type": "string"
+          },
+          "wait_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Until"
           }
         },
         "required": [
@@ -5248,6 +5260,7 @@
           "stop_reason",
           "attempt",
           "steps",
+          "wait_until",
           "created_at",
           "started_at",
           "finished_at"
@@ -5259,6 +5272,7 @@
         "enum": [
           "queued",
           "running",
+          "waiting",
           "done"
         ],
         "title": "RunState",
@@ -6088,7 +6102,9 @@
           "rights_revoked",
           "policy_blocked",
           "provider_refused",
-          "error"
+          "error",
+          "cancelled",
+          "waiting_timeout"
         ],
         "title": "StopReason",
         "type": "string"

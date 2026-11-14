@@ -30,6 +30,7 @@ class Refusal(StrEnum):
     RESPONSIBLE_INACTIVE = "agent.responsible_inactive"
     CONNECTION_UNAVAILABLE = "agent.connection_unavailable"
     THREAD_REPLY = "run.thread_reply"  # replies in a thread do not ask the agent
+    RUN_WAITING = "run.waiting"  # the conversation's run waits for a person's answer
 
 
 def agent_not_found() -> NotFound:

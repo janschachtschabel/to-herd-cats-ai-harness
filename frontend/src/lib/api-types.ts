@@ -3916,7 +3916,9 @@ export interface components {
         };
         /**
          * RunOut
-         * @description `steps`: model calls of the current attempt; `stop_reason` once `done`.
+         * @description `steps`: model calls of the run; `attempt`: its take-ups by a worker;
+         *     `wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);
+         *     `stop_reason` once `done`.
          */
         RunOut: {
             /**
@@ -3954,12 +3956,14 @@ export interface components {
              * Format: uuid
              */
             trigger_message_id: string;
+            /** Wait Until */
+            wait_until: string | null;
         };
         /**
          * RunState
          * @enum {string}
          */
-        RunState: "queued" | "running" | "done";
+        RunState: "queued" | "running" | "waiting" | "done";
         /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
@@ -4282,7 +4286,7 @@ export interface components {
          * StopReason
          * @enum {string}
          */
-        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error";
+        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error" | "cancelled" | "waiting_timeout";
         /**
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page or

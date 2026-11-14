@@ -1,4 +1,4 @@
-"""The step loop of a level-1 run (spec 8.3; plan M5 task 6).
+"""The step loop of a run (spec 8.3; plan M5 task 6, M6 decision 1).
 
 Our code, not the model, decides every step: before each model call the host checks
 the policy of everything read so far, the rights and the limits, and records the call
@@ -15,6 +15,13 @@ the host decides (`deadline`, `rights_revoked`, `policy_blocked`, and `error` wh
 step cannot be recorded or a tool fails: at once, never a blind retry). The deadline
 also cuts a call in flight. The model's text and arguments come without what the
 database cannot store (`storable`).
+
+Replay (plan M6 decision 1): a run taken up again passes its journal, the steps it
+has recorded. The loop goes through them again without calling the provider or the
+host: each recorded answer stands for its model call, each recorded tool result for
+its tool call. A recorded tool call without a recorded result (the worker died before
+it finished) is run now, through the host, like a new one. After the last recorded
+step the loop goes on as usual, with the full history.
 """
 
 import asyncio
@@ -22,7 +29,7 @@ import re
 import time
 import uuid
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -57,6 +64,7 @@ Stop = Literal[
     "policy_blocked",
     "provider_refused",
     "error",
+    "cancelled",
 ]
 
 
@@ -98,6 +106,16 @@ class ToolResult:
     spaces: frozenset[uuid.UUID] = frozenset()
 
 
+@dataclass(frozen=True, slots=True)
+class Recorded:
+    """One step of a run's journal: the model's answer and the results of its tool
+    calls that were recorded, by call id."""
+
+    text: str
+    tool_calls: tuple[ToolCall, ...]
+    results: Mapping[str, ToolResult] = field(default_factory=dict)
+
+
 class StepHost(Protocol):
     def seconds_left(self) -> float: ...
 
@@ -107,7 +125,7 @@ class StepHost(Protocol):
 
     async def after_model_call(self, step: int, reply: Reply) -> None: ...
 
-    async def call_tool(self, step: int, call: ToolCall, args: tools.ToolArgs) -> ToolResult:
+    async def call_tool(self, step: int, call: ToolCall, args: Any) -> ToolResult:
         """Raise `Halt` to stop instead of running it."""
         ...
 
@@ -126,39 +144,48 @@ async def run_loop(
     host: StepHost,
     *,
     max_steps: int,
-    use_tools: bool = True,
+    offered: Sequence[tools.ToolSchema] = (),
+    journal: Sequence[Recorded] = (),
 ) -> Outcome:
     history = list(messages)
-    params = ModelRequestParameters(function_tools=tools.definitions() if use_tools else [])
+    by_name = {tool.name: tool for tool in offered}
+    params = ModelRequestParameters(function_tools=tools.definitions(offered))
     seen: Counter[str] = Counter()
     bad_calls = 0
     for step in range(1, max_steps + 1):
-        try:
-            await host.before_model_call(step)
-            response = await _request(built, history, params, host)
-        except Halt as halt:
-            return Outcome(halt.reason, detail=halt.detail)
-        except ModelHTTPError as exc:
-            reason: Stop = "provider_refused" if exc.status_code in REFUSED_STATUSES else "error"
-            return Outcome(reason, detail=f"status {exc.status_code}")
-        except TimeoutError:
-            return Outcome("deadline")
-        except Exception as exc:  # the provider or the network; never its text
-            return Outcome("error", detail=type(exc).__name__)
-        reply = response.reply
-        try:
-            await host.after_model_call(step, reply)
-        except Halt as halt:
-            return Outcome(halt.reason, detail=halt.detail)
-        history.append(response.message)
-        if not reply.tool_calls:
-            if not reply.text.strip():
-                return Outcome("error", detail="empty answer")
-            return Outcome("completed", answer=reply.text)
-        returns: list[ToolReturnPart] = []
-        for call in reply.tool_calls:
+        recorded = journal[step - 1] if step <= len(journal) else None
+        if recorded is not None:
+            message: ModelResponse = _replayed(recorded)
+            text, calls, results = recorded.text, recorded.tool_calls, recorded.results
+        else:
             try:
-                args = tools.parse(call.name, call.args)
+                await host.before_model_call(step)
+                response = await _request(built, history, params, host)
+            except Halt as halt:
+                return Outcome(halt.reason, detail=halt.detail)
+            except ModelHTTPError as exc:
+                refused = exc.status_code in REFUSED_STATUSES
+                reason: Stop = "provider_refused" if refused else "error"
+                return Outcome(reason, detail=f"status {exc.status_code}")
+            except TimeoutError:
+                return Outcome("deadline")
+            except Exception as exc:  # the provider or the network; never its text
+                return Outcome("error", detail=type(exc).__name__)
+            try:
+                await host.after_model_call(step, response.reply)
+            except Halt as halt:
+                return Outcome(halt.reason, detail=halt.detail)
+            message, text = response.message, response.reply.text
+            calls, results = tuple(response.reply.tool_calls), {}
+        history.append(message)
+        if not calls:
+            if not text.strip():
+                return Outcome("error", detail="empty answer")
+            return Outcome("completed", answer=text)
+        returns: list[ToolReturnPart] = []
+        for call in calls:
+            try:
+                args = tools.parse(by_name, call.name, call.args)
             except tools.BadToolCall as bad:
                 bad_calls += 1
                 if bad_calls >= MAX_BAD_CALLS:
@@ -168,14 +195,23 @@ async def run_loop(
             seen[tools.signature(call.name, args)] += 1
             if seen[tools.signature(call.name, args)] >= SAME_CALL_LIMIT:
                 return Outcome("no_progress")
-            try:
-                result = await host.call_tool(step, call, args)
-            except Halt as halt:
-                return Outcome(halt.reason, detail=halt.detail)
+            result = results.get(call.id)
+            if result is None:
+                try:
+                    result = await host.call_tool(step, call, args)
+                except Halt as halt:
+                    return Outcome(halt.reason, detail=halt.detail)
             framed = frame_untrusted(result.source, result.text, **result.attrs)
             returns.append(ToolReturnPart(call.name, framed, tool_call_id=call.id))
         history.append(ModelRequest(parts=returns, instructions=instructions))
     return Outcome("max_steps")
+
+
+def _replayed(recorded: Recorded) -> ModelResponse:
+    """A recorded answer as the model message it stands for."""
+    parts: list[TextPart | ToolCallPart] = [TextPart(recorded.text)] if recorded.text else []
+    parts += [ToolCallPart(c.name, c.args, tool_call_id=c.id) for c in recorded.tool_calls]
+    return ModelResponse(parts=parts)
 
 
 @dataclass(frozen=True, slots=True)

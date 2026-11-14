@@ -8,15 +8,27 @@ from above. Every agent is level 1 (reads only) in M5.
 
 `run`: one answer to a direct message. Created `queued` in the transaction of the
 message that asks; a worker takes it (`running`, with a lease it renews) and ends it
-(`done`, with `stop_reason`). A conversation has at most one queued and at most one
-running run (unique partial indexes): a message that arrives while one is queued is
-answered by it, one that arrives while one runs gets the next. A run whose lease ran
-out (its worker died) is taken up again from the start, as `attempt` + 1.
+(`done`, with `stop_reason`). A run that needs an answer from a person (a release, a
+question: plan M6 decision 1) is `waiting` until `wait_until`, holding nothing; the
+answer makes it `queued` again (`control.resume_waiting`), the run loop ends it with
+`waiting_timeout` once `wait_until` has passed. A conversation has at most one queued
+run and at most one active run, running or waiting (unique partial indexes): a
+message that arrives while one is queued is answered by it, one that arrives while one
+runs gets the next, one that arrives while one waits gets none (`run.waiting`).
 
-`run_event`: what a run did, step by step (`seq` within an `attempt`): model calls
-with their usage, tool calls with their full arguments and results, the stop. Content
-lives only here, never in logs or metrics; readable by the person who asked, the
-person responsible and those with `agent.manage`.
+Every take-up by a worker counts in `attempt`; `recoveries` counts those after a lost
+lease (its worker died), which are limited. `started_at` is the first take-up: the
+conversation a run answers ends there, whatever take-up works on it.
+
+`run_event`: the run's journal (plan M6 decision 1), one continuous sequence (`seq`,
+counted on across take-ups; `attempt` notes the take-up that wrote it; the stop is
+`seq` 0): model calls with their answer and usage, tool calls with their full
+arguments and results, the stop. A run taken up again replays it and goes on after
+its last step. Content lives only here, never in logs or metrics; readable by the
+person who asked, the person responsible and those with `agent.manage`.
+
+`run_cancel_request`: someone asked a run to stop (spec 8.3); checked before every
+step and in the transaction that ends the run (`cancelled`).
 """
 
 import uuid
@@ -47,6 +59,7 @@ class AgentStatus(StrEnum):
 class RunState(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
+    WAITING = "waiting"
     DONE = "done"
 
 
@@ -59,6 +72,8 @@ class StopReason(StrEnum):
     POLICY_BLOCKED = "policy_blocked"
     PROVIDER_REFUSED = "provider_refused"  # 401, 402, 403, 429
     ERROR = "error"
+    CANCELLED = "cancelled"  # a `run_cancel_request`
+    WAITING_TIMEOUT = "waiting_timeout"  # nobody answered by `wait_until`
 
 
 class EventKind(StrEnum):
@@ -111,6 +126,7 @@ class Run(UuidPk, OrgScoped, Base):
             name="stop_reason",
         ),
         CheckConstraint("(state = 'running') = (lease_until IS NOT NULL)", name="lease"),
+        CheckConstraint("(state = 'waiting') = (wait_until IS NOT NULL)", name="wait"),
         Index(
             "uq_run_queued_per_conversation",
             "conversation_id",
@@ -123,7 +139,14 @@ class Run(UuidPk, OrgScoped, Base):
             unique=True,
             postgresql_where=text("state = 'running'"),
         ),
+        Index(
+            "uq_run_active_per_conversation",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("state IN ('running', 'waiting')"),
+        ),
         Index("ix_run_open", "created_at", postgresql_where=text("state <> 'done'")),
+        Index("ix_run_waiting", "wait_until", postgresql_where=text("state = 'waiting'")),
         Index("ix_run_agent_id", "agent_id"),
         Index("ix_run_trigger_message_id", "trigger_message_id"),
     )
@@ -144,8 +167,12 @@ class Run(UuidPk, OrgScoped, Base):
     state: Mapped[RunState] = mapped_column(String(16), nullable=False)
     stop_reason: Mapped[StopReason | None] = mapped_column(String(32))
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    recoveries: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     steps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    wait_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -167,6 +194,22 @@ class RunEvent(UuidPk, OrgScoped, Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     kind: Mapped[EventKind] = mapped_column(String(16), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class RunCancelRequest(OrgScoped, Base):
+    """Someone asked the run to stop: once per run, before it is done."""
+
+    __tablename__ = "run_cancel_request"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("run.id", ondelete="CASCADE"), primary_key=True
+    )
+    requested_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

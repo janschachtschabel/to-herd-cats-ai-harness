@@ -69,6 +69,15 @@ class RunRepository:
             )
         )
 
+    async def waiting(self, conversation_id: uuid.UUID) -> bool:
+        """Whether the conversation's run waits for a person's answer."""
+        stmt = select(Run.id).where(
+            Run.org_id == self.org_id,
+            Run.conversation_id == conversation_id,
+            Run.state == RunState.WAITING,
+        )
+        return await self.session.scalar(stmt) is not None
+
     async def get(self, run_id: uuid.UUID) -> tuple[Run, Agent] | None:
         stmt = (
             select(Run, Agent)

@@ -4,12 +4,13 @@ the steps' records, and the end (what a run reads: `read_repository.py`).
 Claiming is the worker's, across organisations (like the outbox dispatcher; nothing in
 it is shown to anyone); everything after is scoped by the run's organisation.
 
-- A run is claimed when it is queued and its conversation has no running run, or when
-  it is running and its lease has run out (its worker died: it starts again, attempt
-  + 1). A connection's running runs (with a live lease) stay below its
-  `max_concurrency`. Claims take a transaction-level advisory lock, so two workers
-  never count the same free place twice; `SKIP LOCKED` passes over rows a finishing
-  run holds.
+- A run is claimed when it is queued and its conversation has no active run (running
+  or waiting), or when it is running and its lease has run out (its worker died: it is
+  taken up again and goes on from its journal, `recoveries` + 1). Every take-up counts
+  in `attempt`; `started_at` stays that of the first. A connection's running runs
+  (with a live lease) stay below its `max_concurrency`. Claims take a
+  transaction-level advisory lock, so two workers never count the same free place
+  twice; `SKIP LOCKED` passes over rows a finishing run holds.
 - Every write of a step checks first that the run is still this attempt's
   (`owned`: the row locked, state `running`, the same attempt). A worker that lost its
   lease finds out there and stops without writing anything.
@@ -53,6 +54,21 @@ class Claimed:
     conversation_id: uuid.UUID
     attempt: int
     started_at: datetime
+    recoveries: int = 0
+
+    @classmethod
+    def of(cls, run: Run) -> "Claimed":
+        """The run as its current take-up holds it (for ending one nobody works on)."""
+        return cls(
+            run.id,
+            run.org_id,
+            run.agent_id,
+            run.user_id,
+            run.conversation_id,
+            run.attempt,
+            run.started_at or run.created_at,
+            run.recoveries,
+        )
 
 
 async def claim(session: AsyncSession, lease: float) -> Claimed | None:
@@ -61,7 +77,8 @@ async def claim(session: AsyncSession, lease: float) -> Claimed | None:
     now = utcnow()
     other = aliased(Run)
     busy = exists().where(
-        other.conversation_id == Run.conversation_id, other.state == RunState.RUNNING
+        other.conversation_id == Run.conversation_id,
+        other.state.in_((RunState.RUNNING, RunState.WAITING)),
     )
     mine = aliased(Run)
     theirs = aliased(Agent)
@@ -94,14 +111,14 @@ async def claim(session: AsyncSession, lease: float) -> Claimed | None:
     run = await session.scalar(stmt)
     if run is None:
         return None
+    if run.state == RunState.RUNNING:
+        run.recoveries += 1  # its worker died
     run.state = RunState.RUNNING
     run.attempt += 1
-    run.started_at = now
+    run.started_at = run.started_at or now
     run.lease_until = now + timedelta(seconds=lease)
     await session.flush()
-    return Claimed(
-        run.id, run.org_id, run.agent_id, run.user_id, run.conversation_id, run.attempt, now
-    )
+    return Claimed.of(run)
 
 
 async def renew(session: AsyncSession, held: dict[uuid.UUID, int], lease: float) -> set[uuid.UUID]:
@@ -154,6 +171,26 @@ class RunSteps:
                 created_at=utcnow(),
             )
         )
+        await self.session.flush()
+
+    async def journal(self) -> list[RunEvent]:
+        """The run's model and tool calls so far, in the order they were recorded."""
+        stmt = (
+            select(RunEvent)
+            .where(
+                RunEvent.org_id == self.run.org_id,
+                RunEvent.run_id == self.run.id,
+                RunEvent.kind != EventKind.STOP,
+            )
+            .order_by(RunEvent.seq, RunEvent.attempt)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def wait(self, run: Run, until: datetime) -> None:
+        """The run waits for a person, holding nothing (no lease)."""
+        run.state = RunState.WAITING
+        run.lease_until = None
+        run.wait_until = until
         await self.session.flush()
 
     async def agent(self) -> Agent | None:
@@ -229,14 +266,23 @@ class RunSteps:
         run.state = RunState.DONE
         run.stop_reason = reason  # type: ignore[assignment]
         run.lease_until = None
+        run.wait_until = None
         run.finished_at = utcnow()
         await self.session.flush()
 
 
-async def open_runs(session: AsyncSession) -> tuple[int, float, int]:
+@dataclass(frozen=True, slots=True)
+class OpenRuns:
+    queued: int
+    oldest_queued: float
+    stuck: int
+    waiting: int
+
+
+async def open_runs(session: AsyncSession) -> OpenRuns:
     """For the gauges, across organisations: queued runs, the age of the oldest one
-    (seconds, 0 without one), and stuck runs: running with a lease that ran out (no
-    worker took them up again), or for longer than any run may."""
+    (seconds, 0 without one), stuck runs (running with a lease that ran out, no worker
+    took them up again, or for longer than any run may) and waiting runs."""
     now = utcnow()
     queued = select(func.count(), func.min(Run.created_at)).where(Run.state == RunState.QUEUED)
     count, oldest = (await session.execute(queued)).one()
@@ -247,5 +293,6 @@ async def open_runs(session: AsyncSession) -> tuple[int, float, int]:
             or_(Run.lease_until < now, Run.started_at < overdue),
         )
     )
+    waiting = await session.scalar(select(func.count()).where(Run.state == RunState.WAITING))
     age = (now - oldest).total_seconds() if oldest is not None else 0.0
-    return int(count), max(age, 0.0), int(stuck or 0)
+    return OpenRuns(int(count), max(age, 0.0), int(stuck or 0), int(waiting or 0))

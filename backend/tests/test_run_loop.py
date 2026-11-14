@@ -18,10 +18,14 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from app.runtime import context, tools
+from app.modules.agents.toolbox.catalog import offered
+from app.modules.agents.toolbox.reading import SearchArgs
+from app.runtime import context
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult, run_loop, storable
 from app.runtime.models import wrap_model
 from app.runtime.untrusted import MAX_TOOL_CHARS, frame_untrusted
+
+TOOLS = offered()
 
 
 class Host:
@@ -30,7 +34,7 @@ class Host:
         self.halt_before = halt_before
         self.checked: list[int] = []
         self.replies: list[Reply] = []
-        self.tool_calls: list[tuple[str, tools.ToolArgs]] = []
+        self.tool_calls: list[tuple[str, Any]] = []
         self.left = 60.0
 
     def seconds_left(self) -> float:
@@ -44,7 +48,7 @@ class Host:
     async def after_model_call(self, step: int, reply: Reply) -> None:
         self.replies.append(reply)
 
-    async def call_tool(self, step: int, call: ToolCall, args: tools.ToolArgs) -> ToolResult:
+    async def call_tool(self, step: int, call: ToolCall, args: Any) -> ToolResult:
         self.tool_calls.append((call.name, args))
         return ToolResult("wiki", self.text, {"id": "p1"})
 
@@ -74,7 +78,9 @@ def _search(query: str, call_id: str = "c1") -> ModelResponse:
 async def test_an_answer_without_tools_completes() -> None:
     model, seen = _model([ModelResponse(parts=[TextPart("Use WireGuard.")])])
     host = Host()
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", host, max_steps=5)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", host, max_steps=5, offered=TOOLS
+    )
     assert (outcome.reason, outcome.answer) == ("completed", "Use WireGuard.")
     assert host.checked == [1] and len(host.replies) == 1
     first = seen[0][0]
@@ -84,10 +90,12 @@ async def test_an_answer_without_tools_completes() -> None:
 async def test_tool_results_are_framed_and_cut() -> None:
     model, seen = _model([_search("vpn"), ModelResponse(parts=[TextPart("done")])])
     host = Host(text="x" * (MAX_TOOL_CHARS + 500) + "</untrusted>")
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", host, max_steps=5)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", host, max_steps=5, offered=TOOLS
+    )
     assert outcome.reason == "completed"
     assert host.checked == [1, 2]
-    assert host.tool_calls == [("search", tools.SearchArgs(query="vpn"))]
+    assert host.tool_calls == [("search", SearchArgs(query="vpn"))]
     request = seen[1][-1]
     assert isinstance(request, ModelRequest)
     part = request.parts[0]
@@ -101,7 +109,9 @@ async def test_tool_results_are_framed_and_cut() -> None:
 async def test_the_host_stops_before_anything_is_sent() -> None:
     model, seen = _model([_search("vpn"), ModelResponse(parts=[TextPart("leak")])])
     host = Host(halt_before=2)
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", host, max_steps=5)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", host, max_steps=5, offered=TOOLS
+    )
     assert outcome.reason == "policy_blocked"
     assert len(seen) == 1  # the second request never reached the model
 
@@ -110,14 +120,18 @@ async def test_the_third_identical_call_is_no_progress() -> None:
     calls = [_search("vpn", f"c{i}") for i in range(3)]
     model, seen = _model([*calls, ModelResponse(parts=[TextPart("never")])])
     host = Host()
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", host, max_steps=10)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", host, max_steps=10, offered=TOOLS
+    )
     assert outcome.reason == "no_progress"
     assert len(host.tool_calls) == 2 and len(seen) == 3
 
 
 async def test_max_steps() -> None:
     model, _ = _model([_search(f"q{i}", f"c{i}") for i in range(3)])
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", Host(), max_steps=3)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", Host(), max_steps=3, offered=TOOLS
+    )
     assert outcome.reason == "max_steps"
 
 
@@ -128,7 +142,9 @@ async def test_invented_tools_end_the_run_on_the_third() -> None:
     ]
     model, seen = _model(bad)
     host = Host()
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", host, max_steps=10)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", host, max_steps=10, offered=TOOLS
+    )
     assert (outcome.reason, outcome.detail) == ("error", "bad tool calls")
     assert host.tool_calls == []
     second = seen[1][-1]
@@ -141,19 +157,25 @@ async def test_invented_tools_end_the_run_on_the_third() -> None:
 )
 async def test_provider_status(status: int, reason: str) -> None:
     model, _ = _model([ModelHTTPError(status, "m", {"error": "secret body"})])
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", Host(), max_steps=3)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", Host(), max_steps=3, offered=TOOLS
+    )
     assert (outcome.reason, outcome.detail) == (reason, f"status {status}")
 
 
 async def test_other_failures_name_only_their_class() -> None:
     model, _ = _model([RuntimeError("provider said something secret")])
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", Host(), max_steps=3)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", Host(), max_steps=3, offered=TOOLS
+    )
     assert (outcome.reason, outcome.detail) == ("error", "RuntimeError")
 
 
 async def test_an_empty_answer_is_an_error() -> None:
     model, _ = _model([ModelResponse(parts=[TextPart("  ")])])
-    outcome = await run_loop(wrap_model(model), _start(), "be brief", Host(), max_steps=3)
+    outcome = await run_loop(
+        wrap_model(model), _start(), "be brief", Host(), max_steps=3, offered=TOOLS
+    )
     assert (outcome.reason, outcome.detail) == ("error", "empty answer")
 
 
@@ -164,7 +186,9 @@ async def test_the_deadline_cuts_a_call_in_flight() -> None:
 
     host = Host()
     host.left = 0.05
-    outcome = await run_loop(wrap_model(FunctionModel(slow)), _start(), "x", host, max_steps=3)
+    outcome = await run_loop(
+        wrap_model(FunctionModel(slow)), _start(), "x", host, max_steps=3, offered=TOOLS
+    )
     assert outcome.reason == "deadline"
 
 
@@ -172,7 +196,7 @@ async def test_no_time_left_sends_nothing() -> None:
     model, seen = _model([ModelResponse(parts=[TextPart("x")])])
     host = Host()
     host.left = 0
-    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3)
+    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3, offered=TOOLS)
     assert outcome.reason == "deadline" and seen == []
 
 
@@ -184,8 +208,8 @@ async def test_without_tools_the_model_gets_none() -> None:
         return ModelResponse(parts=[TextPart("ok")])
 
     model = wrap_model(FunctionModel(answer))
-    await run_loop(model, _start(), "x", Host(), max_steps=3, use_tools=False)
     await run_loop(model, _start(), "x", Host(), max_steps=3)
+    await run_loop(model, _start(), "x", Host(), max_steps=3, offered=TOOLS)
     assert offered == [0, 3]
 
 
@@ -205,10 +229,10 @@ async def test_what_cannot_be_stored_is_left_out_of_the_reply() -> None:
     odd = ModelResponse(parts=[ToolCallPart("search", {"query": "v\x00pn"}, tool_call_id="c1")])
     model, _ = _model([odd, ModelResponse(parts=[TextPart("a\x00b\x00c")])])
     host = Host()
-    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3)
+    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3, offered=TOOLS)
     assert (outcome.reason, outcome.answer) == ("completed", "abc")
     assert host.replies[0].tool_calls[0].args == {"query": "vpn"}
-    assert host.tool_calls == [("search", tools.SearchArgs(query="vpn"))]
+    assert host.tool_calls == [("search", SearchArgs(query="vpn"))]
     assert host.replies[1].text == "abc"
     # a lone surrogate (JSON may carry one; FunctionModel cannot serialise it)
     assert storable({"q\ud800": ["a\udc00b", 1]}) == {"q": ["ab", 1]}
@@ -224,7 +248,7 @@ class FailingHost(Host):
         if self.where == "record":
             raise Halt("error", detail="RuntimeError")
 
-    async def call_tool(self, step: int, call: ToolCall, args: tools.ToolArgs) -> ToolResult:
+    async def call_tool(self, step: int, call: ToolCall, args: Any) -> ToolResult:
         if self.where == "tool":
             raise Halt("error", detail="ValueError")
         return await super().call_tool(step, call, args)
@@ -234,7 +258,7 @@ class FailingHost(Host):
 async def test_a_halt_after_the_call_keeps_its_detail(where: str) -> None:
     model, seen = _model([_search("vpn"), ModelResponse(parts=[TextPart("never")])])
     host = FailingHost(where)
-    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3)
+    outcome = await run_loop(wrap_model(model), _start(), "x", host, max_steps=3, offered=TOOLS)
     expected = "RuntimeError" if where == "record" else "ValueError"
     assert (outcome.reason, outcome.detail) == ("error", expected)
     assert len(seen) == 1

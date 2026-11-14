@@ -13,7 +13,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import func, select
 
 from app.core.models_base import utcnow
-from app.modules.agents.executor import MAX_ATTEMPTS, Executor
+from app.modules.agents.executor import MAX_RECOVERIES, Executor
 from app.modules.agents.executor_repository import Claimed, RunSteps, claim
 from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.ai.models import UsageRecord
@@ -195,7 +195,8 @@ async def test_the_deadline_cuts_a_stuck_call(bench: Bench) -> None:
 async def test_a_run_whose_workers_keep_dying_ends(bench: Bench) -> None:
     posted = await bench.say("Hi")
     run = await bench.run_of(posted["agent_run"]["id"])
-    run.state, run.attempt, run.started_at = RunState.RUNNING, MAX_ATTEMPTS, utcnow()
+    run.state, run.attempt, run.started_at = RunState.RUNNING, MAX_RECOVERIES + 1, utcnow()
+    run.recoveries = MAX_RECOVERIES  # the next take-up after a lost lease is one too many
     run.lease_until = utcnow() - timedelta(seconds=1)
     await bench.session.flush()
     assert await bench.run_next() == StopReason.ERROR

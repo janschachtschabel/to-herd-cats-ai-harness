@@ -10,7 +10,10 @@ worker look stuck; hung runs have their own gauge and alert).
   `HERD_RUN_LEASE_SECONDS`. A run whose lease another worker took over (this one hung
   longer than the lease) is cancelled here; the other worker starts it again.
 - Stopping cancels the runs in progress; their leases run out and another worker
-  starts them again (level 1 writes nothing but its answer, which is written once).
+  takes them up again and goes on from their journal (a tool's effect and its entry
+  in the journal are committed together, so nothing is done twice).
+- Every round also ends the waiting runs that are due (`control.sweep_waiting`:
+  `waiting_timeout`, or `cancelled` on request).
 
 Database connections: one at a time per run in progress (each step's short
 transaction, never during a provider call), plus one each for claiming, renewing and
@@ -28,6 +31,7 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from app.core.db import Database
 from app.core.metrics import REGISTRY
+from app.modules.agents.control import sweep_waiting
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import Claimed, claim, open_runs, renew
 from app.modules.agents.step_host import units_of
@@ -46,6 +50,7 @@ class RunMetrics:
     queued: Gauge
     oldest_queued: Gauge
     stuck: Gauge
+    waiting: Gauge
 
 
 _metrics: RunMetrics | None = None
@@ -87,6 +92,12 @@ def run_metrics() -> RunMetrics:
                 registry=REGISTRY,
                 multiprocess_mode="livemax",
             ),
+            waiting=Gauge(
+                "herd_runs_waiting",
+                "Agent runs waiting for a person's answer (from the database).",
+                registry=REGISTRY,
+                multiprocess_mode="livemax",
+            ),
         )
     return _metrics
 
@@ -116,6 +127,7 @@ class RunLoop:
             while not stop.is_set():
                 self.wake.clear()
                 try:
+                    await self.sweep_once()
                     while len(self.held) < self.concurrency and not stop.is_set():
                         claimed = await self.claim()
                         if claimed is None:
@@ -135,6 +147,10 @@ class RunLoop:
             for task in tasks:
                 with suppress(asyncio.CancelledError):
                     await task
+
+    async def sweep_once(self) -> int:
+        async with self.database.session_factory() as session, session.begin():
+            return await sweep_waiting(session)
 
     async def claim(self) -> Claimed | None:
         async with self.database.session_factory() as session, session.begin():
@@ -203,7 +219,8 @@ class RunLoop:
 
     async def update_metrics(self) -> None:
         async with self.database.session_factory() as session:
-            queued, oldest, stuck = await open_runs(session)
-        self.metrics.queued.set(queued)
-        self.metrics.oldest_queued.set(oldest)
-        self.metrics.stuck.set(stuck)
+            runs = await open_runs(session)
+        self.metrics.queued.set(runs.queued)
+        self.metrics.oldest_queued.set(runs.oldest_queued)
+        self.metrics.stuck.set(runs.stuck)
+        self.metrics.waiting.set(runs.waiting)

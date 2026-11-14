@@ -1,12 +1,20 @@
 """The host of a run's step loop (`runtime/loop.StepHost`): the checks before every
 model call and every tool call, and the records after them, each in a short
-transaction of its own (see `executor.py`, which drives it)."""
+transaction of its own (see `executor.py`, which drives it).
+
+Every step's transaction starts by locking the run's row and checking that it is still
+this take-up's (else `Lost`) and that nobody asked it to stop (else `cancelled`). A
+tool runs inside its step's transaction, which then records its `run_event`: a tool
+that writes commits its effect together with its entry in the journal
+(`toolbox/base.py`). A tool that must wait for a person sets the run `waiting` in that
+transaction instead, and the host raises `Suspended` once it is committed."""
 
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,18 +22,22 @@ from app.core.access import Actor
 from app.core.outbox import EventActor, emit
 from app.core.principal import Principal
 from app.modules.agents.actor import Reads, allowed_actor
+from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.models import Agent, EventKind, Run
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.tools import RunTools
+from app.modules.agents.toolbox.base import RunRef, ToolContext, ToolSpec, Wait
 from app.modules.ai.models import DataLocation
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
-from app.runtime import tools as tool_defs
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult
 
 
 class Lost(Exception):  # noqa: N818 (a state: the run is no longer this attempt's)
+    pass
+
+
+class Suspended(Exception):  # noqa: N818 (a state: the run waits for a person)
     pass
 
 
@@ -40,7 +52,7 @@ class Working:
     secret_ref: str | None
     deadline: float
     reads: Reads = field(default_factory=Reads)
-    seq: int = 0
+    seq: int = 0  # the last recorded; the journal counts on across take-ups
 
 
 Unit = Callable[[], AbstractAsyncContextManager[AsyncSession]]
@@ -60,10 +72,13 @@ def units_of(sessions: async_sessionmaker[AsyncSession]) -> Unit:
 class RunHost:
     """The run's `StepHost`; what it checks and records: `executor.py`."""
 
-    def __init__(self, unit: Unit, clock: Callable[[], float], run: Working) -> None:
+    def __init__(
+        self, unit: Unit, clock: Callable[[], float], run: Working, tools: dict[str, ToolSpec]
+    ) -> None:
         self.unit = unit
         self.clock = clock
         self.run = run
+        self.tools = tools
 
     def seconds_left(self) -> float:
         return self.run.deadline - self.clock()
@@ -96,32 +111,48 @@ class RunHost:
             raise
         except Exception as exc:  # the step cannot be recorded: count the call, stop now
             async with self.unit() as session:
-                await self._owned(session)
+                if await RunSteps(session, self.run.claimed).owned() is None:
+                    raise Lost from exc
                 await self._usage(session, reply)
             raise Halt("error", detail=type(exc).__name__) from exc
 
-    async def call_tool(self, step: int, call: ToolCall, args: tool_defs.ToolArgs) -> ToolResult:
+    async def call_tool(self, step: int, call: ToolCall, args: Any) -> ToolResult:
+        spec = self.tools.get(call.name)
+        if spec is None:  # the loop offers and parses only these
+            raise Halt("error", detail="unknown tool")
         try:
             async with self.unit() as session:
-                steps, _, agent = await self._owned(session)
+                steps, run, agent = await self._owned(session)
                 actor = await self._actor(session, agent)
                 location = await self._location(steps)
-                result = await RunTools(session, actor, location, self.run.reads).run(args)
-                content = {
-                    "step": step,
-                    "call_id": call.id,
-                    "name": call.name,
-                    "args": args.model_dump(mode="json"),
-                    "source": result.source,
-                    "attrs": result.attrs,
-                    "text": result.text,
-                    "spaces": sorted(str(space_id) for space_id in result.spaces),
-                }
-                await steps.event(self._seq(), EventKind.TOOL_CALL, content)
+                reads = self.run.reads
+                pages, tickets = set(reads.pages), set(reads.tickets)
+                ctx = ToolContext(session, actor, location, reads, self._ref())
+                result = await spec.run(ctx, args)
+                if isinstance(result, Wait):
+                    await steps.wait(run, result.until)
+                else:
+                    content = {
+                        "step": step,
+                        "call_id": call.id,
+                        "name": call.name,
+                        "args": args.model_dump(mode="json"),
+                        "source": result.source,
+                        "attrs": result.attrs,
+                        "text": result.text,
+                        "spaces": sorted(str(space_id) for space_id in result.spaces),
+                        "read": {
+                            "pages": sorted(str(p) for p in reads.pages - pages),
+                            "tickets": sorted(str(t) for t in reads.tickets - tickets),
+                        },
+                    }
+                    await steps.event(self._seq(), EventKind.TOOL_CALL, content)
         except (Lost, Halt):
             raise
         except Exception as exc:  # a tool that fails ends the run, never retried blind
             raise Halt("error", detail=type(exc).__name__) from exc
+        if isinstance(result, Wait):
+            raise Suspended
         return result
 
     # --- checks ----------------------------------------------------------------------
@@ -132,6 +163,8 @@ class RunHost:
         run = await steps.owned()
         if run is None:
             raise Lost
+        if await ControlRepository(session, run.org_id).cancelled_by(run.id) is not None:
+            raise Halt("cancelled")
         agent = await steps.agent()
         if agent is None:
             raise Halt("rights_revoked")
@@ -175,6 +208,10 @@ class RunHost:
             agent_id=claimed.agent_id,
             run_id=claimed.id,
         )
+
+    def _ref(self) -> RunRef:
+        c = self.run.claimed
+        return RunRef(c.id, c.org_id, c.agent_id, c.user_id, c.conversation_id)
 
     def _seq(self) -> int:
         self.run.seq += 1

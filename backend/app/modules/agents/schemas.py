@@ -126,7 +126,9 @@ class AgentProfileOut(BaseModel):
 
 
 class RunOut(BaseModel):
-    """`steps`: model calls of the current attempt; `stop_reason` once `done`."""
+    """`steps`: model calls of the run; `attempt`: its take-ups by a worker;
+    `wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);
+    `stop_reason` once `done`."""
 
     id: uuid.UUID
     agent_id: uuid.UUID
@@ -136,6 +138,7 @@ class RunOut(BaseModel):
     stop_reason: StopReason | None
     attempt: int
     steps: int
+    wait_until: datetime | None
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -151,6 +154,7 @@ class RunOut(BaseModel):
             stop_reason=run.stop_reason,
             attempt=run.attempt,
             steps=run.steps,
+            wait_until=run.wait_until,
             created_at=run.created_at,
             started_at=run.started_at,
             finished_at=run.finished_at,

@@ -2,6 +2,7 @@
 never makes a run retry blind, and a step whose record fails ends the run at once:
 one provider call, its usage recorded, stop `error`."""
 
+import dataclasses
 from typing import Any
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy import func, select
 
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.models import EventKind, RunEvent, StopReason
-from app.modules.agents.tools import RunTools
+from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.ai.models import UsageRecord
 from tests.factories_agents import Bench
 
@@ -69,10 +70,10 @@ async def test_a_step_whose_record_fails_ends_the_run_at_once(
 async def test_a_tool_that_fails_ends_the_run_at_once(
     bench: Bench, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def failing(self: RunTools, args: Any) -> Any:
+    async def failing(ctx: Any, args: Any) -> Any:
         raise ValueError("broken")
 
-    monkeypatch.setattr(RunTools, "run", failing)
+    monkeypatch.setitem(CATALOG, "search", dataclasses.replace(CATALOG["search"], run=failing))
     bench.stub.state.replies.extend([call("search", query="x"), {"content": "never"}])
     await bench.say("Find")
     assert await bench.run_next() == StopReason.ERROR
