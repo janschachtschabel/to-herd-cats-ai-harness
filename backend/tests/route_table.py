@@ -183,6 +183,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/ai/assignments/users/{user_id}", "ai"),
     ("GET", "/api/ai/usage", "ai"),
     ("GET", "/api/ai/usage/me", "ai"),
+    ("GET", "/api/ai/budgets", "ai"),
+    ("PUT", "/api/ai/budgets/organisation", "ai"),
+    ("PUT", "/api/ai/budgets/users/{user_id}", "ai"),
+    ("PUT", "/api/ai/budgets/agents/{agent_id}", "ai"),
+    ("DELETE", "/api/ai/budgets/{budget_id}", "ai"),
     ("GET", "/api/agents", "agent"),
     ("POST", "/api/agents", "agent"),
     ("GET", "/api/agents/{agent_id}", "agent"),
@@ -237,6 +242,7 @@ def concrete(
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
         "/api/ai/assignments/users/{user_id}",
+        "/api/ai/budgets/{budget_id}",
         "/api/agents/{agent_id}",
     )
     ids = {
@@ -264,6 +270,7 @@ def concrete(
         "{question_id}": str(uuid7()),
         "{proposal_id}": str(proposal_id or uuid7()),
         "{skill_id}": str(skill_id or uuid7()),
+        "{budget_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -328,6 +335,9 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PUT", "/api/ai/assignments/personal-agents"): {"enabled": True, "version": 1},
     ("PUT", "/api/ai/assignments/groups"): {"items": [], "version": 1},
     ("PUT", "/api/ai/assignments/users/{user_id}"): {"no_ai": True, "version": None},
+    ("PUT", "/api/ai/budgets/organisation"): {"tokens_per_day": 1, "version": None},
+    ("PUT", "/api/ai/budgets/users/{user_id}"): {"tokens_per_day": 1, "version": None},
+    ("PUT", "/api/ai/budgets/agents/{agent_id}"): {"tokens_per_day": 1, "version": None},
     ("POST", "/api/agents"): {
         "name": "X",
         "connection_id": str(uuid7()),

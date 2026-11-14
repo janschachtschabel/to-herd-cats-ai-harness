@@ -20,6 +20,7 @@ from app.modules.agents import run_router
 from app.modules.agents import spaces_router as agent_spaces
 from app.modules.agents.approvals import router as approvals_router
 from app.modules.ai import assignment_router as ai_assignments
+from app.modules.ai import budget_router as ai_budgets
 from app.modules.ai import router as ai
 from app.modules.ai import usage_router as ai_usage
 from app.modules.audit.router import router as audit_router
@@ -106,6 +107,7 @@ def api_router() -> APIRouter:
     api.include_router(ai.connections)
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
+    api.include_router(ai_budgets.budgets)
     api.include_router(agents_router.agents)
     api.include_router(run_router.agent_runs)
     api.include_router(run_router.runs)

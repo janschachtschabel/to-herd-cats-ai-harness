@@ -14,6 +14,7 @@ from app.modules.agents.models import (
     RunEvent,
 )
 from app.modules.ai.models import (
+    AiBudget,
     AiConnection,
     GroupAssignment,
     OrgAssignment,
@@ -54,6 +55,7 @@ __all__ = [
     "AgentMemory",
     "AgentSkill",
     "AgentTool",
+    "AiBudget",
     "AiConnection",
     "Approval",
     "GroupAssignment",

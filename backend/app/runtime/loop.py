@@ -12,7 +12,7 @@ Stops: `completed` (an answer without tool calls, or a final tool result),
 identical tool call), `provider_refused` (401, 402, 403, 429), `error` (anything
 else the provider or the network does, an answer that is no use, or a tool the model
 invented three times in a row), and what the host decides (`deadline`,
-`rights_revoked`, `policy_blocked`, and `error` when a step cannot be recorded or a
+`rights_revoked`, `policy_blocked`, `budget`, and `error` when a step cannot be recorded or a
 tool fails: at once, never a blind retry). The deadline also cuts a call in flight.
 The model's text and arguments come without what the database cannot store
 (`storable`).
@@ -67,6 +67,7 @@ Stop = Literal[
     "error",
     "cancelled",
     "approval_expired",
+    "budget",
 ]
 
 

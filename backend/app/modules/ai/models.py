@@ -1,4 +1,4 @@
-"""AI connections (spec 7.1), who uses which (spec 7.2) and usage (spec 7.4).
+"""AI connections (spec 7.1), who uses which (spec 7.2), usage and budgets (spec 7.4).
 
 `secret_ref` is a reference (`env:HERD_AI_*` or `enc:<token>`, `core/secrets.py`), never
 the key itself; NULL for a provider that needs none (a local server). `models` are the
@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -65,6 +66,12 @@ class AiPolicy(StrEnum):
     ANY = "any"
     RESTRICTED = "restricted"  # only connections at one of `allowed_locations`
     NONE = "none"  # AI does not see the space
+
+
+class BudgetScope(StrEnum):
+    ORGANISATION = "organisation"
+    USER = "user"
+    AGENT = "agent"
 
 
 class Purpose(StrEnum):
@@ -190,6 +197,7 @@ class UsageRecord(UuidPk, OrgScoped, Base):
     __table_args__ = (
         Index("ix_usage_record_org_id_created_at", "org_id", "created_at"),
         Index("ix_usage_record_user_id_created_at", "user_id", "created_at"),
+        Index("ix_usage_record_agent_id_created_at", "agent_id", "created_at"),
         Index("ix_usage_record_run_id", "run_id"),
         CheckConstraint(
             "tokens_in >= 0 AND tokens_out >= 0 AND tokens_cached BETWEEN 0 AND tokens_in",
@@ -212,3 +220,60 @@ class UsageRecord(UuidPk, OrgScoped, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class AiBudget(UuidPk, OrgScoped, Base):
+    """A daily limit (spec 7.4, plan M7 decision 10) for the organisation (neither id),
+    one person (`user_id`) or one agent (`agent_id`): tokens (in + out) and/or EUR per
+    UTC day, at least one of them. Checked before every model call of a run against
+    today's `usage_record` sums (`budgets.budget_exhausted`); at most one per subject."""
+
+    __tablename__ = "ai_budget"
+    __table_args__ = (
+        CheckConstraint("num_nonnulls(user_id, agent_id) <= 1", name="subject"),
+        CheckConstraint("tokens_per_day IS NOT NULL OR cost_per_day IS NOT NULL", name="limit"),
+        CheckConstraint("tokens_per_day IS NULL OR tokens_per_day > 0", name="tokens_per_day"),
+        CheckConstraint("cost_per_day IS NULL OR cost_per_day > 0", name="cost_per_day"),
+        Index(
+            "uq_ai_budget_organisation",
+            "org_id",
+            unique=True,
+            postgresql_where=text("user_id IS NULL AND agent_id IS NULL"),
+        ),
+        Index(
+            "uq_ai_budget_user",
+            "org_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("user_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_ai_budget_agent",
+            "org_id",
+            "agent_id",
+            unique=True,
+            postgresql_where=text("agent_id IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE")
+    )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("agent.id", ondelete="CASCADE")
+    )
+    tokens_per_day: Mapped[int | None] = mapped_column(BigInteger)
+    cost_per_day: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # EUR
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    @property
+    def scope(self) -> BudgetScope:
+        if self.user_id is not None:
+            return BudgetScope.USER
+        if self.agent_id is not None:
+            return BudgetScope.AGENT
+        return BudgetScope.ORGANISATION
+
+    @property
+    def subject_id(self) -> uuid.UUID | None:
+        return self.user_id or self.agent_id
