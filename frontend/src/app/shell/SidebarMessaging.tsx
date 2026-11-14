@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { Bell, Hash, Plus, UsersRound } from 'lucide-react'
+import { Bell, Bot, Hash, Plus, UsersRound } from 'lucide-react'
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useActivityCount } from '@/features/activity/queries'
+import { agentOf } from '@/features/agents/display'
 import { useMe } from '@/features/auth/queries'
 import { canCreateChannelIn, canOpenDm } from '@/features/messaging/abilities'
 import { dmLabel } from '@/features/messaging/display'
@@ -171,7 +172,11 @@ export function DirectSection() {
                 className={navLinkClass}
                 activeProps={navLinkActive}
               >
-                <UsersRound className="size-4 shrink-0" aria-hidden />
+                {agentOf(dm) ? (
+                  <Bot className="size-4 shrink-0" aria-hidden />
+                ) : (
+                  <UsersRound className="size-4 shrink-0" aria-hidden />
+                )}
                 <span className="truncate">{dmLabel(t, dm, me?.user.id)}</span>
                 <UnreadBadge unread={unread.get(dm.id)} />
               </Link>

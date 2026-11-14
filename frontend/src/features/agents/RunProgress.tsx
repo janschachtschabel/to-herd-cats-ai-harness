@@ -16,7 +16,8 @@ export function RunProgress({
   const active = useActiveRun(conversationId)
   const run = useRun(active?.runId ?? null)
   if (!active || !run.data || run.data.state === 'done') return null
-  const step = Math.max(run.data.steps, active.step ?? 0)
+  // Steps done so far; the card names the one in progress.
+  const step = Math.max(run.data.steps, active.step ?? 0) + 1
   return (
     <div
       role="status"

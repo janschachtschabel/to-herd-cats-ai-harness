@@ -144,7 +144,7 @@ describe('a direct message with an agent', () => {
     const { user } = await renderApp(`/c/${dm.id}`)
     const box = await screen.findByRole('combobox', { name: 'Nachricht an Direktnachricht' })
     await user.type(box, 'Wie viele Urlaubstage?{Enter}')
-    expect(await screen.findByText('Hilda arbeitet … (Schritt 2)')).toBeInTheDocument()
+    expect(await screen.findByText('Hilda arbeitet … (Schritt 3)')).toBeInTheDocument()
     expect(api.find('GET', `/api/runs/${RUN}`)).toHaveLength(1)
   })
 

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Eye, Hash, UsersRound } from 'lucide-react'
+import { Bot, Eye, Hash, UsersRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { AgentHeaderNote } from '@/features/agents/AgentHeaderNote'
@@ -20,8 +20,8 @@ export function ConversationHeader({
 }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
-  const Icon = conversation.kind === 'dm' ? UsersRound : Hash
   const agent = agentOf(conversation)
+  const Icon = agent ? Bot : conversation.kind === 'dm' ? UsersRound : Hash
   return (
     <header className="mb-3 border-b pb-3">
       <div className="flex flex-wrap items-center gap-2">
