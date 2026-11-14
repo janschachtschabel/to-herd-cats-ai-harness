@@ -263,8 +263,12 @@ und er schreibt nur dorthin, wo sein Auftrag liegt.
 | Ort | liest (∩ Person ∩ Agent) | schreibt |
 |---|---|---|
 | Direktnachricht der Person allein mit dem Agenten | alles | wo Person und Agent beide schreiben dürfen |
-| Direktnachricht mit mehreren Personen | Bereiche, die alle Teilnehmenden lesen | genau diese Bereiche |
+| Direktnachricht mit mehreren Personen (*) | Bereiche, die alle Teilnehmenden lesen | genau diese Bereiche |
 | Kanal, Seiten- oder Ticket-Diskussion in Bereich S | S und die offenen Bereiche (keine offenen, wenn S einen Gast hat) | nur S |
+
+(*) Gebaut, aber heute ohne Weg dorthin: Ein Agent ist nur in Direktnachrichten mit
+genau einer Person (sonst 422 `dm.agent_pair_only`), und Teilnehmende einer
+Direktnachricht ändern sich nie.
 
 Beispiele:
 
@@ -275,8 +279,6 @@ Beispiele:
   Kanal lesen Leute mit, die „Vertrieb“ nicht sehen.
 - Ist in „Marketing“ ein Gast Mitglied, liest Hilda dort auch keine offenen Bereiche
   (Gäste lesen keine offenen Bereiche).
-- In einer Direktnachricht von Anna, Ben und Hilda liest Hilda nur Bereiche, die Anna
-  und Ben beide lesen dürfen.
 - Hat Hilda in einem Lauf „Vertrieb“ gelesen (auch über ihr Gedächtnis dort), schreibt
   sie in diesem Lauf nichts in einen Bereich, dessen Publikum „Vertrieb“ nicht sieht:
   kein Vorschlag, kein Kommentar, kein Gedächtnis dort (Antwort „Not allowed: what you

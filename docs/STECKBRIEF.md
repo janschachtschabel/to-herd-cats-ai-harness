@@ -1,11 +1,13 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 4b (Boards und Sprints), 14.11.2026, Version 0.1.0. Der Steckbrief wird mit
-jedem Meilenstein aktualisiert (Spezifikation 12.7). Die Messwerte aus M2 (Image,
-Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3, die Tickets aus M4 und
-die Sprints und Boards aus M4b sind ohne Docker gemessen, an Prozessen auf der Maschine
+Stand: Meilenstein 6 (Agenten als Mitarbeiter) mit M5 Tasks 1 bis 7 (KI-Grundlage),
+14.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+(Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
+stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
+M3, die Tickets aus M4, die Sprints und Boards aus M4b und die Agenten aus M6
 (Abschnitte [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
-[Tickets (M4)](#tickets-m4) und [Sprints und Boards (M4b)](#sprints-und-boards-m4b)). Was nicht gemessen ist, steht unter
+[Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b) und
+[Agenten (M6)](#agenten-m6)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -27,14 +29,24 @@ Kategorien, Zuweisung, Liste und „Meine Tickets“, Board, Epic-Übersicht, Ti
 mit Systemmeldungen, Ticket-Karten in Nachrichten, Verknüpfung mit Wiki-Seiten, Tags,
 Suche. **Vorhanden (M4b):** Sprints je Bereich (höchstens einer läuft; Abschluss mit
 Bilanz), Vorrat, „Mein Board“ über alle Bereiche nach Kategorie, Daily-Ansicht des
-Boards nach Person. KI folgt ab M5.
+Boards nach Person. **Vorhanden (M5, Tasks 1 bis 7):** KI-Verbindungen zu Anbietern
+mit OpenAI-Protokoll (Schlüssel verschlüsselt oder als Verweis auf eine Variable,
+ausgehende Aufrufe hinter einer SSRF-Sperre), Zuordnung von Modellen zu Personen und
+Gruppen, Verbrauch je Aufruf, KI-Richtlinie je Bereich und KI-Sperre für Seiten,
+Agenten mit Direktnachricht und Laufschleife im Worker. **Vorhanden (M6):** Agenten als
+Mitarbeiter: Stufen 1 bis 3 mit Werkzeugfreigaben (22 Werkzeuge), Erwähnung in Kanal
+und Thread, Ticket-Zuweisung und Übergabe, Freigaben und Rückfragen, Laufansicht und
+Abbruch, Wiederaufnahme nach Absturz aus dem Journal, Seiten- und Skill-Vorschläge,
+Skills (SKILL.md), Gedächtnis je Bereich, persönliche Agenten. Hybride Suche und
+Embeddings (M5 Tasks 8 bis 11), Zeitpläne und Ereignisse (M7) und externe Werkzeuge
+(M8) folgen.
 
 | | |
 |---|---|
 | Dienst-ID | `to-herd-cats-ai` (Log-Feld `service`, `OTEL_SERVICE_NAME`, Image, Chart) |
 | Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|worker\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
-| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
+| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
 | Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
 | Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export |
 | Lizenz | Apache-2.0 |
@@ -241,9 +253,10 @@ Zeit angelegten Tickets dagegen erst nach **7,9 s**, weil sie in derselben Bahn
 `sprint` 96 KB, `work_item` 12 MB, die ganze Datenbank 92 MB (mit rund 25.500
 Systemmeldungen und der Outbox).
 
-**Kosten:** M2 bis M4 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
-Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der Anhänge auf dem
-Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je Anhang).
+**Kosten:** Ohne KI-Verbindung ruft die Anwendung keine kostenpflichtigen Dienste auf
+(kein externer Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der
+Anhänge auf dem Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je
+Anhang). Mit KI kosten die Modellaufrufe beim Anbieter (siehe [Agenten (M6)](#agenten-m6)).
 
 **Engpass Anmeldung:** Die Passwortprüfung ist argon2id (64 MiB, 3 Durchläufe,
 4 Lanes) und läuft in Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY`
@@ -263,6 +276,108 @@ hochgesetzt. Ein Live-Test aus M1 (200 gleichzeitige Fehlanmeldungen von 200 Adr
 18 × 401, 182 × 429 in 2,0 s, `/ready` höchstens 649 ms, kein 503) ist nicht wiederholt
 worden.
 
+### Agenten (M6)
+
+Ohne Docker gemessen, 14.11.2026: getrennte Prozesse `HERD_ROLE=migrate`, `api` und ein
+oder zwei `worker` aus dem Stand von Commit `c1e700a` an einer Wegwerf-Datenbank auf dem
+lokalen PostgreSQL. Als Anbieter diente der Stub aus den Tests
+(`backend/tests/support/openai_stub.py`, eigener Prozess, Verbindung der Art `local`).
+Gemessen hat ein Python-Skript mit httpx und asyncpg auf derselben Maschine (nicht
+eingecheckt). Die Maschine (4 vCPU) war von anderen Prozessen mitbenutzt: Lastmittel
+0,4–2 zu Beginn, 5–6 während einiger Durchläufe.
+
+**Daten**, über die API angelegt:
+
+- 20 Agenten (Stufe 1, `HERD_RUN_CONCURRENCY` 4, Sperrfrist 30 s) und 10 Personen;
+- 200 Direktnachrichten Person–Agent;
+- 5 veröffentlichte Seiten in einem offenen Bereich, damit `search` etwas findet;
+- eine Verbindung mit `max_concurrency` 100 und `requests_per_minute` 100.000, damit
+  ihre Grenzen nicht bremsen.
+
+Der Stub antwortet sofort (dann zeigt die Messung die Arbeit des Servers) oder nach 1 s
+(ein langsamer Anbieter, ohne Netz). Die Zeit eines echten Modells kommt zu allen
+Zahlen hinzu, ebenso seine Kosten.
+
+**Antwortzeit**: je 30 Läufe nacheinander, ein Worker, Stub ohne Verzögerung. „Client“
+misst vom Absenden der Nachricht, bis `GET /api/runs/{id}` „fertig“ meldet (Abfrage alle
+20 ms). „Server“ ist `finished_at − created_at` des Laufs.
+
+| Lauf | Client P50 / P95 / max | Server P50 / P95 / max |
+|---|---|---|
+| 1 Schritt (Antwort) | 194 / 254 / 552 ms | 143 / 175 / 462 ms |
+| 5 Schritte (4 × `search`, dann Antwort) | 537 / 719 / 795 ms | 488 / 644 / 742 ms |
+
+Jeder weitere Schritt kostet also rund 85 ms Arbeit des Servers: Antwort einspielen,
+Journal schreiben, Rechte und Richtlinie prüfen, `search` ausführen.
+
+**200 Läufe in der Warteschlange**: 200 Nachrichten in 200 Direktnachrichten, je 20
+zugleich abgeschickt (4,7–7 s für alle 200), danach erst die Worker gestartet. Läufe je
+Minute = 200 / (erster Start bis letztes Ende).
+
+| Worker | Stub | Läufe zugleich | Läufe/min | Dauer | höchstens laufend | Laufdauer P50 / P95 (Start bis Ende) | Worker-RSS max |
+|---|---|---|---|---|---|---|---|
+| 1 | sofort | 4 | 581 und 538 (2 Durchläufe) | 20,7 / 22,3 s | 4 | 343 / 482 ms, 368 / 545 ms | 208 / 210 MiB |
+| 2 | sofort | 4 je Worker | 1.055 und 1.052 | 11,4 s | 8 | rund 365 / 494 ms | 199–205 MiB je Worker |
+| 1 | 1 s | 4 | 196 | 61,2 s | 4 | 1.163 / 1.325 ms | 234 MiB |
+| 2 | 1 s | 4 je Worker | 366 | 32,8 s | 8 | 1.207 / 1.432 ms | 210 / 217 MiB |
+| 1 | 1 s | 16 | 553 | 21,7 s | 16 | 1.502 / 1.796 ms | 249 MiB |
+
+- In jedem Durchlauf endeten alle 200 Läufe mit genau einer Antwort, jeder im ersten
+  Versuch.
+- Vom Start des Workers bis zum ersten Lauf vergingen 2,2–2,4 s (Start des Prozesses).
+- Ein zweiter Worker verdoppelt den Durchsatz fast. Bei einem langsamen Anbieter
+  bestimmt `HERD_RUN_CONCURRENCY` den Durchsatz: 4 Läufe zugleich mit je 1 s ergeben
+  3,3 je Sekunde, 16 zugleich fast das Dreifache.
+- Die Grenzen der Verbindung (`max_concurrency`, `requests_per_minute`) bremsen hier
+  nicht; im Betrieb tun sie es, und sie gelten über alle Worker.
+
+**Neustart nach Absturz**: Worker 1 bearbeitet einen Lauf, Worker 2 läuft daneben.
+Worker 1 wird mit SIGKILL beendet, während sein Anbieteraufruf unterwegs ist.
+
+| Fall | Sperrfrist | Wiederaufnahme nach dem Kill | fertig nach dem Kill |
+|---|---|---|---|
+| 1 Schritt, 3 × | 30 s | 26,8–26,9 s | 27,2–27,3 s |
+| 5 Schritte, Kill während Aufruf 3, 2 × | 30 s | 30,6–30,7 s | 31,3 s |
+| 1 Schritt, 3 × | 6 s | 4,5–6,4 s | 5,1–6,9 s |
+
+- In den Fällen mit 30 s endete jeder Lauf im zweiten Versuch (`recoveries` 1) mit genau
+  einer Antwort; die Fälle mit 6 s zeigen nur, dass die Zeit mit der Sperrfrist sinkt.
+- Im Fall mit 5 Schritten blieben die Journaleinträge des ersten Versuchs (`seq` 1–4)
+  stehen, der zweite setzte mit `seq` 5–7 fort.
+- Wiederholt wurde nur der verlorene Anbieteraufruf: im Fall mit einem Schritt 2
+  Aufrufe statt 1. Im Fall mit 5 Schritten verbrauchte der verlorene Aufruf eine der
+  vorbereiteten Antworten des Stubs; der Lauf hatte deshalb 4 Schritte mit 5 Aufrufen.
+  Mit einem echten Anbieter wären es 5 Schritte mit 6 Aufrufen.
+- Die Wiederaufnahme hängt an der Sperrfrist: Sie wird alle 10 s erneuert, also kommt
+  ein anderer Worker 20 bis 30 s nach dem Absturz zum Zug, dazu eine Runde seiner
+  Schleife.
+
+**Journal**: über alle 2.668 Läufe der Messung (5.588 Einträge).
+
+| Lauf | Einträge `run_event` | Byte je Lauf (Zeilen) | davon JSON-Inhalt |
+|---|---|---|---|
+| 1 Schritt | 2 (Modellaufruf, Stopp) | rund 440 | rund 190 |
+| 5 Schritte | 10 | rund 3,7 KB | rund 2,1 KB |
+
+- Die Tabelle `run_event` belegte mit Indizes 2,3 MB, rund 900 Byte je Lauf.
+- Dazu je Modellaufruf ein Eintrag `usage_record` (über alle Läufe der Messung 1,05 je
+  Lauf, die meisten mit einem Schritt).
+- Echte Läufe sind größer: Antworten und Werkzeugergebnisse stehen vollständig im
+  Journal, eine gelesene Seite also ganz. Ein Lauf braucht mindestens so viel Platz wie
+  alle seine Werkzeugergebnisse zusammen.
+- Läufe und Journal werden nicht automatisch gelöscht.
+
+**Worker-Speicher**: im Leerlauf 173 MiB RSS (30 s nach `/ready`). In M3 waren es
+104 MiB. Den Unterschied machen vermutlich die Bibliotheken der Laufschleife (Pydantic AI,
+OpenAI-Client); einzeln gemessen ist das nicht. Unter Last mit 4 Läufen zugleich bis
+234 MiB, mit 16 zugleich bis 249 MiB.
+
+**Kosten**: Jeder Modellaufruf kostet beim Anbieter Token. Die Anwendung bucht sie je
+Aufruf (`usage_record`, mit Preis, wenn an der Verbindung einer hinterlegt ist) und
+zeigt sie unter `GET /api/ai/usage` ([`KI.md`](KI.md#verbrauch-apiaiusage)). Ein Lauf
+mit n Schritten macht n Modellaufrufe; dazu kommt höchstens ein wiederholter Aufruf je
+Absturz.
+
 ## Abhängigkeiten
 
 | Dienst | Pflicht | Hinweis |
@@ -274,8 +389,10 @@ worden.
 | OTLP-Collector | nein | Tracing nur, wenn `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist (Chart: `tracing.otlpEndpoint`) |
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
+| KI-Anbieter (OpenAI-Protokoll) | nein (nur für KI) | ausgehend von API (Verbindungstest, Modellliste) und Worker (Läufe), nur zu Verbindungen, die ein Admin anlegt, über die SSRF-Sperre oder `HERD_AI_EGRESS_PROXY`; Chart: `networkPolicy.aiEgress`. Ohne Anbieter läuft alles außer KI |
 
-Keine ausgehenden Verbindungen zu Dritten, keine Drittanbieter-Anfragen im Browser.
+Keine ausgehenden Verbindungen zu Dritten außer zu angelegten KI-Verbindungen (siehe
+[`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)), keine Drittanbieter-Anfragen im Browser.
 Die API-Dokumentation `/api/docs` (Swagger UI, lädt ihre Skripte von einem CDN) gibt
 es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 `production`. Das OpenAPI-Dokument `/api/openapi.json` bleibt immer erreichbar.
@@ -307,7 +424,13 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   idempotent; geprüft mit zwei Verteilern, auch mit scheiternden Nachbarn im Stapel, und
   mit einem Verteiler, der mitten im Handler abgeschossen wird). Je Worker bis zu eine
   Datenbankverbindung je Handler (zurzeit fünf), eine fürs Verteilen, eine für die
-  Metriken und eine für LISTEN.
+  Metriken und eine für LISTEN. **Läufe der Agenten (M6):** Jeder Worker beansprucht
+  Läufe per `SKIP LOCKED` mit einer Sperrfrist (`HERD_RUN_LEASE_SECONDS`, alle Drittel
+  erneuert), höchstens `HERD_RUN_CONCURRENCY` zugleich, dafür bis zu so vielen
+  Datenbankverbindungen mehr plus drei. Stirbt ein Worker, nimmt ein anderer seine Läufe
+  nach Ablauf der Sperrfrist auf und setzt sie aus dem Journal fort (gemessen
+  27–31 s bei 30 s Sperrfrist). Je Thread höchstens ein offener Lauf, gesichert durch
+  eindeutige Teilindizes, nicht durch eine Sperre im Speicher.
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -321,7 +444,10 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 
 ## Zeitpläne
 
-Keine Cronjobs. Seit M3 läuft der **Worker** als Schleife: Er wacht bei jedem Commit
+Keine Cronjobs. Die **Laufschleife** der Agenten (M5, M6) wacht bei jedem Commit mit
+Ereignissen auf (über das `NOTIFY` der Outbox), sonst jede Sekunde, und beendet in jeder
+Runde wartende Läufe, deren Frist abgelaufen ist; jeder laufende Lauf erneuert seine Sperrfrist alle
+`HERD_RUN_LEASE_SECONDS` / 3. Seit M3 läuft der **Worker** als Schleife: Er wacht bei jedem Commit
 mit Ereignissen auf (`NOTIFY herd_outbox`), sonst alle 2 s, verteilt neue Ereignisse
 auf die Bahnen der Handler (bis 500 je Durchlauf), und jede Bahn arbeitet bis 100
 Ereignisse je Stapel ab; einmal je Minute löscht er verteilte Ereignisse, die älter als
@@ -389,6 +515,13 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
   Worker. Drei Läufe; Lastmittel der Maschine durch andere Prozesse 8–10 (Lauf 1)
   bzw. 3–4 (Läufe 2 und 3). Das Leerlauf-RSS von `HERD_ROLE=all` (ohne Collab-Prozess)
   ist ein eigener Start, 30 s nach `/ready`.
+- **Agenten (M6), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen PostgreSQL,
+  daran `HERD_ROLE=migrate`, dann ein Prozess `api`, ein oder zwei `worker` und der
+  Stub-Anbieter als eigener Prozess, alles aus dem Stand von Commit `c1e700a`;
+  Python-Skript mit httpx und asyncpg (nicht eingecheckt; Ablauf oben unter
+  [Agenten (M6)](#agenten-m6)). RSS aus `/proc/<pid>/status` (`VmRSS`) während der
+  Durchläufe, Zeiten des Servers aus `run.created_at`, `started_at` und `finished_at`,
+  Größen mit `pg_column_size` und `pg_total_relation_size`.
 - **Live-Bearbeitung:** eigenes Compose-Projekt, eine Seite, 10 Personen (Rolle
   `editor`, je eigene Sitzung). Statt 10 Browsern 10 Yjs-Clients
   (`@hocuspocus/provider` wie im Browser, Node-Skript auf derselben Maschine) über
@@ -543,6 +676,13 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
   `/api/stream`, der Verlust der LISTEN-Verbindung unter Last (`resync`) und ein
   Neustart eines API-Pods mit 100 offenen Verbindungen.
+- **Agenten (M6):** ein echter Anbieter (Netz, Latenz, Token-Zahlen, Kosten); der
+  Worker im Image und mit `docker stats`; CPU von Worker, API und Datenbank während der
+  Durchläufe; der Speicher der API; große Gesprächsverläufe, Werkzeugergebnisse und
+  Gedächtnisseiten (der Stub antwortet kurz); Freigaben unter Last; die Grenzen einer
+  Verbindung (`max_concurrency`, `requests_per_minute`) als Bremse; Erwähnungen in
+  vielen Threads zugleich; Übergabeketten; mehr als zwei Worker; ein Rollout mit
+  SIGTERM während laufender Läufe (gemessen ist nur SIGKILL).
 
 ### Empfehlung Request und Limit
 
@@ -552,7 +692,7 @@ Aus den Messwerten mit 20–30 % Puffer:
 |---|---|---|---|---|---|
 | api (je Pod, ohne Collab-Prozess) | 250m | 3500m oder keins | 256Mi | 330Mi | Request 100m / 256Mi, Limit 512Mi |
 | collab (eine Replika) | 50m | 500m | 128Mi | 1Gi | Request 50m / 128Mi, Limit 1Gi |
-| worker (je Replika) | 50m | 300m | 128Mi | 140Mi | Request 50m / 192Mi, Limit 384Mi |
+| worker (je Replika) | 50m | 300m (ohne Läufe gemessen) | 256Mi | 330Mi | Request 50m / 192Mi, Limit 384Mi |
 | db (mitgeliefert) | 100m | keins | 100Mi | 105Mi | Request 100m / 256Mi, Limit 1Gi |
 
 - **api CPU:** Limit = Lastspitze 3,2 Kerne + 10 %. Ein kleineres Limit bricht nichts,
@@ -573,10 +713,14 @@ Aus den Messwerten mit 20–30 % Puffer:
   unter `HERD_COLLAB_MEMORY_BUDGET_MB` (400, Schätzung, `docs/WIKI.md`); Faustregel
   Limit ≥ (130 MB + 250 MB je Prüf-Thread + Budget) / 0,8 = 975 MB. Das Chart setzt
   128Mi/1Gi (vorher 512Mi: drei bis fünf große Tabellen-Seiten brachten ihn darüber).
-- **worker:** RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU 20–24 %
-  (ohne Image gemessen). Request = 106 MiB + 20 %, Limit = 107 MiB + 30 %, CPU-Limit =
-  24 % + Reserve. Das Chart setzt mehr (192Mi/384Mi); das bleibt, bis eine Messung im
-  Container vorliegt.
+- **worker:** In M3 RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU
+  20–24 %. Mit den Läufen der Agenten (M6) 173 MiB im Leerlauf, unter Last 199–234 MiB
+  mit 4 Läufen zugleich und 249 MiB mit 16 (alles ohne Image gemessen). Request =
+  Lastmittel rund 210 MiB + 20 %, Limit = Spitze 249 MiB + 30 %; CPU unter Läufen nicht
+  gemessen, das CPU-Limit stammt aus M3. Das Chart setzt Request 192Mi und Limit
+  384Mi; das Limit reicht, der Request liegt unter der Last. Beides bleibt, bis eine
+  Messung im Container vorliegt. Wer `HERD_RUN_CONCURRENCY` erhöht, gibt dem Worker mehr
+  Speicher.
 - **api mit SSE:** 200 offene Verbindungen und 20 Nachrichten je Sekunde kosteten je
   Prozess +15 MiB und bis 50 % eines Kerns (ohne Anmeldelast); das bleibt im Rahmen der
   Empfehlung oben.
@@ -635,7 +779,8 @@ WebSocket hinter einem Ingress, `/data` und ReadWriteMany, Größen von Anfragen
 Anhängen und Importen) stehen im README unter
 [Betriebshinweise](../README.md#betriebshinweise), die Bedienung und der Betrieb des
 Wikis in [`WIKI.md`](WIKI.md), der Nachrichten (Worker, Outbox, SSE hinter einem Proxy)
-in [`NACHRICHTEN.md`](NACHRICHTEN.md).
+in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der Agenten
+(Worker, Läufe, Alarme, Rolling Update) in [`AGENTEN.md`](AGENTEN.md).
 
 ## Metriken und Alarme (seit M3)
 
@@ -651,20 +796,30 @@ in [`NACHRICHTEN.md`](NACHRICHTEN.md).
 | `herd_live_queue_depth` | Gauge (API) | empfangene, noch nicht verteilte Live-Ereignisse |
 | `herd_live_delivery_lag_seconds` | Histogramm (API) | Eintreffen des `NOTIFY` bis Übergabe an die Verbindungen |
 | `herd_live_resyncs_total{reason}` | Zähler (API) | `resync` an Verbindungen: `lag`, `overflow`, `reconnect`, `check_failed` |
+| `herd_runs_total{reason}` | Zähler (nur mit Worker) | beendete Läufe dieses Workers je Stopgrund |
+| `herd_run_duration_seconds` | Histogramm (nur mit Worker) | Dauer einer Aufnahme eines Laufs |
+| `herd_runs_queued` | Gauge (nur mit Worker, alle 10 s) | Läufe in der Warteschlange |
+| `herd_runs_oldest_queued_seconds` | Gauge (nur mit Worker) | Alter des ältesten wartenden Laufs |
+| `herd_runs_stuck` | Gauge (nur mit Worker) | laufende Läufe mit abgelaufener Sperrfrist oder länger als jeder Lauf darf (zählt auch einen Lauf, der nach langem Warten wieder läuft; [`AGENTEN.md`](AGENTEN.md#bekannte-grenzen)) |
+| `herd_runs_waiting` | Gauge (nur mit Worker) | Läufe, die auf eine Freigabe oder Antwort warten |
 
 Alarme in der PrometheusRule des Charts: `HerdOutboxBacklog` (ältestes offenes
 Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (Zahl der aufgegebenen
 Ereignisse gestiegen, Warnung), `HerdWorkerStalled` (ein Worker seit über 3 Minuten
 ohne abgeschlossenen Durchlauf, Warnung), `HerdWorkerAbsent` (API-Pods ohne Worker
 ihres Releases, 5 Minuten, kritisch), dazu wie bisher `HerdNotReady` (deckt die
-Worker-Pods mit ab). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
+Worker-Pods mit ab). Seit M6 für die Läufe der Agenten, je als Warnung: `HerdRunsStuck` (Läufe hängen,
+5 Minuten), `HerdRunsQueued` (ältester wartender Lauf älter als 5 Minuten) und
+`HerdRunsFailing` (mehr als die Hälfte der Läufe der letzten 15 Minuten, mindestens 3,
+endete mit `provider_refused` oder `error`, 5 Minuten lang); Bedeutung und Abhilfe in
+[`AGENTEN.md`](AGENTEN.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Stand M4b)
+## Tests (Stand M6)
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL) | 1.275 (Stand des Branches mit M4b und den ersten M5-Teilen) | 14.11.2026: 1.274 grün, 1 rot: `test_dispatcher_lanes.py::test_a_hanging_handler_does_not_delay_the_others` (Zeitgrenze, unter Last der Maschine; danach allein dreimal grün); 11:40 min. ruff, ruff format, mypy (strict) sauber. Die 181 Tests zu Tickets, Sprints, „Mein Board“, Daily und Demo grün |
-| Frontend (`vitest`) | 282 in 52 Dateien | alle grün (14.11.2026) |
-| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 35 in 11 Dateien: 18 Live-Bearbeitung, 5 Nachrichten, 12 Tickets (davon 4 Sprints und Boards) | 14.11.2026 die 12 Ticket-Tests in einem Lauf grün (43 s), die 4 Sprint-Tests zusätzlich zweimal; die übrigen nicht erneut gelaufen (zuletzt alle 31 grün mit M4) |
-| Compose (`smoke.sh`) | einfach und `SMOKE_NODES=1` | beide `SMOKE OK` mit dem Image der Demo (13.11.2026) |
+| Backend (`pytest`, echtes PostgreSQL) | 1.716 (Backend-Stand von Commit `c1e700a`, gleich dem von `aab401b`) | 14.11.2026: 1.715 grün, 1 rot: `test_run_replay.py::test_a_run_goes_on_after_its_last_recorded_step` (der Stub gab die zweite vorbereitete Antwort nicht zurück; unter Last der Maschine, danach die Datei allein dreimal grün); 27:40 min. ruff, ruff format, mypy (strict, 363 Dateien) sauber. Ein später hinzugekommener Test (`95f8273`) ist hier nicht mitgezählt |
+| Frontend (`vitest`) | 412 in 71 Dateien (Stand `aab401b`) | 14.11.2026: 411 grün, 1 rot unter Last (`SkillProposals.test.tsx`, „a space's moderators find them beside the skills“: die Navigation „Skills und Vorschläge“ nicht gefunden), die Datei allein grün (10 von 10) |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 44 in 13 Dateien (Stand `aab401b`, gezählt mit `playwright test --list`): 18 Live-Bearbeitung, 5 Nachrichten, 13 Tickets, 8 KI und Agenten; dazu später 7 in `agents-work.spec.mjs` (im Quelltext gezählt) | für diesen Steckbrief nicht gelaufen |
+| Compose (`smoke.sh`) | einfach und `SMOKE_NODES=1` | beide `SMOKE OK` mit dem Image der Demo (13.11.2026); für M6 nicht wiederholt (`docker build` geht in dieser Sandbox nicht) |
