@@ -148,6 +148,8 @@ class RunHost:
                             "tickets": sorted(str(t) for t in reads.tickets - tickets),
                         },
                     }
+                    if result.final:
+                        content["final"] = True
                     await steps.event(self._seq(), EventKind.TOOL_CALL, content)
         except (Lost, Halt):
             raise

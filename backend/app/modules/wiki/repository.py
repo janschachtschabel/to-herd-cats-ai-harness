@@ -7,7 +7,7 @@ Reads refresh rows already in the session (`populate_existing`): subtree stateme
 change rows in bulk, behind the session's back."""
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import ColumnElement, Select, and_, false, func, or_, select, tuple_
@@ -104,10 +104,10 @@ class PageRepository:
         drafts: bool,
         after: tuple[str, uuid.UUID] | None,
         limit: int,
-        among: Select[uuid.UUID] | None = None,
+        among: Sequence[Select[uuid.UUID]] = (),
     ) -> list[Page]:
         """The space's pages outside the trash, by path: parents before children;
-        with `among`, only the pages whose ids it selects."""
+        only the pages whose ids every one of `among` selects."""
         stmt = (
             select(Page)
             .where(self._live(), Page.space_id == space_id)
@@ -119,8 +119,8 @@ class PageRepository:
             stmt = stmt.where(Page.status == PageStatus.PUBLISHED)
         if after is not None:
             stmt = stmt.where(tuple_(Page.path, Page.id) > tuple_(*after))
-        if among is not None:
-            stmt = stmt.where(Page.id.in_(among))
+        for ids in among:
+            stmt = stmt.where(Page.id.in_(ids))
         return list((await self.session.scalars(stmt)).all())
 
     async def sibling_slugs(self, space_id: uuid.UUID, parent_id: uuid.UUID | None) -> set[str]:

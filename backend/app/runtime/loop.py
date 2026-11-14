@@ -7,14 +7,15 @@ runs the tool through the services. The loop sends a request only after the host
 yes, and only with what the host gave it. Each call is one `pydantic_ai.direct.
 model_request`, so nothing runs inside the library between our checks.
 
-Stops: `completed` (an answer without tool calls), `max_steps` (that many model calls
-without an answer), `no_progress` (the third identical tool call), `provider_refused`
-(401, 402, 403, 429), `error` (anything else the provider or the network does, an
-answer that is no use, or a tool the model invented three times in a row), and what
-the host decides (`deadline`, `rights_revoked`, `policy_blocked`, and `error` when a
-step cannot be recorded or a tool fails: at once, never a blind retry). The deadline
-also cuts a call in flight. The model's text and arguments come without what the
-database cannot store (`storable`).
+Stops: `completed` (an answer without tool calls, or a final tool result),
+`max_steps` (that many model calls without an answer), `no_progress` (the third
+identical tool call), `provider_refused` (401, 402, 403, 429), `error` (anything
+else the provider or the network does, an answer that is no use, or a tool the model
+invented three times in a row), and what the host decides (`deadline`,
+`rights_revoked`, `policy_blocked`, and `error` when a step cannot be recorded or a
+tool fails: at once, never a blind retry). The deadline also cuts a call in flight.
+The model's text and arguments come without what the database cannot store
+(`storable`).
 
 Replay (plan M6 decision 1): a run taken up again passes its journal, the steps it
 has recorded. The loop goes through them again without calling the provider or the
@@ -98,12 +99,14 @@ class Reply:
 @dataclass(frozen=True, slots=True)
 class ToolResult:
     """`text` for the model (framed and cut by the loop); `source` names it; `spaces`:
-    where the text came from (the host's record, never sent)."""
+    where the text came from (the host's record, never sent). A `final` result ends
+    the run: its text is the answer, and no call after it runs (`submit_result`)."""
 
     source: str
     text: str
     attrs: dict[str, str] = field(default_factory=dict)
     spaces: frozenset[uuid.UUID] = frozenset()
+    final: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +204,8 @@ async def run_loop(
                     result = await host.call_tool(step, call, args)
                 except Halt as halt:
                     return Outcome(halt.reason, detail=halt.detail)
+            if result.final:
+                return Outcome("completed", answer=result.text)
             framed = frame_untrusted(result.source, result.text, **result.attrs)
             returns.append(ToolReturnPart(call.name, framed, tool_call_id=call.id))
         history.append(ModelRequest(parts=returns, instructions=instructions))

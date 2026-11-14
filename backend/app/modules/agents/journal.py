@@ -59,6 +59,7 @@ def _result(content: Mapping[str, Any]) -> ToolResult:
         str(content.get("text") or ""),
         {str(k): str(v) for k, v in (content.get("attrs") or {}).items()},
         frozenset(_ids(content.get("spaces"))),
+        final=content.get("final") is True,
     )
 
 

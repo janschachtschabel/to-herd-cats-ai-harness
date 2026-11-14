@@ -89,17 +89,24 @@ class RunService:
         return ShownEvent(event, content, False)
 
     async def _may_read_all(self, actor: Actor, spaces: object) -> bool:
-        """Whether the actor may read every one of the spaces now (none noted: no);
-        `require` notes an admin's read by admin right."""
-        if not isinstance(spaces, list) or not spaces:
+        if not isinstance(spaces, list):
             return False
-        ids = [uuid.UUID(str(s)) for s in spaces]
-        for space_id in ids:
-            if not await can(self.session, actor, Action.SPACE_READ, space_id):
-                return False
-        for space_id in ids:
-            await require(self.session, actor, Action.SPACE_READ, space_id)
-        return True
+        return await may_read_all(self.session, actor, {uuid.UUID(str(s)) for s in spaces})
+
+
+async def may_read_all(session: AsyncSession, actor: Actor, spaces: set[uuid.UUID]) -> bool:
+    """The redaction rule of run events: whether the actor may read every one of the
+    spaces a result came from now (none noted: no); `require` notes an admin's read
+    by admin right. Also what `search_past_runs` shows (`toolbox/past_runs.py`)."""
+    if not spaces:
+        return False
+    ids = sorted(spaces)
+    for space_id in ids:
+        if not await can(session, actor, Action.SPACE_READ, space_id):
+            return False
+    for space_id in ids:
+        await require(session, actor, Action.SPACE_READ, space_id)
+    return True
 
 
 def _pick(content: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:

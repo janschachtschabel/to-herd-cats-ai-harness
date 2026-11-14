@@ -212,7 +212,29 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
 - Werkzeuge: `search` (Volltext über Seiten und Tickets, nur in Bereichen, deren
   Richtlinie die Verbindung zulässt, ohne gesperrte Seiten), `read_page`,
   `read_ticket`. Ergebnisse gehen gerahmt (`<untrusted>`) und auf 8.000 Zeichen gekürzt
-  an das Modell und vollständig in `run_event`.
+  an das Modell und vollständig in `run_event`. Seit M6 außerdem (alle Stufe 1, lesend):
+  - `list_tree`: ohne `space_id` die lesbaren Bereiche (Name, Art, ID), mit `space_id`
+    die Seiten des Bereichs nach Pfad (ID, Pfad, Titel; kein Inhalt; Entwürfe nur mit
+    Bearbeitungsrecht), seitenweise mit `cursor`.
+  - `list_versions`: die Versionen einer Seite (Nummer, Zeit, Autor, Quelle, Name,
+    Änderungstext; kein Inhalt), nur mit `page.edit` wie für Menschen.
+  - `search_tickets`: Text und Filter (Statuskategorien, mir oder niemandem
+    zugewiesen, Art, Priorität, Bereich), zuletzt geänderte zuerst.
+  - `read_conversation`: nur das Gespräch, in dem der Lauf antwortet (kein Argument
+    nennt ein Gespräch): neueste Nachrichten, ältere mit `before`, Antworten auf eine
+    Nachricht mit `replies_to`; ohne Zeitleisten-Einträge.
+  - `search_past_runs`: frühere Läufe dieses Agenten für dieselbe fragende Person
+    (nie der laufende): ein Werkzeugergebnis nur, solange jeder Bereich, aus dem es
+    stammt, jetzt lesbar ist und seine Richtlinie die Verbindung zulässt (dieselbe
+    Regel wie bei der Schwärzung in `GET /api/runs/{id}/events`); die eigenen Worte des
+    Modells nur, solange jeder Bereich lesbar ist, den ihr Lauf gelesen hat. Außerhalb
+    einer Direktnachricht allein mit dem Agenten nur Läufe desselben Gesprächs.
+  - `submit_result`: gibt das Ergebnis ab; sein Text ist die Antwort, der Lauf endet
+    `completed` ohne weiteren Modellaufruf (auch nach einer Wiederaufnahme genau einmal).
+
+  Listen lassen wie `search` schon in der Abfrage weg, was die Verbindung nicht
+  empfangen darf (Richtlinie, `no_ai`); was nicht lesbar ist, antwortet wie nicht
+  vorhanden. Jedes Ergebnis nennt die Bereiche, aus denen es stammt (`spaces`).
 - Vor jedem Modellaufruf: die strengste Richtlinie aller gelesenen Bereiche (das
   Gespräch selbst zählt als `any`) muss den `data_location` der Verbindung erlauben,
   sonst endet der Lauf mit `policy_blocked`, bevor etwas gesendet wird. Gezählt wird

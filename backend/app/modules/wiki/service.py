@@ -12,6 +12,7 @@ page moves next to a sibling with the same slug (`moves.py`).
 
 import uuid
 
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
@@ -59,18 +60,20 @@ class PageService:
         params: PageParams,
         *,
         tag_id: uuid.UUID | None = None,
+        among: Select[uuid.UUID] | None = None,
     ) -> pagination.Page[Page]:
         """The space's pages outside the trash, flat, by path (parents first); each
         carries `parent_id` and `sort_order` for nesting and ordering siblings. With
-        `tag_id`, only the pages carrying that tag."""
+        `tag_id`, only the pages carrying that tag; with `among`, only those it selects."""
         await require(self.session, actor, Action.SPACE_READ, space_id)
         drafts = await can(self.session, actor, Action.PAGE_EDIT, space_id)
         after = decode_key_cursor(params.cursor) if params.cursor else None
-        tagged = None
+        filters = [among] if among is not None else []
         if tag_id is not None:
-            tagged = tag_repository(self.session, actor).subject_ids(SubjectType.PAGE, [tag_id])
+            tags = tag_repository(self.session, actor)
+            filters.append(tags.subject_ids(SubjectType.PAGE, [tag_id]))
         rows = await self.repo(actor).tree_page(
-            space_id, drafts=drafts, after=after, limit=params.limit + 1, among=tagged
+            space_id, drafts=drafts, after=after, limit=params.limit + 1, among=filters
         )
         items = rows[: params.limit]
         more = len(rows) > params.limit

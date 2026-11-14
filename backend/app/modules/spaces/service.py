@@ -14,6 +14,7 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can, my_roles, require, visible_space_ids
@@ -83,15 +84,22 @@ class SpaceService:
         return {s.id: roles.get(s.id) for s in spaces}
 
     async def list_visible(
-        self, actor: Actor, params: PageParams, *, include_others_personal: bool = True
+        self,
+        actor: Actor,
+        params: PageParams,
+        *,
+        include_others_personal: bool = True,
+        among: Select[uuid.UUID] | None = None,
     ) -> Page[Space]:
         """Every space the actor may read; without `include_others_personal`, other
-        people's personal spaces (which admins may read) are left out."""
+        people's personal spaces (which admins may read) are left out; with `among`,
+        only the spaces it selects."""
         after = decode_id_cursor(params.cursor) if params.cursor else None
         own = None if include_others_personal else actor.principal.id
-        rows = await self.spaces.page_among(
-            visible_space_ids(actor), after, params.limit + 1, personal_only_of=own
-        )
+        ids = visible_space_ids(actor)
+        if among is not None:
+            ids = ids.where(Space.id.in_(among))
+        rows = await self.spaces.page_among(ids, after, params.limit + 1, personal_only_of=own)
         return id_page(rows, params.limit, lambda s: s.id)
 
     async def update(

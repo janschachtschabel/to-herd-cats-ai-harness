@@ -210,7 +210,7 @@ async def test_without_tools_the_model_gets_none() -> None:
     model = wrap_model(FunctionModel(answer))
     await run_loop(model, _start(), "x", Host(), max_steps=3)
     await run_loop(model, _start(), "x", Host(), max_steps=3, offered=TOOLS)
-    assert offered == [0, 3]
+    assert offered == [0, len(TOOLS)]
 
 
 def test_history_keeps_the_newest_turn_and_drops_old_ones_whole() -> None:

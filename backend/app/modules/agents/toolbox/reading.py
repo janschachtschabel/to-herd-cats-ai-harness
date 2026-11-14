@@ -114,9 +114,11 @@ async def read_ticket(ctx: ToolContext, args: ReadTicketArgs) -> ToolResult:
     return ToolResult("ticket", text, attrs, frozenset({ticket.space_id}))
 
 
-def ticket_scope(ctx: ToolContext) -> TicketScope:
-    """The spaces where the run may read tickets, without those AI may not read."""
+def ticket_scope(ctx: ToolContext, *, located: bool = False) -> TicketScope:
+    """The spaces where the run may read tickets, without those AI may not read; if
+    `located`, also without those the run's connection may not receive."""
+    location = ctx.location if located else None
     spaces = space_ids_with(ctx.actor, Action.TICKET_READ).where(
-        Space.id.in_(ai_space_ids(ctx.actor.org_id))
+        Space.id.in_(ai_space_ids(ctx.actor.org_id, location))
     )
     return TicketScope(ctx.actor.org_id, spaces)

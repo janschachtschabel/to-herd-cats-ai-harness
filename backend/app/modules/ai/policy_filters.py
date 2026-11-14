@@ -6,7 +6,7 @@ so content AI may not see never shows up as a hit, a title or a count.
   not `none`); with a data location, only those that allow it (`any`, or `restricted`
   with the location among `allowed_locations`).
 - `ai_readable`: pages or attachments in such spaces that are not locked (`no_ai`);
-  an attachment also not on a locked page.
+  an attachment also not on a locked page; `ai_page_ids` selects such pages.
 
 Neither knows about rights, drafts or the trash: that is the rights filter's part.
 """
@@ -50,3 +50,8 @@ def ai_readable(
         open_pages = select(Page.id).where(Page.org_id == org_id, Page.no_ai.is_(false()))
         readable = and_(readable, Attachment.page_id.in_(open_pages))
     return readable
+
+
+def ai_page_ids(org_id: uuid.UUID, location: DataLocation | None = None) -> Select[uuid.UUID]:
+    """The ids of the pages AI may read (`ai_readable`), for an `IN` filter."""
+    return select(Page.id).where(ai_readable(Page, org_id, location)).correlate(None)
