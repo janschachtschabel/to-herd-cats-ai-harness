@@ -208,6 +208,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert in M6 [Claude, 14.11.2026]: Geprüft wird vor jedem Modell- und jedem Werkzeugaufruf. Freigaben und Rückfragen gehen nur an die auslösende Person, und entscheiden darf sie nur, wenn sie die Wirkung jetzt selbst ausführen dürfte. Die verantwortliche Person springt nicht ein: Ist die auslösende Person nicht mehr aktiv, endet der Lauf vor dem nächsten Werkzeugaufruf mit `rights_revoked`. Die Weitergabe an die verantwortliche Person kommt mit M7, wo Läufe ohne auslösende Person entstehen. Bei einer Übergabe läuft der nächste Lauf als die ursprüngliche Person (`run.user_id` bleibt ihre); ein eigenes Feld `origin_user_id` gibt es nicht, `run.chain_depth` zählt die Kette. Token (M8) und Zeitpläne (M7) als Auslöser gibt es noch nicht. Admins sind nicht ausgenommen: Fragt ein Admin, gilt die Schnittmenge mit den Rollen des Agenten, nicht das Admin-Recht. Plan M6, Entscheidungen 4 und 6.*
 
+*Geändert nach Review M6 [Claude, 14.11.2026]: Zur Schnittmenge kommt, was der Lauf schon gelesen hat. Hat er einen Entwurf aus Bereich X gelesen, darf er nur noch schreiben, was allein die Bearbeitenden von X lesen (Vorschläge zu Seiten von X, `update_page` an einem Entwurf von X, das eigene Gespräch); alles andere lehnt das Werkzeug ab, auch wenn Rolle, Auslöser, Freigabe und Stufe es erlaubten. Einzelheiten in 5.6.*
+
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]
 
 Die Schnittmenge in 5.4 schützt das **Lesen**. Ein Agent schreibt aber in Gespräche mit eigenem Publikum. Damit dort nichts durchsickert, wird der Lesebereich eines Laufs zusätzlich auf das **Publikum des Ausgabeorts** begrenzt:
