@@ -10,13 +10,27 @@ export function isNarrow(): boolean {
 /**
  * Whether the sidebar is open. On a wide screen it starts open beside the page; on a
  * narrow one it starts closed, opens over the page, and closes again with Escape, a
- * click beside it, or a followed link.
+ * click beside it, or a followed link. Resizing across the boundary starts over.
  */
 export function useSidebar() {
-  const [narrow] = useState(isNarrow)
+  const [narrow, setNarrow] = useState(isNarrow)
   const [open, setOpen] = useState(!narrow)
   const toggle = useCallback(() => setOpen((value) => !value), [])
   const close = useCallback(() => setOpen(false), [])
+
+  // A window resized across the boundary behaves as if loaded at its new width: a
+  // sidebar kept beside the page in a phone-wide window pushed the header past its
+  // edge (module review M4b, finding 8).
+  useEffect(() => {
+    const query = typeof window !== 'undefined' ? window.matchMedia?.(NARROW) : undefined
+    if (!query) return
+    const onChange = (event: MediaQueryListEvent) => {
+      setNarrow(event.matches)
+      setOpen(!event.matches)
+    }
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
 
   useEffect(() => {
     if (!narrow || !open) return

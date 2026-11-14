@@ -165,6 +165,21 @@ test("the daily view has a row per person, marks today's changes and filters by 
   const actions = await p.getByRole("button", { name: "Import/Export" }).boundingBox();
   expect(actions.x + actions.width).toBeLessThanOrEqual(375);
   await phone.close();
+
+  // A desktop window with its sidebar open, shrunk to a phone's width, keeps the
+  // header (user menu included) inside the window (module review M4b, finding 8).
+  const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await signIn(desk, OWNER);
+  const d = await openLive(desk, `/spaces/${team.id}/board`);
+  await expect(d.getByRole("button", { name: /^Menü von / })).toBeVisible();
+  await d.setViewportSize({ width: 375, height: 812 });
+  for (const path of [`/spaces/${team.id}/board`, "/tickets"]) {
+    if (path !== `/spaces/${team.id}/board`) await d.goto(path);
+    await expect
+      .poll(() => d.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(375);
+  }
+  await desk.close();
 });
 
 test("my board gathers Ben's tickets from two spaces, moves by keyboard and menu, and explains a missing category", async () => {

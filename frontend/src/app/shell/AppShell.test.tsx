@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { ADMIN_PERMISSIONS, type Call, makeMe, makeSpace, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
@@ -136,5 +136,43 @@ describe('shell', () => {
     )
     expect(toggle).toHaveAttribute('aria-expanded', 'false') // a link was followed
     expect(screen.queryByRole('navigation', { name: 'Hauptnavigation' })).toBeNull()
+  })
+
+  test('a wide window shrunk to a narrow one puts the open sidebar over the page, closed', async () => {
+    // Module review M4b, finding 8: kept beside the page, the sidebar left the header
+    // too little room and the page grew wider than the window.
+    let narrow = false
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          get matches() {
+            return query.includes('max-width') && narrow
+          },
+          media: query,
+          addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) =>
+            query.includes('max-width') && listeners.add(listener),
+          removeEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) =>
+            listeners.delete(listener),
+          addListener: () => {},
+          removeListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    mockApi({ 'GET /api/auth/me': makeMe(['space.create']), 'GET /api/spaces': page([]) })
+    const { user } = await renderApp('/spaces')
+    const toggle = screen.getByRole('button', { name: 'Seitenleiste ein- oder ausblenden' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const resize = (matches: boolean) => {
+      narrow = matches
+      act(() => listeners.forEach((listener) => listener({ matches } as MediaQueryListEvent)))
+    }
+    resize(true)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('navigation', { name: 'Hauptnavigation' })).toBeNull()
+    await user.click(toggle)
+    await user.keyboard('{Escape}') // over the page now: Escape closes it
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    resize(false)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 })
