@@ -32,13 +32,19 @@ from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents.models import MAX_CHAIN_DEPTH
 from app.modules.agents.notices import notice
-from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.standing import Refusal
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.reading import ticket_scope
-from app.modules.agents.toolbox.writing import LEAKS, by, effect, key_for, leaks_into, refused
+from app.modules.agents.toolbox.writing import (
+    LEAKS,
+    by,
+    closed_to_ai,
+    effect,
+    key_for,
+    leaks_into,
+    refused,
+)
 from app.modules.agents.triggers import REFUSED_KEY
-from app.modules.ai.models import AiPolicy
 from app.modules.messaging.models import MAX_BODY_CHARS
 from app.modules.messaging.service import MessageService
 from app.modules.tickets.base import readable
@@ -158,9 +164,8 @@ async def set_ticket_status(ctx: ToolContext, args: SetTicketStatusArgs) -> Tool
 
 async def create_ticket(ctx: ToolContext, args: CreateTicketArgs) -> ToolResult:
     attrs = {"space": str(args.space_id)}
-    policies = await ReadRepository(ctx.session, ctx.run.org_id).policies({args.space_id})
-    if not await can(ctx.session, ctx.actor, Action.TICKET_READ, args.space_id) or any(
-        p.kind == AiPolicy.NONE for p in policies
+    if not await can(ctx.session, ctx.actor, Action.TICKET_READ, args.space_id) or (
+        await closed_to_ai(ctx, args.space_id)
     ):
         return ToolResult("ticket", NOT_FOUND, attrs)
     if await leaks_into(ctx, args.space_id):

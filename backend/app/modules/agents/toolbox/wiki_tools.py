@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import Action, can
 from app.core.errors import NotFound
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import LEAKS, by, effect, leaks_into, refused
+from app.modules.agents.toolbox.writing import LEAKS, by, closed_to_ai, effect, leaks_into, refused
 from app.modules.proposals.models import MAX_REASON_CHARS
 from app.modules.proposals.service import ProposalService
 from app.modules.wiki import diffing
@@ -100,7 +100,9 @@ async def propose_page_change(ctx: ToolContext, args: ProposePageChangeArgs) -> 
 
 async def propose_new_page(ctx: ToolContext, args: ProposeNewPageArgs) -> ToolResult:
     attrs = {"space": str(args.space_id)}
-    if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, args.space_id):
+    if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, args.space_id) or (
+        await closed_to_ai(ctx, args.space_id)
+    ):
         return ToolResult("wiki", NOT_FOUND, attrs)
     if await leaks_into(ctx, args.space_id):
         return ToolResult("wiki", LEAKS, attrs)

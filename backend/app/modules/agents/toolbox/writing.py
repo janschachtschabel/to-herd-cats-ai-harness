@@ -9,6 +9,10 @@
   run has read so far came from a space whose content that space's audience may
   receive (`scope.space_audience`): the space itself, or the open spaces while it has
   no guest. A run that read a private space cannot carry it into another one.
+- **AI policy**: no tool writes into a space whose AI policy is `none`; every tool
+  that names a space asks `closed_to_ai` first and answers "not found", as for a
+  space it cannot see (review M6 finding 5). Tools that name a page or a ticket do
+  not find one there (`PageReader.for_ai`, `reading.ticket_scope`).
 - **One savepoint per effect**: a refusal of a service (`NotFound`, `Forbidden`,
   `Conflict`, `ValidationFailed`) undoes whatever the effect had written and becomes
   a tool error for the model (its code only, never content); the run goes on. The
@@ -25,6 +29,7 @@ from app.core.principal import Principal
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.scope import organisation_audience, space_audience
 from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.ai.models import AiPolicy
 from app.runtime.loop import ToolResult
 
 LEAKS = (
@@ -42,6 +47,12 @@ def key_for(ctx: ToolContext, name: str, *parts: object) -> uuid.UUID:
     """A stable key for what a tool call writes (a message's `client_id`), from the
     run and the call's arguments."""
     return uuid.uuid5(ctx.run.id, ":".join([name, *map(str, parts)]))
+
+
+async def closed_to_ai(ctx: ToolContext, space_id: uuid.UUID) -> bool:
+    """Whether the space's AI policy is `none` (no tool writes there)."""
+    policies = await ReadRepository(ctx.session, ctx.run.org_id).policies({space_id})
+    return any(p.kind == AiPolicy.NONE for p in policies)
 
 
 async def leaks_into(ctx: ToolContext, space_id: uuid.UUID) -> bool:

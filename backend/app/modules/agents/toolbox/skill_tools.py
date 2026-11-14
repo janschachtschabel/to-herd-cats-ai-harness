@@ -31,6 +31,7 @@ from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import (
     LEAKS,
     by,
+    closed_to_ai,
     effect,
     leaks_into,
     leaks_into_organisation,
@@ -145,6 +146,8 @@ async def propose_skill(ctx: ToolContext, args: ProposeSkillArgs) -> ToolResult:
             return ToolResult("skill", NOT_FOUND, attrs)
     space_id = skill.space_id if skill is not None else args.space_id
     if space_id is not None:
+        if await closed_to_ai(ctx, space_id):
+            return ToolResult("skill", NOT_FOUND, attrs)
         if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, space_id):
             return ToolResult("skill", "Not allowed here.", attrs)
         if await leaks_into(ctx, space_id):

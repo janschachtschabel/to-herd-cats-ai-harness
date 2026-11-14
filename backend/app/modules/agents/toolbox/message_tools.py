@@ -19,7 +19,14 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.errors import NotFound
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import LEAKS, by, effect, key_for, leaks_into
+from app.modules.agents.toolbox.writing import (
+    LEAKS,
+    by,
+    closed_to_ai,
+    effect,
+    key_for,
+    leaks_into,
+)
 from app.modules.messaging.models import MAX_BODY_CHARS, ConversationKind
 from app.modules.messaging.service import ConversationService, MessageService
 from app.runtime.loop import ToolResult
@@ -48,8 +55,11 @@ async def post_message(ctx: ToolContext, args: PostMessageArgs) -> ToolResult:
         )
         if conversation.kind != ConversationKind.CHANNEL or conversation.space_id not in spaces:
             return ToolResult("conversation", NOT_FOUND, attrs)
-    if conversation.space_id is not None and await leaks_into(ctx, conversation.space_id):
-        return ToolResult("conversation", LEAKS, attrs)
+    if conversation.space_id is not None:
+        if await closed_to_ai(ctx, conversation.space_id):
+            return ToolResult("conversation", NOT_FOUND, attrs)
+        if await leaks_into(ctx, conversation.space_id):
+            return ToolResult("conversation", LEAKS, attrs)
 
     async def write() -> ToolResult:
         digest = hashlib.sha256(args.text.encode()).hexdigest()

@@ -165,7 +165,9 @@ Rückfragekarten, Einträge in Aktivität und Suche, die Einsicht in Direktnachr
 - nichts lesen, was die fragende Person nicht lesen darf, und nichts aus einem Bereich
   an einen Ort tragen, dessen Publikum es nicht sehen darf;
 - keinen Inhalt an eine Verbindung schicken, die die KI-Richtlinie eines gelesenen
-  Bereichs nicht zulässt;
+  Bereichs nicht zulässt, und nichts in einen Bereich mit der KI-Richtlinie `none`
+  schreiben (keine Nachricht, kein Gedächtnis, kein Ticket, kein Vorschlag: jedes
+  Werkzeug antwortet dort „nicht gefunden“);
 - Code ausführen (es gibt kein solches Werkzeug), andere Agenten erwähnen oder sich
   selbst eine Stufe, ein Werkzeug oder eine Freigabe geben: Was in Seiten, Tickets oder
   Skills steht, sind für den Agenten Daten, keine Anweisungen.

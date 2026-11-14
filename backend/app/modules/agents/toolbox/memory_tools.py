@@ -19,7 +19,7 @@ from app.core.access import Action, can
 from app.modules.agents import memory
 from app.modules.agents.memory_repository import MemoryRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import LEAKS, by, effect, leaks_into
+from app.modules.agents.toolbox.writing import LEAKS, by, closed_to_ai, effect, leaks_into
 from app.modules.wiki.models import MAX_CONTENT_CHARS
 from app.modules.wiki.visibility import PageReader
 from app.runtime.loop import ToolResult
@@ -36,7 +36,9 @@ class UpdateMemoryArgs(BaseModel):
 
 async def update_memory(ctx: ToolContext, args: UpdateMemoryArgs) -> ToolResult:
     attrs = {"space": str(args.space_id)}
-    if not await can(ctx.session, ctx.actor, Action.SPACE_READ, args.space_id):
+    if not await can(ctx.session, ctx.actor, Action.SPACE_READ, args.space_id) or (
+        await closed_to_ai(ctx, args.space_id)
+    ):
         return ToolResult("memory", NOT_FOUND, attrs)
     if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, args.space_id):
         return ToolResult("memory", "Not allowed here.", attrs)
