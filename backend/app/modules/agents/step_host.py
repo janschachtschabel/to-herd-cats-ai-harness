@@ -26,7 +26,9 @@ Bounds (module review M6, findings 3 and 14; review 2, finding 8):
   failure (`db_errors.is_retryable`) is run once more; a second time it counts as
   any other failure.
 - Each step that writes sets the run's lease when it commits (`RunSteps.keep`): the
-  worker's renewal passes over a row a step holds."""
+  worker's renewal passes over a row a step holds.
+- A daily budget reached (`ai/budgets.py`) ends the run with `budget` before the next
+  model call; a call already sent is never cut (plan M7 decision 10)."""
 
 import asyncio
 import time
@@ -60,7 +62,8 @@ from app.modules.agents.step_records import (
 from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSpec, Wait
 from app.modules.agents.toolbox.policy import Grant, effective
 from app.modules.agents.working import Lost, Suspended, Unit, Working, once_more, units_of
-from app.modules.ai.models import DataLocation, UsageRecord
+from app.modules.ai.budgets import budget_exhausted, has_price
+from app.modules.ai.models import AiConnection, DataLocation, UsageRecord
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult
@@ -99,6 +102,7 @@ class RunHost:
             if connection is None:
                 raise Halt("rights_revoked")
             await self._policy(session, connection.data_location)
+            await self._budget(session, connection)
             return await steps.take_rate(connection.id, connection.requests_per_minute)
 
     async def after_model_call(self, step: int, reply: Reply) -> None:
@@ -243,6 +247,14 @@ class RunHost:
         if now.blocked or not connection_allowed(location, policy):
             raise Halt("policy_blocked")
 
+    async def _budget(self, session: AsyncSession, connection: AiConnection) -> None:
+        """No daily budget of the organisation, the person or the agent is reached."""
+        c = self.run.claimed
+        priced = has_price(connection, self.run.model)
+        scope = await budget_exhausted(session, c.org_id, c.user_id, c.agent_id, priced=priced)
+        if scope is not None:
+            raise Halt("budget", detail=scope.value)
+
     async def _location(self, steps: RunSteps) -> DataLocation:
         connection = await steps.connection(self.run.connection_id)
         if connection is None:
@@ -250,7 +262,9 @@ class RunHost:
         return DataLocation(connection.data_location)
 
     async def _usage(self, session: AsyncSession, reply: Reply) -> UsageRecord:
+        """Booked to the person, the agent and the space of the place (none for a DM)."""
         claimed = self.run.claimed
+        place = await RunSteps(session, claimed).conversation()
         return await record_usage(
             session,
             org_id=claimed.org_id,
@@ -263,6 +277,7 @@ class RunHost:
             user_id=claimed.user_id,
             agent_id=claimed.agent_id,
             run_id=claimed.id,
+            space_id=place.space_id,
         )
 
     def _ref(self) -> RunRef:
