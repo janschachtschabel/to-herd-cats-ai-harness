@@ -3,7 +3,8 @@
 # create a page with an attachment (the files volume), open its live-editing
 # WebSocket with and without the session cookie, receive a posted message over the
 # live stream (/api/stream: outbox, worker, NOTIFY, SSE), create a ticket and change its
-# status and find the worker's two system entries in its thread, tear down. Runs as its own
+# status and find the worker's two system entries in its thread, let a one-off automation
+# come due (15 s) and find exactly one term, tear down. Runs as its own
 # compose project on its own ports, with throwaway volumes, so a running installation
 # next to it is not touched. Ends with "SMOKE OK".
 #
@@ -222,6 +223,32 @@ done
 in_channel="$(json 'len(d["items"])' "$(api "$base/api/conversations/$channel_id/messages")")"
 [[ $in_channel == 1 ]] || fail "#allgemein holds $in_channel messages after the ticket changes"
 
+# Automations: a one-off automation due in 15 s fires exactly once, from the worker's due
+# loop (with SMOKE_NODES the worker service alone), read on node B. The agent's connection
+# points at a closed local port: the term and its run count here, not an answer.
+connection="$(api -X POST "$base/api/ai/connections" --data \
+  '{"name": "Smoke", "kind": "local", "base_url": "http://127.0.0.1:9/v1", "models": ["smoke"]}')"
+connection_id="$(json 'd["id"]' "$connection")" || fail "creating an AI connection answered $connection"
+assignments="$(api "$base/api/ai/assignments")"
+assigned="$(api -X PUT "$base/api/ai/assignments/default" --data \
+  "{\"target\": {\"connection_id\": \"$connection_id\", \"model\": \"smoke\"}, \"version\": $(json 'd["version"]' "$assignments")}")"
+json 'd["default"]["connection_id"]' "$assigned" >/dev/null || fail "the standard assignment answered $assigned"
+me_id="$(json 'd["user"]["id"]' "$(api "$base/api/auth/me")")"
+agent="$(api -X POST "$base/api/agents" --data "{\"name\": \"Smoke\", \"intro\": \"Smoke.\", \"instructions\": \"Smoke.\", \"connection_id\": \"$connection_id\", \"model\": \"smoke\", \"responsible_user_id\": \"$me_id\", \"status\": \"active\"}")"
+agent_id="$(json 'd["id"]' "$agent")" || fail "creating an agent answered $agent"
+at="$(python3 -c 'import datetime as t; print((t.datetime.now(t.UTC) + t.timedelta(seconds=15)).isoformat())')"
+automation="$(api -X POST "$base/api/automations" --data "{\"agent_id\": \"$agent_id\", \"place\": {\"type\": \"dm\"}, \"instruction\": \"Smoke.\", \"schedule\": {\"kind\": \"once\", \"at\": \"$at\"}}")"
+automation_id="$(json 'd["id"]' "$automation")" || fail "creating an automation answered $automation"
+terms() {
+  json '" ".join(f["outcome"] for f in d["items"])' \
+    "$(api "$base_b/api/automations/$automation_id/firings?limit=100")"
+}
+for _ in $(seq 150); do [[ -n "$(terms)" ]] && break; sleep 0.2; done
+sleep 6 # one more pass of every due loop (every 5 s): nothing more may come
+[[ "$(terms)" == started ]] || fail "automation $automation_id logged \"$(terms)\", not one started term"
+state="$(json 'd["state"]' "$(api "$base_b/api/automations/$automation_id")")"
+[[ $state == done ]] || fail "automation $automation_id is $state after its one term"
+
 # The worker delivered both (with SMOKE_NODES the worker service is the only dispatcher).
 dispatched() {
   "${compose[@]}" exec -T "$worker" python -c \
@@ -232,5 +259,9 @@ for handler in publish_live ticket_timeline; do
   for _ in $(seq 10); do dispatched "$handler" && break; sleep 0.5; done
   dispatched "$handler" || fail "$worker reports no $handler delivery"
 done
+"${compose[@]}" exec -T "$worker" python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
+  | grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' \
+  || fail "$worker does not report exactly one fired term"
 
 echo "SMOKE OK"

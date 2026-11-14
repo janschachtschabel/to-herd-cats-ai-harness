@@ -121,8 +121,11 @@ files volume), opens the page's live-editing WebSocket with the owner's cookie (
 collab process authenticates it) and without one (closed with 4401), opens the live
 stream (`/api/stream`), posts a message in `#allgemein` and waits for its
 `message.created` event, checks that the worker counted the delivery
-(`herd_outbox_dispatch_total{handler="publish_live",result="ok"}`), and tears everything
-down again. It ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built
+(`herd_outbox_dispatch_total{handler="publish_live",result="ok"}`), lets a one-off
+automation come due 15 s after it was made (an agent on an AI connection to a closed
+local port: only the term counts) and checks that its log holds exactly one started term
+and the worker counted one (`herd_automation_firings_total{outcome="started"}`), and
+tears everything down again. It ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built
 beforehand. `SMOKE_NODES=1` runs the same on `compose.nodes.yml` (project
 `to-herd-cats-ai-smoke-nodes`, ports `SMOKE_PORT`/`SMOKE_PORT_B`, default 18080/18081):
 `/ready` of both API nodes and the worker, the message posted on node A and received on
