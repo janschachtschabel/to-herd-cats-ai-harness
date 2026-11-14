@@ -15,6 +15,11 @@ it is shown to anyone); everything after is scoped by the run's organisation.
 - Every write of a step checks first that the run is still this attempt's
   (`owned`: the row locked, state `running`, the same attempt). A worker that lost its
   lease finds out there and stops without writing anything.
+- Renewing passes over the rows it finds locked (`SKIP LOCKED`, a materialized CTE):
+  a step of this worker holds its run's row for as long as its tool takes, and one
+  renewal statement waiting on it would renew none of the worker's runs. Such a run
+  counts as kept while it is still this attempt's (it is alive: inside its step,
+  which no claim can take from it); the step sets its lease when it commits (`keep`).
 """
 
 import uuid
@@ -29,6 +34,7 @@ from sqlalchemy.orm import aliased
 
 from app.core.models_base import utcnow
 from app.core.principal import PrincipalType
+from app.core.repository import limit_time, locked_batch
 from app.modules.agents.models import (
     Agent,
     EventKind,
@@ -57,10 +63,12 @@ class Claimed:
     trigger_message_id: uuid.UUID | None = None  # None: a ticket's run
     work_item_id: uuid.UUID | None = None
     chain_depth: int = 0
+    lease: float = 0.0  # seconds a step's commit extends the lease by (0: none)
 
     @classmethod
-    def of(cls, run: Run) -> "Claimed":
-        """The run as its current take-up holds it (for ending one nobody works on)."""
+    def of(cls, run: Run, lease: float = 0.0) -> "Claimed":
+        """The run as its current take-up holds it (without `lease`: for ending one
+        nobody works on)."""
         return cls(
             run.id,
             run.org_id,
@@ -73,6 +81,7 @@ class Claimed:
             run.trigger_message_id,
             run.work_item_id,
             run.chain_depth,
+            lease,
         )
 
 
@@ -125,22 +134,20 @@ async def claim(session: AsyncSession, lease: float) -> Claimed | None:
     run.taken_at = now
     run.lease_until = now + timedelta(seconds=lease)
     await session.flush()
-    return Claimed.of(run)
+    return Claimed.of(run, lease)
 
 
 async def renew(session: AsyncSession, held: dict[uuid.UUID, int], lease: float) -> set[uuid.UUID]:
-    """A new lease for the runs this worker holds (id → attempt); the ids still its."""
+    """A new lease for the runs this worker holds (id → attempt) whose rows are free;
+    the ids still its, those a step holds locked included."""
     if not held:
         return set()
-    until = utcnow() + timedelta(seconds=lease)
     pairs = [and_(Run.id == run_id, Run.attempt == attempt) for run_id, attempt in held.items()]
-    stmt = (
-        update(Run)
-        .where(Run.state == RunState.RUNNING, or_(*pairs))
-        .values(lease_until=until)
-        .returning(Run.id)
-    )
-    return set(await session.scalars(stmt))
+    ours = and_(Run.state == RunState.RUNNING, or_(*pairs))
+    free = locked_batch(select(Run.id).where(ours).with_for_update(skip_locked=True), "free")
+    until = utcnow() + timedelta(seconds=lease)
+    await session.execute(update(Run).where(Run.id == free.c.id).values(lease_until=until))
+    return set(await session.scalars(select(Run.id).where(ours)))
 
 
 class RunSteps:
@@ -164,6 +171,16 @@ class RunSteps:
             .execution_options(populate_existing=True)
         )
         return await self.session.scalar(stmt)
+
+    def keep(self, run: Run) -> None:
+        """The step commits: the run's lease runs from now (the renewal passes over a
+        row its step holds)."""
+        if self.run.lease > 0:
+            run.lease_until = utcnow() + timedelta(seconds=self.run.lease)
+
+    async def limit_time(self, lock_seconds: float, statement_seconds: float) -> None:
+        """The step's lock waits and statements end after so long (`db_errors`)."""
+        await limit_time(self.session, int(lock_seconds * 1000), int(statement_seconds * 1000))
 
     async def event(self, seq: int, kind: EventKind, content: Mapping[str, object]) -> None:
         """The step's event; a second write of the same step fails (unique)."""

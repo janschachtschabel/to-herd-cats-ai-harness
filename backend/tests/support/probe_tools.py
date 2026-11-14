@@ -6,8 +6,15 @@
   `in-tool` on stdout after the effect is written, not committed, and waits there.
 - `probe_wait` makes the run wait for a person (`Wait`, 72 hours) until its run is in
   `ANSWERED`; then it answers.
+- `probe_lock` waits for the advisory lock named by its label (a test holds it from
+  another connection), as a tool waits on a page's or a tree's lock.
+- `probe_sleep` takes long: `db:<seconds>` in one statement, `loop:<seconds>` outside
+  the database.
+- `probe_conflict` writes a probe effect, then fails as a deadlock's victim (SQLSTATE
+  40P01): with label `once` on its run's first call only, with `always` every time;
+  `CONFLICTS` counts the calls per run.
 
-`installed(monkeypatch)` lists both in the catalog for one test; `install()` for a
+`installed(monkeypatch)` lists them in the catalog for one test; `install()` for a
 whole process (the child of the crash test).
 """
 
@@ -19,7 +26,7 @@ from datetime import timedelta
 
 import pytest
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
@@ -32,6 +39,7 @@ from app.runtime.loop import ToolResult
 PROBE_ACTION = "test.probe"
 WAIT_HOURS = 72
 ANSWERED: set[uuid.UUID] = set()
+CONFLICTS: dict[uuid.UUID, int] = {}
 
 
 class ProbeArgs(BaseModel):
@@ -56,9 +64,35 @@ async def probe_wait(ctx: ToolContext, args: ProbeArgs) -> ToolResult | Wait:
     return Wait(utcnow() + timedelta(hours=WAIT_HOURS))
 
 
+async def probe_lock(ctx: ToolContext, args: ProbeArgs) -> ToolResult:
+    await ctx.session.execute(select(func.pg_advisory_xact_lock(func.hashtext(args.label))))
+    return ToolResult("probe", f"locked {args.label}")
+
+
+async def probe_sleep(ctx: ToolContext, args: ProbeArgs) -> ToolResult:
+    where, seconds = args.label.split(":")
+    if where == "db":
+        await ctx.session.execute(select(func.pg_sleep(float(seconds))))
+    else:
+        await asyncio.sleep(float(seconds))
+    return ToolResult("probe", f"slept {args.label}")
+
+
+async def probe_conflict(ctx: ToolContext, args: ProbeArgs) -> ToolResult:
+    CONFLICTS[ctx.run.id] = CONFLICTS.get(ctx.run.id, 0) + 1
+    await record(ctx.session, ctx.actor, PROBE_ACTION, "run", ctx.run.id, {"label": args.label})
+    if args.label == "always" or CONFLICTS[ctx.run.id] == 1:
+        raise_deadlock = "DO $$ BEGIN RAISE EXCEPTION 'probe' USING ERRCODE = '40P01'; END $$"
+        await ctx.session.execute(text(raise_deadlock))
+    return ToolResult("probe", f"wrote {args.label}")
+
+
 PROBES = (
     ToolSpec("probe_write", "Write a probe (tests only).", ProbeArgs, probe_write),
     ToolSpec("probe_wait", "Wait for an answer (tests only).", ProbeArgs, probe_wait),
+    ToolSpec("probe_lock", "Wait for a lock (tests only).", ProbeArgs, probe_lock),
+    ToolSpec("probe_sleep", "Take long (tests only).", ProbeArgs, probe_sleep),
+    ToolSpec("probe_conflict", "Lose a deadlock (tests only).", ProbeArgs, probe_conflict),
 )
 
 

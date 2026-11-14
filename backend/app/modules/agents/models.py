@@ -69,6 +69,9 @@ MAX_INTRO_CHARS = 500
 MAX_INSTRUCTIONS_CHARS = 20_000
 MAX_STEPS = 25
 MAX_RUNTIME_SECONDS = 600
+# A tool's step (`step_host`): its lock waits and each statement end after so long.
+STEP_LOCK_TIMEOUT_SECONDS = 5.0
+STEP_STATEMENT_TIMEOUT_SECONDS = 20.0
 MAX_LEVEL = 3  # level 4 (external tools) comes with M8
 MAX_CHAIN_DEPTH = 3  # handovers from agent to agent that led to a run (plan M6 task 8)
 DEFAULT_LEVEL = 2

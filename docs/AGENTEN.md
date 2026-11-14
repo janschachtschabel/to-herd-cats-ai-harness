@@ -599,6 +599,20 @@ ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schri
   Hinweis im Gespräch bzw. Thread.
 - Während eines Anbieteraufrufs hält ein Lauf weder eine Transaktion noch eine
   Datenbankverbindung. Live gehen nur IDs und der Schrittzähler (`run.progress`).
+- **Grenzen eines Werkzeugschritts:** Ein Werkzeug wartet in seinem Schritt höchstens
+  5 s auf eine Sperre (etwa die eines Seitenbaums während eines Imports) und eine
+  Anweisung läuft höchstens 20 s, nie über die Laufzeit hinaus. Wird das überschritten,
+  wird der Schritt zurückgerollt, und das Modell bekommt als Ergebnis
+  `tool_timeout: …` (im Journal wie jedes Ergebnis); der Lauf geht weiter. Die Laufzeit
+  (`max_runtime_seconds`) schneidet einen Werkzeugaufruf ab wie einen Modellaufruf
+  (`deadline`).
+- **Sperrfrist und lange Schritte:** Die Erneuerung der Sperrfristen eines Workers
+  überspringt Läufe, deren Zeile gerade ein Schritt dieses Workers hält (er lebt ja);
+  der Schritt setzt die Sperrfrist, wenn er festschreibt. Ein langer Schritt hält so
+  die übrigen Läufe des Workers nicht auf.
+- **Verklemmung:** Wählt die Datenbank einen Schritt als Opfer eines Deadlocks oder
+  scheitert er an der Serialisierung (SQLSTATE `40P01`, `40001`), wird er einmal
+  wiederholt (Log `runs.step_retried`); beim zweiten Mal endet der Lauf mit `error`.
 
 Warum kein DBOS: Ein Werkzeug und sein Journaleintrag stehen in derselben Transaktion
 der Anwendungsdatenbank; damit ist jede Wirkung innerhalb der Datenbank genau einmal. Ein
@@ -966,6 +980,7 @@ erst nach der Freigabe einer Person:
 | Rückfrage-Antwort | 4.000 Zeichen |
 | persönliche Agenten | `HERD_AI_PERSONAL_AGENTS_MAX`, Standard 5, 0 bis 100 |
 | offene Läufe | einer je Thread, Gespräch, Seite oder Ticket |
+| Werkzeugschritt | 5 s Warten auf eine Sperre, 20 s je Anweisung (dann `tool_timeout` für das Modell) |
 
 ### Umgebungsvariablen
 
