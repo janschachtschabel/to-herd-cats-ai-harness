@@ -1,7 +1,8 @@
 """Terms an automation skips (plan M7 decisions 6, 10 and 13), logged without a run:
 a daily budget reached (`skipped_budget`), the place closed to AI or archived
 (`skipped_policy`). Three runs in a row that do not end `completed` pause it
-(`failing`), and its owner learns of it; a completed run starts the count anew."""
+(`failing`), and its owner learns of it; a completed run starts the count anew. A
+cancelled run and one a daily budget stopped neither count nor start it anew."""
 
 import uuid
 from datetime import timedelta
@@ -11,6 +12,7 @@ from app.modules.agents.models import StopReason
 from app.modules.ai.models import AiPolicy, BudgetScope
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import AutomationState, FiringOutcome, PausedReason
+from app.modules.automations.runs import ended
 from app.modules.messaging.models import Conversation
 from tests.factories_agents import Bench
 from tests.factories_automations import T0, fire, firings, notified, placed, reload, runs_of
@@ -100,3 +102,17 @@ async def test_a_completed_run_starts_the_count_anew(bench: Bench) -> None:
     after = await reload(bench.session, automation.id)
     assert (after.state, after.failures) == (AutomationState.ACTIVE, 1)
     assert await notified(bench.session, automation.id) == []
+
+
+async def test_a_cancelled_or_budget_stopped_run_neither_counts_nor_resets(bench: Bench) -> None:
+    automation = await placed(bench, bench.dm_id)
+    org = automation.org_id
+    await ended(bench.session, org, automation.id, StopReason.PROVIDER_REFUSED)
+    await ended(bench.session, org, automation.id, StopReason.PROVIDER_REFUSED)
+    for reason in (StopReason.CANCELLED, StopReason.BUDGET):
+        await ended(bench.session, org, automation.id, reason)
+        after = await reload(bench.session, automation.id)
+        assert (after.state, after.failures) == (AutomationState.ACTIVE, 2)
+    await ended(bench.session, org, automation.id, StopReason.ERROR)  # the third in a row
+    after = await reload(bench.session, automation.id)
+    assert (after.state, after.paused_reason) == (AutomationState.PAUSED, PausedReason.FAILING)

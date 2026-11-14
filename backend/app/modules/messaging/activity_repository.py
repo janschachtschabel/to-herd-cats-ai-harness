@@ -9,9 +9,10 @@ bound to a proposal instead (a new page at the top level, which has no thread; p
 M6 task 6) is seen while the person may edit pages in its space (who sees proposals);
 one bound to a skill proposal (plan M6 task 9) while the person sees the proposal
 (`skills/sight.py`, the rule its routes use). One bound to an automation (it was
-paused, plan M7) is the person's while the automation exists: it names only the
-automation, its agent and why it is paused now, which the person was told as its
-owner, its agent's responsible person or a manager of its space.
+paused, plan M7) is seen while the automation exists and the person may still see
+it (`automations/sight.py`: its owner, its agent's responsible person, a manager of
+its place's space, `agent.manage`): it names only the automation, its agent and why
+it is paused now.
 """
 
 import uuid
@@ -37,6 +38,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.modules.automations.sight import AutomationSight
+from app.modules.automations.sight import seen as automation_seen
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.notification_models import Notification
 from app.modules.messaging.repository import ConversationScope, visible_conversations
@@ -71,7 +74,11 @@ AUTOMATION = table(
     column("id", Uuid),
     column("agent_id", Uuid),
     column("paused_reason", String),
+    column("owner_user_id", Uuid),
+    column("conversation_id", Uuid),
 )
+# Its agent's responsible person, for who may see it (`automations/sight.py`).
+AGENT = table("agent", column("id", Uuid), column("responsible_user_id", Uuid))
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,11 +99,16 @@ class ActivityEntry:
 
 class ActivityRepository:
     def __init__(
-        self, session: AsyncSession, scope: ConversationScope, skills: SkillProposalSight
+        self,
+        session: AsyncSession,
+        scope: ConversationScope,
+        skills: SkillProposalSight,
+        automations: AutomationSight,
     ) -> None:
         self.session = session
         self.scope = scope
         self.skills = skills
+        self.automations = automations
 
     def _mine(self) -> ColumnElement[bool]:
         # Self-contained subqueries: the list joins `conversation` and `message` too.
@@ -124,7 +136,24 @@ class ActivityRepository:
             .correlate_except(skill)
         )
         about_skill = and_(Notification.skill_proposal_id.is_not(None), sees_skill)
-        about_automation = Notification.automation_id.is_not(None)
+        automation, agent = AUTOMATION.alias("seen_automation"), AGENT.alias("seen_agent")
+        place = aliased(Conversation)
+        sees_automation = (
+            exists()
+            .where(
+                automation.c.id == Notification.automation_id,
+                agent.c.id == automation.c.agent_id,
+                place.id == automation.c.conversation_id,
+                automation_seen(
+                    self.automations,
+                    automation.c.owner_user_id,
+                    agent.c.responsible_user_id,
+                    place.space_id,
+                ),
+            )
+            .correlate_except(automation, agent, place)
+        )
+        about_automation = and_(Notification.automation_id.is_not(None), sees_automation)
         return and_(
             Notification.org_id == self.scope.org_id,
             Notification.user_id == self.scope.principal.id,

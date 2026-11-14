@@ -180,4 +180,4 @@ async def test_its_owner_cancels_it_and_the_notice_goes_into_its_thread(work: Wo
     (root,) = [m for m in said if m.parent_id is None]
     (notice,) = [m for m in said if m.parent_id == root.id]
     assert json.loads(notice.body_md)["to"] == "cancelled"
-    assert (await reload(bench.session, automation.id)).failures == 1  # not completed
+    assert (await reload(bench.session, automation.id)).failures == 0  # a cancel does not count

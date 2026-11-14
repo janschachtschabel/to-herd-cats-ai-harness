@@ -104,6 +104,32 @@ async def test_an_owner_out_of_the_space_pauses_it_and_its_managers_learn(work: 
     assert await runs_of(bench.session, automation_id) == []
 
 
+async def _automation_entries(work: Work, who: str) -> tuple[list[dict[str, Any]], int]:
+    client = getattr(work.bench.people, who)
+    r = await client.get("/api/activity")
+    count = (await client.get("/api/activity/count")).json()["open"]
+    return [a for a in r.json()["items"] if a["reason"] == "automation"], count
+
+
+async def test_an_entry_about_it_is_listed_while_its_recipient_may_see_it(work: Work) -> None:
+    """Bob learned of the pause as a manager of the space; once he no longer manages
+    it, the entry is left out (list, count, marking). The agent's responsible person
+    still sees hers."""
+    bench = work.bench
+    automation_id = await _lost_space(work)
+    (entry,), count = await _automation_entries(work, "bob")
+    assert count == 1
+    bob = bench.people.users["bob"]
+    await SpaceRepository(bench.session).set_member(
+        work.space.id, Principal.user(bob.id), SpaceRole.EDITOR
+    )
+    assert await _automation_entries(work, "bob") == ([], 0)
+    r = await bench.people.bob.post(f"/api/activity/{entry['id']}/read")
+    assert r.status_code == 404
+    (kept,), _ = await _automation_entries(work, "admin")  # the agent's responsible person
+    assert kept["automation"]["id"] == str(automation_id)
+
+
 async def test_who_could_make_it_takes_it_over_and_it_runs_as_theirs(work: Work) -> None:
     bench = work.bench
     automation_id = await _lost_space(work)

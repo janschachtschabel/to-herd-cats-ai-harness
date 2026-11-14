@@ -9,7 +9,9 @@
   automation.
 - `ended`: in the transaction that ends the run. A run that did not end `completed`
   counts (`automation.failures`); the third in a row pauses the automation
-  (`failing`, the owner learns of it). A completed run starts the count anew.
+  (`failing`, the owner learns of it). A completed run starts the count anew. A
+  cancelled run (someone stopped it) and one a daily budget stopped say nothing
+  about the automation: they neither count nor start the count anew.
 """
 
 import uuid
@@ -24,6 +26,7 @@ from app.modules.automations.repository import AutomationRepository
 from app.modules.messaging.models import Message
 
 FAILING_STREAK = 3
+NOT_COUNTED = frozenset({StopReason.CANCELLED, StopReason.BUDGET})
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,8 @@ async def assignment(
 async def ended(
     session: AsyncSession, org_id: uuid.UUID, automation_id: uuid.UUID, reason: StopReason
 ) -> None:
+    if reason in NOT_COUNTED:
+        return
     repo = AutomationRepository(session, org_id)
     automation = await repo.get(automation_id, lock=True)
     if automation is None:

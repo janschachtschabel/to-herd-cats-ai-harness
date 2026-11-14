@@ -752,10 +752,15 @@ Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
   des Agenten und die Verwaltenden des Bereichs (Rolle `admin` über eine Mitgliedschaft)
   bekommen eine Aktivität, bei einer Direktnachricht nur die verantwortliche Person.
   `failing`, wenn drei Läufe in Folge nicht mit `completed` enden
-  (`automation.failures` zählt sie, ein abgeschlossener Lauf setzt den Zähler zurück);
-  die Eigentümerin bekommt eine Aktivität. Aktivitäten zu Aufgaben haben den Grund
-  `automation`, nennen die Aufgabe (`automation: {id, paused_reason}`) und den Agenten
-  als Autor, aber kein Gespräch; das Ereignis trägt nur IDs.
+  (`automation.failures` zählt sie, ein abgeschlossener Lauf setzt den Zähler zurück;
+  ein abgebrochener Lauf und einer, den ein Tagesbudget gestoppt hat, zählen nicht und
+  setzen auch nicht zurück); die Eigentümerin bekommt eine Aktivität. Aktivitäten zu
+  Aufgaben haben den Grund `automation`, nennen die Aufgabe (`automation: {id,
+  paused_reason}`) und den Agenten als Autor, aber kein Gespräch; das Ereignis trägt
+  nur IDs. Gelistet (und gezählt) wird eine solche Aktivität nur, solange die Person
+  die Aufgabe noch sehen darf: als Eigentümerin, verantwortliche Person des Agenten
+  oder Verwaltende (`space.manage`) des Bereichs ihres Ortes, jeweils mit `ai.use`,
+  oder mit `agent.manage`.
 - **Übernehmen**: Wer die Aufgabe selbst anlegen dürfte (`ai.use`, erreicht den Agenten,
   schreibt am Ort), kann sie übernehmen und wird Eigentümerin; die Aufgabe läuft wieder
   (ein verpasster Termin einmal sofort), `version` schützt vor gleichzeitigen

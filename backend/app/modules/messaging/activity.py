@@ -20,6 +20,7 @@ from app.core.errors import NotFound
 from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import PrincipalType
+from app.modules.automations.sight import sight_of as automation_sight_of
 from app.modules.messaging.activity_repository import ActivityEntry, ActivityRepository
 from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.visibility import ConversationReader
@@ -39,7 +40,8 @@ class ActivityService:
 
     async def _repo(self, actor: Actor) -> ActivityRepository:
         skills = await sight_of(self.session, actor)
-        return ActivityRepository(self.session, self.reader.scope(actor), skills)
+        automations = await automation_sight_of(self.session, actor)
+        return ActivityRepository(self.session, self.reader.scope(actor), skills, automations)
 
     async def list(
         self, actor: Actor, params: PageParams, only_open: bool = True
