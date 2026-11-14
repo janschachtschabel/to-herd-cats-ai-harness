@@ -125,7 +125,7 @@ describe('one automation', () => {
       within(actions)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Anhalten', 'Jetzt ausführen', 'Löschen'])
+    ).toEqual(['Bearbeiten', 'Anhalten', 'Jetzt ausführen', 'Löschen'])
   })
 
   test('pausing names the version read; a stale one offers to reload', async () => {

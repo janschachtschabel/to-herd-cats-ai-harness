@@ -194,8 +194,8 @@ export function useDeleteAutomation(id: string) {
   })
 }
 
-/** Loads the automation again (after a stale version), then forgets the error. */
+/** Loads the automation again (after a stale version): it as the server has it now. */
 export function useReloadAutomation(id: string) {
   const queryClient = useQueryClient()
-  return () => queryClient.refetchQueries({ queryKey: automationKeys.detail(id) })
+  return () => queryClient.fetchQuery({ ...automationQuery(id), staleTime: 0 })
 }

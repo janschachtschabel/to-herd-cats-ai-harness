@@ -180,6 +180,7 @@ describe('the automations of a space', () => {
     expect(within(list).getByText('Ereignis-Regel')).toBeInTheDocument()
     expect(within(list).getByText('Bei: Ticket angelegt')).toBeInTheDocument()
     expect(within(list).getByText(/Eigentümerin: Jan Jansen/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Neue Aufgabe' })).toBeEnabled()
   })
 
   test('without AI the space has no such tab', async () => {

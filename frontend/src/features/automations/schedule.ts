@@ -31,6 +31,9 @@ export const DEFAULT_PRESET: Preset = {
 
 export const MAX_MONTH_DAY = 28
 
+/** ISO weekdays, Monday first. */
+export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const
+
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 function hourMinute(time: string): [number, number] | null {

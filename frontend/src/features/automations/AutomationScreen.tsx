@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, PauseCircle } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ArrowLeft, PauseCircle, Pencil } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { AgentBadge } from '@/features/agents/AgentBadge'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/features/shared/states'
 import { ApiError } from '@/lib/api'
 import { AutomationActions } from './AutomationActions'
+import { AutomationFormDialog } from './AutomationFormDialog'
 import { LastRun, NextTerm } from './AutomationList'
 import { agentName, excerpt, placeText, scheduleText, stateText, termText } from './display'
 import { FiringLog } from './FiringLog'
@@ -15,13 +16,7 @@ import { useAutomation, type Automation } from './queries'
 
 /** One automation, as its route shows it; one the reader may not see (or that is
  *  gone) says so in words, as the API answers 404 for both. */
-export function AutomationScreen({
-  automationId,
-  edit,
-}: {
-  automationId: string
-  edit?: (automation: Automation) => ReactNode
-}) {
+export function AutomationScreen({ automationId }: { automationId: string }) {
   const { t } = useTranslation()
   const automation = useAutomation(automationId)
   if (automation.isPending) return <LoadingState />
@@ -31,7 +26,7 @@ export function AutomationScreen({
     }
     return <ErrorState error={automation.error} onRetry={() => void automation.refetch()} />
   }
-  return <AutomationDetail automation={automation.data} edit={edit?.(automation.data)} />
+  return <AutomationDetail automation={automation.data} />
 }
 
 function PlaceLink({ automation }: { automation: Automation }) {
@@ -69,7 +64,22 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function AutomationDetail({ automation, edit }: { automation: Automation; edit?: ReactNode }) {
+/** Its owner changes it in the form (its kind stays). */
+function EditAutomation({ automation }: { automation: Automation }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        <Pencil aria-hidden />
+        {t('automations.actions.edit')}
+      </Button>
+      <AutomationFormDialog open={open} onOpenChange={setOpen} automation={automation} />
+    </>
+  )
+}
+
+function AutomationDetail({ automation }: { automation: Automation }) {
   const { t, i18n } = useTranslation()
   const paused = automation.state === 'paused'
   const ownerUnable = paused && automation.paused_reason === 'owner' && !automation.abilities.resume
@@ -101,7 +111,10 @@ function AutomationDetail({ automation, edit }: { automation: Automation; edit?:
           {ownerUnable && <p>{t('automations.takeOver.ownerUnable')}</p>}
         </div>
       )}
-      <AutomationActions automation={automation} edit={edit} />
+      <AutomationActions
+        automation={automation}
+        edit={automation.abilities.edit ? <EditAutomation automation={automation} /> : undefined}
+      />
       <section aria-labelledby="automation-instruction" className="flex flex-col gap-2">
         <h2 id="automation-instruction" className="text-base font-semibold">
           {t(heartbeat ? 'automations.detail.checklist' : 'automations.detail.instruction')}
