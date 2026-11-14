@@ -26,6 +26,9 @@ In this order:
   the thread the run answers in, one thread per term (decision 3). A heartbeat's
   term opens nothing yet: its run posts the entry only when it has something to
   deliver (`runs.open_thread`), since an answer `HEARTBEAT_OK` leaves no trace.
+
+Whatever the outcome of a logged term, the automation's watchers hear of it
+(`live.fired`); a pause tells them by itself (`pausing.py`).
 """
 
 import uuid
@@ -41,7 +44,7 @@ from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import agent_refusal, run_target
 from app.modules.ai.budgets import budget_exhausted, has_price
 from app.modules.ai.models import AiConnection
-from app.modules.automations import entries, pausing
+from app.modules.automations import entries, live, pausing
 from app.modules.automations.models import (
     Automation,
     AutomationKind,
@@ -88,6 +91,7 @@ async def fire(
     firing_id = uuid7()
     outcome, run_id = await _start(session, automation, agent, place, now, chain_depth)
     await automations.log(automation, due_at, now, outcome, run_id, firing_id=firing_id)
+    await live.fired(session, automation)
     heartbeat = automation.kind == AutomationKind.HEARTBEAT
     if outcome == FiringOutcome.STARTED and place.kind != ConversationKind.DM and not heartbeat:
         await entries.opened(session, automation, place, firing_id)

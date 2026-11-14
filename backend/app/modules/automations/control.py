@@ -105,8 +105,7 @@ class AutomationControl:
         details = {"outcome": fired.label}
         await record(
             self.session, actor, "automation.run_now", "automation", automation.id, details
-        )
-        await self._changed(actor, automation)
+        )  # its watchers heard of the term (`term.fire`)
         return await self.service.get(actor, automation.id)
 
     async def take_over(

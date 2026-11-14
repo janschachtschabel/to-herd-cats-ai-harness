@@ -21,7 +21,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.automations import event_rules, heartbeats, terms
+from app.modules.automations import event_rules, heartbeats, live, terms
 from app.modules.automations.models import Automation, AutomationKind, FiringOutcome
 from app.modules.automations.repository import AutomationRepository, claim_due
 from app.modules.automations.term import Fired, fire
@@ -47,6 +47,7 @@ async def fire_next(session: AsyncSession, now: datetime) -> Fired | None:
         if heartbeats.off_hours(automation, due_at, now):
             outcome = FiringOutcome.SKIPPED_OFF_HOURS
             await automations.log(automation, due_at, now, outcome)
+            await live.fired(session, automation)
             await automations.advance(automation, _next_due(automation, now))
             return Fired(automation.id, due_at, outcome, None)
         fired = await fire(session, automation, due_at, now)

@@ -4,6 +4,9 @@ lists reload: ids only, never its words.
 - `changed`: in the transaction of any change (made, changed, paused, resumed,
   deleted, run now, taken over, paused by the system): one outbox event
   `automation.updated` (the automation's id; its place's space as the event's space).
+- `fired`: the same for a term the due loop or an event rule logged (its last run
+  and next term changed), one per term, with its agent acting; an event counted
+  within a quiet time logs no term and tells nothing.
 - `automation_live` (outbox handler, registered in `handlers.py`): one
   `automation.changed` per person who may see the automation now, by the rule of its
   routes (`sight.py`: its owner, its agent's responsible person, the managers of its
@@ -18,7 +21,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, can
-from app.core.outbox import Acting, Event, emit
+from app.core.outbox import Acting, Event, EventActor, emit
+from app.core.principal import Principal
 from app.modules.agents.repository import AgentRepository
 from app.modules.automations.manage_repository import ManageRepository
 from app.modules.automations.models import Automation
@@ -42,6 +46,12 @@ async def changed(
         subject_id=automation.id,
         payload={"automation_id": str(automation.id)},
     )
+
+
+async def fired(session: AsyncSession, automation: Automation) -> None:
+    place = await AutomationRepository(session, automation.org_id).place(automation)
+    acting = EventActor(automation.org_id, Principal.agent(automation.agent_id))
+    await changed(session, automation, acting, place.space_id)
 
 
 async def automation_live(session: AsyncSession, event: Event) -> None:

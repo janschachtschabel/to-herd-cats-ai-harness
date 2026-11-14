@@ -32,7 +32,7 @@ from uuid_utils.compat import uuid7
 
 from app.core.outbox import Event
 from app.modules.agents.models import MAX_CHAIN_DEPTH
-from app.modules.automations import event_sight
+from app.modules.automations import event_sight, live
 from app.modules.automations.event_repository import Cause, EventRuleRepository
 from app.modules.automations.models import Automation, EventType, FiringOutcome
 from app.modules.automations.repository import AutomationRepository
@@ -82,6 +82,7 @@ async def _take(
         automations = AutomationRepository(session, rule.org_id)
         outcome = FiringOutcome.SKIPPED_DEPTH
         await automations.log(rule, due_at, now, outcome, firing_id=firing_id)
+        await live.fired(session, rule)
         await repo.assign(rule.id, firing_id, only=event.id)
         return outcome.value
     if rule.quiet_until is not None and now < rule.quiet_until:

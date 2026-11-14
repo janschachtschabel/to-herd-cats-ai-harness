@@ -21,6 +21,7 @@ from tests.factories_tools import call
 from tests.factories_writing import Work
 from tests.test_access import actor_of
 from tests.test_automation_events import QUIET, _channel, take_in
+from tests.test_automation_live_terms import told
 
 STEP = timedelta(seconds=QUIET + 1)
 
@@ -54,6 +55,7 @@ async def test_a_chain_stops_at_depth_three(work: Work) -> None:
     assert await _depths(work, rule) == [0, 1, 2, 3]
     logged = await firings(bench.session, rule.id)
     assert [f.outcome for f in logged] == ["started"] * 4 + [FiringOutcome.SKIPPED_DEPTH]
+    assert len(await told(work, rule.id)) == len(logged)  # one live event per term
     assert logged[-1].run_id is None
 
 
