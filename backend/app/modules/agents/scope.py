@@ -102,5 +102,11 @@ async def space_audience(
     return audience
 
 
+async def organisation_audience(session: AsyncSession, org_id: uuid.UUID) -> set[uuid.UUID]:
+    """The spaces whose content may go where everyone of the organisation with AI
+    reads it (an organisation-wide skill; guests have no AI): the open spaces."""
+    return await ScopeRepository(session, org_id).open_ids()
+
+
 def _only(roles: dict[uuid.UUID, SpaceRole], spaces: set[uuid.UUID]) -> ReadScope:
     return ReadScope.of({sid: role for sid, role in roles.items() if sid in spaces})

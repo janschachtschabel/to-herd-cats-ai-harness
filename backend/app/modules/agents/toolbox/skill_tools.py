@@ -17,16 +17,30 @@
   parts of at most `PART_CHARS`, cut at a line's end where one is near; each part
   but the last ends with a note naming the next (`part=n`), so the cut is visible
   and the rest is one call away.
+- **`propose_skill`** (level 2, proposes): a new skill or a change to one of the
+  run's skills, through moderation (`skills/proposals.py`); see the function.
 """
 
-from typing import Annotated
+import uuid
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
-from app.modules.agents.toolbox.writing import refused
-from app.modules.skills.format import MAX_NAME_CHARS
-from app.modules.skills.runs import RunSkill, load_for_run
+from app.core.access import Action, can
+from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
+from app.modules.agents.toolbox.writing import (
+    LEAKS,
+    by,
+    effect,
+    leaks_into,
+    leaks_into_organisation,
+    refused,
+)
+from app.modules.skills.format import MAX_CONTENT_CHARS, MAX_NAME_CHARS
+from app.modules.skills.format import MAX_DESCRIPTION_CHARS as MAX_DESC_CHARS
+from app.modules.skills.proposal_models import MAX_REASON_CHARS
+from app.modules.skills.proposals import SkillProposalService
+from app.modules.skills.runs import LoadedSkill, RunSkill, load_for_run
 from app.runtime.loop import ToolResult
 from app.runtime.untrusted import frame_untrusted
 
@@ -96,3 +110,91 @@ def split(content: str) -> list[str]:
 def _cut(text: str, most: int) -> str:
     flat = " ".join(text.split())
     return flat if len(flat) <= most else flat[: most - 1] + "…"
+
+
+# --- propose_skill (level 2) -----------------------------------------------------------
+
+
+class ProposeSkillArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["change", "new"]
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_NAME_CHARS)
+    ]
+    space_id: uuid.UUID | None = None
+    description: Annotated[str, StringConstraints(min_length=1, max_length=MAX_DESC_CHARS)]
+    content: Annotated[str, StringConstraints(min_length=1, max_length=MAX_CONTENT_CHARS)]
+    reason: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_REASON_CHARS)
+    ]
+
+
+async def propose_skill(ctx: ToolContext, args: ProposeSkillArgs) -> ToolResult:
+    """A proposal for a new skill (in `space_id`, none: organisation-wide) or a change
+    to one of the run's skills (by its listed name), decided by a moderator: in a
+    space only where the run may edit pages (its write scope), and only what that
+    scope's audience may receive (organisation-wide: what came from open spaces)."""
+    attrs = {"name": args.name, "kind": args.kind}
+    skill = None
+    if args.kind == "change":
+        skill = await load_for_run(
+            ctx.session, ctx.actor, ctx.run.agent_id, ctx.location, args.name
+        )
+        if skill is None:
+            return ToolResult("skill", NOT_FOUND, attrs)
+    space_id = skill.space_id if skill is not None else args.space_id
+    if space_id is not None:
+        if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, space_id):
+            return ToolResult("skill", "Not allowed here.", attrs)
+        if await leaks_into(ctx, space_id):
+            return ToolResult("skill", LEAKS, attrs)
+    elif await leaks_into_organisation(ctx):
+        return ToolResult("skill", LEAKS, attrs)
+
+    async def write() -> ToolResult:
+        service = SkillProposalService(ctx.session)
+        author = by(ctx).principal
+        if skill is not None:
+            proposal = await service.propose_change(
+                ctx.actor,
+                skill.id,
+                args.description,
+                args.content,
+                args.reason,
+                author=author,
+                run_id=ctx.run.id,
+            )
+        else:
+            proposal = await service.propose_new(
+                ctx.actor,
+                space_id,
+                args.name,
+                args.description,
+                args.content,
+                args.reason,
+                author=author,
+                run_id=ctx.run.id,
+            )
+        return ToolResult(
+            "skill", f"Skill proposal id={proposal.id} made; a moderator decides.", attrs
+        )
+
+    return await effect(ctx, "skill", attrs, write)
+
+
+async def propose_subjects(ctx: ToolContext, args: ProposeSkillArgs) -> list[Subject] | None:
+    """The skill a change is about (its version), or the scope a new one goes to."""
+    if args.kind == "new":
+        if args.space_id is None:
+            return [Subject("organisation", ctx.run.org_id, 0, None)]
+        return [Subject("space", args.space_id, 0, args.space_id)]
+    found = await _usable(ctx, args.name)
+    if found is None:
+        return None
+    version = await SkillProposalService(ctx.session).current_version(ctx.actor, found.id)
+    return [Subject("skill", found.id, version, found.space_id)]
+
+
+async def _usable(ctx: ToolContext, name: str) -> LoadedSkill | None:
+    return await load_for_run(ctx.session, ctx.actor, ctx.run.agent_id, ctx.location, name)

@@ -34,6 +34,10 @@ ship without a decision on who may call it. Guards:
   else gets 404 `skill.not_found`, as for an unknown id (plan M6 task 9).
 - `proposal`: a page editor in the proposal's space (or its author); everyone else
   gets 404 `proposal.not_found`, as for an unknown id (plan M6).
+- `skill_proposal`: who may decide it (`skill.manage`; a space's: `page.moderate`
+  there, with `ai.use`) or its author; everyone else gets 404
+  `skill_proposal.not_found`, as for an unknown id (plan M6 task 9). The list is
+  `skill` (without AI: 404 `skill.not_found`).
 - `approval`, `question`: whoever may see the run (as `run`); everyone else gets 404
   `approval.not_found` or `question.not_found`, as for an unknown id (plan M6 task 7).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
@@ -212,6 +216,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/skills/{skill_id}/versions/{number}/restore", "skill"),
     ("POST", "/api/skills/import", "skill"),
     ("GET", "/api/skills/{skill_id}/export", "skill"),
+    ("GET", "/api/skill-proposals", "skill"),
+    ("GET", "/api/skill-proposals/{proposal_id}", "skill_proposal"),
+    ("POST", "/api/skill-proposals/{proposal_id}/accept", "skill_proposal"),
+    ("POST", "/api/skill-proposals/{proposal_id}/reject", "skill_proposal"),
 ]
 
 
@@ -290,6 +298,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PUT", "/api/pages/{page_id}/tags"): {"tag_ids": [], "version": 1},
     ("POST", "/api/proposals/{proposal_id}/accept"): {"version": 1},
     ("POST", "/api/proposals/{proposal_id}/reject"): {"version": 1},
+    ("POST", "/api/skill-proposals/{proposal_id}/accept"): {"version": 1},
+    ("POST", "/api/skill-proposals/{proposal_id}/reject"): {"version": 1},
     ("POST", "/api/spaces/{space_id}/channels"): {"name": "x"},
     ("PATCH", "/api/conversations/{conversation_id}"): {"topic": "x", "version": 1},
     ("POST", "/api/conversations/{conversation_id}/archive"): {"version": 1},

@@ -333,7 +333,8 @@
     "reasons": {
       "approval": "bittet dich in {{where}} um eine Freigabe",
       "question": "hat dir in {{where}} eine Frage gestellt",
-      "run_stopped": "meldet in {{where}}, dass ein Lauf nicht zu Ende kam"
+      "run_stopped": "meldet in {{where}}, dass ein Lauf nicht zu Ende kam",
+      "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})"
     }
   }
 }

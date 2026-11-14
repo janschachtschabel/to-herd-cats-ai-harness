@@ -74,6 +74,7 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/spaces/{space_id}/proposals",
         "/api/skills",
         "/api/skills/{skill_id}/versions",
+        "/api/skill-proposals",
         "/api/runs",
         "/api/agents/{agent_id}/runs",
     } <= set(endpoints)

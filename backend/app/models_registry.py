@@ -33,6 +33,7 @@ from app.modules.messaging.social_models import ConversationRead, MessageMention
 from app.modules.orgs.models import Organization
 from app.modules.proposals.models import PageProposal
 from app.modules.skills.models import AgentSkill, Skill, SkillVersion
+from app.modules.skills.proposal_models import SkillProposal
 from app.modules.spaces.models import Space, SpaceMember
 from app.modules.tags.models import Tag, Tagging
 from app.modules.tickets.models import (
@@ -78,6 +79,7 @@ __all__ = [
     "Organization",
     "Page",
     "PageCollabState",
+    "SkillProposal",
     "PageProposal",
     "PageVersion",
     "RateLimitHit",

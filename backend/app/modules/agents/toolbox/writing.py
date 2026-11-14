@@ -23,7 +23,7 @@ from app.core.authorship import Authorship
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.principal import Principal
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.scope import space_audience
+from app.modules.agents.scope import organisation_audience, space_audience
 from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
 from app.runtime.loop import ToolResult
 
@@ -48,11 +48,24 @@ async def leaks_into(ctx: ToolContext, space_id: uuid.UUID) -> bool:
     """Whether writing into the space would show it what its audience may not see:
     a space read so far (where it was read, or where its page or ticket is now)
     outside the space's audience."""
-    now = await ReadRepository(ctx.session, ctx.run.org_id).now(ctx.reads)
-    read = ctx.reads.spaces | now.spaces
+    read = await _read(ctx)
     if not read:
         return False
     return not read <= await space_audience(ctx.session, ctx.run.org_id, space_id)
+
+
+async def leaks_into_organisation(ctx: ToolContext) -> bool:
+    """The same for what everyone of the organisation reads (an organisation-wide
+    skill): anything read outside the open spaces."""
+    read = await _read(ctx)
+    if not read:
+        return False
+    return not read <= await organisation_audience(ctx.session, ctx.run.org_id)
+
+
+async def _read(ctx: ToolContext) -> set[uuid.UUID]:
+    now = await ReadRepository(ctx.session, ctx.run.org_id).now(ctx.reads)
+    return ctx.reads.spaces | now.spaces
 
 
 def refused(source: str, code: str, attrs: dict[str, str] | None = None) -> ToolResult:

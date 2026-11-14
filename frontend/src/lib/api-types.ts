@@ -1568,6 +1568,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skill-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Skill Proposals
+         * @description Newest first: those the caller may decide, and their own.
+         */
+        get: operations["list_skill_proposals_api_skill_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skill-proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skill Proposal */
+        get: operations["get_skill_proposal_api_skill_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skill-proposals/{proposal_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Skill Proposal
+         * @description 403 unless the caller may manage skills in its scope; 409
+         *     `skill_proposal.not_open`, `skill_proposal.version_conflict`,
+         *     `skill_proposal.base_outdated` (the skill moved on: `details` holds its `version`
+         *     and both texts; accept again with `skill_version`), `skill_proposal.skill_archived`,
+         *     `skill.name_taken`.
+         */
+        post: operations["accept_skill_proposal_api_skill_proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skill-proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Skill Proposal */
+        post: operations["reject_skill_proposal_api_skill_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/skills": {
         parameters: {
             query?: never;
@@ -2485,8 +2563,9 @@ export interface components {
          *     message's Markdown. `parent_id`: the thread the message is in (null: top level).
          *     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
          *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
-         *     level has no conversation and no message, but `proposal` (plan M6); `author` may be
-         *     an agent (`type`).
+         *     level has no conversation and no message, but `proposal` (plan M6); a
+         *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9); `author` may be an
+         *     agent (`type`).
          */
         ActivityOut: {
             author: components["schemas"]["ActivityAuthor"] | null;
@@ -2511,6 +2590,7 @@ export interface components {
             /** Read At */
             read_at: string | null;
             reason: components["schemas"]["NotificationReason"];
+            skill_proposal?: components["schemas"]["ActivitySkillProposal"] | null;
             /** Snippet */
             snippet: string;
         };
@@ -2530,6 +2610,20 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+        };
+        /**
+         * ActivitySkillProposal
+         * @description The skill proposal a notification is about (a skill has no thread; its address:
+         *     `/api/skill-proposals/{id}`); `space_id` none: organisation-wide.
+         */
+        ActivitySkillProposal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Space Id */
+            space_id: string | null;
         };
         /**
          * AgentCreate
@@ -4202,7 +4296,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal";
         /** OrgOut */
         OrgOut: {
             /**
@@ -4486,6 +4580,13 @@ export interface components {
         Page_SkillOut_: {
             /** Items */
             items: components["schemas"]["SkillOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[SkillProposalOut] */
+        Page_SkillProposalOut_: {
+            /** Items */
+            items: components["schemas"]["SkillProposalOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -5286,6 +5387,21 @@ export interface components {
             reason: string;
         };
         /**
+         * SkillNowOut
+         * @description The changed skill as it is now: `version` is what accepting a moved-on
+         *     proposal sends as `skill_version`; `number` its newest version.
+         */
+        SkillNowOut: {
+            /** Content */
+            content: string;
+            /** Description */
+            description: string;
+            /** Number */
+            number: number;
+            /** Version */
+            version: number;
+        };
+        /**
          * SkillOut
          * @description A skill without its text (lists).
          */
@@ -5317,10 +5433,137 @@ export interface components {
             version: number;
         };
         /**
+         * SkillProposalAccept
+         * @description `description`/`content`: the final text (none: as proposed). `skill_version`:
+         *     the skill's `version` the moderator decided on; needed once the skill moved on
+         *     (409 `skill_proposal.base_outdated` names it).
+         */
+        SkillProposalAccept: {
+            /** Content */
+            content?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Skill Version */
+            skill_version?: number | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SkillProposalDetailOut
+         * @description With the proposed text and, for a change, the skill now (`outdated`: it has a
+         *     newer version than `base_number`; accepting then needs `skill_version`).
+         */
+        SkillProposalDetailOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /** Base Number */
+            base_number: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            current: components["schemas"]["SkillNowOut"] | null;
+            /** Decided At */
+            decided_at: string | null;
+            decided_by: components["schemas"]["SkillAuthorOut"] | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["SkillProposalKind"];
+            /** Name */
+            name: string | null;
+            /** Outdated */
+            outdated: boolean;
+            proposed: components["schemas"]["SkillTextOut"];
+            /** Reason */
+            reason: string;
+            /** Result Number */
+            result_number: number | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Skill Id */
+            skill_id: string | null;
+            /** Space Id */
+            space_id: string | null;
+            state: components["schemas"]["SkillProposalState"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * SkillProposalKind
+         * @enum {string}
+         */
+        SkillProposalKind: "change" | "new";
+        /**
+         * SkillProposalOut
+         * @description `name`: a new skill's name, or the changed skill's name now. `base_number`: the
+         *     skill's newest version when it was proposed (a change). `result_number`: the
+         *     version an accepted proposal made (none if the skill already held its text).
+         */
+        SkillProposalOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /** Base Number */
+            base_number: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            decided_by: components["schemas"]["SkillAuthorOut"] | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["SkillProposalKind"];
+            /** Name */
+            name: string | null;
+            /** Reason */
+            reason: string;
+            /** Result Number */
+            result_number: number | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Skill Id */
+            skill_id: string | null;
+            /** Space Id */
+            space_id: string | null;
+            state: components["schemas"]["SkillProposalState"];
+            /** Version */
+            version: number;
+        };
+        /** SkillProposalReject */
+        SkillProposalReject: {
+            /** Reason */
+            reason?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SkillProposalState
+         * @enum {string}
+         */
+        SkillProposalState: "open" | "accepted" | "rejected";
+        /**
          * SkillState
          * @enum {string}
          */
         SkillState: "active" | "archived";
+        /** SkillTextOut */
+        SkillTextOut: {
+            /** Content */
+            content: string;
+            /** Description */
+            description: string;
+        };
         /**
          * SkillUpdate
          * @description Only what is given changes; a given field cannot be null.
@@ -9906,6 +10149,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skill_proposals_api_skill_proposals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description only this space's */
+                space_id?: string | null;
+                /** @description true: only organisation-wide; false: only spaces' */
+                org_wide?: boolean | null;
+                /** @description only this state */
+                state?: components["schemas"]["SkillProposalState"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SkillProposalOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_skill_proposal_api_skill_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillProposalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_skill_proposal_api_skill_proposals__proposal_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillProposalAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillProposalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_skill_proposal_api_skill_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillProposalReject"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillProposalDetailOut"];
                 };
             };
             /** @description Validation Error */

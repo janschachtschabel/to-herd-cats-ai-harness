@@ -19,6 +19,7 @@ from app.modules.agents.toolbox.catalog import CATALOG, offered
 from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.proposals.models import PageProposal
+from app.modules.skills.proposal_models import SkillProposal
 from app.modules.spaces.models import AgentWritePolicy
 from app.modules.tickets.models import TicketPageLink, WorkItem
 from app.modules.wiki.models import Page, PageVersion
@@ -34,6 +35,7 @@ WRITING = {
     "set_ticket_status": 2,
     "create_ticket": 2,
     "link_ticket_page": 2,
+    "propose_skill": 2,
     "update_page": 3,
     "assign_ticket": 3,
     "post_message": 3,
@@ -118,6 +120,18 @@ async def _post(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int]
     )
 
 
+async def _skill(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int]]]:
+    args = {
+        "kind": "new",
+        "name": "werkstatt-regeln",
+        "space_id": str(work.space.id),
+        "description": "d",
+        "content": "c",
+        "reason": "r",
+    }
+    return args, lambda: _count(work.bench.session, SkillProposal)
+
+
 PREPARED: dict[str, Prepare] = {
     "propose_page_change": _proposal,
     "propose_new_page": _new_page,
@@ -127,6 +141,7 @@ PREPARED: dict[str, Prepare] = {
     "link_ticket_page": _link,
     "assign_ticket": _assign,
     "post_message": _post,
+    "propose_skill": _skill,
 }
 
 
@@ -136,7 +151,8 @@ async def test_a_writing_tool_writes_once_when_its_run_is_taken_up_again(
 ) -> None:
     await set_level(work.bench, 3)
     args, effects = await PREPARED[name](work)
-    work.bench.stub.state.replies.extend([call(name, **args), {"content": "Done."}])
+    calling = {"tool_calls": [{"name": name, "arguments": args}]}  # args may hold `name`
+    work.bench.stub.state.replies.extend([calling, {"content": "Done."}])
     await work.bench.say("Bitte erledigen")
     die_after(monkeypatch, "call_tool")
     with pytest.raises(Crash):

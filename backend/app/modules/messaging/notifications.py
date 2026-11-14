@@ -28,8 +28,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import Event, emit
-from app.modules.messaging.activity_repository import NotificationRepository
 from app.modules.messaging.notification_models import Notification, NotificationReason
+from app.modules.messaging.notification_repository import NotificationRepository
 from app.modules.messaging.repository import readers_of
 from app.modules.messaging.social_repository import MentionRepository
 from app.modules.messaging.ticket_hooks import ticket_hooks

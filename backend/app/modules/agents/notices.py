@@ -16,9 +16,9 @@ from app.core.models_base import utcnow
 from app.core.outbox import EventActor, emit
 from app.core.principal import Principal
 from app.modules.messaging import threads
-from app.modules.messaging.activity_repository import NotificationRepository
 from app.modules.messaging.models import Conversation, Message
 from app.modules.messaging.notification_models import NotificationReason
+from app.modules.messaging.notification_repository import NotificationRepository
 from app.modules.messaging.thread_repository import ThreadRepository
 
 

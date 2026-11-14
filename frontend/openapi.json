@@ -145,7 +145,7 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); `author` may be\nan agent (`type`).",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9); `author` may be an\nagent (`type`).",
         "properties": {
           "author": {
             "anyOf": [
@@ -238,6 +238,16 @@
           "reason": {
             "$ref": "#/components/schemas/NotificationReason"
           },
+          "skill_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivitySkillProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "snippet": {
             "title": "Snippet",
             "type": "string"
@@ -277,6 +287,34 @@
           "space_id"
         ],
         "title": "ActivityProposal",
+        "type": "object"
+      },
+      "ActivitySkillProposal": {
+        "description": "The skill proposal a notification is about (a skill has no thread; its address:\n`/api/skill-proposals/{id}`); `space_id` none: organisation-wide.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          }
+        },
+        "required": [
+          "id",
+          "space_id"
+        ],
+        "title": "ActivitySkillProposal",
         "type": "object"
       },
       "AgentCreate": {
@@ -4388,7 +4426,8 @@
           "proposal",
           "approval",
           "question",
-          "run_stopped"
+          "run_stopped",
+          "skill_proposal"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -5284,6 +5323,33 @@
           "items"
         ],
         "title": "Page[SkillOut]",
+        "type": "object"
+      },
+      "Page_SkillProposalOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillProposalOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[SkillProposalOut]",
         "type": "object"
       },
       "Page_SkillVersionOut_": {
@@ -7423,6 +7489,35 @@
         "title": "SkillImportSkippedOut",
         "type": "object"
       },
+      "SkillNowOut": {
+        "description": "The changed skill as it is now: `version` is what accepting a moved-on\nproposal sends as `skill_version`; `number` its newest version.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "description",
+          "content",
+          "version",
+          "number"
+        ],
+        "title": "SkillNowOut",
+        "type": "object"
+      },
       "SkillOut": {
         "description": "A skill without its text (lists).",
         "properties": {
@@ -7486,6 +7581,425 @@
         "title": "SkillOut",
         "type": "object"
       },
+      "SkillProposalAccept": {
+        "additionalProperties": false,
+        "description": "`description`/`content`: the final text (none: as proposed). `skill_version`:\nthe skill's `version` the moderator decided on; needed once the skill moved on\n(409 `skill_proposal.base_outdated` names it).",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "skill_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Version"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SkillProposalAccept",
+        "type": "object"
+      },
+      "SkillProposalDetailOut": {
+        "description": "With the proposed text and, for a change, the skill now (`outdated`: it has a\nnewer version than `base_number`; accepting then needs `skill_version`).",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/SkillAuthorOut"
+          },
+          "base_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillNowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillAuthorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SkillProposalKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "outdated": {
+            "title": "Outdated",
+            "type": "boolean"
+          },
+          "proposed": {
+            "$ref": "#/components/schemas/SkillTextOut"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "result_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Number"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "skill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SkillProposalState"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "space_id",
+          "skill_id",
+          "name",
+          "reason",
+          "author",
+          "run_id",
+          "state",
+          "base_number",
+          "decided_by",
+          "decided_at",
+          "decision_reason",
+          "result_number",
+          "version",
+          "created_at",
+          "proposed",
+          "current",
+          "outdated"
+        ],
+        "title": "SkillProposalDetailOut",
+        "type": "object"
+      },
+      "SkillProposalKind": {
+        "enum": [
+          "change",
+          "new"
+        ],
+        "title": "SkillProposalKind",
+        "type": "string"
+      },
+      "SkillProposalOut": {
+        "description": "`name`: a new skill's name, or the changed skill's name now. `base_number`: the\nskill's newest version when it was proposed (a change). `result_number`: the\nversion an accepted proposal made (none if the skill already held its text).",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/SkillAuthorOut"
+          },
+          "base_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillAuthorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SkillProposalKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "result_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Number"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "skill_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SkillProposalState"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "space_id",
+          "skill_id",
+          "name",
+          "reason",
+          "author",
+          "run_id",
+          "state",
+          "base_number",
+          "decided_by",
+          "decided_at",
+          "decision_reason",
+          "result_number",
+          "version",
+          "created_at"
+        ],
+        "title": "SkillProposalOut",
+        "type": "object"
+      },
+      "SkillProposalReject": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SkillProposalReject",
+        "type": "object"
+      },
+      "SkillProposalState": {
+        "enum": [
+          "open",
+          "accepted",
+          "rejected"
+        ],
+        "title": "SkillProposalState",
+        "type": "string"
+      },
       "SkillState": {
         "enum": [
           "active",
@@ -7493,6 +8007,24 @@
         ],
         "title": "SkillState",
         "type": "string"
+      },
+      "SkillTextOut": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "content"
+        ],
+        "title": "SkillTextOut",
+        "type": "object"
       },
       "SkillUpdate": {
         "additionalProperties": false,
@@ -16061,6 +16593,273 @@
         "summary": "Search",
         "tags": [
           "search"
+        ]
+      }
+    },
+    "/api/skill-proposals": {
+      "get": {
+        "description": "Newest first: those the caller may decide, and their own.",
+        "operationId": "list_skill_proposals_api_skill_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "only this space's",
+            "in": "query",
+            "name": "space_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only this space's",
+              "title": "Space Id"
+            }
+          },
+          {
+            "description": "true: only organisation-wide; false: only spaces'",
+            "in": "query",
+            "name": "org_wide",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: only organisation-wide; false: only spaces'",
+              "title": "Org Wide"
+            }
+          },
+          {
+            "description": "only this state",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SkillProposalState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only this state",
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillProposalOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Skill Proposals",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skill-proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_skill_proposal_api_skill_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillProposalDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Skill Proposal",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skill-proposals/{proposal_id}/accept": {
+      "post": {
+        "description": "403 unless the caller may manage skills in its scope; 409\n`skill_proposal.not_open`, `skill_proposal.version_conflict`,\n`skill_proposal.base_outdated` (the skill moved on: `details` holds its `version`\nand both texts; accept again with `skill_version`), `skill_proposal.skill_archived`,\n`skill.name_taken`.",
+        "operationId": "accept_skill_proposal_api_skill_proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillProposalAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillProposalDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Skill Proposal",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/api/skill-proposals/{proposal_id}/reject": {
+      "post": {
+        "operationId": "reject_skill_proposal_api_skill_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillProposalReject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillProposalDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Skill Proposal",
+        "tags": [
+          "skills"
         ]
       }
     },

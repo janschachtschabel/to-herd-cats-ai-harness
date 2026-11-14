@@ -98,7 +98,15 @@ class SkillService:
         await base.audit(self.session, actor, "skill.created", skill.id, details)
         return skill
 
-    async def update(self, actor: Actor, skill_id: uuid.UUID, change: SkillChange) -> Skill:
+    async def update(
+        self,
+        actor: Actor,
+        skill_id: uuid.UUID,
+        change: SkillChange,
+        author: Principal | None = None,
+    ) -> Skill:
+        """`author` of a new version defaults to the actor (an accepted proposal names
+        its agent, `proposals.py`)."""
         skill = await self.managed(actor, skill_id, change.version)
         details: dict[str, object] = {"changes": {}}
         if change.name is not None:
@@ -120,7 +128,8 @@ class SkillService:
                 skill.content, texts = content, True
                 details["content_chars"] = len(content)
         if texts:
-            made = await base.repo(self.session, actor).add_version(skill, actor.principal)
+            who = author or actor.principal
+            made = await base.repo(self.session, actor).add_version(skill, who)
             details["version_number"] = made.number
         skill.version += 1
         await self.session.flush()

@@ -154,6 +154,19 @@ CATALOG: dict[str, ToolSpec] = {
             Action.PAGE_EDIT,
         ),
         ToolSpec(
+            "propose_skill",
+            "Propose a skill: kind=change for one of your listed skills (by its name), "
+            "kind=new for a new one (name, and space_id; none: for the whole organisation). "
+            "Give the full description, the full Markdown text and a short reason. A "
+            "moderator accepts or rejects it.",
+            skill_tools.ProposeSkillArgs,
+            skill_tools.propose_skill,
+            2,
+            PROPOSE,
+            skill_tools.propose_subjects,
+            Action.PAGE_EDIT,
+        ),
+        ToolSpec(
             "comment_ticket",
             "Comment on a ticket (by its key, such as HC-12) in its thread.",
             ticket_tools.CommentTicketArgs,

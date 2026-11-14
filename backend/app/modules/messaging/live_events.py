@@ -8,7 +8,7 @@ only, never content:
      "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>,
      "w": <ticket_id>, "s": <space_id> (ticket events only),
      "r": <sprint_id> (sprint events only, with "s"),
-     "x": <proposal_id> (proposal events only, with "s"),
+     "x": <proposal_id> (proposal events with "s"; `skill_proposal.changed` with "u"),
      "a": <author_id> (proposal events of a person's proposal only),
      "n": <run_id>, "k": <step> (`run.progress` only)}
 
@@ -25,7 +25,9 @@ id (and nothing else). Proposal events (`proposal.created|accepted|rejected|
 withdrawn`, plan M6 task 5) are one `proposal.changed` for the space `s`, for whoever
 may edit pages there (who sees proposals), with the proposal's id, and for the
 proposal's author when that is a person who may read the space (`a`, plan M6 task 6:
-an author always hears of their proposal). `run.progress`
+an author always hears of their proposal). `skill_proposal.changed` (plan M6 task 9)
+is for one person `u` (who may decide the skill proposal `x`, or its author: the
+handler writes one per person), with the proposal's id. `run.progress`
 (plan M5 task 6) names an agent's run in a DM
 as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person).
 Every API process's hub
@@ -76,6 +78,7 @@ LIVE_TYPES: dict[str, str] = {
     # A run's card was decided or answered (plan M6 task 7): its conversation reloads it.
     "approval.decided": "card.changed",
     "question.answered": "card.changed",
+    "skill_proposal.changed": "skill_proposal.changed",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
@@ -84,9 +87,16 @@ TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
 SPRINT_TYPES = frozenset({"sprint.created", "sprint.updated", "sprint.started", "sprint.closed"})
 PROPOSAL_TYPES = frozenset(t for t, name in LIVE_TYPES.items() if name == "proposal.changed")
 SPACE_TYPES = SPRINT_TYPES | PROPOSAL_TYPES
+SKILL_PROPOSAL = "skill_proposal.changed"
 # Events for one person: the payload's `user_id` is who gets them.
 FOR_ONE_PERSON = frozenset(
-    {"notification.created", "conversation.read", "activity.changed", "access.changed"}
+    {
+        "notification.created",
+        "conversation.read",
+        "activity.changed",
+        "access.changed",
+        "skill_proposal.changed",
+    }
 )
 
 
@@ -165,6 +175,8 @@ class LiveEvent:
         if self.run_id is not None:
             data["run_id"] = str(self.run_id)
             data["step"] = self.step
+        if self.proposal_id is not None:  # skill_proposal.changed
+            data["proposal_id"] = str(self.proposal_id)
         return sse_frame(self.name, data)
 
 
@@ -211,6 +223,7 @@ def of_event(event: Event) -> LiveEvent | None:
         space_id=event.space_id if ticket else None,
         run_id=_uuid(payload.get("run_id")) if run else None,
         step=step if run and isinstance(step, int) else None,
+        proposal_id=_uuid(payload.get("proposal_id")) if name == SKILL_PROPOSAL else None,
     )
 
 

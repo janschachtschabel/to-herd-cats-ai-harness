@@ -29,9 +29,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import Event, emit
 from app.core.principal import PrincipalType
-from app.modules.messaging.activity_repository import NotificationRepository
 from app.modules.messaging.models import Message
 from app.modules.messaging.notification_models import NotificationReason
+from app.modules.messaging.notification_repository import NotificationRepository
 from app.modules.messaging.notifications import announce
 from app.modules.messaging.repository import readers_of
 from app.modules.messaging.thread_repository import PageThreadRepository

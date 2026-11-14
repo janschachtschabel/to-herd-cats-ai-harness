@@ -36,6 +36,7 @@ from app.modules.messaging.live import LiveHub
 from app.modules.proposals import router as proposals
 from app.modules.search.router import router as search_router
 from app.modules.skills import assignment_router as skill_assignments
+from app.modules.skills import proposal_router as skill_proposals
 from app.modules.skills import router as skills
 from app.modules.skills import transfer_router as skill_transfer
 from app.modules.skills.transfer import MAX_IMPORT_BYTES as SKILL_IMPORT_MAX_BYTES
@@ -114,6 +115,7 @@ def api_router() -> APIRouter:
     api.include_router(skill_transfer.skill_transfer)  # before /skills/{skill_id}
     api.include_router(skills.skills)
     api.include_router(skill_assignments.agent_skills)
+    api.include_router(skill_proposals.skill_proposals)
     return api
 
 

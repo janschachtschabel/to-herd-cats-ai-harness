@@ -664,6 +664,63 @@ holt er mit `load_skill`.
   Werkzeug freischalten, keine Stufe ändern und nichts freigeben; das entscheidet der
   Host vor jedem Aufruf (getestet mit einem Skill, der genau das behauptet).
 
+### Skill-Vorschläge (`propose_skill`, `/api/skill-proposals`)
+
+`backend/app/modules/skills/proposals.py` (Regeln), `proposal_decisions.py`
+(Annehmen, Ablehnen), `sight.py` (wer was sieht), Werkzeug in
+`agents/toolbox/skill_tools.py`.
+
+- **`propose_skill(kind, name, space_id, description, content, reason)`** (Stufe 2,
+  vorschlagend): `kind=change` für einen der Skills, die der Lauf nutzen darf (nach
+  seinem Namen in der Liste), `kind=new` für einen neuen Skill in `space_id` (ohne:
+  organisationsweit). Ein Vorschlag in einem Bereich braucht `page.edit` dort für den
+  Lauf (also nur innerhalb seines Schreibbereichs) und nur, was das Publikum des
+  Bereichs sehen darf (wie bei jedem schreibenden Werkzeug); ein organisationsweiter
+  Vorschlag nur, was aus offenen Bereichen stammt (alle mit KI lesen ihn später).
+  Wirkung und Journaleintrag in einer Transaktion (Wiedergabe schreibt nichts
+  doppelt). Fehler: „nicht gefunden“, `skill.name_taken`, `skill.name_invalid`,
+  `skill.description_invalid`, `skill.content_invalid`, `skill_proposal.no_change`,
+  `skill_proposal.skill_archived`, `skill_proposal.invalid_reason`.
+- **Tabelle `skill_proposal`**: Art (`change|new`), Bereich (leer: organisationsweit),
+  Skill (bei `new` erst nach dem Annehmen), Name (nur `new`), `base_number` (neueste
+  Version des Skills beim Vorschlag, nur `change`), Beschreibung, Text, Begründung
+  (≤ 300), Urheber (Principal) mit `run_id`, Zustand `open|accepted|rejected`,
+  entschieden von, wann, Ablehnungsgrund, die erzeugte Skill-Version, `version`.
+- **Sehen**: wer ihn entscheiden darf (`skill.manage`; bei einem Bereich auch
+  `page.moderate` dort, mit `ai.use`) und sein Urheber, solange er den Bereich lesen
+  darf; ohne `ai.use` und `skill.manage` niemand. Alles andere antwortet 404
+  `skill_proposal.not_found` wie eine unbekannte ID (die Liste ohne KI: 404
+  `skill.not_found`).
+- **Endpunkte**: `GET /api/skill-proposals?space_id=&org_wide=&state=&limit=&cursor=`
+  (neueste zuerst, `space_id` eines unlesbaren Bereichs: 404 `space.not_found`),
+  `GET /api/skill-proposals/{id}` (mit `proposed`, bei `change` dem Skill jetzt als
+  `current` mit `version` und `number` und `outdated`), `POST …/accept`
+  `{version, description?, content?, skill_version?}`, `POST …/reject`
+  `{version, reason?}`. Entscheiden: 403 ohne das Recht (ein Lauf entscheidet nie),
+  409 `skill_proposal.not_open`, `skill_proposal.version_conflict`.
+- **Basis**: Hat der Skill seit dem Vorschlag eine neuere Version, antwortet `accept`
+  409 `skill_proposal.base_outdated` mit `details = {skill_version, current:
+  {description, content}, proposed: {description, content}}` und schreibt nichts. Die
+  Moderatorin nimmt erneut an, mit `skill_version` und, wo gewünscht, dem endgültigen
+  Text; ist der Skill inzwischen wieder anders, wieder 409.
+- **Annehmen** erzeugt die Skill-Version über die Skill-Dienste (Audit wie dort): mit
+  dem Agenten als Urheber, wenn der Text wie vorgeschlagen bleibt, sonst mit der
+  Moderatorin (wie bei Seitenvorschlägen); ein neuer Skill entsteht im Bereich des
+  Vorschlags. Ein archivierter Skill nimmt nichts an (409
+  `skill_proposal.skill_archived`), ein inzwischen vergebener Name 409
+  `skill.name_taken`.
+- **Aktivität** (Grund `skill_proposal`, an den Vorschlag gebunden: `skill_proposal`
+  `{id, space_id}` in `/api/activity`, kein Gespräch): beim Vorschlag für die
+  Moderatoren des Bereichs nach Mitgliedschaft bzw. für Owner und Admins bei
+  organisationsweiten, beim Entscheiden für einen Urheber, der eine Person ist. Sie
+  steht nur, solange die Person den Vorschlag sieht (dieselbe Regel; wer die
+  Moderation verliert, verliert den Eintrag).
+- **Live**: `skill_proposal.changed` mit `proposal_id`, je Person (wer entscheiden
+  darf, der Urheber), bei jedem Ereignis. Ereignisse `skill_proposal.created|
+  accepted|rejected` tragen nur IDs.
+- Rolling Update: Benachrichtigungen mit Grund `skill_proposal` schreibt erst dieses
+  Release; ein Pod des vorigen liest sie erst, wenn es welche gibt.
+
 ## Testen ohne Anbieter
 
 `backend/tests/support/openai_stub.py` ist ein lokaler Anbieter für Tests und e2e:
