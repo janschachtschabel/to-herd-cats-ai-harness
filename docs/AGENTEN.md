@@ -180,7 +180,9 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
   Entwürfe nur in der Direktnachricht. Der Auftrag selbst erscheint am Ort nicht.
 - **Heartbeat:** Ist nichts zu tun, antwortet der Agent genau `HEARTBEAT_OK`; dann
   erscheint nirgends etwas (keine Nachricht, keine Aktivität), nur das Protokoll
-  vermerkt „nichts zu melden“. Alles andere kommt an den Ort.
+  vermerkt „nichts zu melden“. Alles andere kommt an den Ort. Solange ein Heartbeat
+  noch nichts zugestellt hat, zeigt der Ort auch kein „arbeitet …“: Sein Fortschritt
+  geht live nur an die Eigentümerin (ihre Laufansicht folgt ihm).
 - **Ereignis-Regeln** legen nur die Verwaltenden eines Bereichs an, an einem Kanal oder
   Ticket dieses Bereichs. Der Agent erfährt nur Art und Kennung des Objekts und liest es
   selbst, mit den Rechten der Eigentümerin am Ort: Wer das Ereignis ausgelöst hat,

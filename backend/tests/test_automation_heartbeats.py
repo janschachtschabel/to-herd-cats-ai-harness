@@ -14,10 +14,11 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from app.core.outbox import EventOutbox
+from app.core.outbox import Event, EventOutbox
 from app.modules.agents.models import RunState, StopReason
 from app.modules.automations.models import FiringOutcome
 from app.modules.automations.repository import AutomationRepository
+from app.modules.messaging.live_events import of_event
 from app.modules.messaging.models import MessageKind
 from app.modules.messaging.notification_models import Notification
 from tests.factories_agents import Bench
@@ -32,7 +33,7 @@ from tests.factories_automations import (
 )
 from tests.factories_tools import call
 from tests.factories_writing import Work, messages_in
-from tests.test_approvals import NEW, confirm
+from tests.test_approvals import NEW, confirm, decide
 from tests.test_run_replay import Crash, die_after, take_up_again
 
 CHECKLIST = "Prüfe offene Tickets. CHECK-91"
@@ -190,3 +191,45 @@ async def test_a_heartbeat_asking_for_a_release_opens_its_thread_for_the_card(
     assert root.kind == MessageKind.SYSTEM
     (card,) = [m for m in said if m.parent_id == root.id]
     assert card.kind == MessageKind.APPROVAL
+
+
+async def _live_since(bench: Bench, since: Any) -> list[Any]:
+    rows = await bench.session.scalars(select(EventOutbox).where(EventOutbox.id > since))
+    return [e for e in (of_event(Event.of(row)) for row in rows) if e is not None]
+
+
+async def test_a_silent_heartbeat_sends_nothing_live_into_its_place(work: Work) -> None:
+    """No "is working" card for the place's readers at every interval (review M7,
+    finding 5): its progress goes to its owner alone, whose run view follows it."""
+    bench, channel = work.bench, await _channel(work)
+    await beating(bench, channel)
+    since = await _last_event_id(bench)
+    fired = await fire(bench)
+    bench.stub.state.replies.append({"content": "HEARTBEAT_OK"})
+    assert await bench.run_next() == StopReason.COMPLETED
+    live = await _live_since(bench, since)
+    told = sorted({e.name for e in live if e.conversation_id == channel})
+    assert told == [], f"live events for the heartbeat's place: {told}"
+    progress = [(e.user_id, e.run_id) for e in live if e.name == "run.progress"]
+    assert progress == [(bench.people.users["alice"].id, fired.run_id)]
+
+
+async def test_a_heartbeat_that_delivers_goes_live_in_its_place_from_then_on(work: Work) -> None:
+    """Once its term's thread is open (here: a card waits for a release), its progress
+    goes to the place like any run's."""
+    bench, channel = work.bench, await _channel(work)
+    page_id = await work.page()
+    await confirm(work, "propose_page_change")
+    args = {"page_id": page_id, "content_md": NEW, "reason": "Veraltet"}
+    bench.stub.state.replies.extend([call("propose_page_change", **args), {"content": "Fertig"}])
+    await beating(bench, channel)
+    await fire(bench)
+    assert await bench.run_next() is None  # waits for the release, its card in the thread
+    r = await bench.people.alice.get("/api/approvals", params={"state": "pending"})
+    (approval,) = r.json()["items"]
+    since = await _last_event_id(bench)
+    assert (await decide(work, approval, "approve")).status_code == 200
+    assert await bench.run_next() == StopReason.COMPLETED
+    live = await _live_since(bench, since)
+    progress = [(e.conversation_id, e.user_id) for e in live if e.name == "run.progress"]
+    assert progress and set(progress) == {(channel, None)}

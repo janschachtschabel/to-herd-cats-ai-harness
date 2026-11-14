@@ -13,6 +13,8 @@
   heartbeat's term opens nothing when it fires: the first delivery of its run (its
   answer, a card, the notice of its end) posts the term's entry first
   (`entries.py`), so a heartbeat that answers `HEARTBEAT_OK` leaves no trace.
+- `heard_in_place`: whether the run's progress goes live to its place (a heartbeat's
+  only once it has delivered something; until then to its owner alone).
 - `silent`: in the transaction that ends the run, whether its answer is a
   heartbeat's `HEARTBEAT_OK`, which is delivered nowhere; the term's row notes it
   (`heartbeat_ok`).
@@ -82,6 +84,21 @@ async def open_thread(
         if await repo.entry_of(firing.id) is None:
             await entries.opened(session, automation, place, firing.id)
     return await repo.thread_of(firing.id, lock=lock)
+
+
+async def heard_in_place(session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID) -> bool:
+    """Whether the run's progress goes live to its place: any run but a heartbeat's
+    before its first delivery (its term's entry not yet posted; in a DM, never before
+    its end), which would put an "is working" card in front of the place's readers at
+    every interval for an answer that may be `HEARTBEAT_OK` (review M7, finding 5)."""
+    repo = AutomationRepository(session, org_id)
+    firing = await repo.firing_of(run_id)
+    if firing is None:
+        return True
+    automation = await repo.get(firing.automation_id)
+    if automation is None or automation.kind != AutomationKind.HEARTBEAT:
+        return True
+    return await repo.entry_of(firing.id) is not None
 
 
 async def silent(

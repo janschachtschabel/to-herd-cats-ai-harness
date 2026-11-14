@@ -21,8 +21,15 @@ TOOL_TIMED_OUT = (
 TIMED_OUT_SOURCE = "host"
 
 
-async def progress(session: AsyncSession, claimed: Claimed, steps: int) -> None:
-    """`run.progress` for the DM's person (ids and the step counter only)."""
+async def progress(
+    session: AsyncSession, claimed: Claimed, steps: int, *, in_place: bool = True
+) -> None:
+    """`run.progress` (ids and the step counter only) for whoever may see the run's
+    conversation, or (`in_place` false: a heartbeat that has delivered nothing yet)
+    for the person who asked alone, whose run view follows it."""
+    where: dict[str, str | None] = {"conversation_id": str(claimed.conversation_id)}
+    if not in_place:
+        where = {"conversation_id": None, "user_id": str(claimed.user_id)}
     await emit(
         session,
         type="run.progress",
@@ -30,11 +37,7 @@ async def progress(session: AsyncSession, claimed: Claimed, steps: int) -> None:
         space_id=None,
         subject_type="run",
         subject_id=claimed.id,
-        payload={
-            "conversation_id": str(claimed.conversation_id),
-            "run_id": str(claimed.id),
-            "step": steps,
-        },
+        payload={**where, "run_id": str(claimed.id), "step": steps},
     )
 
 

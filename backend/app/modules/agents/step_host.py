@@ -67,6 +67,7 @@ from app.modules.ai.budgets import budget_exhausted, has_price
 from app.modules.ai.models import AiConnection, DataLocation, UsageRecord
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
+from app.modules.automations import runs as automation_runs
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult
 
 CUT_GRACE_SECONDS = 1.0  # past the deadline, an asyncio timeout ends what the database did not
@@ -129,7 +130,11 @@ class RunHost:
                 content["cost"] = str(usage.cost)  # the run view shows it per step
             await steps.event(self._seq(), EventKind.MODEL_CALL, content)
             run.steps += 1
-            await progress(session, self.run.claimed, run.steps)
+            claimed = self.run.claimed
+            in_place = claimed.automation_id is None or await automation_runs.heard_in_place(
+                session, claimed.org_id, claimed.id
+            )
+            await progress(session, claimed, run.steps, in_place=in_place)
             steps.keep(run)
 
     async def call_tool(self, step: int, call: ToolCall, args: Any) -> ToolResult:

@@ -30,8 +30,9 @@ an author always hears of their proposal). `skill_proposal.changed` (plan M6 tas
 is for one person `u` (who may decide the skill proposal `x`, or its author: the
 handler writes one per person), with the proposal's id; so is `automation.changed`
 (plan M7 task 7, for who may see the automation), with its id and its place's space
-(`s`, null for a DM). `run.progress` (plan M5 task 6) names an agent's run in a DM
-as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person). Every
+(`s`, null for a DM). `run.progress` (plan M5 task 6) names an agent's run as `n` and
+its steps so far as `k`, for whoever may see its conversation `c`; a heartbeat's run
+before it delivers anything names no `c` but its asker `u` (review M7, finding 5). Every
 API process's hub (`live.py`) decodes it again; anything it cannot use is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
 """
@@ -101,6 +102,7 @@ FOR_ONE_PERSON = frozenset(
         "access.changed",
         "skill_proposal.changed",
         "automation.changed",
+        "run.progress",  # a heartbeat's before it delivers: its asker alone, no `c`
     }
 )
 
