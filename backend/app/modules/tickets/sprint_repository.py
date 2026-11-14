@@ -2,7 +2,10 @@
 organisation and the spaces where it may read tickets): a sprint of any other space is
 never loaded, whether asked for by id, as a ticket's sprint or as the next sprint.
 
-Locks (plan M4b review focus 2), always sprints before tickets:
+Locks (plan M4b review focus 2), always sprints before tickets; a closing takes the
+sprint, then the space's status lock (`StatusRepository.lock_space`, which a status
+deletion holds while it moves its tickets), then the sprint's tickets (`lock_tickets`):
+sprint → space statuses → tickets.
 - a sprint being changed, started or closed: `FOR NO KEY UPDATE` (`get(lock=True)`);
   it never changes its key, so the foreign key checks of tickets put into the next
   sprint (`FOR KEY SHARE`) do not wait for it;

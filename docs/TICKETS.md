@@ -472,7 +472,11 @@ der Worker unter Dauerlast langsamer auf (`herd_outbox_pending`, Alarm
   `work_item.status_changed_at`, gesetzt vom Trigger `work_item_status_changed_at` bei
   jedem Wechsel von `status_id` (auch durch ältere Versionen und beim Löschen eines
   Status mit Ersatz), für bestehende Tickets aus der letzten Systemmeldung zum Status
-  nachgetragen. Sperren: erst Sprints, dann Tickets. Audit: `sprint.created`,
+  nachgetragen. Sperren: erst Sprints, dann Tickets; der Abschluss eines Sprints nimmt
+  dazwischen die Status-Sperre des Bereichs (Sprint → Status des Bereichs → Tickets), die
+  auch das Löschen eines Status hält, damit beide nie gleichzeitig Tickets sperren. Ein
+  Deadlock der Datenbank (40P01) würde als 500 beantwortet; eine Zuordnung auf eine
+  wiederholbare Antwort gibt es nicht. Audit: `sprint.created`,
   `sprint.started`, `sprint.closed` (mit Ziel der unerledigten Tickets und Bilanz).
   Keine neuen Einstellungen.
 

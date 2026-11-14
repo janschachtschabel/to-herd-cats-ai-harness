@@ -54,6 +54,7 @@ from app.modules.tickets.models import (
     StatusCategory,
 )
 from app.modules.tickets.sprint_repository import FINISHED, SprintRepository, order_key
+from app.modules.tickets.statuses import status_repository
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
 EDITABLE = ("name", "goal", "starts_on", "ends_on")
@@ -195,6 +196,10 @@ class SprintService:
                 raise ValidationFailed(
                     "No planned sprint to carry on in", code="sprint.next_missing"
                 )
+        # Lock order sprint → the space's statuses → tickets: a status deletion holds the
+        # status lock while it moves its tickets, so the two never lock tickets at once
+        # (in crossing orders, module review M4b finding 2).
+        await status_repository(self.session, actor).lock_space(sprint.space_id)
         tickets = await repo.lock_tickets(sprint.id)
         categories = await repo.categories({status_id for _, status_id in tickets})
         open_ = [t for t, s in tickets if categories.get(s) not in FINISHED]
