@@ -26,6 +26,8 @@ dependencies = [
     "pydantic-ai-slim>=2.68",
     "openai>=3.31",
     "pyyaml>=6.0.3",
+    "cronsim>=2.8",
+    "tzdata>=2025.2",
 ]
 
 [dependency-groups]
