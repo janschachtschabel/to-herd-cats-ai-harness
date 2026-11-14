@@ -165,13 +165,16 @@ cd collab && npm run test:integration             # real API on a throwaway data
 cd frontend && npm run build
 cd e2e && npm ci && npx playwright install chromium && npx playwright test
 # With a Chromium already installed: PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chrome
+# The app runs under the e2e clock (`python -m tests.support.e2e_clock` in place of
+# `app.launch`; a test moves time with `POST /clock` on the control port); never in production.
 ```
 
 ```bash
 docker build -t to-herd-cats-ai:local .                 # the image (SPA + API + collab, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
 SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api-a, api-b, worker; message A → SSE B
-                                                        # (both modes also: a ticket's system entries from the worker)
+                                                        # (both modes also: a ticket's system entries from the worker
+                                                        # and a one-off automation fired exactly once by the due loop)
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 ```
 
