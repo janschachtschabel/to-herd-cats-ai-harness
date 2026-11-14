@@ -12,6 +12,7 @@ from app.modules.ai.assignment_schemas import (
     DefaultIn,
     GroupAssignmentOut,
     GroupsIn,
+    PersonalAgentsIn,
     TargetOut,
     UserAssignmentIn,
     UserAssignmentOut,
@@ -33,6 +34,16 @@ async def set_default_assignment(
 ) -> AssignmentsOut:
     service = AssignmentService(session)
     await service.set_default(actor, body.target, body.version)
+    return await _overview(service, actor)
+
+
+@assignments.put("/personal-agents", response_model=AssignmentsOut)
+async def set_personal_agents(
+    body: PersonalAgentsIn, actor: ActorDep, session: SessionDep
+) -> AssignmentsOut:
+    """Allow or stop personal agents (`agent.create_personal`), with the version."""
+    service = AssignmentService(session)
+    await service.set_personal_agents(actor, body.enabled, body.version)
     return await _overview(service, actor)
 
 
@@ -92,4 +103,8 @@ async def _overview(service: AssignmentService, actor: Actor) -> AssignmentsOut:
         default = TargetOut(
             connection_id=org.connection_id, connection_name=connection_name or "", model=org.model
         )
-    return AssignmentsOut(default=default, version=org.version if org else 1)
+    return AssignmentsOut(
+        default=default,
+        personal_agents=org.personal_agents if org else True,
+        version=org.version if org else 1,
+    )

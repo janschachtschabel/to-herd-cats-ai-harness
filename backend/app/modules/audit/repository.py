@@ -33,6 +33,11 @@ class AuditRepository:
         admin-access index); safe under concurrent requests."""
         await self.session.execute(insert(AuditLog).values(**values).on_conflict_do_nothing())
 
+    async def add_many_unless_present(self, rows: list[dict[str, Any]]) -> None:
+        """`add_unless_present` for several entries, in one statement."""
+        if rows:
+            await self.session.execute(insert(AuditLog).values(rows).on_conflict_do_nothing())
+
     async def page(
         self,
         org_id: uuid.UUID,

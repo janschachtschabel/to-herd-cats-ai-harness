@@ -37,9 +37,21 @@ class DefaultIn(BaseModel):
 
 
 class AssignmentsOut(BaseModel):
-    """The standard assignment; `version` guards it and the group list."""
+    """The standard assignment and whether people with `ai.use` may create personal
+    agents; `version` guards both and the group list."""
 
     default: TargetOut | None
+    personal_agents: bool
+    version: int
+
+
+class PersonalAgentsIn(BaseModel):
+    """Allow (or stop) personal agents for everyone with `ai.use`; off, existing
+    personal agents stop working (`agent.personal_disabled`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
     version: int
 
 

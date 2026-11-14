@@ -131,14 +131,16 @@ ebenso an). Leser ohne KI sehen von beidem nichts.
   `ai_space_ids` und `ai_readable` (`app/modules/ai/policy_filters.py`) in SQL, in
   derselben Abfrage wie die Rechte.
 
-## Agenten (`/api/agents`, Recht `agent.manage`)
+## Agenten (`/api/agents`, Recht `agent.manage`; persönliche: ihre Besitzer)
 
 Agenten sind Principals wie Personen: Mitglied von Bereichen (`PUT
 /api/spaces/{id}/members` mit `member_type: agent`), Teilnehmer einer Direktnachricht,
 Urheber von Nachrichten (`kind: agent`).
 
-- `GET/POST /api/agents`, `GET/PATCH/DELETE /api/agents/{id}` (nur `owner`/`admin`,
-  sonst 404 `agent.not_found`): Name, Kurzvorstellung, Anweisungen (höchstens 20.000
+- `GET/POST /api/agents`, `GET/PATCH/DELETE /api/agents/{id}` (`agent.manage`, für
+  persönliche Agenten auch ihre Besitzer, siehe unten; sonst 404 `agent.not_found`;
+  `GET /api/agents` nennt Personen mit `ai.use` ohne `agent.manage` nur ihre eigenen
+  persönlichen Agenten): Name, Kurzvorstellung, Anweisungen (höchstens 20.000
   Zeichen), Verbindung und Modell (eine Chat-Verbindung, die das Modell anbietet; 422
   `ai.connection_not_chat`, `ai.model_unknown`), verantwortliche Person (aktiv, kein
   Gast; 422 `agent.responsible_invalid`), Status `draft|active|paused`, Grenzen
@@ -146,7 +148,8 @@ Urheber von Nachrichten (`kind: agent`).
   (409 `agent.version_conflict`), Audit ohne den Text der Anweisungen. Wer schon
   gesprochen oder gelaufen ist, wird nicht gelöscht (409 `agent.in_use`), sondern
   pausiert.
-- Antworten nennen auch `responsible_name`, den Namen der verantwortlichen Person.
+- Antworten nennen auch `responsible_name`, den Namen der verantwortlichen Person, und
+  `owner_user_id` (die Besitzerin eines persönlichen Agenten, sonst leer).
 - **Autonomiestufe** `level` (1 nur lesen, 2 vorschlagen, 3 intern schreiben; Stufe 4
   kommt mit M8): neue Agenten haben Stufe 2, Agenten aus M5 wurden bei der Migration
   Stufe 1 (sie waren nur lesend gebaut). Eine Stufe über 2 vergibt nur ein Admin oder
@@ -178,6 +181,53 @@ Urheber von Nachrichten (`kind: agent`).
 - `POST /api/dms` mit `{"agent_id": …}` (ohne weitere Personen, sonst 422
   `dm.agent_pair_only`): die Direktnachricht der Person mit dem Agenten; ohne `ai.use`
   404 `agent.not_found`.
+
+## Persönliche Agenten (M6)
+
+Ein persönlicher Agent gehört einer Person (`owner_user_id`).
+
+- **Recht** `agent.create_personal`: abgeleitet wie `ai.use`, nie gespeichert: wer
+  `ai.use` hat, solange die Organisation persönliche Agenten erlaubt. `/api/auth/me`
+  nennt es in `permissions`.
+- **Schalter**: `PUT /api/ai/assignments/personal-agents` (`ai.manage`, Körper
+  `{"enabled": false, "version": n}` mit der Version aus `GET /api/ai/assignments`, die
+  auch Standard- und Gruppenzuordnung schützt; 409 bei veralteter Version; Audit
+  `ai_assignment.personal_agents_set`). `GET /api/ai/assignments` nennt den Stand in
+  `personal_agents` (Voreinstellung: an). Aus: niemand legt neue an, und bestehende
+  persönliche Agenten antworten nicht mehr (`agent.personal_disabled`).
+- **Anlegen**: `POST /api/agents` mit `{"name": …, "personal": true}`. Ohne `ai.use`
+  404 `agent.not_found`; mit `ai.use`, aber abgeschaltet, 403
+  `agent.personal_disabled`. Verbindung und Modell sind die der Person (ihre
+  Zuordnung); gibt man sie an, müssen es diese sein (422 `ai.connection_not_found`,
+  `ai.model_unknown`). Verantwortlich ist die Besitzerin selbst (eine andere Person:
+  422 `agent.responsible_invalid`). Höchstens Stufe 2 (403 `agent.level_denied`, auch
+  für Admins). Höchstens `HERD_AI_PERSONAL_AGENTS_MAX` (Standard 5, 0 bis 100) je
+  Person (409 `agent.personal_limit`; gezählt unter einer Sperre je Person, zwei
+  gleichzeitige Anlagen überschreiten die Grenze nicht).
+- **Bereiche**: Der Agent ist ab der Anlage Mitglied (`editor`) im persönlichen
+  Bereich seiner Besitzerin und nur dort. Jeder Versuch, ihn einem anderen Bereich
+  hinzuzufügen, scheitert mit 422 `agent.personal_space_only`, auch für Admins und die
+  Besitzerin; wer den Agenten nicht sehen darf, bekommt 404 `agent.not_found`.
+- **Verwalten**: Die Besitzerin (mit `ai.use`) liest, ändert, pausiert und löscht ihre
+  Agenten (Löschen nur ungenutzt, sonst 409 `agent.in_use`) und setzt ihre
+  Werkzeugfreigaben, über dieselben Endpunkte wie `agent.manage`, mit `version` (409).
+  Jede Änderung übernimmt Verbindung und Modell neu aus ihrer Zuordnung: Ändert ein
+  Admin ihre Zuordnung, antwortet der Agent mit `agent.connection_unavailable`, bis er
+  einmal gespeichert wird (`PATCH` nur mit `version` genügt).
+- **Reden**: Nur die Besitzerin erreicht ihn: Direktnachricht, Profil, Verzeichnis und
+  Erwähnungen verbergen ihn vor allen anderen, auch vor Admins (404
+  `agent.not_found`). Läufe fragen daher immer als Besitzerin, ihre Rechte gelten, der
+  Verbrauch wird ihr gebucht. Ein Lauf für jemand anderen (spätere Auslöser) startet
+  nicht (`agent.not_found`) oder endet vor dem ersten Aufruf (`rights_revoked`).
+- **Ende**: Verliert die Besitzerin `ai.use` (`ai.unavailable`), wird sie deaktiviert
+  (`agent.responsible_inactive`) oder schaltet die Organisation persönliche Agenten ab
+  (`agent.personal_disabled`), startet kein Lauf mehr, und ein laufender endet mit
+  `rights_revoked`. Personen werden nicht gelöscht, nur deaktiviert; ein persönlicher
+  Agent bleibt dann bestehen, aber unbenutzbar.
+- **Admins** sehen in der Verwaltung (`GET /api/agents`, `GET /api/agents/{id}`,
+  `GET /api/agents/{id}/runs`) jeden Agenten mit seinen Anweisungen („Admins dürfen
+  alles sehen“); dass sie einen persönlichen Agenten einer anderen Person gezeigt
+  bekamen, steht im Audit (`agent.admin_access`, einmal je Admin, Agent und UTC-Tag).
 
 ## Läufe
 

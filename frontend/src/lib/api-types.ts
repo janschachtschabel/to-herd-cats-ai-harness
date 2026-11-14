@@ -494,6 +494,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/assignments/personal-agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Personal Agents
+         * @description Allow or stop personal agents (`agent.create_personal`), with the version.
+         */
+        put: operations["set_personal_agents_api_ai_assignments_personal_agents_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/assignments/users": {
         parameters: {
             query?: never;
@@ -2306,7 +2326,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -2389,13 +2409,13 @@ export interface components {
          * AgentCreate
          * @description `connection_id`/`model`: a chat connection of the organisation and one of its
          *     models. `responsible_user_id`: an active person (no guest) who answers for it.
+         *     Both are needed for the organisation's agents (`agent.manage`). `personal`: the
+         *     caller's own agent (`agent.create_personal`), which takes the caller's connection
+         *     and model and has the caller as responsible person (given, they must be those).
          */
         AgentCreate: {
-            /**
-             * Connection Id
-             * Format: uuid
-             */
-            connection_id: string;
+            /** Connection Id */
+            connection_id?: string | null;
             /**
              * Instructions
              * @default
@@ -2424,21 +2444,24 @@ export interface components {
              */
             max_steps?: number;
             /** Model */
-            model: string;
+            model?: string | null;
             /** Name */
             name: string;
             /**
-             * Responsible User Id
-             * Format: uuid
+             * Personal
+             * @default false
              */
-            responsible_user_id: string;
+            personal?: boolean;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
             /** @default draft */
             status?: components["schemas"]["AgentStatus"];
         };
         /**
          * AgentOut
-         * @description An agent as those with `agent.manage` see it; `responsible_name`: the
-         *     responsible person's name.
+         * @description An agent as those who manage it see it (`agent.manage`; a personal agent's
+         *     owner); `responsible_name`: the responsible person's name; `owner_user_id`: a
+         *     personal agent's owner (null: the organisation's).
          */
         AgentOut: {
             /**
@@ -2470,6 +2493,8 @@ export interface components {
             model: string;
             /** Name */
             name: string;
+            /** Owner User Id */
+            owner_user_id: string | null;
             /** Responsible Name */
             responsible_name: string | null;
             /**
@@ -2643,7 +2668,8 @@ export interface components {
         };
         /**
          * AgentUpdate
-         * @description Fields left out stay as they are; `connection_id` and `model` go together.
+         * @description Fields left out stay as they are; `connection_id` and `model` go together. A
+         *     personal agent takes its owner's connection and model anew with every change.
          */
         AgentUpdate: {
             /** Connection Id */
@@ -2708,10 +2734,13 @@ export interface components {
         };
         /**
          * AssignmentsOut
-         * @description The standard assignment; `version` guards it and the group list.
+         * @description The standard assignment and whether people with `ai.use` may create personal
+         *     agents; `version` guards both and the group list.
          */
         AssignmentsOut: {
             default: components["schemas"]["TargetOut"] | null;
+            /** Personal Agents */
+            personal_agents: boolean;
             /** Version */
             version: number;
         };
@@ -4382,6 +4411,17 @@ export interface components {
             /** Name */
             name: string | null;
             type: components["schemas"]["PrincipalType"];
+        };
+        /**
+         * PersonalAgentsIn
+         * @description Allow (or stop) personal agents for everyone with `ai.use`; off, existing
+         *     personal agents stop working (`agent.personal_disabled`).
+         */
+        PersonalAgentsIn: {
+            /** Enabled */
+            enabled: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * Price
@@ -7139,6 +7179,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["GroupsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_personal_agents_api_ai_assignments_personal_agents_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonalAgentsIn"];
             };
         };
         responses: {

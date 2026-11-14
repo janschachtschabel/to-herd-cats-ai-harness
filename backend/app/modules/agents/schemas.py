@@ -44,16 +44,20 @@ Level = Annotated[
 
 class AgentCreate(BaseModel):
     """`connection_id`/`model`: a chat connection of the organisation and one of its
-    models. `responsible_user_id`: an active person (no guest) who answers for it."""
+    models. `responsible_user_id`: an active person (no guest) who answers for it.
+    Both are needed for the organisation's agents (`agent.manage`). `personal`: the
+    caller's own agent (`agent.create_personal`), which takes the caller's connection
+    and model and has the caller as responsible person (given, they must be those)."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: Name
     intro: Intro = ""
     instructions: Instructions = ""
-    connection_id: uuid.UUID
-    model: ModelName
-    responsible_user_id: uuid.UUID
+    personal: bool = False
+    connection_id: uuid.UUID | None = None
+    model: ModelName | None = None
+    responsible_user_id: uuid.UUID | None = None
     status: AgentStatus = AgentStatus.DRAFT
     max_steps: Steps = MAX_STEPS
     max_runtime_seconds: Runtime = MAX_RUNTIME_SECONDS
@@ -61,7 +65,8 @@ class AgentCreate(BaseModel):
 
 
 class AgentUpdate(BaseModel):
-    """Fields left out stay as they are; `connection_id` and `model` go together."""
+    """Fields left out stay as they are; `connection_id` and `model` go together. A
+    personal agent takes its owner's connection and model anew with every change."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -79,8 +84,9 @@ class AgentUpdate(BaseModel):
 
 
 class AgentOut(BaseModel):
-    """An agent as those with `agent.manage` see it; `responsible_name`: the
-    responsible person's name."""
+    """An agent as those who manage it see it (`agent.manage`; a personal agent's
+    owner); `responsible_name`: the responsible person's name; `owner_user_id`: a
+    personal agent's owner (null: the organisation's)."""
 
     id: uuid.UUID
     name: str
@@ -90,6 +96,7 @@ class AgentOut(BaseModel):
     model: str
     responsible_user_id: uuid.UUID
     responsible_name: str | None
+    owner_user_id: uuid.UUID | None
     status: AgentStatus
     max_steps: int
     max_runtime_seconds: int
@@ -109,6 +116,7 @@ class AgentOut(BaseModel):
             model=agent.model,
             responsible_user_id=agent.responsible_user_id,
             responsible_name=names.get(agent.id),
+            owner_user_id=agent.owner_user_id,
             status=agent.status,
             max_steps=agent.max_steps,
             max_runtime_seconds=agent.max_runtime_seconds,

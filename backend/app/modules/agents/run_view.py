@@ -4,8 +4,9 @@ view shows, and cancelling.
 - **My runs** (`GET /api/runs`): the runs the caller asked for, for a person with
   `ai.use` or `agent.manage` (else 404 `ai.not_found`, as for the other AI lists).
 - **An agent's runs** (`GET /api/agents/{id}/runs`): for its responsible person with
-  `ai.use` and for `agent.manage`; anyone else 404 `agent.not_found`, as for an
-  unknown agent.
+  `ai.use` (a personal agent's owner) and for `agent.manage` (someone else's personal
+  agent audited, `personal.py`); anyone else 404 `agent.not_found`, as for an unknown
+  agent.
 - **One run** (`GET /api/runs/{id}`): whoever may see it (`runs.RunService.get`;
   else 404 `run.not_found`).
 
@@ -33,6 +34,7 @@ from app.core.errors import Conflict
 from app.core.pagination import Page, decode_id_cursor, encode_id_cursor
 from app.modules.agents import control
 from app.modules.agents.models import Agent
+from app.modules.agents.personal import note_admin_access
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_schemas import MyRunsQuery, RunQuery
 from app.modules.agents.run_view_repository import (
@@ -76,6 +78,7 @@ class RunViewService:
         agent = await AgentRepository(self.session, actor.org_id).get(agent_id)
         if agent is None or not await self._sees_runs_of(actor, agent):
             raise agent_not_found()
+        await note_admin_access(self.session, actor, [agent])
         return await self._page(actor, _filter(query, agent_id=agent.id), query)
 
     async def cancel(self, actor: Actor, run_id: uuid.UUID) -> RunView:

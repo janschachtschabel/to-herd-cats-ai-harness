@@ -104,6 +104,8 @@ class Settings(BaseSettings):
     # run is taken up again after it).
     run_concurrency: int = Field(default=4, ge=1, le=64)
     run_lease_seconds: float = Field(default=30.0, ge=3)
+    # Personal agents one person may have at most (plan M6 decision 13).
+    ai_personal_agents_max: int = Field(default=5, ge=0, le=100)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

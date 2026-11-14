@@ -4,7 +4,7 @@ over all of them, sorted by name."""
 import uuid
 from typing import NamedTuple
 
-from sqlalchemy import String, func, literal, select, tuple_, union_all
+from sqlalchemy import String, func, literal, or_, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access_repository import person_reads_space
@@ -33,11 +33,13 @@ class DirectoryRepository:
         after: tuple[str, uuid.UUID] | None,
         limit: int,
         space_id: uuid.UUID | None = None,
+        viewer: uuid.UUID | None = None,
     ) -> list[DirectoryEntry]:
         """Active people, groups and agents that are not drafts, whose name contains
         `text`; case-insensitive, `%` and `_` taken literally. Never the email: members
         must not probe addresses.
-        With `space_id`, only the people who may read that space."""
+        With `space_id`, only the people who may read that space. Personal agents only
+        for their owner (`viewer`), never for anyone else."""
         parts = []
         if PrincipalType.USER in types:
             people = select(
@@ -62,6 +64,7 @@ class DirectoryRepository:
                     Agent.org_id == org_id,
                     Agent.status != AgentStatus.DRAFT,
                     Agent.name.icontains(text, autoescape=True),
+                    or_(Agent.owner_user_id.is_(None), Agent.owner_user_id == viewer),
                 )
             )
         if PrincipalType.GROUP in types:

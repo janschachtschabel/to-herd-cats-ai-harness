@@ -32,10 +32,12 @@ async def test_only_agent_managers_manage_agents(bench: Bench) -> None:
     assert created.status_code == 201, created.text
     agent = created.json()
     assert agent["status"] == "draft" and agent["version"] == 1
+    mine = await bench.people.alice.get(AGENTS)  # with ai.use: her own personal agents
+    assert mine.status_code == 200 and mine.json()["items"] == []
+    assert (await bench.people.gast.get(AGENTS)).status_code == 404
     for who in ("alice", "gast"):
         client: AsyncClient = getattr(bench.people, who)
         for method, url, payload in (
-            ("GET", AGENTS, None),
             ("POST", AGENTS, body(bench)),
             ("GET", f"{AGENTS}/{agent['id']}", None),
             ("PATCH", f"{AGENTS}/{agent['id']}", {"name": "X", "version": 1}),

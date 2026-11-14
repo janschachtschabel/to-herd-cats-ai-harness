@@ -34,6 +34,9 @@ class Action(StrEnum):
     AGENT_MANAGE = "agent.manage"  # create and change the organisation's agents (spec 8.1)
     SKILL_MANAGE = "skill.manage"  # organisation-wide skills (space skills: `page.moderate`)
     AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
+    # Own personal agents (spec 8.1, plan M6 decision 13): derived, `ai.use` while the
+    # organisation allows personal agents.
+    AGENT_CREATE_PERSONAL = "agent.create_personal"
 
 
 class SpaceRole(StrEnum):
@@ -100,8 +103,9 @@ WRITE_ACTIONS: frozenset[Action] = frozenset(SPACE_ACTION_MIN_ROLE) - READ_ACTIO
 ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADMIN})
 
 # System-wide actions no role grants: `access.can` derives them (`ai.use` from the
-# person's AI assignment, plan M5 decision 5).
-DERIVED_ACTIONS: frozenset[Action] = frozenset({Action.AI_USE})
+# person's AI assignment, plan M5 decision 5; `agent.create_personal` from `ai.use`
+# and the organisation's switch, plan M6 decision 13).
+DERIVED_ACTIONS: frozenset[Action] = frozenset({Action.AI_USE, Action.AGENT_CREATE_PERSONAL})
 
 # System-wide actions per system role.
 SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {

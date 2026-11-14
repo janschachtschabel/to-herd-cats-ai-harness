@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.models_base import Base, OrgScoped, UuidPk, utcnow
 
 ADMIN_ACCESS = "space.admin_access"
+AGENT_ADMIN_ACCESS = "agent.admin_access"  # someone else's personal agent (plan M6)
 
 
 class AuditLog(UuidPk, OrgScoped, Base):
@@ -27,6 +28,15 @@ class AuditLog(UuidPk, OrgScoped, Base):
             text("((created_at AT TIME ZONE 'UTC')::date)"),
             unique=True,
             postgresql_where=text(f"action = '{ADMIN_ACCESS}'"),
+        ),
+        # At most one entry per admin, personal agent of someone else and UTC day.
+        Index(
+            "uq_audit_log_agent_admin_access_daily",
+            "actor_id",
+            "target_id",
+            text("((created_at AT TIME ZONE 'UTC')::date)"),
+            unique=True,
+            postgresql_where=text(f"action = '{AGENT_ADMIN_ACCESS}'"),
         ),
     )
 

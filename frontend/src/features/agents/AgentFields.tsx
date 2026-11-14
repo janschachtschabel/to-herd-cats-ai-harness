@@ -33,7 +33,7 @@ export function AgentFields({
   const connectionId = form.watch('connection_id')
   const model = form.watch('model')
   const instructions = form.watch('instructions') ?? ''
-  const target = connectionId ? { connection_id: connectionId, model } : null
+  const target = connectionId ? { connection_id: connectionId, model: model ?? '' } : null
   const submitted = form.formState.isSubmitted
 
   return (

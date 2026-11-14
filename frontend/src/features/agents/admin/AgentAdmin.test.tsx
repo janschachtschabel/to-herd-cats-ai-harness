@@ -20,6 +20,7 @@ const agent: Agent = {
   model: 'gpt-6-luna',
   responsible_user_id: me.user.id,
   responsible_name: 'Mia Muster',
+  owner_user_id: null,
   status: 'active',
   max_steps: 25,
   max_runtime_seconds: 600,

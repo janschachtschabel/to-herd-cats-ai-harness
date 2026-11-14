@@ -27,7 +27,8 @@
           "ai.manage",
           "agent.manage",
           "skill.manage",
-          "ai.use"
+          "ai.use",
+          "agent.create_personal"
         ],
         "title": "Action",
         "type": "string"
@@ -235,12 +236,19 @@
       },
       "AgentCreate": {
         "additionalProperties": false,
-        "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.",
+        "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.\nBoth are needed for the organisation's agents (`agent.manage`). `personal`: the\ncaller's own agent (`agent.create_personal`), which takes the caller's connection\nand model and has the caller as responsible person (given, they must be those).",
         "properties": {
           "connection_id": {
-            "format": "uuid",
-            "title": "Connection Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
           },
           "instructions": {
             "default": "",
@@ -278,10 +286,17 @@
             "type": "integer"
           },
           "model": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Model",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "name": {
             "maxLength": 120,
@@ -290,10 +305,22 @@
             "title": "Name",
             "type": "string"
           },
+          "personal": {
+            "default": false,
+            "title": "Personal",
+            "type": "boolean"
+          },
           "responsible_user_id": {
-            "format": "uuid",
-            "title": "Responsible User Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible User Id"
           },
           "status": {
             "$ref": "#/components/schemas/AgentStatus",
@@ -301,16 +328,13 @@
           }
         },
         "required": [
-          "name",
-          "connection_id",
-          "model",
-          "responsible_user_id"
+          "name"
         ],
         "title": "AgentCreate",
         "type": "object"
       },
       "AgentOut": {
-        "description": "An agent as those with `agent.manage` see it; `responsible_name`: the\nresponsible person's name.",
+        "description": "An agent as those who manage it see it (`agent.manage`; a personal agent's\nowner); `responsible_name`: the responsible person's name; `owner_user_id`: a\npersonal agent's owner (null: the organisation's).",
         "properties": {
           "connection_id": {
             "format": "uuid",
@@ -355,6 +379,18 @@
             "title": "Name",
             "type": "string"
           },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
           "responsible_name": {
             "anyOf": [
               {
@@ -393,6 +429,7 @@
           "model",
           "responsible_user_id",
           "responsible_name",
+          "owner_user_id",
           "status",
           "max_steps",
           "max_runtime_seconds",
@@ -744,7 +781,7 @@
       },
       "AgentUpdate": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are; `connection_id` and `model` go together.",
+        "description": "Fields left out stay as they are; `connection_id` and `model` go together. A\npersonal agent takes its owner's connection and model anew with every change.",
         "properties": {
           "connection_id": {
             "anyOf": [
@@ -944,7 +981,7 @@
         "type": "object"
       },
       "AssignmentsOut": {
-        "description": "The standard assignment; `version` guards it and the group list.",
+        "description": "The standard assignment and whether people with `ai.use` may create personal\nagents; `version` guards both and the group list.",
         "properties": {
           "default": {
             "anyOf": [
@@ -956,6 +993,10 @@
               }
             ]
           },
+          "personal_agents": {
+            "title": "Personal Agents",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -963,6 +1004,7 @@
         },
         "required": [
           "default",
+          "personal_agents",
           "version"
         ],
         "title": "AssignmentsOut",
@@ -5413,6 +5455,26 @@
           "name"
         ],
         "title": "PersonOut",
+        "type": "object"
+      },
+      "PersonalAgentsIn": {
+        "additionalProperties": false,
+        "description": "Allow (or stop) personal agents for everyone with `ai.use`; off, existing\npersonal agents stop working (`agent.personal_disabled`).",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "version"
+        ],
+        "title": "PersonalAgentsIn",
         "type": "object"
       },
       "Price-Input": {
@@ -11392,6 +11454,48 @@
           }
         },
         "summary": "Set Group Assignments",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/assignments/personal-agents": {
+      "put": {
+        "description": "Allow or stop personal agents (`agent.create_personal`), with the version.",
+        "operationId": "set_personal_agents_api_ai_assignments_personal_agents_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonalAgentsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Personal Agents",
         "tags": [
           "ai"
         ]

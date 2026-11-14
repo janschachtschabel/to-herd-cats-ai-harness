@@ -1,9 +1,10 @@
 """Who uses which connection (spec 7.2), set by holders of `ai.manage` (everyone else:
-404). The standard and the ordered group list share one version (the organisation's
-row); a person's own assignment has its own. A target must be a chat connection of the
-organisation and one of its models; while an assignment uses a connection, the
-connection cannot be deleted (409 `ai.connection_in_use`): writes here lock the
-connection shared, its deletion locks it exclusively. A change is announced
+404). The standard, the ordered group list and the switch for personal agents share
+one version (the organisation's row); a person's own assignment has its own. A target
+must be a chat connection of the organisation and one of its models; while an
+assignment uses a connection, the connection cannot be deleted (409
+`ai.connection_in_use`): writes here lock the connection shared, its deletion locks it
+exclusively. A change is announced
 (`access.changed`) to whom it may concern, so their clients reload `ai.use` at once
 (ruling M5 (c)): a person's own assignment to them, the group list to the people of
 every group in the old or the new list, the standard to every active person.
@@ -53,6 +54,25 @@ class AssignmentService:
         details = _target_details(target)
         await record(
             self.session, actor, "ai_assignment.default_set", "organization", actor.org_id, details
+        )
+        everyone = await UserRepository(self.session).active_ids(actor.org_id)
+        await access_changed(self.session, actor, everyone, space_id=None)
+
+    async def set_personal_agents(self, actor: Actor, enabled: bool, version: int) -> None:
+        """The switch for personal agents (plan M6 decision 13); everyone's
+        `agent.create_personal` may change, so every active person is told."""
+        await require_ai(self.session, actor, Action.AI_MANAGE)
+        org = await self._org(actor, version)
+        org.personal_agents = enabled
+        org.version += 1
+        await self.session.flush()
+        await record(
+            self.session,
+            actor,
+            "ai_assignment.personal_agents_set",
+            "organization",
+            actor.org_id,
+            {"enabled": enabled},
         )
         everyone = await UserRepository(self.session).active_ids(actor.org_id)
         await access_changed(self.session, actor, everyone, space_id=None)

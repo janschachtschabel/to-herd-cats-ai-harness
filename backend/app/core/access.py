@@ -4,7 +4,8 @@ is no other place that decides who may do what.
 - System admins and owners may do everything, in every space of their organisation.
 - System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`), except the
   derived ones (`DERIVED_ACTIONS`): `ai.use` holds whoever the AI assignment gives a
-  usable connection (`modules/ai/effective.py`); no role grants it.
+  usable connection (`modules/ai/effective.py`), `agent.create_personal` whoever has
+  `ai.use` while the organisation allows personal agents; no role grants either.
 - Inside a space the effective role decides: the highest of the actor's direct role
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
@@ -48,7 +49,7 @@ from app.core.permissions import (
     SpaceRole,
 )
 from app.core.principal import PrincipalType
-from app.modules.ai.effective import effective_assignment
+from app.modules.ai.effective import effective_assignment, personal_agents_allowed
 from app.modules.audit.models import ADMIN_ACCESS
 from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
@@ -150,11 +151,16 @@ async def require(
 
 async def _derived(session: AsyncSession, actor: Actor, action: Action) -> bool:
     """`ai.use`: a person whose assignment gives a usable connection (active, no
-    guest: `effective.judge` reads both afresh)."""
-    assert action == Action.AI_USE
+    guest: `effective.judge` reads both afresh). `agent.create_personal`: `ai.use`
+    while the organisation allows personal agents."""
     if actor.principal.type != PrincipalType.USER:
         return False
-    return await effective_assignment(session, actor.org_id, actor.principal.id) is not None
+    if await effective_assignment(session, actor.org_id, actor.principal.id) is None:
+        return False
+    if action == Action.AGENT_CREATE_PERSONAL:
+        return await personal_agents_allowed(session, actor.org_id)
+    assert action == Action.AI_USE
+    return True
 
 
 def _by_admin_power(facts: AccessFacts) -> bool:

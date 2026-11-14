@@ -169,6 +169,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/ai/connections/{connection_id}/models", "ai"),
     ("GET", "/api/ai/assignments", "ai"),
     ("PUT", "/api/ai/assignments/default", "ai"),
+    ("PUT", "/api/ai/assignments/personal-agents", "ai"),
     ("GET", "/api/ai/assignments/groups", "ai"),
     ("PUT", "/api/ai/assignments/groups", "ai"),
     ("GET", "/api/ai/assignments/users", "ai"),
@@ -304,6 +305,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/ai/connections/{connection_id}"): {"name": "X", "version": 1},
     ("POST", "/api/ai/connections/{connection_id}/models"): {"version": 1},
     ("PUT", "/api/ai/assignments/default"): {"target": None, "version": 1},
+    ("PUT", "/api/ai/assignments/personal-agents"): {"enabled": True, "version": 1},
     ("PUT", "/api/ai/assignments/groups"): {"items": [], "version": 1},
     ("PUT", "/api/ai/assignments/users/{user_id}"): {"no_ai": True, "version": None},
     ("POST", "/api/agents"): {

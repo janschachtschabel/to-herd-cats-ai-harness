@@ -117,8 +117,9 @@ class AiConnection(UuidPk, OrgScoped, Timestamps, Base):
 
 class OrgAssignment(Base):
     """The organisation's standard assignment (spec 7.2): a chat connection and a model,
-    or none (then nobody has AI until an admin assigns some). `version` also guards
-    the ordered list of group assignments, which is replaced as a whole."""
+    or none (then nobody has AI until an admin assigns some), and the switch for
+    personal agents. `version` also guards the ordered list of group assignments,
+    which is replaced as a whole."""
 
     __tablename__ = "ai_org_assignment"
     __table_args__ = (CheckConstraint("(connection_id IS NULL) = (model IS NULL)", name="target"),)
@@ -130,6 +131,11 @@ class OrgAssignment(Base):
         PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT"), index=True
     )
     model: Mapped[str | None] = mapped_column(String(MAX_MODEL_CHARS))
+    # Whether people with `ai.use` may create personal agents (`agent.create_personal`,
+    # plan M6 decision 13); admins switch it off. Without a row: on.
+    personal_agents: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 

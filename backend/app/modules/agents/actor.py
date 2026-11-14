@@ -23,7 +23,7 @@ from app.modules.agents.models import Agent
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.scope import place_of, scopes
-from app.modules.agents.standing import agent_refusal
+from app.modules.agents.standing import agent_refusal, owned_by
 from app.modules.groups.repository import GroupRepository
 from app.modules.users.repository import UserRepository
 
@@ -74,11 +74,11 @@ async def allowed_actor(
     conversation_id: uuid.UUID,
 ) -> Actor | None:
     """The run's actor if the run may go on (None: `rights_revoked`): the person acts
-    and has `ai.use`, the agent may run (`standing.agent_refusal`), and every space read
-    so far, where it was read and where it is now, is still visible to the person and
-    the agent together."""
+    and has `ai.use` (and owns the agent, if it is a personal one), the agent may run
+    (`standing.agent_refusal`), and every space read so far, where it was read and
+    where it is now, is still visible to the person and the agent together."""
     actor = await run_actor(session, org_id, user_id, agent.id, conversation_id)
-    if actor is None or not await can(session, actor, Action.AI_USE):
+    if actor is None or not owned_by(agent, actor) or not await can(session, actor, Action.AI_USE):
         return None
     if await agent_refusal(session, org_id, agent) is not None:
         return None

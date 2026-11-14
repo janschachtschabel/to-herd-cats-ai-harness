@@ -38,11 +38,20 @@ class AgentRepository:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         return await self.session.scalar(stmt)
 
-    async def page(self, after: uuid.UUID | None, limit: int) -> list[Agent]:
+    async def page(
+        self, after: uuid.UUID | None, limit: int, *, owner: uuid.UUID | None = None
+    ) -> list[Agent]:
+        """All agents, or with `owner` only that person's personal agents."""
         stmt = select(Agent).where(Agent.org_id == self.org_id).order_by(Agent.id).limit(limit)
+        if owner is not None:
+            stmt = stmt.where(Agent.owner_user_id == owner)
         if after is not None:
             stmt = stmt.where(Agent.id > after)
         return list((await self.session.scalars(stmt)).all())
+
+    async def count_owned(self, owner: uuid.UUID) -> int:
+        stmt = select(func.count()).where(Agent.org_id == self.org_id, Agent.owner_user_id == owner)
+        return int(await self.session.scalar(stmt) or 0)
 
     async def add(self, agent: Agent) -> Agent:
         self.session.add(agent)

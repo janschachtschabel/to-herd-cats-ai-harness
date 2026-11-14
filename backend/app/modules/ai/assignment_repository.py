@@ -58,6 +58,12 @@ class AssignmentRepository:
         row = (await self.session.execute(stmt)).one_or_none()
         return (row[0], row[1]) if row else (None, None)
 
+    async def personal_agents(self) -> bool:
+        """The switch for personal agents (no row yet: on)."""
+        stmt = select(OrgAssignment.personal_agents).where(OrgAssignment.org_id == self.org_id)
+        found = await self.session.scalar(stmt)
+        return True if found is None else bool(found)
+
     async def lock_org(self) -> OrgAssignment:
         """The row, created at version 1 if missing, locked until the transaction ends."""
         await self.session.execute(

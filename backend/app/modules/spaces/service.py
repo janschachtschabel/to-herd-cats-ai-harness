@@ -25,6 +25,7 @@ from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents.models import AgentStatus
 from app.modules.agents.repository import AgentRepository
+from app.modules.agents.standing import owned_by
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import Space, SpaceKind
@@ -212,9 +213,14 @@ class SpaceService:
             agent = await AgentRepository(self.session, org_id).get(principal.id)
             if agent is None or not await self._sees_agents(actor):
                 raise NotFound(code="agent.not_found")
+            manages = await can(self.session, actor, Action.AGENT_MANAGE)
             draft = agent.status == AgentStatus.DRAFT
-            if draft and not await can(self.session, actor, Action.AGENT_MANAGE):
+            if draft and not manages:
                 raise NotFound(code="agent.not_found")  # a draft: as for `visible_agent`
+            if agent.owner_user_id is not None:  # a personal agent stays at home
+                if not (manages or owned_by(agent, actor)):
+                    raise NotFound(code="agent.not_found")
+                raise ValidationFailed(code="agent.personal_space_only")
             return agent.name
         # Under the groups lock: a deletion running now finishes first (and then the
         # group is gone), or waits until this membership is committed and deletes it.

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
 from app.core.request_context import client_ip
-from app.modules.audit.models import ADMIN_ACCESS, AuditLog
+from app.modules.audit.models import ADMIN_ACCESS, AGENT_ADMIN_ACCESS, AuditLog
 from app.modules.audit.repository import AuditRepository
 
 
@@ -46,6 +46,24 @@ async def record_admin_access(
         target_id=space_id,
         details={"kind": kind},
     )
+
+
+async def record_agent_admin_access(
+    session: AsyncSession, actor: Actor, agent_ids: Iterable[uuid.UUID]
+) -> None:
+    """An admin was shown someone else's personal agents (plan M6 decision 13): one
+    entry per admin, agent and UTC day, in one statement."""
+    rows = [
+        {
+            **_who(actor),
+            "action": AGENT_ADMIN_ACCESS,
+            "target_type": "agent",
+            "target_id": agent_id,
+            "details": None,
+        }
+        for agent_id in sorted(set(agent_ids))
+    ]
+    await AuditRepository(session).add_many_unless_present(rows)
 
 
 def snapshot(entity: object, fields: Iterable[str]) -> dict[str, Any]:

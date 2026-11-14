@@ -7,6 +7,10 @@ person responsible for it, a status (`draft`: not offered to anyone; `active`;
 from above; its autonomy level (spec 8.2: 1 reads, 2 proposes, 3 writes inside; 4,
 acting outside, comes with M8), the default of its tool grants.
 
+A personal agent (`owner_user_id`, plan M6 decision 13) belongs to one person: it is
+a member only of that person's personal space, its responsible person is its owner,
+it has at most level 2 and uses the owner's connection and model (`personal.py`).
+
 `agent_tool`: an agent's entry for one tool of the catalog (`toolbox/catalog.py`):
 `allow`, `confirm` or `block`; it can only tighten what the level allows
 (`toolbox/policy.py`).
@@ -104,6 +108,7 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
         ),
         CheckConstraint(f"level BETWEEN 1 AND {MAX_LEVEL}", name="level"),
         Index("ix_agent_connection_id", "connection_id"),
+        Index("ix_agent_owner_user_id", "owner_user_id"),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
@@ -115,6 +120,11 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
     model: Mapped[str] = mapped_column(String(200), nullable=False)
     responsible_user_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
+    )
+    # A personal agent's owner (plan M6 decision 13; `personal.py`); NULL for the
+    # organisation's agents.
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id")
     )
     status: Mapped[AgentStatus] = mapped_column(String(16), nullable=False)
     max_steps: Mapped[int] = mapped_column(Integer, nullable=False, default=MAX_STEPS)

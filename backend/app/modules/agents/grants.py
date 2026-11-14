@@ -5,7 +5,7 @@ entries at once, with the agent's `version` (409 `agent.version_conflict`); a na
 catalog does not list is refused (422 `agent.tool_unknown`). Holders of
 `agent.manage` only (404 `agent.not_found` else); every change is audited.
 `max_level`: the highest level the caller may give the agent (`may_grant_level`), so
-a level they may not give is never offered."""
+a level they may not give is never offered (a personal agent's: 2)."""
 
 import uuid
 from dataclasses import dataclass
@@ -88,6 +88,8 @@ class GrantService:
         return AgentTools(agent, tools, await self.max_level(actor, agent))
 
     async def max_level(self, actor: Actor, agent: Agent) -> int:
+        if agent.owner_user_id is not None:  # personal agents stay at 2 (`personal.py`)
+            return FREE_LEVEL
         for level in range(MAX_LEVEL, FREE_LEVEL, -1):
             if await may_grant_level(self.session, actor, agent.id, level):
                 return level

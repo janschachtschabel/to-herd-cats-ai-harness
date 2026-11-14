@@ -46,3 +46,9 @@ async def effective_assignment(
 ) -> Effective | None:
     """The connection and model the person uses, or None: then no `ai.use`."""
     return judge(await AssignmentRepository(session, org_id).resolve(user_id))
+
+
+async def personal_agents_allowed(session: AsyncSession, org_id: uuid.UUID) -> bool:
+    """The organisation's switch for personal agents (on unless an admin turned it
+    off); with `ai.use` it gives `agent.create_personal`."""
+    return await AssignmentRepository(session, org_id).personal_agents()

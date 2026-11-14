@@ -40,6 +40,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     model: 'gpt-6-luna',
     responsible_user_id: me.user.id,
     responsible_name: 'Mia Muster',
+    owner_user_id: null,
     status: 'active',
     max_steps: 25,
     max_runtime_seconds: 600,
@@ -90,6 +91,7 @@ describe('agents administration', () => {
       max_steps: 25,
       max_runtime_seconds: 600,
       level: 2,
+      personal: false, // an organisation agent (the schema's default)
     })
     expect(await screen.findByRole('article', { name: 'Hilda' })).toBeInTheDocument()
   })
