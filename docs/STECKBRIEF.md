@@ -482,6 +482,12 @@ löscht Ereignisse 7 Tage nach ihrem Termin und Termine nach 90 Tagen, nie solan
 Lauf noch offen ist ([`AGENTEN.md`](AGENTEN.md#aufbewahrung)). Läufe und ihr Journal
 bleiben wie in M6.
 
+**Zeitzonen**: Termine rechnet `zoneinfo` aus der Standardbibliothek. Das Basis-Image
+(`python:3.13-slim` mit dem Digest aus dem `Dockerfile`) bringt die Zonendaten von
+Debian mit (Paket `tzdata` 2026f, geprüft am 14.11.2026); das Python-Paket `tzdata`
+(Laufzeitabhängigkeit, Apache-2.0) ist der Rückfall, wo ein System keine hat. Das Image
+braucht nichts weiter; neue Zonenregeln kommen mit einem neuen Basis-Digest.
+
 ## Abhängigkeiten
 
 | Dienst | Pflicht | Hinweis |
