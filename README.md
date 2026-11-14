@@ -5,7 +5,9 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 4 (Tickets) ist gebaut, dazu M4b (Boards und Sprints).** Aus M1:
+**Stand: Meilenstein 6 (Agenten als Mitarbeiter) ist gebaut, dazu aus M5 die
+KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5 Tasks 8 bis 11) fehlen
+noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -74,9 +76,39 @@ Aus M4b Boards und Sprints:
   auf den laufenden Sprint, mit Hervorhebung dessen, was seit dem letzten Arbeitstag den
   Status gewechselt hat; ein Klick auf eine Person filtert auf sie.
 
-KI-Agenten folgen ab M5. Bedienung und Betrieb des Wikis:
-[`docs/WIKI.md`](docs/WIKI.md), der Nachrichten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md),
-der Tickets: [`docs/TICKETS.md`](docs/TICKETS.md).
+Aus M5 (Tasks 1 bis 7) die KI-Grundlage:
+
+- **KI-Verbindungen** zu Anbietern mit OpenAI-Protokoll (auch kompatible und lokale),
+  Schlüssel verschlüsselt oder als Verweis auf eine Umgebungsvariable, Verbindungstest,
+  Modellliste; ausgehende Aufrufe nur über eine SSRF-Sperre oder einen Proxy.
+- **Wer welches Modell nutzt**: Zuordnung je Person, Gruppe oder als Standard; daraus
+  das Recht `ai.use`. **Verbrauch** je Aufruf (Token, Kosten) nach Tag, Person, Agent,
+  Bereich oder Verbindung.
+- **KI-Richtlinie je Bereich** (alle, nur bestimmte Datenorte, keine KI) und
+  **KI-Sperre** für einzelne Seiten und Dateien.
+
+Aus M6 Agenten als Mitarbeiter:
+
+- **Agenten** mit Stufe (1 lesen, 2 vorschlagen, 3 intern schreiben) und
+  Werkzeugfreigaben je Werkzeug („wie die Stufe“, „nur nach Freigabe“, „gesperrt“);
+  sie sind Mitglied in Bereichen wie Personen und lesen nie mehr als die fragende
+  Person, ihr eigenes Mitglied-Sein und das Publikum des Ortes erlauben.
+- **Ansprechen**: Direktnachricht, `@`-Erwähnung in Kanal, Seiten- oder
+  Ticket-Diskussion (Antwort im Thread), **Ticket-Zuweisung** mit Übergabe an andere
+  Agenten; erledigt setzt immer ein Mensch.
+- **Freigaben und Rückfragen** als Karten im Gespräch, Liste „Freigaben“;
+  **Laufansicht** mit jedem Schritt, **Abbruch**; nach einem Absturz des Workers setzt
+  ein anderer den Lauf aus seinem Journal fort, ohne eine Wirkung doppelt auszuführen.
+- **Vorschläge** von Seiten und Skills mit Annehmen, Ablehnen und Zusammenführen;
+  **Skills** (SKILL.md, organisationsweit oder je Bereich, mit Versionen, Import und
+  Export); **Gedächtnis** je Agent und Bereich als normale Wiki-Seite; **persönliche
+  Agenten** je Person; alles, was ein Agent schreibt, trägt das KI-Kennzeichen.
+
+Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
+[`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
+[`docs/TICKETS.md`](docs/TICKETS.md), der KI-Anbindung (Verbindungen, Schlüssel,
+Zuordnung, Verbrauch, Richtlinie): [`docs/KI.md`](docs/KI.md), der Agenten (Bedienung,
+Verwaltung, Worker, Metriken): [`docs/AGENTEN.md`](docs/AGENTEN.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
@@ -113,7 +145,10 @@ das Wiki:
   einem Reverse Proxy, der den Host umschreibt, also setzen.
 
 In Compose läuft alles in einem App-Container (`HERD_ROLE=all`: API, Worker der
-Outbox, Collab-Prozess). Zum Ausprobieren mehrerer API-Knoten gibt es die Überlagerung
+Outbox und der Läufe der Agenten, Collab-Prozess). KI-Schlüssel (`HERD_SECRET_KEY`,
+Anbieterschlüssel `HERD_AI_<NAME>`, optional `HERD_AI_EGRESS_PROXY`) gehören in die
+optionale Datei `deploy/compose/ai.env` (Vorlage `ai.env.example`); ohne sie startet
+die App wie bisher, nur ohne verschlüsselte Schlüssel. Zum Ausprobieren mehrerer API-Knoten gibt es die Überlagerung
 `compose.nodes.yml`: zwei API-Dienste (`api-a`, `api-b` auf `HERD_HOST_PORT` und
 `HERD_HOST_PORT_B`, Standard 8081), ein eigener `worker`, ein eigener `collab` und ein
 einmaliger `migrate` statt `app`
@@ -179,6 +214,16 @@ Chart setzt keine Annotation dafür (Controller unterscheiden sich), `values.yam
 beschreibt sie und `ci/production-values.yaml` setzt für ingress-nginx
 `proxy-read-timeout` und `proxy-send-timeout` auf 3600.
 
+Seit M5/M6 arbeitet der Worker auch die Läufe der Agenten ab. Die KI-Schlüssel kommen
+aus einem eigenen Secret `ai.existingSecret` (Schlüssel = Variablennamen, etwa
+`HERD_SECRET_KEY`, `HERD_AI_OPENAI_KEY`); es geht an API und Worker, nie an den
+Migrations-Job. Die Grenzen stehen unter `ai.*` (`checkTimeoutSeconds`,
+`personalAgentsMax` für die API; `approvalHours`, `runConcurrency`, `runLeaseSeconds`
+für den Worker). Mit `networkPolicy.enabled` erreichen API und Worker keinen Anbieter,
+bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter oder zum Proxy). Drei Alarme
+kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing` (alle Warnung).
+Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
+
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
 - `api.cookieSecure` (Standard `true`): Das Sitzungs-Cookie trägt `Secure`, der Browser
@@ -210,8 +255,8 @@ cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http:/
 ```
 
 `HERD_ROLE` wählt, was der Prozess tut: `all` (Standard: migrieren, dann bedienen),
-`api`, `migrate`, `worker` (nur der Verteiler der Outbox und der interne Port 9090;
-mehrere Worker nebeneinander sind sicher) oder `collab` (nur der
+`api`, `migrate`, `worker` (der Verteiler der Outbox, die Läufe der Agenten und der
+interne Port 9090; mehrere Worker nebeneinander sind sicher) oder `collab` (nur der
 Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. In
 `all` startet die API den Collab-Prozess als Kindprozess auf
 `127.0.0.1:${HERD_COLLAB_PORT}`, wenn `HERD_INTERNAL_TOKEN` gesetzt ist (dafür
@@ -231,6 +276,27 @@ geplant, und ein Vorrat; der Worker muss laufen):
 cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
   uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
 ```
+
+### KI ausprobieren
+
+Ohne echten Anbieter geht es mit dem Stub aus den Tests (`backend/tests/support/openai_stub.py`;
+Testcode, nicht im Image):
+
+```bash
+cd backend && uv run python -m tests.support.openai_stub --port 8099
+```
+
+Dann in der App (Verwaltung → KI): eine Verbindung der Art `local` mit
+`http://127.0.0.1:8099/v1` einrichten (ohne Schlüssel), „Modelle abrufen“ oder das
+Modell `gpt-6-luna` eintragen, testen und unter der Zuordnung als „Standard der
+Organisation“ wählen. Danach unter
+Verwaltung → Agenten einen Agenten anlegen (aktiv, mit verantwortlicher Person) und ihm
+eine Direktnachricht schreiben; der Worker muss laufen (`HERD_ROLE=all` oder ein
+eigener `worker`). Der Stub antwortet „stub reply“; was er sagen oder welche Werkzeuge
+er aufrufen soll, legt `POST /_stub/script` fest ([`docs/KI.md`](docs/KI.md#testen-ohne-anbieter)).
+In Compose läuft der Stub nicht mit; die Verbindung braucht dort eine Adresse, unter der
+der App-Container den Stub erreicht (Stub mit `--host 0.0.0.0`). Diesen Weg hat hier
+niemand geprüft.
 
 Regeln für Beiträge: [`CLAUDE.md`](CLAUDE.md) (Schichten, `org_id`, Paginierung,
 Fehlerform, i18n, Lizenzen, Commit-Format). Neue Funktionen beginnen mit einem
@@ -252,7 +318,7 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
                                        # Wegwerf-Datenbank (psql, uv nötig), zwei Yjs-Clients
 cd e2e && npm ci && npx playwright install chromium && npx playwright test
-                                       # Browser: Live-Bearbeitung, Nachrichten und Tickets mit zwei
+                                       # Browser: Live-Bearbeitung, Nachrichten, Tickets und Agenten mit zwei
                                        # Personen in der echten App (Rolle all mit Worker,
                                        # Wegwerf-Datenbank); vorher
                                        # `npm run build` in frontend/. Ein vorhandenes Chromium
@@ -271,7 +337,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M4b. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M6. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -279,15 +345,34 @@ kennen.
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
 - **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,
-  sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix) oder
+  sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix; die
+  eigenen Einstellungen mit dem Präfix wie `HERD_AI_EGRESS_PROXY` sind ausgenommen) oder
   verschlüsselt als `enc:` unter `HERD_SECRET_KEY` (mindestens 32 Zeichen, etwa
   `openssl rand -hex 32`; ohne ihn sind nur `env:`-Verweise möglich). Schlüsselwechsel:
   neuen Wert in `HERD_SECRET_KEY`, alten in `HERD_SECRET_KEY_PREVIOUS`, dann
-  `uv run python -m scripts.rotate_secrets`, danach `HERD_SECRET_KEY_PREVIOUS`
-  entfernen. Ausgehende Aufrufe an Anbieter gehen nur über die SSRF-Sperre
+  `cd backend && uv run python -m scripts.rotate_secrets`, danach
+  `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript ist nicht im Image: Es läuft aus
+  einem Quellstand desselben Release gegen dieselbe Datenbank. Compose liest die
+  Schlüssel aus `ai.env`, das Chart aus `ai.existingSecret`. Einzelheiten:
+  [`docs/KI.md`](docs/KI.md).
+- **Ausgehende Aufrufe an KI-Anbieter** gehen nur über die SSRF-Sperre
   (`backend/app/core/egress.py`: nur https, für die Art `local` auch http und private
   Adressen; Link-Local und Metadaten nie; keine Weiterleitungen; Proxy-Variablen der
-  Umgebung werden nicht beachtet). Einzelheiten: `docs/KI.md`.
+  Umgebung werden nicht beachtet) oder über `HERD_AI_EGRESS_PROXY`. Im Chart sperrt die
+  NetworkPolicy sie, bis `networkPolicy.aiEgress` sie freigibt; ohne Freigabe melden
+  Verbindungstests `timeout` oder `unreachable`, und Läufe enden mit `error`.
+- **Läufe der Agenten** (M5, M6) laufen im Worker: höchstens `HERD_RUN_CONCURRENCY`
+  (Standard 4) je Worker, dafür bis zu so vielen Datenbankverbindungen mehr plus drei;
+  `max_concurrency` und `requests_per_minute` einer Verbindung gelten über alle
+  Worker. Stirbt ein Worker, nimmt ein anderer seine Läufe nach der Sperrfrist
+  `HERD_RUN_LEASE_SECONDS` (Standard 30) auf und setzt sie aus dem Journal fort; ein
+  Rollout (SIGTERM) gibt sie ebenso ab. Ohne Worker warten Läufe (`HerdRunsQueued`). Auf
+  Freigaben und Rückfragen wartet ein Lauf höchstens `HERD_AI_APPROVAL_HOURS` (Standard
+  72) und hält so lange seinen Thread. Läufe und Journal (Prompts, Antworten,
+  Werkzeugergebnisse vollständig) werden nicht automatisch gelöscht. Der Worker braucht
+  mit Läufen mehr Speicher (gemessen 173 MiB im Leerlauf, bis rund 250 MiB unter Last,
+  [Steckbrief](docs/STECKBRIEF.md#agenten-m6)). Alarme, Metriken, bekannte Grenzen und
+  das Rolling Update: [`docs/AGENTEN.md`](docs/AGENTEN.md#betrieb).
 - **Mitgeliefertes PostgreSQL im Chart** (`postgresql.enabled`, Standard `true`) ist
   zum Ausprobieren gedacht: ein Pod, keine Replikation, keine Sicherung. In Produktion
   `postgresql.enabled=false` und eine externe Datenbank setzen.

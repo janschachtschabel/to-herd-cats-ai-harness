@@ -3,11 +3,12 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4 and M4b
-(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
-`2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
-`2026-11-13-m4b-boards-sprints.md`) are built; the next milestone is M5 "KI-Grundlage"
-(spec 14), its plan is not written yet. Present: identity, groups, spaces, roles,
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4, M4b,
+M5 Tasks 1–7 and M6 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`,
+`…-m2-wiki.md`, `2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
+`2026-11-13-m4b-boards-sprints.md`, `2026-11-13-m5-ki-grundlage.md`,
+`2026-11-14-m6-agenten-als-mitarbeiter.md`) are built; next are M5 Tasks 8–12 and M7
+(spec 14). Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -21,13 +22,22 @@ board, epic overview, a ticket thread with a system timeline, ticket cards in me
 space (at most one active; closing moves the unfinished to the next sprint or the backlog
 and keeps a tally), backlog, "my board" across spaces by status category, the board's
 daily view grouped by person with what changed status since the last working day (UTC,
-Monday to Friday) (M4b). Planned, not present: AI and agents (agent assignees and their
-ticket rules come in M6), DBOS (M6: the outbox dispatcher is a plain loop until then),
-embeddings, S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
+Monday to Friday) (M4b); AI connections (OpenAI protocol, `env:`/`enc:` secrets, SSRF
+guard, optional egress proxy), model assignment and the derived `ai.use`, usage per
+call, AI policy per space and the `no_ai` lock, agents as principals with a run loop in
+the worker (M5 Tasks 1–7); agents as colleagues: levels 1–3 and a 22-tool catalog with
+per-agent grants, the read and write scope per place, mention/ticket/handover triggers,
+one open run per thread, approvals and questions, the run journal with replay after a
+lost worker, run view and cancel, page and skill proposals, skills (SKILL.md only),
+memory pages per agent and space, personal agents (M6). Planned, not present:
+embeddings, hybrid search, Docling conversion (M5 Tasks 8–11), schedules, events and
+budgets (M7; DBOS is not used, spec E10), external tools/MCP (M8), S3, collab with
+Redis. Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
-boards).
+boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
+`docs/AGENTEN.md` (agents: use, admin, worker runs, limits, metrics and alerts).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -54,13 +64,35 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `features/tickets` (board with `@dnd-kit/core`, no sortable; `sprints/`, `my-board/`,
   `daily/`); what to offer comes from `ticketAbilities(my_role)`. Sprint events go live
   as one SSE name, `sprint.changed` (`space_id`, `sprint_id`).
+- AI (`modules/ai`): connections (`provider.py` makes the provider calls, through
+  `core/egress.py` or `HERD_AI_EGRESS_PROXY`), secrets (`core/secrets.py`: `env:HERD_AI_*`
+  or `enc:` under `HERD_SECRET_KEY`; `scripts/rotate_secrets.py`), assignments and the
+  derived `ai.use`, usage per call (`usage_record`), policy (`policy.py`,
+  `policy_filters.py`: what AI may read, filtered in SQL with the rights).
+- Agents (`modules/agents`): agents and personal agents, the read and write scope per
+  place (`scope.py`), triggers and places (`triggers.py`, `place.py`), runs (`runs.py`,
+  `executor.py`, `step_host.py`, journal `journal.py`, cancel and waiting
+  `control.py`), the tool catalog and tools (`toolbox/`, grants `grants.py`), approvals
+  and questions (`approvals/`), memory (`memory.py`), run view (`run_view.py`), gauges
+  (`gauge_repository.py`). The worker's run loop is `app/worker/runs.py` (claims with
+  `SKIP LOCKED` and a lease, renewed every third).
+- Runtime (`app/runtime/`): the only code that imports Pydantic AI (`loop.py` drives one
+  step, `tools.py`, `models.py`, `context.py`; `untrusted.py` frames tool results);
+  `tests/test_runtime_imports.py` enforces it.
+- Proposals (`modules/proposals`): page proposals by agents, three-way merge on accept,
+  visible with `page.edit` in the space. Skills (`modules/skills`): SKILL.md skills
+  (org-wide or per space, versions, import/export as SKILL.md or ZIP), assignment to
+  agents, skill proposals (`sight.py` is the one visibility rule for routes and
+  activity). Frontend `features/{ai,agents,runs,approvals,proposals,skills}`.
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
-  messaging and tickets in the real app (role all, worker included) on a throwaway
-  database; a CI job of its own. Helpers per area (`tests/helpers.mjs`,
-  `messaging-helpers.mjs`, `tickets-helpers.mjs`); wait on concrete elements or
+  messaging, tickets and agents in the real app (role all, worker included) on a
+  throwaway database, with the OpenAI stub (`backend/tests/support/openai_stub.py`)
+  started by `global-setup.mjs`; a CI job of its own. Helpers per area
+  (`tests/helpers.mjs`, `messaging-helpers.mjs`, `tickets-helpers.mjs`,
+  `ai-helpers.mjs`); wait on concrete elements or
   responses (`openLive()` waits for the page's `/api/stream`), never fixed sleeps.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
@@ -185,6 +217,32 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
   shared API helpers in `demo_api.py`) goes through the public API only; extend it and
   its test with each milestone.
+- AI and agents:
+  - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
+    else does.
+  - A write tool's effect and its `run_event` commit in one transaction; replay after a
+    lost worker reads the journal and never calls the provider or a tool again for a
+    committed step.
+  - Tool results, skills, memory pages and anything an agent reads are untrusted data,
+    framed `<untrusted …>`; they never grant a tool, a level or an approval. The host
+    checks grants, rights, policy and `no_ai` before every model and tool call.
+  - Content (prompts, answers, tool arguments and results, skill and memory text) never
+    goes into logs, outbox payloads, `NOTIFY` or metric labels: ids, counts and codes
+    only. It lives in `run_event` and the messages.
+  - The read scope of a run is the asker's rights ∩ the agent's memberships and open
+    spaces ∩ the audience of the place; the write scope is the place's space (in a DM
+    alone with the agent, no limit beyond rights). `core/access.py` applies both to any
+    actor without knowing agents. Nothing read in a run goes into a space whose
+    audience may not see it.
+  - Hiding: whatever a caller may not see answers exactly like an unknown id (404 with
+    the area's `not_found` code); people without `ai.use` see no agents, runs, skills or
+    proposals; run results from spaces a reader cannot read come redacted.
+  - New settings with the `HERD_AI_` prefix are refused as `env:` key references
+    automatically (`RESERVED_NAMES`); add every new AI setting to Compose, the chart and
+    `docs/AGENTEN.md`.
+- Test databases: backend tests drop and recreate every table per session, so never run
+  two pytest sessions on one database; parallel work uses its own database (`createdb`,
+  then `HERD_TEST_DATABASE_URL`).
 - e2e on the board: dnd-kit's keyboard sensor listens for keys only after a timer of its
   own; after picking a card up, wait one turn of the page's timers before an arrow key.
 
