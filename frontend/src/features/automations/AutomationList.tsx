@@ -8,12 +8,12 @@ import { stateText as runStateText } from '@/features/runs/display'
 import { EmptyState, ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import {
   agentName,
-  excerpt,
   outcomeText,
   placeText,
   scheduleText,
   stateText,
   termText,
+  titleText,
 } from './display'
 import type { Automation } from './queries'
 
@@ -62,7 +62,7 @@ function AutomationRow({ automation, showOwner }: { automation: Automation; show
           params={{ automationId: automation.id }}
           className="min-w-0 font-medium break-words underline-offset-2 hover:underline focus-visible:outline-none"
         >
-          {excerpt(automation.instruction)}
+          {titleText(t, automation)}
         </Link>
         <Badge variant="outline">{t(`automations.kinds.${automation.kind}`)}</Badge>
         {!paused && <Badge variant="secondary">{stateText(t, automation)}</Badge>}

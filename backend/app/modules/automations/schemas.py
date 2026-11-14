@@ -151,14 +151,17 @@ class AbilitiesOut(BaseModel):
 
 class AutomationOut(BaseModel):
     """`abilities`: what the caller may do with it now. `upcoming`: its next terms from
-    now (none for an event rule, or once done)."""
+    now (none for an event rule, or once done). `redacted`: the caller sees it but
+    may not read its place, so `instruction`, `place.name` and `place.ticket_number`
+    are null (`words.py`)."""
 
     id: uuid.UUID
     kind: AutomationKind
     state: AutomationState
     paused_reason: PausedReason | None
     version: int
-    instruction: str
+    instruction: str | None
+    redacted: bool
     agent: NamedOut
     owner: NamedOut
     place: PlaceOut

@@ -4,7 +4,8 @@ deleting, running now and taking over: `control.py`.
 
 Who sees one is `sight.py` (its owner, its agent's responsible person, the managers
 of its place's space, `agent.manage`; nobody without `ai.use` or `agent.manage`):
-anyone else gets 404 `automation.not_found`, exactly as for an unknown id. Lists for
+anyone else gets 404 `automation.not_found`, exactly as for an unknown id. Who sees
+one but may not read its place gets it `redacted` (`words.py`). Lists for
 people without `ai.use` (or `agent.manage`) answer 404 `ai.not_found`, as "my runs"
 does. Only its owner changes it (403 `automation.not_allowed` for others who see it):
 whoever changes it answers for it. Making one: `placing.py`, and at most
@@ -38,6 +39,7 @@ from app.modules.automations.repository import AutomationRepository
 from app.modules.automations.schedule import COLUMNS, Planned, Schedule, plan, upcoming_of
 from app.modules.automations.schemas import AutomationCreate, AutomationUpdate
 from app.modules.automations.sight import AutomationSight, sight_of
+from app.modules.automations.words import WordsReader
 from app.modules.messaging.models import Conversation
 
 CLOCK: Clock = SYSTEM_CLOCK  # tests set one of their own
@@ -58,6 +60,7 @@ class AutomationView:
     may_edit: bool
     may_control: bool
     abilities: Abilities
+    redacted: bool  # its words and its place's names withheld (`words.py`)
 
 
 class AutomationService:
@@ -205,13 +208,15 @@ class AutomationService:
         managed = set(await self.session.scalars(sight.managed_ids)) if rows else set()
         now = self.clock.now()
         reader = AbilityReader(self.session, actor)
+        words = WordsReader(self.session, actor)
         views = []
         for row in rows:
             owner = row.automation.owner_user_id == sight.person_id
             control = owner or sight.manages_all or row.place.space_id in managed
             abilities = await reader.of(row, owner=owner, control=control)
             upcoming = upcoming_of(row.automation, now)
-            views.append(AutomationView(row, upcoming, owner, control, abilities))
+            redacted = not await words.shown(row.place, owner=owner)
+            views.append(AutomationView(row, upcoming, owner, control, abilities, redacted))
         return views
 
     async def _page(

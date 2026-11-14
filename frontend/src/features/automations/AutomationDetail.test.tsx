@@ -116,6 +116,31 @@ describe('one automation', () => {
     ).toBeInTheDocument()
   })
 
+  test('one whose place I may not read says so, without its words or a link there', async () => {
+    const automation = makeAutomation({
+      instruction: null,
+      redacted: true,
+      place: {
+        type: 'channel',
+        conversation_id: 'c-9',
+        space_id: 's-1',
+        name: null,
+        ticket_number: null,
+      },
+      abilities: { ...ALL_ABILITIES, edit: false, run: false, delete: false },
+    })
+    detailApi(automation)
+    await renderApp(`/automations/${automation.id}`)
+    expect(await screen.findByRole('heading', { name: 'Aufgabe für Hilda' })).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Den Auftrag und den Namen des Ortes sehen nur, wem die Aufgabe gehört, und wer den Ort lesen darf.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('ein Kanal, den du nicht siehst')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Kanal/ })).toBeNull()
+  })
+
   test('its owner may edit, pause, run now and delete it; nothing else is offered', async () => {
     const automation = makeAutomation()
     detailApi(automation)

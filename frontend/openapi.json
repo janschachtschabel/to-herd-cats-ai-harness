@@ -1659,7 +1659,7 @@
         "type": "string"
       },
       "AutomationOut": {
-        "description": "`abilities`: what the caller may do with it now. `upcoming`: its next terms from\nnow (none for an event rule, or once done).",
+        "description": "`abilities`: what the caller may do with it now. `upcoming`: its next terms from\nnow (none for an event rule, or once done). `redacted`: the caller sees it but\nmay not read its place, so `instruction`, `place.name` and `place.ticket_number`\nare null (`words.py`).",
         "properties": {
           "abilities": {
             "$ref": "#/components/schemas/AbilitiesOut"
@@ -1754,8 +1754,15 @@
             "type": "string"
           },
           "instruction": {
-            "title": "Instruction",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
           },
           "interval_minutes": {
             "anyOf": [
@@ -1820,6 +1827,10 @@
             ],
             "title": "Quiet Seconds"
           },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
           "state": {
             "$ref": "#/components/schemas/AutomationState"
           },
@@ -1854,6 +1865,7 @@
           "paused_reason",
           "version",
           "instruction",
+          "redacted",
           "agent",
           "owner",
           "place",

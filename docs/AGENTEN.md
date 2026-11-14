@@ -475,6 +475,14 @@ mit einem Ort in einem Bereich, den man verwaltet (`space.manage`). Dieselbe Reg
 (`automations/sight.py`) gilt für die API, die Live-Ereignisse und die Aktivitäten zu
 einer Aufgabe. Was man nicht sieht, antwortet wie eine unbekannte ID (404).
 
+**Was man von ihr liest:** den Auftrag, den Namen des Kanals und die Nummer des Tickets
+nur, wem sie gehört, und wer ihren Ort jetzt lesen darf (Kanal oder Ticket nach den
+Regeln der Unterhaltung; eine Direktnachricht nur ihre Person). Alle anderen, die sie
+sehen (etwa die verantwortliche Person des Agenten außerhalb des Bereichs oder
+`agent.manage`), bekommen diese Felder leer und `redacted: true`, in der Ansicht und in
+den Listen; die Oberfläche sagt das in Worten. Wer den Ort nur mit Admin-Recht liest,
+liest ihn ganz und wird vermerkt (`space.admin_access`, wie beim Lesen des Bereichs).
+
 | Aktion | wer |
 |---|---|
 | anlegen | wer `ai.use` hat, den Agenten erreicht und am Ort schreiben darf; im Kanal und am Ticket muss der Agent Mitglied des Bereichs sein; Ereignis-Regeln nur, wer den Bereich verwaltet; persönliche Agenten nur ihre Eigentümerin, in ihrer Direktnachricht oder ihrem persönlichen Bereich |

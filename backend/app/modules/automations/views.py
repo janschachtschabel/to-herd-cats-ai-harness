@@ -35,21 +35,23 @@ def automation_out(view: AutomationView) -> AutomationOut:
             stop_reason=row.run.stop_reason if row.run else None,
         )
     channel = row.place.kind == ConversationKind.CHANNEL
+    shown = not view.redacted
     return AutomationOut(
         id=automation.id,
         kind=automation.kind,
         state=automation.state,
         paused_reason=automation.paused_reason,
         version=automation.version,
-        instruction=automation.instruction,
+        instruction=automation.instruction if shown else None,
+        redacted=view.redacted,
         agent=NamedOut(id=automation.agent_id, name=row.agent_name),
         owner=NamedOut(id=automation.owner_user_id, name=row.owner_name),
         place=PlaceOut(
             type=PLACE_TYPES[ConversationKind(row.place.kind)],
             conversation_id=row.place.id,
             space_id=row.place.space_id,
-            name=row.place.name if channel else None,
-            ticket_number=row.ticket_number,
+            name=row.place.name if channel and shown else None,
+            ticket_number=row.ticket_number if shown else None,
         ),
         next_due_at=automation.next_due_at,
         cron=automation.cron,

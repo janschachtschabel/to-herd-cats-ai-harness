@@ -61,6 +61,12 @@
       "ticket": "Ticket {{key}}",
       "unnamed": "a channel"
     },
+    "redacted": {
+      "title": "Automation for {{agent}}",
+      "instruction": "Only its owner and those who may read its place see the instruction and the place's name.",
+      "channel": "a channel you cannot see",
+      "ticket": "a ticket you cannot see"
+    },
     "schedule": {
       "once": "Once on {{at}}",
       "hourly": "Hourly at minute {{minute}}",

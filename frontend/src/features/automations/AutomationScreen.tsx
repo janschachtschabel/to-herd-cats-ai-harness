@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/api'
 import { AutomationActions } from './AutomationActions'
 import { AutomationFormDialog } from './AutomationFormDialog'
 import { LastRun, NextTerm } from './AutomationList'
-import { agentName, excerpt, placeText, scheduleText, stateText, termText } from './display'
+import { agentName, placeText, scheduleText, stateText, termText, titleText } from './display'
 import { FiringLog } from './FiringLog'
 import { useAutomation, type Automation } from './queries'
 
@@ -33,6 +33,7 @@ function PlaceLink({ automation }: { automation: Automation }) {
   const { t } = useTranslation()
   const place = automation.place
   const className = 'underline-offset-2 hover:underline'
+  if (automation.redacted) return <span>{placeText(t, automation)}</span>
   if (place.type === 'ticket' && place.ticket_number) {
     return (
       <Link
@@ -87,7 +88,7 @@ function AutomationDetail({ automation }: { automation: Automation }) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={excerpt(automation.instruction)}
+        title={titleText(t, automation)}
         actions={
           <Button variant="outline" asChild>
             <Link to="/automations">
@@ -119,9 +120,13 @@ function AutomationDetail({ automation }: { automation: Automation }) {
         <h2 id="automation-instruction" className="text-base font-semibold">
           {t(heartbeat ? 'automations.detail.checklist' : 'automations.detail.instruction')}
         </h2>
-        <p className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-          {automation.instruction}
-        </p>
+        {automation.instruction === null ? (
+          <p className="text-sm text-muted-foreground">{t('automations.redacted.instruction')}</p>
+        ) : (
+          <p className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+            {automation.instruction}
+          </p>
+        )}
       </section>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
         <Fact label={t('automations.detail.agent')}>

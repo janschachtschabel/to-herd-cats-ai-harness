@@ -3548,7 +3548,9 @@ export interface components {
         /**
          * AutomationOut
          * @description `abilities`: what the caller may do with it now. `upcoming`: its next terms from
-         *     now (none for an event rule, or once done).
+         *     now (none for an event rule, or once done). `redacted`: the caller sees it but
+         *     may not read its place, so `instruction`, `place.name` and `place.ticket_number`
+         *     are null (`words.py`).
          */
         AutomationOut: {
             abilities: components["schemas"]["AbilitiesOut"];
@@ -3571,7 +3573,7 @@ export interface components {
              */
             id: string;
             /** Instruction */
-            instruction: string;
+            instruction: string | null;
             /** Interval Minutes */
             interval_minutes: number | null;
             kind: components["schemas"]["AutomationKind"];
@@ -3583,6 +3585,8 @@ export interface components {
             place: components["schemas"]["PlaceOut"];
             /** Quiet Seconds */
             quiet_seconds: number | null;
+            /** Redacted */
+            redacted: boolean;
             state: components["schemas"]["AutomationState"];
             /** Time Zone */
             time_zone: string | null;

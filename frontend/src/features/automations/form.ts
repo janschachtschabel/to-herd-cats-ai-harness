@@ -93,7 +93,7 @@ export function valuesOf(automation: Automation, readerZone: string): Automation
     placeType: automation.place.type,
     conversationId: automation.place.conversation_id,
     ticketNumber: automation.place.ticket_number ? String(automation.place.ticket_number) : '',
-    instruction: automation.instruction,
+    instruction: automation.instruction ?? '', // only its owner edits it, who reads it
     kind: automation.kind,
     onceDate: once.date,
     onceTime: once.time,

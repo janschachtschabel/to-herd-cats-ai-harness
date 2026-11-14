@@ -27,6 +27,7 @@ export function makeAutomation(overrides: Partial<Automation> = {}): Automation 
     paused_reason: null,
     version: 1,
     instruction: 'Fasse zusammen, was gestern im Kanal besprochen wurde.',
+    redacted: false,
     agent: HILDA_AGENT,
     owner: MIA,
     place: {

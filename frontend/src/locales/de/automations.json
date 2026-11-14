@@ -61,6 +61,12 @@
       "ticket": "Ticket {{key}}",
       "unnamed": "ein Kanal"
     },
+    "redacted": {
+      "title": "Aufgabe für {{agent}}",
+      "instruction": "Den Auftrag und den Namen des Ortes sehen nur, wem die Aufgabe gehört, und wer den Ort lesen darf.",
+      "channel": "ein Kanal, den du nicht siehst",
+      "ticket": "ein Ticket, das du nicht siehst"
+    },
     "schedule": {
       "once": "Einmal am {{at}}",
       "hourly": "Stündlich zur Minute {{minute}}",

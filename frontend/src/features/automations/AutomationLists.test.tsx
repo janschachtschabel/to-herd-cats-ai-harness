@@ -187,6 +187,34 @@ describe('the automations of a space', () => {
     expect(screen.getByRole('button', { name: 'Neue Aufgabe' })).toBeEnabled()
   })
 
+  test('one whose ticket I may not read is listed without its words or number', async () => {
+    const hidden = makeAutomation({
+      instruction: null,
+      redacted: true,
+      place: {
+        type: 'ticket',
+        conversation_id: 'c-2',
+        space_id: 's-1',
+        name: null,
+        ticket_number: null,
+      },
+    })
+    automationsApi(['ai.use'], {
+      'GET /api/spaces/s-1': makeSpace({ id: 's-1', my_role: 'admin' }),
+      'GET /api/spaces/:id/pages/tree': page([]),
+      'GET /api/spaces/s-1/automations': page([hidden]),
+    })
+    const { user } = await renderApp('/spaces/s-1')
+    const tabs = await screen.findByRole('navigation', { name: 'Ansichten des Bereichs' })
+    await user.click(within(tabs).getByRole('link', { name: 'Aufgaben' }))
+    const list = await screen.findByRole('list', { name: 'Aufgaben' })
+    expect(within(list).getByRole('link', { name: 'Aufgabe für Hilda' })).toHaveAttribute(
+      'href',
+      `/automations/${hidden.id}`,
+    )
+    expect(within(list).getByText('ein Ticket, das du nicht siehst')).toBeInTheDocument()
+  })
+
   test('without AI the space has no such tab', async () => {
     automationsApi([], {
       'GET /api/spaces/s-1': makeSpace({ id: 's-1' }),

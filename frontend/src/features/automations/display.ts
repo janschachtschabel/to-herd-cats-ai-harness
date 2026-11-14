@@ -15,6 +15,14 @@ export function excerpt(instruction: string): string {
   return line.length > EXCERPT_CHARS ? `${line.slice(0, EXCERPT_CHARS - 1)}…` : line
 }
 
+/** Its title: the instruction's first line, or (withheld from the reader, `redacted`)
+ *  whose agent it is. */
+export function titleText(t: TFunction, automation: Automation): string {
+  return automation.instruction === null
+    ? t('automations.redacted.title', { agent: agentName(t, automation) })
+    : excerpt(automation.instruction)
+}
+
 export function agentName(t: TFunction, automation: Automation): string {
   return automation.agent.name ?? t('automations.list.unknownAgent')
 }
@@ -22,6 +30,7 @@ export function agentName(t: TFunction, automation: Automation): string {
 export function placeText(t: TFunction, automation: Automation): string {
   const place = automation.place
   if (place.type === 'dm') return t('automations.place.dm', { agent: agentName(t, automation) })
+  if (automation.redacted) return t(`automations.redacted.${place.type}`)
   if (place.type === 'ticket') {
     return t('automations.place.ticket', { key: ticketKey(place.ticket_number ?? 0) })
   }
