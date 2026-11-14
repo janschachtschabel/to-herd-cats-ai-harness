@@ -19,6 +19,14 @@ const PersonalAgentPage = lazyRouteComponent(
   () => import('@/features/agents/personal/PersonalAgentPage'),
   'PersonalAgentPage',
 )
+const MyAutomationsPage = lazyRouteComponent(
+  () => import('@/features/automations/AutomationsPages'),
+  'MyAutomationsPage',
+)
+const AutomationScreen = lazyRouteComponent(
+  () => import('@/features/automations/AutomationScreen'),
+  'AutomationScreen',
+)
 const ApprovalsPage = lazyRouteComponent(
   () => import('@/features/approvals/ApprovalsPage'),
   'ApprovalsPage',
@@ -134,6 +142,29 @@ const personalAgentRoute = createRoute({
   },
 })
 
+/** My automations (plan M7): for people with AI or who manage agents (the API answers
+ *  404 to everyone else). */
+const myAutomationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/automations',
+  loader: ({ context }) => {
+    requireRuns(context.me)
+    return MyAutomationsPage.preload?.()
+  },
+  component: MyAutomationsPage,
+})
+
+/** One automation; whoever the API does not show it to gets its 404 in words. */
+const automationRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/automations/$automationId',
+  loader: () => AutomationScreen.preload?.(),
+  component: function AutomationRoute() {
+    const { automationId } = automationRoute.useParams()
+    return <AutomationScreen automationId={automationId} />
+  },
+})
+
 export const aiWorkRoutes = [
   myRunsRoute,
   runRoute,
@@ -141,4 +172,6 @@ export const aiWorkRoutes = [
   approvalsRoute,
   myAgentsRoute,
   personalAgentRoute,
+  myAutomationsRoute,
+  automationRoute,
 ]

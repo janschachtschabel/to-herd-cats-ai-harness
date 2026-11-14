@@ -37,6 +37,10 @@ const ProposalScreen = lazyRouteComponent(
   () => import('@/features/proposals/ProposalScreen'),
   'ProposalScreen',
 )
+const SpaceAutomationsView = lazyRouteComponent(
+  () => import('@/features/automations/AutomationsPages'),
+  'SpaceAutomationsView',
+)
 const SkillPage = lazyRouteComponent(() => import('@/features/skills/SkillPage'), 'SkillPage')
 const SkillProposalScreen = lazyRouteComponent(
   () => import('@/features/skills/proposals/SkillProposalScreen'),
@@ -156,6 +160,13 @@ const skillsRoute = createRoute({
   },
 })
 
+/** A space's automations and event rules (plan M7; the API shows whom what). */
+const automationsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/automations',
+  component: SpaceAutomationsView,
+})
+
 /** One skill, wherever it belongs (the API answers 404 to whoever may not read it). */
 export const skillRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -188,6 +199,7 @@ export const spaceTree = spaceRoute.addChildren([
   sprintsRoute,
   backlogRoute,
   skillsRoute,
+  automationsRoute,
   proposalsRoute,
   proposalRoute,
 ])

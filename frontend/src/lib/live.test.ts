@@ -124,6 +124,12 @@ describe('live stream', () => {
     ).toMatchObject({ type: 'skill_proposal.changed', proposalId: 'p1' })
   })
 
+  test('an automation event carries the automation and its space (plan M7)', () => {
+    expect(
+      parseLiveEvent('automation.changed', '{"automation_id":"au-1","space_id":null}'),
+    ).toMatchObject({ type: 'automation.changed', automationId: 'au-1', spaceId: null })
+  })
+
   test('a sprint event carries its space (plan M4b)', () => {
     expect(parseLiveEvent('sprint.changed', '{"space_id":"s1","sprint_id":"r1"}')).toMatchObject({
       type: 'sprint.changed',

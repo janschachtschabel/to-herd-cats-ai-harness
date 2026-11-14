@@ -21,7 +21,9 @@ export const automationKeys = {
   mine: ['automations', 'list', 'mine'] as const,
   agent: (agentId: string) => ['automations', 'list', 'agent', agentId] as const,
   space: (spaceId: string) => ['automations', 'list', 'space', spaceId] as const,
+  details: ['automations', 'detail'] as const,
   detail: (id: string) => ['automations', 'detail', id] as const,
+  allFirings: ['automations', 'firings'] as const,
   firings: (id: string) => ['automations', 'firings', id] as const,
   preview: (schedule: ScheduleIn | null) => ['automations', 'preview', schedule] as const,
 }
@@ -105,6 +107,14 @@ export function useTermPreview(schedule: ScheduleIn | null) {
   })
 }
 
+/** What `automation.changed` makes stale: every list (it may have appeared in or left
+ *  one), the automation and its log; never a preview. */
+export function automationEventKeys(id: string | null): (readonly unknown[])[] {
+  const keys: (readonly unknown[])[] = [automationKeys.lists]
+  if (id) keys.push(automationKeys.detail(id), automationKeys.firings(id))
+  return keys
+}
+
 /** Everything shown of automations is stale (one changed). */
 export function refreshAutomations(queryClient: QueryClient, id?: string) {
   void queryClient.invalidateQueries({ queryKey: automationKeys.lists })
@@ -182,4 +192,10 @@ export function useDeleteAutomation(id: string) {
     onSuccess: () => queryClient.removeQueries({ queryKey: automationKeys.detail(id) }),
     onSettled: () => refreshAutomations(queryClient),
   })
+}
+
+/** Loads the automation again (after a stale version), then forgets the error. */
+export function useReloadAutomation(id: string) {
+  const queryClient = useQueryClient()
+  return () => queryClient.refetchQueries({ queryKey: automationKeys.detail(id) })
 }

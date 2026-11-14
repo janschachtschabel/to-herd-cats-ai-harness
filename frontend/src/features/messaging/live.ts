@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
+import { automationEventKeys, automationKeys } from '@/features/automations/queries'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
@@ -42,6 +43,9 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         proposalKeys.all,
         approvalKeys.all,
         skillProposalKeys.all,
+        automationKeys.lists,
+        automationKeys.details,
+        automationKeys.allFirings,
       ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
@@ -93,6 +97,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       // Made or decided (for whoever decides it, or its author): the proposals, and the
       // skills an accepted one changed.
       return [skillProposalKeys.all, skillKeys.all]
+    case 'automation.changed':
+      return automationEventKeys(event.automationId ?? null)
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the
       // run, and their messages.

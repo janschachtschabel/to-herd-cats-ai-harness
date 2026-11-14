@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Activity, Bot, ShieldCheck } from 'lucide-react'
+import { Activity, Bot, CalendarClock, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { usesAi } from '@/features/ai/display'
 import { usePendingApprovalCount } from '@/features/approvals/queries'
@@ -25,7 +25,8 @@ function ApprovalsLink() {
   )
 }
 
-/** "With agents" (plan M6): releases waiting for me, my runs, my own agents. Shown to
+/** "With agents" (plan M6, M7): releases waiting for me, my runs, my own agents, my
+ *  automations. Shown to
  *  people with AI or who manage agents. */
 export function AgentsSection() {
   const { t } = useTranslation()
@@ -50,6 +51,14 @@ export function AgentsSection() {
             <Link to="/my-agents" className={navLinkClass} activeProps={navLinkActive}>
               <Bot className="size-4 shrink-0" aria-hidden />
               <span className="flex-1">{t('nav.myAgents')}</span>
+            </Link>
+          </li>
+        )}
+        {usesAi(me) && (
+          <li>
+            <Link to="/automations" className={navLinkClass} activeProps={navLinkActive}>
+              <CalendarClock className="size-4 shrink-0" aria-hidden />
+              <span className="flex-1">{t('nav.myAutomations')}</span>
             </Link>
           </li>
         )}

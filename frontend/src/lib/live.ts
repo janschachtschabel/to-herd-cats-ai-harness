@@ -20,6 +20,7 @@ export const LIVE_EVENTS = [
   'proposal.changed',
   'card.changed',
   'skill_proposal.changed',
+  'automation.changed',
   'resync',
 ] as const
 
@@ -40,6 +41,9 @@ export interface LiveEvent {
   /** A page proposal (`proposal.changed`, with its space) or a skill proposal
    *  (`skill_proposal.changed`). */
   proposalId?: string | null
+  /** An automation that changed or fired a term (`automation.changed`, with the space
+   *  of its place; none for a DM). */
+  automationId?: string | null
 }
 
 /** `limited`: the server refused another stream for this session (429, too many tabs). */
@@ -84,7 +88,8 @@ function idOrNull(value: unknown): string | null {
  *  `ticket_id` and `space_id`; a sprint's is `{"space_id", "sprint_id"}`, and the
  *  space is all a client refreshes by; an agent run's progress adds `run_id` and
  *  `step`; a proposal's is `{"space_id", "proposal_id"}`, a skill proposal's adds
- *  `proposal_id`); null if unreadable. */
+ *  `proposal_id`; an automation's is `{"automation_id", "space_id"}`); null if
+ *  unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')
@@ -100,6 +105,9 @@ export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | n
     }
     if (type === 'proposal.changed' || type === 'skill_proposal.changed') {
       return { ...event, proposalId: idOrNull(fields.proposal_id) }
+    }
+    if (type === 'automation.changed') {
+      return { ...event, automationId: idOrNull(fields.automation_id) }
     }
     if (type !== 'run.progress') return event
     const step = Number.isInteger(fields.step) ? (fields.step as number) : null

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AgentAutomationsPanel } from '@/features/automations/AutomationsPages'
 import { ErrorState, LoadingState, PageHeader } from '@/features/shared/states'
 import { agentKeys } from '../keys'
 import { useAgent, useAgentTools } from '../adminQueries'
@@ -13,7 +14,7 @@ import { AgentSpacesList } from './AgentSpacesList'
 import { AgentToolsForm } from './AgentToolsForm'
 
 /** One agent for its managers (`agent.manage`): its autonomy level, the grant of each
- *  tool, the spaces it works in and its skills. */
+ *  tool, the spaces it works in, its skills and its automations. */
 export function AgentAdminPage({ agentId }: { agentId: string }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -63,6 +64,7 @@ export function AgentAdminPage({ agentId }: { agentId: string }) {
         <AgentSpacesList agentId={agentId} />
         <AgentSkillsPanel agentId={agentId} onReload={reload} />
       </div>
+      <AgentAutomationsPanel agentId={agentId} />
     </div>
   )
 }

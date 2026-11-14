@@ -67,7 +67,9 @@ function WikiFrame({ space }: { space: Space }) {
             ? 'backlog'
             : matchRoute({ to: '/spaces/$spaceId/skills', params })
               ? 'skills'
-              : 'wiki'
+              : matchRoute({ to: '/spaces/$spaceId/automations', params })
+                ? 'automations'
+                : 'wiki'
 
   return (
     <WikiContext.Provider value={wiki}>

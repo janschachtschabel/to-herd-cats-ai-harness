@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
+import { automationKeys } from '@/features/automations/queries'
 import { skillProposalKeys } from '@/features/skills/proposals/queries'
 import { skillKeys } from '@/features/skills/queries'
 import { ticketKeys } from '@/features/tickets/keys'
@@ -50,6 +51,12 @@ const KEYS = {
   skillProposals: skillProposalKeys.list({ state: 'open' }),
   skillProposal: skillProposalKeys.detail('sp-1'),
   skills: skillKeys.list({}),
+  automationsMine: automationKeys.mine,
+  automationsSpace: automationKeys.space('space'),
+  automationA: automationKeys.detail('au-a'),
+  firingsA: automationKeys.firings('au-a'),
+  automationB: automationKeys.detail('au-b'),
+  preview: automationKeys.preview(null),
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -120,6 +127,20 @@ describe('live invalidation', () => {
       'myApprovals',
       'skillProposals',
       'skillProposal',
+      'automationsMine',
+      'automationsSpace',
+      'automationA',
+      'firingsA',
+      'automationB',
+    ])
+  })
+
+  test('a changed automation refreshes every automation list, it and its log (plan M7)', () => {
+    expect(staleAfter({ type: 'automation.changed', automationId: 'au-a' })).toEqual([
+      'automationsMine',
+      'automationsSpace',
+      'automationA',
+      'firingsA',
     ])
   })
 
