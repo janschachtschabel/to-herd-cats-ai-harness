@@ -11,7 +11,9 @@ has no thread, so it names the proposal and its space, NULL for an organisation-
 skill); `automation` (an automation was paused: plan M7 decisions 2 and 13; it names
 the automation, `automation_id`, and no conversation: for the agent's responsible
 person and the managers of the place's space when its owner lost a right, for the
-owner when it kept failing).
+owner when it kept failing); `review_due` (a page's review is due: plan M7 decision
+11; the message is the entry in the page's thread, for the space's moderators,
+`wiki/review_handlers.py`).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -48,6 +50,7 @@ class NotificationReason(StrEnum):
     RUN_STOPPED = "run_stopped"  # a ticket's run of my agent ended or could not start
     SKILL_PROPOSAL = "skill_proposal"  # a skill proposal to decide, or mine decided
     AUTOMATION = "automation"  # an automation was paused (its owner's rights, failures)
+    REVIEW_DUE = "review_due"  # a page I moderate is due for review (plan M7 task 6)
 
 
 TARGET = (
@@ -68,7 +71,8 @@ class Notification(UuidPk, OrgScoped, Base):
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
             "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
-            " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation')",
+            " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation',"
+            " 'review_due')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),

@@ -1,7 +1,17 @@
 import uuid
+from datetime import date
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -11,6 +21,8 @@ from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
 from app.modules.ai.models import AiPolicy, DataLocation
 
+MIN_REVIEW_DAYS = 7
+MAX_REVIEW_DAYS = 730
 _LOCATIONS = ", ".join(f"'{loc.value}'" for loc in DataLocation)
 
 
@@ -42,6 +54,16 @@ class Space(UuidPk, OrgScoped, Base):
             name="allowed_locations",
         ),
         CheckConstraint("agent_write_policy IN ('propose', 'direct')", name="agent_write_policy"),
+        CheckConstraint(
+            f"review_interval_days IS NULL OR review_interval_days BETWEEN "
+            f"{MIN_REVIEW_DAYS} AND {MAX_REVIEW_DAYS}",
+            name="review_interval_days",
+        ),
+        Index(
+            "ix_space_review_checked_on",
+            "review_checked_on",
+            postgresql_where=text("review_interval_days IS NOT NULL"),
+        ),
     )
 
     kind: Mapped[SpaceKind] = mapped_column(String(16), nullable=False)
@@ -68,6 +90,12 @@ class Space(UuidPk, OrgScoped, Base):
         server_default=AgentWritePolicy.PROPOSE.value,
         nullable=False,
     )
+    # Pages not reviewed for this many days are due (plan M7 decision 11, `wiki/
+    # review.py`); NULL: off. Read by the daily pass, the page API and the tree filter.
+    review_interval_days: Mapped[int | None] = mapped_column(Integer)
+    # The UTC day the daily pass last went through all of the space's due pages
+    # (`wiki/review_pass.py`); NULL: not yet, or the interval changed since.
+    review_checked_on: Mapped[date | None] = mapped_column(Date)
 
 
 class SpaceMember(Base):

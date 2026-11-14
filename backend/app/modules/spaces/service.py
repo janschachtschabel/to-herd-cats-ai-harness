@@ -111,7 +111,7 @@ class SpaceService:
         if space.version != version:
             raise Conflict(code="spaces.version_conflict")
         fields = ("name", "description", "icon", "ai_policy", "allowed_locations")
-        before = snapshot(space, (*fields, "agent_write_policy"))
+        before = snapshot(space, (*fields, "agent_write_policy", "review_interval_days"))
         if data.name is not None:
             space.name = data.name
         if "description" in data.model_fields_set:
@@ -123,6 +123,13 @@ class SpaceService:
             space.allowed_locations = [str(loc) for loc in data.allowed_locations or ()]
         if data.agent_write_policy is not None:
             space.agent_write_policy = data.agent_write_policy
+        interval = data.review_interval_days
+        if (
+            "review_interval_days" in data.model_fields_set
+            and interval != before["review_interval_days"]
+        ):
+            space.review_interval_days = interval
+            space.review_checked_on = None  # the daily pass looks again at its next round
         space.version += 1
         await self.session.flush()
         if changed := changes(before, space):

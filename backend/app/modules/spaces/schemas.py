@@ -6,7 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
 from app.modules.ai.models import AiPolicy, DataLocation
-from app.modules.spaces.models import AgentWritePolicy, Space, SpaceKind
+from app.modules.spaces.models import (
+    MAX_REVIEW_DAYS,
+    MIN_REVIEW_DAYS,
+    AgentWritePolicy,
+    Space,
+    SpaceKind,
+)
 from app.modules.spaces.repository import NamedMember
 
 
@@ -14,7 +20,8 @@ class SpaceOut(BaseModel):
     """`my_role` is the caller's role there, for display (system admins: `admin`).
     `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).
     `agent_write_policy`: whether agents propose page changes (`propose`) or may write
-    pages directly (`direct`, plan M6 decision 8)."""
+    pages directly (`direct`, plan M6 decision 8). `review_interval_days`: pages not
+    reviewed for that many days are due for review (null: off; plan M7 decision 11)."""
 
     id: uuid.UUID
     kind: SpaceKind
@@ -27,6 +34,7 @@ class SpaceOut(BaseModel):
     ai_policy: AiPolicy
     allowed_locations: list[DataLocation]
     agent_write_policy: AgentWritePolicy
+    review_interval_days: int | None
 
     @classmethod
     def of(cls, space: Space, my_role: SpaceRole | None) -> "SpaceOut":
@@ -42,6 +50,7 @@ class SpaceOut(BaseModel):
             ai_policy=space.ai_policy,
             allowed_locations=[DataLocation(loc) for loc in space.allowed_locations],
             agent_write_policy=space.agent_write_policy,
+            review_interval_days=space.review_interval_days,
         )
 
 
@@ -57,7 +66,8 @@ class SpaceCreate(BaseModel):
 class SpaceUpdate(BaseModel):
     """Fields left out stay as they are; null clears description or icon. The kind of a
     space never changes, so it is not a field (sending it is 422). `allowed_locations`
-    comes only with `ai_policy`: at least one for `restricted`, none otherwise (422)."""
+    comes only with `ai_policy`: at least one for `restricted`, none otherwise (422).
+    `review_interval_days`: 7 to 730 days, null turns the review off."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +77,7 @@ class SpaceUpdate(BaseModel):
     ai_policy: AiPolicy | None = None
     allowed_locations: list[DataLocation] | None = Field(default=None, max_length=3)
     agent_write_policy: AgentWritePolicy | None = None
+    review_interval_days: int | None = Field(default=None, ge=MIN_REVIEW_DAYS, le=MAX_REVIEW_DAYS)
 
     @field_validator("name", "ai_policy", "agent_write_policy")
     @classmethod

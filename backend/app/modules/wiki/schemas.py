@@ -28,7 +28,9 @@ class PrincipalRef(BaseModel):
 class PageOut(BaseModel):
     """`version` guards writes (send it back; stale → 409). `collab_generation` changes
     whenever open live-editing sessions of the page end. `tags`: tag ids, by name.
-    `no_ai`: locked for AI (spec 11)."""
+    `no_ai`: locked for AI (spec 11). `reviewed_at`: the last review (publishing or
+    "mark as reviewed"; null for a draft); `review_due`: the space's review interval
+    has passed since (plan M7 decision 11)."""
 
     id: uuid.UUID
     space_id: uuid.UUID
@@ -48,9 +50,11 @@ class PageOut(BaseModel):
     published_at: datetime | None
     tags: list[uuid.UUID]
     no_ai: bool
+    reviewed_at: datetime | None
+    review_due: bool
 
     @classmethod
-    def of(cls, page: Page, *, tags: list[uuid.UUID]) -> "PageOut":
+    def of(cls, page: Page, *, tags: list[uuid.UUID], review_due: bool) -> "PageOut":
         return cls(
             id=page.id,
             space_id=page.space_id,
@@ -70,12 +74,14 @@ class PageOut(BaseModel):
             published_at=page.published_at,
             tags=tags,
             no_ai=page.no_ai,
+            reviewed_at=page.reviewed_at,
+            review_due=review_due,
         )
 
 
 class TreeNodeOut(BaseModel):
     """A page in the flat tree: nest by `parent_id`, order siblings by `sort_order`.
-    `tags`: tag ids, by name."""
+    `tags`: tag ids, by name. `review_due`: as on the page."""
 
     id: uuid.UUID
     parent_id: uuid.UUID | None
@@ -85,9 +91,10 @@ class TreeNodeOut(BaseModel):
     status: PageStatus
     sort_order: int
     tags: list[uuid.UUID]
+    review_due: bool
 
     @classmethod
-    def of(cls, page: Page, *, tags: list[uuid.UUID]) -> "TreeNodeOut":
+    def of(cls, page: Page, *, tags: list[uuid.UUID], review_due: bool) -> "TreeNodeOut":
         return cls(
             id=page.id,
             parent_id=page.parent_id,
@@ -97,6 +104,7 @@ class TreeNodeOut(BaseModel):
             status=page.status,
             sort_order=page.sort_order,
             tags=tags,
+            review_due=review_due,
         )
 
 

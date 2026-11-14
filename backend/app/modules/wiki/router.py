@@ -10,6 +10,7 @@ from app.modules.tags.schemas import TagsSet
 from app.modules.tags.service import TagService
 from app.modules.wiki.ai_lock import AiLockService
 from app.modules.wiki.present import page_out, tree_out
+from app.modules.wiki.review import ReviewService
 from app.modules.wiki.schemas import (
     AiLockIn,
     ExpectedVersion,
@@ -36,8 +37,12 @@ async def page_tree(
     actor: ActorDep,
     session: SessionDep,
     tag: Annotated[uuid.UUID | None, Query(description="only pages with this tag")] = None,
+    review_due: Annotated[
+        bool, Query(description="only pages whose review is due (plan M7 decision 11)")
+    ] = False,
 ) -> Page[TreeNodeOut]:
-    page = await PageService(session).tree(actor, space_id, params, tag_id=tag)
+    among = ReviewService(session).due_filter(actor, space_id) if review_due else None
+    page = await PageService(session).tree(actor, space_id, params, tag_id=tag, among=among)
     return await tree_out(session, actor, page)
 
 
@@ -87,6 +92,13 @@ async def publish_page(
     return await page_out(
         session, actor, await PageService(session).publish(actor, page_id, body.version)
     )
+
+
+@pages.post("/{page_id}/reviewed", response_model=PageOut)
+async def mark_page_reviewed(page_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> PageOut:
+    """Mark a published page as reviewed now (`page.edit`); takes and bumps no version."""
+    page = await ReviewService(session).mark_reviewed(actor, page_id)
+    return await page_out(session, actor, page)
 
 
 @pages.put("/{page_id}/ai-lock", response_model=PageOut)

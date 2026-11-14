@@ -15,6 +15,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped
 
+# The top-level folder of the agents' memory pages (`memory.py`); a title never gives
+# this slug. The review of pages leaves it out (`wiki/review_repository.py`).
+MEMORY_FOLDER_SLUG = "_agenten"
+
 
 class AgentMemory(OrgScoped, Base):
     __tablename__ = "agent_memory"

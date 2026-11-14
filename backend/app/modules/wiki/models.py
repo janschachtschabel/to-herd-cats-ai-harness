@@ -70,6 +70,12 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
         Index("ix_page_space_id_parent_id", "space_id", "parent_id"),
         Index("ix_page_search_tsv", "search_tsv", postgresql_using="gin"),
         Index("ix_page_parent_id", "parent_id"),
+        Index(
+            "ix_page_space_id_reviewed_at",
+            "space_id",
+            "reviewed_at",
+            postgresql_where=text("trashed_at IS NULL AND status = 'published'"),
+        ),
     )
 
     space_id: Mapped[uuid.UUID] = mapped_column(
@@ -95,6 +101,12 @@ class Page(UuidPk, OrgScoped, Timestamps, Base):
     updated_by_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     updated_by_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The last review (plan M7 decision 11, `review.py`): set when the page is published
+    # and by "mark as reviewed"; NULL for a draft. `review_notified_at`: when the daily
+    # pass last emitted `page.review_due` for it (once per interval); NULL again with
+    # every review. Neither bumps `version` or `updated_at`.
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Locked for AI (spec 11): no tool returns it, no embeddings (`ai/policy_filters.py`).
     no_ai: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False

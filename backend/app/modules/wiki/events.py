@@ -7,6 +7,12 @@ system message into the page's thread for each):
 - `page.created`, `page.published`, `page.moved`, `page.trashed`, `page.restored`
   (from the trash), `page.version_restored` (payload also `number`).
 
+`page.review_due` (plan M7 decision 11) comes from the worker's daily pass
+(`review_pass.py`), not from a change: once per interval for a page whose review is
+due. Its actor is whoever last wrote the page (nobody causes it). Its handler
+(`review_handlers.py`) writes its timeline entry and the moderators' activity, so it
+is not among `PAGE_EVENTS`; automations' event rules subscribe to it (plan M7 task 5).
+
 Content changes emit nothing: they are too many, and the versions show them. Payloads
 hold ids and numbers, never titles, paths or content. Subject: the page; space: its
 space.
@@ -31,6 +37,7 @@ PAGE_MOVED = "page.moved"
 PAGE_TRASHED = "page.trashed"
 PAGE_RESTORED = "page.restored"
 PAGE_VERSION_RESTORED = "page.version_restored"
+PAGE_REVIEW_DUE = "page.review_due"
 
 PAGE_EVENTS = (
     PAGE_CREATED,

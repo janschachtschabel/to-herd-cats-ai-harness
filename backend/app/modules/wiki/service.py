@@ -156,6 +156,7 @@ class PageService:
         sort_order = await siblings.next_order(pages, space_id, parent_id)
         taken.add(slug)
         who = by.principal if by else actor.principal
+        published_at = utcnow() if publish else None
         page = await pages.add(
             Page(
                 org_id=actor.org_id,
@@ -167,7 +168,8 @@ class PageService:
                 sort_order=sort_order,
                 content_md=content_md,
                 status=PageStatus.PUBLISHED if publish else PageStatus.DRAFT,
-                published_at=utcnow() if publish else None,
+                published_at=published_at,
+                reviewed_at=published_at,  # publishing counts as a review (`review.py`)
                 created_by_type=who.type,
                 created_by_id=who.id,
                 updated_by_type=who.type,
@@ -262,7 +264,7 @@ class PageService:
             if parent is None or parent.status != PageStatus.PUBLISHED:
                 raise Conflict(code="page.parent_draft")
         page.status = PageStatus.PUBLISHED
-        page.published_at = utcnow()
+        page.published_at = page.reviewed_at = utcnow()  # a review too (`review.py`)
         touch(page, actor)
         await self.session.flush()
         await record(self.session, actor, "page.published", "page", page.id)

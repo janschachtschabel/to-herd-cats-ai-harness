@@ -28,6 +28,7 @@ from app.core.access import Actor
 from app.core.authorship import Authorship
 from app.core.errors import Forbidden
 from app.core.slug import slugify
+from app.modules.agents.memory_models import MEMORY_FOLDER_SLUG
 from app.modules.agents.memory_repository import MemoryPage, MemoryRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.ai.models import DataLocation
@@ -42,7 +43,7 @@ MAX_MEMORY_CHARS = 8_000  # what one memory page may hold (`update_memory`)
 MEMORY_BUDGET = 4_000  # what a run's context holds of all its memory pages together
 MIN_SHARE = 400  # a page's share while that much is left, however many pages there are
 CUT_MARK = "\n[… cut: the rest of this memory page is not shown]"
-FOLDER = ("_agenten", "Agenten")  # slug, title
+FOLDER = (MEMORY_FOLDER_SLUG, "Agenten")  # slug, title
 PAGE = ("gedaechtnis", "Gedächtnis")
 
 LEAD = (
