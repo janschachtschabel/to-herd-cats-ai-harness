@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { Eye, Hash, UsersRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
+import { AgentHeaderNote } from '@/features/agents/AgentHeaderNote'
+import { agentOf } from '@/features/agents/display'
 import { useMe } from '@/features/auth/queries'
 import type { Conversation, Space } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -19,6 +21,7 @@ export function ConversationHeader({
   const { t, i18n } = useTranslation()
   const me = useMe()
   const Icon = conversation.kind === 'dm' ? UsersRound : Hash
+  const agent = agentOf(conversation)
   return (
     <header className="mb-3 border-b pb-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -39,6 +42,7 @@ export function ConversationHeader({
           </Link>
         )}
       </div>
+      {agent && <AgentHeaderNote agentId={agent.id} />}
       {conversation.topic && (
         <p className="mt-1 text-sm text-muted-foreground">{conversation.topic}</p>
       )}

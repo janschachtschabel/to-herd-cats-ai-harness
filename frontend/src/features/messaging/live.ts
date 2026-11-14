@@ -1,6 +1,8 @@
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
+import { agentKeys } from '@/features/agents/keys'
+import { noteRunProgress } from '@/features/agents/live'
 import { ticketKeys } from '@/features/tickets/keys'
 import { sprintEventKeys, ticketEventKeys } from '@/features/tickets/live'
 import { useLive, type LiveEvent } from '@/lib/live'
@@ -26,7 +28,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
   const conversation = event.conversationId
   switch (event.type) {
     case 'resync':
-      return [messagingKeys.all, activityKeys.all, ticketKeys.all]
+      return [messagingKeys.all, activityKeys.all, ticketKeys.all, agentKeys.runs]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
       return [EVERYTHING]
@@ -39,6 +41,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       keys.push(messagingKeys.message(conversation))
       // A direct message moves up its list (or appears: someone wrote to me first).
       if (!isKnownChannel(queryClient, conversation)) keys.push(messagingKeys.dms)
+      // An agent's answer or stop notice: the run shown with progress is done.
+      if (event.type === 'message.created') keys.push(agentKeys.runs)
       return keys
     }
     case 'reaction.changed':
@@ -65,6 +69,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return ticketEventKeys(queryClient, event.ticketId, event.spaceId)
     case 'sprint.changed':
       return sprintEventKeys(queryClient, event.spaceId)
+    case 'run.progress':
+      return event.runId ? [agentKeys.run(event.runId)] : []
   }
 }
 
@@ -105,6 +111,12 @@ export function useLiveUpdates(): void {
   const queryClient = useQueryClient()
   const coalescer = useMemo(() => createCoalescer(queryClient), [queryClient])
   useEffect(() => () => coalescer.stop(), [coalescer])
-  const onEvent = useCallback((event: LiveEvent) => coalescer.add(event), [coalescer])
+  const onEvent = useCallback(
+    (event: LiveEvent) => {
+      noteRunProgress(queryClient, event)
+      coalescer.add(event)
+    },
+    [coalescer, queryClient],
+  )
   useLive(onEvent)
 }

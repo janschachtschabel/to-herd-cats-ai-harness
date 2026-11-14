@@ -25,6 +25,7 @@ const AssignmentsPage = lazyRouteComponent(
   'AssignmentsPage',
 )
 const UsagePage = lazyRouteComponent(() => import('@/features/ai/usage/UsagePage'), 'UsagePage')
+const AgentsPage = lazyRouteComponent(() => import('@/features/agents/AgentsPage'), 'AgentsPage')
 
 /** A page someone without the right must not even learn exists: not found. */
 function requirePermission(me: Me, permission: Permission): void {
@@ -119,6 +120,13 @@ const aiUsageRoute = createRoute({
   component: UsagePage,
 })
 
+const agentsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/agents',
+  loader: ({ context }) => requirePermission(context.me, 'agent.manage'),
+  component: AgentsPage,
+})
+
 /** The administration (`/admin/...`): each page only for those with its right. */
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
@@ -131,4 +139,5 @@ export const adminTree = adminRoute.addChildren([
   aiRoute,
   aiAssignmentsRoute,
   aiUsageRoute,
+  agentsRoute,
 ])

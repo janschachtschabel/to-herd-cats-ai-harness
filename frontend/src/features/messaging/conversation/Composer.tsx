@@ -2,6 +2,8 @@ import { SendHorizontal } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { noRunText } from '@/features/agents/display'
+import { useNoteAgentRun } from '@/features/agents/queries'
 import type { DirectoryEntry } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { insertMention, mentionsIn, typedMention, type Mentioned } from '../mentions'
@@ -37,6 +39,8 @@ export function Composer({
   const [dismissed, setDismissed] = useState<number | null>(null)
   const [active, setActive] = useState(0)
   const [notNotified, setNotNotified] = useState<Mentioned[]>([])
+  const [noRun, setNoRun] = useState<string | null>(null)
+  const noteRun = useNoteAgentRun(conversationId)
   const area = useRef<HTMLTextAreaElement>(null)
   const listId = useId()
   const hintId = useId()
@@ -77,10 +81,12 @@ export function Composer({
     const mentioned = mentionsIn(body)
     setText('', 0)
     setNotNotified([])
+    setNoRun(null)
     const written = await send(
       body,
       mentioned.map((m) => m.id),
     )
+    setNoRun(noteRun(written))
     if (written && written.not_notified.length > 0) {
       const missed = new Set(written.not_notified.map((id) => id.toLowerCase()))
       setNotNotified(mentioned.filter((m) => missed.has(m.id)))
@@ -166,6 +172,11 @@ export function Composer({
           ? t('messaging.composer.tooLong', { count: MAX_CHARS })
           : t('messaging.composer.hint')}
       </p>
+      {noRun && (
+        <p role="status" className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+          {noRunText(t, noRun)}
+        </p>
+      )}
       {notNotified.length > 0 && (
         <p role="status" className="mt-1 text-xs text-amber-700 dark:text-amber-400">
           {t('messaging.composer.notNotified', {

@@ -2,6 +2,10 @@ import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { AgentBadge } from '@/features/agents/AgentBadge'
+import { AnswerSources } from '@/features/agents/AnswerSources'
+import { RUN_STOPPED } from '@/features/agents/display'
+import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { TicketCards } from '@/features/tickets/TicketCard'
 import type { Message } from '@/lib/api'
@@ -31,8 +35,12 @@ function SystemRow({ message }: { message: Message }) {
   )
 }
 
-/** One message: who, when, the text, reactions, its thread, and what one may do. */
+/** One message: who, when, the text, reactions, its thread, and what one may do. An
+ *  agent's answer carries the AI mark; a stopped run leaves a notice with its reason. */
 export function MessageItem({ message }: { message: Message }) {
+  if (message.kind === 'system' && message.system?.key === RUN_STOPPED) {
+    return <RunStoppedNotice message={message} />
+  }
   if (message.kind === 'system') return <SystemRow message={message} />
   return <HumanMessage message={message} />
 }
@@ -59,6 +67,7 @@ function HumanMessage({ message }: { message: Message }) {
     >
       <header className="flex items-baseline gap-2">
         <span className="text-sm font-semibold">{author}</span>
+        {message.kind === 'agent' && <AgentBadge />}
         <MessageTime iso={message.created_at} />
         {message.edited_at && !message.deleted_at && (
           <span className="text-xs text-muted-foreground">{t('messaging.message.edited')}</span>
@@ -72,6 +81,9 @@ function HumanMessage({ message }: { message: Message }) {
         <>
           <MessageMarkdown markdown={message.body_md} meId={meId} />
           <TicketCards markdown={message.body_md} />
+          {message.kind === 'agent' && message.client_id && (
+            <AnswerSources runId={message.client_id} />
+          )}
         </>
       )}
       <Reactions message={message} canReact={can.react} toggle={toggle} />

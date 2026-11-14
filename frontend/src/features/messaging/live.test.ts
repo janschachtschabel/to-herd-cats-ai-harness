@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
+import { agentKeys } from '@/features/agents/keys'
 import { ticketKeys } from '@/features/tickets/keys'
 import { activityKeys, messagingKeys } from './keys'
 import { COALESCE_MS, createCoalescer, invalidateFor } from './live'
@@ -38,6 +39,8 @@ const KEYS = {
   otherSprints: [...ticketKeys.sprints('other'), 'choices'],
   myBoard: ticketKeys.myBoard,
   myColumn: ticketKeys.myColumn('review'),
+  runA: agentKeys.run('run-a'),
+  runB: agentKeys.run('run-b'),
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -101,7 +104,17 @@ describe('live invalidation', () => {
       'activity',
       'activityCount',
       ...ALL_TICKETS,
+      'runA',
+      'runB',
     ])
+  })
+
+  test("an agent run's progress refreshes that run only; the run's answer every run (plan M5)", () => {
+    expect(
+      staleAfter({ type: 'run.progress', conversationId: 'a', runId: 'run-a', step: 1 }),
+    ).toEqual(['runA'])
+    expect(staleAfter({ type: 'message.created', conversationId: 'a' })).toContain('runB')
+    expect(staleAfter({ type: 'message.updated', conversationId: 'a' })).not.toContain('runA')
   })
 
   test('a ticket event refreshes that ticket and the views of its space only (review M4 P4)', () => {
@@ -146,6 +159,9 @@ describe('live invalidation', () => {
       'messagesA',
       'repliesA',
       'messageA',
+      // An agent's answer ends the run whose progress is shown.
+      'runA',
+      'runB',
     ])
   })
 
@@ -210,6 +226,7 @@ describe('coalescing', () => {
         messagingKeys.unread,
         messagingKeys.messages('a'),
         messagingKeys.message('a'),
+        agentKeys.runs,
       ]
         .map((key) => JSON.stringify(key))
         .sort(),

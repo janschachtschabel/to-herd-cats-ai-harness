@@ -33,7 +33,10 @@ export function useMentionCandidates(
   const participants = useMemo(() => {
     const q = query.toLowerCase()
     return (conversation.participants ?? [])
-      .filter((p) => p.is_active && p.id !== meId && p.name.toLowerCase().includes(q))
+      .filter(
+        (p) =>
+          p.type !== 'agent' && p.is_active && p.id !== meId && p.name.toLowerCase().includes(q),
+      )
       .map((p): DirectoryEntry => ({ type: 'user', id: p.id, name: p.name }))
   }, [conversation.participants, query, meId])
   if (dm)

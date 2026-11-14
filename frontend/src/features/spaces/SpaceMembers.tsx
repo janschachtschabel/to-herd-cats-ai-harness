@@ -1,4 +1,4 @@
-import { UserRound, UsersRound } from 'lucide-react'
+import { Bot, UserRound, UsersRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -19,7 +19,8 @@ import { useRemoveSpaceMember, useSetSpaceMember, useSpaceMembers } from './quer
 
 function MemberName({ member }: { member: SpaceMember }) {
   const { t } = useTranslation()
-  const Icon = member.member_type === 'group' ? UsersRound : UserRound
+  const Icon =
+    member.member_type === 'group' ? UsersRound : member.member_type === 'agent' ? Bot : UserRound
   return (
     <span className="flex items-center gap-2">
       <Icon className="size-4 text-muted-foreground" aria-hidden />

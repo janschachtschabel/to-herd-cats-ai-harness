@@ -28,6 +28,7 @@ const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/audit': History,
   '/admin/dm-inspect': Eye,
   '/admin/ai': Sparkles,
+  '/admin/agents': Bot,
 }
 
 function AdminSection() {

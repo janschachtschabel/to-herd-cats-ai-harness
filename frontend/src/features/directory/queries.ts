@@ -2,7 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { api, unwrap, type DirectoryEntry } from '@/lib/api'
 import { pagedQuery } from '@/lib/paging'
 
-export type DirectoryType = 'user' | 'group'
+export type DirectoryType = 'user' | 'group' | 'agent'
 
 /** With `spaceId`: only the people who may read that space (never groups). */
 export const directoryQuery = (q: string, type?: DirectoryType, spaceId?: string) =>

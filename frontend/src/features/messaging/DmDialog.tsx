@@ -10,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { AgentDmPicker } from '@/features/agents/AgentDmPicker'
+import { usesAi } from '@/features/ai/display'
 import { useMe } from '@/features/auth/queries'
 import { DirectoryCombobox } from '@/features/directory/DirectoryCombobox'
 import { principalKey } from '@/features/directory/queries'
@@ -29,9 +31,10 @@ export function DmDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation()
+  const withAgents = usesAi(useMe())
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('messaging.dm.openTitle')}</DialogTitle>
           <DialogDescription>
@@ -39,6 +42,7 @@ export function DmDialog({
           </DialogDescription>
         </DialogHeader>
         {open && <DmForm onDone={() => onOpenChange(false)} />}
+        {open && withAgents && <AgentDmPicker onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )

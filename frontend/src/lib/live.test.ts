@@ -138,4 +138,22 @@ describe('live stream', () => {
       spaceId: 's1',
     })
   })
+
+  test("an agent run's progress carries the run and its step (plan M5), nothing else", () => {
+    expect(
+      parseLiveEvent('run.progress', '{"conversation_id":"c1","run_id":"r1","step":2}'),
+    ).toEqual({
+      type: 'run.progress',
+      conversationId: 'c1',
+      messageId: null,
+      parentId: null,
+      ticketId: null,
+      spaceId: null,
+      runId: 'r1',
+      step: 2,
+    })
+    expect(
+      parseLiveEvent('run.progress', '{"conversation_id":"c1","run_id":"r1","step":"x"}'),
+    ).toMatchObject({ runId: 'r1', step: null })
+  })
 })

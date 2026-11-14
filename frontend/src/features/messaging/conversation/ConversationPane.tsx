@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next'
+import { agentOf } from '@/features/agents/display'
+import { RunProgress } from '@/features/agents/RunProgress'
 import { useMe } from '@/features/auth/queries'
 import type { Conversation, SpaceRole } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -54,6 +56,7 @@ export function ConversationPane({
   }
   const parent = thread ? list.messages.find((m) => m.id === thread) : undefined
   const narrowThread = layout === 'narrow' && thread !== null
+  const agent = agentOf(conversation)
 
   return (
     <ConversationContext.Provider value={view}>
@@ -69,6 +72,7 @@ export function ConversationPane({
               newBefore={newBefore}
               emptyText={emptyText}
             />
+            {agent && <RunProgress conversationId={conversation.id} agentName={agent.name} />}
             {abilities.post ? (
               <Composer
                 key={conversation.id}

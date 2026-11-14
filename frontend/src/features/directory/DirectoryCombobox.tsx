@@ -1,4 +1,4 @@
-import { Loader2, UserRound, UsersRound } from 'lucide-react'
+import { Bot, Loader2, UserRound, UsersRound } from 'lucide-react'
 import { useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
@@ -31,7 +31,7 @@ export function DirectoryCombobox({
   selected: DirectoryEntry | null
   onSelect: (entry: DirectoryEntry | null) => void
   exclude: Set<string>
-  /** Only people (`user`) or only groups; both when left out. */
+  /** Only people (`user`), groups or agents (`agent`: only for `ai.use`); all when left out. */
   type?: DirectoryType
   /** Only the people who may read this space. */
   spaceId?: string
@@ -118,6 +118,8 @@ export function DirectoryCombobox({
               >
                 {entry.type === 'group' ? (
                   <UsersRound className="size-4 text-muted-foreground" aria-hidden />
+                ) : entry.type === 'agent' ? (
+                  <Bot className="size-4 text-muted-foreground" aria-hidden />
                 ) : (
                   <UserRound className="size-4 text-muted-foreground" aria-hidden />
                 )}

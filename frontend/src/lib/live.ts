@@ -16,6 +16,7 @@ export const LIVE_EVENTS = [
   'ticket.created',
   'ticket.updated',
   'sprint.changed',
+  'run.progress',
   'resync',
 ] as const
 
@@ -30,6 +31,9 @@ export interface LiveEvent {
   ticketId: string | null
   /** The ticket's space (ticket events), the sprint's (`sprint.changed`). */
   spaceId: string | null
+  /** An agent's run and its step counter (`run.progress` only). */
+  runId?: string | null
+  step?: number | null
 }
 
 /** `limited`: the server refused another stream for this session (429, too many tabs). */
@@ -72,13 +76,14 @@ function idOrNull(value: unknown): string | null {
 
 /** An event's data (`{"conversation_id", "message_id", "parent_id"}`, tickets add
  *  `ticket_id` and `space_id`; a sprint's is `{"space_id", "sprint_id"}`, and the
- *  space is all a client refreshes by); null if unreadable. */
+ *  space is all a client refreshes by; an agent run's progress adds `run_id` and
+ *  `step`); null if unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')
     if (typeof value !== 'object' || value === null) return null
     const fields = value as Record<string, unknown>
-    return {
+    const event: LiveEvent = {
       type,
       conversationId: idOrNull(fields.conversation_id),
       messageId: idOrNull(fields.message_id),
@@ -86,6 +91,9 @@ export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | n
       ticketId: idOrNull(fields.ticket_id),
       spaceId: idOrNull(fields.space_id),
     }
+    if (type !== 'run.progress') return event
+    const step = Number.isInteger(fields.step) ? (fields.step as number) : null
+    return { ...event, runId: idOrNull(fields.run_id), step }
   } catch {
     return null
   }
