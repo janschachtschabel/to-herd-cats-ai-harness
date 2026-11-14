@@ -23,7 +23,7 @@ from app.core.db_errors import is_retryable, is_timeout
 from app.core.models_base import utcnow
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents import step_host
+from app.modules.agents import step_checks, step_host
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import Claimed, RunSteps, claim
 from app.modules.agents.gauge_repository import open_runs
@@ -236,6 +236,7 @@ async def test_the_steps_around_a_model_call_wait_for_the_runs_row_only_briefly(
     """The checks before a model call and its record lock the run's row like a tool's
     step, with the same bound (review M6 2, finding 8)."""
     monkeypatch.setattr(step_host, "STEP_LOCK_TIMEOUT_SECONDS", 0.3)
+    monkeypatch.setattr(step_checks, "STEP_LOCK_TIMEOUT_SECONDS", 0.3)
     _, _, claimed = await _ticket_run(real_db, make_real_client, openai_stub)
     host = await _host(real_db, claimed)
     reply = Reply("ok", [], 1, 1, 0, 5, "m1")

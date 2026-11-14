@@ -1,6 +1,7 @@
 """The host of a run's step loop (`runtime/loop.StepHost`): the checks before every
 model call and every tool call, and the records after them, each in a short
-transaction of its own (see `executor.py`, which drives it).
+transaction of its own (see `executor.py`, which drives it; the checks themselves:
+`step_checks.py`).
 
 Every step's transaction starts by locking the run's row and checking that it is still
 this take-up's (else `Lost`) and that nobody asked it to stop (else `cancelled`). A
@@ -38,22 +39,24 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Actor
 from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
-from app.modules.agents.actor import allowed_actor
 from app.modules.agents.approvals.gate import gate, settle_timed_out
-from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.models import (
     STEP_LOCK_TIMEOUT_SECONDS,
     STEP_STATEMENT_TIMEOUT_SECONDS,
-    Agent,
     EventKind,
-    Run,
 )
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.repository import AgentRepository
+from app.modules.agents.step_checks import (
+    check_policy,
+    exhausted,
+    granted,
+    location_of,
+    owned,
+    run_actor_now,
+)
 from app.modules.agents.step_records import (
     TIMED_OUT_SOURCE,
     TOOL_TIMED_OUT,
@@ -62,11 +65,9 @@ from app.modules.agents.step_records import (
     tool_content,
 )
 from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSpec, Wait
-from app.modules.agents.toolbox.policy import Grant, effective, watched
+from app.modules.agents.toolbox.policy import Grant
 from app.modules.agents.working import Lost, Suspended, Unit, Working, once_more, units_of
-from app.modules.ai.budgets import budget_exhausted, has_price
-from app.modules.ai.models import AiConnection, BudgetScope, DataLocation, UsageRecord
-from app.modules.ai.policy import ANY, connection_allowed, strictest
+from app.modules.ai.models import UsageRecord
 from app.modules.ai.usage import record_usage
 from app.modules.automations import runs as automation_runs
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult
@@ -102,12 +103,12 @@ class RunHost:
             steps = RunSteps(session, self.run.claimed)
             await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, STEP_STATEMENT_TIMEOUT_SECONDS)
             connection = await steps.connection(self.run.connection_id)
-            spent = await self._exhausted(session, connection)  # before the row lock
-            steps, _, agent = await self._owned(session)
-            await self._actor(session, agent)
+            spent = await exhausted(session, self.run, connection)  # before the row lock
+            steps, _, agent = await owned(session, self.run)
+            await run_actor_now(session, self.run, agent)
             if connection is None:
                 raise Halt("rights_revoked")
-            await self._policy(session, connection.data_location)
+            await check_policy(session, self.run, connection.data_location)
             if spent is not None:
                 raise Halt("budget", detail=spent.value)
             return await steps.take_rate(connection.id, connection.requests_per_minute)
@@ -128,7 +129,7 @@ class RunHost:
 
     async def _record_reply(self, step: int, reply: Reply) -> None:
         async with self.unit() as session:
-            steps, run, _ = await self._owned(session)
+            steps, run, _ = await owned(session, self.run)
             usage = await self._usage(session, reply)
             content = reply_content(step, reply)
             if usage.cost is not None:
@@ -171,10 +172,10 @@ class RunHost:
     ) -> ToolResult | Wait:
         async with self.unit() as session:
             statement = min(STEP_STATEMENT_TIMEOUT_SECONDS, self.seconds_left())
-            steps, run, agent = await self._owned(session, statement)
-            grant = await self._granted(session, agent, spec)
-            actor = await self._actor(session, agent)
-            location = await self._location(steps)
+            steps, run, agent = await owned(session, self.run, statement)
+            grant = await granted(session, self.run, agent, spec)
+            actor = await run_actor_now(session, self.run, agent)
+            location = await location_of(steps, self.run)
             reads = self.run.reads
             pages, tickets, drafts = set(reads.pages), set(reads.tickets), set(reads.drafts)
             ctx = ToolContext(session, actor, location, reads, self._ref(), CallRef(step, call.id))
@@ -199,82 +200,12 @@ class RunHost:
         its approval `failed`)."""
         result = ToolResult(TIMED_OUT_SOURCE, TOOL_TIMED_OUT)
         async with self.unit() as session:
-            steps, run, _ = await self._owned(session)
+            steps, run, _ = await owned(session, self.run)
             await settle_timed_out(session, self._ref(), CallRef(step, call.id))
             content = tool_content(step, call, args, result, 0)
             await steps.event(self._seq(), EventKind.TOOL_CALL, content)
             steps.keep(run)
         return result
-
-    # --- checks ----------------------------------------------------------------------
-
-    async def _owned(
-        self, session: AsyncSession, statement: float = STEP_STATEMENT_TIMEOUT_SECONDS
-    ) -> tuple[RunSteps, Run, Agent]:
-        """The run's records, its row (locked) and its agent as now; the step's lock
-        waits and statements bounded from its first statement on."""
-        steps = RunSteps(session, self.run.claimed)
-        await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, statement)
-        run = await steps.owned()
-        if run is None:
-            raise Lost
-        if await ControlRepository(session, run.org_id).cancelled_by(run.id) is not None:
-            raise Halt("cancelled")
-        agent = await steps.agent()
-        if agent is None:
-            raise Halt("rights_revoked")
-        self.run.agent = agent
-        return steps, run, agent
-
-    async def _granted(self, session: AsyncSession, agent: Agent, spec: ToolSpec) -> Grant:
-        """The tool is still allowed to the agent as it is now (level and entries):
-        `allow`, or `confirm` (a person releases each call, `approvals/gate.py`; in an
-        event rule's run every direct write, `policy.watched`)."""
-        entries = await AgentRepository(session, agent.org_id).tool_entries(agent.id)
-        entry = Grant(entries[spec.name]) if spec.name in entries else None
-        grant = watched(effective(agent.level, spec, entry), spec, event_rule=self.run.event_rule)
-        if grant == Grant.BLOCK:
-            raise Halt("rights_revoked")
-        return grant
-
-    async def _actor(self, session: AsyncSession, agent: Agent) -> Actor:
-        claimed = self.run.claimed
-        actor = await allowed_actor(
-            session,
-            claimed.org_id,
-            claimed.user_id,
-            agent,
-            self.run.reads,
-            claimed.conversation_id,
-        )
-        if actor is None:
-            raise Halt("rights_revoked")
-        return actor
-
-    async def _policy(self, session: AsyncSession, location: DataLocation) -> None:
-        """The strictest current policy of every space read from, where it was read
-        and where its page or ticket is now."""
-        repo = ReadRepository(session, self.run.claimed.org_id)
-        now = await repo.now(self.run.reads)
-        policy = strictest([ANY, *await repo.policies(self.run.reads.spaces | now.spaces)])
-        if now.blocked or not connection_allowed(location, policy):
-            raise Halt("policy_blocked")
-
-    async def _exhausted(
-        self, session: AsyncSession, connection: AiConnection | None
-    ) -> BudgetScope | None:
-        """The daily budget of the organisation, the person or the agent that is
-        reached, if one is; summed before the step locks the run's row, so the sum
-        never holds a cancel or the lease's renewal (module review M7, finding 9)."""
-        c = self.run.claimed
-        priced = has_price(connection, self.run.model)
-        return await budget_exhausted(session, c.org_id, c.user_id, c.agent_id, priced=priced)
-
-    async def _location(self, steps: RunSteps) -> DataLocation:
-        connection = await steps.connection(self.run.connection_id)
-        if connection is None:
-            raise Halt("rights_revoked")
-        return DataLocation(connection.data_location)
 
     async def _usage(self, session: AsyncSession, reply: Reply) -> UsageRecord:
         """Booked to the person, the agent and the space of the place (none for a DM)."""

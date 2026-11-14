@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.models_base import utcnow
-from app.modules.agents import step_host
+from app.modules.agents import step_checks, step_host
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import RunSteps, claim, renew
 from app.modules.agents.models import EventKind, Run, RunEvent, StopReason
@@ -118,6 +118,7 @@ async def test_a_tool_waiting_too_long_for_a_lock_answers_an_error_the_model_see
     bench: Bench, engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(step_host, "STEP_LOCK_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(step_checks, "STEP_LOCK_TIMEOUT_SECONDS", 0.2)
     bench.stub.state.replies.extend([call("probe_lock", label="busy"), {"content": "Later."}])
     await bench.say("Do it")
     async with engine.connect() as other:
