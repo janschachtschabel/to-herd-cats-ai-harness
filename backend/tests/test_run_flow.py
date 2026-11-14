@@ -157,3 +157,14 @@ async def test_usage_names_the_model_the_call_went_to(bench: Bench) -> None:
     assert await bench.run_next(executor) == StopReason.COMPLETED
     models = (await bench.session.scalars(select(UsageRecord.model))).all()
     assert models == ["m1", "m1"]
+
+
+async def test_usage_per_agent_names_the_agent(bench: Bench) -> None:
+    """Finding 12: `by=agent` gives the agent's name."""
+    bench.stub.state.replies.append({"content": "Hi."})
+    await bench.say("Hi")
+    assert await bench.run_next() == StopReason.COMPLETED
+    rows = (await bench.people.admin.get("/api/ai/usage", params={"by": "agent"})).json()
+    assert [(r["key_id"], r["name"], r["calls"]) for r in rows["items"]] == [
+        (str(bench.agent.id), "Ava", 1)
+    ]

@@ -22,7 +22,7 @@ import { AiAdminTabs } from '../AiAdminTabs'
 import { USAGE_GROUPS, useUsage, type UsageGroup } from '../usageQueries'
 import { formatCost, lastThirtyDays } from './period'
 
-/** The organisation's AI usage per UTC day (`ai.manage`), optionally per person,
+/** The organisation's AI usage per UTC day (`ai.manage`), optionally per person, agent,
  *  space or connection. Costs only where a price is stored. */
 export function UsagePage() {
   const { t, i18n } = useTranslation()

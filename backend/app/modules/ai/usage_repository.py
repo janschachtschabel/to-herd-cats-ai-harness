@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import Date, Label, Select, and_, cast, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.agents.models import Agent
 from app.modules.ai.models import AiConnection, UsageRecord
 from app.modules.spaces.models import Space
 from app.modules.users.models import User
@@ -122,13 +123,17 @@ class UsageRepository:
         return [UsageRow(r.day, None if r.key == NO_KEY else r.key, None, _totals(r)) for r in rows]
 
     async def named(self, by: GroupBy, rows: list[UsageRow]) -> list[UsageRow]:
-        """The rows with the display names of their keys, where known (agents: M5
-        task 5; a deleted connection has none)."""
+        """The rows with the display names of their keys, where known (a deleted
+        connection or agent has none)."""
         ids = {r.key for r in rows if r.key is not None}
         names: dict[uuid.UUID, str] = {}
         stmt: Select[uuid.UUID, str] | None = None
         if by == GroupBy.USER:
             stmt = select(User.id, User.name).where(User.org_id == self.org_id, User.id.in_(ids))
+        elif by == GroupBy.AGENT:
+            stmt = select(Agent.id, Agent.name).where(
+                Agent.org_id == self.org_id, Agent.id.in_(ids)
+            )
         elif by == GroupBy.SPACE:
             stmt = select(Space.id, Space.name).where(
                 Space.org_id == self.org_id, Space.id.in_(ids)

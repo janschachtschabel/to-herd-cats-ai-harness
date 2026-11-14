@@ -204,17 +204,17 @@ describe('ai administration', () => {
     })
   })
 
-  test('usage per person over a period', async () => {
+  test('usage per person and per agent over a period', async () => {
     const api = mockApi({
       ...shell(AI_ADMIN),
       'GET /api/ai/usage': (call) =>
         page(
-          call.query.get('by') === 'user'
+          call.query.get('by') === 'user' || call.query.get('by') === 'agent'
             ? [
                 {
                   day: '2026-11-13',
                   key_id: 'u1',
-                  name: 'Ben',
+                  name: call.query.get('by') === 'agent' ? 'Hilda' : 'Ben',
                   calls: 3,
                   tokens_in: 1200,
                   tokens_out: 300,
@@ -236,5 +236,9 @@ describe('ai administration', () => {
     const last = api.find('GET', '/api/ai/usage').at(-1)!
     expect(last.query.get('by')).toBe('user')
     expect(last.query.get('from')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    await user.selectOptions(screen.getByLabelText('Aufteilen nach'), 'Agent')
+    expect(await screen.findByRole('cell', { name: 'Hilda' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Agent' })).toBeInTheDocument()
+    expect(api.find('GET', '/api/ai/usage').at(-1)!.query.get('by')).toBe('agent')
   })
 })

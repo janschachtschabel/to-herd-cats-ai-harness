@@ -135,6 +135,7 @@
       "groups": {
         "day": "Day only",
         "user": "Person",
+        "agent": "Agent",
         "space": "Space",
         "connection": "Connection"
       },

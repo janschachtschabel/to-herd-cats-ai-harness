@@ -4,7 +4,7 @@ import { pagedQuery, usePaged } from '@/lib/paging'
 import { aiKeys } from './keys'
 
 /** How the organisation's usage is grouped: by day alone, or per day and key. */
-export const USAGE_GROUPS = ['day', 'user', 'space', 'connection'] as const
+export const USAGE_GROUPS = ['day', 'user', 'agent', 'space', 'connection'] as const
 export type UsageGroup = (typeof USAGE_GROUPS)[number]
 
 /** Usage sums per UTC day (`ai.manage`); `from`/`to` are days (YYYY-MM-DD). */
