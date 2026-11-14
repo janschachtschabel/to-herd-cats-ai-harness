@@ -17,4 +17,7 @@ export const ticketKeys = {
   epics: (spaceId: string) => ['tickets', 'epics', spaceId] as const,
   pageTickets: (pageId: string) => ['tickets', 'page', pageId] as const,
   parents: (spaceId: string, q: string) => ['tickets', 'parents', spaceId, q] as const,
+  sprints: (spaceId: string) => ['tickets', 'sprints', spaceId] as const,
+  myBoard: ['tickets', 'my-board'] as const,
+  myColumn: (category: string) => ['tickets', 'my-board', category] as const,
 }

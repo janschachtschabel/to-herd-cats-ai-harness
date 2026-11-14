@@ -1,6 +1,7 @@
 {
   "nav": {
-    "tickets": "Tickets"
+    "tickets": "Tickets",
+    "myBoard": "My board"
   },
   "activity": {
     "reasons": {
@@ -56,7 +57,11 @@
       "parent": "Parent",
       "noParent": "None",
       "chooseParent": "Change",
-      "tags": "Tags"
+      "tags": "Tags",
+      "sprint": "Sprint",
+      "noSprint": "No sprint (backlog)",
+      "someSprint": "An earlier sprint",
+      "closedSprintHint": "The sprint is closed, but the ticket is not finished. It stays there until someone moves it to another sprint or the backlog."
     },
     "filters": {
       "label": "Filter tickets",
@@ -151,13 +156,20 @@
       "page_unlinked": "{{actor}} unlinked “{{title}}”.",
       "page_unlinked_hidden": "{{actor}} unlinked a page.",
       "unknown": "{{actor}} changed the ticket.",
-      "goneStatus": "a deleted status"
+      "goneStatus": "a deleted status",
+      "sprint_set": "{{actor}} put the ticket into {{to}}.",
+      "sprint_moved": "{{actor}} moved the ticket from {{from}} to {{to}}.",
+      "sprint_removed": "{{actor}} moved the ticket from {{from}} to the backlog.",
+      "someSprint": "a sprint",
+      "someSprintInto": "a sprint"
     },
     "space": {
       "views": "Views of the space",
       "wiki": "Wiki",
       "board": "Board",
-      "epics": "Epics"
+      "epics": "Epics",
+      "sprints": "Sprints",
+      "backlog": "Backlog"
     },
     "board": {
       "title": "Board",
@@ -208,6 +220,97 @@
     },
     "card": {
       "label": "Ticket {{key}}: {{title}}"
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "A sprint gathers tickets of this space for a span of time. At most one runs at a time.",
+      "create": "New sprint",
+      "empty": "No sprints in this space yet.",
+      "states": {
+        "active": "Active",
+        "planned": "Planned",
+        "closed": "Closed"
+      },
+      "option": {
+        "active": "{{name}} (running)",
+        "closed": "{{name}} (closed)"
+      },
+      "dates": "{{from}} – {{to}}",
+      "start": "Start {{name}}",
+      "startShort": "Start",
+      "close": "Close {{name}}",
+      "closeShort": "Close",
+      "startBlocked": "Can start once {{name}} is closed.",
+      "tallyLabel": "Tally:",
+      "tally": "{{planned}} planned · {{done}} done · {{carried}} carried over",
+      "toggle": "Show the tickets of {{name}}",
+      "noTickets": "No tickets in this sprint.",
+      "closedNote": "Finished tickets stay in the closed sprint. Those reopened afterwards are marked and stay here until someone moves them to another sprint or the backlog.",
+      "reopened": "Reopened after closing",
+      "removeTicket": "Move {{key}} to the backlog",
+      "removeStale": "The ticket was changed in the meantime and stayed in the sprint; the list has been reloaded.",
+      "form": {
+        "title": "New sprint",
+        "description": "Name and dates; the goal in one sentence. The sprint starts out planned.",
+        "name": "Name",
+        "goal": "Goal",
+        "starts": "Start",
+        "ends": "End",
+        "submit": "Create"
+      },
+      "closeDialog": {
+        "title": "Close {{name}}",
+        "text": "Done and cancelled tickets stay in the sprint; the tally is recorded.",
+        "legend": "Where do the unfinished tickets go?",
+        "next": "Into the next sprint: {{name}}",
+        "nextMissing": "Into the next sprint (none planned)",
+        "backlog": "Back to the backlog",
+        "submit": "Close sprint"
+      }
+    },
+    "backlog": {
+      "title": "Backlog",
+      "description": "Unfinished tickets in no sprint, by priority.",
+      "empty": "The backlog is empty.",
+      "selection": "Selection for the sprint",
+      "select": "Select {{key}}",
+      "selectAll": "Select all",
+      "target": "Target sprint",
+      "put": "Put into sprint ({{n}})",
+      "noSprint": "There is no running or planned sprint. Create one first:",
+      "done_one": "{{count}} ticket put into {{name}}.",
+      "done_other": "{{count}} tickets put into {{name}}.",
+      "stale_one": "{{count}} ticket was changed in the meantime and stayed in the backlog; the backlog has been reloaded.",
+      "stale_other": "{{count}} tickets were changed in the meantime and stayed in the backlog; the backlog has been reloaded."
+    },
+    "myBoard": {
+      "title": "My board",
+      "description": "What is assigned to you, from every space, by category. Done shows the last 14 days.",
+      "columns": "Columns of my board",
+      "empty": "Nothing is assigned to you right now.",
+      "changeColumn": "Change the column of {{key}}",
+      "columnMenu": "Choose a column",
+      "categoryEmpty": "{{space}} has no status of the category {{category}}. The ticket stays where it was."
+    },
+    "daily": {
+      "group": "Group by person",
+      "sprint": "Sprint",
+      "allSprints": "All tickets",
+      "backlog": "Backlog (no sprint)",
+      "since": "Highlighted is what changed status, or is new, since {{day}} (midnight UTC).",
+      "unassigned": "Unassigned",
+      "summary_one": "{{count}} ticket, {{changed}} changed since the last working day",
+      "summary_other": "{{count}} tickets, {{changed}} changed since the last working day",
+      "focus": "Show only {{name}}",
+      "focusUnassigned": "Show only unassigned tickets",
+      "focused": "Filtered to {{name}}.",
+      "showAll": "Show everyone",
+      "changed": "Changed",
+      "cell": "{{person}}: {{status}}",
+      "cellChanged_one": "{{count}} changed",
+      "cellChanged_other": "{{count}} changed",
+      "truncated": "More than 100 people have tickets here; the first 100 by name are shown. Narrow it down by sprint, kind or tag to see the others.",
+      "empty": "No tickets for this selection."
     }
   },
   "errors": {
@@ -218,7 +321,9 @@
       "status_invalid": "This status does not exist in this space.",
       "parent_invalid": "This ticket cannot be the parent here.",
       "kind_invalid": "This kind does not fit the parent or child tickets.",
-      "too_many_pages": "No more than 50 pages can be linked."
+      "too_many_pages": "No more than 50 pages can be linked.",
+      "sprint_invalid": "Tickets cannot be put into this sprint.",
+      "category_empty": "The ticket's space has no status of this category."
     },
     "ticket_status": {
       "not_found": "This status does not exist (any more).",
@@ -227,6 +332,14 @@
       "in_use": "The status still has tickets. Choose where they move.",
       "replacement_invalid": "This replacement status does not work.",
       "version_conflict": "Someone has changed this status in the meantime."
+    },
+    "sprint": {
+      "not_found": "This sprint does not exist, or you may not see it.",
+      "version_conflict": "Someone changed the sprint in the meantime.",
+      "active_exists": "A sprint is already running in this space. Close it first.",
+      "state_invalid": "This is not possible (any more) in the sprint's state.",
+      "next_missing": "There is no planned sprint for the tickets to go into.",
+      "dates_invalid": "The end lies before the start."
     }
   }
 }

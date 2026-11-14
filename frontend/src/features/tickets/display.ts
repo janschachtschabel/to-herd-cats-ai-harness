@@ -49,6 +49,7 @@ const TICKET_KEYS = [
   'ticket.description_changed',
   'ticket.page_linked',
   'ticket.page_unlinked',
+  'ticket.sprint_changed',
 ] as const
 
 /** A ticket thread's timeline entry in words, from its key and its old and new values
@@ -95,6 +96,19 @@ export function ticketSystemText(t: TFunction, entry: SystemEntry, locale: strin
     case 'ticket.page_unlinked':
       variant = entry.old?.name ? 'page_unlinked' : 'page_unlinked_hidden'
       params.title = entry.old?.name ?? ''
+      break
+    case 'ticket.sprint_changed':
+      // Into a sprint, from one to another, or back into the backlog (plan M4b).
+      variant = !entry.new ? 'sprint_removed' : entry.old ? 'sprint_moved' : 'sprint_set'
+      params.from = name(entry.old, t('tickets.timeline.someSprint'))
+      params.to = name(
+        entry.new,
+        t(
+          variant === 'sprint_set'
+            ? 'tickets.timeline.someSprintInto'
+            : 'tickets.timeline.someSprint',
+        ),
+      )
       break
   }
   return t(`tickets.timeline.${variant}`, params)

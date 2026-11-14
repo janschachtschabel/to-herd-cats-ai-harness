@@ -11,11 +11,12 @@ import { LinkedPages } from './links/LinkedPages'
 import { ParentField } from './ParentField'
 import { DueLabel, KindLabel, PriorityLabel, StatusBadge } from './parts'
 import { useStatuses } from './queries'
+import { SprintField } from './sprints/SprintField'
 import { TicketTagsField } from './TicketTagsField'
 import { useTicketSave } from './useTicketSave'
 
-/** The ticket's fields beside it: status, assignee, priority, kind, due day, parent,
- *  tags and linked pages. Each change is saved at once against the version read; when
+/** The ticket's fields beside it: status, assignee, priority, kind, due day, sprint,
+ *  parent, tags and linked pages. Each change is saved at once against the version read; when
  *  someone changed the ticket in the meantime, the view says so and offers to reload. */
 export function TicketFields({
   ticket,
@@ -125,6 +126,7 @@ export function TicketFields({
           )
         }
       </FieldRow>
+      <SprintField ticket={ticket} editable={edit} save={save} />
       <ParentField ticket={ticket} editable={edit} save={save} />
       <TicketTagsField ticket={ticket} editable={edit} />
       <LinkedPages ticket={ticket} editable={edit} />

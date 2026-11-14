@@ -5,7 +5,7 @@ import type { SpaceRole, Ticket } from '@/lib/api'
 import { apiError, type Call, makeEntry, makeMe, makeSpace, mockApi, page } from '@/test/api'
 import { makeConversation, makeMessage, shellRoutes } from '@/test/messaging'
 import { renderApp } from '@/test/render'
-import { makeTicket, STATUSES, statusRef } from '@/test/tickets'
+import { makeSprint, makeTicket, STATUSES, statusRef } from '@/test/tickets'
 
 afterEach(() => clearPending())
 
@@ -195,6 +195,52 @@ describe('ticket view', () => {
     expect(await screen.findByText(/inzwischen geändert/)).toBeInTheDocument()
     expect(field).toHaveValue('Meine Fassung.')
     expect((api.find('PATCH', '/api/tickets/42')[0]!.body as { version: number }).version).toBe(1)
+  })
+
+  test('an editor puts the ticket in a sprint and back into the backlog', async () => {
+    const running = makeSprint({ name: 'Sprint 11', state: 'active' })
+    const next = makeSprint({ name: 'Sprint 12', state: 'planned' })
+    let current = makeTicket({ version: 2 })
+    const api = ticketApi('editor', current, {
+      'GET /api/spaces/:id/sprints': page([running, next]),
+      'GET /api/tickets/:number': () => current,
+      'PATCH /api/tickets/:number': (call: Call) => {
+        const body = call.body as { sprint_id: string | null }
+        current = { ...current, sprint_id: body.sprint_id, version: current.version + 1 }
+        return current
+      },
+    })
+    const { user } = await renderApp('/tickets/42')
+    const fields = await screen.findByRole('complementary', { name: 'Felder des Tickets' })
+    const field = await within(fields).findByRole('combobox', { name: 'Sprint' })
+    expect(field).toHaveValue('')
+    await user.selectOptions(field, 'Sprint 12')
+    await waitFor(() => expect(api.find('PATCH', '/api/tickets/42')).toHaveLength(1))
+    expect(api.find('PATCH', '/api/tickets/42')[0]!.body).toEqual({
+      sprint_id: next.id,
+      version: 2,
+    })
+    await waitFor(() => expect(field).toHaveValue(next.id))
+    await user.selectOptions(field, 'Kein Sprint (Vorrat)')
+    await waitFor(() => expect(api.find('PATCH', '/api/tickets/42')).toHaveLength(2))
+    expect(api.find('PATCH', '/api/tickets/42')[1]!.body).toEqual({ sprint_id: null, version: 3 })
+  })
+
+  test('an unfinished ticket in a closed sprint says it stays there until moved', async () => {
+    const closed = makeSprint({
+      name: 'Sprint 10',
+      state: 'closed',
+      tally: { planned: 3, done: 3, carried: 0 },
+    })
+    ticketApi('viewer', makeTicket({ sprint_id: closed.id }), {
+      'GET /api/spaces/:id/sprints': page([closed]),
+    })
+    await renderApp('/tickets/42')
+    const fields = await screen.findByRole('complementary', { name: 'Felder des Tickets' })
+    expect(await within(fields).findByText('Sprint 10 (abgeschlossen)')).toBeInTheDocument()
+    expect(
+      within(fields).getByText(/Der Sprint ist abgeschlossen, das Ticket aber nicht erledigt/),
+    ).toBeInTheDocument()
   })
 
   test('a ticket one may not see is not there, as a free number', async () => {

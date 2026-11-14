@@ -31,6 +31,18 @@ const EpicsView = lazyRouteComponent(
   () => import('@/features/tickets/epics/EpicsView'),
   'EpicsView',
 )
+const SprintsView = lazyRouteComponent(
+  () => import('@/features/tickets/sprints/SprintsView'),
+  'SprintsView',
+)
+const BacklogView = lazyRouteComponent(
+  () => import('@/features/tickets/sprints/BacklogView'),
+  'BacklogView',
+)
+const MyBoardPage = lazyRouteComponent(
+  () => import('@/features/tickets/my-board/MyBoardPage'),
+  'MyBoardPage',
+)
 const TicketsPage = lazyRouteComponent(
   () => import('@/features/tickets/TicketsPage'),
   'TicketsPage',
@@ -119,6 +131,19 @@ const epicsRoute = createRoute({
   component: EpicsView,
 })
 
+/** A space's sprints and its backlog (tickets in no sprint), plan M4b. */
+const sprintsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/sprints',
+  component: SprintsView,
+})
+
+const backlogRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/backlog',
+  component: BacklogView,
+})
+
 /** A page by its id, for links into its discussion (search hits, the activity):
  *  looks the page up and goes to its path with the discussion open. */
 const pageByIdRoute = createRoute({
@@ -170,6 +195,13 @@ const ticketsRoute = createRoute({
   },
 })
 
+/** My tickets of every space as a board by status category (plan M4b). */
+const myBoardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/my-board',
+  component: MyBoardPage,
+})
+
 /** A ticket by its number (`/tickets/42`); `thread`/`message` as for conversations. */
 const ticketRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -210,10 +242,13 @@ export const routeTree = rootRoute.addChildren([
       spaceSettingsRoute,
       boardRoute,
       epicsRoute,
+      sprintsRoute,
+      backlogRoute,
     ]),
     pageByIdRoute,
     conversationRoute,
     ticketsRoute,
+    myBoardRoute,
     ticketRoute,
     activityRoute,
     profileRoute,

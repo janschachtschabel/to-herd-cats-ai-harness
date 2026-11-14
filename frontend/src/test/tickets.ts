@@ -1,4 +1,4 @@
-import type { Ticket, TicketStatus, TicketSummary } from '@/lib/api'
+import type { Sprint, Ticket, TicketStatus, TicketSummary } from '@/lib/api'
 import { uid } from './messaging'
 
 export const STATUSES: TicketStatus[] = [
@@ -52,6 +52,21 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     ...makeTicketSummary(overrides),
     description_md: 'Beim **Anmelden** passiert nichts.',
     children: { open: 0, active: 0, review: 0, done: 0, cancelled: 0 },
+    ...overrides,
+  }
+}
+
+export function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
+  return {
+    id: uid(),
+    space_id: 'space-1',
+    name: 'Sprint 12',
+    goal: 'Anmeldung stabil',
+    starts_on: '2026-11-16',
+    ends_on: '2026-11-27',
+    state: 'planned',
+    tally: null,
+    version: 1,
     ...overrides,
   }
 }

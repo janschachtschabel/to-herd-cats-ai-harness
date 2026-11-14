@@ -15,6 +15,7 @@ export const LIVE_EVENTS = [
   'dm.inspected',
   'ticket.created',
   'ticket.updated',
+  'sprint.changed',
   'resync',
 ] as const
 
@@ -27,7 +28,7 @@ export interface LiveEvent {
   parentId: string | null
   /** The ticket of `ticket.created` / `ticket.updated` (its thread is `conversationId`). */
   ticketId: string | null
-  /** The ticket's space (ticket events only). */
+  /** The ticket's space (ticket events), the sprint's (`sprint.changed`). */
   spaceId: string | null
 }
 
@@ -70,7 +71,8 @@ function idOrNull(value: unknown): string | null {
 }
 
 /** An event's data (`{"conversation_id", "message_id", "parent_id"}`, tickets add
- *  `ticket_id` and `space_id`); null if unreadable. */
+ *  `ticket_id` and `space_id`; a sprint's is `{"space_id", "sprint_id"}`, and the
+ *  space is all a client refreshes by); null if unreadable. */
 export function parseLiveEvent(type: LiveEventType, data: string): LiveEvent | null {
   try {
     const value: unknown = JSON.parse(data || '{}')

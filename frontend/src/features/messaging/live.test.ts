@@ -34,6 +34,10 @@ const KEYS = {
   children: ticketKeys.children('parent'),
   statuses: ticketKeys.statuses('space'),
   ticketThread: ticketKeys.thread(42),
+  sprints: [...ticketKeys.sprints('space'), 'choices'],
+  otherSprints: [...ticketKeys.sprints('other'), 'choices'],
+  myBoard: ticketKeys.myBoard,
+  myColumn: ticketKeys.myColumn('review'),
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -77,6 +81,10 @@ describe('live invalidation', () => {
     'children',
     'statuses',
     'ticketThread',
+    'sprints',
+    'otherSprints',
+    'myBoard',
+    'myColumn',
   ]
 
   test('resync refreshes every conversation, counter and activity query, nothing else', () => {
@@ -107,10 +115,22 @@ describe('live invalidation', () => {
       'column',
       'epics',
       'children',
+      'myBoard', // my board spans every space
+      'myColumn',
     ]
     const event = { conversationId: 'a', ticketId: 't', spaceId: 'space' }
     expect(staleAfter({ type: 'ticket.updated', ...event })).toEqual(affected)
     expect(staleAfter({ type: 'ticket.created', ...event })).toEqual(affected)
+  })
+
+  test('a sprint event refreshes the sprints, boards and lists of its space (plan M4b)', () => {
+    expect(staleAfter({ type: 'sprint.changed', spaceId: 'space' })).toEqual([
+      'board',
+      'spaceList',
+      'column',
+      'sprints',
+    ])
+    expect(staleAfter({ type: 'sprint.changed' })).toEqual(ALL_TICKETS)
   })
 
   test('a ticket event without its space refreshes every ticket view', () => {

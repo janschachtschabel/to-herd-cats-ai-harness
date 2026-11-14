@@ -1,17 +1,17 @@
 import { Link } from '@tanstack/react-router'
-import { BookOpen, Layers, SquareKanban } from 'lucide-react'
+import { BookOpen, Inbox, Layers, SquareKanban, Timer } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ticketAbilities } from '@/features/tickets/abilities'
 import type { Space } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-export type SpaceView = 'wiki' | 'board' | 'epics'
+export type SpaceView = 'wiki' | 'board' | 'epics' | 'sprints' | 'backlog'
 
 const tab =
   'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 /** The views of a space: its wiki (pages, trash, settings), and with `ticket.read`
- *  its board and its epics. */
+ *  its board, its epics, its sprints and its backlog. */
 export function SpaceTabs({ space, current }: { space: Space; current: SpaceView }) {
   const { t } = useTranslation()
   const params = { spaceId: space.id }
@@ -42,6 +42,14 @@ export function SpaceTabs({ space, current }: { space: Space; current: SpaceView
           <Link to="/spaces/$spaceId/epics" params={params} {...look('epics')}>
             <Layers className="size-4" aria-hidden />
             {t('tickets.space.epics')}
+          </Link>
+          <Link to="/spaces/$spaceId/sprints" params={params} {...look('sprints')}>
+            <Timer className="size-4" aria-hidden />
+            {t('tickets.space.sprints')}
+          </Link>
+          <Link to="/spaces/$spaceId/backlog" params={params} {...look('backlog')}>
+            <Inbox className="size-4" aria-hidden />
+            {t('tickets.space.backlog')}
           </Link>
         </>
       )}

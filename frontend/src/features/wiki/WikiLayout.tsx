@@ -19,7 +19,7 @@ import { titleLookup, WikiContext, type Wiki } from './WikiContext'
 import { WikiTreePanel } from './WikiTreePanel'
 
 /** A space: its page tree on the left, the page (or trash, settings) on the right;
- *  the board and the epics take the whole width. */
+ *  the ticket views (board, epics, sprints, backlog) take the whole width. */
 export function WikiLayout({ spaceId }: { spaceId: string }) {
   const space = useSpace(spaceId)
   if (space.isPending) return <LoadingState />
@@ -51,14 +51,16 @@ function WikiFrame({ space }: { space: Space }) {
   )
   const { abilities } = wiki
   const matchRoute = useMatchRoute()
-  const view: SpaceView = matchRoute({
-    to: '/spaces/$spaceId/board',
-    params: { spaceId: space.id },
-  })
+  const params = { spaceId: space.id }
+  const view: SpaceView = matchRoute({ to: '/spaces/$spaceId/board', params })
     ? 'board'
-    : matchRoute({ to: '/spaces/$spaceId/epics', params: { spaceId: space.id } })
+    : matchRoute({ to: '/spaces/$spaceId/epics', params })
       ? 'epics'
-      : 'wiki'
+      : matchRoute({ to: '/spaces/$spaceId/sprints', params })
+        ? 'sprints'
+        : matchRoute({ to: '/spaces/$spaceId/backlog', params })
+          ? 'backlog'
+          : 'wiki'
 
   return (
     <WikiContext.Provider value={wiki}>

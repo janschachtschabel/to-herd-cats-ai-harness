@@ -17,19 +17,28 @@ import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { ticketAbilities } from '../abilities'
 import { CreateTicketDialog } from '../CreateTicketDialog'
+import { DailyBoard } from '../daily/DailyBoard'
+import { boardSprint, withoutFocus } from '../daily/logic'
+import { useSprintChoices } from '../sprints/queries'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilterBar } from './BoardFilterBar'
 import { type CardData, type CardFocus, columnCoordinates, dropTarget, type MoveCard } from './dnd'
 import { type BoardFilters, useBoard, useMoveTicket } from './queries'
 
 /** A space's board (`/spaces/<id>/board`): its statuses as columns in their order.
- *  Moving a card changes its status at once; a refusal puts it back and says why. */
+ *  Moving a card changes its status at once; a refusal puts it back and says why.
+ *  Grouped by person it is the daily view (plan M4b), on the running sprint unless
+ *  another is chosen. */
 export function BoardView() {
   const { t } = useTranslation()
   const { space } = useWiki()
   const abilities = ticketAbilities(space.my_role)
-  const [filters, setFilters] = useState<BoardFilters>({})
-  const board = useBoard(space.id, filters)
+  const [chosen, setFilters] = useState<BoardFilters>({})
+  const [grouped, setGrouped] = useState(false)
+  const sprints = useSprintChoices(space.id)
+  const sprint = boardSprint(chosen, grouped, sprints.data)
+  const filters: BoardFilters = { ...chosen, sprint }
+  const board = useBoard(space.id, filters, !grouped)
   const move = useMoveTicket(space.id, filters)
   const [creating, setCreating] = useState(false)
   const sensors = useSensors(
@@ -86,7 +95,18 @@ export function BoardView() {
           </Button>
         )}
       </div>
-      <BoardFilterBar spaceId={space.id} filters={filters} onChange={setFilters} />
+      <BoardFilterBar
+        spaceId={space.id}
+        filters={chosen}
+        onChange={setFilters}
+        sprint={sprint}
+        sprints={sprints.data ?? []}
+        grouped={grouped}
+        onGrouped={(next) => {
+          setGrouped(next)
+          if (!next) setFilters(withoutFocus(chosen))
+        }}
+      />
       {move.error ? (
         <p
           role="alert"
@@ -95,7 +115,15 @@ export function BoardView() {
           {conflict ? t('tickets.board.conflict') : errorMessage(t, move.error)}
         </p>
       ) : null}
-      {board.isPending ? (
+      {grouped ? (
+        <DailyBoard
+          spaceId={space.id}
+          filters={filters}
+          onFilters={(next) => setFilters({ ...chosen, assignee: next.assignee })}
+          movable={abilities.edit}
+          onMove={(ticket, statusId) => onMove(ticket, statusId)}
+        />
+      ) : board.isPending ? (
         <LoadingState rows={3} />
       ) : board.isError ? (
         <ErrorState error={board.error} onRetry={() => void board.refetch()} />

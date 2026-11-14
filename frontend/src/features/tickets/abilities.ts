@@ -8,6 +8,7 @@ export interface TicketAbilities {
   create: boolean // ticket.create
   edit: boolean // ticket.edit: also take an unassigned ticket, let go of one's own
   assign: boolean // ticket.assign: assign anyone who may read tickets here
+  manageSprints: boolean // ticket.assign: create, start and close sprints (plan M4b)
   comment: boolean // channel.post: write in a ticket's thread (its `can_post` decides)
   manageStatuses: boolean // space.manage
 }
@@ -21,6 +22,7 @@ export function ticketAbilities(role: SpaceRole | null | undefined): TicketAbili
     create: rank >= RANK.editor,
     edit: rank >= RANK.editor,
     assign: rank >= RANK.moderator,
+    manageSprints: rank >= RANK.moderator,
     comment: rank >= RANK.viewer,
     manageStatuses: rank >= RANK.admin,
   }

@@ -45,10 +45,34 @@ describe('ticket timeline wording', () => {
     )
   })
 
+  test('a change of sprint names both sprints, or the backlog', () => {
+    const s11 = { value: 's11', name: 'Sprint 11' }
+    const s12 = { value: 's12', name: 'Sprint 12' }
+    expect(systemText(t, entry('ticket.sprint_changed', null, s12))).toBe(
+      'Jan Jansen hat das Ticket in Sprint 12 gelegt.',
+    )
+    expect(systemText(t, entry('ticket.sprint_changed', s11, s12))).toBe(
+      'Jan Jansen hat das Ticket von Sprint 11 nach Sprint 12 verschoben.',
+    )
+    expect(systemText(t, entry('ticket.sprint_changed', s11, null))).toBe(
+      'Jan Jansen hat das Ticket aus Sprint 11 in den Vorrat gelegt.',
+    )
+    expect(systemText(t, entry('ticket.sprint_changed', null, { value: 's13', name: null }))).toBe(
+      'Jan Jansen hat das Ticket in einen Sprint gelegt.',
+    )
+  })
+
   test('in English', async () => {
     await i18n.changeLanguage('en')
     expect(systemText(i18n.t.bind(i18n), entry('ticket.title_changed'), 'en')).toBe(
       'Jan Jansen changed the title.',
     )
+    expect(
+      systemText(
+        i18n.t.bind(i18n),
+        entry('ticket.sprint_changed', { value: 's11', name: 'Sprint 11' }, null),
+        'en',
+      ),
+    ).toBe('Jan Jansen moved the ticket from Sprint 11 to the backlog.')
   })
 })

@@ -13,20 +13,24 @@ import { storeTicket } from '../queries'
 
 const COLUMN_SIZE = 50
 
-/** The board's filters (plan M4, Task 5): mine only, one kind, one tag, one epic. */
+/** The board's filters (plan M4, Task 5): mine only, one kind, one tag, one epic; and
+ *  (plan M4b) one person (`me`, an id, `none`: nobody) and one sprint (an id, `none`:
+ *  the backlog, `all`: chosen to be none, see `daily/logic.ts`). */
 export interface BoardFilters {
-  assignee?: 'me'
+  assignee?: string
   kind?: TicketKind
   tag?: string
   epic?: string
+  sprint?: string
 }
 
-function filterQuery(filters: BoardFilters) {
+export function filterQuery(filters: BoardFilters) {
   return {
     assignee: filters.assignee,
     kind: filters.kind,
     tag: filters.tag ? [filters.tag] : undefined,
     epic: filters.epic,
+    sprint: filters.sprint === 'all' ? undefined : filters.sprint,
   }
 }
 
@@ -44,8 +48,8 @@ export const boardQuery = (spaceId: string, filters: BoardFilters) =>
       ),
   })
 
-export function useBoard(spaceId: string, filters: BoardFilters) {
-  return useQuery(boardQuery(spaceId, filters))
+export function useBoard(spaceId: string, filters: BoardFilters, enabled = true) {
+  return useQuery({ ...boardQuery(spaceId, filters), enabled })
 }
 
 /** A column's tickets after its first page (the board's), loaded on request. */

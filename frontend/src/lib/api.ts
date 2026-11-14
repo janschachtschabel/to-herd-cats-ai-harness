@@ -43,6 +43,11 @@ export type Epic = Schemas['EpicOut']
 export type Board = Schemas['BoardOut']
 export type BoardColumn = Schemas['BoardColumnOut']
 export type LinkedPage = Schemas['LinkedPageOut']
+export type Sprint = Schemas['SprintOut']
+export type MyBoard = Schemas['MyBoardOut']
+export type MyCard = Schemas['MyCardOut']
+export type BoardRow = Schemas['BoardRowOut']
+export type BoardCell = Schemas['BoardCellOut']
 export type Inspection = Schemas['InspectionOut']
 
 /** One page of a list endpoint: `next_cursor` is null on the last page. */

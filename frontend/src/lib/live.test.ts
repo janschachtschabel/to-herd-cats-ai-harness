@@ -115,6 +115,14 @@ describe('live stream', () => {
     })
   })
 
+  test('a sprint event carries its space (plan M4b)', () => {
+    expect(parseLiveEvent('sprint.changed', '{"space_id":"s1","sprint_id":"r1"}')).toMatchObject({
+      type: 'sprint.changed',
+      spaceId: 's1',
+      ticketId: null,
+    })
+  })
+
   test('ticket events carry the ticket, its space and its thread', () => {
     expect(
       parseLiveEvent(
