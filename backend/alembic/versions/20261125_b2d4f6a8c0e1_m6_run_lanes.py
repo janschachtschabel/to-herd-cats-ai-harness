@@ -18,6 +18,15 @@ release fails until that pod is replaced. There is no index that both serves tha
 clause and lets two threads of a channel queue a run each; nothing with these
 indexes has been released yet (docs/KI.md, release notes).
 
+Not expand-only, and an exception, not a pattern: this revision drops the per-
+conversation unique indexes in the same step that adds the lane ones, so code of the
+previous release on this schema could start two runs in one conversation (and fails
+to queue, above). The house rule (CLAUDE.md: expand first, contract in a later
+release) was set aside only because no release has run agents on the old indexes
+(version 0.1.0, no tag): there is no previous release whose pods could meet this
+schema. A later migration must keep the rule: add the new indexes here, drop the old
+ones a release later.
+
 Revision ID: b2d4f6a8c0e1
 Revises: 10b0b021104e
 Create Date: 2026-11-14 20:00:00.000000
