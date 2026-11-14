@@ -1091,7 +1091,7 @@
         "type": "object"
       },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6).",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1202,6 +1202,10 @@
             ],
             "title": "Reason"
           },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
           "run_id": {
             "format": "uuid",
             "title": "Run Id",
@@ -1244,6 +1248,7 @@
           "decided_by",
           "decided_at",
           "reason",
+          "redacted",
           "expires_at",
           "created_at",
           "version"
@@ -6678,7 +6683,7 @@
         "type": "object"
       },
       "QuestionOut": {
-        "description": "An agent's question; `answer` only for the person asked.",
+        "description": "An agent's question; `question` and `answer` only for the person asked (for\neveryone else null, with `redacted` true: the model's words, as in the run view).",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -6741,8 +6746,19 @@
             "title": "Message Id"
           },
           "question": {
-            "title": "Question",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
           },
           "run_id": {
             "format": "uuid",
@@ -6763,6 +6779,7 @@
           "conversation_id",
           "message_id",
           "question",
+          "redacted",
           "state",
           "addressed_to",
           "answer",

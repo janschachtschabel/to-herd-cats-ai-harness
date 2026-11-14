@@ -25,7 +25,10 @@ class ApprovalOut(BaseModel):
     the diff against the page as it is now (`GET`), instead of the text. `step` and
     `call_id`: the call it waits for, as the run's journal names it (the step a run
     link points at). `outcome`: what became of the call once released: `ran`, or
-    `stale` (what it would change had changed, so nothing ran); null before."""
+    `stale` (what it would change had changed, so nothing ran); null before.
+    `reason`: the person's reason for a rejection, and `args`, only for the person
+    asked; for everyone else both are null and `redacted` is true (as in the run
+    view, review M6 finding 6)."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -43,6 +46,7 @@ class ApprovalOut(BaseModel):
     decided_by: uuid.UUID | None
     decided_at: datetime | None
     reason: str | None
+    redacted: bool
     expires_at: datetime
     created_at: datetime
     version: int
@@ -67,7 +71,8 @@ class ApprovalOut(BaseModel):
             diff_url=diff,
             decided_by=a.decided_by,
             decided_at=a.decided_at,
-            reason=a.reason,
+            reason=a.reason if shown.addressed else None,
+            redacted=not shown.addressed,
             expires_at=a.expires_at,
             created_at=a.created_at,
             version=a.version,
@@ -88,13 +93,15 @@ class ApprovalDecide(BaseModel):
 
 
 class QuestionOut(BaseModel):
-    """An agent's question; `answer` only for the person asked."""
+    """An agent's question; `question` and `answer` only for the person asked (for
+    everyone else null, with `redacted` true: the model's words, as in the run view)."""
 
     id: uuid.UUID
     run_id: uuid.UUID
     conversation_id: uuid.UUID
     message_id: uuid.UUID | None
-    question: str
+    question: str | None
+    redacted: bool
     state: QuestionState
     addressed_to: uuid.UUID
     answer: str | None
@@ -111,7 +118,8 @@ class QuestionOut(BaseModel):
             run_id=q.run_id,
             conversation_id=shown.run.conversation_id,
             message_id=q.message_id,
-            question=q.question,
+            question=q.question if shown.addressed else None,
+            redacted=not shown.addressed,
             state=q.state,
             addressed_to=q.addressed_to,
             answer=q.answer if shown.addressed else None,

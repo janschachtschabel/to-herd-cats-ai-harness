@@ -200,7 +200,7 @@ describe('a release card', () => {
 describe('a question card', () => {
   test('the person asked answers; the answer stands on the card', async () => {
     const asked = makeQuestion({ id: 'q-1', question: 'Für welches Jahr?' })
-    const { api, channel } = channelWith(card('question', 'q-1', asked.question), {
+    const { api, channel } = channelWith(card('question', 'q-1', asked.question ?? ''), {
       'GET /api/questions/:id': asked,
       'POST /api/questions/:id/answer': (call: Call) =>
         makeQuestion({
@@ -227,7 +227,7 @@ describe('a question card', () => {
 
   test('an answer to a run that ended is put into words', async () => {
     const asked = makeQuestion({ id: 'q-2' })
-    const { channel } = channelWith(card('question', 'q-2', asked.question), {
+    const { channel } = channelWith(card('question', 'q-2', asked.question ?? ''), {
       'GET /api/questions/:id': asked,
       'POST /api/questions/:id/answer': apiError(409, 'question.run_ended'),
     })
@@ -245,7 +245,7 @@ describe('a question card', () => {
   test('someone else reads the question without the answer field', async () => {
     const asked = makeQuestion({ id: 'q-3' })
     const { channel } = channelWith(
-      card('question', 'q-3', asked.question),
+      card('question', 'q-3', asked.question ?? ''),
       { 'GET /api/questions/:id': asked },
       'responsible',
     )

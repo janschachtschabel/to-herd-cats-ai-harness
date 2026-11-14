@@ -20,6 +20,7 @@
       "askerDecides": "Entscheiden kann die Person, die den Agenten gefragt hat.",
       "until": "Offen bis {{when}}.",
       "reason": "Begründung: {{reason}}",
+      "reasonRedacted": "Eine Begründung sieht nur die Person, die gefragt wurde.",
       "notYours": "Entscheiden kann nur die Person, die den Agenten gefragt hat. Die Einzelheiten sieht, wer den Lauf sehen darf."
     },
     "state": {
@@ -53,6 +54,7 @@
       "tooLong_other": "Höchstens {{count}} Zeichen.",
       "send": "Antworten",
       "askerAnswers": "Antworten kann die Person, die den Agenten gefragt hat.",
+      "redacted": "Die Frage sieht nur die Person, die den Agenten gefragt hat.",
       "answeredAt": "Beantwortet am {{when}}.",
       "yourAnswer": "Deine Antwort: {{answer}}",
       "expired": "Abgelaufen: Niemand hat rechtzeitig geantwortet.",

@@ -40,7 +40,8 @@ function Decider({ approval, meId }: { approval: Approval; meId: string | undefi
 /** A release card that the API showed: what the agent wants to do (the tool in words,
  *  the server's summary, links to what it would change, the diff), who decides, its
  *  state (waiting, approved and run, stale because the object changed, rejected with
- *  its reason, expired), the decision for the person asked, and a link to the run. */
+ *  its reason, expired), the decision for the person asked, and a link to the run.
+ *  A rejection's reason is the asked person's to read (others: `redacted`). */
 export function ApprovalCardView({ approval }: { approval: Approval }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
@@ -70,6 +71,11 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
           {view === 'rejected' && approval.reason && (
             <span className="mt-0.5 block text-muted-foreground">
               {t('approvals.card.reason', { reason: approval.reason })}
+            </span>
+          )}
+          {view === 'rejected' && approval.redacted && (
+            <span className="mt-0.5 block text-muted-foreground">
+              {t('approvals.card.reasonRedacted')}
             </span>
           )}
         </p>

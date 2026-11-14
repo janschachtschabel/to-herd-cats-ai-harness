@@ -917,8 +917,9 @@ erst nach der Freigabe einer Person:
   Lauf anders (Abbruch), sind seine offenen Freigaben und Fragen `expired`.
 - `GET /api/approvals?state=pending` (seitenweise): meine. `GET /api/approvals/{id}`:
   wer den Lauf sehen darf (wie `GET /api/runs/{id}`), sonst 404
-  `approval.not_found`; die Argumente (`args`) und `diff_url` nur für die fragende
-  Person. `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
+  `approval.not_found`; die Argumente (`args`), `diff_url` und die Begründung einer
+  Ablehnung (`reason`) nur für die fragende Person, für alle anderen `null` mit
+  `redacted: true` (wie in der Laufansicht). `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
   (nur für die fragende Person, bei Seitenwerkzeugen).
   `step` und `call_id` nennen den Aufruf wie das Protokoll des Laufs. `outcome` sagt,
   was nach der Freigabe aus ihm wurde: `ran` (ausgeführt) oder `stale` (nicht
@@ -931,8 +932,9 @@ erst nach der Freigabe einer Person:
   fragende Person (403 `question.not_addressed`; 409 `question.answered`,
   `question.expired`, `question.run_ended`, `question.version_conflict`); die Antwort
   geht als gerahmtes Werkzeugergebnis an das Modell. Ohne Antwort endet der Lauf mit
-  `waiting_timeout`. `GET /api/questions/{id}` wie Freigaben (die Antwort nur für die
-  fragende Person).
+  `waiting_timeout`. `GET /api/questions/{id}` wie Freigaben: Frage (`question`) und
+  Antwort nur für die fragende Person, für alle anderen `null` mit `redacted: true`
+  (die Karte im Gespräch zeigt die Frage dem Publikum des Ortes ohnehin).
 - Outbox und Live-Ereignisse tragen nur IDs (`approval.decided`,
   `question.answered`, `message.created` der Karte, `notification.created`).
 - Die verantwortliche Person springt für die fragende nicht ein: Ein Lauf, dessen

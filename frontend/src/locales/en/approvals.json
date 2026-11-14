@@ -20,6 +20,7 @@
       "askerDecides": "The person who asked the agent decides.",
       "until": "Open until {{when}}.",
       "reason": "Reason: {{reason}}",
+      "reasonRedacted": "Only the person who was asked sees a reason.",
       "notYours": "Only the person who asked the agent decides. Whoever may see the run sees the details."
     },
     "state": {
@@ -53,6 +54,7 @@
       "tooLong_other": "At most {{count}} characters.",
       "send": "Answer",
       "askerAnswers": "The person who asked the agent answers.",
+      "redacted": "Only the person who asked the agent sees the question.",
       "answeredAt": "Answered on {{when}}.",
       "yourAnswer": "Your answer: {{answer}}",
       "expired": "Expired: nobody answered in time.",

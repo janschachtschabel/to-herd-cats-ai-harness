@@ -2964,6 +2964,9 @@ export interface components {
          *     `call_id`: the call it waits for, as the run's journal names it (the step a run
          *     link points at). `outcome`: what became of the call once released: `ran`, or
          *     `stale` (what it would change had changed, so nothing ran); null before.
+         *     `reason`: the person's reason for a rejection, and `args`, only for the person
+         *     asked; for everyone else both are null and `redacted` is true (as in the run
+         *     view, review M6 finding 6).
          */
         ApprovalOut: {
             /**
@@ -3008,6 +3011,8 @@ export interface components {
             outcome: components["schemas"]["ApprovalOutcome"] | null;
             /** Reason */
             reason: string | null;
+            /** Redacted */
+            redacted: boolean;
             /**
              * Run Id
              * Format: uuid
@@ -5046,7 +5051,8 @@ export interface components {
         };
         /**
          * QuestionOut
-         * @description An agent's question; `answer` only for the person asked.
+         * @description An agent's question; `question` and `answer` only for the person asked (for
+         *     everyone else null, with `redacted` true: the model's words, as in the run view).
          */
         QuestionOut: {
             /**
@@ -5081,7 +5087,9 @@ export interface components {
             /** Message Id */
             message_id: string | null;
             /** Question */
-            question: string;
+            question: string | null;
+            /** Redacted */
+            redacted: boolean;
             /**
              * Run Id
              * Format: uuid

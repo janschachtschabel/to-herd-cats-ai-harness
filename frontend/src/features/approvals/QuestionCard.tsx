@@ -60,8 +60,10 @@ function AnswerForm({
 
 /** An agent's question: the question, its state (waiting, answered, expired), the
  *  answer field for the person asked (the answer shows only to them), a refusal in
- *  words, and a link to the run. */
-export function QuestionCardView({ question }: { question: Question }) {
+ *  words, and a link to the run. Others who see the card get the question from the
+ *  API redacted; they read it as the message in front of them has it (`text`), or
+ *  that only the person asked reads it. */
+export function QuestionCardView({ question, text }: { question: Question; text?: string }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
   const now = useNow(60_000)
@@ -79,7 +81,11 @@ export function QuestionCardView({ question }: { question: Question }) {
         </CardState>
       }
     >
-      <p className="whitespace-pre-wrap">{question.question}</p>
+      {question.question !== null || text ? (
+        <p className="whitespace-pre-wrap">{question.question ?? text}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t('approvals.question.redacted')}</p>
+      )}
       {view === 'pending' && mine && <AnswerForm question={question} answer={answer} />}
       {view === 'pending' && !mine && (
         <p className="text-xs text-muted-foreground">{t('approvals.question.askerAnswers')}</p>
@@ -115,7 +121,7 @@ export function QuestionCard({ questionId, text }: { questionId: string; text: s
   if (question.isPending) {
     return <p className="mt-1 text-xs text-muted-foreground">{t('states.loading')}</p>
   }
-  if (question.data) return <QuestionCardView question={question.data} />
+  if (question.data) return <QuestionCardView question={question.data} text={text} />
   const hidden = question.error instanceof ApiError && question.error.status === 404
   return (
     <CardFrame
