@@ -32,7 +32,7 @@ from app.core.access import Actor
 from app.core.errors import Conflict, Forbidden
 from app.modules.agents.repository import AgentRepository
 from app.modules.audit.recorder import record
-from app.modules.automations import takeover, term
+from app.modules.automations import live, takeover, term
 from app.modules.automations.event_repository import TICK, EventRuleRepository
 from app.modules.automations.models import (
     Automation,
@@ -106,6 +106,7 @@ class AutomationControl:
         await record(
             self.session, actor, "automation.run_now", "automation", automation.id, details
         )
+        await self._changed(actor, automation)
         return await self.service.get(actor, automation.id)
 
     async def take_over(
@@ -124,3 +125,8 @@ class AutomationControl:
     async def _audit(self, actor: Actor, action: str, automation: Automation) -> None:
         details = {"state": automation.state.value, "version": automation.version}
         await record(self.session, actor, action, "automation", automation.id, details)
+        await self._changed(actor, automation)
+
+    async def _changed(self, actor: Actor, automation: Automation) -> None:
+        place = await AutomationRepository(self.session, actor.org_id).place(automation)
+        await live.changed(self.session, automation, actor, place.space_id)

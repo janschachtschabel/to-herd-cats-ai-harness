@@ -10,7 +10,8 @@ only, never content:
      "r": <sprint_id> (sprint events only, with "s"),
      "x": <proposal_id> (proposal events with "s"; `skill_proposal.changed` with "u"),
      "a": <author_id> (proposal events of a person's proposal only),
-     "n": <run_id>, "k": <step> (`run.progress` only)}
+     "n": <run_id>, "k": <step> (`run.progress` only),
+     "y": <automation_id> (`automation.changed`, with "u" and "s")}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -27,12 +28,12 @@ may edit pages there (who sees proposals), with the proposal's id, and for the
 proposal's author when that is a person who may read the space (`a`, plan M6 task 6:
 an author always hears of their proposal). `skill_proposal.changed` (plan M6 task 9)
 is for one person `u` (who may decide the skill proposal `x`, or its author: the
-handler writes one per person), with the proposal's id. `run.progress`
-(plan M5 task 6) names an agent's run in a DM
-as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person).
-Every API process's hub
-(`live.py`) decodes it again; anything it cannot use is dropped. Payloads stay far
-below Postgres' 8000-byte limit (about 330 bytes).
+handler writes one per person), with the proposal's id; so is `automation.changed`
+(plan M7 task 7, for who may see the automation), with its id and its place's space
+(`s`, null for a DM). `run.progress` (plan M5 task 6) names an agent's run in a DM
+as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person). Every
+API process's hub (`live.py`) decodes it again; anything it cannot use is dropped.
+Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
 """
 
 import json
@@ -80,6 +81,7 @@ LIVE_TYPES: dict[str, str] = {
     "approval.settled": "card.changed",  # what became of a released call: ran or stale
     "question.answered": "card.changed",
     "skill_proposal.changed": "skill_proposal.changed",
+    "automation.changed": "automation.changed",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
@@ -89,6 +91,7 @@ SPRINT_TYPES = frozenset({"sprint.created", "sprint.updated", "sprint.started", 
 PROPOSAL_TYPES = frozenset(t for t, name in LIVE_TYPES.items() if name == "proposal.changed")
 SPACE_TYPES = SPRINT_TYPES | PROPOSAL_TYPES
 SKILL_PROPOSAL = "skill_proposal.changed"
+AUTOMATION = "automation.changed"
 # Events for one person: the payload's `user_id` is who gets them.
 FOR_ONE_PERSON = frozenset(
     {
@@ -97,6 +100,7 @@ FOR_ONE_PERSON = frozenset(
         "activity.changed",
         "access.changed",
         "skill_proposal.changed",
+        "automation.changed",
     }
 )
 
@@ -116,6 +120,7 @@ class LiveEvent:
     step: int | None = None
     proposal_id: uuid.UUID | None = None  # proposal events only
     author_id: uuid.UUID | None = None  # a person's proposal: its author gets it too
+    automation_id: uuid.UUID | None = None  # automation.changed only (with `space_id`)
 
     @property
     def for_space(self) -> bool:
@@ -150,6 +155,8 @@ class LiveEvent:
             data["x"] = str(self.proposal_id)
         if self.author_id is not None:
             data["a"] = str(self.author_id)
+        if self.automation_id is not None:
+            data["y"] = str(self.automation_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
@@ -163,6 +170,11 @@ class LiveEvent:
         if self.for_space:
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "sprint_id": _text(self.sprint_id)}
+            )
+        if self.name == AUTOMATION:
+            return sse_frame(
+                self.name,
+                {"automation_id": _text(self.automation_id), "space_id": _text(self.space_id)},
             )
         data: dict[str, object] = {
             "conversation_id": _text(self.conversation_id),
@@ -213,6 +225,7 @@ def of_event(event: Event) -> LiveEvent | None:
         )
     run = event.type == "run.progress"
     step = payload.get("step")
+    automation = name == AUTOMATION
     return LiveEvent(
         name=name,
         org_id=event.org_id,
@@ -221,10 +234,11 @@ def of_event(event: Event) -> LiveEvent | None:
         parent_id=_uuid(payload.get("parent_id")),
         user_id=_uuid(payload.get("user_id")) if event.type in FOR_ONE_PERSON else None,
         ticket_id=_uuid(payload.get("ticket_id")) if ticket else None,
-        space_id=event.space_id if ticket else None,
+        space_id=event.space_id if ticket or automation else None,
         run_id=_uuid(payload.get("run_id")) if run else None,
         step=step if run and isinstance(step, int) else None,
         proposal_id=_uuid(payload.get("proposal_id")) if name == SKILL_PROPOSAL else None,
+        automation_id=_uuid(payload.get("automation_id")) if automation else None,
     )
 
 
@@ -250,7 +264,7 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a")
+        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a", "y")
         ids = {key: _strict_uuid(data.get(key)) for key in keys}
         org_id = _strict_uuid(data.get("o"))
         step = data.get("k")
@@ -274,6 +288,7 @@ def decode(raw: str) -> LiveEvent | None:
         step,
         ids["x"],
         ids["a"],
+        ids["y"],
     )
 
 

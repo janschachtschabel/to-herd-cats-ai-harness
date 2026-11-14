@@ -30,7 +30,7 @@ from app.modules.agents.repository import AgentRepository
 from app.modules.agents.standing import agent_not_found, visible_agent
 from app.modules.ai.access import ai_not_found
 from app.modules.audit.recorder import record
-from app.modules.automations import placing
+from app.modules.automations import live, placing
 from app.modules.automations.manage_repository import ManageRepository, Row
 from app.modules.automations.models import Automation, AutomationFiring, AutomationState
 from app.modules.automations.repository import AutomationRepository
@@ -100,6 +100,7 @@ class AutomationService:
         await record(
             self.session, actor, "automation.created", "automation", automation.id, details
         )
+        await live.changed(self.session, automation, actor, place.space_id)
         return await self.get(actor, automation.id)
 
     async def get(self, actor: Actor, automation_id: uuid.UUID) -> AutomationView:
@@ -136,6 +137,7 @@ class AutomationService:
         await record(
             self.session, actor, "automation.updated", "automation", automation.id, details
         )
+        await live.changed(self.session, automation, actor, place.space_id)
         return await self.get(actor, automation.id)
 
     async def mine(self, actor: Actor, params: PageParams) -> Page[AutomationView]:

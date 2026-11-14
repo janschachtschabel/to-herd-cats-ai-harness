@@ -9,7 +9,8 @@ explicit step. The route comes with the management API (task 7).
 - A stale `version`: 409 `automation.version_conflict` (with `current_version`).
 - Someone who may not own it: 403 `automation.not_allowed`.
 
-Audited (`automation.taken_over`, ids only).
+Audited (`automation.taken_over`, ids only); its watchers hear of it
+(`live.changed`).
 """
 
 import uuid
@@ -20,6 +21,7 @@ from app.core.access import Action, Actor, can
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.modules.agents.repository import AgentRepository
 from app.modules.audit.recorder import record
+from app.modules.automations import live
 from app.modules.automations.models import Automation, AutomationState
 from app.modules.automations.repository import AutomationRepository
 from app.modules.automations.standing import may_own
@@ -39,7 +41,8 @@ async def take_over(
         )
     agent = await AgentRepository(session, actor.org_id).get(automation.agent_id)
     assert agent is not None  # the automation goes with its agent
-    if not await may_own(session, actor, agent, await repo.place(automation)):
+    place = await repo.place(automation)
+    if not await may_own(session, actor, agent, place):
         raise Forbidden(code="automation.not_allowed")
     before = automation.owner_user_id
     automation.owner_user_id = actor.principal.id
@@ -51,4 +54,5 @@ async def take_over(
     await session.flush()
     details = {"from": str(before), "to": str(actor.principal.id)}
     await record(session, actor, "automation.taken_over", "automation", automation.id, details)
+    await live.changed(session, automation, actor, place.space_id)
     return automation

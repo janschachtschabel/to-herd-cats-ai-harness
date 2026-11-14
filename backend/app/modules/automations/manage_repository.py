@@ -14,6 +14,7 @@ from sqlalchemy import ColumnElement, Select, and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.core.permissions import ADMIN_ROLES
 from app.core.repository import advisory_xact_lock
 from app.modules.agents.models import Agent, Run
 from app.modules.automations.models import Automation, AutomationFiring, AutomationState
@@ -54,6 +55,15 @@ class ManageRepository:
             Automation.state.in_(OPEN_STATES),
         )
         return int(await self.session.scalar(stmt) or 0)
+
+    async def admins(self) -> list[uuid.UUID]:
+        """The active owners and admins of the organisation (`agent.manage`)."""
+        stmt = select(User.id).where(
+            User.org_id == self.org_id,
+            User.is_active.is_(True),
+            User.system_role.in_(ADMIN_ROLES),
+        )
+        return list((await self.session.scalars(stmt)).all())
 
     async def tag_fits(self, tag_id: uuid.UUID, space_id: uuid.UUID) -> bool:
         """A system tag, or a tag of the space."""
