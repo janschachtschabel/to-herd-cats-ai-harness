@@ -7,7 +7,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.ai.budgets import BudgetView, reached
+from app.modules.ai.budgets import BudgetView, cost_reached, reached, tokens_reached
 from app.modules.ai.models import BudgetScope
 
 MAX_TOKENS_PER_DAY = 10**12
@@ -27,13 +27,24 @@ class BudgetIn(BaseModel):
 
 
 class TodayOut(BaseModel):
-    """Today's use (UTC day) in the budget's scope; `exhausted`: a limit is reached
-    for a priced call."""
+    """Today's use (UTC day) in the budget's scope. `tokens_reached`: its token limit
+    is reached (every call stops); `cost_reached`: its currency limit is reached
+    (calls with a price stop, those without still count toward tokens only);
+    `exhausted`: either (a priced call stops)."""
 
     tokens: int
     cost: Decimal
     unpriced_calls: int
+    tokens_reached: bool
+    cost_reached: bool
     exhausted: bool
+
+
+class AgentPickOut(BaseModel):
+    """An agent to set a budget for."""
+
+    id: uuid.UUID
+    name: str
 
 
 class BudgetOut(BaseModel):
@@ -61,6 +72,8 @@ class BudgetOut(BaseModel):
                 tokens=today.tokens,
                 cost=today.cost,
                 unpriced_calls=today.unpriced_calls,
+                tokens_reached=tokens_reached(row, today),
+                cost_reached=cost_reached(row, today),
                 exhausted=reached(row, today),
             ),
         )

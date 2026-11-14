@@ -24,7 +24,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, Actor
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.models_base import utcnow
-from app.core.pagination import Page, PageParams, decode_id_cursor, encode_id_cursor
+from app.core.pagination import (
+    Page,
+    PageParams,
+    decode_id_cursor,
+    decode_key_cursor,
+    encode_id_cursor,
+    encode_key_cursor,
+)
+from app.modules.agents.models import Agent
 from app.modules.ai.access import require_ai
 from app.modules.ai.budget_repository import NOTHING, BudgetRepository, Spent
 from app.modules.ai.models import AiBudget, AiConnection, BudgetScope
@@ -46,10 +54,17 @@ def has_price(connection: AiConnection | None, model: str) -> bool:
     return connection is not None and model in connection.prices
 
 
+def tokens_reached(budget: AiBudget, spent: Spent) -> bool:
+    return budget.tokens_per_day is not None and spent.tokens >= budget.tokens_per_day
+
+
+def cost_reached(budget: AiBudget, spent: Spent) -> bool:
+    """For a call with a price (one without counts only toward tokens)."""
+    return budget.cost_per_day is not None and spent.cost >= budget.cost_per_day
+
+
 def reached(budget: AiBudget, spent: Spent, *, priced: bool = True) -> bool:
-    if budget.tokens_per_day is not None and spent.tokens >= budget.tokens_per_day:
-        return True
-    return priced and budget.cost_per_day is not None and spent.cost >= budget.cost_per_day
+    return tokens_reached(budget, spent) or (priced and cost_reached(budget, spent))
 
 
 async def budget_exhausted(
@@ -96,6 +111,16 @@ class BudgetService:
         items, more = rows[: params.limit], len(rows) > params.limit
         cursor = encode_id_cursor(items[-1].id) if more else None
         return Page[BudgetView](items=await self._views(repo, items), next_cursor=cursor)
+
+    async def agents(self, actor: Actor, params: PageParams) -> Page[Agent]:
+        """Every agent of the organisation by name, to choose a budget's subject (for
+        `ai.manage` alone: the agent administration needs `agent.manage`)."""
+        await require_ai(self.session, actor, Action.AI_MANAGE)
+        after = decode_key_cursor(params.cursor) if params.cursor else None
+        rows = await BudgetRepository(self.session, actor.org_id).agents(after, params.limit + 1)
+        items, more = rows[: params.limit], len(rows) > params.limit
+        cursor = encode_key_cursor(items[-1].name, items[-1].id) if more else None
+        return Page[Agent](items=items, next_cursor=cursor)
 
     async def set(
         self,

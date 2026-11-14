@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, space_ids_with
 from app.core.actor import Actor
 from app.core.principal import PrincipalType
+from app.modules.ai.models import BudgetScope
 from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.social_repository import (
@@ -62,6 +63,7 @@ class SystemEntry:
     actor_type: PrincipalType = PrincipalType.USER  # an agent's change: `agent`
     run_id: uuid.UUID | None = None  # the agent's run that made the change
     automation_id: uuid.UUID | None = None  # `automation.started`: whose term (plan M7)
+    budget_scope: BudgetScope | None = None  # `run.stopped` by a budget: whose limit
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,7 +149,12 @@ def _system_entry(
         actor_type=PrincipalType.AGENT if actor in agents else PrincipalType.USER,
         run_id=_uuid(body.get("run_id")),
         automation_id=_uuid(body.get("automation_id")),
+        budget_scope=_scope(body.get("scope")) if key == "run.stopped" else None,
     )
+
+
+def _scope(value: object) -> BudgetScope | None:
+    return BudgetScope(value) if isinstance(value, str) and value in set(BudgetScope) else None
 
 
 async def message_views(

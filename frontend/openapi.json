@@ -561,6 +561,26 @@
         "title": "AgentOut",
         "type": "object"
       },
+      "AgentPickOut": {
+        "description": "An agent to set a budget for.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AgentPickOut",
+        "type": "object"
+      },
       "AgentProfileOut": {
         "description": "What a person with `ai.use` learns of an agent to talk to: no instructions, no\nconnection.",
         "properties": {
@@ -5730,6 +5750,33 @@
         "title": "Page[AgentOut]",
         "type": "object"
       },
+      "Page_AgentPickOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPickOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AgentPickOut]",
+        "type": "object"
+      },
       "Page_AgentSpaceOut_": {
         "properties": {
           "items": {
@@ -10073,7 +10120,7 @@
         "type": "string"
       },
       "SystemEntryOut": {
-        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6),\n`automation_id` the automation whose term `automation.started` opened (plan M7;\n`actor` is its owner).",
+        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6),\n`automation_id` the automation whose term `automation.started` opened (plan M7;\n`actor` is its owner), `budget_scope` whose daily limit stopped a run\n(`run.stopped` to `budget`: `user`, `agent` or `organisation`).",
         "properties": {
           "actor": {
             "anyOf": [
@@ -10096,6 +10143,16 @@
               }
             ],
             "title": "Automation Id"
+          },
+          "budget_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "key": {
             "title": "Key",
@@ -11021,11 +11078,15 @@
         "type": "object"
       },
       "TodayOut": {
-        "description": "Today's use (UTC day) in the budget's scope; `exhausted`: a limit is reached\nfor a priced call.",
+        "description": "Today's use (UTC day) in the budget's scope. `tokens_reached`: its token limit\nis reached (every call stops); `cost_reached`: its currency limit is reached\n(calls with a price stop, those without still count toward tokens only);\n`exhausted`: either (a priced call stops).",
         "properties": {
           "cost": {
             "title": "Cost",
             "type": "string"
+          },
+          "cost_reached": {
+            "title": "Cost Reached",
+            "type": "boolean"
           },
           "exhausted": {
             "title": "Exhausted",
@@ -11034,6 +11095,10 @@
           "tokens": {
             "title": "Tokens",
             "type": "integer"
+          },
+          "tokens_reached": {
+            "title": "Tokens Reached",
+            "type": "boolean"
           },
           "unpriced_calls": {
             "title": "Unpriced Calls",
@@ -11044,6 +11109,8 @@
           "tokens",
           "cost",
           "unpriced_calls",
+          "tokens_reached",
+          "cost_reached",
           "exhausted"
         ],
         "title": "TodayOut",
@@ -14082,6 +14149,68 @@
           }
         },
         "summary": "List Budgets",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/budgets/agents": {
+      "get": {
+        "description": "Every agent (id and name, by name) a budget may be set for.",
+        "operationId": "budget_agents_api_ai_budgets_agents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentPickOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Budget Agents",
         "tags": [
           "ai"
         ]

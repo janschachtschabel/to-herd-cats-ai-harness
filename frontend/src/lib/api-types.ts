@@ -592,6 +592,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/budgets/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Budget Agents
+         * @description Every agent (id and name, by name) a budget may be set for.
+         */
+        get: operations["budget_agents_api_ai_budgets_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/budgets/agents/{agent_id}": {
         parameters: {
             query?: never;
@@ -3061,6 +3081,19 @@ export interface components {
             version: number;
         };
         /**
+         * AgentPickOut
+         * @description An agent to set a budget for.
+         */
+        AgentPickOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * AgentProfileOut
          * @description What a person with `ai.use` learns of an agent to talk to: no instructions, no
          *     connection.
@@ -5073,6 +5106,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AgentPickOut] */
+        Page_AgentPickOut_: {
+            /** Items */
+            items: components["schemas"]["AgentPickOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AgentSpaceOut] */
         Page_AgentSpaceOut_: {
             /** Items */
@@ -6613,12 +6653,14 @@ export interface components {
          *     and to (null where there was nothing, and always for title and description),
          *     `run_id` the agent's run that made a ticket change (plan M6 task 6),
          *     `automation_id` the automation whose term `automation.started` opened (plan M7;
-         *     `actor` is its owner).
+         *     `actor` is its owner), `budget_scope` whose daily limit stopped a run
+         *     (`run.stopped` to `budget`: `user`, `agent` or `organisation`).
          */
         SystemEntryOut: {
             actor: components["schemas"]["PersonNameOut"] | null;
             /** Automation Id */
             automation_id?: string | null;
+            budget_scope?: components["schemas"]["BudgetScope"] | null;
             /** Key */
             key: string;
             new: components["schemas"]["SystemValueOut"] | null;
@@ -6979,16 +7021,22 @@ export interface components {
         };
         /**
          * TodayOut
-         * @description Today's use (UTC day) in the budget's scope; `exhausted`: a limit is reached
-         *     for a priced call.
+         * @description Today's use (UTC day) in the budget's scope. `tokens_reached`: its token limit
+         *     is reached (every call stops); `cost_reached`: its currency limit is reached
+         *     (calls with a price stop, those without still count toward tokens only);
+         *     `exhausted`: either (a priced call stops).
          */
         TodayOut: {
             /** Cost */
             cost: string;
+            /** Cost Reached */
+            cost_reached: boolean;
             /** Exhausted */
             exhausted: boolean;
             /** Tokens */
             tokens: number;
+            /** Tokens Reached */
+            tokens_reached: boolean;
             /** Unpriced Calls */
             unpriced_calls: number;
         };
@@ -8673,6 +8721,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_BudgetOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_agents_api_ai_budgets_agents_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AgentPickOut_"];
                 };
             };
             /** @description Validation Error */

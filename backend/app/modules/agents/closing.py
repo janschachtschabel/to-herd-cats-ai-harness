@@ -71,6 +71,8 @@ async def close(
                 await announce(session, claimed.org_id, claimed.agent_id, message)
     else:
         content = {"key": STOP_KEY, "actor": str(claimed.agent_id), "to": reason.value}
+        if reason == StopReason.BUDGET and detail is not None:
+            content["scope"] = detail  # whose daily limit: user, agent or organisation
         conversation = await steps.conversation()
         message = await notice(
             session, claimed.org_id, claimed.agent_id, conversation, claimed.id, content, root

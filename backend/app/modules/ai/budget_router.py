@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query
 
 from app.core.actor import Actor
 from app.core.pagination import Page, PageParams
-from app.modules.ai.budget_schemas import BudgetIn, BudgetOut
+from app.modules.ai.budget_schemas import AgentPickOut, BudgetIn, BudgetOut
 from app.modules.ai.budgets import BudgetService
 from app.modules.ai.models import BudgetScope
 from app.modules.auth.deps import ActorDep, SessionDep
@@ -23,6 +23,18 @@ async def list_budgets(
     page = await BudgetService(session).listed(actor, params)
     return Page[BudgetOut](
         items=[BudgetOut.of(v) for v in page.items], next_cursor=page.next_cursor
+    )
+
+
+@budgets.get("/agents", response_model=Page[AgentPickOut])
+async def budget_agents(
+    params: Annotated[PageParams, Query()], actor: ActorDep, session: SessionDep
+) -> Page[AgentPickOut]:
+    """Every agent (id and name, by name) a budget may be set for."""
+    page = await BudgetService(session).agents(actor, params)
+    return Page[AgentPickOut](
+        items=[AgentPickOut(id=a.id, name=a.name) for a in page.items],
+        next_cursor=page.next_cursor,
     )
 
 

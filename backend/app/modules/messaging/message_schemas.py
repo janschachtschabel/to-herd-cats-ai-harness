@@ -8,6 +8,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.principal import PrincipalType
+from app.modules.ai.models import BudgetScope
 from app.modules.messaging.agent_hooks import RunStart
 from app.modules.messaging.mentions import MAX_MENTIONS
 from app.modules.messaging.models import CARD_KINDS, MAX_BODY_CHARS, Message, MessageKind
@@ -105,7 +106,8 @@ class SystemEntryOut(BaseModel):
     and to (null where there was nothing, and always for title and description),
     `run_id` the agent's run that made a ticket change (plan M6 task 6),
     `automation_id` the automation whose term `automation.started` opened (plan M7;
-    `actor` is its owner)."""
+    `actor` is its owner), `budget_scope` whose daily limit stopped a run
+    (`run.stopped` to `budget`: `user`, `agent` or `organisation`)."""
 
     key: str
     actor: PersonNameOut | None
@@ -114,6 +116,7 @@ class SystemEntryOut(BaseModel):
     new: SystemValueOut | None
     run_id: uuid.UUID | None = None
     automation_id: uuid.UUID | None = None
+    budget_scope: BudgetScope | None = None
 
     @classmethod
     def of(cls, entry: SystemEntry) -> "SystemEntryOut":
@@ -128,6 +131,7 @@ class SystemEntryOut(BaseModel):
             new=SystemValueOut.of(entry.new),
             run_id=entry.run_id,
             automation_id=entry.automation_id,
+            budget_scope=entry.budget_scope,
         )
 
 

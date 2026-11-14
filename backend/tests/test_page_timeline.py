@@ -48,6 +48,7 @@ async def test_publishing_writes_one_system_message_even_when_delivered_twice(
         "new": None,
         "run_id": None,
         "automation_id": None,
+        "budget_scope": None,
     }
     hidden = await messages(wiki.viewer, thread["id"], include_system="false")
     assert hidden == []

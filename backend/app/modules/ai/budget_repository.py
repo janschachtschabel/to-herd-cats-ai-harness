@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, func, literal, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
@@ -110,6 +110,16 @@ class BudgetRepository:
         )
         rows = (await self.session.execute(stmt)).all()
         return {r[0]: _spent(r[1], r[2], r[3]) for r in rows}
+
+    async def agents(self, after: tuple[str, uuid.UUID] | None, limit: int) -> list[Agent]:
+        """The organisation's agents (personal ones too) by name, then id."""
+        stmt = select(Agent).where(Agent.org_id == self.org_id)
+        if after is not None:
+            stmt = stmt.where(
+                tuple_(Agent.name, Agent.id) > tuple_(literal(after[0]), literal(after[1]))
+            )
+        stmt = stmt.order_by(Agent.name, Agent.id).limit(limit)
+        return list((await self.session.scalars(stmt)).all())
 
     async def names(
         self, user_ids: Collection[uuid.UUID], agent_ids: Collection[uuid.UUID]

@@ -185,6 +185,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/ai/usage", "ai"),
     ("GET", "/api/ai/usage/me", "ai"),
     ("GET", "/api/ai/budgets", "ai"),
+    ("GET", "/api/ai/budgets/agents", "ai"),
     ("PUT", "/api/ai/budgets/organisation", "ai"),
     ("PUT", "/api/ai/budgets/users/{user_id}", "ai"),
     ("PUT", "/api/ai/budgets/agents/{agent_id}", "ai"),

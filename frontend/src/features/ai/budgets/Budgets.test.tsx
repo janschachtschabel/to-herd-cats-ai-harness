@@ -19,7 +19,14 @@ function makeBudget(overrides: Partial<Budget> = {}): Budget {
     tokens_per_day: 50_000,
     cost_per_day: '5.00',
     version: 1,
-    today: { tokens: 12_345, cost: '0.12', unpriced_calls: 0, exhausted: false },
+    today: {
+      tokens: 12_345,
+      cost: '0.12',
+      unpriced_calls: 0,
+      tokens_reached: false,
+      cost_reached: false,
+      exhausted: false,
+    },
     ...overrides,
   }
 }
@@ -49,7 +56,14 @@ describe('budgets in the AI administration', () => {
           name: 'Hilda',
           tokens_per_day: null,
           cost_per_day: '1.50',
-          today: { tokens: 900, cost: '1.50', unpriced_calls: 3, exhausted: true },
+          today: {
+            tokens: 900,
+            cost: '1.50',
+            unpriced_calls: 3,
+            tokens_reached: false,
+            cost_reached: true,
+            exhausted: true,
+          },
         }),
       ]),
     })
