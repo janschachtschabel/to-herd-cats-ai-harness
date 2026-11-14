@@ -5,7 +5,8 @@ sich ansprechen und erwähnen, bekommen Tickets, schlagen Änderungen vor oder s
 sie selbst (je nach Stufe), fragen bei kritischen Schritten nach einer Freigabe und
 führen je Bereich ein Gedächtnis. Jeder Lauf ist Schritt für Schritt einsehbar und
 lässt sich abbrechen. Stand: M6 (Spezifikation 5.4, 5.6, 6.3, 8, 9 und 11, soweit
-gebaut; Zeitpläne, Ereignisse und Budgets kommen mit M7, externe Werkzeuge mit M8).
+gebaut; Zeitpläne, Ereignisse und Budgets kommen mit M7, bisher Lauf und API, noch ohne
+Oberfläche; externe Werkzeuge mit M8).
 
 Die KI-Anbindung selbst (Verbindungen, Schlüssel, ausgehende Aufrufe, wer welches
 Modell nutzt, Verbrauch, KI-Richtlinie je Bereich und KI-Sperre) steht in
@@ -689,8 +690,9 @@ Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht z
 
 Aufgaben (`automation`: einmalig zu einem Zeitpunkt oder wiederkehrend nach Cron mit
 IANA-Zeitzone) gehören einer Person und haben einen Ort (die Direktnachricht der
-Eigentümerin mit dem Agenten, einen Kanal oder einen Ticket-Thread). Anlegen lassen sie
-sich noch nicht (API und Oberfläche folgen); der Worker arbeitet fällige aber schon ab:
+Eigentümerin mit dem Agenten, einen Kanal oder einen Ticket-Thread). Angelegt und
+verwaltet werden sie über die API ([Aufgaben verwalten](#aufgaben-verwalten-api-m7));
+die Oberfläche folgt. Der Worker arbeitet fällige so ab:
 
 - Eine eigene Schleife im Worker (auch in `all`, nicht Teil von `/ready`) sieht alle
   5 s nach. Je fälligem Termin **eine** Transaktion: die Aufgabe mit
@@ -768,7 +770,7 @@ Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
   (ein verpasster Termin einmal sofort), `version` schützt vor gleichzeitigen
   Änderungen (409 `automation.version_conflict`), wer es nicht darf, bekommt 403
   `automation.not_allowed`, wer kein `ai.use` hat, 404. Auditiert als
-  `automation.taken_over`. Die Route kommt mit der Verwaltungs-API.
+  `automation.taken_over`. Route: `POST /api/automations/{id}/take-over`.
 
 **Heartbeat** (Art `heartbeat`): Der Agent geht in einem Abstand von 15 bis 1.440
 Minuten eine Checkliste durch (der Auftrag der Aufgabe), nur in den aktiven Stunden:
@@ -838,6 +840,103 @@ angehaltene Regel verpasst, was in ihrer Pause geschieht.
   enden auch zwei Regeln, die einander im Kreis auslösen. Warten mehrere Ereignisse,
   zählt die größte Tiefe. Eine Regel reagiert nie auf ein Ereignis, das ihr eigener
   Lauf an einem Objekt verursacht hat, um das es in diesem Lauf ging.
+
+### Aufgaben verwalten (API, M7)
+
+Alle Routen unter `/api/automations`; Listen seitenweise (`limit` ≤ 100, `cursor`,
+neueste zuerst). Jede Änderung nennt die gelesene `version` (sonst 409
+`automation.version_conflict` mit `details.current_version`) und steht im Audit nur mit
+IDs, Arten und Feldnamen, nie mit dem Auftragstext (`automation.created`,
+`automation.updated`, `automation.paused`, `automation.resumed`, `automation.deleted`,
+`automation.run_now`, `automation.taken_over`).
+
+**Wer sieht und wer darf was.** Sehen wie bei den Aktivitäten oben: wer
+`agent.manage` hat, sieht alle Aufgaben der Organisation; sonst nur mit `ai.use`, und
+dann die eigenen, die der Agenten, für die man verantwortlich ist, und die mit einem Ort
+in einem Bereich, den man verwaltet (`space.manage`). Was man nicht sieht, antwortet
+wie eine unbekannte ID: 404 `automation.not_found`.
+
+| Aktion | wer |
+|---|---|
+| anlegen | wer `ai.use` hat, den Agenten erreicht und am Ort schreibt; Ereignis-Regeln nur, wer den Bereich verwaltet |
+| ändern (`PATCH`), jetzt ausführen | nur die Eigentümerin |
+| anhalten, fortsetzen, löschen | die Eigentümerin, die Verwaltenden des Bereichs ihres Ortes, `agent.manage` |
+| übernehmen | wer sie sieht und sie selbst anlegen dürfte |
+| ansehen, Protokoll | wer sie sieht |
+
+Wer sie sieht, aber die Aktion nicht darf (etwa die verantwortliche Person des
+Agenten), bekommt 403 `automation.not_allowed`. Jede Antwort mit einer Aufgabe nennt
+`may_edit` (ändern, jetzt ausführen) und `may_control` (anhalten, fortsetzen, löschen).
+
+**Routen.**
+
+- `POST /api/automations` (201): `{"agent_id", "place", "instruction", "schedule"}`.
+  Ort `place`: `{"type": "dm"}` (die Direktnachricht der Person mit dem Agenten, wird
+  bei Bedarf eröffnet), `{"type": "channel", "conversation_id"}` oder
+  `{"type": "ticket", "ticket_number"}` (der Thread des Tickets entsteht beim
+  Speichern, falls er fehlt). Auftrag 1 bis 4.000 Zeichen. Zeitplan `schedule` nach
+  `kind`: `once` (`at`, Zeitpunkt mit Zone, in der Zukunft), `recurring` (`cron`,
+  `time_zone`), `heartbeat` (`interval_minutes`, `active_days` 1 = Montag bis 7,
+  `active_from`, `active_until`, `time_zone`), `event` (`event_type`, `quiet_seconds`
+  60 bis 86.400, Standard 300, bei `ticket.created` wahlweise `filter_tag_id` und
+  `filter_ticket_kind`). Höchstens `HERD_AI_AUTOMATIONS_MAX` aktive oder angehaltene
+  Aufgaben je Eigentümerin (409 `automation.limit`; gezählt unter einer Sperre je
+  Person).
+- `POST /api/automations/preview` mit `{"schedule"}`: `{"terms": [...]}`, die nächsten
+  fünf Termine (einmalig: der eine; Ereignis-Regel: keine), ohne zu speichern; mit den
+  Fehlern des Anlegens.
+- `GET /api/automations`: die eigenen. `GET /api/agents/{agent_id}/automations`: die
+  eines Agenten (nur `agent.manage`, sonst 404 `agent.not_found`).
+  `GET /api/spaces/{space_id}/automations`: die mit einem Ort im Bereich, die man sieht
+  (wer den Bereich nicht lesen darf: 404 `space.not_found`). Ohne `ai.use` und ohne
+  `agent.manage`: 404 `ai.not_found`.
+- `GET /api/automations/{id}`: die Aufgabe mit Agent, Eigentümerin, Ort (`type`,
+  `conversation_id`, `space_id`, `name`, `ticket_number`), Zeitplanfeldern,
+  `next_due_at`, den nächsten fünf Terminen (`upcoming`), dem letzten Termin
+  (`last_run`: Ergebnis, Lauf, dessen Zustand und Stopgrund, `heartbeat_ok`) und
+  `version`.
+- `PATCH /api/automations/{id}` mit `{"version", "instruction"?, "schedule"?}`: Die Art
+  bleibt (422 `automation.kind_immutable`); ein neuer Zeitplan berechnet den nächsten
+  Termin neu, eine erledigte einmalige Aufgabe mit neuem Zeitpunkt wird wieder aktiv.
+  Ein schon laufender Lauf arbeitet mit dem alten Auftrag weiter.
+- `POST /api/automations/{id}/pause` und `/resume` mit `{"version"}`: anhalten nur eine
+  aktive (409 `automation.not_active`), fortsetzen nur eine angehaltene (409
+  `automation.not_paused`) und nur, solange die Eigentümerin sie ausführen darf (409
+  `automation.owner_unable`: dann übernehmen). Fortsetzen setzt die Fehlschläge zurück
+  und behält den Termin: ein verpasster läuft einmal.
+- `POST /api/automations/{id}/run` (ohne Körper, ändert `version` nicht): ein Termin
+  außer der Reihe mit allen Prüfungen eines fälligen (Budget, Richtlinie, Agent,
+  Eigentümerin); der Zeitplan bleibt. Ist der vorige Lauf noch offen, wird der Termin
+  als `skipped_busy` protokolliert, kein zweiter Lauf. Darf die Eigentümerin sie nicht
+  mehr ausführen, wird sie angehalten. Nicht für Ereignis-Regeln (409
+  `automation.not_runnable`) und nicht für angehaltene oder erledigte (409
+  `automation.not_active`). Die Antwort zeigt das Ergebnis in `last_run`.
+- `POST /api/automations/{id}/take-over` mit `{"version"}`: siehe oben.
+- `DELETE /api/automations/{id}?version=n` (204): Die Aufgabe bekommt den Zustand
+  `deleted` und ist für die API und die Aktivitäten verschwunden; ihre Läufe, deren
+  Journal und das Protokoll bleiben als Geschichte. Ein offener Lauf wird nicht
+  abgebrochen, er endet, wie er geendet hätte (abbrechen über die Laufansicht).
+- `GET /api/automations/{id}/firings`: das Protokoll, je Termin `due_at`, `fired_at`,
+  `outcome`, `run_id`, `heartbeat_ok`, neueste zuerst.
+
+Fehler beim Anlegen und Ändern (422): `automation.in_the_past`, `automation.invalid_cron`,
+`automation.invalid_time_zone`, `automation.too_frequent` (zwei der nächsten fünf
+Termine näher als 15 Minuten), `automation.invalid_interval`, `automation.invalid_hours`,
+`automation.invalid_place` (Ereignis-Regel in einer Direktnachricht),
+`automation.agent_not_member` (der Agent ist nicht Mitglied des Bereichs des Ortes),
+`automation.invalid_filter` (Filter außer bei `ticket.created`, ein Tag weder des
+Bereichs noch systemweit); 403 `automation.not_allowed`; ein unbekannter oder nicht
+erreichbarer Agent 404 `agent.not_found`, ein nicht lesbarer Kanal 404
+`conversation.not_found`, ein nicht lesbares Ticket 404 `ticket.not_found`.
+
+**Live.** Jede Änderung (auch das Anhalten durch das System und eine Übernahme)
+schreibt in ihrer Transaktion ein Outbox-Ereignis `automation.updated` (nur die ID);
+der Worker (Handler `automation_live`) macht daraus je Person, die die Aufgabe jetzt
+sehen darf (Eigentümerin, verantwortliche Person, Verwaltende des Bereichs,
+`agent.manage`), ein SSE-Ereignis `automation.changed` mit `automation_id` und
+`space_id` (bei einer Direktnachricht `null`), auch für eine gelöschte. Die Oberfläche
+lädt daraufhin ihre Listen neu. Termine der Fälligkeits-Schleife senden keins (den
+neuen Lauf zeigen `run.progress` und die Laufliste).
 
 ### Läufe im Einzelnen
 
@@ -1308,8 +1407,10 @@ IDs, Zähler und Codes.
   Gründe ohne Lauf: `ai.unavailable`, `agent.paused`, `agent.draft`,
   `agent.responsible_inactive`, `agent.connection_unavailable`,
   `agent.personal_disabled`, `run.thread_reply`, `run.waiting`.
+- Aufgaben: [Aufgaben verwalten (API, M7)](#aufgaben-verwalten-api-m7).
 - Live: `run.progress` (`conversation_id`, `run_id`, `step`), `card.changed`,
-  `proposal.changed`, `skill_proposal.changed`, Aktivitätsgründe `approval`, `question`,
+  `proposal.changed`, `skill_proposal.changed`, `automation.changed`
+  (`automation_id`, `space_id`), Aktivitätsgründe `approval`, `question`,
   `run_stopped`, `proposal`, `skill_proposal`.
 
 ### Bekannte Grenzen
@@ -1382,6 +1483,12 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   ohne Tiefe) und hat den Handler nicht; ein Worker des vorigen Releases, der eine
   Regel mit wartenden Ereignissen greift, scheitert an der Terminberechnung, und der
   Termin bleibt fällig. Worker zügig ersetzen.
+- M7, Verwaltungs-API (Migration `8c4e1a7f3b26`): der Zustand `deleted` (nur die
+  Prüfungen erweitert). Ein Pod des vorigen Releases kennt ihn nicht: Seine Schleife
+  und sein Handler der Ereignis-Regeln greifen eine gelöschte Aufgabe nicht (sie ist
+  nicht aktiv), aber seine
+  Aktivitätsansicht listet Einträge zu gelöschten Aufgaben noch. Ein Downgrade löscht
+  gelöschte Aufgaben endgültig.
 - Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
   Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
   (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen

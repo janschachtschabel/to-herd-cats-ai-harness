@@ -136,7 +136,12 @@ Euro oder in beidem; mindestens eins muss gesetzt sein.
 - `GET /api/ai/budgets` (seitenweise): alle Budgets mit `scope` (`organisation`,
   `user`, `agent`), `subject_id` und `name` der Person bzw. des Agenten und dem
   Verbrauch des Tages in `today` (`tokens`, `cost` der Aufrufe mit Preis,
-  `unpriced_calls`, `exhausted`).
+  `unpriced_calls`; `tokens_reached`: das Token-Limit ist erreicht, jeder Aufruf
+  stoppt; `cost_reached`: das Euro-Limit ist erreicht, Aufrufe mit Preis stoppen;
+  `exhausted`: eins von beiden).
+- `GET /api/ai/budgets/agents` (seitenweise, nach Name): alle Agenten der Organisation
+  (auch persönliche) nur mit `id` und `name`, damit `ai.manage` ein Agenten-Budget
+  setzen kann, ohne die Agentenverwaltung (`agent.manage`) zu brauchen.
 - `PUT /api/ai/budgets/organisation`, `PUT /api/ai/budgets/users/{user_id}`,
   `PUT /api/ai/budgets/agents/{agent_id}` mit `{"tokens_per_day", "cost_per_day",
   "version"}`: `version` `null` legt an, sonst die gelesene Version (409
@@ -156,7 +161,9 @@ Organisation, Person bzw. Agent und Zeit). Jedes erreichte Limit zählt, also ge
 engste. Ist eins erreicht (Verbrauch ≥ Limit), endet der Lauf mit dem Stopgrund
 `budget`; im Journal steht als Detail die Geltung (`user`, `agent` oder
 `organisation`, bei mehreren die speziellste), im Gespräch bzw. Thread der übliche
-Hinweis „Lauf beendet“ mit `budget`. Eine Änderung des Budgets gilt ab dem nächsten
+Hinweis „Lauf beendet“ mit `budget`; der Systemeintrag nennt die Geltung als
+`budget_scope` (`user`, `agent`, `organisation`; bei jedem anderen Eintrag `null`).
+Eine Änderung des Budgets gilt ab dem nächsten
 Aufruf, auch mitten im Lauf.
 
 - **Euro nur mit Preis:** Ein Euro-Limit summiert nur Aufrufe mit hinterlegtem Preis und
