@@ -15,6 +15,7 @@ from uuid_utils.compat import uuid7
 from app.core.access_repository import person_holds_role
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
+from app.modules.automations.event_models import EventNote
 from app.modules.automations.models import (
     Automation,
     AutomationFiring,
@@ -72,12 +73,16 @@ class AutomationRepository:
         run_id: uuid.UUID | None = None,
         *,
         firing_id: uuid.UUID | None = None,
+        event: EventNote | None = None,
     ) -> None:
         """The term's row in the log (a started run's with the instruction it was
-        given); a second row for the same term fails the transaction
-        (`uq_automation_firing_term`)."""
+        given and, for an event rule's, what it is told of the events); a second row
+        for the same term fails the transaction (`uq_automation_firing_term`). A
+        logged term ends a streak of terms that could not fire."""
         assert automation.org_id == self.org_id
         started = outcome == FiringOutcome.STARTED
+        told = event if started else None
+        automation.term_errors = 0
         self.session.add(
             AutomationFiring(
                 id=firing_id or uuid7(),
@@ -88,6 +93,9 @@ class AutomationRepository:
                 outcome=outcome,
                 run_id=run_id,
                 instruction=automation.instruction if started else None,
+                event_type=told.type if told else None,
+                event_count=told.count if told else None,
+                event_objects=told.objects if told else None,
             )
         )
         await self.session.flush()

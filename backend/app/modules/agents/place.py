@@ -34,6 +34,7 @@ from app.modules.agents.executor_repository import Claimed
 from app.modules.agents.read_repository import ReadRepository, Said
 from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.automations import runs as automation_runs
+from app.modules.automations.event_models import EventNote
 from app.modules.tickets.models import ticket_key
 from app.runtime.context import Turn
 from app.runtime.untrusted import frame_untrusted
@@ -87,7 +88,7 @@ async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
     return Asked(turns, reply_to, automation_kind=kind)
 
 
-async def _event_frame(reads: ReadRepository, note: automation_runs.EventNote) -> str:
+async def _event_frame(reads: ReadRepository, note: EventNote) -> str:
     """The events an event rule's run was started for, as untrusted data: their kind,
     how many, and the ids of what they are about (a ticket also by its key, which its
     tools take); never anything of the objects themselves."""

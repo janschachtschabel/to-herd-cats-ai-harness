@@ -11,10 +11,11 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.outbox import Event
 from app.modules.agents.models import RunState, StopReason
+from app.modules.automations import runs as automation_runs
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.event_rules import on_event
 from app.modules.automations.firing import fire_next
@@ -205,3 +206,36 @@ async def test_pages_attachments_and_due_reviews_start_runs(work: Work) -> None:
         "page_id": page_id,
     }
     assert taken[str(rules["page.review_due"].id)] == {"page_id": page_id}
+
+
+async def test_a_run_taken_up_again_is_told_the_same_event_kind(work: Work) -> None:
+    """Decision 3 as changed in M7: a waiting or resumed run works with its term's
+    assignment, whatever the owner edits meanwhile. The kind, the count and the ids
+    are copied when the term fires; a take-up reads the copy, not the rule."""
+    bench = work.bench
+    rule = await ruled(bench, await _channel(work))
+    await work.ticket("Neu")
+    await take_in(bench, "ticket.created", T0)
+    [run] = await runs_of(bench.session, rule.id)
+    first = await automation_runs.assignment(bench.session, rule.org_id, run.id)
+    assert first is not None and first.event is not None
+    rule.event_type = "page.published"  # type: ignore[assignment]  # its owner edits the rule
+    await bench.session.flush()
+    again = await automation_runs.assignment(bench.session, rule.org_id, run.id)
+    assert again is not None and again.event is not None
+    assert (again.event.type, again.event.objects) == (first.event.type, first.event.objects)
+
+
+async def test_what_a_run_is_told_outlasts_the_events_it_took(work: Work) -> None:
+    """The cleanup may remove the events a term took; its run is still told the same
+    kind, count and ids (the term's copy)."""
+    bench = work.bench
+    rule = await ruled(bench, await _channel(work))
+    made = await work.ticket("Neu")
+    await take_in(bench, "ticket.created", T0)
+    [run] = await runs_of(bench.session, rule.id)
+    await bench.session.execute(delete(AutomationEvent))
+    told = await automation_runs.assignment(bench.session, rule.org_id, run.id)
+    assert told is not None and told.event is not None
+    assert (told.event.type, told.event.count) == ("ticket.created", 1)
+    assert told.event.objects == [{"ticket_id": made["id"]}]

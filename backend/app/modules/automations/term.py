@@ -22,7 +22,8 @@ In this order:
   owner (`run.user_id`), at the automation's place (`run.conversation_id`), in the
   automation's lane, at the chain's depth the caller names (0 but for a run an
   event of another run started, decision 9). The log keeps the instruction it is
-  given (`runs.py` reads it). In a channel or a ticket's thread a system entry
+  given and, for an event rule, what it is told of the events (`event`; `runs.py`
+  reads both). In a channel or a ticket's thread a system entry
   `automation.started` opens the term (`entries.py`): in a channel it is the root of
   the thread the run answers in, one thread per term (decision 3). A heartbeat's
   term opens nothing yet: its run posts the entry only when it has something to
@@ -46,6 +47,7 @@ from app.modules.agents.standing import agent_refusal, run_target
 from app.modules.ai.budgets import budget_exhausted, has_price
 from app.modules.ai.models import AiConnection
 from app.modules.automations import entries, live, pausing
+from app.modules.automations.event_models import EventNote
 from app.modules.automations.models import (
     Automation,
     AutomationKind,
@@ -79,6 +81,7 @@ async def fire(
     now: datetime,
     *,
     chain_depth: int = 0,
+    event: EventNote | None = None,
 ) -> Fired:
     automations = AutomationRepository(session, automation.org_id)
     place = await automations.place(automation)
@@ -91,7 +94,9 @@ async def fire(
         return Fired(automation.id, due_at, None, None, PausedReason.OWNER)
     firing_id = uuid7()
     outcome, run_id = await _start(session, automation, agent, place, now, chain_depth)
-    await automations.log(automation, due_at, now, outcome, run_id, firing_id=firing_id)
+    await automations.log(
+        automation, due_at, now, outcome, run_id, firing_id=firing_id, event=event
+    )
     await live.fired(session, automation)
     heartbeat = automation.kind == AutomationKind.HEARTBEAT
     if outcome == FiringOutcome.STARTED and place.kind != ConversationKind.DM and not heartbeat:

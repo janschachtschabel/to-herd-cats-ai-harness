@@ -58,7 +58,7 @@ from sqlalchemy import (
     Time,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -139,6 +139,7 @@ class Automation(UuidPk, OrgScoped, Base):
             f"char_length(instruction) BETWEEN 1 AND {MAX_INSTRUCTION_CHARS}", name="instruction"
         ),
         CheckConstraint("failures >= 0", name="failures"),
+        CheckConstraint("term_errors >= 0", name="term_errors"),
         CheckConstraint(
             "(kind = 'heartbeat') = (interval_minutes IS NOT NULL) AND "
             "(kind = 'heartbeat') = (active_days IS NOT NULL) AND "
@@ -208,6 +209,12 @@ class Automation(UuidPk, OrgScoped, Base):
     failures: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
+    # Terms in a row that could not fire (the due loop's transaction failed, review M7
+    # finding 3): each sets the automation aside for longer (`firing.set_aside`); a
+    # logged term sets it back to 0.
+    term_errors: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     # A heartbeat's (decision 7): its interval and active hours (`heartbeat_terms.Hours`).
     interval_minutes: Mapped[int | None] = mapped_column(Integer)
     active_days: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
@@ -228,6 +235,12 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
         CheckConstraint("run_id IS NULL OR outcome = 'started'", name="run"),
         CheckConstraint("(outcome = 'started') = (instruction IS NOT NULL)", name="instruction"),
         CheckConstraint("NOT heartbeat_ok OR outcome = 'started'", name="heartbeat_ok"),
+        CheckConstraint(
+            "(event_type IS NULL) = (event_count IS NULL) AND "
+            "(event_type IS NULL) = (event_objects IS NULL) AND "
+            "(event_type IS NULL OR outcome = 'started')",
+            name="event",
+        ),
         Index("uq_automation_firing_term", "automation_id", "due_at", unique=True),
         Index("ix_automation_firing_run_id", "run_id"),
         Index("ix_automation_firing_fired_at", "fired_at"),  # retention (`upkeep_repository`)
@@ -245,6 +258,12 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
     # What the started run was asked: the automation's instruction as the term fired,
     # so every take-up of the run reads the same, whatever the owner edits meanwhile.
     instruction: Mapped[str | None] = mapped_column(Text)
+    # What an event rule's started run is told of the events its term took, copied as
+    # the term fired (review M7, finding 6): their kind, how many, the ids of the
+    # newest objects (`event_models.EventNote`). Every take-up reads this copy.
+    event_type: Mapped[str | None] = mapped_column(String(32))
+    event_count: Mapped[int | None] = mapped_column(Integer)
+    event_objects: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB(none_as_null=True))
     # A heartbeat's run answered `HEARTBEAT_OK`: nothing was delivered (decision 7).
     heartbeat_ok: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")

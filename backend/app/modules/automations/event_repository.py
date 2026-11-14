@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import Text, cast, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,8 +96,10 @@ class EventRuleRepository:
         subject_id: uuid.UUID,
         ids: dict[str, Any],
         depth: int,
+        now: datetime,
     ) -> bool:
-        """The event, waiting with the rule; False: the rule had it already."""
+        """The event, waiting with the rule since `now`; False: the rule had it
+        already."""
         stmt = (
             insert(AutomationEvent)
             .values(
@@ -107,19 +109,39 @@ class EventRuleRepository:
                 subject_id=subject_id,
                 ids=ids,
                 depth=depth,
+                taken_at=now,
             )
             .on_conflict_do_nothing(index_elements=["automation_id", "event_id"])
             .returning(AutomationEvent.event_id)
         )
         return await self.session.scalar(stmt) is not None
 
-    async def waiting(self, automation_id: uuid.UUID) -> list[AutomationEvent]:
-        stmt = select(AutomationEvent).where(
+    async def waiting(self, automation_id: uuid.UUID) -> tuple[int, int]:
+        """How many events wait with the rule, and the deepest chain among them (0, 0:
+        none), counted in SQL."""
+        stmt = select(func.count(), func.coalesce(func.max(AutomationEvent.depth), 0)).where(
             AutomationEvent.org_id == self.org_id,
             AutomationEvent.automation_id == automation_id,
             AutomationEvent.firing_id.is_(None),
         )
-        return list((await self.session.scalars(stmt)).all())
+        count, depth = (await self.session.execute(stmt)).one()
+        return int(count), int(depth)
+
+    async def newest_objects(self, automation_id: uuid.UUID, limit: int) -> list[dict[str, str]]:
+        """The ids of the objects of up to `limit` waiting events, each once, newest
+        first (event ids are uuid7: their text sorts as they were made)."""
+        stmt = (
+            select(AutomationEvent.ids)
+            .where(
+                AutomationEvent.org_id == self.org_id,
+                AutomationEvent.automation_id == automation_id,
+                AutomationEvent.firing_id.is_(None),
+            )
+            .group_by(AutomationEvent.ids)
+            .order_by(func.max(cast(AutomationEvent.event_id, Text)).desc())
+            .limit(limit)
+        )
+        return [dict(ids) for ids in await self.session.scalars(stmt)]
 
     async def assign(
         self, automation_id: uuid.UUID, firing_id: uuid.UUID, only: uuid.UUID | None = None
@@ -133,14 +155,6 @@ class EventRuleRepository:
         if only is not None:
             stmt = stmt.where(AutomationEvent.event_id == only)
         await self.session.execute(stmt.values(firing_id=firing_id))
-
-    async def of_firing(self, firing_id: uuid.UUID) -> list[AutomationEvent]:
-        stmt = (
-            select(AutomationEvent)
-            .where(AutomationEvent.org_id == self.org_id, AutomationEvent.firing_id == firing_id)
-            .order_by(AutomationEvent.event_id)
-        )
-        return list((await self.session.scalars(stmt)).all())
 
     async def free_term(self, automation_id: uuid.UUID, at: datetime) -> datetime:
         """`at`, or just after the rule's latest term if that is not earlier (a term is

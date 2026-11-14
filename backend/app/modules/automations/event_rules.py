@@ -18,8 +18,9 @@ For each rule (its row locked, in a fixed order):
    rule's `next_due_at` becomes the quiet time's end, when the due loop fires every
    waiting event as one term. Otherwise the term fires now, with the events still
    waiting (a due loop running late). The term's checks are those of any term
-   (`term.fire`); a run is told the kind, the objects' ids and the count
-   (`runs.assignment`). A new quiet time starts with every term.
+   (`term.fire`); a run is told the kind, the count and the ids of the newest
+   MAX_OBJECTS objects, counted in SQL and copied to the term's row as it fires
+   (`runs.assignment` reads the copy). A new quiet time starts with every term.
 
 Times come from the caller ("now"): the handler's clock, the due loop's.
 """
@@ -33,6 +34,7 @@ from uuid_utils.compat import uuid7
 from app.core.outbox import Event
 from app.modules.agents.models import MAX_CHAIN_DEPTH
 from app.modules.automations import event_sight, live
+from app.modules.automations.event_models import MAX_OBJECTS, EventNote
 from app.modules.automations.event_repository import Cause, EventRuleRepository
 from app.modules.automations.models import Automation, EventType, FiringOutcome
 from app.modules.automations.repository import AutomationRepository
@@ -74,7 +76,7 @@ async def _take(
         session, rule, event
     ):
         return None
-    if not await repo.take(rule, event.id, event.subject_id, _ids(event), depth):
+    if not await repo.take(rule, event.id, event.subject_id, _ids(event), depth, now):
         return None
     if depth > MAX_CHAIN_DEPTH:
         due_at = await repo.free_term(rule.id, now)
@@ -99,7 +101,8 @@ async def fire_waiting(session: AsyncSession, rule: Automation, now: datetime) -
     locked by the due loop); None: none waited."""
     repo = EventRuleRepository(session, rule.org_id)
     assert rule.next_due_at is not None
-    if not await repo.waiting(rule.id):
+    count, _ = await repo.waiting(rule.id)
+    if not count:
         rule.next_due_at = None
         await session.flush()
         return None
@@ -113,9 +116,11 @@ async def _fire(
     due_at: datetime,
     now: datetime,
 ) -> Fired:
-    waiting = await repo.waiting(rule.id)
-    depth = max(e.depth for e in waiting)
-    fired = await fire(session, rule, due_at, now, chain_depth=depth)
+    count, depth = await repo.waiting(rule.id)
+    assert rule.event_type is not None  # an event rule
+    objects = await repo.newest_objects(rule.id, MAX_OBJECTS)
+    note = EventNote(rule.event_type, count, objects)
+    fired = await fire(session, rule, due_at, now, chain_depth=depth, event=note)
     if fired.firing_id is None:  # paused: the events wait for it to run again
         rule.next_due_at = due_at
     else:

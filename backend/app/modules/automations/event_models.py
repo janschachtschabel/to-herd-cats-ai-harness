@@ -11,14 +11,28 @@ of the rows of that run's term).
 """
 
 import uuid
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, SmallInteger, text
+from sqlalchemy import DateTime, ForeignKey, Index, SmallInteger, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped
+
+MAX_OBJECTS = 20  # objects an event rule's run is told of by id (the count says the rest)
+
+
+@dataclass(frozen=True, slots=True)
+class EventNote:
+    """What an event rule's run is told of the events its term took (ids only),
+    copied to the term's row as it fires (`automation_firing.event_*`)."""
+
+    type: str
+    count: int
+    objects: list[dict[str, str]]  # the ids of the newest objects (at most MAX_OBJECTS)
 
 
 class AutomationEvent(OrgScoped, Base):
@@ -40,6 +54,11 @@ class AutomationEvent(OrgScoped, Base):
     subject_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     ids: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     depth: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    # When the rule took it in: the cleanup removes what a paused rule kept waiting for
+    # longer than its retention (a paused rule takes in nothing new).
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     firing_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("automation_firing.id", ondelete="CASCADE")
     )
