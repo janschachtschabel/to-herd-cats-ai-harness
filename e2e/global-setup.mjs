@@ -44,6 +44,10 @@ export default async function globalSetup() {
   psql(adminUrl, `DROP DATABASE IF EXISTS ${database}`);
   psql(adminUrl, `CREATE DATABASE ${database}`);
   const dataDir = mkdtempSync(join(tmpdir(), "herd-e2e-"));
+  const databaseUrl = `postgresql+asyncpg://${url.username}:${url.password}@${url.host}/${database}`;
+  // For what the tests make through the backend itself (`seedProposal`): the workers
+  // inherit this process's environment.
+  process.env.HERD_E2E_DATABASE_URL = databaseUrl;
   const app = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
     cwd: BACKEND,
     stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore",
@@ -51,7 +55,7 @@ export default async function globalSetup() {
       ...process.env,
       HERD_ROLE: "all",
       HERD_ENVIRONMENT: "development",
-      HERD_DATABASE_URL: `postgresql+asyncpg://${url.username}:${url.password}@${url.host}/${database}`,
+      HERD_DATABASE_URL: databaseUrl,
       HERD_PUBLIC_PORT: String(port),
       HERD_INTERNAL_PORT: String(port + 1),
       HERD_COLLAB_PORT: String(port + 2),

@@ -1,7 +1,12 @@
 // Setting up AI scenarios: the OpenAI stub (started by global-setup.mjs on the public
 // port + 3) and AI connections, the standard assignment and agents through the API.
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import { OWNER, call } from "./helpers.mjs";
+
+const BACKEND = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "backend");
 
 const port = Number(process.env.HERD_E2E_PORT || 18080);
 export const STUB = `http://127.0.0.1:${port + 3}`;
@@ -81,6 +86,38 @@ export async function aiBasics(admin) {
   const connection = await stubConnection(admin, "Stub");
   await standardAssignment(admin, connection);
   return { connection, hilda: await agent(admin, "Hilda", connection) };
+}
+
+/** An agent's proposal to change `page` (there is no public route: agents propose
+ *  from their runs), made through the backend's service as the run of `agentId` that
+ *  `email` asked for (`tests/support/seed_proposal.py`). Returns `{id, version}`. */
+export function seedProposal({ email, agentId, pageId, content, reason }) {
+  const out = execFileSync(
+    "uv",
+    [
+      "run",
+      "--no-sync",
+      "python",
+      "-m",
+      "tests.support.seed_proposal",
+      "--email",
+      email,
+      "--agent",
+      agentId,
+      "--page",
+      pageId,
+      "--content",
+      content,
+      "--reason",
+      reason,
+    ],
+    {
+      cwd: BACKEND,
+      env: { ...process.env, HERD_DATABASE_URL: process.env.HERD_E2E_DATABASE_URL },
+      encoding: "utf8",
+    },
+  );
+  return JSON.parse(out.trim().split("\n").at(-1));
 }
 
 export { OWNER };
