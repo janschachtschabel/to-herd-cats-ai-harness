@@ -6,8 +6,11 @@ the agent's own page, not a page of the space it would propose changes to), but 
 where the run may edit pages (`page.edit` for the run's actor: the person's rights ∩
 the agent's role ∩ the place's write scope), only what that space's audience may
 receive (`writing.leaks_into`), never on a page locked for AI, and at most
-`MAX_MEMORY_CHARS` (refused with a note to shorten it). Through `writing.effect`: the
-page, its folders and the mapping commit with the call's journal entry.
+`MAX_MEMORY_CHARS` (refused with a note to shorten it). From a DM of the person
+alone with the agent only into a space nobody but that person reads (what the model
+writes there may carry the DM's own words, which no check counts as read; review M6
+finding 16a). Through `writing.effect`: the page, its folders and the mapping commit
+with the call's journal entry.
 """
 
 import uuid
@@ -18,6 +21,8 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import Action, can
 from app.modules.agents import memory
 from app.modules.agents.memory_repository import MemoryRepository
+from app.modules.agents.scope import PlaceKind, place_of
+from app.modules.agents.scope_repository import ScopeRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import LEAKS, by, closed_to_ai, effect, leaks_into
 from app.modules.wiki.models import MAX_CONTENT_CHARS
@@ -25,6 +30,11 @@ from app.modules.wiki.visibility import PageReader
 from app.runtime.loop import ToolResult
 
 MAX_MEMORY_CHARS = memory.MAX_MEMORY_CHARS
+SHARED_SPACE = (
+    "Refused (memory.shared_space): from a direct conversation alone with the person, "
+    "memory goes only into a space nobody but the person reads (such as their own). "
+    "What you write could carry this conversation to the others there."
+)
 
 
 class UpdateMemoryArgs(BaseModel):
@@ -51,6 +61,8 @@ async def update_memory(ctx: ToolContext, args: UpdateMemoryArgs) -> ToolResult:
         return ToolResult("memory", text, attrs)
     if await leaks_into(ctx, args.space_id):
         return ToolResult("memory", LEAKS, attrs)
+    if await _shared_from_alone(ctx, args.space_id):
+        return ToolResult("memory", SHARED_SPACE, attrs)
 
     async def write() -> ToolResult:
         page = await memory.write(
@@ -60,6 +72,14 @@ async def update_memory(ctx: ToolContext, args: UpdateMemoryArgs) -> ToolResult:
         return ToolResult("memory", text, attrs)
 
     return await effect(ctx, "memory", attrs, write)
+
+
+async def _shared_from_alone(ctx: ToolContext, space_id: uuid.UUID) -> bool:
+    run = ctx.run
+    place = await place_of(ctx.session, run.org_id, run.conversation_id, run.user_id)
+    if place is None or place.kind != PlaceKind.ALONE:
+        return False
+    return await ScopeRepository(ctx.session, run.org_id).read_by_others(space_id, run.user_id)
 
 
 async def memory_subjects(ctx: ToolContext, args: UpdateMemoryArgs) -> list[Subject] | None:

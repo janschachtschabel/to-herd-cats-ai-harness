@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import EventOutbox
 from app.core.permissions import SpaceRole
+from app.core.principal import Principal
 from app.modules.messaging.models import Message
 from app.modules.spaces.models import Space, SpaceKind
+from app.modules.spaces.repository import SpaceRepository
 from tests.factories_agents import Bench
 from tests.factories_spaces import MakeSpace
 from tests.factories_tickets import new_ticket
@@ -46,6 +48,14 @@ async def work(bench: Bench, make_space: MakeSpace) -> Work:
     await bench.join(space, SpaceRole.EDITOR)
     private = await make_space(SpaceKind.TEAM, name="Geheim", members=members)
     return Work(bench, space, private)
+
+
+async def alone_in(work: Work) -> None:
+    """Alice becomes the only person who reads the space (the admin's membership goes;
+    an admin still acts there by admin right): memory from her DM alone with the agent
+    may go there (`memory_tools`, review M6 finding 16a)."""
+    admin = work.bench.people.users["admin"]
+    await SpaceRepository(work.bench.session).remove_member(work.space.id, Principal.user(admin.id))
 
 
 async def set_level(bench: Bench, level: int) -> None:

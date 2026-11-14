@@ -440,6 +440,8 @@ Wiederkehrende Auslöser überspringen einen Termin, solange der vorige Lauf noc
 
 *Geändert in M6 [Claude, 14.11.2026]: Der Pfad ist `_agenten/<agent>/gedaechtnis` (Ordner „Agenten“ mit dem Slug `_agenten`, darunter der Name des Agenten); welche Seite es ist, hält die Tabelle `agent_memory`, sodass Umbenennen und Verschieben nichts ändern. Je Seite höchstens 8.000 Zeichen; im Kontext zusammen 4.000, der Bereich des Ortes zuerst. Geladene Gedächtnisseiten zählen als gelesen (Richtlinie, Rechte, Publikumsregel beim Schreiben). `update_memory` schreibt nie in eine für KI gesperrte Seite. Die Oberfläche stellt den Ordner `_agenten` im Seitenbaum ans Ende. `search_past_runs` findet nur Läufe für dieselbe Person und zeigt Ergebnisse nur, solange ihre Bereiche lesbar sind. Skill-Vorschläge haben eine eigene Moderation (`skill_proposal`; entscheiden darf, wer die Skills dort verwaltet), nicht die der Seitenvorschläge. Plan M6, Entscheidungen 10 und 11.*
 
+*Geändert nach Review M6 [Claude, 14.11.2026]: Aus einer Direktnachricht allein mit dem Agenten schreibt `update_memory` nur in einen Bereich, den außer der fragenden Person niemand liest (kein anderes Mitglied, direkt oder über eine Gruppe, kein `open`-Bereich); sonst ein Werkzeugfehler `memory.shared_space`. Was das Modell dort schreibt, kann Worte der Direktnachricht tragen, die keine Prüfung als gelesen zählt. Aus einem Kanal oder Thread des Bereichs bleibt es erlaubt.*
+
 ### 8.6 Eingebaute Werkzeuge
 
 | Gruppe | Werkzeuge |

@@ -9,6 +9,7 @@ characters."""
 import uuid
 from typing import Any
 
+import pytest
 from sqlalchemy import func, select
 
 from app.core.permissions import SpaceRole
@@ -21,10 +22,18 @@ from app.modules.spaces.models import AgentWritePolicy, SpaceKind
 from app.modules.wiki.models import Page, PageStatus, PageVersion
 from tests.factories_spaces import MakeSpace
 from tests.factories_tools import tool_context
-from tests.factories_writing import Work
+from tests.factories_writing import Work, alone_in
 from tests.test_run_scope_places import channel_in
 
 PATH = "_agenten/ava/gedaechtnis"
+
+
+@pytest.fixture
+async def work(work: Work) -> Work:
+    """`work`, with Alice the only person who reads its space, so memory from her DM
+    alone with the agent may go there (`alone_in`)."""
+    await alone_in(work)
+    return work
 
 
 async def remember(ctx: Any, space_id: object, content: str) -> str:

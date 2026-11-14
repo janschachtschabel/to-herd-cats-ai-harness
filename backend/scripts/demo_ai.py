@@ -2,8 +2,8 @@
 connection "Demo-Modell" with the standard assignment (Clara has no AI), two agents
 (Hilda, level 1, viewer; Otto, level 2, editor, with the space's skill „protokoll"),
 Ben's conversation with Hilda and her answer, a ticket Anna assigns to Otto that he
-works up to „Zur Prüfung", Otto's open proposal for „Handbuch", his memory page, and
-a pending approval for Ben (a page proposal Otto may make only after a release).
+works up to „Zur Prüfung", Otto's open proposal for „Handbuch", his memory page
+(asked in the thread of „Handbuch"), and a pending approval for Ben.
 
 How the demo gets a model (`from_env`): `HERD_DEMO_AI_KIND` turns it on (`local`, an
 OpenAI-compatible endpoint the server reaches over http, such as the OpenAI stub of
@@ -245,9 +245,11 @@ async def build(
     start = ask(anna, "anna_otto", "Nenne im Handbuch bitte die Protokollvorlage.")
     made.runs["proposal"] = (await _step(anna, otto, ai, replies, start, wait_seconds))["id"]
 
-    memory = {"space_id": space_id, "content": MEMORY}
+    memory = {"space_id": space_id, "content": MEMORY}  # asked where Team Nord reads
     replies = [_calls(("update_memory", memory)), {"content": "Gemerkt."}]
-    start = ask(anna, "anna_otto", "Merk dir bitte, wer Team Nord moderiert.")
+    thread = str((await call(anna, "GET", f"/api/pages/{handbook_id}/thread"))["id"])
+    remember = "@Otto merk dir bitte, wer Team Nord moderiert."
+    start = lambda: post(anna, thread, remember, mentions=(otto,))  # noqa: E731
     made.runs["memory"] = (await _step(anna, otto, ai, replies, start, wait_seconds))["id"]
     made.memory_page_id = await _memory_page(anna, space_id)
 

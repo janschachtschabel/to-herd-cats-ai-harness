@@ -134,7 +134,9 @@ Ein Agent kann sich je Bereich Notizen machen (Stufe 2). Sie stehen auf einer ga
 normalen Wiki-Seite unter **Agenten › <Name des Agenten> › Gedächtnis** (Ordner
 `_agenten`, im Seitenbaum am Ende), mit den Rechten, Versionen und dem KI-Kennzeichen
 jeder Seite. Wer die Seite bearbeiten darf, korrigiert sie im Editor; wer sie für KI
-sperrt, verbietet dem Agenten das Schreiben. Bei jedem Lauf liest der Agent die
+sperrt, verbietet dem Agenten das Schreiben. Aus einer Direktnachricht allein mit dem
+Agenten merkt er sich nur etwas in einem Bereich, den sonst niemand liest; für einen
+gemeinsamen Bereich erwähnt man ihn in dessen Kanal oder einer Diskussion dort. Bei jedem Lauf liest der Agent die
 Gedächtnisseiten der Bereiche, die er in diesem Lauf lesen darf (zusammen höchstens
 4.000 Zeichen).
 
@@ -538,8 +540,14 @@ zusammengeführten Text ausdrücklich. Endpunkte und Codes in
   Bereich „nicht gefunden“), nur was das Publikum des Bereichs sehen darf (wie jedes
   schreibende Werkzeug), nie auf einer für KI gesperrten Seite (403 `memory.locked`,
   geprüft unter der Zeilensperre der Seite), höchstens 8.000 Zeichen (sonst
-  `memory.too_long` mit der Bitte zu kürzen). Wirkung und Journaleintrag in einer
-  Transaktion.
+  `memory.too_long` mit der Bitte zu kürzen). Aus einer Direktnachricht allein mit dem
+  Agenten nur in einen Bereich, den außer der fragenden Person niemand liest (kein
+  anderes Mitglied, direkt oder über eine Gruppe, und nicht offen; Admins, die kraft
+  Amtes hineinsehen, zählen nicht, ihr Blick wird protokolliert); sonst
+  `memory.shared_space`, als Werkzeugfehler für das Modell. Denn was das Modell dort
+  schreibt, kann Worte der Direktnachricht enthalten, die keine Prüfung als gelesen
+  zählt. Aus einem Kanal oder Thread des Bereichs schreibt es wie zuvor. Die Hilfe des
+  Werkzeugs sagt es dem Modell. Wirkung und Journaleintrag in einer Transaktion.
 - **Im Kontext** stehen nach den Skills die Gedächtnisseiten der Bereiche, die der
   Lauf lesen darf (sein Lesebereich, also auch das Publikum des Ortes) und deren
   KI-Richtlinie die Verbindung des Laufs zulässt; nicht gesperrt, im Papierkorb oder

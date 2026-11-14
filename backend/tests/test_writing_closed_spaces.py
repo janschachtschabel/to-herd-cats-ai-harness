@@ -22,7 +22,7 @@ from app.modules.ai.models import AiPolicy
 from app.modules.messaging.models import Message, MessageKind
 from app.runtime.loop import ToolResult
 from tests.factories_tools import tool_context
-from tests.factories_writing import Work, set_level
+from tests.factories_writing import Work, alone_in, set_level
 
 Write = Callable[[ToolContext, uuid.UUID, uuid.UUID], Awaitable[ToolResult]]
 
@@ -82,6 +82,7 @@ async def test_the_same_tools_write_once_the_space_is_open_to_ai(work: Work, too
     r = await work.admin.post(f"/api/spaces/{work.space.id}/channels", json={"name": "werkbank"})
     channel = uuid.UUID(r.json()["id"])
     await set_level(work.bench, 3)
+    await alone_in(work)  # memory from Alice's DM alone: only where she alone reads
     ctx = await tool_context(work.bench)
     text = (await WRITES[tool](ctx, work.space.id, channel)).text
     assert text.startswith(("Posted message", "Memory saved")), text

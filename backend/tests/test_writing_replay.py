@@ -25,7 +25,7 @@ from app.modules.tickets.models import TicketPageLink, WorkItem
 from app.modules.wiki.models import Page, PageVersion
 from tests.factories_tickets import status_of
 from tests.factories_tools import call
-from tests.factories_writing import Work, set_level
+from tests.factories_writing import Work, alone_in, set_level
 from tests.test_run_replay import Crash, die_after, take_up_again
 
 WRITING = {
@@ -134,6 +134,7 @@ async def _skill(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int
 
 
 async def _memory(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int]]]:
+    await alone_in(work)  # asked in Alice's DM alone with the agent
     args = {"space_id": str(work.space.id), "content": "Merke: Inventur."}
     return args, lambda: _count(
         work.bench.session, PageVersion, PageVersion.content_md == "Merke: Inventur."

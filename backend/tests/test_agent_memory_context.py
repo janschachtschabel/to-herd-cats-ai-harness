@@ -7,6 +7,7 @@ reading it counts: its space is one the run has read."""
 
 import re
 
+import pytest
 from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
@@ -17,9 +18,17 @@ from app.modules.ai.models import AiPolicy, DataLocation
 from app.modules.spaces.models import SpaceKind
 from tests.factories_spaces import MakeSpace
 from tests.factories_tools import call, tool_context
-from tests.factories_writing import Work
+from tests.factories_writing import Work, alone_in
 from tests.test_agent_memory import remember
 from tests.test_run_scope_places import actor_in, channel_in
+
+
+@pytest.fixture
+async def work(work: Work) -> Work:
+    """`work`, with Alice the only person who reads its space, so memory from her DM
+    alone with the agent may go there (`alone_in`)."""
+    await alone_in(work)
+    return work
 
 
 def _prompts(work: Work) -> list[str]:
@@ -93,17 +102,19 @@ async def test_the_place_first_then_by_name_within_the_budget(
         name: await make_space(kind, name, members=[(alice, SpaceRole.EDITOR)])
         for name, kind in (("Alpha", SpaceKind.OPEN), ("Beta", SpaceKind.OPEN))
     }
+    channels = {}
     for name, space in spaces.items():
         await work.bench.join(space, SpaceRole.EDITOR)
-        await remember(await tool_context(work.bench), space.id, f"{name}-" + "m" * 3_000)
+        channels[name] = await channel_in(work.bench, space)  # open: not from a DM alone
+        ctx = await tool_context(work.bench, channels[name].id)
+        await remember(ctx, space.id, f"{name}-" + "m" * 3_000)
     session, agent = work.bench.session, work.bench.agent.id
     alone = await actor_in(work.bench, work.bench.dm_id)
     found = await memory.for_run(session, alone, agent, DataLocation.LOCAL, None)
     assert found.text is not None
     assert found.text.index("Alpha-") < found.text.index("Beta-")
     assert sum(len(m) for m in re.findall("m{20,}", found.text)) <= memory.MEMORY_BUDGET
-    channel = await channel_in(work.bench, spaces["Beta"])
-    in_beta = await actor_in(work.bench, channel.id)
+    in_beta = await actor_in(work.bench, channels["Beta"].id)
     found = await memory.for_run(session, in_beta, agent, DataLocation.LOCAL, spaces["Beta"].id)
     assert found.text is not None
     assert found.text.index("Beta-") < found.text.index("Alpha-")

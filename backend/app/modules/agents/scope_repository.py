@@ -74,6 +74,31 @@ class ScopeRepository:
         stmt = select(Space.id).where(Space.org_id == self.org_id, Space.kind == SpaceKind.OPEN)
         return set(await self.session.scalars(stmt))
 
+    async def read_by_others(self, space_id: uuid.UUID, person: uuid.UUID) -> bool:
+        """Whether anyone active but `person` reads the space as a member (directly or
+        through a group), or the space is open (everyone but guests reads it). Admins
+        who look in by admin right do not count: that look is audited."""
+        is_open = select(Space.id).where(
+            Space.org_id == self.org_id, Space.id == space_id, Space.kind == SpaceKind.OPEN
+        )
+        members = select(SpaceMember.member_id).where(
+            SpaceMember.space_id == space_id, SpaceMember.member_type == PrincipalType.USER
+        )
+        groups = select(SpaceMember.member_id).where(
+            SpaceMember.space_id == space_id, SpaceMember.member_type == PrincipalType.GROUP
+        )
+        in_groups = select(GroupMember.member_id).where(
+            GroupMember.member_type == PrincipalType.USER, GroupMember.group_id.in_(groups)
+        )
+        other = exists().where(
+            User.org_id == self.org_id,
+            User.is_active.is_(True),
+            User.id != person,
+            or_(User.id.in_(members), User.id.in_(in_groups)),
+        )
+        stmt = select(or_(exists(is_open), other))
+        return bool(await self.session.scalar(stmt))
+
     async def has_guests(self, space_id: uuid.UUID) -> bool:
         """Whether a guest is a member of the space, directly or through a group."""
         guest = select(User.id).where(

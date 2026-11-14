@@ -171,7 +171,9 @@ CATALOG: dict[str, ToolSpec] = {
             "update_memory",
             "Replace your memory page in a space (by its id) with new Markdown: notes for "
             "your later work there, at most 8,000 characters, always the whole text (your "
-            "memory as it is now is in your instructions). People can read and correct it.",
+            "memory as it is now is in your instructions). People can read and correct it. "
+            "From a direct conversation alone with the person, only into a space nobody "
+            "else reads.",
             memory_tools.UpdateMemoryArgs,
             memory_tools.update_memory,
             2,
