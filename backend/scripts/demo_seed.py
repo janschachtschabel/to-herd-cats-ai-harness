@@ -6,7 +6,7 @@ stories, tasks and a bug in several statuses, assignments, tags, a linked page,
 comments, a ticket key in a channel; see scripts/demo_tickets.py) and sprints (one
 closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py);
 with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai_model.py) also agents at
-work (M6).
+work (M6) and automations and budgets (M7, scripts/demo_automations.py).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from scripts import demo_ai, demo_sprints, demo_tickets
+from scripts import demo_ai, demo_automations, demo_sprints, demo_tickets
 from scripts.demo_api import DemoFailed, call, mention, post
 from scripts.demo_tickets import SeededTickets
 
@@ -59,6 +59,7 @@ class Seeded:
     tickets: SeededTickets = field(default_factory=SeededTickets)
     sprints: dict[str, str] = field(default_factory=dict)  # ids by name
     ai: demo_ai.SeededAi | None = None
+    automations: demo_automations.SeededAutomations | None = None
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -229,6 +230,15 @@ async def seed(
             leave_id=seeded.page_id,
             wait_seconds=wait_seconds,
         )
+        seeded.automations = await demo_automations.build(
+            admin,
+            people,
+            ai=ai,
+            agents=seeded.ai.agents,
+            space_id=seeded.space_id,
+            channels=seeded.channels,
+            wait_seconds=wait_seconds,
+        )
     return seeded
 
 
@@ -289,6 +299,7 @@ async def _main(base: str, admin_email: str) -> int:
         f"demo ready: space Team Nord ({seeded.space_id}), {tickets} tickets, "
         f"{sprints} sprints, people {people}"
         + (f", agents Hilda and Otto (ticket HC-{seeded.ai.ticket_number})" if seeded.ai else "")
+        + (f", {len(seeded.automations.ids)} automations" if seeded.automations else "")
     )
     return 0
 
