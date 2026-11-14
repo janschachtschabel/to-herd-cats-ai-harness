@@ -85,7 +85,8 @@ describe('my automations', () => {
     expect(within(first!).getByText('Wiederkehrend')).toBeInTheDocument()
     expect(within(first!).getByText('Täglich um 09:00')).toBeInTheDocument()
     expect(within(first!).getByText(/Direktnachricht mit Hilda/)).toBeInTheDocument()
-    expect(within(first!).getByText('16.11.2026, 09:00')).toBeInTheDocument()
+    // The next term in my time, its zone named.
+    expect(within(first!).getByText('16.11.2026, 09:00 (Europe/Berlin)')).toBeInTheDocument()
     expect(within(first!).getByText('Aktiv')).toBeInTheDocument()
     expect(within(first!).getByText(/Gestartet · Abgeschlossen/)).toBeInTheDocument()
     expect(within(first!).getByRole('link', { name: 'Lauf ansehen' })).toHaveAttribute(
@@ -179,6 +180,7 @@ describe('the automations of a space', () => {
     const list = await screen.findByRole('list', { name: 'Aufgaben' })
     expect(within(list).getByText('Ereignis-Regel')).toBeInTheDocument()
     expect(within(list).getByText('Bei: Ticket angelegt')).toBeInTheDocument()
+    expect(within(list).getByText('bei jedem passenden Ereignis')).toBeInTheDocument()
     expect(within(list).getByText(/Eigentümerin: Jan Jansen/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Neue Aufgabe' })).toBeEnabled()
   })

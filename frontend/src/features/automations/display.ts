@@ -79,9 +79,16 @@ export function daysText(t: TFunction, days: readonly number[]): string {
 }
 
 /** A term in the reader's time, with the automation's zone named where it differs. */
-export function termText(t: TFunction, iso: string, locale: string, zone: string | null): string {
+export function termText(
+  t: TFunction,
+  iso: string,
+  locale: string,
+  zone: string | null,
+  nameZone = false,
+): string {
   const { local, there } = formatTerm(iso, locale, viewerZone(), zone)
-  return there ? `${local} (${t('automations.term.there', { time: there, zone })})` : local
+  if (there) return `${local} (${t('automations.term.there', { time: there, zone })})`
+  return nameZone && zone ? `${local} (${t('automations.term.zone', { zone })})` : local
 }
 
 /** Its state in words, with the reason it is paused. */

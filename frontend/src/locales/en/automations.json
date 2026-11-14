@@ -24,6 +24,7 @@
       "label": "Automations",
       "next": "Next term",
       "noNext": "no further term",
+      "onEvent": "on each matching event",
       "lastRun": "Last run",
       "noRun": "none yet",
       "openRun": "View run",

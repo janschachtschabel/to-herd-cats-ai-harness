@@ -24,6 +24,7 @@
       "label": "Aufgaben",
       "next": "Nächster Termin",
       "noNext": "kein weiterer Termin",
+      "onEvent": "bei jedem passenden Ereignis",
       "lastRun": "Letzter Lauf",
       "noRun": "noch keiner",
       "openRun": "Lauf ansehen",

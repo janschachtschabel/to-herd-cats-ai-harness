@@ -37,12 +37,11 @@ export function LastRun({ automation }: { automation: Automation }) {
 /** The next term in my time (the automation's zone named where it differs). */
 export function NextTerm({ automation }: { automation: Automation }) {
   const { t, i18n } = useTranslation()
-  if (!automation.next_due_at || automation.kind === 'event') {
-    return <span>{t('automations.list.noNext')}</span>
-  }
+  if (automation.kind === 'event') return <span>{t('automations.list.onEvent')}</span>
+  if (!automation.next_due_at) return <span>{t('automations.list.noNext')}</span>
   return (
     <time dateTime={automation.next_due_at}>
-      {termText(t, automation.next_due_at, i18n.language, automation.time_zone)}
+      {termText(t, automation.next_due_at, i18n.language, automation.time_zone, true)}
     </time>
   )
 }
