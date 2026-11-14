@@ -1,5 +1,7 @@
 """What a run tells the model before it starts (spec 8.3 point 2, 6.3): the agent's
-instructions with the frame rule, and the conversation so far, limited by characters
+instructions with the frame rule, the sections its host adds after them (the skills
+it may load, its memory: already framed where they hold data), and the conversation
+so far, limited by characters
 (`history_window`, ported from ai-1): the newest turn always stays, older turns are
 dropped whole, oldest first. M5 conversations are DMs with one person, so a turn is
 one message: the person's (`person`) or the agent's own answer (`agent`)."""
@@ -30,10 +32,11 @@ class Turn:
     text: str
 
 
-def instructions(name: str, agent_instructions: str) -> str:
-    return INSTRUCTION_FRAME.format(
+def instructions(name: str, agent_instructions: str, sections: Sequence[str] = ()) -> str:
+    text = INSTRUCTION_FRAME.format(
         name=name, untrusted=UNTRUSTED_NOTE, instructions=agent_instructions or "-"
     )
+    return "\n\n".join([text, *sections])
 
 
 def window(turns: Sequence[Turn], max_chars: int = HISTORY_CHARS) -> list[Turn]:

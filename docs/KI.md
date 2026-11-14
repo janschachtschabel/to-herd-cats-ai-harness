@@ -615,6 +615,30 @@ holt er mit `load_skill`.
   `skill.unarchived`, `skill.imported`, `agent.skills_changed`, mit Namen, Längen und
   Nummern, nie mit Beschreibung oder Text.
 
+### Skills im Lauf
+
+`backend/app/modules/agents/toolbox/skill_tools.py`, `agents/briefing.py`.
+
+- **Im Kontext** stehen nach den Anweisungen des Agenten Name und Beschreibung der
+  Skills, die der Lauf nutzen darf (Regel oben), nach Name, höchstens 25, jede
+  Beschreibung auf 300 Zeichen gekürzt, gerahmt wie ein Werkzeugergebnis; sind es mehr,
+  sagt eine Zeile, wie viele fehlen. Der Text eines Skills steht nie im Kontext. Bei
+  jeder Wiederaufnahme wird die Liste neu bestimmt.
+- **`load_skill(name, part)`** (Stufe 1, lesend) liefert den Text, gerahmt wie jedes
+  Werkzeugergebnis; der Bereich des Skills ist die Quelle des Ergebnisses (Richtlinie
+  und Rechte vor jedem weiteren Modellaufruf, Laufansicht, `search_past_runs`),
+  organisationsweite Skills haben keine. Was der Lauf nicht nutzen darf, ist „nicht
+  gefunden“.
+- **Teile statt längerem Schnitt**: Ein Ergebnis wird im Prompt bei 8.000 Zeichen
+  gekürzt; ein Skill hat bis zu 50.000. Statt Skills einen größeren Schnitt zu geben
+  (ein Skill nähme dann jedem weiteren Aufruf viel Platz), kommt der Text in Teilen zu
+  höchstens 7.000 Zeichen, möglichst am Zeilenende geschnitten; jeder Teil außer dem
+  letzten endet mit `[part n of m: call load_skill with part=n+1 for the rest]`, der
+  Schnitt ist also sichtbar und der Rest einen Aufruf entfernt.
+- Ein Skill ist Anleitung der Organisation, für den Lauf aber Daten: Er kann kein
+  Werkzeug freischalten, keine Stufe ändern und nichts freigeben; das entscheidet der
+  Host vor jedem Aufruf (getestet mit einem Skill, der genau das behauptet).
+
 ## Testen ohne Anbieter
 
 `backend/tests/support/openai_stub.py` ist ein lokaler Anbieter für Tests und e2e:

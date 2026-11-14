@@ -4,7 +4,8 @@ effect. A tool that is not listed here can never run: a run offers only listed t
 its grants allow (`policy.py`), and a call to any other name is a bad call.
 
 To add a tool: write its arguments' model and its `run` (see `base.py`; reading tools
-in `reading.py`, `listing.py`, `conversation.py`, `past_runs.py`), and list it here
+in `reading.py`, `listing.py`, `conversation.py`, `past_runs.py`,
+`skill_tools.py`), and list it here
 with its description, level and effect. A writing tool writes through the services
 with `ctx.actor` in `ctx.session` (its effect and its journal entry commit together);
 it checks its rights itself, before it writes.
@@ -18,6 +19,7 @@ from app.modules.agents.toolbox import (
     past_runs,
     questions,
     reading,
+    skill_tools,
     ticket_tools,
     wiki_tools,
 )
@@ -99,6 +101,15 @@ CATALOG: dict[str, ToolSpec] = {
             "earlier runs, as far as you may still read it here.",
             past_runs.SearchPastRunsArgs,
             past_runs.search_past_runs,
+            1,
+            READ,
+        ),
+        ToolSpec(
+            "load_skill",
+            "Load one of the skills listed in your instructions by its name: its text, in "
+            "parts when it is long (part=2 and on, as the text says).",
+            skill_tools.LoadSkillArgs,
+            skill_tools.load_skill,
             1,
             READ,
         ),

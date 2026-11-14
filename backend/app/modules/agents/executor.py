@@ -52,7 +52,7 @@ from dataclasses import replace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
-from app.modules.agents import place
+from app.modules.agents import briefing, place
 from app.modules.agents.actor import allowed_actor, run_actor
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
@@ -67,7 +67,7 @@ from app.modules.agents.standing import refusal
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.policy import Grant, allowed
-from app.modules.ai.models import AiConnection, ConnectionKind, ParamFamily
+from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
 from app.modules.messaging import threads
 from app.modules.messaging.models import MAX_BODY_CHARS, Message
@@ -126,10 +126,13 @@ class Executor:
             if place_space is not None:  # a channel's or a thread's: its policy counts
                 journal.reads.spaces.add(place_space)
             conversation = claimed.conversation_id
-            if await allowed_actor(session, org, user, agent, journal.reads, conversation) is None:
+            actor = await allowed_actor(session, org, user, agent, journal.reads, conversation)
+            if actor is None:
                 return Outcome("rights_revoked")
             connection = await steps.connection(agent.connection_id)
             assert connection is not None  # agent_refusal checked it
+            location = DataLocation(connection.data_location)
+            added = await briefing.sections(session, actor, agent, location)
             found = await place.asked(ReadRepository(session, org), claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
@@ -150,7 +153,7 @@ class Executor:
                 tools=tools,
                 reply_to=found.reply_to,
             )
-        instructions = context.instructions(agent.name, agent.instructions)
+        instructions = context.instructions(agent.name, agent.instructions, added)
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps
 
