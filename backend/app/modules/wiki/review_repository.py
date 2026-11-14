@@ -140,15 +140,22 @@ class ReviewRepository:
         row = (await self.session.execute(stmt)).first()
         return (row[0], row[1]) if row is not None else None
 
+    async def reminded_since(self, space_id: uuid.UUID, since: datetime) -> int:
+        """How many of the space's pages were reminded at or after `since`."""
+        stmt = select(func.count()).where(
+            Page.space_id == space_id, Page.review_notified_at >= since
+        )
+        return int(await self.session.scalar(stmt) or 0)
+
     async def remind(self, space_id: uuid.UUID, now: datetime, limit: int) -> list[Reminded]:
         """Up to `limit` of the space's due pages that had no reminder within their
-        interval, marked reminded at `now`, by id. The pages are locked
-        (waiting for a writer that holds one: skipping it would lose it until the next
-        day); the space's own lock keeps other workers out."""
+        interval, those reviewed longest ago first, marked reminded at `now`, by id.
+        The pages are locked (waiting for a writer that holds one: skipping it would
+        lose it until the next day); the space's own lock keeps other workers out."""
         batch = locked_batch(
             due_pages(now)
             .where(Page.space_id == space_id, not_reminded(now))
-            .order_by(Page.id)
+            .order_by(Page.reviewed_at.nulls_first(), Page.id)
             .limit(limit)
             .with_for_update(of=Page)
             .correlate(None),  # its own `page`, not the UPDATE's

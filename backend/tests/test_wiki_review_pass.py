@@ -6,6 +6,7 @@ timeline entry and the moderators' activity, once however often it is delivered.
 from datetime import datetime, timedelta
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from app.core.principal import Principal
 from app.modules.groups.models import Group, GroupMember
 from app.modules.spaces.models import Space
 from app.modules.spaces.repository import SpaceRepository
+from app.modules.wiki import review_pass
 from app.modules.wiki.events import PAGE_REVIEW_DUE
 from app.modules.wiki.models import Page
 from app.modules.wiki.review_handlers import notify_on_review_due
@@ -207,3 +209,26 @@ async def test_nothing_for_a_page_reviewed_or_trashed_before_delivery(
     assert r.status_code == 204, r.text
     await _handle(session)
     assert await _activity(wiki.moderator) == []
+
+
+async def test_a_space_gets_at_most_its_daily_reminders_oldest_review_first(
+    wiki: Wiki, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Setting an interval for the first time makes every old page due at once: the
+    pass reminds at most DAILY_REMINDERS of a space a day (20; 3 here), those reviewed
+    longest ago first, the rest on later days (review M7, finding 12). The tree's
+    filter shows every due page all along."""
+    monkeypatch.setattr(review_pass, "DAILY_REMINDERS", 3)
+    await _interval(session, wiki, 7)
+    pages = [await _published(wiki, f"Seite {n}") for n in range(5)]
+    for age, page in enumerate(pages):
+        await _age(session, page["id"], 10 + age)  # the last one reviewed longest ago
+    now = utcnow()
+    assert await _pass(session, now, batch=2) == [2, 1]
+    oldest_first = [p["id"] for p in reversed(pages)]
+    assert set(await _reminded(session)) == set(oldest_first[:3])
+    r = await wiki.editor.get(f"/api/spaces/{wiki.space_id}/pages/tree?review_due=true")
+    assert len(r.json()["items"]) == 5
+    assert await _pass(session, now + timedelta(hours=1)) == []  # not again today
+    assert await _pass(session, now + timedelta(days=1)) == [2]
+    assert sorted(await _reminded(session)) == sorted(oldest_first)

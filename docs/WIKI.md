@@ -190,7 +190,12 @@ Prüfprotokoll (`space.updated`).
   Ein Bereich wird immer nur von einem Worker bearbeitet (Sperre auf der Zeile des
   Bereichs, andere Worker überspringen ihn), in Schritten von höchstens 100 Seiten je
   Transaktion; erst nach dem letzten Schritt ist er für den Tag erledigt
-  (`space.review_checked_on`). Das gilt bei beliebig vielen Worker-Replikas genau
+  (`space.review_checked_on`). **Höchstens 20 Seiten je Bereich und Tag** werden
+  gemeldet, die am längsten nicht geprüften zuerst; die übrigen folgen an den nächsten
+  Tagen. Wer einem Bereich mit vielen alten Seiten zum ersten Mal eine Frist gibt,
+  bekommt also nicht alle Meldungen auf einmal; der Filter des Seitenbaums zeigt
+  trotzdem sofort jede fällige Seite. Scheitert der Schritt eines Bereichs, übergeht
+  der Worker ihn für den Rest der Runde und versucht es in der nächsten wieder. Das gilt bei beliebig vielen Worker-Replikas genau
   einmal. Wird die Frist geändert, schaut der nächste Durchlauf sofort wieder hin: Eine
   kürzere Frist macht Seiten noch am selben Tag fällig.
 - **Mitteilung:** Zu jedem `page.review_due` bekommt der Thread der Seite einen
