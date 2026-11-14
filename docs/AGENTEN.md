@@ -1,0 +1,1095 @@
+# Agenten: Bedienung und Betrieb
+
+Agenten arbeiten wie Kolleginnen und Kollegen: Sie sind Mitglied in Bereichen, lassen
+sich ansprechen und erwähnen, bekommen Tickets, schlagen Änderungen vor oder schreiben
+sie selbst (je nach Stufe), fragen bei kritischen Schritten nach einer Freigabe und
+führen je Bereich ein Gedächtnis. Jeder Lauf ist Schritt für Schritt einsehbar und
+lässt sich abbrechen. Stand: M6 (Spezifikation 5.4, 5.6, 6.3, 8, 9 und 11, soweit
+gebaut; Zeitpläne, Ereignisse und Budgets kommen mit M7, externe Werkzeuge mit M8).
+
+Die KI-Anbindung selbst (Verbindungen, Schlüssel, ausgehende Aufrufe, wer welches
+Modell nutzt, Verbrauch, KI-Richtlinie je Bereich und KI-Sperre) steht in
+[`KI.md`](KI.md). Vorschläge im Wiki: [`WIKI.md`](WIKI.md#vorschläge-seit-m6),
+Agenten an Tickets: [`TICKETS.md`](TICKETS.md#zuweisung), Erwähnungen in Kanälen:
+[`NACHRICHTEN.md`](NACHRICHTEN.md).
+
+## Bedienung
+
+Alles in diesem Teil sieht nur, wer KI nutzen darf (`ai.use`: eine Zuordnung zu einem
+Modell, siehe [`KI.md`](KI.md#wer-nutzt-welches-modell-apiaiassignments-aimanage)).
+Wer keine hat, sieht keine Agenten zur Auswahl, keine Läufe und keine KI-Menüs; was
+Agenten in Gesprächen geschrieben haben, liest jede und jeder normal, mit dem
+KI-Kennzeichen.
+
+### Was ein Agent ist
+
+Ein Agent hat einen Namen, eine Kurzvorstellung, Anweisungen (darin auch seine
+„Persönlichkeit“), ein Modell, eine verantwortliche Person und eine **Stufe**:
+
+| Stufe | kann von sich aus |
+|---|---|
+| 1: nur lesen | Seiten, Tickets, Versionslisten, das eigene Gespräch und frühere eigene Läufe lesen, Skills laden, zurückfragen, antworten |
+| 2: vorschlagen | dazu Änderungen an Seiten und neue Seiten **vorschlagen**, Skills vorschlagen, Tickets kommentieren, anlegen, mit Seiten verknüpfen und bis „Zur Prüfung“ setzen, sein Gedächtnis pflegen |
+| 3: intern schreiben | dazu Seiten direkt schreiben (nur in Bereichen, die das erlauben), Tickets übergeben, in Gespräche schreiben, in denen er Mitglied ist |
+
+Ein Agent liest nie mehr, als die Person darf, die ihn gerade fragt, und nie mehr, als
+er selbst als Mitglied darf, und davon nur, was alle sehen dürfen, die die Antwort
+lesen werden (siehe [Die Publikumsregel](#die-publikumsregel-wer-liest-mit)). Er
+handelt immer im Auftrag einer Person: Ihre Rechte gelten, ihr wird der Verbrauch
+gebucht.
+
+### Mit einem Agenten sprechen
+
+**Neue Direktnachricht** → einen Agenten wählen. Jede Nachricht startet einen Lauf;
+eine Karte im Gespräch zeigt, dass er arbeitet („Hilda arbeitet …“, mit dem Schritt),
+dann kommt die Antwort mit Quellen. Was währenddessen geschrieben wird, beantwortet der
+nächste Lauf gemeinsam. Kann kein Lauf starten, sagt das Eingabefeld warum (keine KI
+zugeordnet, Agent pausiert oder Entwurf, verantwortliche Person deaktiviert, Verbindung
+abgeschaltet, Lauf wartet noch auf eine Antwort, Antwort in einem Thread).
+
+### Erwähnen in Kanal und Thread
+
+`@` im Eingabefeld eines Kanals, einer Seiten- oder Ticket-Diskussion bietet neben
+Personen die Agenten an, die Mitglied des Bereichs sind (mit KI-Kennzeichen). Der
+erwähnte Agent antwortet **im Thread** der Nachricht, nie als neue Nachricht im Kanal;
+er liest diesen Thread (bis zu seinem Start), nicht den ganzen Kanal. Je Thread ist
+höchstens ein Lauf offen; eine weitere Erwähnung im selben Thread wartet, bis er fertig
+ist („Lauf wartet“). In anderen Threads desselben Kanals laufen andere Läufe zugleich.
+Eine nachträgliche Bearbeitung, die einen Agenten erwähnt, startet nichts. Wer keine KI
+hat, kann Agenten nicht erwähnen; eine Erwähnung von Hand verrät nichts und startet
+nichts.
+
+### Tickets zuweisen und übergeben
+
+Ein Agent kann Bearbeiter eines Tickets sein (Auswahl „Zugewiesen“, Agenten mit
+KI-Kennzeichen; nur aktive Agenten, die mindestens als `editor` Mitglied des Bereichs
+sind; persönliche nur durch ihre Eigentümerin). Die Zuweisung startet seinen Lauf: Er
+liest das Ticket, arbeitet, kommentiert in der Ticket-Diskussion und setzt den Status
+höchstens auf eine Kategorie „Zur Prüfung“; **erledigt oder verworfen setzt immer ein
+Mensch**. Kann der Lauf nicht starten oder endet er ohne Antwort, bleibt das Ticket
+zugewiesen, die Diskussion nennt den Grund, und die verantwortliche Person des Agenten
+bekommt einen Eintrag in ihrer Aktivität. Auf Stufe 3 kann ein Agent das Ticket mit
+Begründung an eine Person oder einen anderen Agenten **übergeben**; der nächste Agent
+arbeitet dann für dieselbe Person weiter. Nach drei Übergaben ist Schluss
+(„Übergabegrenze“). Nichts über ein Ticket erscheint in einem Kanal.
+
+### Freigaben und Rückfragen
+
+Ein Werkzeug kann für einen Agenten auf **„Nach Freigabe“** stehen. Will der Agent es
+nutzen, erscheint im Gespräch (oder Thread) eine **Freigabekarte**: was er tun will (mit
+Diff bei Seiten), wer entscheidet, bis wann. Entscheiden darf nur die Person, die den
+Lauf ausgelöst hat, und nur, wenn sie die Änderung auch selbst vornehmen dürfte. Andere
+sehen die Karte ohne Knöpfe. **Freigeben** setzt den Lauf fort; **Ablehnen** (mit
+optionalem Grund) teilt das dem Agenten mit, er arbeitet ohne diese Änderung weiter.
+Hat sich das Objekt zwischen Anfrage und Ausführung geändert (z. B. hat jemand die Seite
+bearbeitet), wird nichts ausgeführt; die Karte zeigt „Veraltet“, und der Agent kann neu
+fragen. Ohne Entscheidung endet der Lauf nach `HERD_AI_APPROVAL_HOURS` (Standard 72
+Stunden). Eine **Rückfrage** (`ask_user`) erscheint ebenso als Karte mit Antwortfeld
+(bis 4.000 Zeichen) für die fragende Person. Offene Freigaben stehen unter
+**Freigaben** in der Seitenleiste (mit Zähler) und in der Aktivität.
+
+Solange ein Lauf wartet, hält er nichts fest außer seinem Thread (bzw. dem Gespräch
+oder Ticket): Neue Nachrichten dort starten keinen weiteren Lauf; nach seinem Ende
+beantwortet ein neuer Lauf, was inzwischen kam.
+
+### Läufe ansehen und abbrechen
+
+**Meine Läufe** (Seitenleiste) listet die Läufe, die man ausgelöst hat, mit Filtern
+nach Zustand und Stopgrund; am Agenten (Verwaltung oder „Meine Agenten“) stehen alle
+seine Läufe für die verantwortliche Person. Die **Laufansicht** zeigt Agent, fragende
+Person, Ort, Zustand, Stopgrund in Worten, Versuche, Dauer, Token und Kosten,
+Übergabetiefe und jeden Schritt: Modellantworten, Werkzeugaufrufe mit Argumenten und
+Ergebnis, Freigaben und Rückfragen. **Lauf abbrechen** (mit Bestätigung) steht allen
+offen, die den Lauf sehen dürfen; ein laufender Lauf hält vor seinem nächsten Schritt,
+ein wartender oder noch nicht begonnener sofort, und er schreibt danach nichts mehr.
+Links zu einem Lauf (an Antworten, Vorschlägen, Ticketmeldungen) erscheinen nur für
+Personen, die ihn sehen dürfen.
+
+### Vorschläge
+
+Auf Stufe 2 schreibt ein Agent Seiten nicht selbst, sondern **schlägt** Änderungen oder
+neue Seiten **vor**. Sie stehen im Reiter **Vorschläge** des Bereichs (für alle, die
+dort Seiten bearbeiten dürfen; mit Zähler), mit Diff, Begründung und Lauf. Moderatoren
+nehmen an oder lehnen ab; hat sich die Seite inzwischen geändert, zeigt ein
+Zusammenführen-Dialog die Stellen, und nichts wird still übernommen. Einzelheiten in
+[`WIKI.md`](WIKI.md#vorschläge-seit-m6). Ebenso schlägt ein Agent Änderungen an Skills
+oder neue Skills vor; darüber entscheidet, wer die Skills dort verwaltet.
+
+### Skills
+
+Ein Skill ist eine Anleitung (eine SKILL.md: Name, Beschreibung, Text), organisationsweit
+oder in einem Bereich, und einem Agenten zugewiesen. Der Agent kennt Name und
+Beschreibung seiner Skills und holt den Text, wenn er ihn braucht. **Nichts in einem
+Skill wird ausgeführt**: Ein Skill ist Text, auch wenn er Code enthält. Skills stehen
+unter **Skills** im Bereich (für alle mit KI, die den Bereich lesen) und in der
+Verwaltung; Moderatoren eines Bereichs pflegen dessen Skills, organisationsweite die
+Admins. Versionen, Wiederherstellen, Import (SKILL.md oder ZIP) und Export gibt es dort.
+
+### Gedächtnis
+
+Ein Agent kann sich je Bereich Notizen machen (Stufe 2). Sie stehen auf einer ganz
+normalen Wiki-Seite unter **Agenten › <Name des Agenten> › Gedächtnis** (Ordner
+`_agenten`, im Seitenbaum am Ende), mit den Rechten, Versionen und dem KI-Kennzeichen
+jeder Seite. Wer die Seite bearbeiten darf, korrigiert sie im Editor; wer sie für KI
+sperrt, verbietet dem Agenten das Schreiben. Bei jedem Lauf liest der Agent die
+Gedächtnisseiten der Bereiche, die er in diesem Lauf lesen darf (zusammen höchstens
+4.000 Zeichen).
+
+### Persönliche Agenten
+
+Unter **Meine Agenten** legt man eigene Agenten an (wenn die Organisation es erlaubt,
+höchstens `HERD_AI_PERSONAL_AGENTS_MAX`, Standard 5). Ein persönlicher Agent nutzt das
+eigene Modell, arbeitet höchstens auf Stufe 2, ist nur Mitglied im eigenen persönlichen
+Bereich und nur für seine Eigentümerin erreichbar (Direktnachricht, Erwähnung,
+Zuweisung); alle anderen sehen ihn nicht. Admins sehen ihn in der Verwaltung, mit
+Vermerk im Audit.
+
+### Das KI-Kennzeichen
+
+Alles, was ein Agent schreibt, trägt das Kennzeichen **KI** und nennt den Agenten (und,
+für wer es sehen darf, den Lauf): Antworten und Kommentare, Systemmeldungen über seine
+Ticketänderungen, Seitenversionen und Vorschläge, Skill-Versionen, Freigabe- und
+Rückfragekarten, Einträge in Aktivität und Suche, die Einsicht in Direktnachrichten.
+
+### Was Agenten nie tun
+
+- nichts löschen und nichts in den Papierkorb legen;
+- keine Vorschläge annehmen oder ablehnen und keine Freigaben erteilen, auch nicht für
+  sich selbst;
+- kein Ticket auf erledigt oder verworfen setzen;
+- keine Seite schreiben, die für KI gesperrt ist, und in Bereichen mit „Agenten schlagen
+  vor“ keine Seite direkt;
+- nichts lesen, was die fragende Person nicht lesen darf, und nichts aus einem Bereich
+  an einen Ort tragen, dessen Publikum es nicht sehen darf;
+- keinen Inhalt an eine Verbindung schicken, die die KI-Richtlinie eines gelesenen
+  Bereichs nicht zulässt;
+- Code ausführen (es gibt kein solches Werkzeug), andere Agenten erwähnen oder sich
+  selbst eine Stufe, ein Werkzeug oder eine Freigabe geben: Was in Seiten, Tickets oder
+  Skills steht, sind für den Agenten Daten, keine Anweisungen.
+
+## Verwaltung
+
+### Agenten anlegen (`agent.manage`)
+
+Verwaltung → **Agenten** (Owner und Admins). `GET/POST /api/agents`,
+`GET/PATCH/DELETE /api/agents/{id}` (sonst 404 `agent.not_found`): Name,
+Kurzvorstellung, Anweisungen (höchstens 20.000 Zeichen), Verbindung und Modell (eine
+Chat-Verbindung, die das Modell anbietet; 422 `ai.connection_not_chat`,
+`ai.model_unknown`, `agent.connection_and_model`), verantwortliche Person (aktiv, kein
+Gast; 422 `agent.responsible_invalid`), Status `draft|active|paused`, Grenzen
+`max_steps` (1–25) und `max_runtime_seconds` (10–600), Stufe. Änderungen mit `version`
+(409 `agent.version_conflict`), Audit ohne den Text der Anweisungen. Wer schon
+gesprochen hat oder gelaufen ist, wird nicht gelöscht (409 `agent.in_use`), sondern
+pausiert. Antworten nennen `responsible_name` und `owner_user_id` (bei persönlichen
+Agenten). Einen Agenten nimmt man wie eine Person in einen Bereich auf (`PUT
+/api/spaces/{id}/members` mit `member_type: agent`); `GET /api/agents/{id}/spaces`
+listet seine Bereiche mit Rolle. Entwürfe sehen nur Personen mit `agent.manage`.
+Persönlichkeit, Avatar und Ersatzmodell der Spezifikation (8.1): Die Persönlichkeit
+gehört in die Anweisungen; Avatar und Ersatzmodell gibt es nicht.
+
+- Agenten sind Principals wie Personen: Mitglied von Bereichen, Teilnehmer einer
+  Direktnachricht, Urheber von Nachrichten (`kind: agent`).
+- `GET /api/agents` nennt Personen mit `ai.use` ohne `agent.manage` nur ihre eigenen
+  persönlichen Agenten. `GET /api/agents/{id}/spaces` (seitenweise nach Name) nennt
+  nur Mitgliedschaften; offene Bereiche, die der Agent nur liest, stehen nicht darin.
+- `GET /api/agents/{id}/profile` (`ai.use`): Name, Kurzvorstellung, Status. Entwürfe
+  sind für alle ohne `agent.manage` unsichtbar, auch beim Hinzufügen als Mitglied
+  eines Bereichs (404 `agent.not_found`). Wer Agenten nicht sieht (weder `ai.use` noch
+  `agent.manage`), entfernt auch keinen aus einem Bereich: 404
+  `spaces.member_not_found` wie für ein unbekanntes Mitglied. Das Verzeichnis
+  (`/api/directory`) nennt Agenten nur Personen mit `ai.use`.
+- `POST /api/dms` mit `{"agent_id": …}` (ohne weitere Personen, sonst 422
+  `dm.agent_pair_only`): die Direktnachricht der Person mit dem Agenten; ohne `ai.use`
+  404 `agent.not_found`.
+
+### Stufen und Werkzeugfreigaben
+
+Neue Agenten haben Stufe 2; Agenten aus M5 wurden bei der Migration Stufe 1. Eine Stufe
+über 2 vergibt nur ein Admin oder wer jeden Bereich verwaltet, in dem der Agent Mitglied
+ist (sonst 403 `agent.level_denied`; ohne Bereiche nur Admins); `max_level` in `GET
+/api/agents/{id}/tools` nennt die höchste Stufe, die man selbst geben darf. Stufe 4
+(extern handeln) kommt mit M8.
+
+Die Stufe ist eine **Voreinstellung**: Jedes Werkzeug ab seiner Mindeststufe steht auf
+`allow`, darunter auf `block`. Je Werkzeug kann ein Eintrag (`allow`, `confirm`,
+`block`) nur **verschärfen**; wirksam ist das Strengere (`GET/PUT
+/api/agents/{id}/tools` mit der `version` des Agenten, unbekannte Werkzeuge 422
+`agent.tool_unknown`, Audit `agent.tools_changed`). In der Oberfläche: „Wie die Stufe“,
+„Nur nach Freigabe“, „Gesperrt“. Ein Lauf bietet dem Modell nur Werkzeuge mit `allow`
+oder `confirm` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
+`rights_revoked`). Ein Werkzeug, das der Katalog nicht kennt, läuft nie.
+
+| Werkzeug | Stufe | Wirkung | Was es tut |
+|---|---|---|---|
+| `search` | 1 | lesen | Volltext über Seiten und Tickets |
+| `read_page`, `read_ticket` | 1 | lesen | eine Seite, ein Ticket |
+| `list_tree` | 1 | lesen | lesbare Bereiche; Seiten eines Bereichs nach Pfad (ohne Inhalt) |
+| `list_versions` | 1 | lesen | Versionen einer Seite (ohne Inhalt; nur mit `page.edit`) |
+| `search_tickets` | 1 | lesen | Tickets nach Text und Filtern |
+| `read_conversation` | 1 | lesen | nur das Gespräch bzw. den Thread des Laufs |
+| `search_past_runs` | 1 | lesen | frühere Läufe dieses Agenten für dieselbe Person |
+| `load_skill` | 1 | lesen | Text eines Skills, in Teilen zu höchstens 7.000 Zeichen |
+| `ask_user` | 1 | lesen | Rückfrage an die fragende Person (wartet) |
+| `submit_result` | 1 | lesen | gibt das Ergebnis ab und beendet den Lauf |
+| `propose_page_change`, `propose_new_page` | 2 | vorschlagen | Seitenvorschlag (`page.edit` nötig) |
+| `propose_skill` | 2 | vorschlagen | Skill-Vorschlag |
+| `update_memory` | 2 | schreiben | Gedächtnisseite des Bereichs ersetzen (höchstens 8.000 Zeichen) |
+| `comment_ticket` | 2 | schreiben | Kommentar in der Ticket-Diskussion |
+| `set_ticket_status` | 2 | schreiben | Status, höchstens Kategorie `review` |
+| `create_ticket` | 2 | schreiben | Ticket anlegen (meldend: der Agent) |
+| `link_ticket_page` | 2 | schreiben | Ticket mit Seite verknüpfen |
+| `update_page` | 3 | schreiben | Seite schreiben, in zwei Schritten (Diff, dann Schreiben); nur bei `agent_write_policy = direct` |
+| `assign_ticket` | 3 | schreiben | Ticket übergeben, mit Begründung als Kommentar |
+| `post_message` | 3 | schreiben | Nachricht in das Gespräch des Laufs oder einen Kanal eines Bereichs, in dem der Agent Mitglied ist |
+
+Ob Agenten in einem Bereich Seiten direkt schreiben dürfen, stellt, wer den Bereich
+verwaltet: Einstellungen → „Schreiben durch Agenten“ (`agent_write_policy`: `propose`,
+Voreinstellung, oder `direct`).
+
+Jedes Werkzeug geht durch dieselben Dienste wie ein Mensch (`router → service →
+repository`), mit dem Akteur des Laufs: den Rechten der fragenden Person, begrenzt auf
+die Rolle des Agenten und den Lese- und Schreibbereich des Ortes, mit Richtlinie und
+`no_ai`. Was ein Agent schreibt, nennt ihn als Urheber (`agent:<id>`) und den Lauf
+(`run_id`). Ein abgelehnter Schreibversuch nimmt alles zurück und meldet dem Modell nur
+den Code.
+
+### Die Publikumsregel: wer liest mit
+
+Ein Lauf liest höchstens, was die fragende Person darf, und davon nur Bereiche, in denen
+der Agent Mitglied ist, und offene Bereiche. Dazu kommt das **Publikum des Ortes**, an
+dem er antwortet: Er liest nur, was alle lesen dürfen, die seine Antwort sehen werden,
+und er schreibt nur dorthin, wo sein Auftrag liegt.
+
+| Ort | liest (∩ Person ∩ Agent) | schreibt |
+|---|---|---|
+| Direktnachricht der Person allein mit dem Agenten | alles | wo Person und Agent beide schreiben dürfen |
+| Direktnachricht mit mehreren Personen | Bereiche, die alle Teilnehmenden lesen | genau diese Bereiche |
+| Kanal, Seiten- oder Ticket-Diskussion in Bereich S | S und die offenen Bereiche (keine offenen, wenn S einen Gast hat) | nur S |
+
+Beispiele:
+
+- Anna fragt Hilda in einer Direktnachricht zu zweit. Hilda liest Annas Team-Bereich
+  „Vertrieb“, wenn sie dort Mitglied ist, und kann in „Vertrieb“ vorschlagen.
+- Anna erwähnt Hilda im Kanal von „Marketing“. Hilda liest nur „Marketing“ und die
+  offenen Bereiche, nicht „Vertrieb“, auch wenn Anna und Hilda beide dort sind: Im
+  Kanal lesen Leute mit, die „Vertrieb“ nicht sehen.
+- Ist in „Marketing“ ein Gast Mitglied, liest Hilda dort auch keine offenen Bereiche
+  (Gäste lesen keine offenen Bereiche).
+- In einer Direktnachricht von Anna, Ben und Hilda liest Hilda nur Bereiche, die Anna
+  und Ben beide lesen dürfen.
+- Hat Hilda in einem Lauf „Vertrieb“ gelesen (auch über ihr Gedächtnis dort), schreibt
+  sie in diesem Lauf nichts in einen Bereich, dessen Publikum „Vertrieb“ nicht sieht:
+  kein Vorschlag, kein Kommentar, kein Gedächtnis dort (Antwort „Not allowed: what you
+  have read in this run …“).
+
+Das wird vor jedem Modell- und Werkzeugaufruf neu bestimmt; wer Rechte oder `ai.use`
+verliert, beendet den Lauf (`rights_revoked`), ebenso ein pausierter Agent oder eine
+deaktivierte verantwortliche Person. Admins sind nicht ausgenommen: Fragt ein Admin
+einen Agenten, liest der Lauf mit den Rollen des Agenten, nicht mit dem Admin-Recht.
+Die eine Rechteprüfung (`core/access.py`) wendet Lese- und Schreibbereich auf jeden
+Akteur an, ohne Agenten zu kennen (`agents/scope.py` berechnet sie).
+
+### Ein offener Lauf je Thread
+
+Höchstens ein Lauf ist je „Bahn“ offen (in der Warteschlange, laufend oder wartend). Die
+Bahn ist in einem Kanal der Thread der erwähnenden Nachricht (eine Erwähnung auf
+oberster Ebene beginnt ihren eigenen Thread), in einer Direktnachricht das Gespräch, in
+einer Seiten-Diskussion die Seite, in einer Ticket-Diskussion das Ticket (Zuweisung,
+Übergabe und Erwähnungen dort teilen sich die Bahn). Ein Lauf, der in einem Kanal-Thread
+auf eine Freigabe wartet, hält also nur diesen Thread. Die Datenbank sichert das mit
+eindeutigen Teilindizes über `COALESCE(lane_id, conversation_id)` (je Bahn ein laufender
+und ein aktiver Lauf, einer in der Warteschlange je Bahn und Agent: der Lauf nach einer
+Übergabe steht hinter dem übergebenden; wird dieser nach einer Freigabe wieder
+eingereiht, bleibt der übergebene Lauf erhalten und folgt ihm). In einem Kanal ist
+`run.lane_id` die Wurzel des Threads; Erwähnungen in anderen Threads desselben Kanals
+laufen zugleich (jeweils bis zur `max_concurrency` der Verbindung). Eine Advisory-Sperre ist dafür nicht nötig
+(die Indizes halten über Worker und Abstürze hinweg); nur das Beanspruchen von Läufen
+serialisiert sich auf einer Sperre je Transaktion.
+
+### Persönliche Agenten (Verwaltung)
+
+Ein persönlicher Agent gehört einer Person (`owner_user_id`).
+
+- **Recht** `agent.create_personal`: abgeleitet wie `ai.use`, nie gespeichert: wer
+  `ai.use` hat, solange die Organisation persönliche Agenten erlaubt. `/api/auth/me`
+  nennt es in `permissions`.
+- **Schalter**: `PUT /api/ai/assignments/personal-agents` (`ai.manage`, Körper
+  `{"enabled": false, "version": n}` mit der Version aus `GET /api/ai/assignments`, die
+  auch Standard- und Gruppenzuordnung schützt; 409 bei veralteter Version; Audit
+  `ai_assignment.personal_agents_set`). `GET /api/ai/assignments` nennt den Stand in
+  `personal_agents` (Voreinstellung: an). Aus: niemand legt neue an, und bestehende
+  persönliche Agenten antworten nicht mehr (`agent.personal_disabled`).
+- **Anlegen**: `POST /api/agents` mit `{"name": …, "personal": true}`. Ohne `ai.use`
+  404 `agent.not_found`; mit `ai.use`, aber abgeschaltet, 403
+  `agent.personal_disabled`. Verbindung und Modell sind die der Person (ihre
+  Zuordnung); gibt man sie an, müssen es diese sein (422 `ai.connection_not_found`,
+  `ai.model_unknown`). Verantwortlich ist die Besitzerin selbst (eine andere Person:
+  422 `agent.responsible_invalid`). Höchstens Stufe 2 (403 `agent.level_denied`, auch
+  für Admins). Höchstens `HERD_AI_PERSONAL_AGENTS_MAX` (Standard 5, 0 bis 100) je
+  Person (409 `agent.personal_limit`; gezählt unter einer Sperre je Person, zwei
+  gleichzeitige Anlagen überschreiten die Grenze nicht).
+- **Bereiche**: Der Agent ist ab der Anlage Mitglied (`editor`) im persönlichen
+  Bereich seiner Besitzerin und nur dort. Jeder Versuch, ihn einem anderen Bereich
+  hinzuzufügen, scheitert mit 422 `agent.personal_space_only`, auch für Admins und die
+  Besitzerin; wer den Agenten nicht sehen darf, bekommt 404 `agent.not_found`.
+- **Verwalten**: Die Besitzerin (mit `ai.use`) liest, ändert, pausiert und löscht ihre
+  Agenten (Löschen nur ungenutzt, sonst 409 `agent.in_use`) und setzt ihre
+  Werkzeugfreigaben, über dieselben Endpunkte wie `agent.manage`, mit `version` (409).
+  Jede Änderung übernimmt Verbindung und Modell neu aus ihrer Zuordnung: Ändert ein
+  Admin ihre Zuordnung, antwortet der Agent mit `agent.connection_unavailable`, bis er
+  einmal gespeichert wird (`PATCH` nur mit `version` genügt).
+- **Reden**: Nur die Besitzerin erreicht ihn: Direktnachricht, Profil, Verzeichnis und
+  Erwähnungen verbergen ihn vor allen anderen, auch vor Admins (404
+  `agent.not_found`). Läufe fragen daher immer als Besitzerin, ihre Rechte gelten, der
+  Verbrauch wird ihr gebucht. Ein Lauf für jemand anderen (spätere Auslöser) startet
+  nicht (`agent.not_found`) oder endet vor dem ersten Aufruf (`rights_revoked`).
+- **Ende**: Verliert die Besitzerin `ai.use` (`ai.unavailable`), wird sie deaktiviert
+  (`agent.responsible_inactive`) oder schaltet die Organisation persönliche Agenten ab
+  (`agent.personal_disabled`), startet kein Lauf mehr, und ein laufender endet mit
+  `rights_revoked`. Personen werden nicht gelöscht, nur deaktiviert; ein persönlicher
+  Agent bleibt dann bestehen, aber unbenutzbar.
+- **Admins** sehen in der Verwaltung (`GET /api/agents`, `GET /api/agents/{id}`,
+  `GET /api/agents/{id}/runs`) jeden Agenten mit seinen Anweisungen („Admins dürfen
+  alles sehen“); dass sie einen persönlichen Agenten einer anderen Person gezeigt
+  bekamen, steht im Audit (`agent.admin_access`, einmal je Admin, Agent und UTC-Tag).
+
+### Skills verwalten (`/api/skills`)
+
+Ein Skill ist eine Anleitung im Format SKILL.md (agentskills.io): YAML-Kopf zwischen
+zwei `---`-Zeilen mit `name` (1 bis 64 Zeichen: Kleinbuchstaben, Ziffern, einzelne
+Bindestriche, nicht am Rand) und `description` (1 bis 1.024 Zeichen), danach die
+Anweisungen in Markdown (höchstens 50.000 Zeichen). **Ein Skill ist Text: nichts darin
+wird je ausgeführt**, auch keine Skripte (es gibt in v1 kein Werkzeug, das Code
+ausführt). Ein Agent sieht im Kontext nur Name und Beschreibung seiner Skills; den Text
+holt er mit `load_skill`.
+
+- **Geltungsbereich:** organisationsweit oder einem Bereich zugeordnet; der Name ist
+  je Organisation und Geltungsbereich eindeutig (409 `skill.name_taken`, archivierte
+  eingeschlossen).
+- **Rechte:** Skills gibt es nur für Personen mit `ai.use` oder `skill.manage`; für
+  alle anderen antwortet jeder Skill-Pfad 404 `skill.not_found` wie für eine
+  unbekannte ID. Organisationsweite Skills lesen alle mit `ai.use`, Skills eines
+  Bereichs alle, die den Bereich lesen. Organisationsweite Skills verwaltet, wer
+  `skill.manage` hat (Admins), Skills eines Bereichs die Moderatoren des Bereichs
+  (`page.moderate`) oder `skill.manage`; wer einen Skill sieht, aber nicht verwalten
+  darf, bekommt 403 `auth.permission_denied`.
+- `GET /api/skills` (nach Name, Filter `space_id`, `org_wide`, `state`, `q` für einen
+  Teil des Namens; seitenweise), `POST /api/skills`, `GET/PATCH /api/skills/{id}`,
+  `POST /api/skills/{id}/archive` und `/unarchive` (kein Löschen; 409
+  `skill.state_conflict`). Schreiben mit `version` (409 `skill.version_conflict`);
+  Eingaben 422 `skill.name_invalid`, `skill.description_invalid`,
+  `skill.content_invalid`.
+- **Versionen:** jede Änderung von Beschreibung oder Text ist eine Version (die erste
+  beim Anlegen; Umbenennen nicht). `GET /api/skills/{id}/versions`,
+  `GET …/versions/{n}`, `POST …/versions/{n}/restore` (eine neue Version mit dem alten
+  Stand; 404 `skill.version_not_found`).
+- **Export und Import:** `GET /api/skills/{id}/export` liefert die SKILL.md.
+  `POST /api/skills/import` (optional `?space_id=`) nimmt eine SKILL.md oder ein ZIP
+  mit einem oder mehreren Skill-Ordnern (je Ordner eine `SKILL.md`, deren `name` dem
+  Ordnernamen gleicht; höchstens vier Pfadteile tief, 100 Skills, 10 MB). Der Kopf
+  wird streng geprüft (nur die Felder des Formats; `license`, `compatibility`,
+  `metadata` und `allowed-tools` werden angenommen, aber nicht übernommen und als
+  `ignored_fields` gemeldet). Das ZIP wird wie beim Wiki-Import gelesen (Grenzen für
+  Einträge, entpackte Größe, keine Pfadtricks, kein zip64). Andere Dateien eines
+  Ordners werden nicht übernommen (`file_unsupported`): ein Skill besteht hier nur aus
+  seiner SKILL.md. Die Antwort nennt je Skill, was angelegt wurde und warum nicht
+  (`exists`, `duplicate`, `name_mismatch`, `frontmatter_invalid`, `too_large`, …).
+- **Agenten:** `GET/PUT /api/agents/{id}/skills` (`agent.manage`) zeigt und ersetzt die
+  Skills eines Agenten (höchstens 50, mit der `version` des Agenten). Zuweisbar sind
+  organisationsweite Skills und Skills eines Bereichs, den der Agent liest (422
+  `agent.skill_not_assignable`); zwei Skills gleichen Namens 422
+  `agent.skill_names_clash`. Ob ein Lauf einen Skill nutzen darf, entscheidet sich
+  beim Nutzen: zugewiesen, aktiv, organisationsweit oder in einem Bereich, den der
+  Lauf liest (Rechte der Person, des Agenten und Publikum des Ortes), und die
+  KI-Richtlinie dieses Bereichs lässt die Verbindung des Laufs zu. Verlässt ein Agent
+  einen Bereich, bleibt die Zuweisung stehen, wirkt aber nicht (`available: false`).
+- Audit: `skill.created`, `skill.updated`, `skill.restored`, `skill.archived`,
+  `skill.unarchived`, `skill.imported`, `agent.skills_changed`, mit Namen, Längen und
+  Nummern, nie mit Beschreibung oder Text.
+
+#### Skills im Lauf
+
+`backend/app/modules/agents/toolbox/skill_tools.py`, `agents/briefing.py`.
+
+- **Im Kontext** stehen nach den Anweisungen des Agenten Name und Beschreibung der
+  Skills, die der Lauf nutzen darf (Regel oben), nach Name, höchstens 25, jede
+  Beschreibung auf 300 Zeichen gekürzt, gerahmt wie ein Werkzeugergebnis; sind es mehr,
+  sagt eine Zeile, wie viele fehlen. Der Text eines Skills steht nie im Kontext. Bei
+  jeder Wiederaufnahme wird die Liste neu bestimmt.
+- **`load_skill(name, part)`** (Stufe 1, lesend) liefert den Text, gerahmt wie jedes
+  Werkzeugergebnis; der Bereich des Skills ist die Quelle des Ergebnisses (Richtlinie
+  und Rechte vor jedem weiteren Modellaufruf, Laufansicht, `search_past_runs`),
+  organisationsweite Skills haben keine. Was der Lauf nicht nutzen darf, ist „nicht
+  gefunden“.
+- **Teile statt längerem Schnitt**: Ein Ergebnis wird im Prompt bei 8.000 Zeichen
+  gekürzt; ein Skill hat bis zu 50.000. Statt Skills einen größeren Schnitt zu geben
+  (ein Skill nähme dann jedem weiteren Aufruf viel Platz), kommt der Text in Teilen zu
+  höchstens 7.000 Zeichen, möglichst am Zeilenende geschnitten; jeder Teil außer dem
+  letzten endet mit `[part n of m: call load_skill with part=n+1 for the rest]`, der
+  Schnitt ist also sichtbar und der Rest einen Aufruf entfernt.
+- Ein Skill ist Anleitung der Organisation, für den Lauf aber Daten: Er kann kein
+  Werkzeug freischalten, keine Stufe ändern und nichts freigeben; das entscheidet der
+  Host vor jedem Aufruf (getestet mit einem Skill, der genau das behauptet).
+
+#### Skill-Vorschläge (`propose_skill`, `/api/skill-proposals`)
+
+`backend/app/modules/skills/proposals.py` (Regeln), `proposal_decisions.py`
+(Annehmen, Ablehnen), `sight.py` (wer was sieht), Werkzeug in
+`agents/toolbox/skill_tools.py`.
+
+- **`propose_skill(kind, name, space_id, description, content, reason)`** (Stufe 2,
+  vorschlagend): `kind=change` für einen der Skills, die der Lauf nutzen darf (nach
+  seinem Namen in der Liste), `kind=new` für einen neuen Skill in `space_id` (ohne:
+  organisationsweit). Ein Vorschlag in einem Bereich braucht `page.edit` dort für den
+  Lauf (also nur innerhalb seines Schreibbereichs) und nur, was das Publikum des
+  Bereichs sehen darf (wie bei jedem schreibenden Werkzeug); ein organisationsweiter
+  Vorschlag nur, was aus offenen Bereichen stammt (alle mit KI lesen ihn später).
+  Wirkung und Journaleintrag in einer Transaktion (Wiedergabe schreibt nichts
+  doppelt). Fehler: „nicht gefunden“, `skill.name_taken`, `skill.name_invalid`,
+  `skill.description_invalid`, `skill.content_invalid`, `skill_proposal.no_change`,
+  `skill_proposal.skill_archived`, `skill_proposal.invalid_reason`.
+- **Tabelle `skill_proposal`**: Art (`change|new`), Bereich (leer: organisationsweit),
+  Skill (bei `new` erst nach dem Annehmen), Name (nur `new`), `base_number` (neueste
+  Version des Skills beim Vorschlag, nur `change`), Beschreibung, Text, Begründung
+  (≤ 300), Urheber (Principal) mit `run_id`, Zustand `open|accepted|rejected`,
+  entschieden von, wann, Ablehnungsgrund, die erzeugte Skill-Version, `version`.
+- **Sehen**: wer ihn entscheiden darf (`skill.manage`; bei einem Bereich auch
+  `page.moderate` dort, mit `ai.use`) und sein Urheber, solange er den Bereich lesen
+  darf; ohne `ai.use` und `skill.manage` niemand. Alles andere antwortet 404
+  `skill_proposal.not_found` wie eine unbekannte ID (die Liste ohne KI: 404
+  `skill.not_found`).
+- **Endpunkte**: `GET /api/skill-proposals?space_id=&org_wide=&state=&limit=&cursor=`
+  (neueste zuerst, `space_id` eines unlesbaren Bereichs: 404 `space.not_found`),
+  `GET /api/skill-proposals/{id}` (mit `proposed`, bei `change` dem Skill jetzt als
+  `current` mit `version` und `number` und `outdated`), `POST …/accept`
+  `{version, description?, content?, skill_version?}`, `POST …/reject`
+  `{version, reason?}`. Entscheiden: 403 ohne das Recht (ein Lauf entscheidet nie),
+  409 `skill_proposal.not_open`, `skill_proposal.version_conflict`.
+- **Basis**: Hat der Skill seit dem Vorschlag eine neuere Version, antwortet `accept`
+  409 `skill_proposal.base_outdated` mit `details = {skill_version, current:
+  {description, content}, proposed: {description, content}}` und schreibt nichts. Die
+  Moderatorin nimmt erneut an, mit `skill_version` und, wo gewünscht, dem endgültigen
+  Text; ist der Skill inzwischen wieder anders, wieder 409.
+- **Annehmen** erzeugt die Skill-Version über die Skill-Dienste (Audit wie dort): mit
+  dem Agenten als Urheber, wenn der Text wie vorgeschlagen bleibt, sonst mit der
+  Moderatorin (wie bei Seitenvorschlägen); ein neuer Skill entsteht im Bereich des
+  Vorschlags. Ein archivierter Skill nimmt nichts an (409
+  `skill_proposal.skill_archived`), ein inzwischen vergebener Name 409
+  `skill.name_taken`.
+- **Aktivität** (Grund `skill_proposal`, an den Vorschlag gebunden: `skill_proposal`
+  `{id, space_id}` in `/api/activity`, kein Gespräch): beim Vorschlag für die
+  Moderatoren des Bereichs nach Mitgliedschaft bzw. für Owner und Admins bei
+  organisationsweiten, beim Entscheiden für einen Urheber, der eine Person ist. Sie
+  steht nur, solange die Person den Vorschlag sieht (dieselbe Regel; wer die
+  Moderation verliert, verliert den Eintrag).
+- **Live**: `skill_proposal.changed` mit `proposal_id`, je Person (wer entscheiden
+  darf, der Urheber), bei jedem Ereignis. Ereignisse `skill_proposal.created|
+  accepted|rejected` tragen nur IDs.
+
+**Seitenvorschläge** (`modules/proposals`): sichtbar für alle, die im Bereich Seiten
+bearbeiten dürfen (`page.edit`, strenger als Lesen: ein Vorschlag zeigt unveröffentlichte
+Inhalte und frühere Stände), und für den Urheber; entscheiden mit `page.moderate`. Die
+Regel beim Annehmen: Gleicht die Seite noch dem Stand, auf dem der Vorschlag beruht
+(Inhalt verglichen, nicht die Nummer), wird er übernommen; sonst 409
+`proposal.base_outdated` mit einem Drei-Wege-Abgleich, und die Moderatorin bestätigt den
+zusammengeführten Text ausdrücklich. Endpunkte und Codes in
+[`WIKI.md`](WIKI.md#vorschläge-seit-m6).
+
+### Gedächtnis (Einzelheiten)
+
+`backend/app/modules/agents/memory.py` (Regeln), `memory_repository.py`, Werkzeug in
+`agents/toolbox/memory_tools.py`, Kontext über `agents/briefing.py`.
+
+- **Eine normale Wiki-Seite je Agent und Bereich** unter
+  `_agenten/<agent>/gedaechtnis` (Titel „Gedächtnis“, darüber die Ordner „Agenten“ mit
+  dem Slug `_agenten` und der Name des Agenten). Sie hat die Rechte des Bereichs,
+  Versionen, Generationen und das Live-Bearbeiten wie jede Seite; Menschen korrigieren
+  sie im Editor. Welche Seite es ist, steht in der Tabelle `agent_memory` (Agent,
+  Bereich, Seite; Fremdschlüssel mit `CASCADE`): Umbenennen oder Verschieben der Seite
+  oder des Agenten ändert nichts. Eine Seite im Papierkorb (oder, falls es je einen Weg
+  gäbe, in einem anderen Bereich) gilt nicht mehr; das nächste `update_memory` legt
+  eine neue an. Zwei Agenten mit gleichem Namen teilen sich den Ordner, die zweite
+  Seite heißt dann `gedaechtnis-2`.
+- **`update_memory(space_id, content)`** (Stufe 2, schreibend, direkt erlaubt, auch
+  wenn der Bereich Änderungen von Agenten nur als Vorschlag annimmt): ersetzt den
+  ganzen Text. Das erste Mal legt es die fehlenden Ordner und die Seite an,
+  veröffentlicht (unter der Baumsperre des Bereichs), danach eine neue Version. Jede
+  Version trägt Quelle `agent`, den Agenten als Urheber und die `run_id` (KI-Kennzeichen
+  wie bei `update_page`). Nur wo der Lauf `page.edit` hat (Rechte der Person ∩ Rolle
+  des Agenten ∩ Schreibbereich des Ortes; sonst „Not allowed here.“, ein unlesbarer
+  Bereich „nicht gefunden“), nur was das Publikum des Bereichs sehen darf (wie jedes
+  schreibende Werkzeug), nie auf einer für KI gesperrten Seite (403 `memory.locked`,
+  geprüft unter der Zeilensperre der Seite), höchstens 8.000 Zeichen (sonst
+  `memory.too_long` mit der Bitte zu kürzen). Wirkung und Journaleintrag in einer
+  Transaktion.
+- **Im Kontext** stehen nach den Skills die Gedächtnisseiten der Bereiche, die der
+  Lauf lesen darf (sein Lesebereich, also auch das Publikum des Ortes) und deren
+  KI-Richtlinie die Verbindung des Laufs zulässt; nicht gesperrt, im Papierkorb oder
+  außerhalb ihres Bereichs. Reihenfolge: der Bereich des Ortes zuerst, dann nach
+  Bereichsname. **Zusammen höchstens 4.000 Zeichen**: Jede Seite bekommt einen
+  gleichen Anteil am Rest (mindestens 400, solange so viel übrig ist); was eine Seite
+  nicht braucht, geht an die folgenden. Ein Schnitt endet mit
+  `[… cut: the rest of this memory page is not shown]`; Seiten ohne Platz fehlen, eine
+  Zeile nennt ihre Zahl. Rahmen und Überschriften kommen dazu. Jede Seite ist gerahmt
+  wie ein Werkzeugergebnis (`<untrusted source="memory" space=… space_id=…
+  page_id=…>`): Notizen, keine Anweisungen.
+- **Gelesen**: Bereiche und Seiten des geladenen Gedächtnisses zählen als gelesen
+  (Richtlinie und Rechte vor jedem Modellaufruf, Publikumsregel beim Schreiben). Folge:
+  Ein Lauf im Gespräch allein mit dem Agenten, der Gedächtnis aus Team-Bereich A
+  geladen hat, schreibt nichts in einen Bereich, dessen Publikum A nicht sieht, auch
+  nicht in dessen Gedächtnis. Das ist gewollt: So trägt das Gedächtnis kein Wissen aus
+  einem Team-Bereich in einen anderen.
+- Ohne Gedächtnis sagt der Kontext nichts dazu. Bei jeder Wiederaufnahme wird es neu
+  bestimmt.
+- **Seitenbaum**: Der Baum (`GET /api/spaces/{id}/pages/tree`) kommt flach nach Pfad;
+  Geschwister ordnet die Oberfläche nach `sort_order`. Den Ordner `_agenten` (Pfad
+  `_agenten` auf oberster Ebene) stellt die Oberfläche ans Ende; der Server ordnet ihn
+  nicht um.
+
+## Betrieb
+
+### Wie ein Lauf arbeitet
+
+Ein Lauf entsteht in der Transaktion der auslösenden Nachricht oder Zuweisung (Zustand
+`queued`). Der **Worker** (`HERD_ROLE=worker`, in `all` enthalten) beansprucht ihn
+(`FOR NO KEY UPDATE SKIP LOCKED`, Sperrfrist `HERD_RUN_LEASE_SECONDS`), höchstens
+`HERD_RUN_CONCURRENCY` zugleich je Worker und höchstens `max_concurrency` je Verbindung
+über alle Worker, mit `requests_per_minute` je Verbindung (Fenster in der Datenbank).
+Die Laufschleife (`app/runtime/loop.py`, der einzige Ort, der Pydantic AI importiert)
+ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schritt fest:
+
+- **Journal:** Jede Modellantwort (Text, Werkzeugaufrufe, Verbrauch) und jedes
+  Werkzeugergebnis (vollständig, mit den Bereichen, aus denen es stammt) ist ein
+  `run_event`. Ein **schreibendes Werkzeug schreibt seine Wirkung und seinen
+  Journaleintrag in derselben Transaktion**: entweder beides oder nichts.
+- **Warten:** Braucht ein Lauf eine Freigabe oder Antwort, steht er auf `waiting` bis
+  `wait_until`; dabei hält er keine Sperrfrist und keinen Worker. Die Entscheidung setzt
+  ihn in ihrer Transaktion wieder auf `queued`. Läuft die Zeit ab, beendet ihn die
+  Laufschleife (`approval_expired` bzw. `waiting_timeout`).
+- **Abbruch:** ein eigener Datensatz `run_cancel_request`, geprüft vor jedem Schritt und
+  in der Transaktion des Abschlusses (Abbruch und Abschluss sperren dieselbe Zeile).
+- **Stopgründe:** `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
+  Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402, 403,
+  429; ohne Wiederholung), `error`, `cancelled`, `waiting_timeout`, `approval_expired`.
+  Die Antwort ist genau eine Nachricht `kind: agent`; jeder andere Stopp steht als
+  Hinweis im Gespräch bzw. Thread.
+- Während eines Anbieteraufrufs hält ein Lauf weder eine Transaktion noch eine
+  Datenbankverbindung. Live gehen nur IDs und der Schrittzähler (`run.progress`).
+
+Warum kein DBOS: Ein Werkzeug und sein Journaleintrag stehen in derselben Transaktion
+der Anwendungsdatenbank; damit ist jede Wirkung innerhalb der Datenbank genau einmal. Ein
+Werkzeug für dauerhafte Abläufe mit eigener Zustandsablage sichert das nicht zu
+(Spezifikation E10, geändert in M6). Zeitpläne entscheidet M7 neu.
+
+### Was bei einem Neustart des Workers passiert
+
+- **SIGTERM** (Rollout): Der Worker beendet seine Läufe nicht, er gibt sie ab; nach Ablauf
+  ihrer Sperrfrist nimmt ein Worker sie wieder auf.
+- **Absturz** (SIGKILL, Knoten weg): ebenso, nach Ablauf der Sperrfrist (bei 30 s und
+  Erneuerung alle 10 s also 20 bis 30 s später; gemessen 27 bis 31 s, siehe
+  [Steckbrief](STECKBRIEF.md#agenten-m6)).
+- **Wiederaufnahme spielt das Journal ein:** Festgeschriebene Modellantworten und
+  Werkzeugergebnisse werden nicht noch einmal angefragt oder ausgeführt; der Lauf setzt
+  nach dem letzten festgeschriebenen Schritt fort. Ein festgeschriebener Werkzeugaufruf
+  ohne Ergebnis wird jetzt ausgeführt (seine Wirkung war nicht festgeschrieben, sonst
+  stünde das Ergebnis da). Verloren geht höchstens ein Modellaufruf, dessen Antwort noch
+  nicht gespeichert war: Er wird wiederholt (Kosten, keine Wirkung).
+- Was der Lauf gelesen hatte, zählt für Richtlinie und Rechte wie zuvor; er beantwortet
+  das Gespräch bis zu seinem ersten Start.
+- `attempt` zählt jede Aufnahme, `recoveries` nur die nach einem verlorenen Worker; nach
+  der dritten solchen endet der Lauf mit `error` (Detail `attempts`).
+- Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
+  `HerdWorkerAbsent`).
+
+### Läufe im Einzelnen
+
+Jede neue Nachricht der Person in einer solchen Direktnachricht (nicht in einem Thread)
+legt in derselben Transaktion einen Lauf an. Die Antwort auf das Senden nennt ihn in
+`agent_run: {"id", "reason"}`; ohne Lauf steht der Grund in `reason`:
+`ai.unavailable`, `agent.paused`, `agent.draft`, `agent.responsible_inactive`,
+`agent.connection_unavailable`, `agent.personal_disabled`, `run.thread_reply`,
+`run.waiting` (der Lauf des
+Gesprächs wartet auf eine Antwort, siehe unten); `agent_id` nennt den Agenten. Läufe
+aus Erwähnungen und Ticket-Zuweisungen: siehe
+[Auslöser](#auslöser-erwähnung-ticket-zuweisung-übergabe). Je Gespräch läuft höchstens
+ein Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam
+(in Kanälen gilt das je Thread, siehe [Ein offener Lauf je
+Thread](#ein-offener-lauf-je-thread)).
+
+Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
+`backend/app/modules/agents/executor.py`, Schleife `backend/app/runtime/loop.py`):
+
+- Er liest mit den Rechten der Person, begrenzt auf die Bereiche des Agenten
+  (`read_scope`): seine Mitgliedschaften und die offenen Bereiche, und darin auf das,
+  was das Publikum des Orts sehen darf, an dem er antwortet (Spec 5.6, M6;
+  `backend/app/modules/agents/scope.py`; Tabelle und Beispiele unter
+  [Die Publikumsregel](#die-publikumsregel-wer-liest-mit); in der Direktnachricht
+  allein setzt der Ort dem Schreiben keine Grenze, es gelten nur die Rechte). Hat S einen Gast als Mitglied (direkt oder über eine Gruppe), zählen die offenen
+  Bereiche nicht (Gäste lesen keine offenen Bereiche; strenger als Spec 5.6).
+  Deaktivierte Teilnehmende zählen nicht; bleibt nur die fragende Person, gilt
+  „allein“. Außerhalb von `write_scope` darf der Lauf lesen, was Rechte und
+  `read_scope` erlauben, aber nichts schreiben (auch kein Posten, auch für Admins);
+  die eine Rechteprüfung (`core/access.py`) wendet beides auf jeden Akteur an, ohne
+  Agenten zu kennen. Vor jedem
+  Modell- und Werkzeugaufruf wird das neu bestimmt; wer `ai.use` oder den Zugang zu
+  einem schon gelesenen Bereich verliert, beendet den Lauf (`rights_revoked`), ebenso
+  ein Agent, der währenddessen pausiert oder dessen verantwortliche Person deaktiviert
+  wird.
+- Werkzeuge: `search` (Volltext über Seiten und Tickets, nur in Bereichen, deren
+  Richtlinie die Verbindung zulässt, ohne gesperrte Seiten), `read_page`,
+  `read_ticket`. Ergebnisse gehen gerahmt (`<untrusted>`) und auf 8.000 Zeichen gekürzt
+  an das Modell und vollständig in `run_event`. Seit M6 außerdem (alle Stufe 1, lesend):
+  - `list_tree`: ohne `space_id` die lesbaren Bereiche (Name, Art, ID), mit `space_id`
+    die Seiten des Bereichs nach Pfad (ID, Pfad, Titel; kein Inhalt; Entwürfe nur mit
+    Bearbeitungsrecht), seitenweise mit `cursor`.
+  - `list_versions`: die Versionen einer Seite (Nummer, Zeit, Autor, Quelle, Name,
+    Änderungstext; kein Inhalt), nur mit `page.edit` wie für Menschen.
+  - `search_tickets`: Text und Filter (Statuskategorien, mir oder niemandem
+    zugewiesen, Art, Priorität, Bereich), zuletzt geänderte zuerst.
+  - `read_conversation`: nur das Gespräch, in dem der Lauf antwortet (kein Argument
+    nennt ein Gespräch): neueste Nachrichten, ältere mit `before`, Antworten auf eine
+    Nachricht mit `replies_to`; ohne Zeitleisten-Einträge.
+  - `search_past_runs`: frühere Läufe dieses Agenten für dieselbe fragende Person
+    (nie der laufende): ein Werkzeugergebnis nur, solange jeder Bereich, aus dem es
+    stammt, jetzt lesbar ist und seine Richtlinie die Verbindung zulässt (dieselbe
+    Regel wie bei der Schwärzung in `GET /api/runs/{id}/events`); die eigenen Worte des
+    Modells nur, solange jeder Bereich lesbar ist, den ihr Lauf gelesen hat. Außerhalb
+    einer Direktnachricht allein mit dem Agenten nur Läufe desselben Gesprächs.
+  - `submit_result`: gibt das Ergebnis ab; sein Text ist die Antwort, der Lauf endet
+    `completed` ohne weiteren Modellaufruf (auch nach einer Wiederaufnahme genau einmal).
+  - `ask_user`: stellt der fragenden Person eine Frage (Karte im Gespräch, siehe
+    „Freigaben und Rückfragen“) und wartet auf die Antwort.
+
+  Schreibende Werkzeuge (M6; `backend/app/modules/agents/toolbox/{wiki,ticket,message}_tools.py`)
+  gehen durch dieselben Dienste wie Menschen, mit dem Akteur des Laufs (Rechte, Lese-
+  und Schreibbereich, Rolle des Agenten, `no_ai`). Was sie schreiben, nennt den Agenten
+  als Autor und den Lauf (`run_id`); Ereignisse und Zeitleisten nennen den Agenten
+  (`actor.type = "agent"`, `run_id`). Nichts, was der Lauf in einem anderen Bereich
+  gelesen hat, geht in einen Bereich, dessen Publikum es nicht sehen darf (Antwort
+  „Not allowed: what you have read in this run …“, nichts geschrieben). Kein Werkzeug löscht, legt in den
+  Papierkorb oder entscheidet Vorschläge.
+  - Stufe 2: `propose_page_change`, `propose_new_page` (Vorschläge, nur mit
+    `page.edit` für den Lauf), `comment_ticket` (Nachricht `kind: agent` im
+    Ticket-Thread), `set_ticket_status` (höchstens Kategorie `review`; `done` und
+    `cancelled` setzt nur eine Person, die Antwort nennt die erlaubten Status),
+    `create_ticket` (meldend: der Agent), `link_ticket_page` (einmal je Seite),
+    `propose_skill` und `update_memory` (siehe
+    [Skill-Vorschläge](#skill-vorschläge-propose_skill-apiskill-proposals) und
+    [Gedächtnis](#gedächtnis-einzelheiten)).
+  - Stufe 3: `update_page` in zwei Schritten: der erste Aufruf liefert den Diff zur
+    aktuellen Version und ein `token` (gebunden an Lauf, Seite, Version und beide
+    Inhalte), erst der zweite Aufruf mit diesem Token schreibt, als Version der Quelle
+    `agent` mit neuer Generation (laufende Sitzungen enden). Nur in Bereichen mit
+    `agent_write_policy = direct`, sonst die Antwort „propose instead“; eine Seite mit
+    `no_ai` wird nie geschrieben (auch nicht, wenn sie zwischen Diff und Schreiben
+    gesperrt wird). `assign_ticket` (an Person oder Agent, mit Grund als Kommentar im
+    Ticket-Thread; Agenten nur als Mitglied mit mindestens Rolle `editor` des Bereichs).
+    `post_message` nur in das Gespräch des Laufs oder in einen Kanal eines Bereichs, in
+    dem der Agent Mitglied ist.
+  - Jede Wirkung steht in derselben Transaktion wie ihr Journaleintrag; nach einer
+    Wiederaufnahme wird der Aufruf aus dem Journal eingespielt, nicht wiederholt.
+    Abgelehnte Schreibversuche nehmen alles zurück (Savepoint) und antworten mit dem
+    Fehlercode (`Not allowed (…)`, `Refused (…)`, `Changed meanwhile (…)`).
+
+  Listen lassen wie `search` schon in der Abfrage weg, was die Verbindung nicht
+  empfangen darf (Richtlinie, `no_ai`); was nicht lesbar ist, antwortet wie nicht
+  vorhanden. Jedes Ergebnis nennt die Bereiche, aus denen es stammt (`spaces`).
+- Vor jedem Modellaufruf: die strengste Richtlinie aller gelesenen Bereiche (das
+  Gespräch selbst zählt als `any`) muss den `data_location` der Verbindung erlauben,
+  sonst endet der Lauf mit `policy_blocked`, bevor etwas gesendet wird. Gezählt wird
+  der Bereich, in dem gelesen wurde, und der, in dem die gelesene Seite oder das
+  Ticket jetzt liegt: wird eine Seite während des Laufs verschoben, gilt auch der neue
+  Bereich (für Richtlinie und Zugang); eine seither gesperrte, gelöschte oder in den
+  Papierkorb gelegte Seite und ein gelöschtes Ticket beenden den Lauf ebenfalls mit
+  `policy_blocked`. Das gilt auch für Treffer der Suche.
+- Der Verlauf: Gesendet werden die eigenen Nachrichten des Gesprächs (Person und
+  Agent, ohne Threads). Hat eine frühere Antwort des Agenten Inhalt aus einem Bereich
+  zitiert, gehört dieser Text nun zum Gespräch und geht mit dem Verlauf an das Modell,
+  auch wenn der Bereich seither strenger eingestellt ist oder der Agent eine andere
+  Verbindung nutzt (bewusst so entschieden: das Gespräch ist der Inhalt der Person
+  und zählt als `any`). Wer das nicht will, löscht die betreffende Antwort.
+- Ist die Nachricht, die einen Lauf ausgelöst hat, gelöscht, bevor er beginnt (keine
+  Nachricht der Person nach der letzten Antwort), endet er mit `completed` ohne
+  Aufruf, Antwort oder Hinweis.
+- Stopgründe: `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
+  Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402,
+  403, 429; ohne Wiederholung), `error` (auch sofort, wenn ein Schritt nicht
+  gespeichert werden kann oder ein Werkzeug scheitert; kein blindes Wiederholen),
+  `cancelled` (Abbruch angefordert), `waiting_timeout` (niemand hat rechtzeitig
+  geantwortet), `approval_expired` (niemand hat rechtzeitig freigegeben). Die
+  Antwort ist eine Nachricht `kind: agent`
+  mit `client_id` = Lauf-ID (genau einmal); bei jedem anderen Stopp steht im Gespräch
+  ein Zeitleisten-Eintrag `system.key = "run.stopped"` mit dem Grund in
+  `system.new.value`.
+- Live: `run.progress` (`conversation_id`, `run_id`, `step`) nach jedem Modellaufruf,
+  an die Person im Gespräch.
+- `GET /api/runs/{id}` und `GET /api/runs/{id}/events` (seitenweise): für die Person,
+  die gefragt hat, und die verantwortliche Person (je mit `ai.use`) und für
+  `agent.manage`; sonst 404 `run.not_found`. Die Person, die gefragt hat, sieht ihre
+  Läufe vollständig. Alle anderen sehen ein Werkzeugergebnis nur, solange sie jeden
+  Bereich lesen dürfen, aus dem es stammt (jedes Ergebnis nennt seine Bereiche in
+  `spaces`); sonst kommt das Ereignis mit `redacted: true` und nur Schritt,
+  Werkzeugname und Quelle. Wer als Admin einen Team- oder persönlichen Bereich nur
+  kraft Admin-Rechts liest, bekommt den Inhalt und einen Audit-Eintrag
+  `space.admin_access` (einmal je Admin, Bereich und Tag), wie beim direkten Lesen
+  einer Seite. Die eigenen Worte des Modells (Text und Argumente) gehören zum Gespräch
+  und bleiben der Person vorbehalten; Admins lesen sie nur über die begründete,
+  protokollierte Einsicht in Direktnachrichten, die Agenten-Nachrichten mit der
+  KI-Kennzeichnung und Stopps als Hinweis zeigt. Verbrauch, Modell und Stopp sehen alle,
+  denen der Lauf sichtbar ist.
+- Verbrauch wird je Modellaufruf einmal gebucht, in derselben Transaktion wie der
+  Schritt (`run_event`, eindeutig je Lauf, Versuch und Schritt); Ausnahmen siehe
+  [`KI.md`](KI.md#verbrauch-apiaiusage) und [Bekannte Grenzen](#bekannte-grenzen).
+
+#### Journal, Warten, Abbruch
+
+- **Journal**: `run_event` ist das Laufprotokoll. `seq` zählt über alle Aufnahmen eines
+  Laufs fort (der Stopp hat `seq` 0), `attempt` nennt die Aufnahme, die den Schritt
+  geschrieben hat. Jede Modellantwort (Text, Werkzeugaufrufe mit Argumenten, Verbrauch)
+  und jedes Werkzeugergebnis (vollständig, mit den Bereichen und den gelesenen Seiten
+  und Tickets) steht dort.
+- **Wiederaufnahme**: siehe [Was bei einem Neustart des Workers
+  passiert](#was-bei-einem-neustart-des-workers-passiert). Der Lauf beantwortet das
+  Gespräch bis zu seinem ersten Start (`started_at`), gleich in welcher Aufnahme.
+- **Schreibende Werkzeuge** schreiben ihre Wirkung und ihren Journaleintrag in
+  derselben Transaktion: entweder beides oder nichts. Eine Wirkung entsteht daher
+  innerhalb der Datenbank genau einmal, auch wenn der Worker vor, während oder nach
+  dem Schreiben stirbt.
+- `attempt` zählt jede Aufnahme (auch nach dem Warten), `recoveries` nur die nach
+  einem verlorenen Worker (`recoveries` > 2: `error`).
+- **Warten**: Braucht ein Lauf eine Antwort (Freigabe, Rückfrage), steht er auf
+  `waiting` bis `wait_until` (`HERD_AI_APPROVAL_HOURS`, Standard 72 Stunden, für
+  Freigaben und Rückfragen). Dabei hält er nichts: keine
+  Sperrfrist, keinen Worker. Das Gespräch bleibt belegt: Eine neue Nachricht startet
+  keinen Lauf (`run.waiting`); wenn der wartende Lauf endet, legt er für die
+  Nachrichten, die seit seinem Start gekommen sind, einen neuen Lauf an. Die Antwort
+  setzt den Lauf in ihrer Transaktion wieder auf `queued`; er spielt sein Journal ein
+  und führt den Werkzeugaufruf, auf den er wartete, erneut aus. Läuft `wait_until` ab,
+  beendet die Laufschleife ihn mit `waiting_timeout` und einem Hinweis im Gespräch.
+  `GET /api/runs/{id}` nennt `wait_until`.
+- **Abbruch**: ein eigener Datensatz `run_cancel_request` (einmal je Lauf, mit der
+  anfragenden Person). Geprüft wird vor jedem Schritt und in der Transaktion des
+  Abschlusses; er gewinnt dort auch gegen eine fertige Antwort (`cancelled`, keine
+  Antwort, ein Hinweis). Ein wartender Lauf endet bei der nächsten Runde der
+  Laufschleife, ein Lauf in der Warteschlange, sobald er aufgenommen wird. Ein schon
+  beendeter Lauf bleibt, wie er ist. Den Endpunkt beschreibt der nächste Abschnitt.
+
+#### Laufansicht und Abbruch (API)
+
+- `GET /api/runs` („meine Läufe“): die Läufe, die man selbst ausgelöst hat, neueste
+  zuerst, seitenweise (`limit` ≤ 100, `cursor`). Filter: `agent_id`, `state`
+  (`queued`, `running`, `waiting`, `done`), `stop_reason`, `since` (einschließlich) und
+  `until` (ausschließlich), beide mit Zeitzone (sonst 422). Nur mit `ai.use` oder
+  `agent.manage`, sonst 404 `ai.not_found`.
+- `GET /api/agents/{id}/runs`: alle Läufe eines Agenten, für seine verantwortliche
+  Person (mit `ai.use`) und `agent.manage`; sonst 404 `agent.not_found` wie für einen
+  unbekannten Agenten. Dieselben Filter außer `agent_id`.
+- `GET /api/runs/{id}`: wer den Lauf sehen darf (siehe oben), sonst 404
+  `run.not_found`. Listen und Einzelansicht zeigen dieselbe Form: Agent (ID, Name),
+  fragende Person (ID, Name; alle, die einen Lauf sehen, dürfen Personen nach Namen
+  finden), Ort (`place`: Art des Gesprächs `dm`, `channel`, `thread_page`,
+  `thread_ticket`, seine ID; Bereich, Seite und Ticketnummer nur, wenn die lesende
+  Person den Bereich lesen darf, sonst leer), Zustand, Stopgrund, `attempt`,
+  `recoveries`, `steps`, Start, Ende, `wait_until`, Verbrauch aus den
+  Verbrauchseinträgen (`usage`: Aufrufe, Token ein/aus/gecacht, Kosten der Aufrufe mit
+  Preis, sonst leer) und `cancel_requested`. Listen filtern in SQL und brauchen je
+  Seite zwei Abfragen, gleich wie lang sie ist.
+- `GET /api/runs/{id}/events`: das Journal wie oben (Schwärzung und Audit
+  unverändert). Neu je Ereignis, wo der Schritt es festgehalten hat: `tokens_in`,
+  `tokens_out`, `tokens_cached`, `cost` (Modellaufrufe mit Preis) und `duration_ms`
+  (Modell- und Werkzeugaufrufe; ältere Werkzeugaufrufe ohne). Diese Zahlen sehen alle,
+  denen der Lauf sichtbar ist, auch bei geschwärzten Ereignissen.
+- `POST /api/runs/{id}/cancel`: abbrechen darf, wer den Lauf sehen darf (die fragende
+  Person, die verantwortliche Person, `agent.manage`); sonst 404 `run.not_found`. Der
+  Abbruch wird einmal gespeichert; ein Lauf in der Warteschlange oder ein wartender
+  Lauf endet sofort in derselben Transaktion mit `cancelled` und seinem Hinweis im
+  Gespräch, ein laufender vor seinem nächsten Schritt oder in der Transaktion seines
+  Abschlusses (höchstens ein Modellaufruf, der schon unterwegs ist, wird noch bezahlt).
+  Ein abgebrochener Lauf schreibt danach nichts mehr: keine Antwort und keinen neuen
+  Lauf für Nachrichten, die währenddessen kamen. Ein zweiter Abbruch antwortet wie der
+  erste (200); ein Lauf, der anders zu Ende ging, antwortet 409 `run.finished`. Einen
+  Worker aufzuwecken ist nicht nötig: Was sofort endet, braucht keinen, und das
+  Outbox-Ereignis des Hinweises weckt die Laufschleife ohnehin. Abbruch und Abschluss
+  sperren beide die Zeile des Laufs: Entweder sieht der Abschluss den Abbruch
+  (`cancelled`, keine Antwort), oder der Abbruch findet den Lauf beendet (409); ebenso
+  gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs.
+
+#### Auslöser: Erwähnung, Ticket-Zuweisung, Übergabe
+
+`backend/app/modules/agents/triggers.py`, Orte und Verlauf `place.py`. Neben der
+Direktnachricht starten Läufe so:
+
+- **Erwähnung**: Eine neue Nachricht einer Person in einem Kanal, einem Seiten- oder
+  Ticket-Thread, deren `mentions` einen Agenten nennen, startet einen Lauf des ersten
+  genannten Agenten, der Mitglied des Bereichs ist und kein Entwurf, wenn die Person
+  `ai.use` hat. Ohne `ai.use` oder bei einem Agenten außerhalb des Bereichs startet
+  nichts und die Antwort verrät nichts (`agent_run: null`, die ID steht wie jede
+  Unbekannte in `not_notified`; das Verzeichnis zeigt solchen Personen ohnehin keine
+  Agenten). Sonst nennt `agent_run` den Lauf oder den Grund (`agent.paused`, …,
+  `run.waiting`: im Thread ist schon ein Lauf offen) und
+  `agent_id`. Der Lauf liest den Thread der erwähnenden Nachricht (Wurzel und
+  Antworten bis zu seinem Start) und antwortet dort als Antwort; seine Stopp-Meldung
+  steht ebenfalls im Thread. Eine Bearbeitung, die einen Agenten neu erwähnt, startet
+  nichts; Nachrichten von Agenten erwähnen niemanden, Agenten starten so keine Agenten.
+- **Persönliche Agenten** fragt nur ihre Eigentümerin oder ihr Eigentümer (Erwähnung,
+  Zuweisung, Übergabe; für alle anderen ist er wie nicht vorhanden: keine Antwort,
+  `ticket.assignee_invalid`), und Mitglied ist er nur im persönlichen Bereich.
+- **Richtlinie des Orts**: Was ein Lauf in einem Kanal oder Thread gefragt wird, ist
+  Inhalt dieses Bereichs; dessen KI-Richtlinie gilt (z. B. `none` → `policy_blocked`
+  vor dem ersten Aufruf), anders als in einer Direktnachricht, die als `any` zählt.
+- **Ticket-Zuweisung** an einen Agenten (Regeln in `docs/TICKETS.md`): Der Lauf hat
+  den Ticket-Thread als Ort, die zuweisende Person als Fragende und das Ticket als
+  Aufgabe (`run.work_item_id`; das Modell bekommt den Schlüssel und liest das Ticket
+  mit `read_ticket`); seine Antwort ist ein Kommentar im Thread. Kann er nicht starten
+  (Agent pausiert, …, oder im Thread ist schon ein Lauf offen: ein Lauf je Ticket),
+  bleibt das Ticket zugewiesen, der Thread nennt den Grund (Systemmeldung
+  `run.refused`, Akteur der Agent, `to` der Code) und die verantwortliche Person des
+  Agenten bekommt einen Aktivitätseintrag (`run_stopped`); ebenso, wenn ein Lauf an
+  einem Ticket ohne Antwort endet (außer bei Abbruch).
+- **Übergabe**: Weist ein Lauf mit `assign_ticket` das Ticket einem anderen Agenten
+  zu, startet dessen Lauf für dieselbe Person (der Lauf handelt als die Person, die
+  den ersten fragte), eine Stufe tiefer (`run.chain_depth`, höchstens 3); er folgt dem
+  übergebenden Lauf im selben Thread. Ein Lauf auf Stufe 3 übergibt nicht mehr: das
+  Werkzeug lehnt ab (`run.handover_limit`), der Thread vermerkt es (`run.refused`).
+- Je Thread ist höchstens ein Lauf offen: [Ein offener Lauf je
+  Thread](#ein-offener-lauf-je-thread).
+- Laufansicht: `trigger_message_id` ist bei Ticket-Läufen `null`, `chain_depth` zeigt
+  die Stufe.
+
+#### Freigaben und Rückfragen (API)
+
+`backend/app/modules/agents/approvals/`. Ein Werkzeug, dessen wirksame Freigabe am
+Agenten `confirm` ist, wird dem Modell angeboten wie jedes erlaubte; sein Aufruf läuft
+erst nach der Freigabe einer Person:
+
+- Der Aufruf legt eine **Freigabe** an (`approval`: Lauf, Schritt und Aufruf-ID,
+  Werkzeug, kanonische Argumente, betroffene Objekte mit Version und Bereich,
+  `fingerprint`), postet eine **Karte** im Gespräch des Laufs (Nachricht
+  `kind: approval` des Agenten, `card: {"type", "id"}`, Text: Werkzeug und die
+  genannten IDs, nie Inhalt) mit einem Aktivitätseintrag (Grund `approval`) für die
+  fragende Person, und der Lauf wartet (`HERD_AI_APPROVAL_HOURS`, Standard 72).
+  Ein Aufruf, der nichts ändert (die Vorschau von `update_page`), braucht keine
+  Freigabe.
+- **Fingerabdruck**: SHA-256 über Werkzeugname, Argumente als kanonisches JSON und
+  Art, ID, Version und Bereich jedes betroffenen Objekts. Je Werkzeug: Seite
+  (`propose_page_change`, `update_page` mit Token), Bereich und ggf. Elternseite
+  (`propose_new_page`), Ticket (`comment_ticket`, `set_ticket_status`,
+  `assign_ticket`), Bereich (`create_ticket`), Ticket und Seite (`link_ticket_page`),
+  Gespräch (`post_message`), Gedächtnisseite mit Version, vor der ersten der Bereich
+  (`update_memory`), Skill mit Version bzw. Bereich oder Organisation
+  (`propose_skill`); lesende Werkzeuge nur Name und Argumente.
+- `POST /api/approvals/{id}/decide` (`decision: approve|reject`, `reason`, `version`):
+  nur die fragende Person, und nur, wenn sie die Wirkung jetzt selbst ausführen dürfte
+  (die Aktion des Werkzeugs in jedem betroffenen Bereich, mit ihren eigenen Rechten;
+  403 `approval.not_permitted`; andere, die die Freigabe sehen: 403
+  `approval.not_addressed`). 409: `approval.decided` (schon entschieden),
+  `approval.expired`, `approval.run_ended` (Lauf beendet oder Abbruch angefordert),
+  `approval.version_conflict`. Die Entscheidung setzt den Lauf in ihrer Transaktion
+  wieder auf `queued` (zuerst wird der Lauf gesperrt, dann die Freigabe; der Ablauf
+  sperrt in derselben Reihenfolge).
+- Beim Fortsetzen: Fingerabdruck neu berechnet; weicht er ab, läuft nichts und das
+  Werkzeugergebnis ist `approval_stale` (das Modell kann neu anfragen). Dann die Rechte
+  des Laufs erneut (Freigabe am Agenten, Person, Agent, Aktion je Objekt): entzogen →
+  `rights_revoked`. Abgelehnt → Werkzeugergebnis `approval_rejected` mit dem Grund
+  (gerahmt wie jedes Ergebnis). Abgelaufen → Stopgrund `approval_expired`. Endet ein
+  Lauf anders (Abbruch), sind seine offenen Freigaben und Fragen `expired`.
+- `GET /api/approvals?state=pending` (seitenweise): meine. `GET /api/approvals/{id}`:
+  wer den Lauf sehen darf (wie `GET /api/runs/{id}`), sonst 404
+  `approval.not_found`; die Argumente (`args`) und `diff_url` nur für die fragende
+  Person. `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
+  (nur für die fragende Person, bei Seitenwerkzeugen).
+  `step` und `call_id` nennen den Aufruf wie das Protokoll des Laufs. `outcome` sagt,
+  was nach der Freigabe aus ihm wurde: `ran` (ausgeführt) oder `stale` (nicht
+  ausgeführt, weil sich ein Objekt geändert hat); gesetzt in der Transaktion des
+  Aufrufs, zusammen mit Wirkung und Journaleintrag, und live als `card.changed`
+  gemeldet (Outbox `approval.settled`, nur IDs).
+- **Rückfragen**: `ask_user` legt `run_question` an, postet die Frage als Karte
+  (`kind: question`, Aktivität `question`), der Lauf wartet. `POST
+  /api/questions/{id}/answer` (`text` bis 4.000 Zeichen, `version`) nur durch die
+  fragende Person (403 `question.not_addressed`; 409 `question.answered`,
+  `question.expired`, `question.run_ended`, `question.version_conflict`); die Antwort
+  geht als gerahmtes Werkzeugergebnis an das Modell. Ohne Antwort endet der Lauf mit
+  `waiting_timeout`. `GET /api/questions/{id}` wie Freigaben (die Antwort nur für die
+  fragende Person).
+- Outbox und Live-Ereignisse tragen nur IDs (`approval.decided`,
+  `question.answered`, `message.created` der Karte, `notification.created`).
+- Die verantwortliche Person springt für die fragende nicht ein: Ein Lauf, dessen
+  Person nicht mehr aktiv ist, endet vor jedem Werkzeugaufruf mit `rights_revoked`,
+  fragt also nie (Läufe ohne fragende Person kommen erst mit M7).
+
+### Grenzen
+
+| Grenze | Wert |
+|---|---|
+| Schritte je Lauf | `max_steps` am Agenten, 1 bis 25 |
+| Laufzeit je Aufnahme | `max_runtime_seconds` am Agenten, 10 bis 600 s |
+| gleicher Werkzeugaufruf | der dritte beendet den Lauf (`no_progress`) |
+| Wiederaufnahmen nach Absturz | 2, die dritte endet mit `error` |
+| Warten auf Freigabe oder Antwort | `HERD_AI_APPROVAL_HOURS`, Standard 72 h, höchstens 720 |
+| Übergaben | Kettentiefe höchstens 3 |
+| Anweisungen | 20.000 Zeichen |
+| Gesprächsverlauf im Prompt | 24.000 Zeichen (die neuesten 200 Nachrichten, dann nach Zeichen gekürzt) |
+| Werkzeugergebnis im Prompt | 8.000 Zeichen (im Journal vollständig) |
+| Skill-Text je `load_skill` | 7.000 Zeichen je Teil, Skill höchstens 50.000 |
+| Skills im Kontext | 25, Beschreibung je 300 Zeichen |
+| Gedächtnis | 8.000 Zeichen je Seite, 4.000 Zeichen zusammen im Kontext |
+| Rückfrage-Antwort | 4.000 Zeichen |
+| persönliche Agenten | `HERD_AI_PERSONAL_AGENTS_MAX`, Standard 5, 0 bis 100 |
+| offene Läufe | einer je Thread, Gespräch, Seite oder Ticket |
+
+### Umgebungsvariablen
+
+| Variable | Standard | Wer liest sie | Bedeutung |
+|---|---|---|---|
+| `HERD_RUN_CONCURRENCY` | 4 | Worker | Läufe je Worker zugleich (1 bis 64); der Worker braucht dafür bis zu diesem Wert + 3 Datenbankverbindungen |
+| `HERD_RUN_LEASE_SECONDS` | 30 | Worker | Sperrfrist eines laufenden Laufs (mindestens 3), alle Drittel erneuert; bestimmt, wie schnell ein Absturz aufgefangen wird |
+| `HERD_AI_APPROVAL_HOURS` | 72 | Worker | Wartezeit auf eine Freigabe oder Antwort (höchstens 720) |
+| `HERD_AI_PERSONAL_AGENTS_MAX` | 5 | API | persönliche Agenten je Person (0 bis 100) |
+| `HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS` | – | API, Worker | Schlüssel für `enc:`-Geheimnisse ([`KI.md`](KI.md#schlüssel)) |
+| `HERD_AI_EGRESS_PROXY` | – | API, Worker | Proxy für Anbieteraufrufe ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)) |
+| `HERD_AI_CHECK_TIMEOUT_SECONDS` | 20 | API | Zeitlimit für Verbindungstest und Modellliste |
+| `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
+
+**Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage
+`ai.env.example`), die übrigen in `.env`; siehe [`deploy/compose/README.md`](../deploy/compose/README.md).
+**Helm:** `ai.existingSecret` (ein Secret, dessen Schlüssel diese Variablen sind; geht an
+API und Worker, nie an den Migrations-Job), `ai.checkTimeoutSeconds`,
+`ai.personalAgentsMax` (API), `ai.approvalHours`, `ai.runConcurrency`,
+`ai.runLeaseSeconds` (Worker). Mit `networkPolicy.enabled` erreichen API und Worker
+**keinen Anbieter**, bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter, oder nur
+zum Proxy aus `HERD_AI_EGRESS_PROXY`); das Chart legt dafür eine eigene NetworkPolicy
+nur für API und Worker an. Ohne sie antworten Verbindungstests `timeout` oder
+`unreachable`, und Läufe enden mit `error`.
+
+### Metriken und Alarme
+
+Nur Prozesse mit Worker exportieren sie (die API nicht); die Zähler aus der Datenbank
+liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
+
+| Metrik | Art | Bedeutung |
+|---|---|---|
+| `herd_runs_total{reason}` | Zähler | beendete Läufe dieses Workers je Stopgrund |
+| `herd_run_duration_seconds` | Histogramm | Dauer einer Aufnahme |
+| `herd_runs_queued` | Gauge | Läufe in der Warteschlange |
+| `herd_runs_oldest_queued_seconds` | Gauge | Alter des ältesten wartenden Laufs |
+| `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder länger als jeder Lauf darf |
+| `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
+
+Alarme in der PrometheusRule des Charts (mit promtool-Tests):
+
+- `HerdRunsStuck`: `herd_runs_stuck` > 0 seit 5 Minuten. Kein Worker übernimmt Läufe
+  mit abgelaufener Sperrfrist; Logs `runs.failed`, `runs.renew_failed`,
+  `runs.claim_failed`.
+- `HerdRunsQueued`: ältester wartender Lauf älter als 5 Minuten. Worker ausgelastet
+  (`HERD_RUN_CONCURRENCY`, `max_concurrency`, `requests_per_minute`) oder fehlend.
+- `HerdRunsFailing`: mehr als die Hälfte der Läufe der letzten 15 Minuten (mindestens
+  3) endete mit `provider_refused` oder `error`, 5 Minuten lang. Meist ein Schlüssel,
+  ein Kontingent oder die Netzfreigabe: Verbindung in der KI-Verwaltung testen.
+- Dazu wie bisher `HerdWorkerAbsent`, `HerdWorkerStalled`, `HerdNotReady`.
+
+Einen Alarm für wartende Läufe, deren Frist abgelaufen ist, ohne dass die Laufschleife
+sie beendet hat (`HerdRunsWaitingExpired`), gibt es nicht: Keine Metrik zählt solche
+Läufe (`herd_runs_waiting` zählt alle wartenden). Die Schleife beendet sie in jeder
+Runde (etwa jede Sekunde); bleibt sie aus, melden `HerdWorkerAbsent` oder
+`HerdWorkerStalled` den Worker.
+
+Die Läufe zählen nicht zur Bereitschaft (`/ready`) des Workers: Ein langsamer Anbieter
+soll den Worker nicht als hängend erscheinen lassen.
+
+### Was wo gespeichert ist
+
+| Was | Wo |
+|---|---|
+| Agent, Werkzeugeinträge, Skills des Agenten | `agent`, `agent_tool`, `agent_skill` |
+| Lauf und Journal | `run`, `run_event` (Prompts, Modellantworten, Werkzeugargumente und -ergebnisse vollständig), `run_cancel_request` |
+| Freigaben und Rückfragen | `approval` (Argumente, Fingerabdruck, Entscheidung, `outcome` `ran`/`stale`), `run_question`; die Karten als Nachrichten `kind: approval|question` |
+| Antworten, Kommentare | Nachrichten `kind: agent` (`client_id` = Lauf) |
+| Verbrauch | `usage_record` je Modellaufruf ([`KI.md`](KI.md#verbrauch-apiaiusage)) |
+| Vorschläge | `page_proposal`, `skill_proposal` |
+| Skills | `skill`, `skill_version` |
+| Gedächtnis | normale Wiki-Seiten, Zuordnung in `agent_memory` |
+
+Läufe und ihr Journal werden nicht automatisch gelöscht; sie gehen mit ihrem Gespräch
+bzw. Ticket. Inhalte stehen nie in Logs, Outbox, `NOTIFY` oder Metriken: Dort stehen nur
+IDs, Zähler und Codes.
+
+### API im Überblick
+
+- Läufe, Freigaben und Rückfragen: [Laufansicht und Abbruch
+  (API)](#laufansicht-und-abbruch-api), [Freigaben und Rückfragen
+  (API)](#freigaben-und-rückfragen-api); wer einen Lauf liest: [Läufe im
+  Einzelnen](#läufe-im-einzelnen).
+- Agenten, Werkzeuge, Skills: [Verwaltung](#verwaltung); Seitenvorschläge:
+  [`WIKI.md`](WIKI.md#vorschläge-seit-m6).
+- Antwort auf das Senden einer Nachricht: `agent_run: {id, reason, agent_id}` oder `null`;
+  Gründe ohne Lauf: `ai.unavailable`, `agent.paused`, `agent.draft`,
+  `agent.responsible_inactive`, `agent.connection_unavailable`,
+  `agent.personal_disabled`, `run.thread_reply`, `run.waiting`.
+- Live: `run.progress` (`conversation_id`, `run_id`, `step`), `card.changed`,
+  `proposal.changed`, `skill_proposal.changed`, Aktivitätsgründe `approval`, `question`,
+  `run_stopped`, `proposal`, `skill_proposal`.
+
+### Bekannte Grenzen
+
+- **Verbrauch wird in zwei seltenen Fällen zu wenig gezählt**, nie doppelt: Ein
+  Anbieteraufruf eines Workers, der danach abstürzt oder seine Sperrfrist verliert, ist
+  bezahlt, aber nicht gebucht; und scheitern beim Abschluss eines Schritts sowohl das
+  Speichern des Schritts als auch das Nachbuchen in eigener Transaktion, fehlt dieser
+  eine Aufruf ([`KI.md`](KI.md#verbrauch-apiaiusage)).
+- **Freigaben gehen nur an die fragende Person.** Die Spezifikation (5.4) nennt die
+  verantwortliche Person als Ersatz; das kommt mit M7, wo Läufe ohne fragende Person
+  (Zeitpläne) entstehen. Ist die fragende Person nicht mehr aktiv, endet der Lauf vor
+  dem nächsten Werkzeugaufruf mit `rights_revoked`.
+- **Skills sind nur ihre SKILL.md**: zusätzliche Dateien (Referenzen, Vorlagen, Skripte)
+  werden beim Import nicht übernommen, und Felder wie `license` gehen beim Export
+  verloren.
+- Ein Lauf, der auf eine Freigabe wartet, hält seinen Thread (bzw. das Gespräch oder
+  Ticket) bis zu 72 Stunden; Erwähnungen dort antworten so lange „Lauf wartet“.
+- Wird ein Werkzeug während des Wartens gesperrt, bietet die Wiederaufnahme es nicht
+  mehr an; der eingespielte Aufruf läuft nicht, der Lauf kann aber zu Ende kommen.
+- Ein persönlicher Agent, dessen Eigentümerin eine andere Zuordnung bekam, antwortet
+  `agent.connection_unavailable`, bis er einmal gespeichert wird.
+- Für Agenten aus anderen Systemen (agentskills.io) sind Skripte in Skills nur Text;
+  ein Werkzeug, das Code ausführt, gibt es nicht.
+- `herd_runs_stuck` zählt auch einen Lauf, der nach langem Warten wieder läuft, weil
+  sein `started_at` der erste Start bleibt (ein Fehler der Metrik, noch offen); läuft ein solcher
+  Lauf länger als 5 Minuten, kann `HerdRunsStuck` fälschlich auslösen.
+
+### Rolling Update (aus M5 und M6)
+
+Bisher ist kein Release mit M5 oder M6 erschienen; die Hinweise gelten, sobald eins auf
+ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
+
+- Neue Aufzählungswerte entstehen erst durch dieses Release: Zustand `waiting`,
+  Stopgründe `cancelled`, `waiting_timeout`, `approval_expired`, Nachrichtenarten
+  `approval` und `question`, Versionsquelle `agent`, Aktivitätsgründe `proposal`,
+  `approval`, `question`, `run_stopped`, `skill_proposal`, Läufe ohne auslösende
+  Nachricht (Ticket-Läufe), Systemmeldungen als Antworten in Kanal-Threads. Ein Pod des
+  vorigen Releases liest solche Zeilen nicht (Versionsliste, Aktivität, Laufansicht
+  scheitern dort), bis er ersetzt ist.
+- Die Migration der Bahnen (`b2d4f6a8c0e1`) ersetzt den Index „ein Lauf in der
+  Warteschlange je Gespräch“, auf den sich ein Release vor ihr beim Einreihen beruft
+  (`ON CONFLICT (conversation_id)`): Solange ein solcher API-Pod läuft, schlagen
+  Direktnachrichten an Agenten und Erwähnungen über ihn fehl. Rollout daher zügig
+  durchziehen (oder alte API-Pods vor dem Start der neuen beenden).
+- Ein Worker des vorigen Releases arbeitet keine Läufe ab, die er nicht kennt (wartende,
+  Ticket-Läufe); er sollte nicht neben neuen Workern weiterlaufen.
+
+### Woran man Probleme erkennt
+
+- **Agent antwortet nicht, Karte „arbeitet“ bleibt:** `herd_runs_queued` und
+  `herd_runs_oldest_queued_seconds` (läuft ein Worker? `HerdWorkerAbsent`), dann
+  `herd_runs_stuck`. In der Laufansicht Zustand und Versuche.
+- **Läufe enden mit „Anbieter lehnt ab“ oder „Fehler“:** Verbindung in der
+  KI-Verwaltung testen; Netzfreigabe (`networkPolicy.aiEgress`) und Proxy prüfen;
+  `HerdRunsFailing`.
+- **„Durch die Richtlinie des Bereichs gestoppt“ (`policy_blocked`):** Ein gelesener
+  Bereich lässt die Verbindung des Agenten nicht zu; das ist gewollt ([`KI.md`](KI.md)).
+- **Viele wartende Läufe** (`herd_runs_waiting`): Freigaben bleiben liegen; die Liste
+  „Freigaben“ der fragenden Personen zeigt sie.
+- Logs der Läufe: `runs.claim_failed`, `runs.failed`, `runs.renew_failed`,
+  `runs.metrics_failed` (mit Lauf-ID und Fehlerklasse, nie Inhalt), dazu
+  `ai.provider_call` (Pfad, Zustand, Dauer) bei Verbindungstests. Die HTTP-Clients
+  (`httpx`, `httpcore`, `hpack`, `httpx2`, `httpcore2`, `openai`) bleiben auch bei
+  `HERD_LOG_LEVEL=DEBUG` auf WARNING, weil sie sonst Kopfzeilen der Anbieter
+  protokollieren.

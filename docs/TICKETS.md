@@ -131,8 +131,8 @@ Kategorie `cancelled` („Verworfen“). Zwischen Bereichen verschieben lässt e
   Fragende: wer zugewiesen hat; seine Antwort ist ein Kommentar dort; ein Lauf je
   Ticket). Kann er nicht starten, bleibt das Ticket zugewiesen und der Thread nennt
   den Grund (`run.refused`); die verantwortliche Person des Agenten erfährt es in
-  ihrer Aktivität. Einzelheiten und Übergaben zwischen Agenten: `docs/KI.md`
-  („Auslöser“). In Kanäle und Direktnachrichten schreibt auch ein solcher Lauf nichts.
+  ihrer Aktivität. Einzelheiten und Übergaben zwischen Agenten:
+  [`AGENTEN.md`](AGENTEN.md#auslöser-erwähnung-ticket-zuweisung-übergabe). In Kanäle und Direktnachrichten schreibt auch ein solcher Lauf nichts.
 - **„Übernehmen“** weist ein nicht zugewiesenes Ticket sich selbst zu, **„Abgeben“**
   löst die eigene Zuweisung (beides mit `ticket.edit`). **„Jemandem zuweisen“** (mit
   `ticket.assign`) öffnet eine Personenauswahl mit genau den Personen, die den Bereich

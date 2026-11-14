@@ -146,8 +146,10 @@ Begründung, die beim Annehmen zum Änderungstext der Version wird.
   die im Bereich Seiten bearbeiten dürfen. In Kanälen erscheint nichts.
 - **Einstellung „Schreiben durch Agenten“** (`agent_write_policy`, Einstellungen des
   Bereichs, `space.manage`): `propose` (Voreinstellung, Agenten schlagen vor) oder
-  `direct` (Agenten mit passender Stufe dürfen Seiten direkt schreiben; die
-  Werkzeuge kommen mit M6 Aufgabe 6).
+  `direct` (Agenten auf Stufe 3 dürfen Seiten mit `update_page` direkt schreiben). Die
+  Gedächtnisseite eines Agenten schreibt er in beiden Fällen selbst
+  (`update_memory`). Agenten, Stufen und Werkzeuge:
+  [`AGENTEN.md`](AGENTEN.md#stufen-und-werkzeugfreigaben).
 
 Vorschläge von Menschen (`human_review`) gibt es noch nicht; der Dienst nimmt sie an,
 eine Oberfläche oder Route dafür nicht.

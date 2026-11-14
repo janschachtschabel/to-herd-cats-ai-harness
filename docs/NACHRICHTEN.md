@@ -65,7 +65,7 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
   dieses Gespräch nicht sehen“). Ob jemand zu einem Bereich gehört, verrät das nicht:
   Unbekannte, deaktivierte und unberechtigte Personen werden gleich behandelt.
   Erwähnt eine Person mit `ai.use` einen Agenten, der Mitglied des Bereichs ist,
-  antwortet er im Thread der Nachricht (M6; `docs/KI.md`, „Auslöser“); seine
+  antwortet er im Thread der Nachricht (M6; [`AGENTEN.md`](AGENTEN.md#erwähnen-in-kanal-und-thread)); seine
   Stopp-Meldung steht dann als Systemmeldung im Thread, auch in Kanälen.
 - **Reaktionen:** ein Emoji je Klick (Schnellauswahl in der Oberfläche; die API nimmt
   jedes einzelne Emoji bis 32 Codepunkte, keine Wörter). Nochmal klicken nimmt die
