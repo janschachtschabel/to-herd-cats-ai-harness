@@ -574,7 +574,8 @@ zusammengeführten Text ausdrücklich. Endpunkte und Codes in
   `memory.shared_space`, als Werkzeugfehler für das Modell. Denn was das Modell dort
   schreibt, kann Worte der Direktnachricht enthalten, die keine Prüfung als gelesen
   zählt. Aus einem Kanal oder Thread des Bereichs schreibt es wie zuvor. Die Hilfe des
-  Werkzeugs sagt es dem Modell. Wirkung und Journaleintrag in einer Transaktion.
+  Werkzeugs sagt es dem Modell. `update_page` lehnt Gedächtnisseiten ab, damit diese
+  Regel der einzige Weg bleibt. Wirkung und Journaleintrag in einer Transaktion.
 - **Im Kontext** stehen nach den Skills die Gedächtnisseiten der Bereiche, die der
   Lauf lesen darf (sein Lesebereich, also auch das Publikum des Ortes) und deren
   KI-Richtlinie die Verbindung des Laufs zulässt; nicht gesperrt, im Papierkorb oder
@@ -759,7 +760,9 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
     `agent` mit neuer Generation (laufende Sitzungen enden). Nur in Bereichen mit
     `agent_write_policy = direct`, sonst die Antwort „propose instead“; eine Seite mit
     `no_ai` wird nie geschrieben (auch nicht, wenn sie zwischen Diff und Schreiben
-    gesperrt wird). `assign_ticket` (an Person oder Agent, mit Grund als Kommentar im
+    gesperrt wird). Die Gedächtnisseite eines Agenten (`_agenten/…`) schreibt
+    `update_page` nie, von keinem Ort aus (Antwort: „use update_memory“): Gedächtnis
+    ändert nur `update_memory`, das die Regeln für das Gedächtnis hält. `assign_ticket` (an Person oder Agent, mit Grund als Kommentar im
     Ticket-Thread; Agenten nur als Mitglied mit mindestens Rolle `editor` des Bereichs).
     `post_message` nur in das Gespräch des Laufs oder in einen Kanal eines Bereichs, in
     dem der Agent Mitglied ist.

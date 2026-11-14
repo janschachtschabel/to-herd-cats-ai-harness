@@ -8,9 +8,10 @@ thread of the space it writes as before: its words are that place's already."""
 import uuid
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.toolbox import memory_tools
+from app.modules.agents.memory_repository import MemoryRepository
+from app.modules.agents.toolbox import memory_tools, wiki_tools
 from app.modules.agents.toolbox.catalog import CATALOG
-from app.modules.spaces.models import SpaceKind
+from app.modules.spaces.models import AgentWritePolicy, SpaceKind
 from tests.factories_spaces import MakeSpace
 from tests.factories_tools import tool_context
 from tests.factories_writing import Work
@@ -49,3 +50,27 @@ async def test_from_a_place_of_the_space_it_writes_there(work: Work) -> None:
 
 def test_the_tools_help_says_so() -> None:
     assert "only into a space nobody else reads" in CATALOG["update_memory"].description
+
+
+async def test_update_page_leaves_memory_pages_to_update_memory(work: Work) -> None:
+    """A memory page is an ordinary wiki page; `update_page` refuses it from any place,
+    so the rule above is the only way in (review M6 2, finding 3)."""
+    bench = work.bench
+    work.space.agent_write_policy = AgentWritePolicy.DIRECT
+    await bench.session.flush()
+    channel = await channel_in(bench, work.space)
+    there = await tool_context(bench, channel.id)
+    first = memory_tools.UpdateMemoryArgs(space_id=work.space.id, content="Notiz")
+    assert (await memory_tools.update_memory(there, first)).text.startswith("Memory saved")
+    memory = await MemoryRepository(bench.session, bench.agent.org_id).get(
+        bench.agent.id, work.space.id
+    )
+    assert memory is not None
+    words = "Was Alice nur in der DM sagte"
+    alone = await tool_context(bench)
+    refused = memory_tools.UpdateMemoryArgs(space_id=work.space.id, content=words)
+    assert (await memory_tools.update_memory(alone, refused)).text.startswith("Refused (memory.")
+    for ctx in (alone, await tool_context(bench, channel.id)):
+        change = wiki_tools.UpdatePageArgs(page_id=memory.page_id, content_md=words, reason="r")
+        said = (await wiki_tools.update_page(ctx, change)).text
+        assert said == wiki_tools.USE_UPDATE_MEMORY, said

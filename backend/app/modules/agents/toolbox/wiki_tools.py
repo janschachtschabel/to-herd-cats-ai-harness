@@ -13,7 +13,9 @@
   page locked for AI (checked again under the page's row lock). Written as a Markdown
   save (`PageService.update`): the page's newest version holds its content before the
   write (every save is a version), the write is a new version with source `agent`,
-  the agent as author and the run, and a new generation ends live sessions.
+  the agent as author and the run, and a new generation ends live sessions. Never an
+  agent's memory page: memory changes only through `update_memory`, which holds its
+  rules (review M6 2, finding 3).
 
 Nothing is deleted or put into the trash: no tool offers it. Every write goes through
 `writing.effect` (one savepoint; the audience check of `writing.leaks_into` first).
@@ -28,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.core.access import Action, can
 from app.core.errors import NotFound
+from app.modules.agents.memory_repository import MemoryRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import by, closed_to_ai, effect, leaks_into, refused
 from app.modules.proposals.models import MAX_REASON_CHARS
@@ -50,6 +53,7 @@ Reason = Annotated[
 ]
 DIFF_LINES = 400  # shown to the model at most; the token binds the whole content
 PROPOSE_INSTEAD = "This space takes changes from agents only as proposals: use propose_page_change."
+USE_UPDATE_MEMORY = "This is an agent's memory page: change your memory with update_memory."
 
 
 class ProposePageChangeArgs(BaseModel):
@@ -134,6 +138,8 @@ async def update_page(ctx: ToolContext, args: UpdatePageArgs) -> ToolResult:
     page = await _page(ctx, args.page_id)
     if page is None:
         return ToolResult("wiki", NOT_FOUND, attrs)
+    if await MemoryRepository(ctx.session, ctx.run.org_id).is_memory(page.id):
+        return ToolResult("wiki", USE_UPDATE_MEMORY, attrs)  # its rules: `memory_tools`
     if not await ProposalService(ctx.session).agent_writes_directly(ctx.actor, page.space_id):
         return ToolResult("wiki", PROPOSE_INSTEAD, attrs)
     if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, page.space_id):

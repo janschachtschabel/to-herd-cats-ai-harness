@@ -42,6 +42,13 @@ class MemoryRepository:
         )
         return await self.session.scalar(stmt)
 
+    async def is_memory(self, page_id: uuid.UUID) -> bool:
+        """Whether the page is an agent's memory page (any agent's, any space)."""
+        stmt = select(AgentMemory.page_id).where(
+            AgentMemory.org_id == self.org_id, AgentMemory.page_id == page_id
+        )
+        return await self.session.scalar(stmt.limit(1)) is not None
+
     async def point(
         self,
         found: AgentMemory | None,
