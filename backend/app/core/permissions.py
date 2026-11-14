@@ -32,6 +32,7 @@ class Action(StrEnum):
     DM_INSPECT = "dm.inspect"  # read others' direct messages: audited, with a reason, 60 min
     AI_MANAGE = "ai.manage"  # AI connections, assignments and usage (spec 7)
     AGENT_MANAGE = "agent.manage"  # create and change the organisation's agents (spec 8.1)
+    SKILL_MANAGE = "skill.manage"  # organisation-wide skills (space skills: `page.moderate`)
     AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
 
 

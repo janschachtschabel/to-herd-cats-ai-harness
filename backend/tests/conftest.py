@@ -43,6 +43,7 @@ from tests.factories_collab import collab, internal, internal_token  # noqa: E40
 from tests.factories_dms import people  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_messaging import chat  # noqa: E402, F401
+from tests.factories_skills import lab  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_tickets import desk  # noqa: E402, F401
 from tests.factories_wiki import wiki  # noqa: E402, F401

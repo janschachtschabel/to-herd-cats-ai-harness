@@ -338,6 +338,60 @@ Betrieb:
   `herd_runs_oldest_queued_seconds`, `herd_runs_stuck`, `herd_runs_waiting` (Läufe, die
   auf eine Antwort warten); Alarme `HerdRunsStuck` und `HerdRunsQueued`.
 
+## Skills (`/api/skills`, M6)
+
+Ein Skill ist eine Anleitung im Format SKILL.md (agentskills.io): YAML-Kopf zwischen
+zwei `---`-Zeilen mit `name` (1 bis 64 Zeichen: Kleinbuchstaben, Ziffern, einzelne
+Bindestriche, nicht am Rand) und `description` (1 bis 1.024 Zeichen), danach die
+Anweisungen in Markdown (höchstens 50.000 Zeichen). **Ein Skill ist Text: nichts darin
+wird je ausgeführt**, auch keine Skripte (es gibt in v1 kein Werkzeug, das Code
+ausführt). Ein Agent sieht im Kontext nur Name und Beschreibung seiner Skills; den Text
+holt er mit `load_skill`.
+
+- **Geltungsbereich:** organisationsweit oder einem Bereich zugeordnet; der Name ist
+  je Organisation und Geltungsbereich eindeutig (409 `skill.name_taken`, archivierte
+  eingeschlossen).
+- **Rechte:** Skills gibt es nur für Personen mit `ai.use` oder `skill.manage`; für
+  alle anderen antwortet jeder Skill-Pfad 404 `skill.not_found` wie für eine
+  unbekannte ID. Organisationsweite Skills lesen alle mit `ai.use`, Skills eines
+  Bereichs alle, die den Bereich lesen. Organisationsweite Skills verwaltet, wer
+  `skill.manage` hat (Admins), Skills eines Bereichs die Moderatoren des Bereichs
+  (`page.moderate`) oder `skill.manage`; wer einen Skill sieht, aber nicht verwalten
+  darf, bekommt 403 `auth.permission_denied`.
+- `GET /api/skills` (nach Name, Filter `space_id`, `org_wide`, `state`, `q` für einen
+  Teil des Namens; seitenweise), `POST /api/skills`, `GET/PATCH /api/skills/{id}`,
+  `POST /api/skills/{id}/archive` und `/unarchive` (kein Löschen; 409
+  `skill.state_conflict`). Schreiben mit `version` (409 `skill.version_conflict`);
+  Eingaben 422 `skill.name_invalid`, `skill.description_invalid`,
+  `skill.content_invalid`.
+- **Versionen:** jede Änderung von Beschreibung oder Text ist eine Version (die erste
+  beim Anlegen; Umbenennen nicht). `GET /api/skills/{id}/versions`,
+  `GET …/versions/{n}`, `POST …/versions/{n}/restore` (eine neue Version mit dem alten
+  Stand; 404 `skill.version_not_found`).
+- **Export und Import:** `GET /api/skills/{id}/export` liefert die SKILL.md.
+  `POST /api/skills/import` (optional `?space_id=`) nimmt eine SKILL.md oder ein ZIP
+  mit einem oder mehreren Skill-Ordnern (je Ordner eine `SKILL.md`, deren `name` dem
+  Ordnernamen gleicht; höchstens vier Pfadteile tief, 100 Skills, 10 MB). Der Kopf
+  wird streng geprüft (nur die Felder des Formats; `license`, `compatibility`,
+  `metadata` und `allowed-tools` werden angenommen, aber nicht übernommen und als
+  `ignored_fields` gemeldet). Das ZIP wird wie beim Wiki-Import gelesen (Grenzen für
+  Einträge, entpackte Größe, keine Pfadtricks, kein zip64). Andere Dateien eines
+  Ordners werden nicht übernommen (`file_unsupported`): ein Skill besteht hier nur aus
+  seiner SKILL.md. Die Antwort nennt je Skill, was angelegt wurde und warum nicht
+  (`exists`, `duplicate`, `name_mismatch`, `frontmatter_invalid`, `too_large`, …).
+- **Agenten:** `GET/PUT /api/agents/{id}/skills` (`agent.manage`) zeigt und ersetzt die
+  Skills eines Agenten (höchstens 50, mit der `version` des Agenten). Zuweisbar sind
+  organisationsweite Skills und Skills eines Bereichs, den der Agent liest (422
+  `agent.skill_not_assignable`); zwei Skills gleichen Namens 422
+  `agent.skill_names_clash`. Ob ein Lauf einen Skill nutzen darf, entscheidet sich
+  beim Nutzen: zugewiesen, aktiv, organisationsweit oder in einem Bereich, den der
+  Lauf liest (Rechte der Person, des Agenten und Publikum des Ortes), und die
+  KI-Richtlinie dieses Bereichs lässt die Verbindung des Laufs zu. Verlässt ein Agent
+  einen Bereich, bleibt die Zuweisung stehen, wirkt aber nicht (`available: false`).
+- Audit: `skill.created`, `skill.updated`, `skill.restored`, `skill.archived`,
+  `skill.unarchived`, `skill.imported`, `agent.skills_changed`, mit Namen, Längen und
+  Nummern, nie mit Beschreibung oder Text.
+
 ## Testen ohne Anbieter
 
 `backend/tests/support/openai_stub.py` ist ein lokaler Anbieter für Tests und e2e:

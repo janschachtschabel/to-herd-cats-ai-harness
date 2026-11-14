@@ -72,6 +72,8 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/admin/dm-inspect",
         "/api/admin/dm-inspect/{inspection_id}/messages",
         "/api/spaces/{space_id}/proposals",
+        "/api/skills",
+        "/api/skills/{skill_id}/versions",
     } <= set(endpoints)
 
 
@@ -94,6 +96,7 @@ async def test_hostile_cursors_answer_422_everywhere(
         json={"conversation_id": dm.json()["id"], "reason": "hostile cursor test"},
     )
     ticket = await owner.post(f"/api/spaces/{space_id}/tickets", json={"title": "Ticket"})
+    skill = await owner.post("/api/skills", json={"name": "s", "description": "d", "content": "c"})
     ids = {
         "{number}": str(ticket.json()["number"]),
         "{category}": "open",
@@ -104,6 +107,7 @@ async def test_hostile_cursors_answer_422_everywhere(
         "{page_id}": page.json()["id"],
         "{conversation_id}": channel.json()["id"],
         "{message_id}": message.json()["id"],
+        "{skill_id}": skill.json()["id"],
     }
     for template in _list_endpoints():
         if template in NEED_A_RUN:

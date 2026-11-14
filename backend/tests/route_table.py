@@ -28,6 +28,8 @@ ship without a decision on who may call it. Guards:
   gets 404 `agent.not_found`, as for an unknown id (plan M5).
 - `run`: the person who asked, the agent's responsible person (each with `ai.use`) or
   `agent.manage`; everyone else gets 404 `run.not_found`.
+- `skill`: `ai.use` or `skill.manage` (and `space.read` for a space's skill); everyone
+  else gets 404 `skill.not_found`, as for an unknown id (plan M6 task 9).
 - `proposal`: a page editor in the proposal's space (or its author); everyone else
   gets 404 `proposal.not_found`, as for an unknown id (plan M6).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
@@ -180,8 +182,21 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/agents/{agent_id}", "agent"),
     ("GET", "/api/agents/{agent_id}/tools", "agent"),
     ("PUT", "/api/agents/{agent_id}/tools", "agent"),
+    ("GET", "/api/agents/{agent_id}/skills", "agent"),
+    ("PUT", "/api/agents/{agent_id}/skills", "agent"),
     ("GET", "/api/runs/{run_id}", "run"),
     ("GET", "/api/runs/{run_id}/events", "run"),
+    ("GET", "/api/skills", "skill"),
+    ("POST", "/api/skills", "skill"),
+    ("GET", "/api/skills/{skill_id}", "skill"),
+    ("PATCH", "/api/skills/{skill_id}", "skill"),
+    ("POST", "/api/skills/{skill_id}/archive", "skill"),
+    ("POST", "/api/skills/{skill_id}/unarchive", "skill"),
+    ("GET", "/api/skills/{skill_id}/versions", "skill"),
+    ("GET", "/api/skills/{skill_id}/versions/{number}", "skill"),
+    ("POST", "/api/skills/{skill_id}/versions/{number}/restore", "skill"),
+    ("POST", "/api/skills/import", "skill"),
+    ("GET", "/api/skills/{skill_id}/export", "skill"),
 ]
 
 
@@ -194,6 +209,7 @@ def concrete(
     status_id: object | None = None,
     sprint_id: object | None = None,
     proposal_id: object | None = None,
+    skill_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -222,6 +238,7 @@ def concrete(
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
         "{proposal_id}": str(proposal_id or uuid7()),
+        "{skill_id}": str(skill_id or uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -291,4 +308,10 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     },
     ("PATCH", "/api/agents/{agent_id}"): {"name": "X", "version": 1},
     ("PUT", "/api/agents/{agent_id}/tools"): {"tools": [], "version": 1},
+    ("PUT", "/api/agents/{agent_id}/skills"): {"skill_ids": [], "version": 1},
+    ("POST", "/api/skills"): {"name": "x", "description": "d", "content": "c"},
+    ("PATCH", "/api/skills/{skill_id}"): {"name": "x", "version": 1},
+    ("POST", "/api/skills/{skill_id}/archive"): {"version": 1},
+    ("POST", "/api/skills/{skill_id}/unarchive"): {"version": 1},
+    ("POST", "/api/skills/{skill_id}/versions/{number}/restore"): {"version": 1},
 }

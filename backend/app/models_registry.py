@@ -31,6 +31,7 @@ from app.modules.messaging.notification_models import Notification
 from app.modules.messaging.social_models import ConversationRead, MessageMention, Reaction
 from app.modules.orgs.models import Organization
 from app.modules.proposals.models import PageProposal
+from app.modules.skills.models import AgentSkill, Skill, SkillVersion
 from app.modules.spaces.models import Space, SpaceMember
 from app.modules.tags.models import Tag, Tagging
 from app.modules.tickets.models import (
@@ -46,6 +47,7 @@ from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
     "Agent",
+    "AgentSkill",
     "AgentTool",
     "AiConnection",
     "GroupAssignment",
@@ -78,6 +80,8 @@ __all__ = [
     "RateLimitHit",
     "Reaction",
     "Space",
+    "Skill",
+    "SkillVersion",
     "SpaceMember",
     "Sprint",
     "Tag",

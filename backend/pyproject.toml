@@ -25,6 +25,7 @@ dependencies = [
     "cryptography>=46",
     "pydantic-ai-slim>=2.68",
     "openai>=3.31",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]

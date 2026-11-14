@@ -351,6 +351,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{agent_id}/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Skills
+         * @description The agent's skills the caller sees, by name.
+         */
+        get: operations["get_agent_skills_api_agents__agent_id__skills_get"];
+        /**
+         * Set Agent Skills
+         * @description Replace the agent's skills (those the caller sees), with the agent's `version`.
+         */
+        put: operations["set_agent_skills_api_agents__agent_id__skills_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/tools": {
         parameters: {
             query?: never;
@@ -1334,6 +1358,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Skills
+         * @description By name: organisation-wide skills and those of the spaces the caller reads.
+         */
+        get: operations["list_skills_api_skills_get"];
+        put?: never;
+        /**
+         * Create Skill
+         * @description Organisation-wide: `skill.manage`; in a space: `page.moderate` there. 409
+         *     `skill.name_taken` when the scope has a skill of that name (archived included).
+         */
+        post: operations["create_skill_api_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Skills
+         * @description Skills from a SKILL.md or a ZIP of skill folders (`skill.manage`, or
+         *     `page.moderate` in the space); 413 `import.too_large` over 10 MB or the archive's
+         *     limits, 422 `import.invalid_zip` for a broken ZIP. Each skill is reported.
+         */
+        post: operations["import_skills_api_skills_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skill */
+        get: operations["get_skill_api_skills__skill_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Skill
+         * @description A change of description or content makes a new version.
+         */
+        patch: operations["update_skill_api_skills__skill_id__patch"];
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Skill
+         * @description No run uses an archived skill; 409 `skill.state_conflict` if it is archived.
+         */
+        post: operations["archive_skill_api_skills__skill_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Skill
+         * @description The skill's SKILL.md.
+         */
+        get: operations["export_skill_api_skills__skill_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Skill */
+        post: operations["unarchive_skill_api_skills__skill_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Skill Versions
+         * @description Newest first, without their text.
+         */
+        get: operations["list_skill_versions_api_skills__skill_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skill Version */
+        get: operations["get_skill_version_api_skills__skill_id__versions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/{skill_id}/versions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Skill Version
+         * @description A new version with that version's description and content.
+         */
+        post: operations["restore_skill_version_api_skills__skill_id__versions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces": {
         parameters: {
             query?: never;
@@ -2019,7 +2225,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "ai.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -2228,6 +2434,57 @@ export interface components {
             id: string | null;
             /** Reason */
             reason: string | null;
+        };
+        /**
+         * AgentSkillOut
+         * @description `available`: whether the agent may use it now (active, and organisation-wide or
+         *     of a space the agent reads); a run also needs the person and the place to read it.
+         */
+        AgentSkillOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /** Available */
+            available: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id: string | null;
+            state: components["schemas"]["SkillState"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * AgentSkillsOut
+         * @description `version`: the agent's (setting the skills changes it).
+         */
+        AgentSkillsOut: {
+            /** Skills */
+            skills: components["schemas"]["AgentSkillOut"][];
+            /** Version */
+            version: number;
+        };
+        /** AgentSkillsPut */
+        AgentSkillsPut: {
+            /** Skill Ids */
+            skill_ids: string[];
+            /** Version */
+            version: number;
         };
         /**
          * AgentStatus
@@ -3836,6 +4093,20 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[SkillOut] */
+        Page_SkillOut_: {
+            /** Items */
+            items: components["schemas"]["SkillOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[SkillVersionOut] */
+        Page_SkillVersionOut_: {
+            /** Items */
+            items: components["schemas"]["SkillVersionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[SpaceMemberOut] */
         Page_SpaceMemberOut_: {
             /** Items */
@@ -4384,6 +4655,189 @@ export interface components {
             kind: components["schemas"]["SecretKind"] | null;
             /** Set */
             set: boolean;
+        };
+        /**
+         * SkillAuthorOut
+         * @description `name`: the person's or agent's name (none if it is gone).
+         */
+        SkillAuthorOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            type: components["schemas"]["PrincipalType"];
+        };
+        /**
+         * SkillCreate
+         * @description `space_id`: the space the skill belongs to; none: organisation-wide.
+         */
+        SkillCreate: {
+            /** Content */
+            content: string;
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id?: string | null;
+        };
+        /**
+         * SkillDetailOut
+         * @description A skill with its instructions (`content`, Markdown).
+         */
+        SkillDetailOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id: string | null;
+            state: components["schemas"]["SkillState"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SkillImportCreatedOut
+         * @description `ignored_fields`: optional front matter fields of the format that are not kept.
+         */
+        SkillImportCreatedOut: {
+            /** Ignored Fields */
+            ignored_fields: string[];
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /**
+             * Skill Id
+             * Format: uuid
+             */
+            skill_id: string;
+        };
+        /** SkillImportOut */
+        SkillImportOut: {
+            /** Created */
+            created: components["schemas"]["SkillImportCreatedOut"][];
+            /** Skipped */
+            skipped: components["schemas"]["SkillImportSkippedOut"][];
+        };
+        /**
+         * SkillImportSkippedOut
+         * @description `path`: the entry's name in the archive (`SKILL.md` for a single file).
+         *     `reason`: unsafe_path, not_in_skill, file_unsupported (a skill is its SKILL.md
+         *     only), too_deep, too_many, too_large, unreadable, invalid_text,
+         *     frontmatter_invalid, name_invalid, description_invalid, content_invalid,
+         *     name_mismatch (name and folder differ), duplicate (twice in the import), exists
+         *     (the scope has a skill of that name).
+         */
+        SkillImportSkippedOut: {
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * SkillOut
+         * @description A skill without its text (lists).
+         */
+        SkillOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Space Id */
+            space_id: string | null;
+            state: components["schemas"]["SkillState"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SkillState
+         * @enum {string}
+         */
+        SkillState: "active" | "archived";
+        /**
+         * SkillUpdate
+         * @description Only what is given changes; a given field cannot be null.
+         */
+        SkillUpdate: {
+            /** Content */
+            content?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Version */
+            version: number;
+        };
+        /** SkillVersionDetailOut */
+        SkillVersionDetailOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Number */
+            number: number;
+        };
+        /** SkillVersionIn */
+        SkillVersionIn: {
+            /** Version */
+            version: number;
+        };
+        /** SkillVersionOut */
+        SkillVersionOut: {
+            author: components["schemas"]["SkillAuthorOut"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Number */
+            number: number;
         };
         /**
          * SkippedOut
@@ -6196,6 +6650,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_skills_api_agents__agent_id__skills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_agent_skills_api_agents__agent_id__skills_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentSkillsPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillsOut"];
                 };
             };
             /** @description Validation Error */
@@ -8484,6 +9004,385 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skills_api_skills_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description only this space's */
+                space_id?: string | null;
+                /** @description true: only organisation-wide; false: only spaces' */
+                org_wide?: boolean | null;
+                /** @description only this state */
+                state?: components["schemas"]["SkillState"] | null;
+                /** @description a part of the name */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SkillOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_skill_api_skills_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_skills_api_skills_import_post: {
+        parameters: {
+            query?: {
+                /** @description none: organisation-wide */
+                space_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/zip": string;
+                "text/markdown": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_skill_api_skills__skill_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_skill_api_skills__skill_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_skill_api_skills__skill_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillVersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_skill_api_skills__skill_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_skill_api_skills__skill_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillVersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skill_versions_api_skills__skill_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SkillVersionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_skill_version_api_skills__skill_id__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillVersionDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_skill_version_api_skills__skill_id__versions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillVersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDetailOut"];
                 };
             };
             /** @description Validation Error */

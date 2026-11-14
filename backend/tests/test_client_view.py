@@ -23,6 +23,7 @@ ALL_SYSTEM = [
     "dm.inspect",
     "group.manage",
     "page.purge",
+    "skill.manage",
     "space.create",
     "tag.manage",
     "user.manage",

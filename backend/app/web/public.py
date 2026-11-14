@@ -32,6 +32,10 @@ from app.modules.messaging import router_social as messaging_social
 from app.modules.messaging.live import LiveHub
 from app.modules.proposals import router as proposals
 from app.modules.search.router import router as search_router
+from app.modules.skills import assignment_router as skill_assignments
+from app.modules.skills import router as skills
+from app.modules.skills import transfer_router as skill_transfer
+from app.modules.skills.transfer import MAX_IMPORT_BYTES as SKILL_IMPORT_MAX_BYTES
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
 from app.modules.tickets import link_router as ticket_links
@@ -100,6 +104,9 @@ def api_router() -> APIRouter:
     api.include_router(ai_usage.usage)
     api.include_router(agents_router.agents)
     api.include_router(agents_router.runs)
+    api.include_router(skill_transfer.skill_transfer)  # before /skills/{skill_id}
+    api.include_router(skills.skills)
+    api.include_router(skill_assignments.agent_skills)
     return api
 
 
@@ -110,6 +117,7 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
             "POST", re.compile(r"/api/pages/[^/]+/attachments"), settings.attachment_max_bytes
         ),
         RouteLimit("POST", re.compile(r"/api/spaces/[^/]+/import"), settings.import_max_bytes),
+        RouteLimit("POST", re.compile(r"/api/skills/import"), SKILL_IMPORT_MAX_BYTES),
     ]
 
 

@@ -1,6 +1,7 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
 a space, page, conversation, message, ticket status, ticket or sprint without a role
-answers 404 exactly like something that does not exist; so does a page proposal."""
+answers 404 exactly like something that does not exist; so does a page proposal, and
+a skill for people without AI."""
 
 from datetime import date
 
@@ -14,6 +15,7 @@ from app.core.principal import Principal, SystemRole
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
 from app.modules.proposals.service import ProposalService
+from app.modules.skills.service import SkillDraft, SkillService
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import TicketStatus
 from app.modules.tickets.service import TicketService
@@ -46,6 +48,30 @@ async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
                 response = await client.request(method, concrete(template), json=body)
                 assert response.status_code == 404, (method, template, response.text)
                 assert response.json()["error"]["code"] == codes[guard]
+
+
+async def test_skill_routes_do_not_exist_for_people_without_ai(
+    member_client: AsyncClient,
+    guest_client: AsyncClient,
+    session: AsyncSession,
+    owner_user: User,
+    open_space: Space,
+) -> None:
+    """Neither `ai.use` nor `skill.manage`: not even a skill of an open space, or an
+    organisation-wide one, is there."""
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    service = SkillService(session)
+    org_wide = await service.create(actor, SkillDraft("org", "d", "c"))
+    in_open = await service.create(actor, SkillDraft("open", "d", "c", open_space.id))
+    for skill_id in (org_wide.id, in_open.id):
+        for client in (member_client, guest_client):
+            for method, template, guard in ROUTES:
+                if guard == "skill":
+                    path = concrete(template, open_space.id, skill_id=skill_id)
+                    body = BODIES.get((method, template), {})
+                    response = await client.request(method, path, json=body)
+                    assert response.status_code == 404, (method, template, response.text)
+                    assert response.json()["error"]["code"] == "skill.not_found"
 
 
 async def test_space_routes_hide_spaces_without_a_role(
