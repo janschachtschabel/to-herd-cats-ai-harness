@@ -15,29 +15,47 @@ A `once` is done after its term, whatever the outcome; a recurring automation ta
 the first term after "now" (`terms.next_term`), a heartbeat the next in its active
 hours (`heartbeat_terms.py`), so after an outage either fires once for all the terms
 it missed. A term at which the automation was paused keeps it.
+
+A term whose transaction fails (any bug or bad row) would stay the most overdue and
+hold every term behind it: the due loop sets its automation aside (`set_aside`, in a
+transaction of its own; review M7, finding 3): its next term SET_ASIDE_FIRST later,
+doubling with every failure in a row (`term_errors`) up to SET_ASIDE_MAX. A logged
+term ends the streak (`AutomationRepository.log`).
 """
 
-from datetime import datetime
+import uuid
+from collections.abc import Callable
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.automations import event_rules, heartbeats, live, terms
 from app.modules.automations.models import Automation, AutomationKind, FiringOutcome
-from app.modules.automations.repository import AutomationRepository, claim_due
+from app.modules.automations.repository import AutomationRepository, claim_due, claim_failed
 from app.modules.automations.term import Fired, fire
 
-__all__ = ["Fired", "fire_next"]
+__all__ = ["Fired", "fire_next", "set_aside"]
+
+SET_ASIDE_FIRST = timedelta(minutes=1)
+SET_ASIDE_MAX = timedelta(hours=1)
+
+Claimed = Callable[[uuid.UUID, datetime], None]
 
 
-async def fire_next(session: AsyncSession, now: datetime) -> Fired | None:
+async def fire_next(
+    session: AsyncSession, now: datetime, *, claimed: Claimed | None = None
+) -> Fired | None:
     """Fire the most overdue automation due at `now` that no other worker holds;
-    None: none is due. The caller commits."""
+    None: none is due. The caller commits. `claimed` hears of each automation taken
+    and its term, so a caller whose transaction fails knows which to set aside."""
     while True:
         automation = await claim_due(session, now)
         if automation is None:
             return None
         assert automation.next_due_at is not None  # an active automation has a term
         due_at = automation.next_due_at
+        if claimed is not None:
+            claimed(automation.id, due_at)
         if automation.kind == AutomationKind.EVENT:
             fired = await event_rules.fire_waiting(session, automation, now)
             if fired is None:
@@ -63,3 +81,19 @@ def _next_due(automation: Automation, now: datetime) -> datetime | None:
         return heartbeats.next_term(automation, now)
     assert automation.cron is not None and automation.time_zone is not None
     return terms.next_term(automation.cron, automation.time_zone, now)
+
+
+async def set_aside(
+    session: AsyncSession, automation_id: uuid.UUID, due_at: datetime, now: datetime
+) -> bool:
+    """Its term at `due_at` could not fire: try again a backoff later (the caller
+    commits). False: it is no longer due then, or another worker holds it."""
+    automation = await claim_failed(session, automation_id, due_at)
+    if automation is None:
+        return False
+    automation.term_errors += 1
+    doublings = min(automation.term_errors - 1, 16)  # past the bound anyway
+    wait = min(SET_ASIDE_FIRST * 2**doublings, SET_ASIDE_MAX)
+    automation.next_due_at = now + wait
+    await session.flush()
+    return True

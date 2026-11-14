@@ -22,6 +22,7 @@ from app.core.metrics import REGISTRY
 @dataclass(frozen=True, slots=True)
 class AutomationMetrics:
     firings: Counter
+    set_aside: Counter
     due: Gauge
     oldest_due: Gauge
     paused: Gauge
@@ -42,6 +43,12 @@ def automation_metrics() -> AutomationMetrics:
                 "Terms of automations fired by this worker (due loop and event rules), by "
                 "outcome: started, skipped_* or paused_<reason>.",
                 ["outcome"],
+                registry=REGISTRY,
+            ),
+            set_aside=Counter(
+                "herd_automation_terms_set_aside_total",
+                "Terms the due loop of this worker could not fire (their transaction "
+                "failed) and set aside for a backoff.",
                 registry=REGISTRY,
             ),
             due=Gauge(

@@ -141,6 +141,17 @@ describe('one automation', () => {
     expect(screen.queryByRole('link', { name: /Kanal/ })).toBeNull()
   })
 
+  test('one whose terms keep failing to fire says so', async () => {
+    const automation = makeAutomation({ term_errors: 3 })
+    detailApi(automation)
+    await renderApp(`/automations/${automation.id}`)
+    expect(
+      await screen.findByText(
+        'Die letzten 3 Termine ließen sich nicht auslösen; das System versucht es später erneut.',
+      ),
+    ).toBeInTheDocument()
+  })
+
   test('its owner may edit, pause, run now and delete it; nothing else is offered', async () => {
     const automation = makeAutomation()
     detailApi(automation)

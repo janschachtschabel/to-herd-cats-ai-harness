@@ -138,7 +138,9 @@
       "logLabel": "Log of the terms",
       "logEmpty": "No term yet.",
       "due": "Term",
-      "notFound": "This automation does not exist, or you may not see it."
+      "notFound": "This automation does not exist, or you may not see it.",
+      "termErrors_one": "The last term could not fire; the system tries again later.",
+      "termErrors_other": "The last {{count}} terms could not fire; the system tries again later."
     },
     "actions": {
       "label": "Actions",

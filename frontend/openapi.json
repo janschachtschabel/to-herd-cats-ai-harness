@@ -1659,7 +1659,7 @@
         "type": "string"
       },
       "AutomationOut": {
-        "description": "`abilities`: what the caller may do with it now. `upcoming`: its next terms from\nnow (none for an event rule, or once done). `redacted`: the caller sees it but\nmay not read its place, so `instruction`, `place.name` and `place.ticket_number`\nare null (`words.py`).",
+        "description": "`abilities`: what the caller may do with it now. `upcoming`: its next terms from\nnow (none for an event rule, or once done). `redacted`: the caller sees it but\nmay not read its place, so `instruction`, `place.name` and `place.ticket_number`\nare null (`words.py`). `term_errors`: terms in a row the due loop could not fire\nand set aside (0: none).",
         "properties": {
           "abilities": {
             "$ref": "#/components/schemas/AbilitiesOut"
@@ -1834,6 +1834,10 @@
           "state": {
             "$ref": "#/components/schemas/AutomationState"
           },
+          "term_errors": {
+            "title": "Term Errors",
+            "type": "integer"
+          },
           "time_zone": {
             "anyOf": [
               {
@@ -1863,6 +1867,7 @@
           "kind",
           "state",
           "paused_reason",
+          "term_errors",
           "version",
           "instruction",
           "redacted",

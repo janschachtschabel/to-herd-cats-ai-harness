@@ -2,12 +2,14 @@
 space (what the caller may see there), each item with its next term, state and last
 run; and the log of one automation, paginated, newest term first."""
 
+import uuid
 from datetime import timedelta
 from typing import Any
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.modules.automations.firing import fire_next
+from app.modules.automations.models import Automation
 from app.modules.spaces.repository import SpaceRepository
 from tests.factories_automations import finish_runs
 from tests.factories_writing import Work
@@ -113,3 +115,16 @@ async def test_the_log_shows_each_term_newest_first(work: Work) -> None:
     (oldest,) = rest.json()["items"]
     assert (oldest["outcome"], oldest["run_id"]) == ("started", str(first.run_id))
     refused(await bench.people.bob.get(path), 404, "automation.not_found")
+
+
+async def test_an_item_says_how_many_terms_in_a_row_could_not_fire(work: Work) -> None:
+    """Set aside by the due loop (review M7, finding 3): the streak shows, so its owner
+    sees that it keeps failing."""
+    alice = work.bench.people.alice
+    made = await make(alice, body(work, {"type": "dm"}, DAILY))
+    assert made["term_errors"] == 0
+    row = await work.bench.session.get(Automation, uuid.UUID(made["id"]))
+    assert row is not None
+    row.term_errors = 3
+    await work.bench.session.flush()
+    assert [a["term_errors"] for a in await items(alice, BASE)] == [3]

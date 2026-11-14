@@ -45,6 +45,24 @@ async def claim_due(session: AsyncSession, now: datetime) -> Automation | None:
     return await session.scalar(stmt)
 
 
+async def claim_failed(
+    session: AsyncSession, automation_id: uuid.UUID, due_at: datetime
+) -> Automation | None:
+    """The automation whose term at `due_at` could not fire, locked, if it is still
+    active and due then (None: another worker holds it, or it changed meanwhile)."""
+    stmt = (
+        select(Automation)
+        .where(
+            Automation.id == automation_id,
+            Automation.state == AutomationState.ACTIVE,
+            Automation.next_due_at == due_at,
+        )
+        .with_for_update(skip_locked=True)
+        .execution_options(populate_existing=True)
+    )
+    return await session.scalar(stmt)
+
+
 class AutomationRepository:
     def __init__(self, session: AsyncSession, org_id: uuid.UUID) -> None:
         self.session = session

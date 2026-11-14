@@ -3550,7 +3550,8 @@ export interface components {
          * @description `abilities`: what the caller may do with it now. `upcoming`: its next terms from
          *     now (none for an event rule, or once done). `redacted`: the caller sees it but
          *     may not read its place, so `instruction`, `place.name` and `place.ticket_number`
-         *     are null (`words.py`).
+         *     are null (`words.py`). `term_errors`: terms in a row the due loop could not fire
+         *     and set aside (0: none).
          */
         AutomationOut: {
             abilities: components["schemas"]["AbilitiesOut"];
@@ -3588,6 +3589,8 @@ export interface components {
             /** Redacted */
             redacted: boolean;
             state: components["schemas"]["AutomationState"];
+            /** Term Errors */
+            term_errors: number;
             /** Time Zone */
             time_zone: string | null;
             /** Upcoming */

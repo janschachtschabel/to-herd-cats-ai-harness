@@ -41,6 +41,7 @@ def automation_out(view: AutomationView) -> AutomationOut:
         kind=automation.kind,
         state=automation.state,
         paused_reason=automation.paused_reason,
+        term_errors=automation.term_errors,
         version=automation.version,
         instruction=automation.instruction if shown else None,
         redacted=view.redacted,

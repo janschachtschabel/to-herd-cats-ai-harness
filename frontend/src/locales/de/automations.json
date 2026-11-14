@@ -138,7 +138,9 @@
       "logLabel": "Protokoll der Termine",
       "logEmpty": "Noch kein Termin.",
       "due": "Termin",
-      "notFound": "Diese Aufgabe gibt es nicht, oder du darfst sie nicht sehen."
+      "notFound": "Diese Aufgabe gibt es nicht, oder du darfst sie nicht sehen.",
+      "termErrors_one": "Der letzte Termin ließ sich nicht auslösen; das System versucht es später erneut.",
+      "termErrors_other": "Die letzten {{count}} Termine ließen sich nicht auslösen; das System versucht es später erneut."
     },
     "actions": {
       "label": "Aktionen",

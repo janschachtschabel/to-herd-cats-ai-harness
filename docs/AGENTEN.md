@@ -831,6 +831,16 @@ Person = die Eigentümerin, Bahn `lane_id` = die Aufgabe) oder der Vermerk
   Termin in rund 21 ms; während die eben gestarteten Läufe rechnen, in rund 100 ms. 1.000
   zugleich fällige Termine brauchten mit einem Worker 104 s, mit dreien 48–65 s
   (Steckbrief). Mehr Worker teilen sich die Termine.
+- **Ein Termin, der sich nicht feuern lässt** (seine Transaktion scheitert, etwa an
+  einem Fehler oder einer kaputten Zeile), hält keinen anderen auf: Die Schleife stellt
+  die Aufgabe in einer eigenen Transaktion zurück (nächster Versuch nach 1, 2, 4 …
+  Minuten, höchstens nach einer Stunde; `automation.term_errors` zählt die Fehlschläge
+  in Folge, die Ansicht der Aufgabe nennt sie) und macht mit dem nächsten Termin
+  weiter. Ein protokollierter Termin setzt die Zählung zurück. Im Log
+  `automations.term_failed` (Aufgaben-ID und Fehlertyp), gezählt in
+  `herd_automation_terms_set_aside_total`. Ebenso übergeht der Prüfdurchlauf einen
+  Bereich, dessen Schritt scheitert, für den Rest der Runde (`wiki.review_step_failed`).
+  Feuern, Prüfdurchlauf und Aufräumen laufen in jeder Runde, was die anderen auch tun.
 - Bis zu zwei Datenbankverbindungen (Feuern, Gauges); Fehler im Log als
   `automations.pass_failed` bzw. `automations.metrics_failed` (nur der Fehlertyp).
 
@@ -1415,6 +1425,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_runs_stuck` | Gauge | laufende Läufe mit abgelaufener Sperrfrist oder deren aktuelle Aufnahme (`taken_at`) länger zurückliegt, als jeder Lauf darf; ein Lauf, der nach langem Warten wieder läuft, zählt nicht |
 | `herd_runs_waiting` | Gauge | Läufe, die auf eine Freigabe oder Antwort warten |
 | `herd_automation_firings_total{outcome}` | Zähler | Termine von Aufgaben, die dieser Worker gefeuert hat (Fälligkeits-Schleife und Handler der Ereignis-Regeln, gezählt nach dem Commit), je Ergebnis: `started`, `skipped_busy`, `skipped_paused_agent`, `skipped_budget`, `skipped_policy`, `skipped_off_hours`, `skipped_depth`, `paused_owner` |
+| `herd_automation_terms_set_aside_total` | Zähler | Termine, die die Fälligkeits-Schleife dieses Workers nicht feuern konnte (ihre Transaktion scheiterte) und zurückstellte (seit Review M7) |
 | `herd_automations_due` | Gauge | aktive Aufgaben, deren Termin gekommen ist und die noch kein Worker gefeuert hat |
 | `herd_automations_oldest_due_seconds` | Gauge | Wartezeit des ältesten fälligen Termins (0 ohne einen) |
 | `herd_automations_paused{reason}` | Gauge | angehaltene Aufgaben je Grund (`manual`, `owner`, `failing`) |
@@ -1436,7 +1447,8 @@ Alarme in der PrometheusRule des Charts (mit promtool-Tests):
   3 Minuten, 5 Minuten lang. Die Fälligkeits-Schleife kommt nicht nach (viele Termine
   zugleich bei wenigen Workern, siehe [Steckbrief](STECKBRIEF.md#automatisierung-m7):
   1.000 zugleich brauchten mit einem Worker rund 100 s) oder scheitert immer wieder an
-  einem Termin (`automations.pass_failed`; der Termin bleibt fällig). Ein Worker eines
+  einer Runde (`automations.pass_failed`, etwa die Datenbank nicht erreichbar; ein
+  einzelner Termin, der scheitert, wird zurückgestellt: `automations.term_failed`). Ein Worker eines
   älteren Releases kann Heartbeats und Ereignis-Regeln nicht feuern. Abhilfe: mehr
   Worker, Log lesen.
 - `HerdAutomationsFailing` (seit M7): mindestens 5 Aufgaben mehr binnen einer Stunde

@@ -7,11 +7,17 @@ automations one per transaction (`automations.firing.fire_next`: the row locked
 committed together), at most BATCH per pass, so a stop request is seen between
 batches. A transaction that fails (a lost connection, a crash before the commit)
 leaves the term due as it was: the next pass, here or in another worker, fires it.
+A term that fails once it is claimed is set aside for a backoff (`firing.set_aside`,
+a transaction of its own; logged with ids and the error's class only, counted in
+`herd_automation_terms_set_aside_total`), and the pass goes on with the next term.
 Runs it starts are queued; the run loop takes them up like any other.
 
 Each round also takes steps of the daily page review (`wiki/review_pass.py`), one
 transaction each, at most REVIEW_STEPS per round: spaces whose pages it has not been
 through today (UTC) are claimed `SKIP LOCKED`, their due pages reminded in batches.
+A space whose step fails is passed over for the rest of the round. The firing, the
+review and the cleanup each run in every round, whatever the others did; the first
+error goes on to `serve`, which logs it and waits before the next round.
 
 At most every CLEANUP_EVERY_SECONDS a round also removes, in batches of CLEANUP_BATCH
 (one transaction each), what the automations' log no longer needs (`cleanup`): the
@@ -29,13 +35,14 @@ Outside the worker's readiness, like the run loop.
 import asyncio
 import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
-from app.modules.automations.firing import Fired, fire_next
+from app.modules.automations.firing import Fired, fire_next, set_aside
 from app.modules.automations.metrics import automation_metrics
 from app.modules.automations.upkeep_repository import UpkeepRepository
 from app.modules.wiki.review_pass import Step, review_next
@@ -94,43 +101,83 @@ class DueLoop:
                 await asyncio.wait_for(stop.wait(), timeout=wait)
 
     async def round(self) -> bool:
-        """Fire due automations, then review steps; whether more may be due."""
-        fired = await self.pass_once()
-        steps = await self.review_once()
-        await self.cleanup_if_due()
+        """Fire due automations, then review steps, then the cleanup if due, each
+        whatever the others did; whether more may be due. The first error is raised
+        once all three had their turn."""
+        errors: list[Exception] = []
+        fired = await _guarded(self.pass_once(), errors, 0)
+        steps = await _guarded(self.review_once(), errors, 0)
+        await _guarded(self.cleanup_if_due(), errors, None)
+        if errors:
+            raise errors[0]
         return fired == BATCH or steps == REVIEW_STEPS
 
     async def review_once(self) -> int:
         """Steps of the daily page review, one transaction each, until every space is
-        checked for today or REVIEW_STEPS were taken; how many."""
-        steps = 0
-        while steps < REVIEW_STEPS:
-            if await self.review_step() is None:
+        checked for today or REVIEW_STEPS were tried; how many were taken. A space
+        whose step fails is passed over for the rest of the round."""
+        steps, tried, failed = 0, 0, set[uuid.UUID]()
+        while tried < REVIEW_STEPS:
+            tried += 1
+            held: list[uuid.UUID] = []
+            try:
+                step = await self.review_step(failed, held.append)
+            except Exception as exc:
+                if not held:
+                    raise
+                failed.add(held[-1])
+                logger.warning(
+                    "wiki.review_step_failed",
+                    extra={"space_id": str(held[-1]), "error": type(exc).__name__},
+                )
+                continue
+            if step is None:
                 break
             steps += 1
         return steps
 
-    async def review_step(self) -> Step | None:
+    async def review_step(
+        self,
+        skip: set[uuid.UUID] | None = None,
+        claimed: Callable[[uuid.UUID], None] | None = None,
+    ) -> Step | None:
         async with self.database.session_factory() as session, session.begin():
-            step = await review_next(session, self.clock.now())
+            step = await review_next(session, self.clock.now(), skip=skip or (), claimed=claimed)
         if step is not None:  # committed
             self.metrics.review_reminders.inc(step.reminded)
         return step
 
     async def pass_once(self) -> int:
         """Fire due automations, one transaction each, until none is due or BATCH
-        fired; how many fired."""
-        fired = 0
-        while fired < BATCH:
-            found = await self.fire_one()
-            if found is None:
+        were tried (fired or set aside); how many."""
+        tried = 0
+        while tried < BATCH:
+            if not await self.fire_one():
                 break
-            fired += 1
-        return fired
+            tried += 1
+        return tried
 
-    async def fire_one(self) -> Fired | None:
-        async with self.database.session_factory() as session, session.begin():
-            found = await fire_next(session, self.clock.now())
+    async def fire_one(self) -> Fired | bool | None:
+        """The term fired; True: one failed and was set aside; None: none is due."""
+        held: list[tuple[uuid.UUID, datetime]] = []
+        try:
+            async with self.database.session_factory() as session, session.begin():
+                found = await fire_next(
+                    session, self.clock.now(), claimed=lambda a, d: held.append((a, d))
+                )
+        except Exception as exc:
+            if not held:
+                raise  # nothing claimed (the claim, the connection): `serve` waits
+            automation_id, due_at = held[-1]
+            logger.warning(
+                "automations.term_failed",
+                extra={"automation_id": str(automation_id), "error": type(exc).__name__},
+            )
+            async with self.database.session_factory() as session, session.begin():
+                aside = await set_aside(session, automation_id, due_at, self.clock.now())
+            if aside:  # committed
+                self.metrics.set_aside.inc()
+            return True
         if found is not None:  # committed
             self.metrics.firings.labels(outcome=found.label).inc()
         return found
@@ -192,3 +239,12 @@ class DueLoop:
         for reason, n in paused.items():
             self.metrics.paused.labels(reason=reason.value).set(n)
         self.metrics.review_spaces.set(unchecked)
+
+
+async def _guarded[T](work: Awaitable[T], errors: list[Exception], fallback: T) -> T:
+    """`work`'s result; an error is noted in `errors` and `fallback` returned."""
+    try:
+        return await work
+    except Exception as exc:
+        errors.append(exc)
+        return fallback

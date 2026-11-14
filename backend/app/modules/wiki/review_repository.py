@@ -119,16 +119,19 @@ class ReviewRepository:
 
     # --- the daily pass ----------------------------------------------------------------
 
-    async def claim_space(self, today: date) -> tuple[uuid.UUID, uuid.UUID] | None:
+    async def claim_space(
+        self, today: date, skip: Collection[uuid.UUID] = ()
+    ) -> tuple[uuid.UUID, uuid.UUID] | None:
         """A space (org id, space id) with an interval that the pass has not been
-        through today, locked until the transaction ends; spaces another worker holds
-        are passed over. `FOR NO KEY UPDATE` leaves inserts that refer to the space
-        (pages, messages) free."""
+        through today, locked until the transaction ends; spaces another worker holds,
+        and those in `skip`, are passed over. `FOR NO KEY UPDATE` leaves inserts that
+        refer to the space (pages, messages) free."""
         stmt = (
             select(Space.org_id, Space.id)
             .where(
                 Space.review_interval_days.is_not(None),
                 or_(Space.review_checked_on.is_(None), Space.review_checked_on < today),
+                Space.id.not_in(list(skip)),
             )
             .order_by(Space.review_checked_on.nulls_first(), Space.id)
             .limit(1)

@@ -153,12 +153,14 @@ class AutomationOut(BaseModel):
     """`abilities`: what the caller may do with it now. `upcoming`: its next terms from
     now (none for an event rule, or once done). `redacted`: the caller sees it but
     may not read its place, so `instruction`, `place.name` and `place.ticket_number`
-    are null (`words.py`)."""
+    are null (`words.py`). `term_errors`: terms in a row the due loop could not fire
+    and set aside (0: none)."""
 
     id: uuid.UUID
     kind: AutomationKind
     state: AutomationState
     paused_reason: PausedReason | None
+    term_errors: int
     version: int
     instruction: str | None
     redacted: bool

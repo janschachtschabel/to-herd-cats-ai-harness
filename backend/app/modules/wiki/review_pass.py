@@ -11,7 +11,8 @@ marks up to `batch` of its due pages reminded (`page.review_notified_at`, see
 A space with many due pages takes several steps, each its own short transaction;
 until the last one it stays unchecked, and the next step (here or in another worker)
 claims it again. A step that fails leaves nothing behind: its pages stay unreminded
-and the space unchecked.
+and the space unchecked; the due loop passes that space over for the rest of its
+round (`skip`), so one space that cannot be reviewed holds no other.
 
 Why a date on the space and no job table or automation row: automations belong to
 people (decision 2), and a single job row would make one worker do every
@@ -24,6 +25,7 @@ round looks at it again (a shorter interval makes pages due at once).
 
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -44,15 +46,25 @@ class Step:
     done: bool  # the space is checked for today
 
 
-async def review_next(session: AsyncSession, now: datetime, *, batch: int = BATCH) -> Step | None:
+async def review_next(
+    session: AsyncSession,
+    now: datetime,
+    *,
+    batch: int = BATCH,
+    skip: Collection[uuid.UUID] = (),
+    claimed: Callable[[uuid.UUID], None] | None = None,
+) -> Step | None:
     """One step of the pass at `now`; None when every space is checked for today (or
-    held by another worker)."""
+    held by another worker). `skip`: spaces to pass over (their step failed in this
+    round); `claimed` hears of the space taken."""
     reviews = ReviewRepository(session)
     today = now.astimezone(UTC).date()
-    claimed = await reviews.claim_space(today)
-    if claimed is None:
+    found = await reviews.claim_space(today, skip)
+    if found is None:
         return None
-    org_id, space_id = claimed
+    org_id, space_id = found
+    if claimed is not None:
+        claimed(space_id)
     reminded = await reviews.remind(space_id, now, batch)
     await _emit(session, org_id, reminded)
     done = len(reminded) < batch

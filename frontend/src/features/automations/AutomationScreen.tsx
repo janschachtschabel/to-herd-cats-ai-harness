@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, PauseCircle, Pencil } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, PauseCircle, Pencil } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -111,6 +111,12 @@ function AutomationDetail({ automation }: { automation: Automation }) {
           </p>
           {ownerUnable && <p>{t('automations.takeOver.ownerUnable')}</p>}
         </div>
+      )}
+      {automation.term_errors > 0 && (
+        <p className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {t('automations.detail.termErrors', { count: automation.term_errors })}
+        </p>
       )}
       <AutomationActions
         automation={automation}

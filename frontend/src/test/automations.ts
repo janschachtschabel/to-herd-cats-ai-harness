@@ -25,6 +25,7 @@ export function makeAutomation(overrides: Partial<Automation> = {}): Automation 
     kind: 'recurring',
     state: 'active',
     paused_reason: null,
+    term_errors: 0,
     version: 1,
     instruction: 'Fasse zusammen, was gestern im Kanal besprochen wurde.',
     redacted: false,
