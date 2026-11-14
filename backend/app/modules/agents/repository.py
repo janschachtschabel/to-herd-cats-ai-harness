@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import OPEN_SPACE_FLOOR, SpaceRole
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Agent, AgentStatus, Run
+from app.modules.agents.models import Agent, AgentStatus, AgentTool, Run
 from app.modules.ai.models import AiConnection
 from app.modules.messaging.models import ConversationParticipant
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
@@ -122,6 +122,36 @@ class AgentRepository:
         for sid in await self.session.scalars(open_spaces):
             roles[sid] = max(roles.get(sid, OPEN_SPACE_FLOOR), OPEN_SPACE_FLOOR)
         return roles
+
+    async def member_space_ids(self, agent_id: uuid.UUID) -> set[uuid.UUID]:
+        """The spaces the agent is a member of (not the open ones it reads)."""
+        stmt = (
+            select(SpaceMember.space_id)
+            .join(Space, Space.id == SpaceMember.space_id)
+            .where(
+                Space.org_id == self.org_id,
+                SpaceMember.member_type == PrincipalType.AGENT,
+                SpaceMember.member_id == agent_id,
+            )
+        )
+        return set(await self.session.scalars(stmt))
+
+    async def tool_entries(self, agent_id: uuid.UUID) -> dict[str, str]:
+        """The agent's entries per tool (tool name → policy)."""
+        stmt = select(AgentTool.tool, AgentTool.policy).where(
+            AgentTool.org_id == self.org_id, AgentTool.agent_id == agent_id
+        )
+        return {tool: policy for tool, policy in await self.session.execute(stmt)}
+
+    async def replace_tool_entries(self, agent_id: uuid.UUID, entries: dict[str, str]) -> None:
+        await self.session.execute(
+            delete(AgentTool).where(AgentTool.org_id == self.org_id, AgentTool.agent_id == agent_id)
+        )
+        for tool, policy in sorted(entries.items()):
+            self.session.add(
+                AgentTool(org_id=self.org_id, agent_id=agent_id, tool=tool, policy=policy)
+            )
+        await self.session.flush()
 
     async def of_conversation(self, conversation_id: uuid.UUID) -> Agent | None:
         """The agent taking part in a DM, if one does."""

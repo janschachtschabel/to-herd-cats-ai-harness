@@ -26,7 +26,9 @@ from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.models import Agent, EventKind, Run
 from app.modules.agents.read_repository import ReadRepository
+from app.modules.agents.repository import AgentRepository
 from app.modules.agents.toolbox.base import RunRef, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.policy import Grant, effective
 from app.modules.ai.models import DataLocation
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
@@ -53,6 +55,7 @@ class Working:
     deadline: float
     reads: Reads = field(default_factory=Reads)
     seq: int = 0  # the last recorded; the journal counts on across take-ups
+    tools: list[ToolSpec] = field(default_factory=list)  # allowed at the take-up
 
 
 Unit = Callable[[], AbstractAsyncContextManager[AsyncSession]]
@@ -72,13 +75,11 @@ def units_of(sessions: async_sessionmaker[AsyncSession]) -> Unit:
 class RunHost:
     """The run's `StepHost`; what it checks and records: `executor.py`."""
 
-    def __init__(
-        self, unit: Unit, clock: Callable[[], float], run: Working, tools: dict[str, ToolSpec]
-    ) -> None:
+    def __init__(self, unit: Unit, clock: Callable[[], float], run: Working) -> None:
         self.unit = unit
         self.clock = clock
         self.run = run
-        self.tools = tools
+        self.tools = {tool.name: tool for tool in run.tools}
 
     def seconds_left(self) -> float:
         return self.run.deadline - self.clock()
@@ -123,6 +124,7 @@ class RunHost:
         try:
             async with self.unit() as session:
                 steps, run, agent = await self._owned(session)
+                await self._granted(session, agent, spec)
                 actor = await self._actor(session, agent)
                 location = await self._location(steps)
                 reads = self.run.reads
@@ -170,6 +172,13 @@ class RunHost:
             raise Halt("rights_revoked")
         self.run.agent = agent
         return steps, run, agent
+
+    async def _granted(self, session: AsyncSession, agent: Agent, spec: ToolSpec) -> None:
+        """The tool is still allowed to the agent as it is now (level and entries)."""
+        entries = await AgentRepository(session, agent.org_id).tool_entries(agent.id)
+        entry = Grant(entries[spec.name]) if spec.name in entries else None
+        if effective(agent.level, spec, entry) != Grant.ALLOW:
+            raise Halt("rights_revoked")
 
     async def _actor(self, session: AsyncSession, agent: Agent) -> Actor:
         claimed = self.run.claimed

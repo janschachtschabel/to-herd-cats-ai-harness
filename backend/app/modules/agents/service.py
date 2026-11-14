@@ -4,7 +4,9 @@
 An agent talks to a chat connection of the organisation, with one of its models; the
 connection is locked shared while an agent is written, so it cannot be deleted under
 it (the deletion checks agents too, 409 `ai.connection_in_use`). Its responsible
-person is an active person, no guest. Limits are capped (25 steps, 10 minutes). An
+person is an active person, no guest. Limits are capped (25 steps, 10 minutes). Its
+level (1 to 3, default 2) above 2 only from an admin or someone who manages every
+space of the agent (403 `agent.level_denied`, `toolbox/policy.py`). An
 agent that took part in a conversation or ran is not deleted (409 `agent.in_use`):
 it is paused, so its answers stay attributed. Every change is audited (without the
 instructions' text, which may be long; their length instead).
@@ -18,13 +20,14 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can
-from app.core.errors import Conflict, ValidationFailed
+from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
 from app.modules.agents.models import Agent
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.schemas import AgentCreate, AgentUpdate
 from app.modules.agents.standing import agent_not_found, visible_agent
+from app.modules.agents.toolbox.policy import may_grant_level
 from app.modules.ai.effective import CHAT_PURPOSES
 from app.modules.ai.repository import ConnectionRepository
 from app.modules.audit.recorder import changes, record, snapshot
@@ -39,6 +42,7 @@ _FIELDS = (
     "status",
     "max_steps",
     "max_runtime_seconds",
+    "level",
 )
 
 
@@ -80,6 +84,7 @@ class AgentService:
         await require_agents(self.session, actor)
         await self._usable_connection(actor, data.connection_id, data.model)
         await self._responsible(actor, data.responsible_user_id)
+        await self._level(actor, None, data.level)
         agent = await self.repo(actor).add(
             Agent(
                 org_id=actor.org_id,
@@ -92,6 +97,7 @@ class AgentService:
                 status=data.status,
                 max_steps=data.max_steps,
                 max_runtime_seconds=data.max_runtime_seconds,
+                level=data.level,
             )
         )
         details = {**snapshot(agent, _FIELDS), "instructions_chars": len(agent.instructions)}
@@ -110,6 +116,8 @@ class AgentService:
             await self._usable_connection(actor, data.connection_id, data.model)
         if data.responsible_user_id is not None:
             await self._responsible(actor, data.responsible_user_id)
+        if data.level is not None and data.level > agent.level:
+            await self._level(actor, agent.id, data.level)
         before = snapshot(agent, _FIELDS)
         for name in given:
             value = getattr(data, name)
@@ -134,6 +142,10 @@ class AgentService:
         await repo.delete(agent)
         await self._audit(actor, "agent.deleted", agent, details)
 
+    async def current(self, actor: Actor, agent_id: uuid.UUID, version: int) -> Agent:
+        """The agent locked, at `version` (409 `agent.version_conflict` else)."""
+        return await self._current(actor, agent_id, version)
+
     async def _current(self, actor: Actor, agent_id: uuid.UUID, version: int) -> Agent:
         agent = _found(await self.repo(actor).get(agent_id, lock=True))
         if agent.version != version:
@@ -141,6 +153,10 @@ class AgentService:
                 code="agent.version_conflict", details={"current_version": agent.version}
             )
         return agent
+
+    async def _level(self, actor: Actor, agent_id: uuid.UUID | None, level: int) -> None:
+        if not await may_grant_level(self.session, actor, agent_id, level):
+            raise Forbidden(code="agent.level_denied")
 
     async def _usable_connection(self, actor: Actor, connection_id: uuid.UUID, model: str) -> None:
         connection = await ConnectionRepository(self.session, actor.org_id).get_shared(

@@ -135,7 +135,7 @@ ebenso an). Leser ohne KI sehen von beidem nichts.
 
 Agenten sind Principals wie Personen: Mitglied von Bereichen (`PUT
 /api/spaces/{id}/members` mit `member_type: agent`), Teilnehmer einer Direktnachricht,
-Urheber von Nachrichten (`kind: agent`). In M5 ist jeder Agent Stufe 1: er liest nur.
+Urheber von Nachrichten (`kind: agent`).
 
 - `GET/POST /api/agents`, `GET/PATCH/DELETE /api/agents/{id}` (nur `owner`/`admin`,
   sonst 404 `agent.not_found`): Name, Kurzvorstellung, Anweisungen (höchstens 20.000
@@ -147,6 +147,23 @@ Urheber von Nachrichten (`kind: agent`). In M5 ist jeder Agent Stufe 1: er liest
   gesprochen oder gelaufen ist, wird nicht gelöscht (409 `agent.in_use`), sondern
   pausiert.
 - Antworten nennen auch `responsible_name`, den Namen der verantwortlichen Person.
+- **Autonomiestufe** `level` (1 nur lesen, 2 vorschlagen, 3 intern schreiben; Stufe 4
+  kommt mit M8): neue Agenten haben Stufe 2, Agenten aus M5 wurden bei der Migration
+  Stufe 1 (sie waren nur lesend gebaut). Eine Stufe über 2 vergibt nur ein Admin oder
+  wer jeden Bereich verwaltet, in dem der Agent Mitglied ist (sonst 403
+  `agent.level_denied`; ohne Bereiche nur Admins). Da Organisations-Agenten ohnehin
+  `agent.manage` brauchen, sind das heute immer Admins.
+- **Werkzeugfreigaben** (`GET/PUT /api/agents/{id}/tools`, `agent.manage`): jedes
+  Werkzeug des Katalogs mit seiner Mindeststufe und Wirkung (`read`, `propose`,
+  `write`), der Voreinstellung aus der Stufe (`allow` ab der Mindeststufe, sonst
+  `block`), dem Eintrag des Agenten (`allow`, `confirm`, `block` oder keiner) und der
+  wirksamen Freigabe (die strengere von beiden: Einträge können nur verschärfen).
+  `PUT` ersetzt alle Einträge mit der `version` des Agenten (409
+  `agent.version_conflict`); unbekannte Werkzeuge 422 `agent.tool_unknown`; jede
+  Änderung im Audit (`agent.tools_changed`). Ein Lauf bietet dem Modell nur Werkzeuge
+  mit wirksamem `allow` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
+  `rights_revoked`). `confirm` wartet auf die Freigaben (M6 Task 7) und wird bis dahin
+  nicht angeboten. Ein Werkzeug, das der Katalog nicht kennt, läuft nie.
 - `GET /api/agents/{id}/profile` (`ai.use`): Name, Kurzvorstellung, Status; Entwürfe
   sind für alle ohne `agent.manage` unsichtbar, auch beim Hinzufügen als Mitglied
   eines Bereichs (404 `agent.not_found`). Wer Agenten nicht sieht (weder `ai.use` noch

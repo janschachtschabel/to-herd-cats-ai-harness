@@ -4,7 +4,12 @@
 introduction for colleagues, instructions, the connection and model it talks to, the
 person responsible for it, a status (`draft`: not offered to anyone; `active`;
 `paused`: kept, but starts no runs) and its limits per run (steps, runtime), capped
-from above. Every agent is level 1 (reads only) in M5.
+from above; its autonomy level (spec 8.2: 1 reads, 2 proposes, 3 writes inside; 4,
+acting outside, comes with M8), the default of its tool grants.
+
+`agent_tool`: an agent's entry for one tool of the catalog (`toolbox/catalog.py`):
+`allow`, `confirm` or `block`; it can only tighten what the level allows
+(`toolbox/policy.py`).
 
 `run`: one answer to a direct message. Created `queued` in the transaction of the
 message that asks; a worker takes it (`running`, with a lease it renews) and ends it
@@ -48,6 +53,8 @@ MAX_INTRO_CHARS = 500
 MAX_INSTRUCTIONS_CHARS = 20_000
 MAX_STEPS = 25
 MAX_RUNTIME_SECONDS = 600
+MAX_LEVEL = 3  # level 4 (external tools) comes with M8
+DEFAULT_LEVEL = 2
 
 
 class AgentStatus(StrEnum):
@@ -95,6 +102,7 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
         CheckConstraint(
             f"max_runtime_seconds BETWEEN 10 AND {MAX_RUNTIME_SECONDS}", name="max_runtime"
         ),
+        CheckConstraint(f"level BETWEEN 1 AND {MAX_LEVEL}", name="level"),
         Index("ix_agent_connection_id", "connection_id"),
     )
 
@@ -113,7 +121,21 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
     max_runtime_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=MAX_RUNTIME_SECONDS
     )
+    level: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=DEFAULT_LEVEL, server_default=text(str(DEFAULT_LEVEL))
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class AgentTool(OrgScoped, Base):
+    __tablename__ = "agent_tool"
+    __table_args__ = (CheckConstraint("policy IN ('allow', 'confirm', 'block')", name="policy"),)
+
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("agent.id", ondelete="CASCADE"), primary_key=True
+    )
+    tool: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy: Mapped[str] = mapped_column(String(16), nullable=False)
 
 
 class Run(UuidPk, OrgScoped, Base):

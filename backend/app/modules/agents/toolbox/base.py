@@ -24,6 +24,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -35,6 +36,26 @@ from app.modules.ai.models import DataLocation
 from app.runtime.loop import ToolResult
 
 NOT_FOUND = "Nothing found (or not readable)."
+
+
+class Effect(StrEnum):
+    """What a tool does: reads, proposes (a human decides), or writes."""
+
+    READ = "read"
+    PROPOSE = "propose"
+    WRITE = "write"
+
+
+class Grant(StrEnum):
+    """How an agent may use a tool (spec 8.1), from loose to strict."""
+
+    ALLOW = "allow"
+    CONFIRM = "confirm"
+    BLOCK = "block"
+
+    @property
+    def strictness(self) -> int:
+        return list(Grant).index(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +90,11 @@ Runner = Callable[[ToolContext, Any], Awaitable[ToolResult | Wait]]
 
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
+    """`level`: the lowest autonomy level (1 to 3) whose default allows the tool."""
+
     name: str
     description: str
     args: type[BaseModel]
     run: Runner
+    level: int = 1
+    effect: Effect = Effect.READ

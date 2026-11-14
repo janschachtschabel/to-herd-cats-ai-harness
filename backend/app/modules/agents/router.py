@@ -9,12 +9,15 @@ from fastapi import APIRouter, Query
 import app.modules.agents.hooks  # noqa: F401 -- registers what messaging asks of agents
 from app.core.access import Actor
 from app.core.pagination import Page, PageParams
+from app.modules.agents.grants import GrantService
 from app.modules.agents.models import Agent
 from app.modules.agents.runs import RunService
 from app.modules.agents.schemas import (
     AgentCreate,
     AgentOut,
     AgentProfileOut,
+    AgentToolsOut,
+    AgentToolsPut,
     AgentUpdate,
     RunEventOut,
     RunOut,
@@ -56,6 +59,22 @@ async def agent_profile(
 ) -> AgentProfileOut:
     """For a person with `ai.use`: name, introduction and status (no draft)."""
     return AgentProfileOut.of(await AgentService(session).profile(actor, agent_id))
+
+
+@agents.get("/{agent_id}/tools", response_model=AgentToolsOut)
+async def agent_tools(agent_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> AgentToolsOut:
+    """Every tool of the catalog with the agent's grant (`agent.manage`)."""
+    return AgentToolsOut.of(await GrantService(session).get(actor, agent_id))
+
+
+@agents.put("/{agent_id}/tools", response_model=AgentToolsOut)
+async def set_agent_tools(
+    agent_id: uuid.UUID, body: AgentToolsPut, actor: ActorDep, session: SessionDep
+) -> AgentToolsOut:
+    """Replace the agent's entries (they only tighten), with its `version`."""
+    entries = {entry.tool: entry.policy for entry in body.tools}
+    shown = await GrantService(session).set(actor, agent_id, entries, body.version)
+    return AgentToolsOut.of(shown)
 
 
 @agents.patch("/{agent_id}", response_model=AgentOut)

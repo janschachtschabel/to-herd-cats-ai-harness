@@ -351,6 +351,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{agent_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Tools
+         * @description Every tool of the catalog with the agent's grant (`agent.manage`).
+         */
+        get: operations["agent_tools_api_agents__agent_id__tools_get"];
+        /**
+         * Set Agent Tools
+         * @description Replace the agent's entries (they only tighten), with its `version`.
+         */
+        put: operations["set_agent_tools_api_agents__agent_id__tools_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/assignments": {
         parameters: {
             query?: never;
@@ -2020,6 +2044,12 @@ export interface components {
              */
             intro?: string;
             /**
+             * Level
+             * @description autonomy level (spec 8.2); above 2: admins
+             * @default 2
+             */
+            level?: number;
+            /**
              * Max Runtime Seconds
              * @description seconds
              * @default 600
@@ -2067,6 +2097,8 @@ export interface components {
             instructions: string;
             /** Intro */
             intro: string;
+            /** Level */
+            level: number;
             /** Max Runtime Seconds */
             max_runtime_seconds: number;
             /** Max Steps */
@@ -2126,6 +2158,57 @@ export interface components {
          * @enum {string}
          */
         AgentStatus: "draft" | "active" | "paused";
+        /** AgentToolEntry */
+        AgentToolEntry: {
+            policy: components["schemas"]["Grant"];
+            /** Tool */
+            tool: string;
+        };
+        /**
+         * AgentToolOut
+         * @description One tool of the catalog for this agent: its own `level` (the lowest that allows
+         *     it) and `effect`; `default` (from the agent's level), `entry` (the agent's, or
+         *     null) and `effective` (the stricter of both; what a run gets).
+         */
+        AgentToolOut: {
+            default: components["schemas"]["Grant"];
+            effect: components["schemas"]["Effect"];
+            effective: components["schemas"]["Grant"];
+            entry: components["schemas"]["Grant"] | null;
+            /** Level */
+            level: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * AgentToolsOut
+         * @description An agent's tool grants: every tool of the catalog (a fixed, short list, so not
+         *     paged). `version`: the agent's.
+         */
+        AgentToolsOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Level */
+            level: number;
+            /** Tools */
+            tools: components["schemas"]["AgentToolOut"][];
+            /** Version */
+            version: number;
+        };
+        /**
+         * AgentToolsPut
+         * @description All of the agent's entries (those left out are removed); each can only tighten
+         *     what the level allows. With the agent's `version`.
+         */
+        AgentToolsPut: {
+            /** Tools */
+            tools: components["schemas"]["AgentToolEntry"][];
+            /** Version */
+            version: number;
+        };
         /**
          * AgentUpdate
          * @description Fields left out stay as they are; `connection_id` and `model` go together.
@@ -2137,6 +2220,8 @@ export interface components {
             instructions?: string | null;
             /** Intro */
             intro?: string | null;
+            /** Level */
+            level?: number | null;
             /** Max Runtime Seconds */
             max_runtime_seconds?: number | null;
             /** Max Steps */
@@ -2742,6 +2827,12 @@ export interface components {
             version: number;
         };
         /**
+         * Effect
+         * @description What a tool does: reads, proposes (a human decides), or writes.
+         * @enum {string}
+         */
+        Effect: "read" | "propose" | "write";
+        /**
          * EpicOut
          * @description An epic with how many children it has per status category (its progress).
          */
@@ -2798,6 +2889,12 @@ export interface components {
          * @enum {string}
          */
         EventKind: "model_call" | "tool_call" | "stop";
+        /**
+         * Grant
+         * @description How an agent may use a tool (spec 8.1), from loose to strict.
+         * @enum {string}
+         */
+        Grant: "allow" | "confirm" | "block";
         /** GroupAssignmentOut */
         GroupAssignmentOut: {
             /**
@@ -5794,6 +5891,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_tools_api_agents__agent_id__tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_agent_tools_api_agents__agent_id__tools_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentToolsPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolsOut"];
                 };
             };
             /** @description Validation Error */

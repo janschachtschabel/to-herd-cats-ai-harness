@@ -43,6 +43,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     status: 'active',
     max_steps: 25,
     max_runtime_seconds: 600,
+    level: 2,
     version: 2,
     created_at: '2026-11-13T08:00:00Z',
     updated_at: '2026-11-13T08:00:00Z',
@@ -88,6 +89,7 @@ describe('agents administration', () => {
       status: 'active',
       max_steps: 25,
       max_runtime_seconds: 600,
+      level: 2,
     })
     expect(await screen.findByRole('article', { name: 'Hilda' })).toBeInTheDocument()
   })

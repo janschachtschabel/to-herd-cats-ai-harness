@@ -253,6 +253,14 @@
             "title": "Intro",
             "type": "string"
           },
+          "level": {
+            "default": 2,
+            "description": "autonomy level (spec 8.2); above 2: admins",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level",
+            "type": "integer"
+          },
           "max_runtime_seconds": {
             "default": 600,
             "description": "seconds",
@@ -326,6 +334,10 @@
             "title": "Intro",
             "type": "string"
           },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
           "max_runtime_seconds": {
             "title": "Max Runtime Seconds",
             "type": "integer"
@@ -383,6 +395,7 @@
           "status",
           "max_steps",
           "max_runtime_seconds",
+          "level",
           "version",
           "created_at",
           "updated_at"
@@ -462,6 +475,125 @@
         "title": "AgentStatus",
         "type": "string"
       },
+      "AgentToolEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/Grant"
+          },
+          "tool": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "policy"
+        ],
+        "title": "AgentToolEntry",
+        "type": "object"
+      },
+      "AgentToolOut": {
+        "description": "One tool of the catalog for this agent: its own `level` (the lowest that allows\nit) and `effect`; `default` (from the agent's level), `entry` (the agent's, or\nnull) and `effective` (the stricter of both; what a run gets).",
+        "properties": {
+          "default": {
+            "$ref": "#/components/schemas/Grant"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/Effect"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/Grant"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Grant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "effect",
+          "default",
+          "entry",
+          "effective"
+        ],
+        "title": "AgentToolOut",
+        "type": "object"
+      },
+      "AgentToolsOut": {
+        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_id",
+          "level",
+          "version",
+          "tools"
+        ],
+        "title": "AgentToolsOut",
+        "type": "object"
+      },
+      "AgentToolsPut": {
+        "additionalProperties": false,
+        "description": "All of the agent's entries (those left out are removed); each can only tighten\nwhat the level allows. With the agent's `version`.",
+        "properties": {
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolEntry"
+            },
+            "maxItems": 100,
+            "title": "Tools",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tools",
+          "version"
+        ],
+        "title": "AgentToolsPut",
+        "type": "object"
+      },
       "AgentUpdate": {
         "additionalProperties": false,
         "description": "Fields left out stay as they are; `connection_id` and `model` go together.",
@@ -501,6 +633,20 @@
               }
             ],
             "title": "Intro"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "description": "autonomy level (spec 8.2); above 2: admins",
+                "maximum": 3.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
           },
           "max_runtime_seconds": {
             "anyOf": [
@@ -2122,6 +2268,16 @@
         "title": "DmOut",
         "type": "object"
       },
+      "Effect": {
+        "description": "What a tool does: reads, proposes (a human decides), or writes.",
+        "enum": [
+          "read",
+          "propose",
+          "write"
+        ],
+        "title": "Effect",
+        "type": "string"
+      },
       "EpicOut": {
         "description": "An epic with how many children it has per status category (its progress).",
         "properties": {
@@ -2264,6 +2420,16 @@
           "stop"
         ],
         "title": "EventKind",
+        "type": "string"
+      },
+      "Grant": {
+        "description": "How an agent may use a tool (spec 8.1), from loose to strict.",
+        "enum": [
+          "allow",
+          "confirm",
+          "block"
+        ],
+        "title": "Grant",
         "type": "string"
       },
       "GroupAssignmentOut": {
@@ -9105,6 +9271,102 @@
           }
         },
         "summary": "Agent Profile",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/tools": {
+      "get": {
+        "description": "Every tool of the catalog with the agent's grant (`agent.manage`).",
+        "operationId": "agent_tools_api_agents__agent_id__tools_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentToolsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Tools",
+        "tags": [
+          "agents"
+        ]
+      },
+      "put": {
+        "description": "Replace the agent's entries (they only tighten), with its `version`.",
+        "operationId": "set_agent_tools_api_agents__agent_id__tools_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentToolsPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentToolsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Agent Tools",
         "tags": [
           "agents"
         ]

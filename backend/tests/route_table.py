@@ -172,6 +172,8 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/agents/{agent_id}/profile", "agent"),
     ("PATCH", "/api/agents/{agent_id}", "agent"),
     ("DELETE", "/api/agents/{agent_id}", "agent"),
+    ("GET", "/api/agents/{agent_id}/tools", "agent"),
+    ("PUT", "/api/agents/{agent_id}/tools", "agent"),
     ("GET", "/api/runs/{run_id}", "run"),
     ("GET", "/api/runs/{run_id}/events", "run"),
 ]
@@ -278,4 +280,5 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "responsible_user_id": str(uuid7()),
     },
     ("PATCH", "/api/agents/{agent_id}"): {"name": "X", "version": 1},
+    ("PUT", "/api/agents/{agent_id}/tools"): {"tools": [], "version": 1},
 }

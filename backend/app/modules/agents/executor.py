@@ -56,10 +56,12 @@ from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import replay
 from app.modules.agents.models import EventKind, Run, StopReason
 from app.modules.agents.read_repository import ReadRepository
+from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import refusal
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
+from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.ai.models import AiConnection, ConnectionKind, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
 from app.modules.messaging.models import MAX_BODY_CHARS, Message
@@ -125,6 +127,9 @@ class Executor:
                 return Outcome("completed")
             target = _target(connection, agent.model)
             deadline = self.clock() + agent.max_runtime_seconds
+            entries = await AgentRepository(session, org).tool_entries(agent.id)
+            grants = {name: Grant(policy) for name, policy in entries.items()}
+            tools = allowed(agent.level, offered(), grants) if target.supports_tools else []
             run = Working(
                 claimed,
                 agent,
@@ -134,6 +139,7 @@ class Executor:
                 deadline,
                 reads=journal.reads,
                 seq=journal.seq,
+                tools=tools,
             )
         turns = [context.Turn("agent" if s.by_agent else "person", s.text) for s in said]
         instructions = context.instructions(agent.name, agent.instructions)
@@ -154,8 +160,7 @@ class Executor:
             return Outcome("error", detail="secret unavailable")
         timeout = max(run.deadline - self.clock(), 1.0)
         built = self.make_model(replace(target, api_key=key), timeout)
-        tools = offered() if target.supports_tools else []
-        host = RunHost(self.unit, self.clock, run, {tool.name: tool for tool in tools})
+        host = RunHost(self.unit, self.clock, run)
         try:
             return await run_loop(
                 built,
@@ -163,7 +168,7 @@ class Executor:
                 instructions,
                 host,
                 max_steps=run.agent.max_steps,
-                offered=tools,
+                offered=run.tools,
                 journal=journal,
             )
         finally:
