@@ -84,7 +84,7 @@ describe('activity', () => {
     mockApi({ ...shellRoutes(makeMe(['ai.use'])), 'GET /api/activity': page([entry]) })
     await renderApp('/activity')
     const item = (await screen.findByText(/Eine Aufgabe mit Hilda/)).closest('li')!
-    expect(item).toHaveTextContent('Die Eigentümerin darf sie nicht mehr ausführen.')
+    expect(item).toHaveTextContent('Wer sie besitzt, darf sie nicht mehr ausführen.')
     expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
   })
 

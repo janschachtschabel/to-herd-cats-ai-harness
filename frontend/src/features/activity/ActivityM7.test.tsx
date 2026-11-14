@@ -34,7 +34,7 @@ describe('activity entries of M7', () => {
     })
     const { user, router } = await renderApp('/activity')
     const sentences = [
-      'Eine Aufgabe mit Hilda ist angehalten: Die Eigentümerin darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.',
+      'Eine Aufgabe mit Hilda ist angehalten: Wer sie besitzt, darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.',
       'Eine Aufgabe mit Hilda ist angehalten: Drei Läufe in Folge kamen nicht zu Ende.',
       'Eine Aufgabe mit Hilda wurde von Hand angehalten.',
       'Eine Aufgabe mit Hilda war angehalten und läuft inzwischen wieder.',

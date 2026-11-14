@@ -29,7 +29,7 @@
       "lastRun": "Letzter Lauf",
       "noRun": "noch keiner",
       "openRun": "Lauf ansehen",
-      "owner": "Eigentümerin: {{name}}",
+      "owner": "Gehört {{name}}",
       "unknownAgent": "ein entfernter Agent",
       "unknownOwner": "eine frühere Person"
     },
@@ -52,7 +52,7 @@
     },
     "paused": {
       "manual": "Von Hand angehalten",
-      "owner": "Angehalten: Die Eigentümerin darf sie nicht mehr ausführen",
+      "owner": "Angehalten: Wer sie besitzt, darf sie nicht mehr ausführen",
       "failing": "Angehalten: Drei Läufe in Folge kamen nicht zu Ende"
     },
     "place": {
@@ -117,7 +117,7 @@
       "instruction": "Auftrag",
       "checklist": "Checkliste",
       "agent": "Agent",
-      "owner": "Eigentümerin",
+      "owner": "Gehört",
       "place": "Ort",
       "schedule": "Zeitplan",
       "state": "Zustand",
@@ -151,9 +151,9 @@
     },
     "takeOver": {
       "title": "Aufgabe übernehmen?",
-      "text": "Du wirst ihre Eigentümerin: Sie läuft dann mit deinen Rechten und in deinem Namen, ihre Läufe verbrauchen dein Budget, und Freigaben und Rückfragen gehen an dich. Eine angehaltene Aufgabe läuft wieder.",
+      "text": "Sie gehört dann dir: Sie läuft mit deinen Rechten und in deinem Namen, ihre Läufe verbrauchen dein Budget, und Freigaben und Rückfragen gehen an dich. Eine angehaltene Aufgabe läuft wieder.",
       "confirm": "Übernehmen",
-      "ownerUnable": "Die Eigentümerin darf diese Aufgabe nicht mehr ausführen; fortsetzen geht deshalb nicht. Wer sie selbst anlegen dürfte, kann sie übernehmen."
+      "ownerUnable": "Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen; fortsetzen geht deshalb nicht. Wer sie selbst anlegen dürfte, kann sie übernehmen."
     },
     "form": {
       "createTitle": "Neue Aufgabe",
@@ -237,7 +237,7 @@
       "not_allowed": "Das darfst du bei dieser Aufgabe nicht.",
       "not_active": "Die Aufgabe ist nicht aktiv.",
       "not_paused": "Die Aufgabe ist nicht angehalten.",
-      "owner_unable": "Die Eigentümerin darf diese Aufgabe nicht mehr ausführen. Wer sie selbst anlegen dürfte, kann sie übernehmen.",
+      "owner_unable": "Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen. Wer sie selbst anlegen dürfte, kann sie übernehmen.",
       "not_runnable": "Eine Ereignis-Regel läuft nur auf ein Ereignis hin.",
       "limit": "Du hast schon so viele Aufgaben, wie erlaubt sind. Lösche eine, bevor du eine neue anlegst.",
       "kind_immutable": "Die Art einer Aufgabe lässt sich nicht ändern.",

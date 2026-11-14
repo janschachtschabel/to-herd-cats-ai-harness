@@ -237,7 +237,7 @@ describe('one automation', () => {
     const { user } = await renderApp(`/automations/${automation.id}`)
     expect(
       await screen.findByText(
-        /Die Eigentümerin darf diese Aufgabe nicht mehr ausführen; fortsetzen geht deshalb nicht/,
+        /Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen; fortsetzen geht deshalb nicht/,
       ),
     ).toBeInTheDocument()
     const actions = screen.getByRole('group', { name: 'Aktionen' })
@@ -248,7 +248,9 @@ describe('one automation', () => {
     ).toEqual(['Übernehmen', 'Löschen'])
     await user.click(within(actions).getByRole('button', { name: 'Übernehmen' }))
     const dialog = await screen.findByRole('dialog', { name: 'Aufgabe übernehmen?' })
-    expect(within(dialog).getByText(/läuft dann mit deinen Rechten/)).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(/gehört dann dir: Sie läuft mit deinen Rechten/),
+    ).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Übernehmen' }))
     expect(await screen.findByText('Aktiv')).toBeInTheDocument()
     expect(api.find('POST', `/api/automations/${automation.id}/take-over`)[0]?.body).toEqual({
@@ -269,7 +271,7 @@ describe('one automation', () => {
     await user.click(await screen.findByRole('button', { name: 'Fortsetzen' }))
     expect(
       await screen.findByText(
-        'Die Eigentümerin darf diese Aufgabe nicht mehr ausführen. Wer sie selbst anlegen dürfte, kann sie übernehmen.',
+        'Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen. Wer sie selbst anlegen dürfte, kann sie übernehmen.',
       ),
     ).toBeInTheDocument()
   })

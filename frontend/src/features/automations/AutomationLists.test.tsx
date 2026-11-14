@@ -104,7 +104,7 @@ describe('my automations', () => {
       ),
     ).toBeInTheDocument()
     expect(
-      within(second!).getByText('Angehalten: Die Eigentümerin darf sie nicht mehr ausführen'),
+      within(second!).getByText('Angehalten: Wer sie besitzt, darf sie nicht mehr ausführen'),
     ).toBeInTheDocument()
     expect(within(second!).getByText('noch keiner')).toBeInTheDocument()
 
@@ -183,7 +183,7 @@ describe('the automations of a space', () => {
     expect(within(list).getByText('Ereignis-Regel')).toBeInTheDocument()
     expect(within(list).getByText('Bei: Ticket angelegt')).toBeInTheDocument()
     expect(within(list).getByText('bei jedem passenden Ereignis')).toBeInTheDocument()
-    expect(within(list).getByText(/Eigentümerin: Jan Jansen/)).toBeInTheDocument()
+    expect(within(list).getByText(/Gehört Jan Jansen/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Neue Aufgabe' })).toBeEnabled()
   })
 

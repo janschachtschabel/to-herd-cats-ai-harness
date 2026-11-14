@@ -401,7 +401,7 @@
       "space": "einem Bereich"
     },
     "automation": {
-      "owner": "Eine Aufgabe mit {{agent}} ist angehalten: Die Eigentümerin darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.",
+      "owner": "Eine Aufgabe mit {{agent}} ist angehalten: Wer sie besitzt, darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.",
       "failing": "Eine Aufgabe mit {{agent}} ist angehalten: Drei Läufe in Folge kamen nicht zu Ende.",
       "manual": "Eine Aufgabe mit {{agent}} wurde von Hand angehalten.",
       "paused": "Eine Aufgabe mit {{agent}} ist angehalten.",
