@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { AgentBadge } from '@/features/agents/AgentBadge'
+import { RUN_STOPPED } from '@/features/agents/display'
+import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
 import { MessageMarkdown } from '@/features/messaging/MessageMarkdown'
 import {
   EmptyState,
@@ -26,7 +29,8 @@ function useNow(everyMs: number): number {
 }
 
 /** A granted inspection: who talks, why one looks, until when, and the messages,
- *  read only (newest first, replies included). */
+ *  read only (newest first, replies included); an agent's with the AI mark, a run's
+ *  stop as its notice. */
 export function InspectionView({
   inspection,
   dm,
@@ -72,28 +76,35 @@ export function InspectionView({
         <EmptyState text={t('dmInspect.empty')} />
       ) : (
         <ol className="flex flex-col gap-2" aria-label={t('dmInspect.messages')}>
-          {messages.items.map((message) => (
-            <li key={message.id} className="rounded-md border px-3 py-2">
-              <p className="flex flex-wrap items-baseline gap-2 text-sm">
-                <span className="font-semibold">
-                  {message.author?.name ?? t('messaging.message.unknownAuthor')}
-                </span>
-                <time dateTime={message.created_at} className="text-xs text-muted-foreground">
-                  {formatDateTime(message.created_at, i18n.language)}
-                </time>
-                {message.parent_id && (
-                  <span className="text-xs text-muted-foreground">{t('dmInspect.inThread')}</span>
-                )}
-              </p>
-              {message.deleted_at ? (
-                <p className="text-sm text-muted-foreground italic">
-                  {t('messaging.message.deleted')}
+          {messages.items.map((message) =>
+            message.kind === 'system' && message.system?.key === RUN_STOPPED ? (
+              <li key={message.id}>
+                <RunStoppedNotice message={message} />
+              </li>
+            ) : (
+              <li key={message.id} className="rounded-md border px-3 py-2">
+                <p className="flex flex-wrap items-baseline gap-2 text-sm">
+                  <span className="font-semibold">
+                    {message.author?.name ?? t('messaging.message.unknownAuthor')}
+                  </span>
+                  {message.kind === 'agent' && <AgentBadge />}
+                  <time dateTime={message.created_at} className="text-xs text-muted-foreground">
+                    {formatDateTime(message.created_at, i18n.language)}
+                  </time>
+                  {message.parent_id && (
+                    <span className="text-xs text-muted-foreground">{t('dmInspect.inThread')}</span>
+                  )}
                 </p>
-              ) : (
-                <MessageMarkdown markdown={message.body_md} />
-              )}
-            </li>
-          ))}
+                {message.deleted_at ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    {t('messaging.message.deleted')}
+                  </p>
+                ) : (
+                  <MessageMarkdown markdown={message.body_md} />
+                )}
+              </li>
+            ),
+          )}
         </ol>
       )}
       {!expired && (

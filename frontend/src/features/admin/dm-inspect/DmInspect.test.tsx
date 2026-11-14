@@ -76,6 +76,66 @@ describe('direct message inspection', () => {
     expect(screen.queryByRole('textbox', { name: /Nachricht/ })).toBeNull()
   })
 
+  test("an agent's messages carry the AI mark; a stopped run says why", async () => {
+    const lea = makeEntry({ name: 'Lea Löwe' })
+    const conversation = '00000000-0000-7000-a000-000000000003'
+    mockApi({
+      ...shellRoutes(makeMe(['dm.inspect', 'directory.read'])),
+      'GET /api/directory': page([lea]),
+      'GET /api/admin/dm-inspect': page([
+        {
+          conversation_id: conversation,
+          participants: [{ id: lea.id, name: 'Lea Löwe', is_active: true }],
+          created_at: '2026-11-13T08:00:00Z',
+          last_message_at: null,
+        },
+      ]),
+      'POST /api/admin/dm-inspect': {
+        status: 201,
+        body: {
+          id: 'grant-3',
+          conversation_id: conversation,
+          reason: 'Prüfung nach Meldung 44',
+          granted_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+        },
+      },
+      'GET /api/admin/dm-inspect/:id/messages': page([
+        makeMessage({
+          kind: 'system',
+          author: null,
+          body_md: '',
+          system: {
+            key: 'run.stopped',
+            actor: null,
+            number: null,
+            old: null,
+            new: { value: 'policy_blocked', name: null },
+          },
+        }),
+        makeMessage({
+          kind: 'agent',
+          body_md: 'Es gibt 30 Tage Urlaub.',
+          author: { type: 'agent', id: 'agent-1', name: 'Hilda' },
+        }),
+      ]),
+    })
+    const { user } = await renderApp('/admin/dm-inspect')
+    await user.click(await screen.findByRole('combobox', { name: 'Person' }))
+    await user.click(await screen.findByRole('option', { name: /Lea Löwe/ }))
+    await user.click(await screen.findByRole('button', { name: 'Einsicht beantragen' }))
+    await user.type(screen.getByLabelText('Begründung'), 'Prüfung nach Meldung 44')
+    await user.click(screen.getByRole('button', { name: 'Einsicht beginnen' }))
+    const list = await screen.findByRole('list', { name: 'Nachrichten, neueste zuerst' })
+    const answer = within(list).getByText('Es gibt 30 Tage Urlaub.').closest('li')!
+    expect(within(answer).getByText('Hilda')).toBeInTheDocument()
+    expect(within(answer).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+    expect(
+      within(list).getByText(/Durch die KI-Richtlinie eines Bereichs gestoppt/),
+    ).toBeInTheDocument()
+    expect(within(list).queryByText('Unbekannt')).toBeNull()
+  })
+
   test('an expired inspection says so instead of showing messages', async () => {
     const lea = makeEntry({ name: 'Lea Löwe' })
     mockApi({
