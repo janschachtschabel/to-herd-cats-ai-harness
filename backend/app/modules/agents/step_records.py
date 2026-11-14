@@ -57,9 +57,9 @@ def tool_content(
     args: Any,
     result: ToolResult,
     duration_ms: int,
-    read: tuple[set[uuid.UUID], set[uuid.UUID]] = (set(), set()),
+    read: tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]] = (set(), set(), set()),
 ) -> dict[str, object]:
-    """`read`: the pages and tickets the call read (new to the run)."""
+    """`read`: the pages, tickets and drafts' spaces the call read (new to the run)."""
     content: dict[str, object] = {
         "step": step,
         "call_id": call.id,
@@ -73,6 +73,7 @@ def tool_content(
         "read": {
             "pages": sorted(str(p) for p in read[0]),
             "tickets": sorted(str(t) for t in read[1]),
+            "drafts": sorted(str(d) for d in read[2]),
         },
     }
     if result.final:
@@ -80,13 +81,17 @@ def tool_content(
     return content
 
 
-def snapshot(reads: Reads) -> tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]:
-    return set(reads.spaces), set(reads.pages), set(reads.tickets)
+Snapshot = tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]
 
 
-def restore(reads: Reads, saved: tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]) -> None:
+def snapshot(reads: Reads) -> Snapshot:
+    return set(reads.spaces), set(reads.pages), set(reads.tickets), set(reads.drafts)
+
+
+def restore(reads: Reads, saved: Snapshot) -> None:
     """What the run had read before a step that was rolled back (in place: the step's
     tool context shares the object)."""
-    for now, then in zip((reads.spaces, reads.pages, reads.tickets), saved, strict=True):
+    sets = (reads.spaces, reads.pages, reads.tickets, reads.drafts)
+    for now, then in zip(sets, saved, strict=True):
         now.clear()
         now.update(then)

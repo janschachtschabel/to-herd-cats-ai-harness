@@ -41,6 +41,7 @@ def replay(events: Iterable[RunEvent]) -> Replay:
             reads.spaces |= result.spaces
             reads.pages |= _ids(read.get("pages"))
             reads.tickets |= _ids(read.get("tickets"))
+            reads.drafts |= _ids(read.get("drafts"))
     steps: list[Recorded] = []
     while (answer := answers.get(len(steps) + 1)) is not None:
         calls = tuple(

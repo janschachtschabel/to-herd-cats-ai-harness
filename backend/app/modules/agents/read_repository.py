@@ -18,7 +18,7 @@ from app.modules.messaging.models import Conversation, ConversationKind, Message
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import WorkItem
 from app.modules.users.models import User
-from app.modules.wiki.models import Page
+from app.modules.wiki.models import Page, PageStatus
 
 HISTORY_MESSAGES = 200  # the newest top-level messages read; `context.window` cuts by chars
 
@@ -182,6 +182,17 @@ class ReadRepository:
                 found += 1
         blocked |= found < len(reads.pages) + len(reads.tickets)
         return Whereabouts(spaces, blocked)
+
+    async def draft_spaces(self, page_ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        """The spaces of those pages that are drafts now."""
+        if not page_ids:
+            return set()
+        stmt = select(Page.space_id).where(
+            Page.org_id == self.org_id,
+            Page.id.in_(sorted(page_ids)),
+            Page.status == PageStatus.DRAFT,
+        )
+        return set(await self.session.scalars(stmt))
 
     async def still_visible(self, actor: Actor, space_ids: set[uuid.UUID]) -> set[uuid.UUID]:
         """Which of the spaces the actor (with its read scope) may read now."""

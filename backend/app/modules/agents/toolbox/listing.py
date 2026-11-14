@@ -84,6 +84,8 @@ async def list_tree(ctx: ToolContext, args: ListTreeArgs) -> ToolResult:
     if not listed.items:
         return ToolResult("wiki", NOT_FOUND, attrs)
     ctx.reads.spaces.add(args.space_id)
+    if any(p.status != PageStatus.PUBLISHED for p in listed.items):
+        ctx.reads.drafts.add(args.space_id)  # a draft's title is the draft's
     lines = [
         f"- page id={p.id} path={p.path!r} title={p.title!r}"
         + (" (draft)" if p.status != PageStatus.PUBLISHED else "")

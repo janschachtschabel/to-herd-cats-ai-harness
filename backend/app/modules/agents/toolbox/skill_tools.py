@@ -29,7 +29,6 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from app.core.access import Action, can
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import (
-    LEAKS,
     by,
     closed_to_ai,
     effect,
@@ -150,10 +149,10 @@ async def propose_skill(ctx: ToolContext, args: ProposeSkillArgs) -> ToolResult:
             return ToolResult("skill", NOT_FOUND, attrs)
         if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, space_id):
             return ToolResult("skill", "Not allowed here.", attrs)
-        if await leaks_into(ctx, space_id):
-            return ToolResult("skill", LEAKS, attrs)
-    elif await leaks_into_organisation(ctx):
-        return ToolResult("skill", LEAKS, attrs)
+        if why := await leaks_into(ctx, space_id):
+            return ToolResult("skill", why, attrs)
+    elif why := await leaks_into_organisation(ctx):
+        return ToolResult("skill", why, attrs)
 
     async def write() -> ToolResult:
         service = SkillProposalService(ctx.session)

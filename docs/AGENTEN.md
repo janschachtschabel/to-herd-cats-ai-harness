@@ -287,6 +287,32 @@ Das gilt für `read_page`, `search`, `list_tree`, `list_versions` und den Diff v
 unbekannte Seite. Technisch ist das `ReadScope.drafts` am Akteur des Laufs, das
 `core/access.sees_drafts` und `draft_space_ids` auswerten.
 
+**Ein gelesener Entwurf bleibt bei den Bearbeitenden.** Hat ein Lauf einen Entwurf aus
+Bereich X gelesen (allein mit der Person: `read_page`, ein Treffer von `search`, ein
+Titel in `list_tree`, ein Treffer von `search_past_runs`, eine Gedächtnisseite im
+Entwurf), merkt er sich das (`Reads.drafts`; im Journal unter `read.drafts`, sodass ein
+fortgesetzter Lauf es wieder weiß; auch wenn der Entwurf inzwischen veröffentlicht
+ist). Ein Lauf im Thread einer Entwurfsseite beginnt mit dieser Marke. Solange sie
+steht, antwortet jedes Werkzeug, dessen Wirkung andere als die Bearbeitenden von X
+lesen könnten, mit einem Werkzeugfehler („Not allowed: you have read a draft …“), den
+das Modell sieht:
+
+| Werkzeug | nach einem Entwurf aus X |
+|---|---|
+| `search`, `read_page`, `read_ticket`, `list_tree`, `list_versions`, `search_tickets`, `read_conversation`, `search_past_runs`, `load_skill` | lesen, keine Prüfung |
+| `ask_user`, `submit_result`, die Antwort | erlaubt (eigenes Gespräch) |
+| `post_message` | ins eigene Gespräch erlaubt, in einen Kanal abgelehnt |
+| `propose_page_change` | zu einer Seite von X erlaubt, sonst abgelehnt |
+| `update_page` | an einem Entwurf von X erlaubt, sonst abgelehnt |
+| `comment_ticket`, `set_ticket_status`, `create_ticket`, `link_ticket_page`, `assign_ticket` | abgelehnt |
+| `propose_new_page`, `propose_skill`, `update_memory` | abgelehnt |
+
+Das eigene Gespräch des Laufs ist ausgenommen, weil dessen Publikum die Antwort
+ohnehin liest: die Person allein (sie durfte den Entwurf lesen) oder der Thread eines
+Entwurfs in X (den nur die Bearbeitenden von X lesen). In der Laufansicht sieht das
+Ergebnis eines Werkzeugaufrufs, der einen Entwurf las, außer der fragenden Person nur,
+wer in dessen Bereich Seiten bearbeiten darf.
+
 Beispiele:
 
 - Anna fragt Hilda in einer Direktnachricht zu zweit. Hilda liest Annas Team-Bereich
@@ -779,7 +805,8 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   `agent.manage`; sonst 404 `run.not_found`. Die Person, die gefragt hat, sieht ihre
   Läufe vollständig. Alle anderen sehen ein Werkzeugergebnis nur, solange sie jeden
   Bereich lesen dürfen, aus dem es stammt (jedes Ergebnis nennt seine Bereiche in
-  `spaces`); sonst kommt das Ereignis mit `redacted: true` und nur Schritt,
+  `spaces`), und eines, das einen Entwurf las (`read.drafts`), nur mit `page.edit` in
+  dessen Bereich; sonst kommt das Ereignis mit `redacted: true` und nur Schritt,
   Werkzeugname und Quelle. Wer als Admin einen Team- oder persönlichen Bereich nur
   kraft Admin-Rechts liest, bekommt den Inhalt und einen Audit-Eintrag
   `space.admin_access` (einmal je Admin, Bereich und Tag), wie beim direkten Lesen

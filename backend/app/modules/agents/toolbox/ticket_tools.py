@@ -34,8 +34,8 @@ from app.modules.agents.toolbox import handover
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.reading import ticket_scope
 from app.modules.agents.toolbox.writing import (
-    LEAKS,
     by,
+    carries_draft,
     closed_to_ai,
     effect,
     key_for,
@@ -117,8 +117,8 @@ async def comment_ticket(ctx: ToolContext, args: CommentTicketArgs) -> ToolResul
     ticket = await _ticket(ctx, args.key)
     if ticket is None:
         return ToolResult("ticket", NOT_FOUND, attrs)
-    if await leaks_into(ctx, ticket.space_id):
-        return ToolResult("ticket", LEAKS, attrs)
+    if why := await leaks_into(ctx, ticket.space_id):
+        return ToolResult("ticket", why, attrs)
 
     async def write() -> ToolResult:
         await _comment(ctx, ticket, args.text, "comment")
@@ -144,6 +144,8 @@ async def set_ticket_status(ctx: ToolContext, args: SetTicketStatusArgs) -> Tool
             else ("Only a person sets a status of category done or cancelled")
         )
         return ToolResult("ticket", f"{why}. You may set: {names}.", attrs)
+    if drafted := await carries_draft(ctx):
+        return ToolResult("ticket", drafted, attrs)
 
     async def write() -> ToolResult:
         view = await TicketService(ctx.session).update(
@@ -164,8 +166,8 @@ async def create_ticket(ctx: ToolContext, args: CreateTicketArgs) -> ToolResult:
         await closed_to_ai(ctx, args.space_id)
     ):
         return ToolResult("ticket", NOT_FOUND, attrs)
-    if await leaks_into(ctx, args.space_id):
-        return ToolResult("ticket", LEAKS, attrs)
+    if why := await leaks_into(ctx, args.space_id):
+        return ToolResult("ticket", why, attrs)
     parent_id = None
     if args.parent_key is not None:
         parent = await _ticket(ctx, args.parent_key)
@@ -198,6 +200,8 @@ async def link_ticket_page(ctx: ToolContext, args: LinkTicketPageArgs) -> ToolRe
         page = None
     if ticket is None or page is None:
         return ToolResult("ticket", NOT_FOUND, attrs)
+    if why := await carries_draft(ctx):
+        return ToolResult("ticket", why, attrs)
 
     async def write() -> ToolResult:
         linked = await TicketLinks(ctx.session).link(ctx.actor, ticket.number, page.id, by(ctx))
@@ -214,8 +218,8 @@ async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
     ticket = await _ticket(ctx, args.key)
     if ticket is None:
         return ToolResult("ticket", NOT_FOUND, attrs)
-    if await leaks_into(ctx, ticket.space_id):
-        return ToolResult("ticket", LEAKS, attrs)
+    if why := await leaks_into(ctx, ticket.space_id):
+        return ToolResult("ticket", why, attrs)
     assignee = Principal(PrincipalType(args.assignee_type), args.assignee_id)
     to_agent = assignee.type == PrincipalType.AGENT
     if to_agent and (refusal := await handover.refusal(ctx, ticket, assignee.id)):

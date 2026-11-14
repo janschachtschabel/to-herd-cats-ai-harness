@@ -20,7 +20,6 @@ from app.core.errors import NotFound
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import (
-    LEAKS,
     by,
     closed_to_ai,
     effect,
@@ -58,8 +57,9 @@ async def post_message(ctx: ToolContext, args: PostMessageArgs) -> ToolResult:
     if conversation.space_id is not None:
         if await closed_to_ai(ctx, conversation.space_id):
             return ToolResult("conversation", NOT_FOUND, attrs)
-        if await leaks_into(ctx, conversation.space_id):
-            return ToolResult("conversation", LEAKS, attrs)
+        # Its own conversation reads the run's answer anyway (`writing`, drafts).
+        if why := await leaks_into(ctx, conversation.space_id, editors_only=own):
+            return ToolResult("conversation", why, attrs)
 
     async def write() -> ToolResult:
         digest = hashlib.sha256(args.text.encode()).hexdigest()

@@ -157,7 +157,7 @@ class RunHost:
             actor = await self._actor(session, agent)
             location = await self._location(steps)
             reads = self.run.reads
-            pages, tickets = set(reads.pages), set(reads.tickets)
+            pages, tickets, drafts = set(reads.pages), set(reads.tickets), set(reads.drafts)
             ctx = ToolContext(session, actor, location, reads, self._ref(), CallRef(step, call.id))
             started = time.perf_counter()
             held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
@@ -166,7 +166,9 @@ class RunHost:
             if isinstance(result, Wait):
                 await steps.wait(run, result.until)
                 return result
-            read = (reads.pages - pages, reads.tickets - tickets)
+            repo = ReadRepository(session, run.org_id)
+            reads.drafts |= await repo.draft_spaces(reads.pages - pages)  # as read
+            read = (reads.pages - pages, reads.tickets - tickets, reads.drafts - drafts)
             content = tool_content(step, call, args, result, duration_ms, read)
             await steps.event(self._seq(), EventKind.TOOL_CALL, content)
             steps.keep(run)

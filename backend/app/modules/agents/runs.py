@@ -10,7 +10,9 @@ their run in full. Anyone else reads
   a direct page read; otherwise, and for a result without noted spaces, the event
   comes `redacted`: its step, tool name and source stay; so does a result that
   marks itself the asker's (`ASKER_ONLY` in its attrs: `search_past_runs` with any
-  of the model's words or a hit from a run that read no space, review M6 finding 10);
+  of the model's words or a hit from a run that read no space, review M6 finding 10),
+  and one that read a draft (its `read.drafts`) unless they see drafts in that space
+  (`page.edit`, review M6 2 finding 2);
 - never the model's own words, its text and its tool calls' arguments, nor a tool
   call's arguments: they are the conversation's content, which its person reads (an
   admin only through the audited inspection of the DM). Usage (tokens, cost,
@@ -23,7 +25,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, can, require
+from app.core.access import Action, Actor, can, require, sees_drafts
 from app.core.errors import NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.agents.models import EventKind, Run, RunEvent
@@ -94,13 +96,18 @@ class RunService:
         if event.kind == EventKind.TOOL_CALL:
             kept = _pick(content, TOOL_CALL_SHOWN)
             attrs = {k: v for k, v in (content.get("attrs") or {}).items() if k != "query"}
-            if attrs.get(ASKER_ONLY) or not await self._may_read_all(actor, content.get("spaces")):
+            hidden = attrs.get(ASKER_ONLY) or not await self._may_read_all(actor, content)
+            if hidden:
                 return ShownEvent(event, kept, True)
             return ShownEvent(event, {**kept, "attrs": attrs, "text": content.get("text")}, False)
         return ShownEvent(event, content, False)
 
-    async def _may_read_all(self, actor: Actor, spaces: object) -> bool:
+    async def _may_read_all(self, actor: Actor, content: dict[str, Any]) -> bool:
+        spaces = content.get("spaces")
         if not isinstance(spaces, list):
+            return False
+        drafts = (content.get("read") or {}).get("drafts") or []
+        if not await may_read_drafts(self.session, actor, {uuid.UUID(str(d)) for d in drafts}):
             return False
         return await may_read_all(self.session, actor, {uuid.UUID(str(s)) for s in spaces})
 
@@ -117,6 +124,15 @@ async def may_read_all(session: AsyncSession, actor: Actor, spaces: set[uuid.UUI
             return False
     for space_id in ids:
         await require(session, actor, Action.SPACE_READ, space_id)
+    return True
+
+
+async def may_read_drafts(session: AsyncSession, actor: Actor, spaces: set[uuid.UUID]) -> bool:
+    """Whether the actor sees drafts in every one of the spaces (a result that read a
+    draft there: run events, `search_past_runs`)."""
+    for space_id in sorted(spaces):
+        if not await sees_drafts(session, actor, space_id):
+            return False
     return True
 
 

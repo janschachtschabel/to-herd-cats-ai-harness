@@ -24,7 +24,7 @@ from app.modules.agents.memory_repository import MemoryRepository
 from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.agents.scope_repository import ScopeRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import LEAKS, by, closed_to_ai, effect, leaks_into
+from app.modules.agents.toolbox.writing import by, closed_to_ai, effect, leaks_into
 from app.modules.wiki.models import MAX_CONTENT_CHARS
 from app.modules.wiki.visibility import PageReader
 from app.runtime.loop import ToolResult
@@ -59,8 +59,8 @@ async def update_memory(ctx: ToolContext, args: UpdateMemoryArgs) -> ToolResult:
             "update_memory again."
         )
         return ToolResult("memory", text, attrs)
-    if await leaks_into(ctx, args.space_id):
-        return ToolResult("memory", LEAKS, attrs)
+    if why := await leaks_into(ctx, args.space_id):
+        return ToolResult("memory", why, attrs)
     if await _shared_from_alone(ctx, args.space_id):
         return ToolResult("memory", SHARED_SPACE, attrs)
 

@@ -33,11 +33,15 @@ class Reads:
     """What the run has read so far: its policy and rights are checked against all of
     it before every model call (the conversation itself counts as policy `any`). The
     spaces as they were at read time, and the pages and tickets, whose spaces are
-    looked up again for every check (a page moved since counts where it is now)."""
+    looked up again for every check (a page moved since counts where it is now).
+    `drafts`: the spaces of drafts it read, as they were then (journaled with the
+    call that read them): only their editors may read what the run writes while it
+    holds one (`toolbox/writing.carries_draft`, review M6 2 finding 1)."""
 
     spaces: set[uuid.UUID] = field(default_factory=set)
     pages: set[uuid.UUID] = field(default_factory=set)
     tickets: set[uuid.UUID] = field(default_factory=set)
+    drafts: set[uuid.UUID] = field(default_factory=set)
 
 
 async def run_actor(

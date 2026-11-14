@@ -29,11 +29,17 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import Action, can
 from app.core.errors import NotFound
 from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import LEAKS, by, closed_to_ai, effect, leaks_into, refused
+from app.modules.agents.toolbox.writing import by, closed_to_ai, effect, leaks_into, refused
 from app.modules.proposals.models import MAX_REASON_CHARS
 from app.modules.proposals.service import ProposalService
 from app.modules.wiki import diffing
-from app.modules.wiki.models import MAX_CONTENT_CHARS, MAX_TITLE_CHARS, Page, VersionSource
+from app.modules.wiki.models import (
+    MAX_CONTENT_CHARS,
+    MAX_TITLE_CHARS,
+    Page,
+    PageStatus,
+    VersionSource,
+)
 from app.modules.wiki.service import PageService
 from app.modules.wiki.visibility import PageReader
 from app.runtime.loop import ToolResult
@@ -80,8 +86,8 @@ async def propose_page_change(ctx: ToolContext, args: ProposePageChangeArgs) -> 
     page = await _page(ctx, args.page_id)
     if page is None or not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, page.space_id):
         return ToolResult("wiki", NOT_FOUND if page is None else "Not allowed here.", attrs)
-    if await leaks_into(ctx, page.space_id):
-        return ToolResult("wiki", LEAKS, attrs)
+    if why := await leaks_into(ctx, page.space_id, editors_only=True):  # page.edit sees it
+        return ToolResult("wiki", why, attrs)
 
     async def write() -> ToolResult:
         proposal = await ProposalService(ctx.session).propose_change(
@@ -104,8 +110,8 @@ async def propose_new_page(ctx: ToolContext, args: ProposeNewPageArgs) -> ToolRe
         await closed_to_ai(ctx, args.space_id)
     ):
         return ToolResult("wiki", NOT_FOUND, attrs)
-    if await leaks_into(ctx, args.space_id):
-        return ToolResult("wiki", LEAKS, attrs)
+    if why := await leaks_into(ctx, args.space_id):
+        return ToolResult("wiki", why, attrs)
 
     async def write() -> ToolResult:
         proposal = await ProposalService(ctx.session).propose_new(
@@ -132,8 +138,9 @@ async def update_page(ctx: ToolContext, args: UpdatePageArgs) -> ToolResult:
         return ToolResult("wiki", PROPOSE_INSTEAD, attrs)
     if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, page.space_id):
         return ToolResult("wiki", "Not allowed here.", attrs)
-    if await leaks_into(ctx, page.space_id):
-        return ToolResult("wiki", LEAKS, attrs)
+    draft = page.status == PageStatus.DRAFT  # only the space's editors read it
+    if why := await leaks_into(ctx, page.space_id, editors_only=draft):
+        return ToolResult("wiki", why, attrs)
     ctx.reads.spaces.add(page.space_id)  # the diff shows the page
     ctx.reads.pages.add(page.id)
     spaces = frozenset({page.space_id})

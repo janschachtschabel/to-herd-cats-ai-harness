@@ -28,11 +28,13 @@ class PastHit:
 
 @dataclass(slots=True)
 class RunReads:
-    """What a run's tool calls read: their spaces, pages and tickets."""
+    """What a run's tool calls read: their spaces, pages and tickets, and the spaces
+    of the drafts among them."""
 
     spaces: set[uuid.UUID] = field(default_factory=set)
     pages: set[uuid.UUID] = field(default_factory=set)
     tickets: set[uuid.UUID] = field(default_factory=set)
+    drafts: set[uuid.UUID] = field(default_factory=set)
 
 
 def _escaped(text: str) -> str:
@@ -123,13 +125,19 @@ class PastRunRepository:
             into.spaces |= noted.spaces
             into.pages |= noted.pages
             into.tickets |= noted.tickets
+            into.drafts |= noted.drafts
         return found
 
 
 def event_reads(content: dict[str, Any]) -> RunReads:
     """What one tool call's event notes it read."""
     read = content.get("read") or {}
-    return RunReads(_ids(content.get("spaces")), _ids(read.get("pages")), _ids(read.get("tickets")))
+    return RunReads(
+        _ids(content.get("spaces")),
+        _ids(read.get("pages")),
+        _ids(read.get("tickets")),
+        _ids(read.get("drafts")),
+    )
 
 
 def _ids(values: object) -> set[uuid.UUID]:

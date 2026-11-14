@@ -9,6 +9,14 @@
   run has read so far came from a space whose content that space's audience may
   receive (`scope.space_audience`): the space itself, or the open spaces while it has
   no guest. A run that read a private space cannot carry it into another one.
+- **Drafts** (review M6 2 finding 1; spec 5.6): a run that read a draft of space X
+  (`Reads.drafts`, or a page it read that is a draft now) writes nothing that people
+  other than X's editors may read: every writing tool refuses (`DRAFTS`), except a
+  proposal for a page of X (seen with `page.edit` in X), `update_page` on a draft of
+  X, and what goes to the run's own conversation (`post_message` there, a question,
+  the final answer): its audience reads the answer anyway, and it is either the
+  person alone with the agent, who read the draft, or a draft's thread in X, which
+  only X's editors read.
 - **AI policy**: no tool writes into a space whose AI policy is `none`; every tool
   that names a space asks `closed_to_ai` first and answers "not found", as for a
   space it cannot see (review M6 finding 5). Tools that name a page or a ticket do
@@ -36,6 +44,11 @@ LEAKS = (
     "Not allowed: what you have read in this run may not be shown to the people of that "
     "space. Write only what comes from that space (or from open spaces)."
 )
+DRAFTS = (
+    "Not allowed: you have read a draft in this run, and drafts are only for the editors "
+    "of their space. Write nothing others may read; propose a change to a page of the "
+    "draft's space instead, or answer here."
+)
 
 
 def by(ctx: ToolContext) -> Authorship:
@@ -55,23 +68,46 @@ async def closed_to_ai(ctx: ToolContext, space_id: uuid.UUID) -> bool:
     return any(p.kind == AiPolicy.NONE for p in policies)
 
 
-async def leaks_into(ctx: ToolContext, space_id: uuid.UUID) -> bool:
-    """Whether writing into the space would show it what its audience may not see:
-    a space read so far (where it was read, or where its page or ticket is now)
-    outside the space's audience."""
+async def leaks_into(
+    ctx: ToolContext, space_id: uuid.UUID, *, editors_only: bool = False
+) -> str | None:
+    """Why writing into the space would show its audience what it may not see (None:
+    it would not): a draft read (`carries_draft`; `editors_only`: what is written
+    there is read only by the space's editors), or a space read so far (where it was
+    read, or where its page or ticket is now) outside the space's audience."""
+    if why := await carries_draft(ctx, space_id if editors_only else None):
+        return why
     read = await _read(ctx)
-    if not read:
-        return False
-    return not read <= await space_audience(ctx.session, ctx.run.org_id, space_id)
+    if read and not read <= await space_audience(ctx.session, ctx.run.org_id, space_id):
+        return LEAKS
+    return None
 
 
-async def leaks_into_organisation(ctx: ToolContext) -> bool:
+async def leaks_into_organisation(ctx: ToolContext) -> str | None:
     """The same for what everyone of the organisation reads (an organisation-wide
-    skill): anything read outside the open spaces."""
+    skill): a draft, or anything read outside the open spaces."""
+    if why := await carries_draft(ctx):
+        return why
     read = await _read(ctx)
-    if not read:
-        return False
-    return not read <= await organisation_audience(ctx.session, ctx.run.org_id)
+    if read and not read <= await organisation_audience(ctx.session, ctx.run.org_id):
+        return LEAKS
+    return None
+
+
+async def carries_draft(ctx: ToolContext, editors_of: uuid.UUID | None = None) -> str | None:
+    """`DRAFTS` while the run holds a draft, unless every draft it read is of
+    `editors_of`, the space whose editors alone read what is written."""
+    drafts = await drafts_read(ctx)
+    if drafts and not (editors_of is not None and drafts <= {editors_of}):
+        return DRAFTS
+    return None
+
+
+async def drafts_read(ctx: ToolContext) -> set[uuid.UUID]:
+    """The spaces of drafts the run read: noted when read, and pages it read that
+    are drafts now."""
+    now = await ReadRepository(ctx.session, ctx.run.org_id).draft_spaces(ctx.reads.pages)
+    return ctx.reads.drafts | now
 
 
 async def _read(ctx: ToolContext) -> set[uuid.UUID]:

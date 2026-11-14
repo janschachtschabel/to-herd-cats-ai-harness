@@ -9,7 +9,8 @@ also notes an admin's read by admin right):
 - the model's own words (its text, a final result) while every space its run read is,
   as they may repeat any of it;
 - what a hit read counts for the run's checks like a fresh read: its spaces and its
-  pages and tickets where they are now (a page locked or trashed since: no hit).
+  pages and tickets where they are now (a page locked or trashed since: no hit), and
+  the drafts it read (only for a run that sees drafts in their spaces now).
 The result is the asker's alone in the run view (`runs.ASKER_ONLY`) once a hit holds
 the model's words or comes from a run that noted no space (or from such a result):
 the model's words are the conversation's content, which the run view shows nobody
@@ -35,7 +36,7 @@ from app.modules.agents.past_runs_repository import (
     event_reads,
 )
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.runs import ASKER_ONLY, may_read_all
+from app.modules.agents.runs import ASKER_ONLY, may_read_all, may_read_drafts
 from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
 from app.modules.ai.policy import ANY, connection_allowed, strictest
@@ -88,6 +89,7 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
         ctx.reads.spaces |= now
         ctx.reads.pages |= noted.pages
         ctx.reads.tickets |= noted.tickets
+        ctx.reads.drafts |= noted.drafts
         lines.append(_line(hit, args.query))
         if len(lines) == HITS:
             break
@@ -107,7 +109,7 @@ class _Checker:
             return None
         repo = ReadRepository(ctx.session, ctx.run.org_id)
         now = await repo.now(Reads(pages=set(noted.pages), tickets=set(noted.tickets)))
-        if now.blocked:
+        if now.blocked or not await may_read_drafts(ctx.session, ctx.actor, noted.drafts):
             return None
         spaces = noted.spaces | now.spaces
         if not _words(hit) and not noted.spaces:  # a result that noted no space: never

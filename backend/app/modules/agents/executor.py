@@ -13,8 +13,8 @@ works.
   deleted (else `policy_blocked`); a run in a channel or a thread has read its space
   (what it is asked there is that space's content), and a run in a page's thread has
   read that page (a page locked for AI ends it `policy_blocked` before any model
-  call); then a place in the connection's
-  `requests_per_minute`.
+  call; a draft's thread marks its space's draft as read, `writing.carries_draft`);
+  then a place in the connection's `requests_per_minute`.
 - After every model call, in one transaction: the step's `run_event`, its usage
   (`record_usage`) and the step counter. The event's key (run, attempt, step) is
   unique and the transaction checks the attempt first, so a call is recorded once,
@@ -142,6 +142,9 @@ class Executor:
             briefed = await briefing.brief(session, actor, agent, location, place_space)
             journal.reads.spaces |= briefed.spaces  # the memory it gets is read
             journal.reads.pages |= briefed.pages
+            # a draft's thread (or a draft memory page) is its editors' alone: the mark
+            drafts = await ReadRepository(session, org).draft_spaces(journal.reads.pages)
+            journal.reads.drafts |= drafts
             found = await place.asked(session, claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
