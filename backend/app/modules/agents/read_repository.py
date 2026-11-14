@@ -7,15 +7,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor, visible_space_ids
-from app.modules.agents.models import Run
+from app.core.principal import PrincipalType
+from app.modules.agents.models import Agent, Run
 from app.modules.ai.policy import Policy
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import WorkItem
+from app.modules.users.models import User
 from app.modules.wiki.models import Page
 
 HISTORY_MESSAGES = 200  # the newest top-level messages read; `context.window` cuts by chars
@@ -36,8 +38,13 @@ class Whereabouts:
 
 @dataclass(frozen=True, slots=True)
 class Said:
+    """A message as a run reads it: whether an agent wrote it, its author (id and name
+    as they are now; None once gone) and its text."""
+
     by_agent: bool
     text: str
+    author_id: uuid.UUID | None = None
+    author_name: str | None = None
 
 
 class ReadRepository:
@@ -57,7 +64,7 @@ class ReadRepository:
         )
         at = func.coalesce(answered, Message.created_at)
         stmt = (
-            select(Message.kind, Message.body_md, at)
+            select(Message.kind, Message.body_md, Message.author_id, self._author_name(), at)
             .where(
                 Message.org_id == self.org_id,
                 Message.conversation_id == conversation_id,
@@ -71,9 +78,9 @@ class ReadRepository:
         )
         rows = list(reversed((await self.session.execute(stmt)).all()))
         rows.sort(
-            key=lambda row: row[2] or until
+            key=lambda row: row[4] or until
         )  # stable: messages of one moment keep their order
-        return [Said(kind == MessageKind.AGENT, body) for kind, body, _ in rows]
+        return [Said(k == MessageKind.AGENT, body, by, name) for k, body, by, name, _ in rows]
 
     async def thread_root(self, trigger_id: uuid.UUID, *, lock: bool = False) -> Message | None:
         """The thread a mention's run answers in: the root of the mentioning message's
@@ -98,7 +105,7 @@ class ReadRepository:
         """A thread as a mention's run answers it: the people's and the agents' messages
         in it written up to `until` (the run's start), oldest first."""
         stmt = (
-            select(Message.kind, Message.body_md)
+            select(Message.kind, Message.body_md, Message.author_id, self._author_name())
             .where(
                 Message.org_id == self.org_id,
                 or_(Message.id == root_id, Message.parent_id == root_id),
@@ -110,7 +117,25 @@ class ReadRepository:
             .limit(HISTORY_MESSAGES)
         )
         rows = reversed((await self.session.execute(stmt)).all())
-        return [Said(kind == MessageKind.AGENT, body) for kind, body in rows]
+        return [Said(k == MessageKind.AGENT, body, by, name) for k, body, by, name in rows]
+
+    async def person_name(self, user_id: uuid.UUID) -> str | None:
+        stmt = select(User.name).where(User.org_id == self.org_id, User.id == user_id)
+        return await self.session.scalar(stmt)
+
+    def _author_name(self) -> ColumnElement[str | None]:
+        """The (correlated) message's author's name: a person's or an agent's."""
+        person = select(User.name).where(
+            Message.author_type == PrincipalType.USER,
+            User.org_id == self.org_id,
+            User.id == Message.author_id,
+        )
+        agent = select(Agent.name).where(
+            Message.author_type == PrincipalType.AGENT,
+            Agent.org_id == self.org_id,
+            Agent.id == Message.author_id,
+        )
+        return func.coalesce(person.scalar_subquery(), agent.scalar_subquery())
 
     async def present(self, message_id: uuid.UUID) -> bool:
         """Whether the message is there and not deleted."""

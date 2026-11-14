@@ -52,7 +52,10 @@ abgeschaltet, Lauf wartet noch auf eine Antwort, Antwort in einem Thread).
 `@` im Eingabefeld eines Kanals, einer Seiten- oder Ticket-Diskussion bietet neben
 Personen die Agenten an, die Mitglied des Bereichs sind (mit KI-Kennzeichen). Der
 erwähnte Agent antwortet **im Thread** der Nachricht, nie als neue Nachricht im Kanal;
-er liest diesen Thread (bis zu seinem Start), nicht den ganzen Kanal. Je Thread ist
+er liest diesen Thread (bis zu seinem Start), nicht den ganzen Kanal. Als Auftrag gilt
+nur, was die erwähnende Person geschrieben hat: Nachrichten anderer Personen und anderer
+Agenten im Thread bekommt er mit Namen als Kontext, ausdrücklich als Daten und nie als
+Anweisung, und nur seine eigenen früheren Antworten gelten als seine. Je Thread ist
 höchstens ein Lauf offen; eine weitere Erwähnung im selben Thread wartet, bis er fertig
 ist („Lauf wartet“). In anderen Threads desselben Kanals laufen andere Läufe zugleich.
 Eine nachträgliche Bearbeitung, die einen Agenten erwähnt, startet nichts. Wer keine KI
@@ -569,6 +572,12 @@ Ein Lauf entsteht in der Transaktion der auslösenden Nachricht oder Zuweisung (
 Die Laufschleife (`app/runtime/loop.py`, der einzige Ort, der Pydantic AI importiert)
 ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schritt fest:
 
+- **Kontext:** Nutzer-Beiträge sind nur die Nachrichten der fragenden Person,
+  Assistenten-Beiträge nur die eigenen früheren Antworten des Agenten. Nachrichten
+  anderer Personen und Agenten gehen als ein Block `<untrusted source="conversation">`
+  mit `<message author="…">` je Nachricht an das Modell (`<` im Text maskiert). Die
+  Rahmenanweisung sagt in der Direktnachricht allein „eine Person“, sonst „mehrere lesen
+  mit, nur <Name> fragt“ (`app/runtime/context.py`, `agents/place.py`).
 - **Journal:** Jede Modellantwort (Text, Werkzeugaufrufe, Verbrauch) und jedes
   Werkzeugergebnis (vollständig, mit den Bereichen, aus denen es stammt) ist ein
   `run_event`. Ein **schreibendes Werkzeug schreibt seine Wirkung und seinen

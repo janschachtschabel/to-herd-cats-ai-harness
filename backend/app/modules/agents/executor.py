@@ -135,7 +135,7 @@ class Executor:
             briefed = await briefing.brief(session, actor, agent, location, place_space)
             journal.reads.spaces |= briefed.spaces  # the memory it gets is read
             journal.reads.pages |= briefed.pages
-            found = await place.asked(ReadRepository(session, org), claimed)
+            found = await place.asked(session, claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
             target = _target(connection, agent.model)
@@ -155,7 +155,9 @@ class Executor:
                 tools=tools,
                 reply_to=found.reply_to,
             )
-        instructions = context.instructions(agent.name, agent.instructions, briefed.sections)
+        instructions = context.instructions(
+            agent.name, agent.instructions, briefed.sections, found.asker
+        )
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps
 
