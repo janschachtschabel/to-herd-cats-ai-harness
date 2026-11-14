@@ -22,6 +22,7 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
+from app.modules.agents.models import AgentStatus
 from app.modules.agents.repository import AgentRepository
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.groups.repository import GroupRepository
@@ -148,7 +149,9 @@ class SpaceService:
     ) -> None:
         await self._members_changeable(actor, space_id)
         principal = Principal(member_type, member_id)
-        if not await self.spaces.remove_member(space_id, principal):
+        # Agents exist only for those who may see them: the same 404 as for no member.
+        hidden = member_type == PrincipalType.AGENT and not await self._sees_agents(actor)
+        if hidden or not await self.spaces.remove_member(space_id, principal):
             raise NotFound(code="spaces.member_not_found")
         await self._audit(actor, "space.member_removed", space_id, _member(principal))
         await self._access_changed(actor, space_id, principal)
@@ -187,7 +190,8 @@ class SpaceService:
 
     async def _name_of(self, actor: Actor, principal: Principal) -> str:
         """The person's, group's or agent's name; 404 unless it exists in the
-        organisation (an agent also for someone who may not see agents)."""
+        organisation (an agent also for someone who may not see agents, a draft agent
+        for someone without `agent.manage`)."""
         org_id = actor.org_id
         if principal.type == PrincipalType.USER:
             if (user := await self.users.get(org_id, principal.id)) is None:
@@ -197,6 +201,9 @@ class SpaceService:
             agent = await AgentRepository(self.session, org_id).get(principal.id)
             if agent is None or not await self._sees_agents(actor):
                 raise NotFound(code="agent.not_found")
+            draft = agent.status == AgentStatus.DRAFT
+            if draft and not await can(self.session, actor, Action.AGENT_MANAGE):
+                raise NotFound(code="agent.not_found")  # a draft: as for `visible_agent`
             return agent.name
         # Under the groups lock: a deletion running now finishes first (and then the
         # group is gone), or waits until this membership is committed and deletes it.

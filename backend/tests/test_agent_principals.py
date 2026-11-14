@@ -137,6 +137,44 @@ async def test_agents_as_space_members(bench: Bench) -> None:
     assert again.status_code == 404 and again.json()["error"]["code"] == "agent.not_found"
 
 
+async def test_without_ai_an_agent_member_cannot_be_removed_or_told_apart(
+    bench: Bench,
+) -> None:
+    """Finding 8: a space admin without `ai.use` gets the same 404 for a real agent
+    member as for an invented id, and the membership stays."""
+    made = await bench.people.alice.post("/api/spaces", json={"kind": "team", "name": "Team"})
+    url = f"/api/spaces/{made.json()['id']}/members"
+    member = {"member_type": "agent", "member_id": str(bench.agent.id), "role": "viewer"}
+    assert (await bench.people.alice.put(url, json=member)).status_code == 200
+    await assign_default(bench.people.admin, None)
+    answers = [
+        await bench.people.alice.delete(f"{url}/agent/{agent_id}")
+        for agent_id in (bench.agent.id, uuid.uuid4())
+    ]
+    for answer in answers:
+        assert answer.status_code == 404
+        assert answer.json()["error"]["code"] == "spaces.member_not_found"
+    listed = (await bench.people.admin.get(url)).json()["items"]
+    assert ("agent", "Ava") in [(m["member_type"], m["name"]) for m in listed]
+
+
+async def test_a_draft_agent_is_no_member_for_those_who_may_not_manage_agents(
+    bench: Bench,
+) -> None:
+    """Finding 9: adding a draft answers like an unknown agent, without its name."""
+    draft = await make_agent(
+        bench.session, bench.people, bench.connection.id, name="SecretDraftBot", status="draft"
+    )
+    made = await bench.people.alice.post("/api/spaces", json={"kind": "team", "name": "Team"})
+    url = f"/api/spaces/{made.json()['id']}/members"
+    member = {"member_type": "agent", "member_id": str(draft.id), "role": "viewer"}
+    r = await bench.people.alice.put(url, json=member)
+    assert r.status_code == 404 and r.json()["error"]["code"] == "agent.not_found"
+    assert "SecretDraftBot" not in r.text
+    by_manager = await bench.people.admin.put(url, json=member)
+    assert by_manager.status_code == 200 and by_manager.json()["name"] == "SecretDraftBot"
+
+
 async def _access_changed(bench: Bench) -> set[str]:
     rows = (
         await bench.session.scalars(select(EventOutbox).where(EventOutbox.type == "access.changed"))
