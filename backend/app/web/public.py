@@ -16,6 +16,7 @@ from app.core.request_log import RequestLogMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.telemetry import configure_tracing
 from app.modules.agents import router as agents_router
+from app.modules.agents import run_router
 from app.modules.ai import assignment_router as ai_assignments
 from app.modules.ai import router as ai
 from app.modules.ai import usage_router as ai_usage
@@ -103,7 +104,8 @@ def api_router() -> APIRouter:
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
     api.include_router(agents_router.agents)
-    api.include_router(agents_router.runs)
+    api.include_router(run_router.agent_runs)
+    api.include_router(run_router.runs)
     api.include_router(skill_transfer.skill_transfer)  # before /skills/{skill_id}
     api.include_router(skills.skills)
     api.include_router(skill_assignments.agent_skills)

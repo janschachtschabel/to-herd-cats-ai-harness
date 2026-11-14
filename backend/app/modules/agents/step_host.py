@@ -10,6 +10,7 @@ that writes commits its effect together with its entry in the journal
 transaction instead, and the host raises `Suspended` once it is committed."""
 
 import asyncio
+import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -29,7 +30,7 @@ from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.toolbox.base import RunRef, ToolContext, ToolSpec, Wait
 from app.modules.agents.toolbox.policy import Grant, effective
-from app.modules.ai.models import DataLocation
+from app.modules.ai.models import DataLocation, UsageRecord
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
 from app.runtime.loop import Halt, Reply, ToolCall, ToolResult
@@ -104,8 +105,11 @@ class RunHost:
         try:
             async with self.unit() as session:
                 steps, run, _ = await self._owned(session)
-                await steps.event(self._seq(), EventKind.MODEL_CALL, _reply_content(step, reply))
-                await self._usage(session, reply)
+                usage = await self._usage(session, reply)
+                content = _reply_content(step, reply)
+                if usage.cost is not None:
+                    content["cost"] = str(usage.cost)  # the run view shows it per step
+                await steps.event(self._seq(), EventKind.MODEL_CALL, content)
                 run.steps += 1
                 await _progress(session, self.run.claimed, run.steps)
         except (Lost, Halt):
@@ -130,7 +134,9 @@ class RunHost:
                 reads = self.run.reads
                 pages, tickets = set(reads.pages), set(reads.tickets)
                 ctx = ToolContext(session, actor, location, reads, self._ref())
+                started = time.perf_counter()
                 result = await spec.run(ctx, args)
+                duration_ms = round((time.perf_counter() - started) * 1000)
                 if isinstance(result, Wait):
                     await steps.wait(run, result.until)
                 else:
@@ -143,6 +149,7 @@ class RunHost:
                         "attrs": result.attrs,
                         "text": result.text,
                         "spaces": sorted(str(space_id) for space_id in result.spaces),
+                        "duration_ms": duration_ms,
                         "read": {
                             "pages": sorted(str(p) for p in reads.pages - pages),
                             "tickets": sorted(str(t) for t in reads.tickets - tickets),
@@ -211,9 +218,9 @@ class RunHost:
             raise Halt("rights_revoked")
         return DataLocation(connection.data_location)
 
-    async def _usage(self, session: AsyncSession, reply: Reply) -> None:
+    async def _usage(self, session: AsyncSession, reply: Reply) -> UsageRecord:
         claimed = self.run.claimed
-        await record_usage(
+        return await record_usage(
             session,
             org_id=claimed.org_id,
             connection_id=self.run.connection_id,

@@ -318,7 +318,47 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   Abschlusses; er gewinnt dort auch gegen eine fertige Antwort (`cancelled`, keine
   Antwort, ein Hinweis). Ein wartender Lauf endet bei der nächsten Runde der
   Laufschleife, ein Lauf in der Warteschlange, sobald er aufgenommen wird. Ein schon
-  beendeter Lauf bleibt, wie er ist. Der Endpunkt dafür kommt mit der Laufansicht.
+  beendeter Lauf bleibt, wie er ist. Den Endpunkt beschreibt der nächste Abschnitt.
+
+### Laufansicht und Abbruch (M6)
+
+- `GET /api/runs` („meine Läufe“): die Läufe, die man selbst ausgelöst hat, neueste
+  zuerst, seitenweise (`limit` ≤ 100, `cursor`). Filter: `agent_id`, `state`
+  (`queued`, `running`, `waiting`, `done`), `stop_reason`, `since` (einschließlich) und
+  `until` (ausschließlich), beide mit Zeitzone (sonst 422). Nur mit `ai.use` oder
+  `agent.manage`, sonst 404 `ai.not_found`.
+- `GET /api/agents/{id}/runs`: alle Läufe eines Agenten, für seine verantwortliche
+  Person (mit `ai.use`) und `agent.manage`; sonst 404 `agent.not_found` wie für einen
+  unbekannten Agenten. Dieselben Filter außer `agent_id`.
+- `GET /api/runs/{id}`: wer den Lauf sehen darf (siehe oben), sonst 404
+  `run.not_found`. Listen und Einzelansicht zeigen dieselbe Form: Agent (ID, Name),
+  fragende Person (ID, Name; alle, die einen Lauf sehen, dürfen Personen nach Namen
+  finden), Ort (`place`: Art des Gesprächs `dm`, `channel`, `thread_page`,
+  `thread_ticket`, seine ID; Bereich, Seite und Ticketnummer nur, wenn die lesende
+  Person den Bereich lesen darf, sonst leer), Zustand, Stopgrund, `attempt`,
+  `recoveries`, `steps`, Start, Ende, `wait_until`, Verbrauch aus den
+  Verbrauchseinträgen (`usage`: Aufrufe, Token ein/aus/gecacht, Kosten der Aufrufe mit
+  Preis, sonst leer) und `cancel_requested`. Listen filtern in SQL und brauchen je
+  Seite zwei Abfragen, gleich wie lang sie ist.
+- `GET /api/runs/{id}/events`: das Journal wie oben (Schwärzung und Audit
+  unverändert). Neu je Ereignis, wo der Schritt es festgehalten hat: `tokens_in`,
+  `tokens_out`, `tokens_cached`, `cost` (Modellaufrufe mit Preis) und `duration_ms`
+  (Modell- und Werkzeugaufrufe; ältere Werkzeugaufrufe ohne). Diese Zahlen sehen alle,
+  denen der Lauf sichtbar ist, auch bei geschwärzten Ereignissen.
+- `POST /api/runs/{id}/cancel`: abbrechen darf, wer den Lauf sehen darf (die fragende
+  Person, die verantwortliche Person, `agent.manage`); sonst 404 `run.not_found`. Der
+  Abbruch wird einmal gespeichert; ein Lauf in der Warteschlange oder ein wartender
+  Lauf endet sofort in derselben Transaktion mit `cancelled` und seinem Hinweis im
+  Gespräch, ein laufender vor seinem nächsten Schritt oder in der Transaktion seines
+  Abschlusses (höchstens ein Modellaufruf, der schon unterwegs ist, wird noch bezahlt).
+  Ein abgebrochener Lauf schreibt danach nichts mehr: keine Antwort und keinen neuen
+  Lauf für Nachrichten, die währenddessen kamen. Ein zweiter Abbruch antwortet wie der
+  erste (200); ein Lauf, der anders zu Ende ging, antwortet 409 `run.finished`. Einen
+  Worker aufzuwecken ist nicht nötig: Was sofort endet, braucht keinen, und das
+  Outbox-Ereignis des Hinweises weckt die Laufschleife ohnehin. Abbruch und Abschluss
+  sperren beide die Zeile des Laufs: Entweder sieht der Abschluss den Abbruch
+  (`cancelled`, keine Antwort), oder der Abbruch findet den Lauf beendet (409); ebenso
+  gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs.
 
 Betrieb:
 

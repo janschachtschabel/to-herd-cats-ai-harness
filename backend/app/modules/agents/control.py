@@ -9,10 +9,15 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
   queues when it ends (`executor.close`). Nothing wakes the workers here: the answer's
   own outbox event does, else they look within a second.
 - `request_cancel` records the request once (`run_cancel_request`). Who may ask is the
-  caller's rule (the run view, M6 task 10). The run's row is locked first, so a run
-  that ends at the same moment either ends `cancelled` or was done before (False).
-  A running run stops before its next step; a queued one when it is taken up; a
-  waiting one at the next sweep.
+  caller's rule. The run's row is locked first, so a run that ends at the same moment
+  either ends `cancelled` or was done before (False). A running run stops before its
+  next step; a queued one when it is taken up; a waiting one at the next sweep.
+- `cancel` (the run view's `POST /api/runs/{id}/cancel`, M6 task 10): the same
+  request, and a run nobody works on (queued or waiting) ends `cancelled` at once, in
+  the same transaction, with its notice; a running one stops before its next step or
+  at its end. Asking again answers the same; a run that ended otherwise first: False.
+  No worker needs waking: the run that ends here needs none, and the notice's outbox
+  event wakes the loops anyway.
 - `sweep_waiting`, from the run loop: waiting runs past `wait_until` end with
   `waiting_timeout`, those someone asked to stop with `cancelled`, each with its notice
   in the conversation, like any other end.
@@ -53,6 +58,22 @@ async def request_cancel(
     if run is None or run.state == RunState.DONE:
         return False
     await repo.add_cancel_request(run.id, user_id)
+    return True
+
+
+async def cancel(
+    session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID, user_id: uuid.UUID
+) -> bool:
+    """Stop the run, now if nobody works on it (False: it ended otherwise first)."""
+    repo = ControlRepository(session, org_id)
+    run = await repo.lock(run_id)
+    if run is None:
+        return False
+    if run.state == RunState.DONE:
+        return run.stop_reason == StopReason.CANCELLED
+    await repo.add_cancel_request(run.id, user_id)
+    if run.state in (RunState.QUEUED, RunState.WAITING):
+        await close(session, RunSteps(session, Claimed.of(run)), run, StopReason.CANCELLED)
     return True
 
 

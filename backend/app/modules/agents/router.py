@@ -1,5 +1,5 @@
-"""Agent and run routes. Managing agents needs `agent.manage`, an agent's profile
-`ai.use`; anyone else gets 404 `agent.not_found`. Runs: see `runs.py`."""
+"""Agent routes. Managing agents needs `agent.manage`, an agent's profile `ai.use`;
+anyone else gets 404 `agent.not_found`. Runs: `run_router.py`."""
 
 import uuid
 from typing import Annotated
@@ -11,7 +11,6 @@ from app.core.access import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.agents.grants import GrantService
 from app.modules.agents.models import Agent
-from app.modules.agents.runs import RunService
 from app.modules.agents.schemas import (
     AgentCreate,
     AgentOut,
@@ -19,14 +18,11 @@ from app.modules.agents.schemas import (
     AgentToolsOut,
     AgentToolsPut,
     AgentUpdate,
-    RunEventOut,
-    RunOut,
 )
 from app.modules.agents.service import AgentService
 from app.modules.auth.deps import ActorDep, SessionDep
 
 agents = APIRouter(prefix="/agents", tags=["agents"])
-runs = APIRouter(prefix="/runs", tags=["agents"])
 
 
 @agents.get("", response_model=Page[AgentOut])
@@ -98,21 +94,3 @@ async def delete_agent(
 
 async def _out(service: AgentService, actor: Actor, agent: Agent) -> AgentOut:
     return AgentOut.of(agent, await service.responsible_names(actor, [agent]))
-
-
-@runs.get("/{run_id}", response_model=RunOut)
-async def get_run(run_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> RunOut:
-    return RunOut.of(await RunService(session).get(actor, run_id))
-
-
-@runs.get("/{run_id}/events", response_model=Page[RunEventOut])
-async def run_events(
-    run_id: uuid.UUID,
-    params: Annotated[PageParams, Query()],
-    actor: ActorDep,
-    session: SessionDep,
-) -> Page[RunEventOut]:
-    page = await RunService(session).events(actor, run_id, params)
-    return Page[RunEventOut](
-        items=[RunEventOut.of(e) for e in page.items], next_cursor=page.next_cursor
-    )

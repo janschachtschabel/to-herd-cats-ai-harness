@@ -1,7 +1,7 @@
-"""A run and its events as people read them (spec 8.3; the run view itself comes with
-M6). A run is visible to the person who asked and to the agent's responsible person,
-each while they have `ai.use`, and to holders of `agent.manage`; to anyone else it
-answers 404 `run.not_found`, as for an unknown id.
+"""A run and its events as people read them (spec 8.3; the run view, its lists and
+cancelling: `run_view.py`). A run is visible to the person who asked and to the
+agent's responsible person, each while they have `ai.use`, and to holders of
+`agent.manage`; to anyone else it answers 404 `run.not_found`, as for an unknown id.
 
 What of the events (spec 5.5; module review 1, finding 1): the person who asked reads
 their run in full. Anyone else reads
@@ -11,8 +11,8 @@ their run in full. Anyone else reads
   comes `redacted`: its step, tool name and source stay;
 - never the model's own words, its text and its tool calls' arguments, nor a tool
   call's arguments: they are the conversation's content, which its person reads (an
-  admin only through the audited inspection of the DM). Usage, model, tool names and
-  the stop stay.
+  admin only through the audited inspection of the DM). Usage (tokens, cost,
+  duration), model, tool names and the stop stay.
 """
 
 import uuid
@@ -27,8 +27,16 @@ from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.agents.models import EventKind, Run, RunEvent
 from app.modules.agents.run_repository import RunRepository
 
-MODEL_CALL_SHOWN = ("step", "model", "tokens_in", "tokens_out", "tokens_cached", "duration_ms")
-TOOL_CALL_SHOWN = ("step", "call_id", "name", "source")
+MODEL_CALL_SHOWN = (
+    "step",
+    "model",
+    "tokens_in",
+    "tokens_out",
+    "tokens_cached",
+    "duration_ms",
+    "cost",
+)
+TOOL_CALL_SHOWN = ("step", "call_id", "name", "source", "duration_ms")
 
 
 def run_not_found() -> NotFound:

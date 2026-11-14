@@ -27,7 +27,9 @@ ship without a decision on who may call it. Guards:
 - `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
   gets 404 `agent.not_found`, as for an unknown id (plan M5).
 - `run`: the person who asked, the agent's responsible person (each with `ai.use`) or
-  `agent.manage`; everyone else gets 404 `run.not_found`.
+  `agent.manage`; everyone else gets 404 `run.not_found` (also for cancelling).
+  "My runs" (`GET /api/runs`) is `ai`: without `ai.use` or `agent.manage`, 404
+  `ai.not_found`.
 - `skill`: `ai.use` or `skill.manage` (and `space.read` for a space's skill); everyone
   else gets 404 `skill.not_found`, as for an unknown id (plan M6 task 9).
 - `proposal`: a page editor in the proposal's space (or its author); everyone else
@@ -184,8 +186,11 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PUT", "/api/agents/{agent_id}/tools", "agent"),
     ("GET", "/api/agents/{agent_id}/skills", "agent"),
     ("PUT", "/api/agents/{agent_id}/skills", "agent"),
+    ("GET", "/api/agents/{agent_id}/runs", "agent"),
+    ("GET", "/api/runs", "ai"),
     ("GET", "/api/runs/{run_id}", "run"),
     ("GET", "/api/runs/{run_id}/events", "run"),
+    ("POST", "/api/runs/{run_id}/cancel", "run"),
     ("GET", "/api/skills", "skill"),
     ("POST", "/api/skills", "skill"),
     ("GET", "/api/skills/{skill_id}", "skill"),

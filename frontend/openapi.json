@@ -4779,6 +4779,33 @@
         "title": "Page[RunEventOut]",
         "type": "object"
       },
+      "Page_RunOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[RunOut]",
+        "type": "object"
+      },
       "Page_SkillOut_": {
         "properties": {
           "items": {
@@ -6106,7 +6133,7 @@
         "type": "object"
       },
       "RunEventOut": {
-        "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything.",
+        "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything. `tokens_*`, `cost` (model calls with a price) and `duration_ms`\n(model and tool calls) where the step recorded them, null otherwise.",
         "properties": {
           "attempt": {
             "title": "Attempt",
@@ -6117,10 +6144,32 @@
             "title": "Content",
             "type": "object"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
           },
           "id": {
             "format": "uuid",
@@ -6137,6 +6186,39 @@
           "seq": {
             "title": "Seq",
             "type": "integer"
+          },
+          "tokens_cached": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Cached"
+          },
+          "tokens_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Out"
           }
         },
         "required": [
@@ -6146,22 +6228,44 @@
           "kind",
           "content",
           "redacted",
+          "tokens_in",
+          "tokens_out",
+          "tokens_cached",
+          "cost",
+          "duration_ms",
           "created_at"
         ],
         "title": "RunEventOut",
         "type": "object"
       },
       "RunOut": {
-        "description": "`steps`: model calls of the run; `attempt`: its take-ups by a worker;\n`wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);\n`stop_reason` once `done`.",
+        "description": "A run as the run view shows it. `asker_*`: the person who asked (whose rights it\nread with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a\nworker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,\nwhen it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone\nasked it to stop.",
         "properties": {
           "agent_id": {
             "format": "uuid",
             "title": "Agent Id",
             "type": "string"
           },
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "asker_id": {
+            "format": "uuid",
+            "title": "Asker Id",
+            "type": "string"
+          },
+          "asker_name": {
+            "title": "Asker Name",
+            "type": "string"
+          },
           "attempt": {
             "title": "Attempt",
             "type": "integer"
+          },
+          "cancel_requested": {
+            "title": "Cancel Requested",
+            "type": "boolean"
           },
           "conversation_id": {
             "format": "uuid",
@@ -6189,6 +6293,13 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "place": {
+            "$ref": "#/components/schemas/RunPlaceOut"
+          },
+          "recoveries": {
+            "title": "Recoveries",
+            "type": "integer"
           },
           "started_at": {
             "anyOf": [
@@ -6224,6 +6335,9 @@
             "title": "Trigger Message Id",
             "type": "string"
           },
+          "usage": {
+            "$ref": "#/components/schemas/RunUsageOut"
+          },
           "wait_until": {
             "anyOf": [
               {
@@ -6240,18 +6354,82 @@
         "required": [
           "id",
           "agent_id",
+          "agent_name",
+          "asker_id",
+          "asker_name",
           "conversation_id",
           "trigger_message_id",
+          "place",
           "state",
           "stop_reason",
           "attempt",
+          "recoveries",
           "steps",
           "wait_until",
           "created_at",
           "started_at",
-          "finished_at"
+          "finished_at",
+          "usage",
+          "cancel_requested"
         ],
         "title": "RunOut",
+        "type": "object"
+      },
+      "RunPlaceOut": {
+        "description": "Where the run answers: the conversation's kind and id; its space, and for a\nthread its page or ticket, only where the reader reads that space (else null).",
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
+          },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "ticket_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Number"
+          }
+        },
+        "required": [
+          "kind",
+          "conversation_id",
+          "space_id",
+          "page_id",
+          "ticket_number"
+        ],
+        "title": "RunPlaceOut",
         "type": "object"
       },
       "RunState": {
@@ -6263,6 +6441,47 @@
         ],
         "title": "RunState",
         "type": "string"
+      },
+      "RunUsageOut": {
+        "description": "The run's usage records summed: model calls, tokens (`tokens_in` includes the\ncached ones), `cost` of the priced calls (null if none had a price).",
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "tokens_cached": {
+            "title": "Tokens Cached",
+            "type": "integer"
+          },
+          "tokens_in": {
+            "title": "Tokens In",
+            "type": "integer"
+          },
+          "tokens_out": {
+            "title": "Tokens Out",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calls",
+          "tokens_in",
+          "tokens_out",
+          "tokens_cached",
+          "cost"
+        ],
+        "title": "RunUsageOut",
+        "type": "object"
       },
       "SearchResults": {
         "description": "A page of hits of every kind, told apart by `type`.",
@@ -10553,6 +10772,144 @@
         ]
       }
     },
+    "/api/agents/{agent_id}/runs": {
+      "get": {
+        "description": "The agent's runs, newest first (its responsible person, `agent.manage`).",
+        "operationId": "runs_of_agent_api_agents__agent_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stop_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StopReason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stop Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runs Of Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/agents/{agent_id}/skills": {
       "get": {
         "description": "The agent's skills the caller sees, by name.",
@@ -14206,6 +14563,151 @@
         ]
       }
     },
+    "/api/runs": {
+      "get": {
+        "description": "The runs the caller asked for, newest first (`ai.use` or `agent.manage`).",
+        "operationId": "my_runs_api_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stop_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StopReason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stop Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Runs",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/runs/{run_id}": {
       "get": {
         "operationId": "get_run_api_runs__run_id__get",
@@ -14244,6 +14746,50 @@
           }
         },
         "summary": "Get Run",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/cancel": {
+      "post": {
+        "description": "Stop the run (once; asking again answers the same); 409 `run.finished` if it\nended otherwise.",
+        "operationId": "cancel_run_api_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Run",
         "tags": [
           "agents"
         ]

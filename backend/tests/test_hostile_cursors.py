@@ -74,10 +74,12 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/spaces/{space_id}/proposals",
         "/api/skills",
         "/api/skills/{skill_id}/versions",
+        "/api/runs",
+        "/api/agents/{agent_id}/runs",
     } <= set(endpoints)
 
 
-NEED_A_RUN = {"/api/runs/{run_id}/events"}
+NEED_A_RUN = {"/api/runs/{run_id}/events", "/api/agents/{agent_id}/runs"}
 
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
@@ -134,9 +136,9 @@ async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
     assert await bench.run_next() == StopReason.COMPLETED
     run_id = posted["agent_run"]["id"]
     for template in NEED_A_RUN:
-        path = template.replace("{run_id}", run_id)
+        path = template.replace("{run_id}", run_id).replace("{agent_id}", str(bench.agent.id))
         for name, cursor in HOSTILE.items():
-            response = await bench.people.alice.get(path, params={"cursor": cursor})
+            response = await bench.people.admin.get(path, params={"cursor": cursor})
             if name == "empty":
                 assert response.status_code == 200, (name, response.text)
                 continue

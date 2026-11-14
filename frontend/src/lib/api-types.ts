@@ -351,6 +351,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{agent_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Runs Of Agent
+         * @description The agent's runs, newest first (its responsible person, `agent.manage`).
+         */
+        get: operations["runs_of_agent_api_agents__agent_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/skills": {
         parameters: {
             query?: never;
@@ -1303,6 +1323,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Runs
+         * @description The runs the caller asked for, newest first (`ai.use` or `agent.manage`).
+         */
+        get: operations["my_runs_api_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -1314,6 +1354,27 @@ export interface paths {
         get: operations["get_run_api_runs__run_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Run
+         * @description Stop the run (once; asking again answers the same); 409 `run.finished` if it
+         *     ended otherwise.
+         */
+        post: operations["cancel_run_api_runs__run_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4093,6 +4154,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[RunOut] */
+        Page_RunOut_: {
+            /** Items */
+            items: components["schemas"]["RunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[SkillOut] */
         Page_SkillOut_: {
             /** Items */
@@ -4549,7 +4617,8 @@ export interface components {
          * @description One step of a run (model call: usage and the answer's parts; tool call: name,
          *     arguments, result, the spaces it came from; stop: the reason). `redacted`: parts
          *     the reader may not read are left out (`agents/runs.py`); the asking person always
-         *     gets everything.
+         *     gets everything. `tokens_*`, `cost` (model calls with a price) and `duration_ms`
+         *     (model and tool calls) where the step recorded them, null otherwise.
          */
         RunEventOut: {
             /** Attempt */
@@ -4558,11 +4627,15 @@ export interface components {
             content: {
                 [key: string]: unknown;
             };
+            /** Cost */
+            cost: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Duration Ms */
+            duration_ms: number | null;
             /**
              * Id
              * Format: uuid
@@ -4573,12 +4646,20 @@ export interface components {
             redacted: boolean;
             /** Seq */
             seq: number;
+            /** Tokens Cached */
+            tokens_cached: number | null;
+            /** Tokens In */
+            tokens_in: number | null;
+            /** Tokens Out */
+            tokens_out: number | null;
         };
         /**
          * RunOut
-         * @description `steps`: model calls of the run; `attempt`: its take-ups by a worker;
-         *     `wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);
-         *     `stop_reason` once `done`.
+         * @description A run as the run view shows it. `asker_*`: the person who asked (whose rights it
+         *     read with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a
+         *     worker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,
+         *     when it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone
+         *     asked it to stop.
          */
         RunOut: {
             /**
@@ -4586,8 +4667,19 @@ export interface components {
              * Format: uuid
              */
             agent_id: string;
+            /** Agent Name */
+            agent_name: string;
+            /**
+             * Asker Id
+             * Format: uuid
+             */
+            asker_id: string;
+            /** Asker Name */
+            asker_name: string;
             /** Attempt */
             attempt: number;
+            /** Cancel Requested */
+            cancel_requested: boolean;
             /**
              * Conversation Id
              * Format: uuid
@@ -4605,6 +4697,9 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            place: components["schemas"]["RunPlaceOut"];
+            /** Recoveries */
+            recoveries: number;
             /** Started At */
             started_at: string | null;
             state: components["schemas"]["RunState"];
@@ -4616,14 +4711,51 @@ export interface components {
              * Format: uuid
              */
             trigger_message_id: string;
+            usage: components["schemas"]["RunUsageOut"];
             /** Wait Until */
             wait_until: string | null;
+        };
+        /**
+         * RunPlaceOut
+         * @description Where the run answers: the conversation's kind and id; its space, and for a
+         *     thread its page or ticket, only where the reader reads that space (else null).
+         */
+        RunPlaceOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            kind: components["schemas"]["ConversationKind"];
+            /** Page Id */
+            page_id: string | null;
+            /** Space Id */
+            space_id: string | null;
+            /** Ticket Number */
+            ticket_number: number | null;
         };
         /**
          * RunState
          * @enum {string}
          */
         RunState: "queued" | "running" | "waiting" | "done";
+        /**
+         * RunUsageOut
+         * @description The run's usage records summed: model calls, tokens (`tokens_in` includes the
+         *     cached ones), `cost` of the priced calls (null if none had a price).
+         */
+        RunUsageOut: {
+            /** Calls */
+            calls: number;
+            /** Cost */
+            cost: string | null;
+            /** Tokens Cached */
+            tokens_cached: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
         /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
@@ -6650,6 +6782,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runs_of_agent_api_agents__agent_id__runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                state?: components["schemas"]["RunState"] | null;
+                stop_reason?: components["schemas"]["StopReason"] | null;
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunOut_"];
                 };
             };
             /** @description Validation Error */
@@ -8913,7 +9083,75 @@ export interface operations {
             };
         };
     };
+    my_runs_api_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                state?: components["schemas"]["RunState"] | null;
+                stop_reason?: components["schemas"]["StopReason"] | null;
+                since?: string | null;
+                until?: string | null;
+                agent_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_api_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_run_api_runs__run_id__cancel_post: {
         parameters: {
             query?: never;
             header?: never;

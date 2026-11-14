@@ -1,9 +1,9 @@
-"""Agents and runs as the API takes and shows them."""
+"""Agents as the API takes and shows them (runs: `run_schemas.py`)."""
 
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -17,12 +17,7 @@ from app.modules.agents.models import (
     MAX_STEPS,
     Agent,
     AgentStatus,
-    EventKind,
-    Run,
-    RunState,
-    StopReason,
 )
-from app.modules.agents.runs import ShownEvent
 from app.modules.agents.toolbox.policy import Effect, Grant
 
 if TYPE_CHECKING:  # grants.py imports the service, which imports these schemas
@@ -202,67 +197,3 @@ class AgentProfileOut(BaseModel):
     @classmethod
     def of(cls, agent: Agent) -> "AgentProfileOut":
         return cls(id=agent.id, name=agent.name, intro=agent.intro, status=agent.status)
-
-
-class RunOut(BaseModel):
-    """`steps`: model calls of the run; `attempt`: its take-ups by a worker;
-    `wait_until`: while `waiting`, when it ends unanswered (`waiting_timeout`);
-    `stop_reason` once `done`."""
-
-    id: uuid.UUID
-    agent_id: uuid.UUID
-    conversation_id: uuid.UUID
-    trigger_message_id: uuid.UUID
-    state: RunState
-    stop_reason: StopReason | None
-    attempt: int
-    steps: int
-    wait_until: datetime | None
-    created_at: datetime
-    started_at: datetime | None
-    finished_at: datetime | None
-
-    @classmethod
-    def of(cls, run: Run) -> "RunOut":
-        return cls(
-            id=run.id,
-            agent_id=run.agent_id,
-            conversation_id=run.conversation_id,
-            trigger_message_id=run.trigger_message_id,
-            state=run.state,
-            stop_reason=run.stop_reason,
-            attempt=run.attempt,
-            steps=run.steps,
-            wait_until=run.wait_until,
-            created_at=run.created_at,
-            started_at=run.started_at,
-            finished_at=run.finished_at,
-        )
-
-
-class RunEventOut(BaseModel):
-    """One step of a run (model call: usage and the answer's parts; tool call: name,
-    arguments, result, the spaces it came from; stop: the reason). `redacted`: parts
-    the reader may not read are left out (`agents/runs.py`); the asking person always
-    gets everything."""
-
-    id: uuid.UUID
-    attempt: int
-    seq: int
-    kind: EventKind
-    content: dict[str, Any]
-    redacted: bool
-    created_at: datetime
-
-    @classmethod
-    def of(cls, shown: ShownEvent) -> "RunEventOut":
-        event = shown.event
-        return cls(
-            id=event.id,
-            attempt=event.attempt,
-            seq=event.seq,
-            kind=event.kind,
-            content=shown.content,
-            redacted=shown.redacted,
-            created_at=event.created_at,
-        )

@@ -25,7 +25,8 @@ works.
   DM (`run.stopped` with the reason, for the client to word); the run `done`. A cancel
   request found there wins over any other end (`cancelled`, no answer). A message the
   person sent after the run started that no queued run will answer (it came while the
-  run waited) gets a run of its own, queued in the same transaction. A run whose
+  run waited) gets a run of its own, queued in the same transaction; not after a
+  cancelled run, which writes nothing beyond its notice. A run whose
   question was deleted before it started (no person's message after the last answer)
   ends `completed` at once, without a call, an answer or a notice.
 
@@ -234,7 +235,8 @@ async def close(
         stop["by"] = str(by)
     await steps.event(STOP_SEQ, EventKind.STOP, stop)
     await steps.done(run, reason.value)
-    await _follow_up(session, steps, run)
+    if reason != StopReason.CANCELLED:  # cancelled: nothing more is written
+        await _follow_up(session, steps, run)
     return reason
 
 
