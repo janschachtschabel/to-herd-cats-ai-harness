@@ -137,10 +137,21 @@ class LastRunOut(BaseModel):
     stop_reason: StopReason | None
 
 
+class AbilitiesOut(BaseModel):
+    """What the caller may do with it now (`abilities.py`): the same rules the actions
+    enforce."""
+
+    edit: bool
+    pause: bool
+    resume: bool
+    delete: bool
+    run: bool
+    take_over: bool
+
+
 class AutomationOut(BaseModel):
-    """`may_edit`: the caller owns it; `may_control`: may pause, resume and delete it
-    (its owner, a manager of its place's space, `agent.manage`). `upcoming`: its next
-    terms from now (none for an event rule, or once done)."""
+    """`abilities`: what the caller may do with it now. `upcoming`: its next terms from
+    now (none for an event rule, or once done)."""
 
     id: uuid.UUID
     kind: AutomationKind
@@ -164,8 +175,7 @@ class AutomationOut(BaseModel):
     filter_ticket_kind: TicketKind | None
     last_run: LastRunOut | None
     upcoming: list[datetime]
-    may_edit: bool
-    may_control: bool
+    abilities: AbilitiesOut
 
 
 class FiringOut(BaseModel):

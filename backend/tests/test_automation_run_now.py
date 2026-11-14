@@ -94,7 +94,12 @@ async def test_a_manager_takes_it_over_after_its_owner_left(work: Work) -> None:
     assert r.status_code == 200, r.text
     taken = r.json()
     assert taken["owner"]["id"] == bench.people.id("bob")
-    assert (taken["state"], taken["paused_reason"], taken["may_edit"]) == ("active", None, True)
+    assert (taken["state"], taken["paused_reason"], taken["abilities"]["edit"]) == (
+        "active",
+        None,
+        True,
+    )
+    assert taken["abilities"]["take_over"] is False
     stmt = select(AuditLog.details).where(AuditLog.action == "automation.taken_over")
     (details,) = (await bench.session.scalars(stmt)).all()
     assert details == {"from": str(alice.id), "to": bench.people.id("bob")}

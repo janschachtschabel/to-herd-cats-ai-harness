@@ -83,7 +83,15 @@ async def test_a_spaces_automations_are_those_the_caller_sees_there(work: Work) 
     assert await items(bob, path) == []  # a member who does not manage the space
     await spaces.set_member(work.space.id, Principal.user(bob_user.id), SpaceRole.ADMIN)
     (seen,) = await items(bob, path)
-    assert (seen["id"], seen["may_edit"], seen["may_control"]) == (in_space["id"], False, True)
+    assert seen["id"] == in_space["id"]
+    assert seen["abilities"] == {
+        "edit": False,
+        "pause": True,
+        "resume": False,
+        "delete": True,
+        "run": False,
+        "take_over": True,
+    }
 
 
 async def test_the_log_shows_each_term_newest_first(work: Work) -> None:

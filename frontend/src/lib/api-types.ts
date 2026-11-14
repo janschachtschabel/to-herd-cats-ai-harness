@@ -2843,6 +2843,25 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AbilitiesOut
+         * @description What the caller may do with it now (`abilities.py`): the same rules the actions
+         *     enforce.
+         */
+        AbilitiesOut: {
+            /** Delete */
+            delete: boolean;
+            /** Edit */
+            edit: boolean;
+            /** Pause */
+            pause: boolean;
+            /** Resume */
+            resume: boolean;
+            /** Run */
+            run: boolean;
+            /** Take Over */
+            take_over: boolean;
+        };
+        /**
          * Action
          * @enum {string}
          */
@@ -3528,11 +3547,11 @@ export interface components {
         AutomationKind: "once" | "recurring" | "heartbeat" | "event";
         /**
          * AutomationOut
-         * @description `may_edit`: the caller owns it; `may_control`: may pause, resume and delete it
-         *     (its owner, a manager of its place's space, `agent.manage`). `upcoming`: its next
-         *     terms from now (none for an event rule, or once done).
+         * @description `abilities`: what the caller may do with it now. `upcoming`: its next terms from
+         *     now (none for an event rule, or once done).
          */
         AutomationOut: {
+            abilities: components["schemas"]["AbilitiesOut"];
             /** Active Days */
             active_days: number[] | null;
             /** Active From */
@@ -3557,10 +3576,6 @@ export interface components {
             interval_minutes: number | null;
             kind: components["schemas"]["AutomationKind"];
             last_run: components["schemas"]["LastRunOut"] | null;
-            /** May Control */
-            may_control: boolean;
-            /** May Edit */
-            may_edit: boolean;
             /** Next Due At */
             next_due_at: string | null;
             owner: components["schemas"]["NamedOut"];

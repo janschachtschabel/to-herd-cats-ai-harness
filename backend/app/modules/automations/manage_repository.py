@@ -31,6 +31,7 @@ OPEN_STATES = (AutomationState.ACTIVE, AutomationState.PAUSED)
 @dataclass(frozen=True, slots=True)
 class Row:
     automation: Automation
+    agent: Agent
     agent_name: str | None
     owner_name: str | None
     place: Conversation
@@ -133,6 +134,7 @@ class ManageRepository:
         return [
             Row(
                 automation=row[0],
+                agent=row[1],
                 agent_name=row[1].name,
                 owner_name=row[3],
                 place=row[2],

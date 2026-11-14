@@ -110,6 +110,8 @@ async def test_resuming_is_refused_while_its_owner_may_not_run_it(work: Work) ->
     fired = await fire_next(work.bench.session, NOW + timedelta(days=1))
     assert fired is not None and fired.paused == "owner"
     current = (await work.bench.people.bob.get(f"{BASE}/{made['id']}")).json()
+    abilities = current["abilities"]
+    assert (abilities["pause"], abilities["resume"], abilities["take_over"]) == (False, False, True)
     refused(await post(work.bench.people.bob, current, "resume"), 409, "automation.owner_unable")
 
 

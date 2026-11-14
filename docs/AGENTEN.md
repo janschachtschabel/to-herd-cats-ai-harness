@@ -866,7 +866,9 @@ wie eine unbekannte ID: 404 `automation.not_found`.
 
 Wer sie sieht, aber die Aktion nicht darf (etwa die verantwortliche Person des
 Agenten), bekommt 403 `automation.not_allowed`. Jede Antwort mit einer Aufgabe nennt
-`may_edit` (ändern, jetzt ausführen) und `may_control` (anhalten, fortsetzen, löschen).
+`abilities` (`edit`, `pause`, `resume`, `delete`, `run`, `take_over`): was die Person jetzt
+damit tun darf, nach denselben Regeln wie die Aktionen (fortsetzen nur, solange die
+Eigentümerin sie wieder ausführen dürfte; übernehmen nur für andere, die sie anlegen dürften).
 
 **Routen.**
 

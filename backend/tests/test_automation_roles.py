@@ -5,7 +5,9 @@ editor of the space, a viewer, a manager of the space, someone with `agent.manag
 `ai.use`, the agent's responsible person (in no space) and the owner of another
 organisation (through the services: login knows the installation's one organisation
 only). Who may not see it gets 404 like an unknown id; who sees it but may not
-do the action gets 403."""
+do the action gets 403. Whoever sees it reads in `abilities` exactly what the action
+then answers (the one exception: its owner taking over her own is a harmless 200,
+and offered to nobody)."""
 
 import uuid
 from collections.abc import Awaitable, Callable
@@ -90,6 +92,16 @@ async def _cast(work: Work, make_user: MakeUser, make_client: MakeClient) -> dic
     return cast
 
 
+async def _prepare(work: Work, made: dict[str, Any], action: str) -> dict[str, Any]:
+    """The automation as the action finds it: paused by its owner before a resume."""
+    if action != "resume":
+        return made
+    paused = await post(work.bench.people.alice, made, "pause")
+    assert paused.status_code == 200, paused.text
+    result: dict[str, Any] = paused.json()
+    return result
+
+
 async def _act(work: Work, client: AsyncClient, made: dict[str, Any], action: str) -> Response:
     path = f"{BASE}/{made['id']}"
     if action == "get":
@@ -98,15 +110,27 @@ async def _act(work: Work, client: AsyncClient, made: dict[str, Any], action: st
         return await client.get(f"{path}/firings")
     if action == "update":
         return await client.patch(path, json={"version": made["version"], "instruction": "Neu"})
-    if action == "resume":
-        paused = await post(work.bench.people.alice, made, "pause")
-        assert paused.status_code == 200, paused.text
-        return await post(client, paused.json(), "resume")
     if action == "delete":
         return await client.delete(f"{path}?version={made['version']}")
     if action == "run":
         return await client.post(f"{path}/run")
     return await post(client, made, action.replace("_", "-"))
+
+
+ABILITY = {"update": "edit", "run": "run", "take_over": "take_over"}
+
+
+async def _offered(client: AsyncClient, made: dict[str, Any], action: str) -> bool | None:
+    """What `abilities` offers for the action (None: neither the automation is seen
+    nor the action one to offer)."""
+    if action in ("get", "firings"):
+        return None
+    r = await client.get(f"{BASE}/{made['id']}")
+    if r.status_code == 404:
+        return None
+    assert r.status_code == 200, r.text
+    abilities: dict[str, bool] = r.json()["abilities"]
+    return abilities[ABILITY.get(action, action)]
 
 
 def _answers(r: Response, expected: tuple[int, str | None]) -> None:
@@ -134,8 +158,15 @@ async def test_each_role_may_do_what_the_table_says(
     place = {"type": "channel", "conversation_id": await channel(work)}
     actions, lists = TABLE[role]
     for action, expected in zip(ACTIONS, actions, strict=True):
-        made = await make(work.bench.people.alice, body(work, place, DAILY))
-        _answers(await _act(work, cast[role], made, action), expected)
+        made = await _prepare(
+            work, await make(work.bench.people.alice, body(work, place, DAILY)), action
+        )
+        offered = await _offered(cast[role], made, action)
+        r = await _act(work, cast[role], made, action)
+        _answers(r, expected)
+        if offered is not None:
+            done = r.status_code in (200, 204) and not (role == "owner" and action == "take_over")
+            assert offered is done, (role, action, offered, r.status_code)
     shown = await make(work.bench.people.alice, body(work, place, DAILY))
     for which, expected in zip(LISTS, lists, strict=True):
         r = await _listed(work, cast[role], which)

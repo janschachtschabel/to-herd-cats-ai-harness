@@ -96,7 +96,15 @@ async def test_a_recurring_automation_in_the_dm_comes_with_its_next_terms(work: 
     }
     assert made["owner"] == {"id": work.bench.people.id("alice"), "name": "Alice"}
     assert made["agent"] == {"id": str(work.bench.agent.id), "name": "Ava"}
-    assert (made["instruction"], made["may_edit"], made["may_control"]) == (SECRET, True, True)
+    assert made["instruction"] == SECRET
+    assert made["abilities"] == {
+        "edit": True,
+        "pause": True,
+        "resume": False,
+        "delete": True,
+        "run": True,
+        "take_over": False,
+    }
     got = await alice.get(f"{BASE}/{made['id']}")
     assert got.status_code == 200 and got.json() == made
 
@@ -142,6 +150,7 @@ async def test_an_event_rule_is_for_who_manages_the_space(work: Work) -> None:
     made = await make(alice, body(work, place, rule))
     assert (made["kind"], made["next_due_at"], made["upcoming"]) == ("event", None, [])
     assert (made["event_type"], made["quiet_seconds"]) == ("page.published", 300)
+    assert (made["abilities"]["edit"], made["abilities"]["run"]) == (True, False)  # no event
     dm = await alice.post(BASE, json=body(work, {"type": "dm"}, rule))
     refused(dm, 422, "automation.invalid_place")
     filtered = {**rule, "filter_ticket_kind": "bug"}

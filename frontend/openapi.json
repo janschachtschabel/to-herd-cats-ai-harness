@@ -1,6 +1,45 @@
 {
   "components": {
     "schemas": {
+      "AbilitiesOut": {
+        "description": "What the caller may do with it now (`abilities.py`): the same rules the actions\nenforce.",
+        "properties": {
+          "delete": {
+            "title": "Delete",
+            "type": "boolean"
+          },
+          "edit": {
+            "title": "Edit",
+            "type": "boolean"
+          },
+          "pause": {
+            "title": "Pause",
+            "type": "boolean"
+          },
+          "resume": {
+            "title": "Resume",
+            "type": "boolean"
+          },
+          "run": {
+            "title": "Run",
+            "type": "boolean"
+          },
+          "take_over": {
+            "title": "Take Over",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "edit",
+          "pause",
+          "resume",
+          "delete",
+          "run",
+          "take_over"
+        ],
+        "title": "AbilitiesOut",
+        "type": "object"
+      },
       "Action": {
         "enum": [
           "space.read",
@@ -1620,8 +1659,11 @@
         "type": "string"
       },
       "AutomationOut": {
-        "description": "`may_edit`: the caller owns it; `may_control`: may pause, resume and delete it\n(its owner, a manager of its place's space, `agent.manage`). `upcoming`: its next\nterms from now (none for an event rule, or once done).",
+        "description": "`abilities`: what the caller may do with it now. `upcoming`: its next terms from\nnow (none for an event rule, or once done).",
         "properties": {
+          "abilities": {
+            "$ref": "#/components/schemas/AbilitiesOut"
+          },
           "active_days": {
             "anyOf": [
               {
@@ -1739,14 +1781,6 @@
               }
             ]
           },
-          "may_control": {
-            "title": "May Control",
-            "type": "boolean"
-          },
-          "may_edit": {
-            "title": "May Edit",
-            "type": "boolean"
-          },
           "next_due_at": {
             "anyOf": [
               {
@@ -1836,8 +1870,7 @@
           "filter_ticket_kind",
           "last_run",
           "upcoming",
-          "may_edit",
-          "may_control"
+          "abilities"
         ],
         "title": "AutomationOut",
         "type": "object"

@@ -31,6 +31,7 @@ from app.modules.agents.standing import agent_not_found, visible_agent
 from app.modules.ai.access import ai_not_found
 from app.modules.audit.recorder import record
 from app.modules.automations import live, placing
+from app.modules.automations.abilities import Abilities, AbilityReader
 from app.modules.automations.manage_repository import ManageRepository, Row
 from app.modules.automations.models import Automation, AutomationFiring, AutomationState
 from app.modules.automations.repository import AutomationRepository
@@ -56,6 +57,7 @@ class AutomationView:
     upcoming: list[datetime]
     may_edit: bool
     may_control: bool
+    abilities: Abilities
 
 
 class AutomationService:
@@ -108,7 +110,7 @@ class AutomationService:
         row = await self.repo(actor).one(sight, automation_id) if sight.sees else None
         if row is None:
             raise automation_not_found()
-        (view,) = await self.views(sight, [row])
+        (view,) = await self.views(actor, sight, [row])
         return view
 
     async def update(
@@ -197,14 +199,19 @@ class AutomationService:
     def repo(self, actor: Actor) -> ManageRepository:
         return ManageRepository(self.session, actor.org_id)
 
-    async def views(self, sight: AutomationSight, rows: list[Row]) -> list[AutomationView]:
+    async def views(
+        self, actor: Actor, sight: AutomationSight, rows: list[Row]
+    ) -> list[AutomationView]:
         managed = set(await self.session.scalars(sight.managed_ids)) if rows else set()
         now = self.clock.now()
+        reader = AbilityReader(self.session, actor)
         views = []
         for row in rows:
             owner = row.automation.owner_user_id == sight.person_id
             control = owner or sight.manages_all or row.place.space_id in managed
-            views.append(AutomationView(row, upcoming_of(row.automation, now), owner, control))
+            abilities = await reader.of(row, owner=owner, control=control)
+            upcoming = upcoming_of(row.automation, now)
+            views.append(AutomationView(row, upcoming, owner, control, abilities))
         return views
 
     async def _page(
@@ -218,7 +225,7 @@ class AutomationService:
         rows = await self.repo(actor).page(sight, where, before, params.limit + 1)
         items, more = rows[: params.limit], len(rows) > params.limit
         cursor = encode_id_cursor(items[-1].automation.id) if more else None
-        return Page[AutomationView](items=await self.views(sight, items), next_cursor=cursor)
+        return Page[AutomationView](items=await self.views(actor, sight, items), next_cursor=cursor)
 
 
 def _current(automation: Automation) -> Planned:

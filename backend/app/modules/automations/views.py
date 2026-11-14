@@ -3,6 +3,7 @@ views."""
 
 from app.modules.automations.models import AutomationFiring
 from app.modules.automations.schemas import (
+    AbilitiesOut,
     AutomationOut,
     FiringOut,
     LastRunOut,
@@ -63,8 +64,7 @@ def automation_out(view: AutomationView) -> AutomationOut:
         filter_ticket_kind=automation.filter_ticket_kind,
         last_run=last,
         upcoming=view.upcoming,
-        may_edit=view.may_edit,
-        may_control=view.may_control,
+        abilities=AbilitiesOut.model_validate(view.abilities, from_attributes=True),
     )
 
 
