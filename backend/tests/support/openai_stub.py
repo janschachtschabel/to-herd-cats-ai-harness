@@ -61,8 +61,12 @@ class StubState:
     dimension: int = 8
     redirect_to: str | None = None
     invalid_json: bool = False
+    # Raised by every reset: a request that began before it (a test's call left
+    # behind, still in `delay`) takes nothing of the next test and answers 503.
+    epoch: int = 0
 
     def reset(self) -> None:
+        self.epoch += 1
         self.log.clear()
         self.replies.clear()
         self.failures.clear()
@@ -115,6 +119,7 @@ def _chat(reply: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
 
 def build_app(state: StubState, prefix: str = "/v1") -> Starlette:
     async def handle(request: Request) -> Response:
+        epoch = state.epoch
         raw = (await request.body()).decode("utf-8", "replace")
         try:
             body: Any = json.loads(raw) if raw else None
@@ -125,6 +130,8 @@ def build_app(state: StubState, prefix: str = "/v1") -> Starlette:
         )
         if state.delay:
             await asyncio.sleep(state.delay)
+        if epoch != state.epoch:  # left behind by a reset: the next test's script is not its
+            return JSONResponse({"error": {"message": "stale request"}}, status_code=503)
         if state.failures:
             status = state.failures.popleft()
             echo = request.headers.get("authorization", "")
