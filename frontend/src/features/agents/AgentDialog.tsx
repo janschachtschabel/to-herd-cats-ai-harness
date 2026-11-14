@@ -6,12 +6,11 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { chatConnections, type Connection } from '@/features/ai/display'
-import { hasPermission, useMe } from '@/features/auth/queries'
+import { useMe } from '@/features/auth/queries'
 import { FormActions, SaveError } from '@/features/shared/forms'
 import type { DirectoryEntry, Schemas } from '@/lib/api'
 import { bodySchema } from '@/lib/schemas'
 import { AgentFields } from './AgentFields'
-import { useUsers } from '@/features/admin/users/queries'
 import { agentQuery, useCreateAgent, useUpdateAgent, type Agent } from './queries'
 
 type Values = Schemas['AgentCreate']
@@ -123,14 +122,9 @@ function EditForm({
   onDone: () => void
 }) {
   const { t } = useTranslation()
-  const me = useMe()
   const queryClient = useQueryClient()
   const update = useUpdateAgent(agent.id)
   const [version, setVersion] = useState(agent.version)
-  // The person's name, from the people list where one may read it (the agent names
-  // only the id); otherwise a placeholder until another person is picked.
-  const people = useUsers(hasPermission(me, 'user.manage'))
-  const name = people.items.find((u) => u.id === agent.responsible_user_id)?.name ?? null
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -153,7 +147,7 @@ function EditForm({
   const responsible: DirectoryEntry = {
     type: 'user',
     id: agent.responsible_user_id,
-    name: name ?? t('agents.fields.currentResponsible'),
+    name: agent.responsible_name ?? t('agents.fields.currentResponsible'),
   }
   return (
     <form
@@ -163,12 +157,7 @@ function EditForm({
       noValidate
       className="flex flex-col gap-4"
     >
-      <AgentFields
-        key={name ?? 'unnamed'}
-        form={form}
-        connections={connections}
-        responsible={responsible}
-      />
+      <AgentFields form={form} connections={connections} responsible={responsible} />
       <SaveError error={update.error} onReload={() => void reload()} />
       <Actions pending={update.isPending} submit={t('actions.save')} onDone={onDone} />
     </form>

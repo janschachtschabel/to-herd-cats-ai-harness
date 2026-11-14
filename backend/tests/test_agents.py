@@ -144,3 +144,18 @@ async def test_a_run_for_whom_it_concerns(bench: Bench) -> None:
     rest = await bench.people.alice.get(f"{url}/events?cursor={events['next_cursor']}")
     kinds = [events["items"][0]["kind"], *(e["kind"] for e in rest.json()["items"])]
     assert sorted(kinds) == ["model_call", "stop"]
+
+
+async def test_an_agent_names_its_responsible_person(bench: Bench) -> None:
+    """Task 7's concern: the dialog shows the name without the people list's pages."""
+    admin = bench.people.users["admin"]
+    created = (await bench.people.admin.post(AGENTS, json=body(bench))).json()
+    assert created["responsible_name"] == admin.name
+    url = f"{AGENTS}/{created['id']}"
+    changed = await bench.people.admin.patch(
+        url, json={"responsible_user_id": bench.people.id("alice"), "version": 1}
+    )
+    assert changed.json()["responsible_name"] == bench.people.users["alice"].name
+    assert (await bench.people.admin.get(url)).json()["responsible_name"] == "Alice"
+    listed = (await bench.people.admin.get(AGENTS)).json()["items"]
+    assert {a["name"]: a["responsible_name"] for a in listed} == {"Ava": admin.name, "Bea": "Alice"}

@@ -12,6 +12,7 @@ instructions' text, which may be long; their length instead).
 
 import json
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,6 +63,14 @@ class AgentService:
     async def get(self, actor: Actor, agent_id: uuid.UUID) -> Agent:
         await require_agents(self.session, actor)
         return _found(await self.repo(actor).get(agent_id))
+
+    async def responsible_names(
+        self, actor: Actor, agents: Sequence[Agent]
+    ) -> dict[uuid.UUID, str]:
+        """For showing agents to someone who may manage them: their responsible
+        people's names (the dialog needs no people list for it)."""
+        await require_agents(self.session, actor)
+        return await self.repo(actor).responsible_names({a.id for a in agents})
 
     async def profile(self, actor: Actor, agent_id: uuid.UUID) -> Agent:
         """For a person with `ai.use`: an agent that is not a draft."""

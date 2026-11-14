@@ -1,6 +1,7 @@
 """Agents and runs as the API takes and shows them."""
 
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -72,7 +73,8 @@ class AgentUpdate(BaseModel):
 
 
 class AgentOut(BaseModel):
-    """An agent as those with `agent.manage` see it."""
+    """An agent as those with `agent.manage` see it; `responsible_name`: the
+    responsible person's name."""
 
     id: uuid.UUID
     name: str
@@ -81,6 +83,7 @@ class AgentOut(BaseModel):
     connection_id: uuid.UUID
     model: str
     responsible_user_id: uuid.UUID
+    responsible_name: str | None
     status: AgentStatus
     max_steps: int
     max_runtime_seconds: int
@@ -89,7 +92,7 @@ class AgentOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, agent: Agent) -> "AgentOut":
+    def of(cls, agent: Agent, names: Mapping[uuid.UUID, str]) -> "AgentOut":
         return cls(
             id=agent.id,
             name=agent.name,
@@ -98,6 +101,7 @@ class AgentOut(BaseModel):
             connection_id=agent.connection_id,
             model=agent.model,
             responsible_user_id=agent.responsible_user_id,
+            responsible_name=names.get(agent.id),
             status=agent.status,
             max_steps=agent.max_steps,
             max_runtime_seconds=agent.max_runtime_seconds,

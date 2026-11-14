@@ -69,6 +69,17 @@ class AgentRepository:
         ran = exists().where(Run.org_id == self.org_id, Run.agent_id == agent_id)
         return bool(await self.session.scalar(select(talks | ran)))
 
+    async def responsible_names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """Each agent's responsible person's name, by agent id (one join)."""
+        if not ids:
+            return {}
+        stmt = (
+            select(Agent.id, User.name)
+            .join(User, User.id == Agent.responsible_user_id)
+            .where(Agent.org_id == self.org_id, User.org_id == self.org_id, Agent.id.in_(ids))
+        )
+        return {agent_id: name for agent_id, name in await self.session.execute(stmt)}
+
     async def names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         if not ids:
             return {}

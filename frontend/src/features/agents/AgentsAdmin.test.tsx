@@ -39,6 +39,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     connection_id: CONNECTION.id,
     model: 'gpt-6-luna',
     responsible_user_id: me.user.id,
+    responsible_name: 'Mia Muster',
     status: 'active',
     max_steps: 25,
     max_runtime_seconds: 600,
@@ -121,7 +122,8 @@ describe('agents administration', () => {
   })
 
   test('editing shows the responsible person by name and the agent version on save', async () => {
-    const agent = makeAgent()
+    // The name comes with the agent: no people list (whose first page may not hold it).
+    const agent = makeAgent({ responsible_name: 'Paul Pfeffer' })
     const api = mockApi({
       'GET /api/auth/me': me,
       'GET /api/spaces': page([]),
@@ -134,7 +136,7 @@ describe('agents administration', () => {
     const card = await screen.findByRole('article', { name: 'Hilda' })
     await user.click(within(card).getByRole('button', { name: 'Bearbeiten' }))
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByDisplayValue('Mia Muster')).toBeInTheDocument()
+    expect(await within(dialog).findByDisplayValue('Paul Pfeffer')).toBeInTheDocument()
     await user.clear(within(dialog).getByLabelText('Name'))
     await user.type(within(dialog).getByLabelText('Name'), 'Hilde')
     await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))

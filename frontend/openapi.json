@@ -301,7 +301,7 @@
         "type": "object"
       },
       "AgentOut": {
-        "description": "An agent as those with `agent.manage` see it.",
+        "description": "An agent as those with `agent.manage` see it; `responsible_name`: the\nresponsible person's name.",
         "properties": {
           "connection_id": {
             "format": "uuid",
@@ -342,6 +342,17 @@
             "title": "Name",
             "type": "string"
           },
+          "responsible_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Name"
+          },
           "responsible_user_id": {
             "format": "uuid",
             "title": "Responsible User Id",
@@ -368,6 +379,7 @@
           "connection_id",
           "model",
           "responsible_user_id",
+          "responsible_name",
           "status",
           "max_steps",
           "max_runtime_seconds",

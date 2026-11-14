@@ -7,7 +7,9 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 import app.modules.agents.hooks  # noqa: F401 -- registers what messaging asks of agents
+from app.core.access import Actor
 from app.core.pagination import Page, PageParams
+from app.modules.agents.models import Agent
 from app.modules.agents.runs import RunService
 from app.modules.agents.schemas import (
     AgentCreate,
@@ -28,18 +30,24 @@ runs = APIRouter(prefix="/runs", tags=["agents"])
 async def list_agents(
     params: Annotated[PageParams, Query()], actor: ActorDep, session: SessionDep
 ) -> Page[AgentOut]:
-    page = await AgentService(session).list(actor, params)
-    return Page[AgentOut](items=[AgentOut.of(a) for a in page.items], next_cursor=page.next_cursor)
+    service = AgentService(session)
+    page = await service.list(actor, params)
+    names = await service.responsible_names(actor, page.items)
+    return Page[AgentOut](
+        items=[AgentOut.of(a, names) for a in page.items], next_cursor=page.next_cursor
+    )
 
 
 @agents.post("", response_model=AgentOut, status_code=201)
 async def create_agent(body: AgentCreate, actor: ActorDep, session: SessionDep) -> AgentOut:
-    return AgentOut.of(await AgentService(session).create(actor, body))
+    service = AgentService(session)
+    return await _out(service, actor, await service.create(actor, body))
 
 
 @agents.get("/{agent_id}", response_model=AgentOut)
 async def get_agent(agent_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> AgentOut:
-    return AgentOut.of(await AgentService(session).get(actor, agent_id))
+    service = AgentService(session)
+    return await _out(service, actor, await service.get(actor, agent_id))
 
 
 @agents.get("/{agent_id}/profile", response_model=AgentProfileOut)
@@ -54,7 +62,8 @@ async def agent_profile(
 async def update_agent(
     agent_id: uuid.UUID, body: AgentUpdate, actor: ActorDep, session: SessionDep
 ) -> AgentOut:
-    return AgentOut.of(await AgentService(session).update(actor, agent_id, body))
+    service = AgentService(session)
+    return await _out(service, actor, await service.update(actor, agent_id, body))
 
 
 @agents.delete("/{agent_id}", status_code=204)
@@ -66,6 +75,10 @@ async def delete_agent(
 ) -> None:
     """Only an agent that never talked or ran (409 `agent.in_use`: pause it instead)."""
     await AgentService(session).delete(actor, agent_id, version)
+
+
+async def _out(service: AgentService, actor: Actor, agent: Agent) -> AgentOut:
+    return AgentOut.of(agent, await service.responsible_names(actor, [agent]))
 
 
 @runs.get("/{run_id}", response_model=RunOut)

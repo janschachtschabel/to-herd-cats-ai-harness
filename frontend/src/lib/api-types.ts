@@ -2044,7 +2044,8 @@ export interface components {
         };
         /**
          * AgentOut
-         * @description An agent as those with `agent.manage` see it.
+         * @description An agent as those with `agent.manage` see it; `responsible_name`: the
+         *     responsible person's name.
          */
         AgentOut: {
             /**
@@ -2074,6 +2075,8 @@ export interface components {
             model: string;
             /** Name */
             name: string;
+            /** Responsible Name */
+            responsible_name: string | null;
             /**
              * Responsible User Id
              * Format: uuid
