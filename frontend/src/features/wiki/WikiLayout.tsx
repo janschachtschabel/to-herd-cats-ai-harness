@@ -81,7 +81,7 @@ function WikiFrame({ space }: { space: Space }) {
             )}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex max-w-full shrink-0 flex-wrap gap-2">
           {abilities.trash && (
             <Button variant="outline" asChild>
               <Link to="/spaces/$spaceId/trash" params={{ spaceId: space.id }}>

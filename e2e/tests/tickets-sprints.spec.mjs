@@ -161,6 +161,9 @@ test("the daily view has a row per person, marks today's changes and filters by 
   await expect
     .poll(() => p.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(375);
+  // The space's actions above wrap instead of running off the screen.
+  const actions = await p.getByRole("button", { name: "Import/Export" }).boundingBox();
+  expect(actions.x + actions.width).toBeLessThanOrEqual(375);
   await phone.close();
 });
 
