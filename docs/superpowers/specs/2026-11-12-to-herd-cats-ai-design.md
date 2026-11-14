@@ -399,7 +399,9 @@ Eine Stufe ist eine **Voreinstellung** der Werkzeugfreigaben. Einzelne Werkzeuge
 | 3 | Schreiben intern | dazu direkte Seiten- und Ticketänderungen in Bereichen mit `agent_write_policy=direct` |
 | 4 | Nach außen handeln | dazu externe Werkzeuge mit Schreibwirkung; als kritisch markierte Aufrufe brauchen immer eine Freigabe |
 
-Eine Stufe über 2 darf nur vergeben, wer jeden Bereich des Agenten verwaltet, oder ein Admin.
+Eine Stufe über 2 darf nur ein Admin vergeben.
+
+*Geändert nach Review M6 [Claude, 14.11.2026]: Früher stand hier „wer jeden Bereich des Agenten verwaltet, oder ein Admin“. Dieser Zweig war nicht erreichbar und ist entfallen (`may_grant_level`: Stufe ≤ 2 oder Admin).*
 
 ### 8.3 Lauf
 

@@ -99,9 +99,7 @@ describe('agent administration: level, tools, spaces, skills', () => {
         version: 4,
       }),
     )
-    expect(
-      await within(levels).findByText(/Stufe 3 vergibt nur ein Admin oder wer jeden Bereich/),
-    ).toBeInTheDocument()
+    expect(await within(levels).findByText(/Stufe 3 vergibt nur ein Admin\./)).toBeInTheDocument()
   })
 
   test('without the right to give level 3 it is not offered, and says why', async () => {

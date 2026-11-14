@@ -18,7 +18,7 @@
         "2": "Liest wie Stufe 1, schlägt Änderungen an Seiten vor, kommentiert und legt Tickets an. Vorschläge nimmt ein Mensch an.",
         "3": "Wie Stufe 2, schreibt Seiten direkt (nur in Bereichen, die das erlauben), übergibt Tickets und schreibt Nachrichten in Gespräche, in denen er Mitglied ist."
       },
-      "withheld": "Stufe 3 vergibt nur ein Admin oder wer jeden Bereich des Agenten verwaltet (ohne Bereiche nur ein Admin).",
+      "withheld": "Stufe 3 vergibt nur ein Admin.",
       "save": "Stufe speichern"
     },
     "tools": {
@@ -114,7 +114,7 @@
   },
   "errors": {
     "agent": {
-      "level_denied": "Stufe 3 vergibt nur ein Admin oder wer jeden Bereich des Agenten verwaltet.",
+      "level_denied": "Stufe 3 vergibt nur ein Admin.",
       "tool_unknown": "Dieses Werkzeug gibt es nicht (mehr). Bitte neu laden.",
       "skill_not_assignable": "Mindestens ein Skill lässt sich diesem Agenten nicht zuweisen (unbekannt oder außerhalb seiner Bereiche).",
       "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben.",

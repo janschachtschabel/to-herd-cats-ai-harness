@@ -73,6 +73,8 @@ async def place_of(
     people = await repo.people(conversation_id)
     if people <= {asker}:
         return Place(PlaceKind.ALONE)
+    # A fail-closed guard: no route creates a DM of several people with an agent today.
+    # Without this branch such a DM would fall through to ALONE, the widest scope.
     return Place(PlaceKind.DM, people=people | {asker})
 
 

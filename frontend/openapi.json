@@ -813,7 +813,7 @@
         "type": "object"
       },
       "AgentToolsOut": {
-        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's. `max_level`: the highest level the caller may give\nthe agent (above 2: admins, or whoever manages every space of the agent).",
+        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's. `max_level`: the highest level the caller may give\nthe agent (above 2: admins only).",
         "properties": {
           "agent_id": {
             "format": "uuid",

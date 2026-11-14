@@ -2861,7 +2861,7 @@ export interface components {
          * AgentToolsOut
          * @description An agent's tool grants: every tool of the catalog (a fixed, short list, so not
          *     paged). `version`: the agent's. `max_level`: the highest level the caller may give
-         *     the agent (above 2: admins, or whoever manages every space of the agent).
+         *     the agent (above 2: admins only).
          */
         AgentToolsOut: {
             /**

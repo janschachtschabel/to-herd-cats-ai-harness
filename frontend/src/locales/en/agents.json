@@ -18,7 +18,7 @@
         "2": "Reads like level 1, proposes changes to pages, comments and creates tickets. A person accepts proposals.",
         "3": "Like level 2, writes pages directly (only in spaces that allow it), hands tickets on and writes messages in conversations it is a member of."
       },
-      "withheld": "Only an admin, or whoever manages every space of the agent, gives level 3 (with no spaces, only an admin).",
+      "withheld": "Only an admin gives level 3.",
       "save": "Save level"
     },
     "tools": {
@@ -114,7 +114,7 @@
   },
   "errors": {
     "agent": {
-      "level_denied": "Only an admin, or whoever manages every space of the agent, gives level 3.",
+      "level_denied": "Only an admin gives level 3.",
       "tool_unknown": "This tool does not exist (any more). Please reload.",
       "skill_not_assignable": "At least one skill cannot be given to this agent (unknown, or outside its spaces).",
       "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them.",
