@@ -112,7 +112,9 @@
       "replies_other": "{{count}} replies",
       "openWithCount_one": "Open {{author}}'s thread, {{count}} reply",
       "openWithCount_other": "Open {{author}}'s thread, {{count}} replies",
-      "composer": "Reply in thread"
+      "composer": "Reply in thread",
+      "openSystem_one": "Open thread “{{text}}”, {{count}} reply",
+      "openSystem_other": "Open thread “{{text}}”, {{count}} replies"
     },
     "discussion": {
       "title": "Discussion",
@@ -130,6 +132,8 @@
       "page_trashed": "{{actor}} moved the page to the trash.",
       "page_restored": "{{actor}} restored the page from the trash.",
       "page_version_restored": "{{actor}} restored version {{number}}.",
+      "page_review_due": "The page's review is due.",
+      "automation_started": "{{actor}}'s automation started.",
       "unknown": "{{actor}} changed the page."
     }
   },
@@ -145,13 +149,17 @@
     "open": "Open",
     "doneAction": "Done",
     "markDone": "Mark the entry from {{author}} as done",
+    "markDoneEntry": "Mark entry as done",
     "done": "Done",
     "unreadCount_one": "{{count}} unread entry",
     "unreadCount_other": "{{count}} unread entries",
     "reasons": {
       "mention": "mentioned you in {{where}}",
-      "reply": "replied to a thread in {{where}}",
-      "review_due": "reports: the review of {{where}} is due"
+      "reply": "replied to a thread in {{where}}"
+    },
+    "reviewDue": {
+      "named": "The review of the page “{{title}}” is due. Please review it.",
+      "page": "The review of a page is due. Please review it."
     }
   },
   "dmInspect": {

@@ -22,19 +22,34 @@ import { AddReaction, Reactions } from './Reactions'
 import { MessageTime } from './MessageTime'
 
 /** A system entry of a page or ticket thread: a grey line on the timeline; an agent's
- *  change carries the AI mark. */
+ *  change carries the AI mark. One with replies (an automation's term in a channel
+ *  opens a thread on its entry) leads into its thread. */
 function SystemRow({ message }: { message: Message }) {
   const { t, i18n } = useTranslation()
+  const { openThread } = useConversationView()
   if (!message.system) return null
+  const text = systemText(t, message.system, i18n.language)
+  const replies = !message.parent_id && openThread && message.reply_count > 0 ? openThread : null
   return (
     <div
-      className="flex items-center gap-2 py-1 pl-2 text-xs text-muted-foreground"
+      className="flex flex-wrap items-center gap-x-2 py-1 pl-2 text-xs text-muted-foreground"
       data-kind="system"
     >
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-      <span>{systemText(t, message.system, i18n.language)}</span>
+      <span>{text}</span>
       {message.system.actor?.type === 'agent' && <AgentBadge />}
       <MessageTime iso={message.created_at} />
+      {replies && (
+        <Button
+          variant="link"
+          size="xs"
+          className="px-0"
+          onClick={() => replies(message.id)}
+          aria-label={t('messaging.thread.openSystem', { count: message.reply_count, text })}
+        >
+          {t('messaging.thread.replies', { count: message.reply_count })}
+        </Button>
+      )}
     </div>
   )
 }

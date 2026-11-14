@@ -394,18 +394,18 @@
       "approval": "bittet dich in {{where}} um eine Freigabe",
       "question": "hat dir in {{where}} eine Frage gestellt",
       "run_stopped": "meldet in {{where}}, dass ein Lauf nicht zu Ende kam",
-      "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})",
-      "automation": "hat eine Aufgabe angehalten ({{where}})"
+      "skill_proposal": "hat einen Skill vorgeschlagen oder einen Vorschlag entschieden ({{where}})"
     },
     "skillProposalWhere": {
       "org": "organisationsweit",
       "space": "einem Bereich"
     },
-    "automationPaused": {
-      "owner": "die Eigentümerin darf sie nicht mehr ausführen",
-      "failing": "drei Läufe in Folge kamen nicht zu Ende",
-      "manual": "von Hand angehalten",
-      "none": "sie läuft wieder"
+    "automation": {
+      "owner": "Eine Aufgabe mit {{agent}} ist angehalten: Die Eigentümerin darf sie nicht mehr ausführen. Wer sie anlegen dürfte, kann sie übernehmen.",
+      "failing": "Eine Aufgabe mit {{agent}} ist angehalten: Drei Läufe in Folge kamen nicht zu Ende.",
+      "manual": "Eine Aufgabe mit {{agent}} wurde von Hand angehalten.",
+      "paused": "Eine Aufgabe mit {{agent}} ist angehalten.",
+      "resumed": "Eine Aufgabe mit {{agent}} war angehalten und läuft inzwischen wieder."
     }
   }
 }

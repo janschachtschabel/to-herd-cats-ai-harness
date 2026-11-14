@@ -394,18 +394,18 @@
       "approval": "asks you for a release in {{where}}",
       "question": "asked you a question in {{where}}",
       "run_stopped": "reports in {{where}} that a run did not finish",
-      "skill_proposal": "proposed a skill or decided a skill proposal ({{where}})",
-      "automation": "paused an automation ({{where}})"
+      "skill_proposal": "proposed a skill or decided a skill proposal ({{where}})"
     },
     "skillProposalWhere": {
       "org": "organisation-wide",
       "space": "a space"
     },
-    "automationPaused": {
-      "owner": "its owner may no longer run it",
-      "failing": "three runs in a row did not finish",
-      "manual": "paused by hand",
-      "none": "it runs again"
+    "automation": {
+      "owner": "An automation with {{agent}} is paused: its owner may no longer run it. Whoever may create it can take it over.",
+      "failing": "An automation with {{agent}} is paused: three runs in a row did not finish.",
+      "manual": "An automation with {{agent}} was paused by hand.",
+      "paused": "An automation with {{agent}} is paused.",
+      "resumed": "An automation with {{agent}} was paused and runs again."
     }
   }
 }

@@ -112,7 +112,9 @@
       "replies_other": "{{count}} Antworten",
       "openWithCount_one": "Thread von {{author}} öffnen, {{count}} Antwort",
       "openWithCount_other": "Thread von {{author}} öffnen, {{count}} Antworten",
-      "composer": "Im Thread antworten"
+      "composer": "Im Thread antworten",
+      "openSystem_one": "Thread „{{text}}“ öffnen, {{count}} Antwort",
+      "openSystem_other": "Thread „{{text}}“ öffnen, {{count}} Antworten"
     },
     "discussion": {
       "title": "Diskussion",
@@ -130,6 +132,8 @@
       "page_trashed": "{{actor}} hat die Seite in den Papierkorb gelegt.",
       "page_restored": "{{actor}} hat die Seite aus dem Papierkorb geholt.",
       "page_version_restored": "{{actor}} hat Version {{number}} wiederhergestellt.",
+      "page_review_due": "Die Prüffrist der Seite ist abgelaufen.",
+      "automation_started": "Aufgabe von {{actor}} gestartet.",
       "unknown": "{{actor}} hat die Seite geändert."
     }
   },
@@ -145,13 +149,17 @@
     "open": "Öffnen",
     "doneAction": "Erledigt",
     "markDone": "Eintrag von {{author}} als erledigt markieren",
+    "markDoneEntry": "Eintrag als erledigt markieren",
     "done": "Erledigt",
     "unreadCount_one": "{{count}} ungelesener Eintrag",
     "unreadCount_other": "{{count}} ungelesene Einträge",
     "reasons": {
       "mention": "hat dich in {{where}} erwähnt",
-      "reply": "hat in {{where}} auf einen Thread geantwortet",
-      "review_due": "meldet: Die Prüffrist von {{where}} ist abgelaufen"
+      "reply": "hat in {{where}} auf einen Thread geantwortet"
+    },
+    "reviewDue": {
+      "named": "Die Prüffrist der Seite „{{title}}“ ist abgelaufen. Bitte prüfen.",
+      "page": "Die Prüffrist einer Seite ist abgelaufen. Bitte prüfen."
     }
   },
   "dmInspect": {

@@ -47,9 +47,12 @@ const SYSTEM_KEYS = [
   'proposal.accepted',
   'proposal.rejected',
   'proposal.withdrawn',
+  'page.review_due',
+  'automation.started',
 ] as const
 
-/** A timeline entry (page or ticket thread) in words, from its key and parameters. */
+/** A timeline entry (page or ticket thread, or a channel's thread root that an
+ *  automation opened) in words, from its key and parameters. */
 export function systemText(t: TFunction, entry: SystemEntry, locale = 'de'): string {
   if (entry.key.startsWith('ticket.')) return ticketSystemText(t, entry, locale)
   const actor = entry.actor?.name ?? t('messaging.system.someone')

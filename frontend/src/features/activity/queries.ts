@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { activityKeys } from '@/features/messaging/keys'
+import { pageQuery } from '@/features/wiki/queries'
 import { api, unwrap } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
 
@@ -57,4 +58,11 @@ export function useMarkActivityDone(notificationId: string) {
 
 export function useReadAllActivity() {
   return useActivityMutation(async () => unwrap(await api.POST('/api/activity/read-all')))
+}
+
+/** The title of the page an entry is about (a review that came due names its page;
+ *  the entry carries only the page's id). Null while loading or when not readable. */
+export function usePageTitle(pageId: string | null): string | null {
+  const page = useQuery({ ...pageQuery(pageId ?? ''), enabled: pageId !== null, retry: false })
+  return page.data?.title ?? null
 }
