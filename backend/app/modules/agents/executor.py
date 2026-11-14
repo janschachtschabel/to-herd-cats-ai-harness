@@ -116,7 +116,8 @@ class Executor:
                 return Outcome("error", detail="attempts")
             org, user = claimed.org_id, claimed.user_id
             journal = replay(await steps.journal())
-            if await allowed_actor(session, org, user, agent, journal.reads) is None:
+            conversation = claimed.conversation_id
+            if await allowed_actor(session, org, user, agent, journal.reads, conversation) is None:
                 return Outcome("rights_revoked")
             connection = await steps.connection(agent.connection_id)
             assert connection is not None  # agent_refusal checked it

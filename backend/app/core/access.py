@@ -10,7 +10,9 @@ is no other place that decides who may do what.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
   an unknown id, and 403 only where the space is visible but the right is missing.
 - An actor with a `read_scope` (an agent's run, spec 5.6) sees only the spaces it
-  lists, and holds at most the role it gives there, admins included.
+  lists, and holds at most the role it gives there, admins included. One with a
+  `write_scope` (plan M6 decision 5) writes only in the spaces it lists (`viewer`
+  elsewhere, and no channel posts there), admins included.
 - When an admin gets into a team or personal space only through admin power (no
   membership of their own or through a group), `require` notes it in the audit log
   (spec 5.5), at most once per admin, space and UTC day. `can` only answers.
@@ -41,6 +43,7 @@ from app.core.permissions import (
     OPEN_SPACE_READERS,
     SPACE_ACTION_MIN_ROLE,
     SYSTEM_ROLE_ACTIONS,
+    WRITE_ACTIONS,
     Action,
     SpaceRole,
 )
@@ -177,9 +180,11 @@ def _effective_role(facts: AccessFacts) -> SpaceRole | None:
 
 
 def _capped(role: SpaceRole | None, facts: AccessFacts) -> SpaceRole | None:
-    if role is None or facts.cap is None:
+    if role is None:
         return role
-    return min(role, facts.cap)
+    if facts.cap is not None:
+        role = min(role, facts.cap)
+    return role if facts.writable else min(role, SpaceRole.VIEWER)
 
 
 def _allows(facts: AccessFacts, action: Action) -> bool:
@@ -187,7 +192,7 @@ def _allows(facts: AccessFacts, action: Action) -> bool:
         return False
     if action not in SPACE_ACTION_MIN_ROLE:
         return action in SYSTEM_ROLE_ACTIONS[facts.system_role]
-    if not facts.readable:
+    if not facts.readable or (action in WRITE_ACTIONS and not facts.writable):
         return False
     if facts.system_role in ADMIN_ROLES:
         role: SpaceRole | None = _capped(SpaceRole.ADMIN, facts)

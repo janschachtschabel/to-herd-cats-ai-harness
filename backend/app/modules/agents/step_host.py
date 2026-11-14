@@ -182,7 +182,14 @@ class RunHost:
 
     async def _actor(self, session: AsyncSession, agent: Agent) -> Actor:
         claimed = self.run.claimed
-        actor = await allowed_actor(session, claimed.org_id, claimed.user_id, agent, self.run.reads)
+        actor = await allowed_actor(
+            session,
+            claimed.org_id,
+            claimed.user_id,
+            agent,
+            self.run.reads,
+            claimed.conversation_id,
+        )
         if actor is None:
             raise Halt("rights_revoked")
         return actor

@@ -90,6 +90,11 @@ SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
     Action.TICKET_ASSIGN: SpaceRole.MODERATOR,
 }
 
+# The space actions that only read; every other space action writes (a `write_scope`
+# holds them, `core/actor.WriteScope`).
+READ_ACTIONS: frozenset[Action] = frozenset({Action.SPACE_READ, Action.TICKET_READ})
+WRITE_ACTIONS: frozenset[Action] = frozenset(SPACE_ACTION_MIN_ROLE) - READ_ACTIONS
+
 # System roles that hold every right, in every space of their organisation (E4).
 ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADMIN})
 

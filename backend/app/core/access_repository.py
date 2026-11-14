@@ -43,13 +43,15 @@ class AccessFacts:
     """`system_role` is None when the actor no longer acts (deactivated, gone);
     `kind` is None when the space does not exist in the actor's organisation;
     `member_role` is the highest role the actor or one of its groups holds there;
-    `cap` the most its `read_scope` allows there (None: no read scope)."""
+    `cap` the most its `read_scope` allows there (None: no read scope); `writable`
+    whether its `write_scope` lets it write there (True without one)."""
 
     system_role: SystemRole | None
     kind: SpaceKind | None = None
     member_role: SpaceRole | None = None
     readable: bool = False
     cap: SpaceRole | None = None
+    writable: bool = True
 
 
 _REMEMBERED = "herd.access_facts"
@@ -89,7 +91,14 @@ class AccessRepository:
         remembered: dict[object, object] | None = self.session.info.get(_REMEMBERED)
         if remembered is None:
             return await self._facts(actor, space_id)
-        key = (actor.org_id, actor.principal, actor.group_ids, actor.read_scope, space_id)
+        key = (
+            actor.org_id,
+            actor.principal,
+            actor.group_ids,
+            actor.read_scope,
+            actor.write_scope,
+            space_id,
+        )
         facts = remembered.get(key)
         if not isinstance(facts, AccessFacts):
             facts = remembered[key] = await self._facts(actor, space_id)
@@ -114,6 +123,7 @@ class AccessRepository:
             member_role=SpaceRole.from_rank(row[2]) if row[2] is not None else None,
             readable=bool(row[3]),
             cap=_cap(actor, space_id),
+            writable=actor.writes_in(space_id),
         )
 
     async def facts_in(
@@ -136,6 +146,7 @@ class AccessRepository:
                 kind=SpaceKind(row[2]),
                 member_role=SpaceRole.from_rank(row[3]) if row[3] is not None else None,
                 cap=_cap(actor, row[0]),
+                writable=actor.writes_in(row[0]),
             )
             for row in await self.session.execute(stmt)
         }
@@ -253,11 +264,14 @@ def _subject_role(actor: Actor) -> ScalarSelect[str]:
 
 def _in_scope(actor: Actor, min_role: SpaceRole = SpaceRole.VIEWER) -> ColumnElement[bool]:
     """The spaces a check considers at all: the actor's organisation, and, with a read
-    scope, only the spaces it allows at least `min_role` in."""
-    in_org = Space.org_id == actor.org_id
-    if actor.read_scope is None:
-        return in_org
-    return and_(in_org, Space.id.in_(actor.read_scope.ids(min_role)))
+    scope, only the spaces it allows at least `min_role` in; above `viewer` (a role for
+    writing), with a write scope, only the spaces it lists."""
+    clauses = [Space.org_id == actor.org_id]
+    if actor.read_scope is not None:
+        clauses.append(Space.id.in_(actor.read_scope.ids(min_role)))
+    if actor.write_scope is not None and min_role > SpaceRole.VIEWER:
+        clauses.append(Space.id.in_(actor.write_scope.ids()))
+    return and_(*clauses)
 
 
 def _cap(actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:

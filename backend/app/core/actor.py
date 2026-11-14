@@ -1,7 +1,7 @@
 """Who acts: the principal, its organisation, and what it was when the request began."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from app.core.permissions import ADMIN_ROLES, SpaceRole
@@ -31,18 +31,44 @@ class ReadScope:
 
 
 @dataclass(frozen=True, slots=True)
+class WriteScope:
+    """Where an actor may write at most (plan M6 decision 5): outside the spaces it
+    lists, it may still read what its rights and its read scope allow, but no action
+    that writes, posting in a channel included (`permissions.WRITE_ACTIONS`). An
+    agent's run from a place in space S writes only in S (`modules/agents/scope.py`);
+    the check applies it to whatever actor carries it."""
+
+    space_ids: frozenset[uuid.UUID]
+
+    @classmethod
+    def of(cls, space_ids: Iterable[uuid.UUID]) -> "WriteScope":
+        return cls(frozenset(space_ids))
+
+    def allows(self, space_id: uuid.UUID) -> bool:
+        return space_id in self.space_ids
+
+    def ids(self) -> list[uuid.UUID]:
+        return sorted(self.space_ids)
+
+
+@dataclass(frozen=True, slots=True)
 class Actor:
     """A snapshot taken by `actor_for` at the start of a request (or, later, of a
     tool call). The permission check re-reads the system role and whether the person
     is still active; group memberships come from `group_ids`, so an actor that should
     see a group change is built anew. `read_scope`, when set, narrows every check and
-    every list filter (see `ReadScope`)."""
+    every list filter (see `ReadScope`); `write_scope`, when set, every write (see
+    `WriteScope`)."""
 
     org_id: uuid.UUID
     principal: Principal
     system_role: SystemRole
     group_ids: frozenset[uuid.UUID]
     read_scope: ReadScope | None = None
+    write_scope: WriteScope | None = None
+
+    def writes_in(self, space_id: uuid.UUID) -> bool:
+        return self.write_scope is None or self.write_scope.allows(space_id)
 
     @property
     def is_admin(self) -> bool:

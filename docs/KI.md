@@ -188,7 +188,23 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
 `backend/app/modules/agents/executor.py`, Schleife `backend/app/runtime/loop.py`):
 
 - Er liest mit den Rechten der Person, begrenzt auf die Bereiche des Agenten
-  (`read_scope`): seine Mitgliedschaften und die offenen Bereiche. Vor jedem
+  (`read_scope`): seine Mitgliedschaften und die offenen Bereiche, und darin auf das,
+  was das Publikum des Orts sehen darf, an dem er antwortet (Spec 5.6, M6;
+  `backend/app/modules/agents/scope.py`):
+
+  | Ort                                         | liest (∩ Agent)              | schreibt (`write_scope`) |
+  |---------------------------------------------|------------------------------|--------------------------|
+  | Direktnachricht der Person allein mit Agent | alles                        | ohne Grenze              |
+  | Direktnachricht mit mehreren Personen       | Bereiche, die alle lesen     | genau diese Bereiche     |
+  | Kanal, Seiten- oder Ticket-Thread in S      | S und die offenen Bereiche   | nur S                    |
+
+  Hat S einen Gast als Mitglied (direkt oder über eine Gruppe), zählen die offenen
+  Bereiche nicht (Gäste lesen keine offenen Bereiche; strenger als Spec 5.6).
+  Deaktivierte Teilnehmende zählen nicht; bleibt nur die fragende Person, gilt
+  „allein“. Außerhalb von `write_scope` darf der Lauf lesen, was Rechte und
+  `read_scope` erlauben, aber nichts schreiben (auch kein Posten, auch für Admins);
+  die eine Rechteprüfung (`core/access.py`) wendet beides auf jeden Akteur an, ohne
+  Agenten zu kennen. Vor jedem
   Modell- und Werkzeugaufruf wird das neu bestimmt; wer `ai.use` oder den Zugang zu
   einem schon gelesenen Bereich verliert, beendet den Lauf (`rights_revoked`), ebenso
   ein Agent, der währenddessen pausiert oder dessen verantwortliche Person deaktiviert
