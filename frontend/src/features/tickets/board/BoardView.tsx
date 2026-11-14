@@ -24,17 +24,27 @@ import { BoardColumn } from './BoardColumn'
 import { BoardFilterBar } from './BoardFilterBar'
 import { type CardData, type CardFocus, columnCoordinates, dropTarget, type MoveCard } from './dnd'
 import { type BoardFilters, useBoard, useMoveTicket } from './queries'
+import type { BoardSearch } from './search'
 
 /** A space's board (`/spaces/<id>/board`): its statuses as columns in their order.
  *  Moving a card changes its status at once; a refusal puts it back and says why.
  *  Grouped by person it is the daily view (plan M4b), on the running sprint unless
- *  another is chosen. */
-export function BoardView() {
+ *  another is chosen. Filters and grouping stand in the address (`search`). */
+export function BoardView({
+  search,
+  onSearch,
+}: {
+  search: BoardSearch
+  onSearch: (next: BoardSearch) => void
+}) {
   const { t } = useTranslation()
   const { space } = useWiki()
   const abilities = ticketAbilities(space.my_role)
-  const [chosen, setFilters] = useState<BoardFilters>({})
-  const [grouped, setGrouped] = useState(false)
+  const { group, ...chosen } = search
+  const grouped = group === 'assignee'
+  const setFilters = (next: BoardFilters) => onSearch({ ...next, group })
+  const setGrouped = (next: boolean, filters: BoardFilters) =>
+    onSearch({ ...filters, group: next ? 'assignee' : undefined })
   const sprints = useSprintChoices(space.id)
   const sprint = boardSprint(chosen, grouped, sprints.data)
   const filters: BoardFilters = { ...chosen, sprint }
@@ -102,10 +112,7 @@ export function BoardView() {
         sprint={sprint}
         sprints={sprints.data ?? []}
         grouped={grouped}
-        onGrouped={(next) => {
-          setGrouped(next)
-          if (!next) setFilters(withoutFocus(chosen))
-        }}
+        onGrouped={(next) => setGrouped(next, next ? chosen : withoutFocus(chosen))}
       />
       {move.error ? (
         <p

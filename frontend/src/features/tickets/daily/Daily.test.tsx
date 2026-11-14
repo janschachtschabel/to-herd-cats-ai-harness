@@ -127,4 +127,33 @@ describe('daily view', () => {
       expect(api.find('GET', '/api/spaces/space-1/board').at(-1)!.query.get('sprint')).toBe('none'),
     )
   })
+
+  test('the daily mode, the sprint and the person stand in the address', async () => {
+    // Module review M4b, finding 9: a reload or a shared link keeps the view.
+    dailyApi('viewer')
+    const { user, router } = await renderApp('/spaces/space-1/board')
+    await user.click(await screen.findByRole('checkbox', { name: 'Nach Person gruppieren' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Sprint' }), planned.id)
+    await user.click(await screen.findByRole('button', { name: 'Nur Lea Löwe zeigen' }))
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        group: 'assignee',
+        sprint: planned.id,
+        assignee: LEA.id,
+      }),
+    )
+    await user.click(screen.getByRole('checkbox', { name: 'Nach Person gruppieren' }))
+    await waitFor(() => expect(router.state.location.search).toEqual({ sprint: planned.id }))
+  })
+
+  test('opened from a link, the board starts in the daily mode it names', async () => {
+    const api = dailyApi('viewer')
+    await renderApp(`/spaces/space-1/board?group=assignee&sprint=${planned.id}&kind=nonsense`)
+    expect(await screen.findByRole('region', { name: /^Lea Löwe/ })).toBeVisible()
+    expect(screen.getByRole('checkbox', { name: 'Nach Person gruppieren' })).toBeChecked()
+    const asked = api.find('GET', '/api/spaces/space-1/board').at(-1)!.query
+    expect(asked.get('group_by')).toBe('assignee')
+    expect(asked.get('sprint')).toBe(planned.id)
+    expect(asked.get('kind')).toBeNull() // not a kind: left out
+  })
 })

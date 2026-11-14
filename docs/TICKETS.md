@@ -298,6 +298,8 @@ Auf dem Board des Bereichs schaltet **„Nach Person gruppieren“** auf die Ans
 Daily: eine **Zeile je zugewiesener Person** (nach Name), am Ende „Nicht zugewiesen“;
 die Spalten bleiben die Status des Bereichs. Voreingestellt ist der **laufende Sprint**,
 falls es einen gibt; die Sprint-Auswahl, Art, Tags, Epic und „Nur meine“ gelten weiter.
+Gruppierung und Filter stehen in der Adresse (`?group=assignee&sprint=…&assignee=…`):
+Neu laden und ein geteilter Link zeigen dieselbe Ansicht.
 
 - Jede Zeile nennt, wie viele Tickets die Person hier hat und wie viele davon sich seit
   dem letzten Arbeitstag geändert haben; jede Zelle ihre Anzahl, die Zahl der geänderten

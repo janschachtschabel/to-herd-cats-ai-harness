@@ -152,11 +152,19 @@ test("the daily view has a row per person, marks today's changes and filters by 
   await a.getByRole("button", { name: "Alle Personen zeigen" }).click();
   await expect(personRow(a, "Nicht zugewiesen")).toBeVisible();
 
+  // The daily view stands in the address: a reload keeps it (module review M4b,
+  // finding 9).
+  await expect(a).toHaveURL(/[?&]group=assignee/);
+  await a.reload();
+  await expect(a.getByRole("checkbox", { name: "Nach Person gruppieren" })).toBeChecked();
+  await expect(card(personRow(a, "Nicht zugewiesen"), third.key)).toBeVisible();
+
   // On a phone the rows scroll sideways inside the board, the page never does.
   const phone = await browser.newContext({ viewport: { width: 375, height: 812 } });
   await signIn(phone, OWNER);
-  const p = await openLive(phone, `/spaces/${team.id}/board`);
-  await p.getByRole("checkbox", { name: "Nach Person gruppieren" }).check();
+  // Opened from a link that names the daily view.
+  const p = await openLive(phone, `/spaces/${team.id}/board?group=assignee`);
+  await expect(p.getByRole("checkbox", { name: "Nach Person gruppieren" })).toBeChecked();
   await expect(card(personRow(p, "Ben"), login.key)).toBeVisible();
   await expect
     .poll(() => p.evaluate(() => document.documentElement.scrollWidth))

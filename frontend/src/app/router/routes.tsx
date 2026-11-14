@@ -1,5 +1,6 @@
 import { createRoute, lazyRouteComponent, notFound, redirect } from '@tanstack/react-router'
 import { pageQuery } from '@/features/wiki/queries'
+import { boardSearch } from '@/features/tickets/board/search'
 import { ticketSearch } from '@/features/tickets/filters'
 import { adminTree } from './adminRoutes'
 import { appRoute, loginRoute, rootRoute } from './base'
@@ -122,7 +123,17 @@ const spaceSettingsRoute = createRoute({
 const boardRoute = createRoute({
   getParentRoute: () => spaceRoute,
   path: '/board',
-  component: BoardView,
+  validateSearch: boardSearch,
+  component: function BoardRoute() {
+    const search = boardRoute.useSearch()
+    const navigate = boardRoute.useNavigate()
+    return (
+      <BoardView
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
 })
 
 const epicsRoute = createRoute({
