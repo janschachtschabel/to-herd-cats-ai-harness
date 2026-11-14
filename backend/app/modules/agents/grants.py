@@ -3,7 +3,9 @@ of the catalog with its level and effect, the default the agent's level gives, t
 agent's entry and the effective grant (`toolbox/policy.py`). Setting replaces all
 entries at once, with the agent's `version` (409 `agent.version_conflict`); a name the
 catalog does not list is refused (422 `agent.tool_unknown`). Holders of
-`agent.manage` only (404 `agent.not_found` else); every change is audited."""
+`agent.manage` only (404 `agent.not_found` else); every change is audited.
+`max_level`: the highest level the caller may give the agent (`may_grant_level`), so
+a level they may not give is never offered."""
 
 import uuid
 from dataclasses import dataclass
@@ -12,11 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
 from app.core.errors import ValidationFailed
-from app.modules.agents.models import Agent
+from app.modules.agents.models import MAX_LEVEL, Agent
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.service import AgentService
 from app.modules.agents.toolbox.catalog import CATALOG
-from app.modules.agents.toolbox.policy import Grant, default_grant, effective
+from app.modules.agents.toolbox.policy import (
+    FREE_LEVEL,
+    Grant,
+    default_grant,
+    effective,
+    may_grant_level,
+)
 from app.modules.audit.recorder import record
 
 
@@ -34,6 +42,7 @@ class ToolGrant:
 class AgentTools:
     agent: Agent
     tools: list[ToolGrant]
+    max_level: int
 
 
 class GrantService:
@@ -76,4 +85,10 @@ class GrantService:
                     effective(agent.level, spec, entry),
                 )
             )
-        return AgentTools(agent, tools)
+        return AgentTools(agent, tools, await self.max_level(actor, agent))
+
+    async def max_level(self, actor: Actor, agent: Agent) -> int:
+        for level in range(MAX_LEVEL, FREE_LEVEL, -1):
+            if await may_grant_level(self.session, actor, agent.id, level):
+                return level
+        return FREE_LEVEL

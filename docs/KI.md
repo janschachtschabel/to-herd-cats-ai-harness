@@ -163,7 +163,12 @@ Urheber von Nachrichten (`kind: agent`).
   Änderung im Audit (`agent.tools_changed`). Ein Lauf bietet dem Modell nur Werkzeuge
   mit wirksamem `allow` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
   `rights_revoked`). `confirm` wartet auf die Freigaben (M6 Task 7) und wird bis dahin
-  nicht angeboten. Ein Werkzeug, das der Katalog nicht kennt, läuft nie.
+  nicht angeboten. Ein Werkzeug, das der Katalog nicht kennt, läuft nie. `max_level`
+  nennt die höchste Stufe, die die fragende Person diesem Agenten geben darf; die
+  Oberfläche bietet nur Stufen bis dahin an.
+- `GET /api/agents/{id}/spaces` (`agent.manage`, seitenweise nach Name): die Bereiche,
+  in denen der Agent Mitglied ist, mit seiner Rolle (offene Bereiche, die er nur liest,
+  stehen nicht darin).
 - `GET /api/agents/{id}/profile` (`ai.use`): Name, Kurzvorstellung, Status; Entwürfe
   sind für alle ohne `agent.manage` unsichtbar, auch beim Hinzufügen als Mitglied
   eines Bereichs (404 `agent.not_found`). Wer Agenten nicht sieht (weder `ai.use` noch

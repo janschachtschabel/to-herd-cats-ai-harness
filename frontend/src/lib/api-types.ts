@@ -395,6 +395,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{agent_id}/spaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Spaces
+         * @description The agent's memberships by name (open spaces it only reads are not listed).
+         */
+        get: operations["list_agent_spaces_api_agents__agent_id__spaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/tools": {
         parameters: {
             query?: never;
@@ -2548,6 +2568,21 @@ export interface components {
             version: number;
         };
         /**
+         * AgentSpaceOut
+         * @description A space the agent is a member of, with its `role` there.
+         */
+        AgentSpaceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["SpaceKind"];
+            /** Name */
+            name: string;
+            role: components["schemas"]["SpaceRole"];
+        };
+        /**
          * AgentStatus
          * @enum {string}
          */
@@ -2577,7 +2612,8 @@ export interface components {
         /**
          * AgentToolsOut
          * @description An agent's tool grants: every tool of the catalog (a fixed, short list, so not
-         *     paged). `version`: the agent's.
+         *     paged). `version`: the agent's. `max_level`: the highest level the caller may give
+         *     the agent (above 2: admins, or whoever manages every space of the agent).
          */
         AgentToolsOut: {
             /**
@@ -2587,6 +2623,8 @@ export interface components {
             agent_id: string;
             /** Level */
             level: number;
+            /** Max Level */
+            max_level: number;
             /** Tools */
             tools: components["schemas"]["AgentToolOut"][];
             /** Version */
@@ -4046,6 +4084,13 @@ export interface components {
         Page_AgentOut_: {
             /** Items */
             items: components["schemas"]["AgentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[AgentSpaceOut] */
+        Page_AgentSpaceOut_: {
+            /** Items */
+            items: components["schemas"]["AgentSpaceOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -6886,6 +6931,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentSkillsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_spaces_api_agents__agent_id__spaces_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AgentSpaceOut_"];
                 };
             };
             /** @description Validation Error */

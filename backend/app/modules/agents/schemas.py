@@ -134,10 +134,12 @@ class AgentToolOut(BaseModel):
 
 class AgentToolsOut(BaseModel):
     """An agent's tool grants: every tool of the catalog (a fixed, short list, so not
-    paged). `version`: the agent's."""
+    paged). `version`: the agent's. `max_level`: the highest level the caller may give
+    the agent (above 2: admins, or whoever manages every space of the agent)."""
 
     agent_id: uuid.UUID
     level: int
+    max_level: int
     version: int
     tools: list[AgentToolOut]
 
@@ -146,6 +148,7 @@ class AgentToolsOut(BaseModel):
         return cls(
             agent_id=shown.agent.id,
             level=shown.agent.level,
+            max_level=shown.max_level,
             version=shown.agent.version,
             tools=[
                 AgentToolOut(

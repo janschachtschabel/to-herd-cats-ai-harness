@@ -581,6 +581,34 @@
         "title": "AgentSkillsPut",
         "type": "object"
       },
+      "AgentSpaceOut": {
+        "description": "A space the agent is a member of, with its `role` there.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SpaceKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SpaceRole"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "role"
+        ],
+        "title": "AgentSpaceOut",
+        "type": "object"
+      },
       "AgentStatus": {
         "enum": [
           "draft",
@@ -653,7 +681,7 @@
         "type": "object"
       },
       "AgentToolsOut": {
-        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's.",
+        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's. `max_level`: the highest level the caller may give\nthe agent (above 2: admins, or whoever manages every space of the agent).",
         "properties": {
           "agent_id": {
             "format": "uuid",
@@ -662,6 +690,10 @@
           },
           "level": {
             "title": "Level",
+            "type": "integer"
+          },
+          "max_level": {
+            "title": "Max Level",
             "type": "integer"
           },
           "tools": {
@@ -679,6 +711,7 @@
         "required": [
           "agent_id",
           "level",
+          "max_level",
           "version",
           "tools"
         ],
@@ -4372,6 +4405,33 @@
           "items"
         ],
         "title": "Page[AgentOut]",
+        "type": "object"
+      },
+      "Page_AgentSpaceOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSpaceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AgentSpaceOut]",
         "type": "object"
       },
       "Page_AttachmentOut_": {
@@ -11003,6 +11063,78 @@
         "summary": "Set Agent Skills",
         "tags": [
           "skills"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/spaces": {
+      "get": {
+        "description": "The agent's memberships by name (open spaces it only reads are not listed).",
+        "operationId": "list_agent_spaces_api_agents__agent_id__spaces_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentSpaceOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agent Spaces",
+        "tags": [
+          "agents"
         ]
       }
     },

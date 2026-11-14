@@ -79,7 +79,11 @@ def test_the_list_endpoints_are_found() -> None:
     } <= set(endpoints)
 
 
-NEED_A_RUN = {"/api/runs/{run_id}/events", "/api/agents/{agent_id}/runs"}
+NEED_A_RUN = {
+    "/api/runs/{run_id}/events",
+    "/api/agents/{agent_id}/runs",
+    "/api/agents/{agent_id}/spaces",
+}
 
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
