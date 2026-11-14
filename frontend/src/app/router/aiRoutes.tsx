@@ -4,11 +4,16 @@ import type { RunFilters } from '@/features/runs/queries'
 import type { Me } from '@/lib/api'
 import { appRoute } from './base'
 
-// Working with agents (plan M6 task 12): runs, the run page, an agent's runs. Every
+// Working with agents (plan M6 task 12): runs, the run page, an agent's runs, my
+// releases. Every
 // view is its own chunk, as in routes.tsx.
 const MyRunsPage = lazyRouteComponent(() => import('@/features/runs/RunsPages'), 'MyRunsPage')
 const AgentRunsPage = lazyRouteComponent(() => import('@/features/runs/RunsPages'), 'AgentRunsPage')
 const RunScreen = lazyRouteComponent(() => import('@/features/runs/RunScreen'), 'RunScreen')
+const ApprovalsPage = lazyRouteComponent(
+  () => import('@/features/approvals/ApprovalsPage'),
+  'ApprovalsPage',
+)
 
 const RUN_STATES = new Set(['queued', 'running', 'waiting', 'done'])
 const STOP_REASONS = new Set([
@@ -91,4 +96,15 @@ const agentRunsRoute = createRoute({
   },
 })
 
-export const aiWorkRoutes = [myRunsRoute, runRoute, agentRunsRoute]
+/** The releases agents asked of me (people with AI; others are never asked). */
+const approvalsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/approvals',
+  loader: ({ context }) => {
+    requireRuns(context.me)
+    return ApprovalsPage.preload?.()
+  },
+  component: ApprovalsPage,
+})
+
+export const aiWorkRoutes = [myRunsRoute, runRoute, agentRunsRoute, approvalsRoute]

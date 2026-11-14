@@ -1,0 +1,100 @@
+{
+  "nav": {
+    "approvals": "Freigaben",
+    "approvalsCount_one": "{{count}} Freigabe wartet",
+    "approvalsCount_other": "{{count}} Freigaben warten"
+  },
+  "approvals": {
+    "card": {
+      "label": "Freigabe",
+      "title": "Freigabe erbeten: {{tool}}",
+      "titleUnknown": "Freigabe erbeten",
+      "openPage": "Betroffene Seite öffnen",
+      "openTicket": "Ticket {{key}} öffnen",
+      "showDiff": "Änderung ansehen",
+      "hideDiff": "Änderung ausblenden",
+      "diffTooLarge": "Die Texte sind zu groß für einen Vergleich.",
+      "args": "Angaben des Aufrufs",
+      "youDecide": "Du entscheidest.",
+      "decides": "Entscheiden kann {{name}}.",
+      "askerDecides": "Entscheiden kann die Person, die den Agenten gefragt hat.",
+      "until": "Offen bis {{when}}.",
+      "reason": "Begründung: {{reason}}",
+      "notYours": "Entscheiden kann nur die Person, die den Agenten gefragt hat. Die Einzelheiten sieht, wer den Lauf sehen darf."
+    },
+    "state": {
+      "pending": "Wartet auf Entscheidung",
+      "approved": "Freigegeben",
+      "done": "Freigegeben und ausgeführt",
+      "stale": "Veraltet",
+      "rejected": "Abgelehnt",
+      "expired": "Abgelaufen"
+    },
+    "outcome": {
+      "approved": "Freigegeben am {{when}}. Der Agent führt es gleich aus.",
+      "done": "Freigegeben am {{when}} und ausgeführt.",
+      "stale": "Freigegeben am {{when}}, aber nicht ausgeführt: Der Inhalt hat sich seit der Anfrage geändert. Der Agent kann neu fragen.",
+      "rejected": "Abgelehnt am {{when}}. Nichts wurde ausgeführt.",
+      "expired": "Abgelaufen: Niemand hat rechtzeitig entschieden. Nichts wurde ausgeführt."
+    },
+    "decide": {
+      "approve": "Freigeben",
+      "reject": "Ablehnen",
+      "reason": "Begründung (freiwillig, geht an den Agenten)",
+      "reasonTooLong_one": "Höchstens {{count}} Zeichen.",
+      "reasonTooLong_other": "Höchstens {{count}} Zeichen.",
+      "rejectConfirm": "Ablehnen"
+    },
+    "question": {
+      "label": "Rückfrage",
+      "title": "Rückfrage des Agenten",
+      "answerLabel": "Deine Antwort",
+      "tooLong_one": "Höchstens {{count}} Zeichen.",
+      "tooLong_other": "Höchstens {{count}} Zeichen.",
+      "send": "Antworten",
+      "askerAnswers": "Antworten kann die Person, die den Agenten gefragt hat.",
+      "answeredAt": "Beantwortet am {{when}}.",
+      "yourAnswer": "Deine Antwort: {{answer}}",
+      "expired": "Abgelaufen: Niemand hat rechtzeitig geantwortet.",
+      "state": {
+        "pending": "Wartet auf Antwort",
+        "answered": "Beantwortet",
+        "expired": "Abgelaufen"
+      }
+    },
+    "page": {
+      "title": "Freigaben",
+      "description": "Was Agenten in deinem Auftrag tun wollen und erst nach deiner Freigabe tun.",
+      "filter": "Zustand",
+      "pending": "Offen",
+      "all": "Alle",
+      "empty": "Keine offenen Freigaben.",
+      "emptyAll": "Noch keine Freigaben.",
+      "list": "Freigaben",
+      "where": "Wo:"
+    },
+    "waiting": {
+      "question": "Antworten kann {{name}}, auf der Karte im Gespräch.",
+      "approval": "Wartet auf die Entscheidung von {{name}}."
+    }
+  },
+  "errors": {
+    "approval": {
+      "not_found": "Diese Freigabe gibt es nicht (mehr), oder du darfst sie nicht sehen.",
+      "not_addressed": "Entscheiden kann nur die Person, die den Agenten gefragt hat.",
+      "not_permitted": "Du darfst das, was der Agent tun will, selbst nicht (mehr) tun; deshalb kannst du es auch nicht freigeben.",
+      "decided": "Diese Freigabe ist schon entschieden.",
+      "expired": "Diese Freigabe ist abgelaufen; der Agent hat aufgehört zu warten.",
+      "run_ended": "Der Lauf wartet nicht mehr darauf (er ist beendet oder wurde abgebrochen).",
+      "version_conflict": "Die Freigabe hat sich inzwischen geändert. Sie wurde neu geladen."
+    },
+    "question": {
+      "not_found": "Diese Rückfrage gibt es nicht (mehr), oder du darfst sie nicht sehen.",
+      "not_addressed": "Antworten kann nur die Person, die den Agenten gefragt hat.",
+      "answered": "Diese Rückfrage ist schon beantwortet.",
+      "expired": "Diese Rückfrage ist abgelaufen; der Agent hat aufgehört zu warten.",
+      "run_ended": "Der Lauf wartet nicht mehr auf die Antwort (er ist beendet oder wurde abgebrochen).",
+      "version_conflict": "Die Rückfrage hat sich inzwischen geändert. Sie wurde neu geladen."
+    }
+  }
+}

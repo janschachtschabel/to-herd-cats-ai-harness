@@ -2,6 +2,7 @@ import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/r
 import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
 import { agentKeys } from '@/features/agents/keys'
+import { approvalKeys } from '@/features/approvals/queries'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
@@ -37,6 +38,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         agentKeys.runs,
         agentKeys.allRunEvents,
         proposalKeys.all,
+        approvalKeys.all,
       ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
@@ -70,6 +72,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'dm.inspected':
       return conversation ? [messagingKeys.conversation(conversation)] : []
     case 'notification.created':
+      // A new release card comes with an activity entry for the person asked.
+      return [activityKeys.all, approvalKeys.mine]
     case 'activity.changed':
       return [activityKeys.all]
     case 'ticket.created':
@@ -82,6 +86,16 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return event.runId ? [agentKeys.run(event.runId), agentKeys.runEvents(event.runId)] : []
     case 'proposal.changed':
       return proposalEventKeys(event)
+    case 'card.changed':
+      // A run's card was decided or answered: the cards, the run, and their messages.
+      return [
+        approvalKeys.all,
+        agentKeys.runs,
+        agentKeys.allRunEvents,
+        ...(conversation
+          ? [messagingKeys.messages(conversation), messagingKeys.replies(conversation)]
+          : []),
+      ]
   }
 }
 

@@ -18,6 +18,7 @@ export const LIVE_EVENTS = [
   'sprint.changed',
   'run.progress',
   'proposal.changed',
+  'card.changed',
   'resync',
 ] as const
 

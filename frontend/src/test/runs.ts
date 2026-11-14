@@ -66,6 +66,8 @@ export function makeApproval(overrides: Partial<Approval> = {}): Approval {
     run_id: 'run-1',
     conversation_id: 'c-1',
     message_id: 'm-1',
+    step: 2,
+    call_id: 'call_0',
     tool: 'propose_page_change',
     summary: 'propose_page_change: page_id=p-1',
     args: { page_id: 'p-1', reason: 'Neue Frist' },

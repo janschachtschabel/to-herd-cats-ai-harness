@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
 import { agentKeys } from '@/features/agents/keys'
+import { approvalKeys } from '@/features/approvals/queries'
 import { ticketKeys } from '@/features/tickets/keys'
 import { activityKeys, messagingKeys } from './keys'
 import { COALESCE_MS, createCoalescer, invalidateFor } from './live'
@@ -41,6 +42,9 @@ const KEYS = {
   myColumn: ticketKeys.myColumn('review'),
   runA: agentKeys.run('run-a'),
   runB: agentKeys.run('run-b'),
+  approval: approvalKeys.detail('ap-1'),
+  question: approvalKeys.question('q-1'),
+  myApprovals: [...approvalKeys.mine, 'pending'],
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -106,6 +110,27 @@ describe('live invalidation', () => {
       ...ALL_TICKETS,
       'runA',
       'runB',
+      'approval',
+      'question',
+      'myApprovals',
+    ])
+  })
+
+  test("a decided card refreshes the cards, the runs and its conversation's messages", () => {
+    expect(staleAfter({ type: 'card.changed', conversationId: 'a', messageId: 'm' })).toEqual([
+      'messagesA',
+      'repliesA',
+      'runA',
+      'runB',
+      'approval',
+      'question',
+      'myApprovals',
+    ])
+    // A new card's activity entry refreshes my list of releases (and its count).
+    expect(staleAfter({ type: 'notification.created' })).toEqual([
+      'activity',
+      'activityCount',
+      'myApprovals',
     ])
   })
 
@@ -179,6 +204,7 @@ describe('live invalidation', () => {
     expect(staleAfter({ type: 'notification.created', conversationId: 'a' })).toEqual([
       'activity',
       'activityCount',
+      'myApprovals',
     ])
     expect(staleAfter({ type: 'activity.changed' })).toEqual(['activity', 'activityCount'])
   })

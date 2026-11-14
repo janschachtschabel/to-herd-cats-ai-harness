@@ -6,6 +6,8 @@ import { AgentBadge } from '@/features/agents/AgentBadge'
 import { AnswerSources } from '@/features/agents/AnswerSources'
 import { byAgent, isRunNotice } from '@/features/agents/display'
 import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
+import { isCard } from '@/features/approvals/display'
+import { MessageCard } from '@/features/approvals/MessageCard'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { TicketCards } from '@/features/tickets/TicketCard'
 import type { Message } from '@/lib/api'
@@ -79,8 +81,14 @@ function HumanMessage({ message }: { message: Message }) {
         <EditMessageForm message={message} onDone={() => setEditing(false)} />
       ) : (
         <>
-          <MessageMarkdown markdown={message.body_md} meId={meId} />
-          <TicketCards markdown={message.body_md} />
+          {isCard(message) ? (
+            <MessageCard message={message} />
+          ) : (
+            <>
+              <MessageMarkdown markdown={message.body_md} meId={meId} />
+              <TicketCards markdown={message.body_md} />
+            </>
+          )}
           {message.kind === 'agent' && (message.run_id ?? message.client_id) && (
             <AnswerSources runId={(message.run_id ?? message.client_id) as string} />
           )}

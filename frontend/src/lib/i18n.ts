@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import deAgents from '@/locales/de/agents.json'
+import deApprovals from '@/locales/de/approvals.json'
 import deAi from '@/locales/de/ai.json'
 import de from '@/locales/de/common.json'
 import deMessaging from '@/locales/de/messaging.json'
@@ -10,6 +11,7 @@ import deSkills from '@/locales/de/skills.json'
 import deTickets from '@/locales/de/tickets.json'
 import deWiki from '@/locales/de/wiki.json'
 import enAgents from '@/locales/en/agents.json'
+import enApprovals from '@/locales/en/approvals.json'
 import enAi from '@/locales/en/ai.json'
 import en from '@/locales/en/common.json'
 import enMessaging from '@/locales/en/messaging.json'
@@ -38,7 +40,7 @@ type Tree = { [key: string]: string | Tree }
 
 /** One namespace from several files (`common.json`, `wiki.json`, `messaging.json`,
  *  `tickets.json`, `ai.json`, `agents.json`, `skills.json`, `proposals.json`,
- *  `runs.json`): groups such as
+ *  `runs.json`, `approvals.json`): groups such as
  *  `errors` are merged key by key. */
 export function mergeResources(...trees: Tree[]): Tree {
   const out: Tree = {}
@@ -65,6 +67,7 @@ void i18n.use(initReactI18next).init({
         deSkills,
         deProposals,
         deRuns,
+        deApprovals,
       ),
     },
     en: {
@@ -78,6 +81,7 @@ void i18n.use(initReactI18next).init({
         enSkills,
         enProposals,
         enRuns,
+        enApprovals,
       ),
     },
   },

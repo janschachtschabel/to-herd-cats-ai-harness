@@ -18,7 +18,7 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Place({ link, text }: { link: PlaceLink | null; text: string }) {
+export function Place({ link, text }: { link: PlaceLink | null; text: string }) {
   const className = 'underline underline-offset-2'
   if (!link) return <>{text}</>
   if (link.to === 'ticket') {
