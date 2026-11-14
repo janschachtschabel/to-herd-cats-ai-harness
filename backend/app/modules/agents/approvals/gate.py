@@ -34,8 +34,9 @@ from pydantic import BaseModel
 
 from app.core.access import can
 from app.core.models_base import utcnow
+from app.core.outbox import emit
 from app.modules.agents.approvals import cards
-from app.modules.agents.approvals.models import Approval, ApprovalState
+from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.toolbox.base import Subject, ToolContext, ToolSpec, Wait
 from app.modules.messaging.models import MessageKind
@@ -83,6 +84,7 @@ async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult 
         said = f" The person's reason: {found.reason}" if found.reason else ""
         return ToolResult("approval", REJECTED + said, {"tool": spec.name})
     if subjects is None or fingerprint(spec.name, canonical, subjects) != found.fingerprint:
+        await _settle(ctx, found, ApprovalOutcome.STALE)
         return ToolResult("approval", STALE, {"tool": spec.name})
     if spec.action is not None:
         for subject in subjects:
@@ -90,7 +92,29 @@ async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult 
                 ctx.session, ctx.actor, spec.action, subject.space_id
             ):
                 raise Halt("rights_revoked")
+    await _settle(ctx, found, ApprovalOutcome.RAN)
     return None
+
+
+async def _settle(ctx: ToolContext, approval: Approval, outcome: ApprovalOutcome) -> None:
+    """Record what became of an approved call (rolled back with the call if the tool
+    fails) and tell the card's readers."""
+    approval.outcome = outcome
+    await ctx.session.flush()
+    await emit(
+        ctx.session,
+        type="approval.settled",
+        actor=ctx.actor,
+        space_id=None,
+        subject_type="approval",
+        subject_id=approval.id,
+        payload={
+            "approval_id": str(approval.id),
+            "run_id": str(ctx.run.id),
+            "conversation_id": str(ctx.run.conversation_id),
+            "message_id": str(approval.message_id) if approval.message_id else None,
+        },
+    )
 
 
 async def _ask(

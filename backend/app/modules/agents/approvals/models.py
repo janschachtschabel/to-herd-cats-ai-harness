@@ -11,7 +11,10 @@ says (the tool and the ids it names; never content). It is addressed to one pers
 inactive), who decides (`approved` or `rejected`, `decided_by`, `decided_at`, an
 optional `reason` for the model) before `expires_at`, else it is `expired`; it is
 `expired` too when its run ends otherwise (cancelled). `message_id`: the card in the
-run's conversation.
+run's conversation. `outcome`: what became of an approved call, set in the transaction
+where the run came back to it: `ran`, or `stale` (the fingerprint differed, so nothing
+ran); null while it waits, when rejected or expired, and when the run stopped before
+(its rights were gone).
 
 `run_question`: `ask_user`'s question to the same person, `answer`ed (bounded) or
 `expired` like an approval.
@@ -51,6 +54,11 @@ class ApprovalState(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     EXPIRED = "expired"
+
+
+class ApprovalOutcome(StrEnum):
+    RAN = "ran"
+    STALE = "stale"
 
 
 class QuestionState(StrEnum):
@@ -95,6 +103,10 @@ class Approval(_Waited, Base):
             " AND (decided_at IS NULL) = (decided_by IS NULL)",
             name="decided",
         ),
+        CheckConstraint(
+            f"outcome IS NULL OR (state = 'approved' AND {_in('outcome', ApprovalOutcome)})",
+            name="outcome",
+        ),
         CheckConstraint(f"char_length(reason) <= {MAX_REASON_CHARS}", name="reason_length"),
         CheckConstraint(f"char_length(summary) <= {MAX_SUMMARY_CHARS}", name="summary_length"),
         Index("ix_approval_addressed_to_id", "addressed_to", "id"),
@@ -111,6 +123,7 @@ class Approval(_Waited, Base):
     )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reason: Mapped[str | None] = mapped_column(Text)
+    outcome: Mapped[ApprovalOutcome | None] = mapped_column(String(16))
 
 
 class RunQuestion(_Waited, Base):

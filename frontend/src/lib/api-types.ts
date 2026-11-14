@@ -2961,8 +2961,9 @@ export interface components {
          *     the ids the call names. `args`: the call's arguments, only for the person asked
          *     (null for others). `diff_url`: for a page's new content, where that person reads
          *     the diff against the page as it is now (`GET`), instead of the text. `step` and
-         *     `call_id`: the call it waits for, as the run's journal names it (where a reader of
-         *     the run finds what became of the call once released: it ran, or it was stale).
+         *     `call_id`: the call it waits for, as the run's journal names it (the step a run
+         *     link points at). `outcome`: what became of the call once released: `ran`, or
+         *     `stale` (what it would change had changed, so nothing ran); null before.
          */
         ApprovalOut: {
             /**
@@ -3004,6 +3005,7 @@ export interface components {
             id: string;
             /** Message Id */
             message_id: string | null;
+            outcome: components["schemas"]["ApprovalOutcome"] | null;
             /** Reason */
             reason: string | null;
             /**
@@ -3021,6 +3023,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ApprovalOutcome
+         * @enum {string}
+         */
+        ApprovalOutcome: "ran" | "stale";
         /**
          * ApprovalState
          * @enum {string}

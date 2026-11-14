@@ -73,6 +73,7 @@ export function makeApproval(overrides: Partial<Approval> = {}): Approval {
     args: { page_id: 'p-1', reason: 'Neue Frist' },
     diff_url: '/api/approvals/x/diff',
     state: 'pending',
+    outcome: null,
     addressed_to: 'asker',
     decided_by: null,
     decided_at: null,

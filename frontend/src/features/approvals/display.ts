@@ -1,12 +1,9 @@
-import type { RunEvent } from '@/features/agents/queries'
 import type { Message } from '@/lib/api'
 import type { Approval, Question } from './queries'
 
 /** What a release card shows: waiting; approved and still to run, run, or not run
  *  because the object changed meanwhile (`stale`); rejected; expired. */
 export type ApprovalView = 'pending' | 'approved' | 'done' | 'stale' | 'rejected' | 'expired'
-
-const STALE = 'approval_stale'
 
 function expired(card: { state: string; expires_at: string }, now: number): boolean {
   return (
@@ -15,33 +12,21 @@ function expired(card: { state: string; expires_at: string }, now: number): bool
 }
 
 /**
- * A release's state as the card shows it. After an approval the run's journal tells
- * what became of the call (the tool call with the approval's step and call id): its
- * result `approval_stale` means the object changed since the person released it and
- * nothing ran; any other result means it ran. Without that entry yet (or without the
- * journal: a reader who may not read it) it is "approved".
+ * A release's state as the card shows it. After an approval the API's `outcome` tells
+ * what became of the call: `stale` (the object changed since the person released it,
+ * so nothing ran) or `ran`. Without one yet it is "approved".
  */
-export function approvalView(
-  approval: Approval,
-  events: readonly RunEvent[] | undefined,
-  now: number,
-): ApprovalView {
+export function approvalView(approval: Approval, now: number): ApprovalView {
   if (expired(approval, now)) return 'expired'
   if (approval.state === 'pending') return 'pending'
   if (approval.state === 'rejected') return 'rejected'
-  const call = (events ?? []).find((event) => {
-    if (event.kind !== 'tool_call' || event.redacted) return false
-    const content = event.content as { step?: unknown; call_id?: unknown }
-    return content.step === approval.step && content.call_id === approval.call_id
-  })
-  if (!call) return 'approved'
-  const text = (call.content as { text?: unknown }).text
-  return typeof text === 'string' && text.startsWith(STALE) ? 'stale' : 'done'
+  if (approval.outcome === 'stale') return 'stale'
+  return approval.outcome === 'ran' ? 'done' : 'approved'
 }
 
 /** Whether the person asked can still decide here (the server checks again). */
 export function mayDecide(approval: Approval, meId: string | undefined, now: number): boolean {
-  return approval.addressed_to === meId && approvalView(approval, undefined, now) === 'pending'
+  return approval.addressed_to === meId && approvalView(approval, now) === 'pending'
 }
 
 export type QuestionView = 'pending' | 'answered' | 'expired'

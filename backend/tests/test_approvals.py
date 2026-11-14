@@ -21,6 +21,7 @@ from app.modules.agents import control
 from app.modules.agents.approvals.gate import fingerprint
 from app.modules.agents.approvals.models import Approval
 from app.modules.agents.models import Run, StopReason
+from app.modules.messaging.live_events import of_event
 from app.modules.proposals.models import PageProposal
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.wiki.models import Page
@@ -78,6 +79,7 @@ async def test_a_confirm_tool_is_offered_and_its_call_waits_for_a_release(work: 
     assert run.state == "waiting" and run.wait_until is not None
     assert run.wait_until - utcnow() > timedelta(hours=71)
     assert approval["tool"] == "propose_page_change" and approval["state"] == "pending"
+    assert approval["outcome"] is None  # what became of the call: only once released
     assert approval["summary"] == f"propose_page_change: page_id={page_id}"
     assert approval["args"] == {"page_id": page_id, "content_md": NEW, "reason": "Klarer"}
     assert approval["diff_url"] == f"/api/approvals/{approval['id']}/diff"
@@ -119,6 +121,14 @@ async def test_a_release_runs_the_call_once(work: Work) -> None:
     assert await work.bench.run_next() == StopReason.COMPLETED
     (proposal,) = await proposals(work)
     assert proposal.content_md == NEW and proposal.run_id == run_id
+    # The API tells what became of the call (set where the call ran) and says so live.
+    shown = (await work.bench.people.alice.get(f"/api/approvals/{approval['id']}")).json()
+    assert shown["outcome"] == "ran" and shown["state"] == "approved"
+    (settled,) = await events(work.bench.session, "approval.settled")
+    assert settled.payload == {**event.payload}
+    live = of_event(settled)
+    assert live is not None and live.name == "card.changed"
+    assert str(live.conversation_id) == settled.payload["conversation_id"]
     assert len(work.bench.stub.state.log) == 2  # the model was asked once before, once after
     again = await decide(work, decided, "reject")
     assert again.status_code == 409 and again.json()["error"]["code"] == "approval.decided"
@@ -133,6 +143,8 @@ async def test_a_rejection_tells_the_model_why_and_runs_nothing(work: Work) -> N
     assert await proposals(work) == []
     sent = await tool_texts(work)
     assert "approval_rejected" in sent and "Bitte nicht jetzt" in sent and "<untrusted" in sent
+    shown = (await work.bench.people.alice.get(f"/api/approvals/{approval['id']}")).json()
+    assert shown["outcome"] is None
 
 
 async def test_a_changed_page_makes_the_release_stale(work: Work) -> None:
@@ -146,6 +158,14 @@ async def test_a_changed_page_makes_the_release_stale(work: Work) -> None:
     assert await work.bench.run_next() == StopReason.COMPLETED
     assert await proposals(work) == []
     assert "approval_stale" in await tool_texts(work)
+    # The API reports the release as stale (set in the transaction that found it so),
+    # for the person asked and for anyone else who sees the card.
+    url = f"/api/approvals/{approval['id']}"
+    for who in ("alice", "admin"):
+        shown = (await getattr(work.bench.people, who).get(url)).json()
+        assert shown["outcome"] == "stale" and shown["state"] == "approved", who
+    (settled,) = await events(work.bench.session, "approval.settled")
+    assert settled.payload["approval_id"] == approval["id"]
 
 
 async def test_rights_lost_while_waiting_end_the_run(work: Work) -> None:
@@ -156,6 +176,8 @@ async def test_rights_lost_while_waiting_end_the_run(work: Work) -> None:
     await work.bench.join(work.space, SpaceRole.VIEWER)
     assert await work.bench.run_next() == StopReason.RIGHTS_REVOKED
     assert await proposals(work) == []
+    shown = (await work.bench.people.alice.get(f"/api/approvals/{approval['id']}")).json()
+    assert shown["outcome"] is None  # the call neither ran nor was found stale
 
 
 async def test_a_grant_blocked_while_waiting_runs_nothing(work: Work) -> None:

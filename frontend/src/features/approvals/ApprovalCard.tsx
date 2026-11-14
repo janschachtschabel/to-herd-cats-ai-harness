@@ -1,6 +1,6 @@
 import { ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useRun, useRunEvents } from '@/features/agents/queries'
+import { useRun } from '@/features/agents/queries'
 import { useMe } from '@/features/auth/queries'
 import { RunLink } from '@/features/runs/RunBits'
 import { toolText } from '@/features/runs/display'
@@ -47,9 +47,8 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
   const meId = me?.user.id
   const now = useNow(60_000)
   const decide = useDecideApproval(approval.id)
-  // After an approval the run's journal tells whether the call ran or was stale.
-  const events = useRunEvents(approval.run_id, approval.state === 'approved')
-  const view = approvalView(approval, events.data?.items, now)
+  // After an approval the API tells whether the call ran or was stale.
+  const view = approvalView(approval, now)
   const when = (iso: string | null) => (iso ? formatDateTime(iso, i18n.language) : '')
   return (
     <CardFrame

@@ -87,7 +87,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'proposal.changed':
       return proposalEventKeys(event)
     case 'card.changed':
-      // A run's card was decided or answered: the cards, the run, and their messages.
+      // A run's card was decided, answered or settled (ran or stale): the cards, the
+      // run, and their messages.
       return [
         approvalKeys.all,
         agentKeys.runs,

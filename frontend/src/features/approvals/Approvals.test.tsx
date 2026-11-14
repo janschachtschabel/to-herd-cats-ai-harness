@@ -147,29 +147,16 @@ describe('a release card', () => {
     expect(within(shown).queryByRole('button', { name: 'Freigeben' })).toBeNull()
   })
 
-  test('an approved call that found its object changed is shown as stale', async () => {
+  test('an approved call that the API reports stale is shown as stale', async () => {
     const approved = makeApproval({
       id: 'ap-4',
       state: 'approved',
-      step: 2,
-      call_id: 'call_0',
+      outcome: 'stale',
       decided_at: '2026-11-14T10:00:00Z',
       version: 2,
     })
-    const { channel } = channelWith(card('approval', 'ap-4', approved.summary), {
+    const { api, channel } = channelWith(card('approval', 'ap-4', approved.summary), {
       'GET /api/approvals/:id': approved,
-      'GET /api/runs/:id/events': page([
-        makeEvent({
-          kind: 'tool_call',
-          content: {
-            step: 2,
-            call_id: 'call_0',
-            name: 'propose_page_change',
-            source: 'approval',
-            text: 'approval_stale: what this call would change has changed',
-          },
-        }),
-      ]),
     })
     await renderApp(`/c/${channel.id}`)
     const shown = await screen.findByRole('region', { name: 'Freigabe' })
@@ -177,6 +164,8 @@ describe('a release card', () => {
     expect(
       within(shown).getByText(/Der Inhalt hat sich seit der Anfrage geändert/),
     ).toBeInTheDocument()
+    // The card asks nobody's journal: the API's outcome is enough.
+    expect(api.calls.some((c) => c.path.endsWith('/events'))).toBe(false)
   })
 
   test('someone else who sees the run sees the card without actions, and who decides', async () => {

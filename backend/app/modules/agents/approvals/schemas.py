@@ -10,6 +10,7 @@ from app.modules.agents.approvals.models import (
     MAX_ANSWER_CHARS,
     MAX_REASON_CHARS,
     Approval,
+    ApprovalOutcome,
     ApprovalState,
     QuestionState,
     RunQuestion,
@@ -22,8 +23,9 @@ class ApprovalOut(BaseModel):
     the ids the call names. `args`: the call's arguments, only for the person asked
     (null for others). `diff_url`: for a page's new content, where that person reads
     the diff against the page as it is now (`GET`), instead of the text. `step` and
-    `call_id`: the call it waits for, as the run's journal names it (where a reader of
-    the run finds what became of the call once released: it ran, or it was stale)."""
+    `call_id`: the call it waits for, as the run's journal names it (the step a run
+    link points at). `outcome`: what became of the call once released: `ran`, or
+    `stale` (what it would change had changed, so nothing ran); null before."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -34,6 +36,7 @@ class ApprovalOut(BaseModel):
     tool: str
     summary: str
     state: ApprovalState
+    outcome: ApprovalOutcome | None
     addressed_to: uuid.UUID
     args: dict[str, Any] | None
     diff_url: str | None
@@ -58,6 +61,7 @@ class ApprovalOut(BaseModel):
             tool=a.tool,
             summary=a.summary,
             state=a.state,
+            outcome=a.outcome,
             addressed_to=a.addressed_to,
             args=a.args if shown.addressed else None,
             diff_url=diff,

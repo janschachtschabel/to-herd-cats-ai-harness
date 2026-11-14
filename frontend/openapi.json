@@ -1091,7 +1091,7 @@
         "type": "object"
       },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (where a reader of\nthe run finds what became of the call once released: it ran, or it was stale).",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1181,6 +1181,16 @@
             ],
             "title": "Message Id"
           },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason": {
             "anyOf": [
               {
@@ -1227,6 +1237,7 @@
           "tool",
           "summary",
           "state",
+          "outcome",
           "addressed_to",
           "args",
           "diff_url",
@@ -1239,6 +1250,14 @@
         ],
         "title": "ApprovalOut",
         "type": "object"
+      },
+      "ApprovalOutcome": {
+        "enum": [
+          "ran",
+          "stale"
+        ],
+        "title": "ApprovalOutcome",
+        "type": "string"
       },
       "ApprovalState": {
         "enum": [

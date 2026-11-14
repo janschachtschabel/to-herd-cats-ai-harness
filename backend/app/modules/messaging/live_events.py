@@ -77,6 +77,7 @@ LIVE_TYPES: dict[str, str] = {
     "proposal.withdrawn": "proposal.changed",
     # A run's card was decided or answered (plan M6 task 7): its conversation reloads it.
     "approval.decided": "card.changed",
+    "approval.settled": "card.changed",  # what became of a released call: ran or stale
     "question.answered": "card.changed",
     "skill_proposal.changed": "skill_proposal.changed",
 }
