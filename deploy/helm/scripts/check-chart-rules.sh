@@ -213,7 +213,7 @@ grep -q "203.0.113.0/24" <<<"$(doc NetworkPolicy t-to-herd-cats-ai "$out")$(doc 
 out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMonitor.enabled=true)
 rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
 for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
-  HerdRunsStuck HerdRunsQueued HerdRunsFailing; do
+  HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \

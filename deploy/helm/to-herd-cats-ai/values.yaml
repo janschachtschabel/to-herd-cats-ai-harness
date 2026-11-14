@@ -186,7 +186,7 @@ networkPolicy:
 ## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
 ## @param metrics.serviceMonitor.interval Scrape interval
 ## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
-## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), and for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing (from the worker's metrics)
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing, and for automations HerdAutomationsLagging and HerdAutomationsFailing (all from the worker's metrics)
 ## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
 metrics:
   serviceMonitor:

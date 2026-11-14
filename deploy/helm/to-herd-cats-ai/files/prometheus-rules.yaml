@@ -146,3 +146,33 @@ groups:
         annotations:
           summary: "Most agent runs of {{ $labels.namespace }}/{{ $labels.job }} fail ({{ $value | humanizePercentage }} in 15 minutes)"
           description: "Runs stop with provider_refused or error. Test the agents' connections in the AI administration (unauthorized, payment_required, rate_limited, timeout, unreachable, blocked); look at the stop reasons in the run view and for runs.failed in the workers' logs. With networkPolicy.enabled the provider must be allowed in networkPolicy.aiEgress."
+      # Automations (plan M7). Every worker reads from the database how long the oldest due
+      # term has waited to be fired (herd_automations_oldest_due_seconds). The due loop
+      # looks every 5 seconds and fires up to 50 terms a pass, one transaction each, so a
+      # term normally waits seconds. 3 minutes of it for 5 minutes means the due loop is
+      # not keeping up, or a term fails to fire again and again (automations.pass_failed
+      # in the workers' logs; it stays due and is tried again). With no worker at all the
+      # gauge is absent and HerdWorkerAbsent fires instead.
+      - alert: HerdAutomationsLagging
+        expr: |
+          max by (namespace, job) (herd_automations_oldest_due_seconds) > 180
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A due automation of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 3 minutes to be fired"
+          description: "The workers' due loop does not keep up or keeps failing on a term (automations.pass_failed in the workers' logs; a worker of an older release cannot fire heartbeats and event rules). Scheduled agent work starts late."
+      # Automations pause themselves after three runs in a row that did not complete
+      # (paused_reason failing). herd_automations_paused counts the paused ones by reason
+      # from the database; 5 more pausing for failures within an hour points at a cause
+      # common to them (a provider, a key, a tool) rather than at single automations.
+      - alert: HerdAutomationsFailing
+        expr: |
+          max by (namespace, job) (herd_automations_paused{reason="failing"})
+            - max by (namespace, job) (herd_automations_paused{reason="failing"} offset 1h)
+            >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} more automations of {{ $labels.namespace }}/{{ $labels.job }} paused for failing runs within an hour"
+          description: "Their last three runs did not complete; their owners got an activity entry. Look at the stop reasons of their runs in the run view (and HerdRunsFailing); once the cause is fixed, the owners or the space managers resume them."
