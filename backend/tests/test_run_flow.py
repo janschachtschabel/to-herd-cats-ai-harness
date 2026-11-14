@@ -12,6 +12,7 @@ from app.modules.agents.executor_repository import claim
 from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.live_events import decode, of_event
+from app.modules.messaging.models import Message
 from tests.factories_agents import Bench
 
 
@@ -115,3 +116,20 @@ async def test_progress_goes_live_with_ids_and_the_step_only(bench: Bench) -> No
     assert "Secret" not in payload and "Secret" not in event.frame().decode()
     assert b'"step":2' in event.frame()
     assert decode(payload.replace('"k":2', '"k":"2"')) is None
+
+
+async def test_a_run_whose_question_was_deleted_sends_nothing(bench: Bench) -> None:
+    """Finding 10: no person's message left to answer → no call, no answer, no notice."""
+    bench.stub.state.replies.append({"content": "Answer one."})
+    await bench.say("First question")
+    assert await bench.run_next() == StopReason.COMPLETED
+    for text in ("Never mind", None):
+        if text is None:  # the very first message of a DM, deleted
+            await bench.session.execute(Message.__table__.update().values(deleted_at=func.now()))
+        posted = await bench.say(text or "Again")
+        r = await bench.people.alice.delete(f"/api/messages/{posted['id']}")
+        assert r.status_code == 204, r.text
+        assert await bench.run_next() == StopReason.COMPLETED
+    assert len(bench.stub.state.log) == 1
+    kinds = [m["kind"] for m in await bench.messages()]
+    assert kinds.count("agent") <= 1 and "system" not in kinds

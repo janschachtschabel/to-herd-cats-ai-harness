@@ -22,7 +22,9 @@ works.
   is still recorded).
 - The end, in one transaction: the answer (`kind=agent`, `client_id` = the run, so
   there is never a second one), or on any other stop a timeline notice in the DM
-  (`run.stopped` with the reason, for the client to word); the run `done`.
+  (`run.stopped` with the reason, for the client to word); the run `done`. A run whose
+  question was deleted before it started (no person's message after the last answer)
+  ends `completed` at once, without a call, an answer or a notice.
 
 A worker that lost the run (its lease ran out and another worker took it) notices at
 its next write and stops without writing anything (`Lost`). The provider's key is
@@ -45,7 +47,7 @@ from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.step_host import Lost, RunHost, Unit, Working
 from app.modules.ai.models import AiConnection, ConnectionKind, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
-from app.modules.messaging.models import MAX_BODY_CHARS
+from app.modules.messaging.models import MAX_BODY_CHARS, Message
 from app.modules.messaging.thread_repository import ThreadRepository
 from app.runtime import context, models
 from app.runtime.loop import Outcome, run_loop
@@ -101,6 +103,8 @@ class Executor:
             said = await ReadRepository(session, org).said(
                 claimed.conversation_id, claimed.started_at
             )
+            if not said or said[-1].by_agent:  # its question was deleted: nothing to answer
+                return Outcome("completed")
             target = _target(connection, agent.model)
             deadline = self.clock() + agent.max_runtime_seconds
             run = Working(claimed, agent, connection.id, connection.secret_ref, deadline)
@@ -142,9 +146,11 @@ class Executor:
             if run is None:
                 raise Lost
             acting = EventActor(claimed.org_id, Principal.agent(claimed.agent_id))
-            if reason == StopReason.COMPLETED and outcome.answer is not None:
-                message = await steps.answer(outcome.answer[:MAX_BODY_CHARS])
-                system = False
+            message: Message | None = None
+            system = False
+            if reason == StopReason.COMPLETED:
+                if outcome.answer is not None:
+                    message = await steps.answer(outcome.answer[:MAX_BODY_CHARS])
             else:
                 body = json.dumps({"key": STOP_KEY, "to": reason.value})
                 notice = ThreadRepository(session, claimed.org_id)
