@@ -1,5 +1,6 @@
 // Setting up automations (plan M7 task 10): the app's settable clock, automations and
 // their log through the API, and waiting for their runs.
+import { execFileSync } from "node:child_process";
 import { expect } from "@playwright/test";
 import { call } from "./helpers.mjs";
 
@@ -52,12 +53,14 @@ export async function firings(context, id) {
   return page.items.reverse();
 }
 
-/** Waits until the log holds `count` terms; returns them, oldest first. */
-export async function loggedTerms(context, id, count) {
+/** Waits until the log holds `count` terms (`atLeast`: or more); returns them, oldest
+ *  first. */
+export async function loggedTerms(context, id, count, { atLeast = false } = {}) {
   let found = [];
-  await expect
-    .poll(async () => (found = await firings(context, id)).length, { timeout: 45_000 })
-    .toBe(count);
+  const poll = expect.poll(async () => (found = await firings(context, id)).length, {
+    timeout: 45_000,
+  });
+  await (atLeast ? poll.toBeGreaterThanOrEqual(count) : poll.toBe(count));
   return found;
 }
 
@@ -107,4 +110,17 @@ export const onEvent = (event_type, extra = {}) => ({
 /** The person's unread activity count (`/api/activity/count`). */
 export async function unread(context) {
   return call(context, "GET", "/api/activity/count");
+}
+
+/** One value from the scratch database (psql), for what no route tells: how many
+ *  events wait for an event rule's quiet time to end. */
+export function sql(query) {
+  const url = process.env.HERD_E2E_DATABASE_URL.replace("+asyncpg", "");
+  return execFileSync("psql", [url, "-tAc", query], { encoding: "utf8" }).trim();
+}
+
+/** Waits until `count` events wait for the rule's quiet time to end. */
+export async function waitingEvents(id, count) {
+  const query = `SELECT count(*) FROM automation_event WHERE automation_id = '${id}' AND firing_id IS NULL`;
+  await expect.poll(() => Number(sql(query)), { timeout: 30_000 }).toBe(count);
 }

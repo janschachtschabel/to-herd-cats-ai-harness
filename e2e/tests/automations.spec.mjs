@@ -37,7 +37,12 @@ let takt; // a channel of the space
 const made = []; // automations to remove after each scenario
 
 const agentSays = (scope, text) => message(scope, "Mira", text);
-const system = (scope, text) => scope.locator("[data-kind=system]").filter({ hasText: text });
+// System entries in the conversation itself (an open thread repeats its root).
+const system = (page, text) =>
+  page
+    .getByRole("region", { name: "Gespräch" })
+    .locator("[data-kind=system]")
+    .filter({ hasText: text });
 const started = () => `Aufgabe von ${me.name} gestartet.`;
 
 test.beforeAll(async ({ browser }) => {
