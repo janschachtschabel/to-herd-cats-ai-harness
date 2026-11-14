@@ -1517,6 +1517,320 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "AutomationCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "instruction": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          },
+          "place": {
+            "discriminator": {
+              "mapping": {
+                "channel": "#/components/schemas/ChannelPlaceIn",
+                "dm": "#/components/schemas/DmPlaceIn",
+                "ticket": "#/components/schemas/TicketPlaceIn"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DmPlaceIn"
+              },
+              {
+                "$ref": "#/components/schemas/ChannelPlaceIn"
+              },
+              {
+                "$ref": "#/components/schemas/TicketPlaceIn"
+              }
+            ],
+            "title": "Place"
+          },
+          "schedule": {
+            "discriminator": {
+              "mapping": {
+                "event": "#/components/schemas/EventIn",
+                "heartbeat": "#/components/schemas/HeartbeatIn",
+                "once": "#/components/schemas/OnceIn",
+                "recurring": "#/components/schemas/RecurringIn"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OnceIn"
+              },
+              {
+                "$ref": "#/components/schemas/RecurringIn"
+              },
+              {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              },
+              {
+                "$ref": "#/components/schemas/EventIn"
+              }
+            ],
+            "title": "Schedule"
+          }
+        },
+        "required": [
+          "agent_id",
+          "place",
+          "instruction",
+          "schedule"
+        ],
+        "title": "AutomationCreate",
+        "type": "object"
+      },
+      "AutomationKind": {
+        "enum": [
+          "once",
+          "recurring",
+          "heartbeat",
+          "event"
+        ],
+        "title": "AutomationKind",
+        "type": "string"
+      },
+      "AutomationOut": {
+        "description": "`may_edit`: the caller owns it; `may_control`: may pause, resume and delete it\n(its owner, a manager of its place's space, `agent.manage`). `upcoming`: its next\nterms from now (none for an event rule, or once done).",
+        "properties": {
+          "active_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Days"
+          },
+          "active_from": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active From"
+          },
+          "active_until": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Until"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/NamedOut"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filter_tag_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter Tag Id"
+          },
+          "filter_ticket_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "interval_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Minutes"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AutomationKind"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "may_control": {
+            "title": "May Control",
+            "type": "boolean"
+          },
+          "may_edit": {
+            "title": "May Edit",
+            "type": "boolean"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/NamedOut"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/PlaceOut"
+          },
+          "quiet_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet Seconds"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AutomationState"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "upcoming": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Upcoming",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "paused_reason",
+          "version",
+          "instruction",
+          "agent",
+          "owner",
+          "place",
+          "next_due_at",
+          "cron",
+          "time_zone",
+          "interval_minutes",
+          "active_days",
+          "active_from",
+          "active_until",
+          "event_type",
+          "quiet_seconds",
+          "filter_tag_id",
+          "filter_ticket_kind",
+          "last_run",
+          "upcoming",
+          "may_edit",
+          "may_control"
+        ],
+        "title": "AutomationOut",
+        "type": "object"
+      },
+      "AutomationState": {
+        "enum": [
+          "active",
+          "paused",
+          "done"
+        ],
+        "title": "AutomationState",
+        "type": "string"
+      },
       "BoardCellOut": {
         "description": "A person's tickets in one status: how many, how many changed status since the\nboard's `changed_since`, the first of them in board order, and the cursor for more\n(`GET /api/spaces/{space_id}/board/{status_id}?assignee=<id>|none`).",
         "properties": {
@@ -1857,6 +2171,27 @@
           "name"
         ],
         "title": "ChannelCreate",
+        "type": "object"
+      },
+      "ChannelPlaceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "channel",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id"
+        ],
+        "title": "ChannelPlaceIn",
         "type": "object"
       },
       "ChannelUpdate": {
@@ -2978,6 +3313,21 @@
         "title": "DmOut",
         "type": "object"
       },
+      "DmPlaceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "dm",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "DmPlaceIn",
+        "type": "object"
+      },
       "Effect": {
         "description": "What a tool does: reads, proposes (a human decides), or writes.",
         "enum": [
@@ -3123,6 +3473,54 @@
         "title": "EpicOut",
         "type": "object"
       },
+      "EventIn": {
+        "additionalProperties": false,
+        "properties": {
+          "event_type": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "filter_tag_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter Tag Id"
+          },
+          "filter_ticket_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "const": "event",
+            "title": "Kind",
+            "type": "string"
+          },
+          "quiet_seconds": {
+            "default": 300,
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Quiet Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "event_type"
+        ],
+        "title": "EventIn",
+        "type": "object"
+      },
       "EventKind": {
         "enum": [
           "model_call",
@@ -3130,6 +3528,79 @@
           "stop"
         ],
         "title": "EventKind",
+        "type": "string"
+      },
+      "EventType": {
+        "description": "What an event rule listens to (decision 8).",
+        "enum": [
+          "page.published",
+          "ticket.created",
+          "attachment.uploaded",
+          "page.review_due"
+        ],
+        "title": "EventType",
+        "type": "string"
+      },
+      "FiringOut": {
+        "description": "One term of the log: how it went, the run it started, whether a heartbeat's\nrun answered `HEARTBEAT_OK` (nothing delivered).",
+        "properties": {
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "fired_at": {
+            "format": "date-time",
+            "title": "Fired At",
+            "type": "string"
+          },
+          "heartbeat_ok": {
+            "title": "Heartbeat Ok",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/FiringOutcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          }
+        },
+        "required": [
+          "id",
+          "due_at",
+          "fired_at",
+          "outcome",
+          "run_id",
+          "heartbeat_ok"
+        ],
+        "title": "FiringOut",
+        "type": "object"
+      },
+      "FiringOutcome": {
+        "enum": [
+          "started",
+          "skipped_busy",
+          "skipped_paused_agent",
+          "skipped_budget",
+          "skipped_policy",
+          "skipped_off_hours",
+          "skipped_depth"
+        ],
+        "title": "FiringOutcome",
         "type": "string"
       },
       "Grant": {
@@ -3390,6 +3861,55 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HeartbeatIn": {
+        "additionalProperties": false,
+        "properties": {
+          "active_days": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Active Days",
+            "type": "array"
+          },
+          "active_from": {
+            "format": "time",
+            "title": "Active From",
+            "type": "string"
+          },
+          "active_until": {
+            "format": "time",
+            "title": "Active Until",
+            "type": "string"
+          },
+          "interval_minutes": {
+            "title": "Interval Minutes",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "heartbeat",
+            "title": "Kind",
+            "type": "string"
+          },
+          "time_zone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Time Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "interval_minutes",
+          "active_days",
+          "active_from",
+          "active_until",
+          "time_zone"
+        ],
+        "title": "HeartbeatIn",
         "type": "object"
       },
       "HitAuthor": {
@@ -3657,6 +4177,77 @@
           "expires_at"
         ],
         "title": "InspectionOut",
+        "type": "object"
+      },
+      "LastRunOut": {
+        "description": "The latest term: how it went (`outcome`), its run and how that ended.",
+        "properties": {
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "fired_at": {
+            "format": "date-time",
+            "title": "Fired At",
+            "type": "string"
+          },
+          "firing_id": {
+            "format": "uuid",
+            "title": "Firing Id",
+            "type": "string"
+          },
+          "heartbeat_ok": {
+            "title": "Heartbeat Ok",
+            "type": "boolean"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/FiringOutcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "run_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "firing_id",
+          "due_at",
+          "fired_at",
+          "outcome",
+          "heartbeat_ok",
+          "run_id",
+          "run_state",
+          "stop_reason"
+        ],
+        "title": "LastRunOut",
         "type": "object"
       },
       "LinkedPageOut": {
@@ -4615,6 +5206,32 @@
         "title": "MyUsageOut",
         "type": "object"
       },
+      "NamedOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "NamedOut",
+        "type": "object"
+      },
       "NotificationReason": {
         "enum": [
           "mention",
@@ -4631,6 +5248,27 @@
         ],
         "title": "NotificationReason",
         "type": "string"
+      },
+      "OnceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "kind": {
+            "const": "once",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "at"
+        ],
+        "title": "OnceIn",
+        "type": "object"
       },
       "OrgOut": {
         "properties": {
@@ -5138,6 +5776,33 @@
         "title": "Page[AuditOut]",
         "type": "object"
       },
+      "Page_AutomationOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AutomationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AutomationOut]",
+        "type": "object"
+      },
       "Page_BudgetOut_": {
         "properties": {
           "items": {
@@ -5298,6 +5963,33 @@
           "items"
         ],
         "title": "Page[EpicOut]",
+        "type": "object"
+      },
+      "Page_FiringOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiringOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[FiringOut]",
         "type": "object"
       },
       "Page_GroupAssignmentOut_": {
@@ -6069,6 +6761,15 @@
         "title": "PasswordChangeIn",
         "type": "object"
       },
+      "PausedReason": {
+        "enum": [
+          "manual",
+          "owner",
+          "failing"
+        ],
+        "title": "PausedReason",
+        "type": "string"
+      },
       "PersonNameOut": {
         "description": "Who caused a timeline entry: a person, or (plan M6) an agent (`type`).",
         "properties": {
@@ -6142,6 +6843,120 @@
           "version"
         ],
         "title": "PersonalAgentsIn",
+        "type": "object"
+      },
+      "PlaceOut": {
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "ticket_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Number"
+          },
+          "type": {
+            "enum": [
+              "dm",
+              "channel",
+              "ticket"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "conversation_id",
+          "space_id",
+          "name",
+          "ticket_number"
+        ],
+        "title": "PlaceOut",
+        "type": "object"
+      },
+      "PreviewIn": {
+        "additionalProperties": false,
+        "properties": {
+          "schedule": {
+            "discriminator": {
+              "mapping": {
+                "event": "#/components/schemas/EventIn",
+                "heartbeat": "#/components/schemas/HeartbeatIn",
+                "once": "#/components/schemas/OnceIn",
+                "recurring": "#/components/schemas/RecurringIn"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OnceIn"
+              },
+              {
+                "$ref": "#/components/schemas/RecurringIn"
+              },
+              {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              },
+              {
+                "$ref": "#/components/schemas/EventIn"
+              }
+            ],
+            "title": "Schedule"
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "title": "PreviewIn",
+        "type": "object"
+      },
+      "PreviewOut": {
+        "properties": {
+          "terms": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "terms"
+        ],
+        "title": "PreviewOut",
         "type": "object"
       },
       "Price-Input": {
@@ -7058,6 +7873,34 @@
           "message_id"
         ],
         "title": "ReadPosition",
+        "type": "object"
+      },
+      "RecurringIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cron": {
+            "maxLength": 120,
+            "title": "Cron",
+            "type": "string"
+          },
+          "kind": {
+            "const": "recurring",
+            "title": "Kind",
+            "type": "string"
+          },
+          "time_zone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Time Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "cron",
+          "time_zone"
+        ],
+        "title": "RecurringIn",
         "type": "object"
       },
       "RunEventOut": {
@@ -9795,6 +10638,26 @@
         "title": "TicketOut",
         "type": "object"
       },
+      "TicketPlaceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "ticket_number": {
+            "title": "Ticket Number",
+            "type": "integer"
+          },
+          "type": {
+            "const": "ticket",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "ticket_number"
+        ],
+        "title": "TicketPlaceIn",
+        "type": "object"
+      },
       "TicketSprintOut": {
         "description": "The ticket's sprint (one of its own space).",
         "properties": {
@@ -12219,6 +13082,78 @@
         ]
       }
     },
+    "/api/agents/{agent_id}/automations": {
+      "get": {
+        "description": "Every automation of the agent (`agent.manage`).",
+        "operationId": "automations_of_agent_api_agents__agent_id__automations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AutomationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Automations Of Agent",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
     "/api/agents/{agent_id}/profile": {
       "get": {
         "description": "For a person with `ai.use`: name, introduction and status (no draft).",
@@ -14355,6 +15290,264 @@
         "summary": "Change My Password",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/automations": {
+      "get": {
+        "description": "The caller's own automations, newest first.",
+        "operationId": "my_automations_api_automations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AutomationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Automations",
+        "tags": [
+          "automations"
+        ]
+      },
+      "post": {
+        "operationId": "create_automation_api_automations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Automation",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/preview": {
+      "post": {
+        "description": "The next five terms of a schedule, refused like a save would refuse it.",
+        "operationId": "preview_terms_api_automations_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Terms",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/{automation_id}": {
+      "get": {
+        "operationId": "get_automation_api_automations__automation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Automation",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/{automation_id}/firings": {
+      "get": {
+        "description": "Its terms, newest first: how each went and the run it started.",
+        "operationId": "automation_log_api_automations__automation_id__firings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FiringOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Automation Log",
+        "tags": [
+          "automations"
         ]
       }
     },
@@ -18367,6 +19560,78 @@
         "summary": "Update Space",
         "tags": [
           "spaces"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/automations": {
+      "get": {
+        "description": "The automations at places in the space that the caller may see.",
+        "operationId": "automations_of_space_api_spaces__space_id__automations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AutomationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Automations Of Space",
+        "tags": [
+          "automations"
         ]
       }
     },

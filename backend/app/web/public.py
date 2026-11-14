@@ -26,6 +26,7 @@ from app.modules.ai import usage_router as ai_usage
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
+from app.modules.automations import router as automations_router
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
 from app.modules.messaging import router as messaging
@@ -114,6 +115,9 @@ def api_router() -> APIRouter:
     api.include_router(agent_spaces.agent_spaces)
     api.include_router(approvals_router.approvals)
     api.include_router(approvals_router.questions)
+    api.include_router(automations_router.automations)
+    api.include_router(automations_router.agent_automations)
+    api.include_router(automations_router.space_automations)
     api.include_router(skill_transfer.skill_transfer)  # before /skills/{skill_id}
     api.include_router(skills.skills)
     api.include_router(skill_assignments.agent_skills)

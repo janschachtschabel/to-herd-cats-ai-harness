@@ -331,6 +331,26 @@ export interface paths {
         patch: operations["update_agent_api_agents__agent_id__patch"];
         trace?: never;
     };
+    "/api/agents/{agent_id}/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Automations Of Agent
+         * @description Every automation of the agent (`agent.manage`).
+         */
+        get: operations["automations_of_agent_api_agents__agent_id__automations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/profile": {
         parameters: {
             query?: never;
@@ -943,6 +963,84 @@ export interface paths {
          * @description The caller's own password; this session stays, every other one ends.
          */
         post: operations["change_my_password_api_auth_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Automations
+         * @description The caller's own automations, newest first.
+         */
+        get: operations["my_automations_api_automations_get"];
+        put?: never;
+        /** Create Automation */
+        post: operations["create_automation_api_automations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Terms
+         * @description The next five terms of a schedule, refused like a save would refuse it.
+         */
+        post: operations["preview_terms_api_automations_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Automation */
+        get: operations["get_automation_api_automations__automation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/firings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Automation Log
+         * @description Its terms, newest first: how each went and the run it started.
+         */
+        get: operations["automation_log_api_automations__automation_id__firings_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1970,6 +2068,26 @@ export interface paths {
         head?: never;
         /** Update Space */
         patch: operations["update_space_api_spaces__space_id__patch"];
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Automations Of Space
+         * @description The automations at places in the space that the caller may see.
+         */
+        get: operations["automations_of_space_api_spaces__space_id__automations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/spaces/{space_id}/board": {
@@ -3269,6 +3387,80 @@ export interface components {
             /** Target Type */
             target_type: string;
         };
+        /** AutomationCreate */
+        AutomationCreate: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Instruction */
+            instruction: string;
+            /** Place */
+            place: components["schemas"]["DmPlaceIn"] | components["schemas"]["ChannelPlaceIn"] | components["schemas"]["TicketPlaceIn"];
+            /** Schedule */
+            schedule: components["schemas"]["OnceIn"] | components["schemas"]["RecurringIn"] | components["schemas"]["HeartbeatIn"] | components["schemas"]["EventIn"];
+        };
+        /**
+         * AutomationKind
+         * @enum {string}
+         */
+        AutomationKind: "once" | "recurring" | "heartbeat" | "event";
+        /**
+         * AutomationOut
+         * @description `may_edit`: the caller owns it; `may_control`: may pause, resume and delete it
+         *     (its owner, a manager of its place's space, `agent.manage`). `upcoming`: its next
+         *     terms from now (none for an event rule, or once done).
+         */
+        AutomationOut: {
+            /** Active Days */
+            active_days: number[] | null;
+            /** Active From */
+            active_from: string | null;
+            /** Active Until */
+            active_until: string | null;
+            agent: components["schemas"]["NamedOut"];
+            /** Cron */
+            cron: string | null;
+            event_type: components["schemas"]["EventType"] | null;
+            /** Filter Tag Id */
+            filter_tag_id: string | null;
+            filter_ticket_kind: components["schemas"]["TicketKind"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instruction */
+            instruction: string;
+            /** Interval Minutes */
+            interval_minutes: number | null;
+            kind: components["schemas"]["AutomationKind"];
+            last_run: components["schemas"]["LastRunOut"] | null;
+            /** May Control */
+            may_control: boolean;
+            /** May Edit */
+            may_edit: boolean;
+            /** Next Due At */
+            next_due_at: string | null;
+            owner: components["schemas"]["NamedOut"];
+            paused_reason: components["schemas"]["PausedReason"] | null;
+            place: components["schemas"]["PlaceOut"];
+            /** Quiet Seconds */
+            quiet_seconds: number | null;
+            state: components["schemas"]["AutomationState"];
+            /** Time Zone */
+            time_zone: string | null;
+            /** Upcoming */
+            upcoming: string[];
+            /** Version */
+            version: number;
+        };
+        /**
+         * AutomationState
+         * @enum {string}
+         */
+        AutomationState: "active" | "paused" | "done";
         /**
          * BoardCellOut
          * @description A person's tickets in one status: how many, how many changed status since the
@@ -3394,6 +3586,19 @@ export interface components {
             name: string;
             /** Topic */
             topic?: string | null;
+        };
+        /** ChannelPlaceIn */
+        ChannelPlaceIn: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "channel";
         };
         /**
          * ChannelUpdate
@@ -3792,6 +3997,14 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** DmPlaceIn */
+        DmPlaceIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "dm";
+        };
         /**
          * Effect
          * @description What a tool does: reads, proposes (a human decides), or writes.
@@ -3850,11 +4063,66 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** EventIn */
+        EventIn: {
+            event_type: components["schemas"]["EventType"];
+            /** Filter Tag Id */
+            filter_tag_id?: string | null;
+            filter_ticket_kind?: components["schemas"]["TicketKind"] | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "event";
+            /**
+             * Quiet Seconds
+             * @default 300
+             */
+            quiet_seconds?: number;
+        };
         /**
          * EventKind
          * @enum {string}
          */
         EventKind: "model_call" | "tool_call" | "stop";
+        /**
+         * EventType
+         * @description What an event rule listens to (decision 8).
+         * @enum {string}
+         */
+        EventType: "page.published" | "ticket.created" | "attachment.uploaded" | "page.review_due";
+        /**
+         * FiringOut
+         * @description One term of the log: how it went, the run it started, whether a heartbeat's
+         *     run answered `HEARTBEAT_OK` (nothing delivered).
+         */
+        FiringOut: {
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Fired At
+             * Format: date-time
+             */
+            fired_at: string;
+            /** Heartbeat Ok */
+            heartbeat_ok: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            outcome: components["schemas"]["FiringOutcome"];
+            /** Run Id */
+            run_id: string | null;
+        };
+        /**
+         * FiringOutcome
+         * @enum {string}
+         */
+        FiringOutcome: "started" | "skipped_busy" | "skipped_paused_agent" | "skipped_budget" | "skipped_policy" | "skipped_off_hours" | "skipped_depth";
         /**
          * Grant
          * @description How an agent may use a tool (spec 8.1), from loose to strict.
@@ -3968,6 +4236,30 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HeartbeatIn */
+        HeartbeatIn: {
+            /** Active Days */
+            active_days: number[];
+            /**
+             * Active From
+             * Format: time
+             */
+            active_from: string;
+            /**
+             * Active Until
+             * Format: time
+             */
+            active_until: string;
+            /** Interval Minutes */
+            interval_minutes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "heartbeat";
+            /** Time Zone */
+            time_zone: string;
         };
         /** HitAuthor */
         HitAuthor: {
@@ -4094,6 +4386,34 @@ export interface components {
             id: string;
             /** Reason */
             reason: string;
+        };
+        /**
+         * LastRunOut
+         * @description The latest term: how it went (`outcome`), its run and how that ended.
+         */
+        LastRunOut: {
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Fired At
+             * Format: date-time
+             */
+            fired_at: string;
+            /**
+             * Firing Id
+             * Format: uuid
+             */
+            firing_id: string;
+            /** Heartbeat Ok */
+            heartbeat_ok: boolean;
+            outcome: components["schemas"]["FiringOutcome"];
+            /** Run Id */
+            run_id: string | null;
+            run_state: components["schemas"]["RunState"] | null;
+            stop_reason: components["schemas"]["StopReason"] | null;
         };
         /**
          * LinkedPageOut
@@ -4466,11 +4786,34 @@ export interface components {
             /** Unpriced Calls */
             unpriced_calls: number;
         };
+        /** NamedOut */
+        NamedOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+        };
         /**
          * NotificationReason
          * @enum {string}
          */
         NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due";
+        /** OnceIn */
+        OnceIn: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "once";
+        };
         /** OrgOut */
         OrgOut: {
             /**
@@ -4658,6 +5001,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AutomationOut] */
+        Page_AutomationOut_: {
+            /** Items */
+            items: components["schemas"]["AutomationOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[BudgetOut] */
         Page_BudgetOut_: {
             /** Items */
@@ -4697,6 +5047,13 @@ export interface components {
         Page_EpicOut_: {
             /** Items */
             items: components["schemas"]["EpicOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[FiringOut] */
+        Page_FiringOut_: {
+            /** Items */
+            items: components["schemas"]["FiringOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -4924,6 +5281,11 @@ export interface components {
             new_password: string;
         };
         /**
+         * PausedReason
+         * @enum {string}
+         */
+        PausedReason: "manual" | "owner" | "failing";
+        /**
          * PersonNameOut
          * @description Who caused a timeline entry: a person, or (plan M6) an agent (`type`).
          */
@@ -4962,6 +5324,35 @@ export interface components {
             enabled: boolean;
             /** Version */
             version: number;
+        };
+        /** PlaceOut */
+        PlaceOut: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Name */
+            name: string | null;
+            /** Space Id */
+            space_id: string | null;
+            /** Ticket Number */
+            ticket_number: number | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "dm" | "channel" | "ticket";
+        };
+        /** PreviewIn */
+        PreviewIn: {
+            /** Schedule */
+            schedule: components["schemas"]["OnceIn"] | components["schemas"]["RecurringIn"] | components["schemas"]["HeartbeatIn"] | components["schemas"]["EventIn"];
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /** Terms */
+            terms: string[];
         };
         /**
          * Price
@@ -5298,6 +5689,18 @@ export interface components {
              * Format: uuid
              */
             message_id: string;
+        };
+        /** RecurringIn */
+        RecurringIn: {
+            /** Cron */
+            cron: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "recurring";
+            /** Time Zone */
+            time_zone: string;
         };
         /**
          * RunEventOut
@@ -6357,6 +6760,16 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+        };
+        /** TicketPlaceIn */
+        TicketPlaceIn: {
+            /** Ticket Number */
+            ticket_number: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ticket";
         };
         /**
          * TicketSprintOut
@@ -7610,6 +8023,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    automations_of_agent_api_agents__agent_id__automations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AutomationOut_"];
                 };
             };
             /** @description Validation Error */
@@ -8931,6 +9378,169 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_automations_api_automations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AutomationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_automation_api_automations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_terms_api_automations_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_automation_api_automations__automation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    automation_log_api_automations__automation_id__firings_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_FiringOut_"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -11213,6 +11823,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    automations_of_space_api_spaces__space_id__automations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AutomationOut_"];
                 };
             };
             /** @description Validation Error */

@@ -226,6 +226,13 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/skill-proposals/{proposal_id}", "skill_proposal"),
     ("POST", "/api/skill-proposals/{proposal_id}/accept", "skill_proposal"),
     ("POST", "/api/skill-proposals/{proposal_id}/reject", "skill_proposal"),
+    ("POST", "/api/automations", "ai"),
+    ("POST", "/api/automations/preview", "ai"),
+    ("GET", "/api/automations/{automation_id}", "automation"),
+    ("GET", "/api/automations", "ai"),
+    ("GET", "/api/agents/{agent_id}/automations", "agent"),
+    ("GET", "/api/spaces/{space_id}/automations", "space"),
+    ("GET", "/api/automations/{automation_id}/firings", "automation"),
 ]
 
 
@@ -272,6 +279,7 @@ def concrete(
         "{proposal_id}": str(proposal_id or uuid7()),
         "{skill_id}": str(skill_id or uuid7()),
         "{budget_id}": str(uuid7()),
+        "{automation_id}": str(uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -355,4 +363,13 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/skills/{skill_id}/versions/{number}/restore"): {"version": 1},
     ("POST", "/api/approvals/{approval_id}/decide"): {"decision": "approve", "version": 1},
     ("POST", "/api/questions/{question_id}/answer"): {"text": "x", "version": 1},
+    ("POST", "/api/automations"): {
+        "agent_id": str(uuid7()),
+        "place": {"type": "dm"},
+        "instruction": "x",
+        "schedule": {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"},
+    },
+    ("POST", "/api/automations/preview"): {
+        "schedule": {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"}
+    },
 }
