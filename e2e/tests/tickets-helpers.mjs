@@ -69,3 +69,37 @@ export async function conversationsSnapshot(context) {
   }
   return snapshot;
 }
+
+/** A planned sprint of `spaceId` (two weeks from `starts_on`, default today). */
+export async function sprint(
+  context,
+  spaceId,
+  name,
+  starts_on = new Date().toISOString().slice(0, 10),
+) {
+  const end = new Date(`${starts_on}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 13);
+  return call(context, "POST", `/api/spaces/${spaceId}/sprints`, {
+    name,
+    starts_on,
+    ends_on: end.toISOString().slice(0, 10),
+  });
+}
+
+/** A sprint in the space's sprint list (its heading names it). */
+export const sprintItem = (page, name) =>
+  page.getByRole("article", { name: new RegExp(`^${name}`) });
+
+/** A column of "Mein Board", found by its category (Offen, In Arbeit, Zur Prüfung, Erledigt). */
+export const myColumn = (page, name) =>
+  page
+    .getByRole("group", { name: "Spalten von Mein Board" })
+    .getByRole("region", { name: new RegExp(`^${name} `) });
+
+/** A person's row of the daily view (`Nicht zugewiesen` for nobody's tickets). */
+export const personRow = (page, name) =>
+  page.getByRole("region", { name: new RegExp(`^${name}$`) });
+
+/** A ticket's system entries in its thread, worded as the browser shows them. */
+export const timelineEntry = (page, text) =>
+  page.getByRole("complementary", { name: "Kommentare" }).getByText(text);
