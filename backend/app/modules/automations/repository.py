@@ -15,6 +15,7 @@ from uuid_utils.compat import uuid7
 from app.core.access_repository import person_holds_role
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
+from app.modules.agents.models import Run, RunState
 from app.modules.automations.event_models import EventNote
 from app.modules.automations.models import (
     Automation,
@@ -117,6 +118,15 @@ class AutomationRepository:
             )
         )
         await self.session.flush()
+
+    async def open_run(self, automation_id: uuid.UUID) -> uuid.UUID | None:
+        """The automation's run not yet done (its lane holds at most one)."""
+        stmt = select(Run.id).where(
+            Run.org_id == self.org_id,
+            Run.automation_id == automation_id,
+            Run.state != RunState.DONE,
+        )
+        return await self.session.scalar(stmt.limit(1))
 
     async def firing_of(self, run_id: uuid.UUID) -> AutomationFiring | None:
         """The term that started the run."""

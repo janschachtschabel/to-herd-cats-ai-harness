@@ -196,7 +196,9 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
   bei einer Ereignis-Regel auch, wenn sie den Bereich nicht mehr verwaltet) oder wenn drei Läufe in Folge nicht zu Ende kamen. Wer betroffen ist, bekommt eine
   Aktivität (die verantwortliche Person des Agenten und die Verwaltenden des Bereichs
   bzw. bei Fehlschlägen die Eigentümerin). Rechte wandern nie still: Wer die Aufgabe
-  selbst anlegen dürfte, kann sie **übernehmen** und wird Eigentümerin.
+  selbst anlegen dürfte, kann sie **übernehmen** und wird Eigentümerin. Ein noch offener
+  Lauf der bisherigen Eigentümerin wird dabei abgebrochen (er hielte sonst die Bahn der
+  Aufgabe, womöglich bis eine Freigabe verfällt, die niemand mehr gibt).
 - **Fortsetzen** holt einen verpassten Termin einmal nach. **Jetzt ausführen** (nur die
   Eigentümerin, nicht für Ereignis-Regeln) löst einen Termin außer der Reihe aus, mit
   denselben Prüfungen. **Löschen** entfernt die Aufgabe; ihre Läufe bleiben einsehbar.

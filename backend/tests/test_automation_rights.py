@@ -15,6 +15,7 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.modules.agents.models import RunState, StopReason
+from app.modules.agents.run_control_models import RunCancelRequest
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import AutomationState, PausedReason
 from app.modules.automations.takeover import take_over
@@ -187,3 +188,24 @@ async def test_an_approval_goes_to_the_owner_and_her_decision_resumes_the_run(
     assert run.stop_reason == StopReason.COMPLETED
     for event in await events(bench.session, "message.created"):
         assert "Summarise" not in json.dumps(event.payload)
+
+
+async def test_a_take_over_asks_the_old_owners_open_run_to_stop(work: Work) -> None:
+    """The old owner's run would hold the automation's lane (its later terms
+    `skipped_busy`) for as long as it waits, perhaps for a release nobody gives: the
+    take-over asks it to stop, by the taker (review M7, finding 10)."""
+    bench = work.bench
+    automation = await placed(bench, await _channel(work))
+    bob = bench.people.users["bob"]
+    await SpaceRepository(bench.session).set_member(
+        work.space.id, Principal.user(bob.id), SpaceRole.ADMIN
+    )
+    fired = await fire(bench)
+    assert fired.run_id is not None
+    taker = await actor_of(bench.session, bob)
+    await take_over(bench.session, taker, automation.id, automation.version)
+    asked = await bench.session.scalars(
+        select(RunCancelRequest.requested_by).where(RunCancelRequest.run_id == fired.run_id)
+    )
+    assert list(asked) == [bob.id]
+    assert await bench.run_next() == StopReason.CANCELLED

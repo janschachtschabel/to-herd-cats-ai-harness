@@ -3,7 +3,9 @@ themselves (`standing.may_own`: `ai.use`, the agent within reach, writing at its
 place, and for an event rule managing its space) becomes its owner; it runs on with
 their rights and their name, and a paused one resumes (its next term, if past, fires
 once). Rights never move without this explicit step. The route comes with the
-management API (task 7).
+management API (task 7). The previous owner's open run, if any, is asked to stop
+(`agents.control.request_cancel`, by the taker, in the same transaction): it would
+hold the automation's lane, perhaps waiting for a release nobody gives.
 
 - Someone without `ai.use` sees no automations: 404 `automation.not_found`, as for
   an unknown id.
@@ -21,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can
 from app.core.errors import Conflict, Forbidden, NotFound
+from app.modules.agents.control import request_cancel
 from app.modules.agents.repository import AgentRepository
 from app.modules.audit.recorder import record
 from app.modules.automations import live
@@ -57,6 +60,9 @@ async def take_over(
     automation.failures = 0
     automation.version += 1
     await session.flush()
+    running = await repo.open_run(automation.id)
+    if running is not None:
+        await request_cancel(session, actor.org_id, running, actor.principal.id)
     details = {"from": str(before), "to": str(actor.principal.id)}
     await record(session, actor, "automation.taken_over", "automation", automation.id, details)
     await live.changed(session, automation, actor, place.space_id)
