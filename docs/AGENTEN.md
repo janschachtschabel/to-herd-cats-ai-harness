@@ -497,7 +497,9 @@ bekommt 403 `automation.not_allowed`; die Oberfläche bietet nur an, was die Ant
 ausführen dürfte; sonst bleibt nur die Übernahme.
 
 **Obergrenze:** höchstens `HERD_AI_AUTOMATIONS_MAX` (Standard 20, 0 bis 1.000) aktive
-oder angehaltene Aufgaben je Eigentümerin; erledigte und gelöschte zählen nicht.
+oder angehaltene Aufgaben je Eigentümerin; erledigte und gelöschte zählen nicht. Die
+Grenze gilt auch, wenn eine erledigte einmalige Aufgabe einen neuen Zeitpunkt bekommt
+(sie ist dann wieder aktiv) und bei der Übernahme (409 `automation.limit`).
 **Budgets** begrenzen den Verbrauch je Tag für die Organisation, eine Person oder einen
 Agenten ([`KI.md`](KI.md#budgets-apiaibudgets-aimanage)); Aufgaben haben kein eigenes
 Budget, ihr Verbrauch zählt bei ihrer Eigentümerin und ihrem Agenten.

@@ -10,7 +10,8 @@ people without `ai.use` (or `agent.manage`) answer 404 `ai.not_found`, as "my ru
 does. Only its owner changes it (403 `automation.not_allowed` for others who see it):
 whoever changes it answers for it. Making one: `placing.py`, and at most
 `HERD_AI_AUTOMATIONS_MAX` open ones (active or paused) per person (409
-`automation.limit`). Every change bumps `version` (409
+`automation.limit`; `hold_room`, also when a done `once` comes back and on a
+take-over). Every change bumps `version` (409
 `automation.version_conflict` with `current_version` for a stale one) and is
 audited with ids only, never the instruction.
 """
@@ -63,6 +64,15 @@ class AutomationView:
     redacted: bool  # its words and its place's names withheld (`words.py`)
 
 
+async def hold_room(session: AsyncSession, org_id: uuid.UUID, owner_id: uuid.UUID) -> None:
+    """The person may own one more open automation (409 `automation.limit` at the
+    cap): making one, a done `once` given a new instant, a take-over. Held until the
+    transaction ends, so two of them do not both take the last place."""
+    owned = await ManageRepository(session, org_id).hold_owner(owner_id)
+    if owned >= get_settings().ai_automations_max:
+        raise Conflict(code="automation.limit")
+
+
 class AutomationService:
     def __init__(self, session: AsyncSession, clock: Clock | None = None) -> None:
         self.session = session
@@ -80,9 +90,7 @@ class AutomationService:
         agent = await visible_agent(self.session, actor, body.agent_id)
         place = await placing.find(self.session, actor, agent, body.place)
         await placing.check(self.session, actor, agent, place, planned)
-        owned = await ManageRepository(self.session, actor.org_id).hold_owner(actor.principal.id)
-        if owned >= get_settings().ai_automations_max:
-            raise Conflict(code="automation.limit")
+        await hold_room(self.session, actor.org_id, actor.principal.id)
         automation = Automation(
             org_id=actor.org_id,
             owner_user_id=actor.principal.id,
@@ -134,6 +142,8 @@ class AutomationService:
             automation.instruction = body.instruction
             changed.append("instruction")
         if body.schedule is not None:
+            if automation.state == AutomationState.DONE and planned.next_due_at is not None:
+                await hold_room(self.session, actor.org_id, automation.owner_user_id)
             _reschedule(automation, planned)
             changed.append("schedule")
         automation.version += 1

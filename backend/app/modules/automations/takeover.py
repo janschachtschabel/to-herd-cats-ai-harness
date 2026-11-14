@@ -9,6 +9,7 @@ management API (task 7).
   an unknown id.
 - A stale `version`: 409 `automation.version_conflict` (with `current_version`).
 - Someone who may not own it: 403 `automation.not_allowed`.
+- Someone at the cap of open automations: 409 `automation.limit` (`hold_room`).
 
 Audited (`automation.taken_over`, ids only); its watchers hear of it
 (`live.changed`).
@@ -25,6 +26,7 @@ from app.modules.audit.recorder import record
 from app.modules.automations import live
 from app.modules.automations.models import Automation, AutomationState
 from app.modules.automations.repository import AutomationRepository
+from app.modules.automations.service import hold_room
 from app.modules.automations.standing import may_own
 
 
@@ -45,6 +47,8 @@ async def take_over(
     place = await repo.place(automation)
     if not await may_own(session, actor, agent, place, automation.kind):
         raise Forbidden(code="automation.not_allowed")
+    if automation.owner_user_id != actor.principal.id:
+        await hold_room(session, actor.org_id, actor.principal.id)
     before = automation.owner_user_id
     automation.owner_user_id = actor.principal.id
     if automation.state == AutomationState.PAUSED:
