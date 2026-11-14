@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
 from app.core.db_errors import is_timeout
+from app.core.outbox import caused_by
 from app.modules.agents.actor import allowed_actor
 from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.control_repository import ControlRepository
@@ -168,8 +169,9 @@ class RunHost:
             pages, tickets, drafts = set(reads.pages), set(reads.tickets), set(reads.drafts)
             ctx = ToolContext(session, actor, location, reads, self._ref(), CallRef(step, call.id))
             started = time.perf_counter()
-            held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
-            result = held if held is not None else await spec.run(ctx, args)
+            with caused_by(run.id):  # what the tool emits names the run (plan M7)
+                held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
+                result = held if held is not None else await spec.run(ctx, args)
             duration_ms = round((time.perf_counter() - started) * 1000)
             if isinstance(result, Wait):
                 await steps.wait(run, result.until)

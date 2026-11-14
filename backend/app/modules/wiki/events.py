@@ -13,6 +13,10 @@ due. Its actor is whoever last wrote the page (nobody causes it). Its handler
 (`review_handlers.py`) writes its timeline entry and the moderators' activity, so it
 is not among `PAGE_EVENTS`; automations' event rules subscribe to it (plan M7 task 5).
 
+`attachment.uploaded` (plan M7 task 5): an upload through the route (subject: the
+attachment; payload `attachment_id`, `page_id`); for automations' event rules, on no
+timeline.
+
 Content changes emit nothing: they are too many, and the versions show them. Payloads
 hold ids and numbers, never titles, paths or content. Subject: the page; space: its
 space.
@@ -38,6 +42,7 @@ PAGE_TRASHED = "page.trashed"
 PAGE_RESTORED = "page.restored"
 PAGE_VERSION_RESTORED = "page.version_restored"
 PAGE_REVIEW_DUE = "page.review_due"
+ATTACHMENT_UPLOADED = "attachment.uploaded"
 
 PAGE_EVENTS = (
     PAGE_CREATED,

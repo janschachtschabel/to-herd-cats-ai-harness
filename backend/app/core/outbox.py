@@ -13,11 +13,14 @@ the handlers registered for its type (`app.worker`).
   even when the event is handed over again (at least once).
 - Payloads hold ids and flags, never message text or other content: events travel to
   handlers and from there into `NOTIFY` payloads; nothing of them is logged.
+- An event that an agent's run caused in one of its steps names the run (`run_id`,
+  plan M7 decision 9): the step host runs the step's tool inside `caused_by(run_id)`,
+  and `emit` takes the run from there, so no service has to pass it on.
 """
 
 import uuid
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
@@ -92,6 +95,9 @@ class EventOutbox(UuidPk, OrgScoped, Base):
     )
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     routed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The run whose step caused it (no foreign key, like the subject: the event outlives
+    # the run); automations' event rules read it for the chain's depth (plan M7).
+    run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
 class EventLane(Base):
@@ -162,6 +168,7 @@ class Event:
     subject_id: uuid.UUID
     payload: dict[str, Any]
     created_at: datetime
+    run_id: uuid.UUID | None = None  # the run whose step caused it
 
     @property
     def acting(self) -> EventActor:
@@ -180,11 +187,24 @@ class Event:
             subject_id=row.subject_id,
             payload=dict(row.payload),
             created_at=row.created_at,
+            run_id=row.run_id,
         )
 
 
 # Set inside `one_notify`: whether an event was written there (emit's NOTIFY waits).
 _deferred: ContextVar[list[bool] | None] = ContextVar("herd_outbox_deferred", default=None)
+# Set inside `caused_by`: the run whose step is writing (the events name it).
+_causing_run: ContextVar[uuid.UUID | None] = ContextVar("herd_outbox_run", default=None)
+
+
+@contextmanager
+def caused_by(run_id: uuid.UUID) -> Iterator[None]:
+    """Within the block (a run's step, in one task), every event names the run."""
+    token = _causing_run.set(run_id)
+    try:
+        yield
+    finally:
+        _causing_run.reset(token)
 
 
 async def _notify(session: AsyncSession) -> None:
@@ -242,6 +262,7 @@ async def emit_many(
     M4b finding 6)."""
     if not events:
         return []
+    run_id = _causing_run.get()
     rows = [
         EventOutbox(
             org_id=actor.org_id,
@@ -252,6 +273,7 @@ async def emit_many(
             subject_type=new.subject_type,
             subject_id=new.subject_id,
             payload=new.payload,
+            run_id=run_id,
         )
         for new in events
     ]

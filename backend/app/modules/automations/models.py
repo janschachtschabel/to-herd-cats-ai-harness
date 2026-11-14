@@ -30,7 +30,8 @@ in a row did not end `completed`, decision 13); keeps its next term, fires nothi
 the agent may not run; `skipped_budget`: a daily budget is reached;
 `skipped_policy`: the place is closed to AI, archived, or its ticket is gone;
 `skipped_off_hours`: a heartbeat's term taken up after its window closed, after an
-outage). A heartbeat's run that answered `HEARTBEAT_OK` marks its row
+outage; `skipped_depth`: an event a run caused at the end of a chain of three, plan
+M7 decision 9). A heartbeat's run that answered `HEARTBEAT_OK` marks its row
 (`heartbeat_ok`): nothing was delivered. A
 term at which the owner turned out to have lost a right it needs logs nothing: the
 automation is paused (`paused_reason = owner`) and keeps the term. The unique index per
@@ -62,15 +63,29 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.models_base import Base, OrgScoped, UuidPk
 from app.modules.automations.heartbeat_terms import MAX_INTERVAL_MINUTES, MIN_INTERVAL_MINUTES
 from app.modules.automations.terms import MAX_CRON_CHARS
+from app.modules.tickets.models import TicketKind
 
 MAX_INSTRUCTION_CHARS = 4_000
 MAX_ZONE_CHARS = 64
+MIN_QUIET_SECONDS = 60
+MAX_QUIET_SECONDS = 86_400
+DEFAULT_QUIET_SECONDS = 300
 
 
 class AutomationKind(StrEnum):
     ONCE = "once"
     RECURRING = "recurring"
     HEARTBEAT = "heartbeat"
+    EVENT = "event"
+
+
+class EventType(StrEnum):
+    """What an event rule listens to (decision 8)."""
+
+    PAGE_PUBLISHED = "page.published"
+    TICKET_CREATED = "ticket.created"
+    ATTACHMENT_UPLOADED = "attachment.uploaded"
+    PAGE_REVIEW_DUE = "page.review_due"
 
 
 class AutomationState(StrEnum):
@@ -92,6 +107,7 @@ class FiringOutcome(StrEnum):
     SKIPPED_BUDGET = "skipped_budget"  # a daily budget of the owner, agent or org is reached
     SKIPPED_POLICY = "skipped_policy"  # the place closed to AI, archived, or its ticket gone
     SKIPPED_OFF_HOURS = "skipped_off_hours"  # a heartbeat's term taken up after its window
+    SKIPPED_DEPTH = "skipped_depth"  # an event a run caused at the end of a chain of three
 
 
 def _in(column: str, values: type[StrEnum]) -> str:
@@ -111,7 +127,9 @@ class Automation(UuidPk, OrgScoped, Base):
         CheckConstraint("(kind = 'recurring') = (cron IS NOT NULL)", name="cron"),
         CheckConstraint("cron IS NULL OR time_zone IS NOT NULL", name="cron_zone"),
         CheckConstraint("kind <> 'once' OR time_zone IS NULL", name="once_zone"),
-        CheckConstraint("(state = 'done') = (next_due_at IS NULL)", name="next_due"),
+        CheckConstraint(
+            "kind = 'event' OR (state = 'done') = (next_due_at IS NULL)", name="next_due"
+        ),
         CheckConstraint("state <> 'done' OR kind = 'once'", name="done"),
         CheckConstraint(
             f"char_length(instruction) BETWEEN 1 AND {MAX_INSTRUCTION_CHARS}", name="instruction"
@@ -133,6 +151,30 @@ class Automation(UuidPk, OrgScoped, Base):
             "cardinality(active_days) BETWEEN 1 AND 7 AND "
             "active_days <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]",
             name="active_days",
+        ),
+        CheckConstraint(
+            "(kind = 'event') = (event_type IS NOT NULL) AND "
+            "(kind = 'event') = (quiet_seconds IS NOT NULL) AND "
+            "(kind <> 'event' OR time_zone IS NULL) AND "
+            "(kind = 'event' OR quiet_until IS NULL)",
+            name="event",
+        ),
+        CheckConstraint(_in("event_type", EventType), name="event_type"),
+        CheckConstraint(
+            f"quiet_seconds BETWEEN {MIN_QUIET_SECONDS} AND {MAX_QUIET_SECONDS}",
+            name="quiet_seconds",
+        ),
+        CheckConstraint(
+            "(filter_tag_id IS NULL AND filter_ticket_kind IS NULL) OR "
+            "event_type = 'ticket.created'",
+            name="event_filter",
+        ),
+        CheckConstraint(_in("filter_ticket_kind", TicketKind), name="filter_ticket_kind"),
+        Index(
+            "ix_automation_event_type",
+            "org_id",
+            "event_type",
+            postgresql_where=text("kind = 'event' AND state = 'active'"),
         ),
         Index("ix_automation_due", "next_due_at", postgresql_where=text("state = 'active'")),
         Index("ix_automation_owner_user_id", "owner_user_id"),
@@ -167,6 +209,12 @@ class Automation(UuidPk, OrgScoped, Base):
     active_days: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
     active_from: Mapped[time | None] = mapped_column(Time)
     active_until: Mapped[time | None] = mapped_column(Time)
+    # An event rule's (decisions 8 and 9).
+    event_type: Mapped[EventType | None] = mapped_column(String(32))
+    quiet_seconds: Mapped[int | None] = mapped_column(Integer)
+    quiet_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    filter_tag_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    filter_ticket_kind: Mapped[TicketKind | None] = mapped_column(String(16))
 
 
 class AutomationFiring(UuidPk, OrgScoped, Base):

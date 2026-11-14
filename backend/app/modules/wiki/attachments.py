@@ -26,12 +26,14 @@ from app.core.access import Action, Actor
 from app.core.config import get_settings
 from app.core.db import after_commit
 from app.core.errors import NotFound, ValidationFailed
+from app.core.outbox import emit
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.core.storage import Storage, StoredFileMissing, get_storage
 from app.core.uploads import spool
 from app.modules.audit.recorder import record
 from app.modules.wiki import filetypes
 from app.modules.wiki.attachments_repository import AttachmentRepository
+from app.modules.wiki.events import ATTACHMENT_UPLOADED
 from app.modules.wiki.models import MAX_FILENAME_CHARS, Attachment, Page
 from app.modules.wiki.visibility import PageReader
 
@@ -69,10 +71,21 @@ class AttachmentService:
     ) -> Attachment:
         """The upload route's: rights first, so nothing is read from someone who may
         not upload. The request's body is then read with no transaction open (no
-        pooled connection held, however slowly it arrives), see `add`."""
+        pooled connection held, however slowly it arrives), see `add`. Emits
+        `attachment.uploaded` (ids only; an import's attachments emit nothing)."""
         await self._editable(actor, page_id)
         await self.session.commit()
-        return await self.add(actor, page_id, filename, stream)
+        attachment = await self.add(actor, page_id, filename, stream)
+        await emit(
+            self.session,
+            type=ATTACHMENT_UPLOADED,
+            actor=actor,
+            space_id=attachment.space_id,
+            subject_type="attachment",
+            subject_id=attachment.id,
+            payload={"attachment_id": str(attachment.id), "page_id": str(attachment.page_id)},
+        )
+        return attachment
 
     async def add(
         self, actor: Actor, page_id: uuid.UUID, filename: str, stream: AsyncIterator[bytes]

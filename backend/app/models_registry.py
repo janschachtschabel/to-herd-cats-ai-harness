@@ -22,6 +22,7 @@ from app.modules.ai.models import (
 )
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
+from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import Automation, AutomationFiring
 from app.modules.groups.models import Group, GroupMember
 from app.modules.messaging.models import (
@@ -69,6 +70,7 @@ __all__ = [
     "Attachment",
     "AuditLog",
     "Automation",
+    "AutomationEvent",
     "AutomationFiring",
     "Base",
     "Conversation",
