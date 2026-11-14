@@ -382,9 +382,13 @@ Ein persönlicher Agent gehört einer Person (`owner_user_id`).
   Werkzeugfreigaben, über dieselben Endpunkte wie `agent.manage`, mit `version` (409).
   Jede Änderung übernimmt Verbindung und Modell neu aus ihrer Zuordnung. Ein Lauf nimmt
   Verbindung und Modell der Besitzerin so, wie ihre Zuordnung beim Start des Laufs ist:
-  Ändert ein Admin ihre Zuordnung, arbeitet schon der nächste Lauf damit, ohne dass der
-  Agent gespeichert werden muss (ein laufender Lauf bleibt bei seiner). Hat sie keine KI
-  mehr, startet kein Lauf (`ai.unavailable`).
+  Ändert ein Admin ihre Zuordnung (persönlich, über eine Gruppe oder den Standard),
+  schreibt dieselbe Transaktion ihre neue Verbindung und ihr neues Modell an ihre
+  persönlichen Agenten; schon der nächste Lauf arbeitet damit (ein laufender Lauf
+  bleibt bei seiner). So zählt `max_concurrency` bei der Verbindung, die der Agent
+  wirklich nutzt, und die alte Verbindung lässt sich löschen, sobald sie sonst niemand
+  nutzt. Hat sie keine KI mehr, bleibt gespeichert, was war, und es startet kein Lauf
+  (`ai.unavailable`).
 - **Reden**: Nur die Besitzerin erreicht ihn: Direktnachricht, Profil, Verzeichnis und
   Erwähnungen verbergen ihn vor allen anderen, auch vor Admins (404
   `agent.not_found`). Läufe fragen daher immer als Besitzerin, ihre Rechte gelten, der
@@ -1155,10 +1159,9 @@ IDs, Zähler und Codes.
   Ticket) bis zu 72 Stunden; Erwähnungen dort antworten so lange „Lauf wartet“.
 - Wird ein Werkzeug während des Wartens gesperrt, bietet die Wiederaufnahme es nicht
   mehr an; der eingespielte Aufruf läuft nicht, der Lauf kann aber zu Ende kommen.
-- Ein persönlicher Agent zählt für `max_concurrency` bei der Verbindung, die zuletzt an
-  ihm gespeichert wurde, auch wenn ein Lauf nach einer geänderten Zuordnung schon die
-  neue nutzt; die Anzeige von Verbindung und Modell am Agenten folgt ebenfalls erst beim
-  nächsten Speichern.
+- Ein Lauf, der vor einer geänderten Zuordnung seiner Besitzerin begann, arbeitet mit
+  der alten Verbindung zu Ende, zählt für `max_concurrency` aber schon bei der neuen
+  (die Zählung liest die Verbindung, die jetzt am Agenten steht).
 - Für Agenten aus anderen Systemen (agentskills.io) sind Skripte in Skills nur Text;
   ein Werkzeug, das Code ausführt, gibt es nicht.
 

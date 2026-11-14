@@ -9,7 +9,8 @@
   `agent.responsible_invalid`), and is billed: only the owner talks to the agent, so
   every run asks as the owner.
 - **Connection and model**: the owner's assignment (`ai/effective.py`), stored with
-  every change (while the owner has AI); given ones must be those (422 `ai.connection_not_found`,
+  every change of the agent and of the owner's assignment (`ai/assignments.py`, while
+  the owner has AI); given ones must be those (422 `ai.connection_not_found`,
   `ai.model_unknown`). A run takes the owner's assignment as it is when it starts
   (`standing.run_target`), so a change by an admin applies from the next run.
 - **Level**: at most 2 (403 `agent.level_denied`), also when an admin sets it.

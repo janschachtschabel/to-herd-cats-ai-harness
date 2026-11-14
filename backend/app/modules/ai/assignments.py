@@ -8,6 +8,13 @@ exclusively. A change is announced
 (`access.changed`) to whom it may concern, so their clients reload `ai.use` at once
 (ruling M5 (c)): a person's own assignment to them, the group list to the people of
 every group in the old or the new list, the standard to every active person.
+
+Personal agents follow (review M6 2, finding 5): every change writes the owner's new
+effective connection and model onto the owner's personal agents in the same
+transaction (an owner left without AI keeps what was stored: the agent cannot run).
+So the claim counts their runs against the connection they call, and a connection
+nothing uses any more can be deleted. A run still resolves the owner's assignment
+when it starts (`agents/standing.run_target`).
 """
 
 import uuid
@@ -23,7 +30,7 @@ from app.core.principal import SystemRole
 from app.modules.ai.access import require_ai
 from app.modules.ai.assignment_repository import AssignmentRepository, Named
 from app.modules.ai.assignment_schemas import MAX_GROUP_ASSIGNMENTS, GroupItemIn, TargetIn
-from app.modules.ai.effective import CHAT_PURPOSES
+from app.modules.ai.effective import CHAT_PURPOSES, Effective, effective_assignment
 from app.modules.ai.models import GroupAssignment, OrgAssignment, UserAssignment
 from app.modules.ai.repository import ConnectionRepository
 from app.modules.audit.recorder import record
@@ -55,6 +62,7 @@ class AssignmentService:
         await record(
             self.session, actor, "ai_assignment.default_set", "organization", actor.org_id, details
         )
+        await self._follow(actor, None)
         everyone = await UserRepository(self.session).active_ids(actor.org_id)
         await access_changed(self.session, actor, everyone, space_id=None)
 
@@ -118,6 +126,7 @@ class AssignmentService:
         people: list[uuid.UUID] = []
         for group_id in dict.fromkeys([*before, *(i.group_id for i in items)]):
             people += await groups.user_ids(group_id)
+        await self._follow(actor, people)
         await access_changed(self.session, actor, people, space_id=None)
 
     async def users(self, actor: Actor, params: PageParams) -> Page[Named[UserAssignment]]:
@@ -161,6 +170,7 @@ class AssignmentService:
         await self.session.flush()
         details = {"no_ai": row.no_ai, **_target_details(target)}
         await record(self.session, actor, "ai_assignment.user_set", "user", user_id, details)
+        await self._follow(actor, [user_id])
         await access_changed(self.session, actor, [user_id], space_id=None)
         return Named(row, user.name, connection_name)
 
@@ -176,7 +186,26 @@ class AssignmentService:
             )
         await repo.delete(row)
         await record(self.session, actor, "ai_assignment.user_removed", "user", user_id, {})
+        await self._follow(actor, [user_id])
         await access_changed(self.session, actor, [user_id], space_id=None)
+
+    async def _follow(self, actor: Actor, owners: Sequence[uuid.UUID] | None) -> None:
+        """The owners' (None: everyone's) personal agents take their owner's target."""
+        targets: dict[uuid.UUID, Effective | None] = {}
+        for agent in await self.repo(actor).personal_agents_of(owners):
+            owner = agent.owner_user_id
+            assert owner is not None
+            if owner not in targets:
+                targets[owner] = await effective_assignment(self.session, actor.org_id, owner)
+            target = targets[owner]
+            if target is None or (agent.connection_id, agent.model) == (
+                target.connection_id,
+                target.model,
+            ):
+                continue
+            agent.connection_id, agent.model = target.connection_id, target.model
+            agent.version += 1
+        await self.session.flush()
 
     async def _org(self, actor: Actor, version: int) -> OrgAssignment:
         org = await self.repo(actor).lock_org()

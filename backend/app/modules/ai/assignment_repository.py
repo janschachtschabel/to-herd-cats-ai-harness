@@ -3,6 +3,7 @@ group assignments, a person's own; and the one statement that resolves which app
 to a person (`effective`). Every statement is scoped by the organisation."""
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from sqlalchemy import and_, delete, exists, false, func, literal, or_, select, true, union_all
@@ -144,6 +145,14 @@ class AssignmentRepository:
             for table in (OrgAssignment, GroupAssignment, UserAssignment, Agent)
         ]
         return bool(await self.session.scalar(select(or_(*uses))))
+
+    async def personal_agents_of(self, owners: Collection[uuid.UUID] | None) -> list[Agent]:
+        """The personal agents of these owners (None: of everyone), in id order."""
+        stmt = select(Agent).where(Agent.org_id == self.org_id, Agent.owner_user_id.is_not(None))
+        if owners is not None:
+            stmt = stmt.where(Agent.owner_user_id.in_(sorted(set(owners))))
+        stmt = stmt.order_by(Agent.id).execution_options(populate_existing=True)
+        return list((await self.session.scalars(stmt)).all())
 
     async def group_ids(self) -> list[uuid.UUID]:
         """The groups that have an assignment now."""
