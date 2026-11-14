@@ -1,5 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { configure, getConfig, screen, waitFor, within } from '@testing-library/react'
+import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { apiError, makeMe, makeSpace, mockApi, page, type Call } from '@/test/api'
 import { renderApp } from '@/test/render'
 import { makeRun } from '@/test/runs'
@@ -20,7 +20,16 @@ function spaceRoutes(extra: Record<string, unknown> = {}) {
   }
 }
 
-describe('skill proposals', () => {
+// On a busy machine (vitest beside the backend suite) the app's first render here
+// (session, space, lazy routes; `renderApp` waits for the router) and the navigations
+// took longer than Testing Library's default 1 s: every wait of this file gets 10 s,
+// and a test (the first one walks through several views) 30 s instead of vitest's 5 s.
+// A lookup that finds its element still returns at once.
+const defaultTimeout = getConfig().asyncUtilTimeout
+beforeAll(() => configure({ asyncUtilTimeout: 10_000 }))
+afterAll(() => configure({ asyncUtilTimeout: defaultTimeout }))
+
+describe('skill proposals', { timeout: 30_000 }, () => {
   test("a space's moderators find them beside the skills, with the AI mark", async () => {
     const proposal = makeSkillProposal({ space_id: space.id, kind: 'new', name: 'vorlage' })
     const api = mockApi({
