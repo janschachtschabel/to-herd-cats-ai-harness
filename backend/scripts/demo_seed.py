@@ -4,7 +4,9 @@ with messages, thread replies, mentions and reactions, a direct message, a page
 discussion that starts with the worker's system entries, and tickets (an epic with
 stories, tasks and a bug in several statuses, assignments, tags, a linked page,
 comments, a ticket key in a channel; see scripts/demo_tickets.py) and sprints (one
-closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py).
+closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py);
+with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai.py) also agents at
+work (M6).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
@@ -27,7 +29,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from scripts import demo_sprints, demo_tickets
+from scripts import demo_ai, demo_sprints, demo_tickets
 from scripts.demo_api import DemoFailed, call, mention, post
 from scripts.demo_tickets import SeededTickets
 
@@ -49,12 +51,14 @@ class DemoExists(Exception):
 class Seeded:
     space_id: str = ""
     page_id: str = ""
+    handbook_id: str = ""
     ids: dict[str, str] = field(default_factory=dict)
     emails: dict[str, str] = field(default_factory=dict)
     channels: dict[str, str] = field(default_factory=dict)
     dm_id: str = ""
     tickets: SeededTickets = field(default_factory=SeededTickets)
     sprints: dict[str, str] = field(default_factory=dict)  # ids by name
+    ai: demo_ai.SeededAi | None = None
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -95,7 +99,7 @@ async def _pages(anna: httpx.AsyncClient, seeded: Seeded) -> None:
         pages,
         {"title": "Urlaub", "content_md": LEAVE, "parent_id": handbook["id"]},
     )
-    page_id = str(leave["id"])
+    seeded.handbook_id, page_id = str(handbook["id"]), str(leave["id"])
     publish = {"version": leave["version"]}
     leave = await call(anna, "POST", f"/api/pages/{page_id}/publish", publish)
     edit = {"content_md": LEAVE + "\nEntwurf: 35 Tage für alle.\n", "version": leave["version"]}
@@ -182,10 +186,12 @@ async def seed(
     people_password: str,
     settle: Callable[[], Awaitable[None]],
     wait_seconds: float = 60,
+    ai: demo_ai.Ai | None = None,
 ) -> Seeded:
     """Creates the demo. `connect()` gives a new client (own cookies, CSRF header) of
     the installation; `settle()` is awaited before the page discussion is used (a
-    no-op against a running installation, whose worker writes the system entries)."""
+    no-op against a running installation, whose worker writes the system entries);
+    `ai`: the model for the agents (none: no agents)."""
     seeded = Seeded()
     admin = await _login(connect, admin_email, admin_password)
     await _people(admin, people_password, seeded)
@@ -212,6 +218,17 @@ async def seed(
     await demo_tickets.comment(
         people, seeded.tickets, seeded.ids, settle=settle, wait_seconds=wait_seconds
     )
+    if ai is not None:
+        seeded.ai = await demo_ai.build(
+            admin,
+            people,
+            ai=ai,
+            ids=seeded.ids,
+            space_id=seeded.space_id,
+            handbook_id=seeded.handbook_id,
+            leave_id=seeded.page_id,
+            wait_seconds=wait_seconds,
+        )
     return seeded
 
 
@@ -247,12 +264,14 @@ async def _main(base: str, admin_email: str) -> int:
         return None
 
     try:
+        ai = demo_ai.from_env()
         seeded = await seed(
             connect,
             admin_email=admin_email,
             admin_password=admin_password,
             people_password=people_password,
             settle=nothing,
+            ai=ai,
         )
     except DemoExists as exists:
         print(f"demo data present already ({exists}); nothing changed")
@@ -269,6 +288,7 @@ async def _main(base: str, admin_email: str) -> int:
     print(
         f"demo ready: space Team Nord ({seeded.space_id}), {tickets} tickets, "
         f"{sprints} sprints, people {people}"
+        + (f", agents Hilda and Otto (ticket HC-{seeded.ai.ticket_number})" if seeded.ai else "")
     )
     return 0
 
