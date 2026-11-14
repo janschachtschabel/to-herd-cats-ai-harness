@@ -60,7 +60,9 @@ class RunOut(BaseModel):
     read with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a
     worker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,
     when it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone
-    asked it to stop."""
+    asked it to stop. `trigger_message_id`: the message that asked (a DM's message or
+    a mention; null for a run on a ticket assigned to the agent); `chain_depth`: the
+    handovers from agent to agent that led to it (0: a person asked it)."""
 
     id: uuid.UUID
     agent_id: uuid.UUID
@@ -68,7 +70,8 @@ class RunOut(BaseModel):
     asker_id: uuid.UUID
     asker_name: str
     conversation_id: uuid.UUID
-    trigger_message_id: uuid.UUID
+    trigger_message_id: uuid.UUID | None
+    chain_depth: int
     place: RunPlaceOut
     state: RunState
     stop_reason: StopReason | None
@@ -94,6 +97,7 @@ class RunOut(BaseModel):
             asker_name=row.asker_name,
             conversation_id=run.conversation_id,
             trigger_message_id=run.trigger_message_id,
+            chain_depth=run.chain_depth,
             place=RunPlaceOut(
                 kind=place.kind,
                 conversation_id=place.conversation_id,

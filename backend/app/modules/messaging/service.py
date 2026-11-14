@@ -7,8 +7,9 @@ A message whose conversation the actor cannot see is 404 `message.not_found`.
 
 Posting is idempotent per author and `client_id`: a resend returns the first message
 (`Posted.created` false), and nothing else happens. A new top-level message in a DM
-with an agent queues the agent's run in the same transaction, if the person and the
-agent may (`agent_hooks.after_post`; `Posted.agent_run` says which run, or why none).
+with an agent, or a person's new message elsewhere that mentions an agent (plan M6
+task 8), queues the agent's run in the same transaction, if the person and the agent
+may (`agent_hooks.after_post`; `Posted.agent_run` says which run, or why none).
 Posting and editing take the ids the message mentions (`mentions.py`); those who may
 not see the conversation come back in `not_notified`. An agent's run posts with the
 rights of the person who asked, written for the agent (`by`, plan M6 task 6): the
@@ -51,7 +52,7 @@ class Posted(NamedTuple):
     message: Message
     created: bool  # False: a resend with a known `client_id`
     not_notified: list[uuid.UUID]  # mentioned ids that were not stored (see mentions.py)
-    agent_run: RunStart | None = None  # in a DM with an agent: the run, or why none
+    agent_run: RunStart | None = None  # a DM with an agent, a mention: the run, or why none
 
 
 class Edited(NamedTuple):
@@ -169,8 +170,11 @@ class MessageService:
         )
         await self._emit(actor, conversation, message, "message.created", by)
         run = None
-        if conversation.kind == ConversationKind.DM and by is None:
-            run = await agent_hooks().after_post(self.session, actor, conversation, message)
+        if by is None:
+            hooks = agent_hooks()
+            run = await hooks.after_post(self.session, actor, conversation, message, asked)
+        if run is not None and run.agent_id is not None:
+            missed = [i for i in missed if i != run.agent_id]
         return Posted(message, True, missed, run)
 
     async def edit(

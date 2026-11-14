@@ -20,10 +20,11 @@ from app.core.access import Action, Actor, require
 from app.core.authorship import Authorship
 from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams
-from app.core.principal import Principal
+from app.core.principal import Principal, PrincipalType
 from app.modules.audit.recorder import record
 from app.modules.messaging.models import Conversation
 from app.modules.tickets import hierarchy, listing
+from app.modules.tickets.agent_hooks import assignee_hooks
 from app.modules.tickets.assignment import check_assignment
 from app.modules.tickets.base import (
     editable,
@@ -109,7 +110,7 @@ class TicketService:
             changes[Field.ASSIGNEE] = (None, assignee.id)
         await emit_change(self.session, actor, TICKET_CREATED, ticket, changes, by)
         await self._audit(actor, "ticket.created", ticket, {"number": ticket.number})
-        await self._audit_changes(actor, ticket, changes, status)
+        await self._after_changes(actor, ticket, changes, status, by)
         return await view_of(self.session, actor, repo, ticket.id)
 
     async def get(self, actor: Actor, number: int) -> TicketView:
@@ -168,7 +169,7 @@ class TicketService:
         ticket.version += 1
         await self.session.flush()
         await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes, by)
-        await self._audit_changes(actor, ticket, changes, status)
+        await self._after_changes(actor, ticket, changes, status, by)
         return await view_of(self.session, actor, repo, ticket.id)
 
     async def list(
@@ -235,36 +236,26 @@ class TicketService:
                 check_sprint(sprints, ticket.space_id, values["sprint_id"])
             changes[Field.SPRINT] = (ticket.sprint_id, values["sprint_id"])
         if Field.KIND in changes or Field.PARENT in changes:
-            await self._check_hierarchy(repo, ticket, values, changes)
+            await hierarchy.check_change(repo, ticket, values, changes)
         return changes
 
-    async def _check_hierarchy(
+    async def _after_changes(
         self,
-        repo: TicketRepository,
+        actor: Actor,
         ticket: WorkItem,
-        values: dict[str, Any],
         changes: Changes,
+        status: TicketStatus | None,
+        by: Authorship | None,
     ) -> None:
-        kind = TicketKind(values.get("kind") or ticket.kind)
-        parent_id = values["parent_id"] if "parent_id" in values else ticket.parent_id
-        if parent_id is not None:
-            parent = (
-                None if parent_id == ticket.id else await repo.parent_in(ticket.space_id, parent_id)
-            )
-            if parent is None:
-                raise hierarchy.parent_invalid()
-            hierarchy.check_parent(kind, parent.kind)
-        if Field.KIND in changes:
-            hierarchy.check_children(kind, await repo.child_kinds(ticket.id))
-
-    async def _audit_changes(
-        self, actor: Actor, ticket: WorkItem, changes: Changes, status: TicketStatus | None
-    ) -> None:
-        """Assignments and cancellations go into the audit log."""
+        """Assignments and cancellations go into the audit log; a ticket assigned to
+        an agent is handed over to it (`agent_hooks.AssigneeHooks.assigned`)."""
         if Field.ASSIGNEE in changes:
             old, new = changes[Field.ASSIGNEE]
             details = {"from": str(old) if old else None, "to": str(new) if new else None}
             await self._audit(actor, "ticket.assigned", ticket, details)
+            hooks = assignee_hooks()
+            if new is not None and ticket.assignee_type == PrincipalType.AGENT and hooks:
+                await hooks.assigned(self.session, actor, ticket, by)
         if status is not None and status.category == StatusCategory.CANCELLED:
             await self._audit(actor, "ticket.cancelled", ticket, {"status_id": str(status.id)})
 

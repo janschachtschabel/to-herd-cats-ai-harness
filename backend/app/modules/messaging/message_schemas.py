@@ -204,21 +204,26 @@ class AgentRunOut(BaseModel):
     """What a message to an agent started: its run (`id`; possibly one already waiting,
     which answers this message too), or no run and why (`reason`: `ai.unavailable`,
     `agent.draft`, `agent.paused`, `agent.responsible_inactive`,
-    `agent.connection_unavailable`, `run.thread_reply`)."""
+    `agent.connection_unavailable`, `run.thread_reply`, `run.waiting`). `agent_id`:
+    the agent it asked (the DM's, or the one a mention named)."""
 
     id: uuid.UUID | None
     reason: str | None
+    agent_id: uuid.UUID | None = None
 
     @classmethod
     def of(cls, start: RunStart | None) -> "AgentRunOut | None":
-        return None if start is None else cls(id=start.run_id, reason=start.reason)
+        if start is None:
+            return None
+        return cls(id=start.run_id, reason=start.reason, agent_id=start.agent_id)
 
 
 class MessageWriteOut(MessageOut):
     """`not_notified`: the mentioned ids that were not stored: people who may not see
-    the conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:
-    for a new message in a DM with an agent, the run it started or why none (null
-    otherwise, and for a resend)."""
+    the conversation, and ids of nobody (indistinguishable on purpose; an agent a
+    mention asked is not among them). `agent_run`: for a new message in a DM with an
+    agent, or one that mentions an agent the writer may ask, the run it started or why
+    none (null otherwise, and for a resend)."""
 
     not_notified: list[uuid.UUID]
     agent_run: AgentRunOut | None = None

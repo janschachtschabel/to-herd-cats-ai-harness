@@ -55,6 +55,9 @@ class Claimed:
     attempt: int
     started_at: datetime
     recoveries: int = 0
+    trigger_message_id: uuid.UUID | None = None  # None: a ticket's run
+    work_item_id: uuid.UUID | None = None
+    chain_depth: int = 0
 
     @classmethod
     def of(cls, run: Run) -> "Claimed":
@@ -68,6 +71,9 @@ class Claimed:
             run.attempt,
             run.started_at or run.created_at,
             run.recoveries,
+            run.trigger_message_id,
+            run.work_item_id,
+            run.chain_depth,
         )
 
 
@@ -236,14 +242,15 @@ class RunSteps:
             return 0.0
         return max((start + RATE_WINDOW - now).total_seconds(), 0.05)
 
-    async def answer(self, text_md: str) -> Message | None:
-        """The agent's answer, once per run (`client_id` = the run; None if written)."""
+    async def answer(self, text_md: str, parent: Message | None) -> Message | None:
+        """The agent's answer, once per run (`client_id` = the run; None if written);
+        with `parent`: a reply in its thread (the caller counts it)."""
         stmt = (
             insert(Message)
             .values(
                 org_id=self.run.org_id,
                 conversation_id=self.run.conversation_id,
-                parent_id=None,
+                parent_id=parent.id if parent is not None else None,
                 author_type=PrincipalType.AGENT,
                 author_id=self.run.agent_id,
                 kind=MessageKind.AGENT,

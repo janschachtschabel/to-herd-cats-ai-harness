@@ -6,6 +6,7 @@ import {
   MessageCircleQuestion,
   MessageSquare,
   MessageSquareReply,
+  OctagonAlert,
   ShieldCheck,
   UserCheck,
 } from 'lucide-react'
@@ -105,6 +106,7 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   proposal: FilePen,
   approval: ShieldCheck,
   question: MessageCircleQuestion,
+  run_stopped: OctagonAlert,
 }
 
 function ActivityItem({ entry }: { entry: ActivityEntry }) {

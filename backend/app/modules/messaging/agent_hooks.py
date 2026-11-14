@@ -20,12 +20,14 @@ from app.modules.messaging.models import Conversation, Message
 
 @dataclass(frozen=True, slots=True)
 class RunStart:
-    """What a message in a DM with an agent started: a run (`run_id`, possibly one
-    already waiting that answers it too), or none and why (`reason`, a code the client
-    words: `ai.unavailable`, `agent.paused`, ...)."""
+    """What a message in a DM with an agent, or one that mentions an agent, started: a
+    run (`run_id`, possibly one already waiting that answers it too), or none and why
+    (`reason`, a code the client words: `ai.unavailable`, `agent.paused`, ...).
+    `agent_id`: the agent it asked (one a mention named is not "not notified")."""
 
     run_id: uuid.UUID | None
     reason: str | None
+    agent_id: uuid.UUID | None = None
 
 
 class AgentHooks(Protocol):
@@ -36,10 +38,16 @@ class AgentHooks(Protocol):
         ...
 
     async def after_post(
-        self, session: AsyncSession, actor: Actor, conversation: Conversation, message: Message
+        self,
+        session: AsyncSession,
+        actor: Actor,
+        conversation: Conversation,
+        message: Message,
+        mentioned: list[uuid.UUID],
     ) -> RunStart | None:
-        """For a new message in a DM: the run it starts, or why none (None: the DM has
-        no agent)."""
+        """For a person's new message: in a DM, the run it starts or why none (None:
+        the DM has no agent); elsewhere, the run a mention of an agent among
+        `mentioned` starts or why none (None: it mentions no agent it may ask)."""
         ...
 
     async def names(

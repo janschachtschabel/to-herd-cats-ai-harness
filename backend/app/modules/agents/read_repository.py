@@ -1,19 +1,19 @@
-"""The SQL of what a run reads besides its tools (`executor.py`): the conversation it
-answers, and where what it has read is now and that place's current policy (spec
-7.3), in the run's organisation."""
+"""The SQL of what a run reads besides its tools (`executor.py`, `place.py`): the
+conversation, the thread or the ticket it answers, and where what it has read is now
+and that place's current policy (spec 7.3), in the run's organisation."""
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor, visible_space_ids
 from app.modules.agents.models import Run
 from app.modules.ai.policy import Policy
-from app.modules.messaging.models import Message, MessageKind
+from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import WorkItem
 from app.modules.wiki.models import Page
@@ -74,6 +74,56 @@ class ReadRepository:
             key=lambda row: row[2] or until
         )  # stable: messages of one moment keep their order
         return [Said(kind == MessageKind.AGENT, body) for kind, body, _ in rows]
+
+    async def thread_root(self, trigger_id: uuid.UUID, *, lock: bool = False) -> Message | None:
+        """The thread a mention's run answers in: the root of the mentioning message's
+        thread (the message itself at the top level); None in a DM."""
+        trigger = select(func.coalesce(Message.parent_id, Message.id)).where(
+            Message.org_id == self.org_id, Message.id == trigger_id
+        )
+        stmt = (
+            select(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(
+                Message.org_id == self.org_id,
+                Message.id == trigger.scalar_subquery(),
+                Conversation.kind != ConversationKind.DM,
+            )
+        )
+        if lock:
+            stmt = stmt.with_for_update(of=Message).execution_options(populate_existing=True)
+        return await self.session.scalar(stmt)
+
+    async def thread(self, root_id: uuid.UUID, until: datetime) -> list[Said]:
+        """A thread as a mention's run answers it: the people's and the agents' messages
+        in it written up to `until` (the run's start), oldest first."""
+        stmt = (
+            select(Message.kind, Message.body_md)
+            .where(
+                Message.org_id == self.org_id,
+                or_(Message.id == root_id, Message.parent_id == root_id),
+                Message.deleted_at.is_(None),
+                Message.kind.in_((MessageKind.HUMAN, MessageKind.AGENT)),
+                Message.created_at <= until,
+            )
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(HISTORY_MESSAGES)
+        )
+        rows = reversed((await self.session.execute(stmt)).all())
+        return [Said(kind == MessageKind.AGENT, body) for kind, body in rows]
+
+    async def present(self, message_id: uuid.UUID) -> bool:
+        """Whether the message is there and not deleted."""
+        stmt = select(Message.id).where(
+            Message.org_id == self.org_id, Message.id == message_id, Message.deleted_at.is_(None)
+        )
+        return await self.session.scalar(stmt) is not None
+
+    async def ticket_number(self, work_item_id: uuid.UUID) -> int | None:
+        stmt = select(WorkItem.number).where(
+            WorkItem.org_id == self.org_id, WorkItem.id == work_item_id
+        )
+        return await self.session.scalar(stmt)
 
     async def policies(self, space_ids: set[uuid.UUID]) -> list[Policy]:
         """The spaces' policies as they are now."""

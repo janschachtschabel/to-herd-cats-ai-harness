@@ -44,15 +44,18 @@ class ThreadRepository:
         body_md: str,
         at: datetime,
         offset: int = 0,
+        parent: Message | None = None,
     ) -> Message | None:
         """The system message `client_id` (an event's, or one entry of it); None if it
-        exists already."""
+        exists already. With `parent`: a reply in its thread (a run's notice where it
+        answers a mention; the caller counts the reply)."""
         stmt = (
             insert(Message)
             .values(
                 id=_id_at(at + timedelta(microseconds=offset)),
                 org_id=self.org_id,
                 conversation_id=thread.id,
+                parent_id=parent.id if parent is not None else None,
                 author_type=SYSTEM_AUTHOR,
                 author_id=None,
                 kind=MessageKind.SYSTEM,

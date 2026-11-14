@@ -123,10 +123,16 @@ Kategorie `cancelled` („Verworfen“). Zwischen Bereichen verschieben lässt e
 - Zugewiesen werden Personen, die die Tickets des Bereichs lesen dürfen, und (seit M6)
   Agenten (`assignee: {"type": "agent", "id": …}`): nur wer selbst `ai.use` hat, nur
   aktive Agenten (kein Entwurf), die Mitglied des Bereichs mit mindestens Rolle
-  `editor` sind. Alles andere beantwortet die API gleich mit 422
+  `editor` sind, persönliche Agenten nur durch ihre Eigentümerin oder ihren Eigentümer. Alles andere beantwortet die API gleich mit 422
   `ticket.assignee_invalid`, ob es die Person oder den Agenten gibt oder nicht. Ein
   Agent kann auch der meldende sein (`reporter.type = "agent"`, über sein Werkzeug
   `create_ticket`); Zeitleiste und Ereignisse nennen ihn dann mit dem Lauf (`run_id`).
+- Die Zuweisung an einen Agenten startet seinen Lauf am Ticket (Ort: der Ticket-Thread,
+  Fragende: wer zugewiesen hat; seine Antwort ist ein Kommentar dort; ein Lauf je
+  Ticket). Kann er nicht starten, bleibt das Ticket zugewiesen und der Thread nennt
+  den Grund (`run.refused`); die verantwortliche Person des Agenten erfährt es in
+  ihrer Aktivität. Einzelheiten und Übergaben zwischen Agenten: `docs/KI.md`
+  („Auslöser“). In Kanäle und Direktnachrichten schreibt auch ein solcher Lauf nichts.
 - **„Übernehmen“** weist ein nicht zugewiesenes Ticket sich selbst zu, **„Abgeben“**
   löst die eigene Zuweisung (beides mit `ticket.edit`). **„Jemandem zuweisen“** (mit
   `ticket.assign`) öffnet eine Personenauswahl mit genau den Personen, die den Bereich

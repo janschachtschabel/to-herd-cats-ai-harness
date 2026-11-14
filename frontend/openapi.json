@@ -516,8 +516,20 @@
         "type": "object"
       },
       "AgentRunOut": {
-        "description": "What a message to an agent started: its run (`id`; possibly one already waiting,\nwhich answers this message too), or no run and why (`reason`: `ai.unavailable`,\n`agent.draft`, `agent.paused`, `agent.responsible_inactive`,\n`agent.connection_unavailable`, `run.thread_reply`).",
+        "description": "What a message to an agent started: its run (`id`; possibly one already waiting,\nwhich answers this message too), or no run and why (`reason`: `ai.unavailable`,\n`agent.draft`, `agent.paused`, `agent.responsible_inactive`,\n`agent.connection_unavailable`, `run.thread_reply`, `run.waiting`). `agent_id`:\nthe agent it asked (the DM's, or the one a mention named).",
         "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
           "id": {
             "anyOf": [
               {
@@ -3863,7 +3875,7 @@
         "type": "object"
       },
       "MessageWriteOut": {
-        "description": "`not_notified`: the mentioned ids that were not stored: people who may not see\nthe conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:\nfor a new message in a DM with an agent, the run it started or why none (null\notherwise, and for a resend).",
+        "description": "`not_notified`: the mentioned ids that were not stored: people who may not see\nthe conversation, and ids of nobody (indistinguishable on purpose; an agent a\nmention asked is not among them). `agent_run`: for a new message in a DM with an\nagent, or one that mentions an agent the writer may ask, the run it started or why\nnone (null otherwise, and for a resend).",
         "properties": {
           "agent_run": {
             "anyOf": [
@@ -4365,7 +4377,8 @@
           "ticket_comment",
           "proposal",
           "approval",
-          "question"
+          "question",
+          "run_stopped"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -6821,7 +6834,7 @@
         "type": "object"
       },
       "RunOut": {
-        "description": "A run as the run view shows it. `asker_*`: the person who asked (whose rights it\nread with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a\nworker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,\nwhen it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone\nasked it to stop.",
+        "description": "A run as the run view shows it. `asker_*`: the person who asked (whose rights it\nread with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a\nworker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,\nwhen it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone\nasked it to stop. `trigger_message_id`: the message that asked (a DM's message or\na mention; null for a run on a ticket assigned to the agent); `chain_depth`: the\nhandovers from agent to agent that led to it (0: a person asked it).",
         "properties": {
           "agent_id": {
             "format": "uuid",
@@ -6848,6 +6861,10 @@
           "cancel_requested": {
             "title": "Cancel Requested",
             "type": "boolean"
+          },
+          "chain_depth": {
+            "title": "Chain Depth",
+            "type": "integer"
           },
           "conversation_id": {
             "format": "uuid",
@@ -6913,9 +6930,16 @@
             ]
           },
           "trigger_message_id": {
-            "format": "uuid",
-            "title": "Trigger Message Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Message Id"
           },
           "usage": {
             "$ref": "#/components/schemas/RunUsageOut"
@@ -6941,6 +6965,7 @@
           "asker_name",
           "conversation_id",
           "trigger_message_id",
+          "chain_depth",
           "place",
           "state",
           "stop_reason",

@@ -108,7 +108,11 @@ async def test_it_stops_when_personal_agents_are_switched_off(bench: Bench) -> N
     dm = await open_agent_dm(bench.people.alice, agent)
     assert (await switch(bench, False)).status_code == 200
     refused = await ask(bench, dm["id"])
-    assert refused["agent_run"] == {"id": None, "reason": "agent.personal_disabled"}
+    assert refused["agent_run"] == {
+        "id": None,
+        "reason": "agent.personal_disabled",
+        "agent_id": str(agent.id),
+    }
     assert (await switch(bench, True)).status_code == 200
     assert (await ask(bench, dm["id"], "Again"))["agent_run"]["id"] is not None
 
@@ -124,7 +128,11 @@ async def test_it_follows_its_owners_model_only_when_saved_again(bench: Bench) -
     )
     assert r.status_code == 200, r.text
     refused = await ask(bench, dm["id"])
-    assert refused["agent_run"] == {"id": None, "reason": "agent.connection_unavailable"}
+    assert refused["agent_run"] == {
+        "id": None,
+        "reason": "agent.connection_unavailable",
+        "agent_id": str(agent.id),
+    }
     saved = await bench.people.alice.patch(f"{AGENTS}/{agent.id}", json={"version": 1})
     assert saved.status_code == 200, saved.text
     assert (saved.json()["connection_id"], saved.json()["model"]) == (other["id"], "m9")

@@ -64,6 +64,9 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
   Gespräch sehen darf; die anderen nennt der Composer („Nicht benachrichtigt: … – kann
   dieses Gespräch nicht sehen“). Ob jemand zu einem Bereich gehört, verrät das nicht:
   Unbekannte, deaktivierte und unberechtigte Personen werden gleich behandelt.
+  Erwähnt eine Person mit `ai.use` einen Agenten, der Mitglied des Bereichs ist,
+  antwortet er im Thread der Nachricht (M6; `docs/KI.md`, „Auslöser“); seine
+  Stopp-Meldung steht dann als Systemmeldung im Thread, auch in Kanälen.
 - **Reaktionen:** ein Emoji je Klick (Schnellauswahl in der Oberfläche; die API nimmt
   jedes einzelne Emoji bis 32 Codepunkte, keine Wörter). Nochmal klicken nimmt die
   eigene Reaktion zurück.
@@ -115,8 +118,10 @@ gemeldet hat (`ticket_comment`, nicht zusätzlich zu einer Erwähnung oder Antwo
 zugewiesen hat, und keinen Textausschnitt (sie verweist auf die Systemmeldung im
 Ticket-Thread). Der Zähler steht in der Seitenleiste und im Fenstertitel („(3) Herd“);
 über 99 zeigen Zähler „99+“. Einträge zu Gesprächen, die man nicht
-mehr sehen darf, oder zu gelöschten Nachrichten verschwinden. Weitere Gründe und Reiter
-kommen mit Agenten (M6).
+mehr sehen darf, oder zu gelöschten Nachrichten verschwinden. Mit Agenten (M6) kommen
+`approval` und `question` (Karten eines Laufs, die einen fragen) und `run_stopped`
+(ein Lauf des eigenen Agenten an einem Ticket kam nicht zu Ende oder startete nicht;
+für die verantwortliche Person, ohne Textausschnitt).
 
 ### Suche
 

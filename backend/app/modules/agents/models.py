@@ -15,12 +15,17 @@ it has at most level 2 and uses the owner's connection and model (`personal.py`)
 `allow`, `confirm` or `block`; it can only tighten what the level allows
 (`toolbox/policy.py`).
 
-`run`: one answer to a direct message. Created `queued` in the transaction of the
-message that asks; a worker takes it (`running`, with a lease it renews) and ends it
-(`done`, with `stop_reason`). A run that needs an answer from a person (a release, a
-question: plan M6 decision 1) is `waiting` until `wait_until`, holding nothing; the
-answer makes it `queued` again (`control.resume_waiting`), the run loop ends it with
-`waiting_timeout` once `wait_until` has passed. A conversation has at most one queued
+`run`: one answer to a direct message, to a mention of the agent in a channel or a
+thread (it answers in the mentioning message's thread), or to a ticket assigned to it
+(`work_item_id`: its task; it answers in the ticket's thread, `triggers.py`). Created
+`queued` in the transaction of the message or the assignment that asks
+(`trigger_message_id`: the message; none for an assignment); `chain_depth` counts the
+handovers from agent to agent that led to it (at most `MAX_CHAIN_DEPTH`). A worker
+takes it (`running`, with a lease it renews) and ends it (`done`, with `stop_reason`).
+A run that needs an answer from a person (a release, a question: plan M6 decision 1)
+is `waiting` until `wait_until`, holding nothing; the answer makes it `queued` again
+(`control.resume_waiting`), the run loop ends it with `waiting_timeout` once
+`wait_until` has passed. A conversation has at most one queued
 run and at most one active run, running or waiting (unique partial indexes): a
 message that arrives while one is queued is answered by it, one that arrives while one
 runs gets the next, one that arrives while one waits gets none (`run.waiting`).
@@ -58,6 +63,7 @@ MAX_INSTRUCTIONS_CHARS = 20_000
 MAX_STEPS = 25
 MAX_RUNTIME_SECONDS = 600
 MAX_LEVEL = 3  # level 4 (external tools) comes with M8
+MAX_CHAIN_DEPTH = 3  # handovers from agent to agent that led to a run (plan M6 task 8)
 DEFAULT_LEVEL = 2
 
 
@@ -182,6 +188,11 @@ class Run(UuidPk, OrgScoped, Base):
         Index("ix_run_waiting", "wait_until", postgresql_where=text("state = 'waiting'")),
         Index("ix_run_agent_id", "agent_id"),
         Index("ix_run_trigger_message_id", "trigger_message_id"),
+        Index("ix_run_work_item_id", "work_item_id"),
+        CheckConstraint(
+            "trigger_message_id IS NOT NULL OR work_item_id IS NOT NULL", name="trigger"
+        ),
+        CheckConstraint(f"chain_depth BETWEEN 0 AND {MAX_CHAIN_DEPTH}", name="chain_depth"),
     )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(
@@ -194,8 +205,14 @@ class Run(UuidPk, OrgScoped, Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False
     )
-    trigger_message_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE"), nullable=False
+    trigger_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE")
+    )
+    work_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("work_item.id", ondelete="CASCADE")
+    )
+    chain_depth: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
     )
     state: Mapped[RunState] = mapped_column(String(16), nullable=False)
     stop_reason: Mapped[StopReason | None] = mapped_column(String(32))

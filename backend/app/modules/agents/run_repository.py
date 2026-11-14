@@ -1,9 +1,9 @@
-"""The SQL of runs as people see them: start one for a message, read one and its
-events. What the worker does with runs is in `executor_repository.py`."""
+"""The SQL of runs as people see them: start one for a message, a mention or a
+ticket, read one and its events. What the worker does with runs is in `executor_repository.py`."""
 
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import exists, literal, select, text, true
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,6 +68,56 @@ class RunRepository:
                 Run.state == RunState.QUEUED,
             )
         )
+
+    async def start(
+        self,
+        agent_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        *,
+        message_id: uuid.UUID | None = None,
+        work_item_id: uuid.UUID | None = None,
+        chain_depth: int = 0,
+        besides: uuid.UUID | None = None,
+    ) -> uuid.UUID | None:
+        """A new queued run for a mention or a ticket, if the conversation has no run
+        queued, running or waiting other than `besides` (the run handing a ticket over
+        from there: the new run follows it). None: it has one; two at once: one wins,
+        the unique index of queued runs keeps the other out."""
+        values = {
+            "id": uuid.uuid4(),
+            "org_id": self.org_id,
+            "agent_id": agent_id,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "trigger_message_id": message_id,
+            "work_item_id": work_item_id,
+            "chain_depth": chain_depth,
+            "state": RunState.QUEUED.value,
+            "attempt": 0,
+            "steps": 0,
+            "created_at": utcnow(),
+        }
+        busy = exists().where(
+            Run.org_id == self.org_id,
+            Run.conversation_id == conversation_id,
+            Run.state != RunState.DONE,
+            Run.id != besides if besides is not None else true(),
+        )
+        row = select(*(literal(v, Run.__table__.c[k].type) for k, v in values.items())).where(~busy)
+        stmt = (
+            insert(Run)
+            .from_select(list(values), row)
+            .on_conflict_do_nothing(
+                index_elements=["conversation_id"], index_where=text("state = 'queued'")
+            )
+            .returning(Run.id)
+        )
+        return await self.session.scalar(stmt)
+
+    async def of_run(self, run_id: uuid.UUID) -> Run | None:
+        stmt = select(Run).where(Run.org_id == self.org_id, Run.id == run_id)
+        return await self.session.scalar(stmt)
 
     async def waiting(self, conversation_id: uuid.UUID) -> bool:
         """Whether the conversation's run waits for a person's answer."""

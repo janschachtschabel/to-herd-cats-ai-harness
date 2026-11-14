@@ -149,7 +149,11 @@ async def test_rights_lost_during_the_run_stop_it(bench: Bench, change: str) -> 
 async def test_a_message_without_ai_starts_no_run(bench: Bench) -> None:
     await assign_default(bench.people.admin, None)
     posted = await bench.say("Hello?")
-    assert posted["agent_run"] == {"id": None, "reason": "ai.unavailable"}
+    assert posted["agent_run"] == {
+        "id": None,
+        "reason": "ai.unavailable",
+        "agent_id": str(bench.agent.id),
+    }
 
 
 async def test_an_admin_asking_gains_no_reach_and_is_noted(

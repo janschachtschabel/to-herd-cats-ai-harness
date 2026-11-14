@@ -33,9 +33,10 @@ class Refusal(StrEnum):
     RESPONSIBLE_INACTIVE = "agent.responsible_inactive"
     CONNECTION_UNAVAILABLE = "agent.connection_unavailable"
     THREAD_REPLY = "run.thread_reply"  # replies in a thread do not ask the agent
-    RUN_WAITING = "run.waiting"  # the conversation's run waits for a person's answer
+    RUN_WAITING = "run.waiting"  # the place has a run that answers first (one at a time)
     PERSONAL_DISABLED = "agent.personal_disabled"  # the organisation stopped personal agents
     NOT_FOUND = "agent.not_found"  # someone else's personal agent: not there for them
+    HANDOVER_LIMIT = "run.handover_limit"  # a run at the chain's end hands over no more
 
 
 def agent_not_found() -> NotFound:

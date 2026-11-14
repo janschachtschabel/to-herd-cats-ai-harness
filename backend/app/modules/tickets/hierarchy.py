@@ -13,9 +13,12 @@ two tickets made each other's parent at once do not deadlock (review M4 P2).
 """
 
 from collections.abc import Iterable
+from typing import Any
 
 from app.core.errors import ValidationFailed
-from app.modules.tickets.models import TicketKind
+from app.modules.tickets.events import Changes, Field
+from app.modules.tickets.models import TicketKind, WorkItem
+from app.modules.tickets.repository import TicketRepository
 
 ALLOWED_PARENTS: dict[TicketKind, frozenset[TicketKind]] = {
     TicketKind.EPIC: frozenset(),
@@ -42,3 +45,20 @@ def check_children(kind: TicketKind, child_kinds: Iterable[TicketKind]) -> None:
         raise ValidationFailed(
             "Its children cannot sit below this kind", code="ticket.kind_invalid"
         )
+
+
+async def check_change(
+    repo: TicketRepository, ticket: WorkItem, values: dict[str, Any], changes: Changes
+) -> None:
+    """A changed kind or parent still fits: the parent exists in the ticket's space and
+    may hold the kind, and the children may sit below it."""
+    kind = TicketKind(values.get("kind") or ticket.kind)
+    parent_id = values["parent_id"] if "parent_id" in values else ticket.parent_id
+    if parent_id is not None:
+        own = parent_id == ticket.id
+        parent = None if own else await repo.parent_in(ticket.space_id, parent_id)
+        if parent is None:
+            raise parent_invalid()
+        check_parent(kind, parent.kind)
+    if Field.KIND in changes:
+        check_children(kind, await repo.child_kinds(ticket.id))

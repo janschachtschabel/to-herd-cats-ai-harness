@@ -68,7 +68,11 @@ async def test_a_draft_agent_cannot_be_addressed(bench: Bench) -> None:
 async def test_after_losing_ai_a_message_starts_no_run(bench: Bench) -> None:
     await assign_default(bench.people.admin, None)
     posted = await bench.say("Still there?")
-    assert posted["agent_run"] == {"id": None, "reason": "ai.unavailable"}
+    assert posted["agent_run"] == {
+        "id": None,
+        "reason": "ai.unavailable",
+        "agent_id": str(bench.agent.id),
+    }
     assert posted["body_md"] == "Still there?"  # the message itself is kept
     assert await _runs(bench) == 0
 
@@ -99,7 +103,7 @@ async def test_an_agent_that_may_not_run_says_why(bench: Bench, change: str, rea
         connection.models = ["m2"]
     await bench.session.flush()
     posted = await bench.say("Hi", dm=str(dm["id"]))
-    assert posted["agent_run"] == {"id": None, "reason": reason}
+    assert posted["agent_run"] == {"id": None, "reason": reason, "agent_id": str(agent.id)}
     assert await _runs(bench) == 0
 
 
@@ -109,7 +113,11 @@ async def test_a_reply_in_a_thread_starts_no_run(bench: Bench) -> None:
         f"/api/conversations/{bench.dm_id}/messages",
         json={"body_md": "Reply", "parent_id": top["id"]},
     )
-    assert r.json()["agent_run"] == {"id": None, "reason": "run.thread_reply"}
+    assert r.json()["agent_run"] == {
+        "id": None,
+        "reason": "run.thread_reply",
+        "agent_id": str(bench.agent.id),
+    }
     assert await _runs(bench) == 1
 
 

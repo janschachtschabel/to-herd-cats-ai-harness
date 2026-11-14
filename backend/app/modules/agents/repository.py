@@ -89,6 +89,27 @@ class AgentRepository:
         )
         return {agent_id: name for agent_id, name in await self.session.execute(stmt)}
 
+    async def first_member(self, ids: list[uuid.UUID], space_id: uuid.UUID) -> Agent | None:
+        """The first of `ids` that is an agent, no draft, and a member of the space."""
+        if not ids:
+            return None
+        stmt = (
+            select(Agent)
+            .join(
+                SpaceMember,
+                (SpaceMember.member_type == PrincipalType.AGENT)
+                & (SpaceMember.member_id == Agent.id),
+            )
+            .where(
+                Agent.org_id == self.org_id,
+                Agent.id.in_(ids),
+                Agent.status != AgentStatus.DRAFT,
+                SpaceMember.space_id == space_id,
+            )
+        )
+        found = {agent.id: agent for agent in await self.session.scalars(stmt)}
+        return next((found[i] for i in ids if i in found), None)
+
     async def names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         if not ids:
             return {}

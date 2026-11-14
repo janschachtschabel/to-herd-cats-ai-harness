@@ -306,7 +306,8 @@
   "activity": {
     "reasons": {
       "approval": "asks you for a release in {{where}}",
-      "question": "asked you a question in {{where}}"
+      "question": "asked you a question in {{where}}",
+      "run_stopped": "reports in {{where}} that a run did not finish"
     }
   }
 }

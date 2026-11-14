@@ -236,7 +236,8 @@ legt in derselben Transaktion einen Lauf an. Die Antwort auf das Senden nennt ih
 `agent_run: {"id", "reason"}`; ohne Lauf steht der Grund in `reason`:
 `ai.unavailable`, `agent.paused`, `agent.draft`, `agent.responsible_inactive`,
 `agent.connection_unavailable`, `run.thread_reply`, `run.waiting` (der Lauf des
-Gesprächs wartet auf eine Antwort, siehe unten). Je Gespräch läuft höchstens ein
+Gesprächs wartet auf eine Antwort, siehe unten); `agent_id` nennt den Agenten. Läufe
+aus Erwähnungen und Ticket-Zuweisungen: siehe „Auslöser“. Je Gespräch läuft höchstens ein
 Lauf; Nachrichten, die währenddessen kommen, beantwortet der nächste Lauf gemeinsam.
 
 Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
@@ -444,6 +445,49 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   sperren beide die Zeile des Laufs: Entweder sieht der Abschluss den Abbruch
   (`cancelled`, keine Antwort), oder der Abbruch findet den Lauf beendet (409); ebenso
   gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs.
+
+### Auslöser: Erwähnung, Ticket-Zuweisung, Übergabe (M6)
+
+`backend/app/modules/agents/triggers.py`, Orte und Verlauf `place.py`. Neben der
+Direktnachricht starten Läufe so:
+
+- **Erwähnung**: Eine neue Nachricht einer Person in einem Kanal, einem Seiten- oder
+  Ticket-Thread, deren `mentions` einen Agenten nennen, startet einen Lauf des ersten
+  genannten Agenten, der Mitglied des Bereichs ist und kein Entwurf, wenn die Person
+  `ai.use` hat. Ohne `ai.use` oder bei einem Agenten außerhalb des Bereichs startet
+  nichts und die Antwort verrät nichts (`agent_run: null`, die ID steht wie jede
+  Unbekannte in `not_notified`; das Verzeichnis zeigt solchen Personen ohnehin keine
+  Agenten). Sonst nennt `agent_run` den Lauf oder den Grund (`agent.paused`, …,
+  `run.waiting`: im Gespräch ist schon ein Lauf offen, je Gespräch einer) und
+  `agent_id`. Der Lauf liest den Thread der erwähnenden Nachricht (Wurzel und
+  Antworten bis zu seinem Start) und antwortet dort als Antwort; seine Stopp-Meldung
+  steht ebenfalls im Thread. Eine Bearbeitung, die einen Agenten neu erwähnt, startet
+  nichts; Nachrichten von Agenten erwähnen niemanden, Agenten starten so keine Agenten.
+- **Persönliche Agenten** fragt nur ihre Eigentümerin oder ihr Eigentümer (Erwähnung,
+  Zuweisung, Übergabe; für alle anderen ist er wie nicht vorhanden: keine Antwort,
+  `ticket.assignee_invalid`), und Mitglied ist er nur im persönlichen Bereich.
+- **Richtlinie des Orts**: Was ein Lauf in einem Kanal oder Thread gefragt wird, ist
+  Inhalt dieses Bereichs; dessen KI-Richtlinie gilt (z. B. `none` → `policy_blocked`
+  vor dem ersten Aufruf), anders als in einer Direktnachricht, die als `any` zählt.
+- **Ticket-Zuweisung** an einen Agenten (Regeln in `docs/TICKETS.md`): Der Lauf hat
+  den Ticket-Thread als Ort, die zuweisende Person als Fragende und das Ticket als
+  Aufgabe (`run.work_item_id`; das Modell bekommt den Schlüssel und liest das Ticket
+  mit `read_ticket`); seine Antwort ist ein Kommentar im Thread. Kann er nicht starten
+  (Agent pausiert, …, oder im Thread ist schon ein Lauf offen: ein Lauf je Ticket),
+  bleibt das Ticket zugewiesen, der Thread nennt den Grund (Systemmeldung
+  `run.refused`, Akteur der Agent, `to` der Code) und die verantwortliche Person des
+  Agenten bekommt einen Aktivitätseintrag (`run_stopped`); ebenso, wenn ein Lauf an
+  einem Ticket ohne Antwort endet (außer bei Abbruch).
+- **Übergabe**: Weist ein Lauf mit `assign_ticket` das Ticket einem anderen Agenten
+  zu, startet dessen Lauf für dieselbe Person (der Lauf handelt als die Person, die
+  den ersten fragte), eine Stufe tiefer (`run.chain_depth`, höchstens 3); er folgt dem
+  übergebenden Lauf im selben Thread. Ein Lauf auf Stufe 3 übergibt nicht mehr: das
+  Werkzeug lehnt ab (`run.handover_limit`), der Thread vermerkt es (`run.refused`).
+- Laufansicht: `trigger_message_id` ist bei Ticket-Läufen `null`, `chain_depth` zeigt
+  die Stufe.
+- Rolling Update: Ein Lauf ohne auslösende Nachricht, Systemmeldungen als Antworten
+  in Kanal-Threads und der Grund `run_stopped` entstehen erst durch dieses Release; das
+  vorige liest sie nicht, solange sie nicht geschrieben wurden.
 
 ### Freigaben und Rückfragen (M6)
 

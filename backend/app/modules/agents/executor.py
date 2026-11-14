@@ -10,7 +10,8 @@ works.
   together (`actor.allowed_actor`; else `rights_revoked`); the current policies of
   those spaces, with the conversation as `any`, allow the connection's data location
   now, and no page read has been locked for AI, trashed or deleted since, nor a ticket
-  deleted (else `policy_blocked`); then a place in the connection's
+  deleted (else `policy_blocked`); a run in a channel or a thread has read its space
+  (what it is asked there is that space's content); then a place in the connection's
   `requests_per_minute`.
 - After every model call, in one transaction: the step's `run_event`, its usage
   (`record_usage`) and the step counter. The event's key (run, attempt, step) is
@@ -21,14 +22,18 @@ works.
   recorded, or a tool that fails, ends the run with `error` at once (the call's usage
   is still recorded).
 - The end, in one transaction (`close`): the answer (`kind=agent`, `client_id` = the
-  run, so there is never a second one), or on any other stop a timeline notice in the
-  DM (`run.stopped` with the reason, for the client to word); the run `done`. A cancel
+  run, so there is never a second one), or on any other stop a timeline notice
+  (`run.stopped` with the reason, for the client to word), where the run answers
+  (`place.py`: the DM, the mentioning message's thread, the ticket's thread); the run
+  `done`. A ticket's run that ends without its answer (not cancelled) gives the
+  agent's responsible person an activity entry (`run_stopped`). A cancel
   request found there wins over any other end (`cancelled`, no answer). A message the
   person sent after the run started that no queued run will answer (it came while the
   run waited) gets a run of its own, queued in the same transaction; not after a
-  cancelled run, which writes nothing beyond its notice. A run whose
-  question was deleted before it started (no person's message after the last answer)
-  ends `completed` at once, without a call, an answer or a notice.
+  cancelled run, which writes nothing beyond its notice (a DM's run only). A run
+  whose question was deleted before it started (no person's message after the last
+  answer, the mentioning message deleted, the ticket gone) ends `completed` at once,
+  without a call, an answer or a notice.
 
 Taking a run up again (plan M6 decision 1): the run replays its journal (`journal.py`)
 and goes on after its last recorded step, with what it had read restored; the
@@ -40,7 +45,6 @@ its next write and stops without writing anything (`Lost`). The provider's key i
 resolved only now, for this take-up's client, and never stored or logged.
 """
 
-import json
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -48,15 +52,14 @@ from dataclasses import replace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
-from app.core.models_base import utcnow
-from app.core.outbox import EventActor, emit
-from app.core.principal import Principal
+from app.modules.agents import place
 from app.modules.agents.actor import allowed_actor, run_actor
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import replay
 from app.modules.agents.models import EventKind, Run, StopReason
+from app.modules.agents.notices import announce, notice, notify
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
@@ -66,8 +69,9 @@ from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.ai.models import AiConnection, ConnectionKind, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
+from app.modules.messaging import threads
 from app.modules.messaging.models import MAX_BODY_CHARS, Message
-from app.modules.messaging.thread_repository import ThreadRepository
+from app.modules.messaging.notification_models import NotificationReason
 from app.runtime import context, models
 from app.runtime.loop import Outcome, Recorded, run_loop
 
@@ -118,15 +122,16 @@ class Executor:
                 return Outcome("error", detail="attempts")
             org, user = claimed.org_id, claimed.user_id
             journal = replay(await steps.journal())
+            place_space = (await steps.conversation()).space_id
+            if place_space is not None:  # a channel's or a thread's: its policy counts
+                journal.reads.spaces.add(place_space)
             conversation = claimed.conversation_id
             if await allowed_actor(session, org, user, agent, journal.reads, conversation) is None:
                 return Outcome("rights_revoked")
             connection = await steps.connection(agent.connection_id)
             assert connection is not None  # agent_refusal checked it
-            said = await ReadRepository(session, org).said(
-                claimed.conversation_id, claimed.started_at
-            )
-            if not said or said[-1].by_agent:  # its question was deleted: nothing to answer
+            found = await place.asked(ReadRepository(session, org), claimed)
+            if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
             target = _target(connection, agent.model)
             deadline = self.clock() + agent.max_runtime_seconds
@@ -143,10 +148,10 @@ class Executor:
                 reads=journal.reads,
                 seq=journal.seq,
                 tools=tools,
+                reply_to=found.reply_to,
             )
-        turns = [context.Turn("agent" if s.by_agent else "person", s.text) for s in said]
         instructions = context.instructions(agent.name, agent.instructions)
-        history = context.history(turns, instructions)
+        history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps
 
     async def _loop(
@@ -202,44 +207,45 @@ async def close(
     by = await ControlRepository(session, claimed.org_id).cancelled_by(run.id)
     if by is not None:
         reason, answer, detail = StopReason.CANCELLED, None, None
-    acting = EventActor(claimed.org_id, Principal.agent(claimed.agent_id))
-    message: Message | None = None
-    system = False
+    root = None
+    if claimed.trigger_message_id is not None:
+        reads = ReadRepository(session, claimed.org_id)
+        root = await reads.thread_root(claimed.trigger_message_id, lock=True)
     if reason == StopReason.COMPLETED:
         if answer is not None:
-            message = await steps.answer(answer[:MAX_BODY_CHARS])
+            message = await steps.answer(answer[:MAX_BODY_CHARS], root)
+            if message is not None:
+                if root is not None:
+                    threads.count_reply(root, message)
+                    await session.flush()
+                await announce(session, claimed.org_id, claimed.agent_id, message)
     else:
-        body = json.dumps({"key": STOP_KEY, "to": reason.value})
-        notice = ThreadRepository(session, claimed.org_id)
+        content = {"key": STOP_KEY, "actor": str(claimed.agent_id), "to": reason.value}
         conversation = await steps.conversation()
-        message = await notice.add_system(conversation, claimed.id, body, utcnow())
-        system = True
-    if message is not None:
-        payload: dict[str, object] = {
-            "conversation_id": str(claimed.conversation_id),
-            "message_id": str(message.id),
-            "parent_id": None,
-        }
-        if system:
-            payload["system"] = True
-        await emit(
-            session,
-            type="message.created",
-            actor=acting,
-            space_id=None,
-            subject_type="message",
-            subject_id=message.id,
-            payload=payload,
+        message = await notice(
+            session, claimed.org_id, claimed.agent_id, conversation, claimed.id, content, root
         )
+        if message is not None and claimed.work_item_id is not None and by is None:
+            await _tell_responsible(session, steps, message)
     stop: dict[str, object] = {"reason": reason.value, "detail": detail}
     if by is not None:
         stop["by"] = str(by)
     await steps.event(STOP_SEQ, EventKind.STOP, stop)
     await WaitedRepository(session, claimed.org_id).expire_pending(run.id)
     await steps.done(run, reason.value)
-    if reason != StopReason.CANCELLED:  # cancelled: nothing more is written
-        await _follow_up(session, steps, run)
+    if reason != StopReason.CANCELLED and claimed.work_item_id is None and root is None:
+        await _follow_up(session, steps, run)  # a DM's run (cancelled: nothing more)
     return reason
+
+
+async def _tell_responsible(session: AsyncSession, steps: RunSteps, message: Message) -> None:
+    """A ticket's run ended without its answer: the agent's responsible person learns
+    of it (`run_stopped`)."""
+    agent = await steps.agent()
+    if agent is not None:
+        reason = NotificationReason.RUN_STOPPED
+        user_id = agent.responsible_user_id
+        await notify(session, agent.org_id, agent.id, message, user_id, reason)
 
 
 async def _follow_up(session: AsyncSession, steps: RunSteps, run: Run) -> None:

@@ -2659,9 +2659,12 @@ export interface components {
          * @description What a message to an agent started: its run (`id`; possibly one already waiting,
          *     which answers this message too), or no run and why (`reason`: `ai.unavailable`,
          *     `agent.draft`, `agent.paused`, `agent.responsible_inactive`,
-         *     `agent.connection_unavailable`, `run.thread_reply`).
+         *     `agent.connection_unavailable`, `run.thread_reply`, `run.waiting`). `agent_id`:
+         *     the agent it asked (the DM's, or the one a mention named).
          */
         AgentRunOut: {
+            /** Agent Id */
+            agent_id?: string | null;
             /** Id */
             id: string | null;
             /** Reason */
@@ -4011,9 +4014,10 @@ export interface components {
         /**
          * MessageWriteOut
          * @description `not_notified`: the mentioned ids that were not stored: people who may not see
-         *     the conversation, and ids of nobody (indistinguishable on purpose). `agent_run`:
-         *     for a new message in a DM with an agent, the run it started or why none (null
-         *     otherwise, and for a resend).
+         *     the conversation, and ids of nobody (indistinguishable on purpose; an agent a
+         *     mention asked is not among them). `agent_run`: for a new message in a DM with an
+         *     agent, or one that mentions an agent the writer may ask, the run it started or why
+         *     none (null otherwise, and for a resend).
          */
         MessageWriteOut: {
             agent_run?: components["schemas"]["AgentRunOut"] | null;
@@ -4192,7 +4196,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped";
         /** OrgOut */
         OrgOut: {
             /**
@@ -5045,7 +5049,9 @@ export interface components {
          *     read with, who is billed); `steps`: its model calls; `attempt`: its take-ups by a
          *     worker, `recoveries` those after a lost worker; `wait_until`: while `waiting`,
          *     when it ends unanswered; `stop_reason` once `done`; `cancel_requested`: someone
-         *     asked it to stop.
+         *     asked it to stop. `trigger_message_id`: the message that asked (a DM's message or
+         *     a mention; null for a run on a ticket assigned to the agent); `chain_depth`: the
+         *     handovers from agent to agent that led to it (0: a person asked it).
          */
         RunOut: {
             /**
@@ -5066,6 +5072,8 @@ export interface components {
             attempt: number;
             /** Cancel Requested */
             cancel_requested: boolean;
+            /** Chain Depth */
+            chain_depth: number;
             /**
              * Conversation Id
              * Format: uuid
@@ -5092,11 +5100,8 @@ export interface components {
             /** Steps */
             steps: number;
             stop_reason: components["schemas"]["StopReason"] | null;
-            /**
-             * Trigger Message Id
-             * Format: uuid
-             */
-            trigger_message_id: string;
+            /** Trigger Message Id */
+            trigger_message_id: string | null;
             usage: components["schemas"]["RunUsageOut"];
             /** Wait Until */
             wait_until: string | null;

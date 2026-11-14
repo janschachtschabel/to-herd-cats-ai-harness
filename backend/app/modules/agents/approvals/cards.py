@@ -19,11 +19,9 @@ from datetime import datetime, timedelta
 
 from app.core.config import get_settings
 from app.core.models_base import utcnow
-from app.core.outbox import EventActor, emit
-from app.core.principal import Principal
+from app.modules.agents.notices import notify
 from app.modules.agents.toolbox.base import ToolContext
 from app.modules.agents.toolbox.writing import by
-from app.modules.messaging.activity_repository import NotificationRepository
 from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.notification_models import NotificationReason
 from app.modules.messaging.service import MessageService
@@ -65,24 +63,8 @@ async def post(
         by=by(ctx),
         card=kind,
     )
-    message = posted.message
     reason = (
         NotificationReason.APPROVAL if kind == MessageKind.APPROVAL else NotificationReason.QUESTION
     )
-    added = await NotificationRepository(ctx.session, ctx.run.org_id).add(message, [(to, reason)])
-    for notification in added:
-        await emit(
-            ctx.session,
-            type="notification.created",
-            actor=EventActor(ctx.run.org_id, Principal.agent(ctx.run.agent_id)),
-            space_id=None,
-            subject_type="notification",
-            subject_id=notification.id,
-            payload={
-                "notification_id": str(notification.id),
-                "conversation_id": str(message.conversation_id),
-                "message_id": str(message.id),
-                "user_id": str(to),
-            },
-        )
-    return message
+    await notify(ctx.session, ctx.run.org_id, ctx.run.agent_id, posted.message, to, reason)
+    return posted.message

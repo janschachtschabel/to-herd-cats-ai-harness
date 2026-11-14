@@ -1,8 +1,10 @@
 // Acceptance of M4 (spec 14/M4): "Kanäle bleiben frei von Ticketmeldungen". After ten
 // ticket changes, processed by the worker (their timeline entries are in the ticket's
 // thread), no channel and no direct message holds a new message: checked through the
-// API for everything Anna and Ben see, and in Ben's browser.
+// API for everything Anna and Ben see, and in Ben's browser. The same holds for a
+// ticket an agent works on (M6 task 8): its run comments in the ticket's thread only.
 import { expect, test } from "@playwright/test";
+import { aiBasics, scriptStub } from "./ai-helpers.mjs";
 import { MEMBER, OWNER, call, publishedPage, signIn, teamSpace } from "./helpers.mjs";
 import { channel, closePages, message, openLive, post } from "./messaging-helpers.mjs";
 import { change, conversationsSnapshot, status, ticket } from "./tickets-helpers.mjs";
@@ -109,4 +111,44 @@ test("ten ticket changes leave every channel and direct message as it was", asyn
   await b.goto(`/tickets/${made.number}`);
   await expect(b.getByText("anna hat das Ticket Ben zugewiesen.")).toBeVisible();
   await expect(message(b, "Ben", "Ich fange morgen an.")).toBeVisible();
+});
+
+test("a ticket an agent works on leaves every channel and direct message as it was", async () => {
+  const { hilda } = await aiBasics(anna);
+  const space = await teamSpace(anna, "Ruhe mit Hilda");
+  await call(anna, "PUT", `/api/spaces/${space.id}/members`, {
+    member_type: "agent",
+    member_id: hilda.id,
+    role: "editor",
+  });
+  const room = await channel(anna, space.id, "werkstatt");
+  await post(anna, room.id, "Wer räumt heute auf?");
+  await call(anna, "POST", "/api/dms", { agent_id: hilda.id });
+  const before = await conversationsSnapshot(anna);
+  const made = await ticket(anna, space.id, "Lager zählen");
+  const review = await status(anna, space.id, "Zur Prüfung");
+  await scriptStub(anna.request, {
+    replies: [
+      {
+        tool_calls: [
+          { name: "set_ticket_status", arguments: { key: made.key, status: review.name } },
+        ],
+      },
+      { content: "Gezählt, bitte prüfen." },
+    ],
+  });
+
+  await change(anna, made.number, { assignee: { type: "agent", id: hilda.id } });
+  const comments = async () => {
+    const thread = await call(anna, "GET", `/api/tickets/${made.number}/thread`);
+    const page = await call(anna, "GET", `/api/conversations/${thread.id}/messages?limit=100`);
+    return page.items.filter((m) => m.kind === "agent").map((m) => m.body_md);
+  };
+  await expect.poll(comments, { timeout: 30_000 }).toEqual(["Gezählt, bitte prüfen."]);
+  const done = await call(anna, "GET", `/api/tickets/${made.number}`);
+  expect(done.status.category).toBe("review");
+  await expect
+    .poll(() => timeline(anna, made.number), { timeout: 30_000 })
+    .toContain("ticket.status_changed");
+  expect(await conversationsSnapshot(anna)).toEqual(before);
 });

@@ -74,6 +74,7 @@ class RunRef:
     user_id: uuid.UUID
     conversation_id: uuid.UUID
     reply_to: uuid.UUID | None = None  # the thread its messages go to (None: top level)
+    chain_depth: int = 0  # handovers from agent to agent that led to the run
 
 
 @dataclass(frozen=True, slots=True)

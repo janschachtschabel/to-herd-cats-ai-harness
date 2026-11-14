@@ -60,6 +60,7 @@ class Working:
     reads: Reads = field(default_factory=Reads)
     seq: int = 0  # the last recorded; the journal counts on across take-ups
     tools: list[ToolSpec] = field(default_factory=list)  # allowed at the take-up
+    reply_to: uuid.UUID | None = None  # the thread it answers in (`place.py`)
 
 
 Unit = Callable[[], AbstractAsyncContextManager[AsyncSession]]
@@ -244,7 +245,15 @@ class RunHost:
 
     def _ref(self) -> RunRef:
         c = self.run.claimed
-        return RunRef(c.id, c.org_id, c.agent_id, c.user_id, c.conversation_id)
+        return RunRef(
+            c.id,
+            c.org_id,
+            c.agent_id,
+            c.user_id,
+            c.conversation_id,
+            self.run.reply_to,
+            c.chain_depth,
+        )
 
     def _seq(self) -> int:
         self.run.seq += 1

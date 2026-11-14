@@ -61,7 +61,11 @@ async def test_a_waiting_run_holds_nothing_and_keeps_its_conversation(bench: Ben
         assert await claim(session, LEASE) is None
         assert (await open_runs(session)).waiting == 1
     later = await bench.say("Anything?")
-    assert later["agent_run"] == {"id": None, "reason": "run.waiting"}
+    assert later["agent_run"] == {
+        "id": None,
+        "reason": "run.waiting",
+        "agent_id": str(bench.agent.id),
+    }
     shown = await bench.people.alice.get(f"/api/runs/{run.id}")
     assert shown.json()["state"] == "waiting" and shown.json()["wait_until"] is not None
 

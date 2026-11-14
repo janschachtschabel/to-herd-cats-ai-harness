@@ -39,6 +39,7 @@ class NotificationReason(StrEnum):
     PROPOSAL = "proposal"
     APPROVAL = "approval"  # a run's card asks me to release a tool call (plan M6 task 7)
     QUESTION = "question"  # a run's card asks me a question
+    RUN_STOPPED = "run_stopped"  # a ticket's run of my agent ended or could not start
 
 
 class Notification(UuidPk, OrgScoped, Base):
@@ -47,7 +48,7 @@ class Notification(UuidPk, OrgScoped, Base):
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
             "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
-            " 'approval', 'question')",
+            " 'approval', 'question', 'run_stopped')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),
