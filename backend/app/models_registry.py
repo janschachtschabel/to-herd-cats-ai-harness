@@ -22,6 +22,7 @@ from app.modules.ai.models import (
 )
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
+from app.modules.automations.models import Automation, AutomationFiring
 from app.modules.groups.models import Group, GroupMember
 from app.modules.messaging.models import (
     Conversation,
@@ -66,6 +67,8 @@ __all__ = [
     "RunQuestion",
     "Attachment",
     "AuditLog",
+    "Automation",
+    "AutomationFiring",
     "Base",
     "Conversation",
     "ConversationRead",

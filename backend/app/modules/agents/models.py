@@ -16,8 +16,10 @@ it has at most level 2 and uses the owner's connection and model (`personal.py`)
 (`toolbox/policy.py`).
 
 `run`: one answer to a direct message, to a mention of the agent in a channel or a
-thread (it answers in the mentioning message's thread), or to a ticket assigned to it
-(`work_item_id`: its task; it answers in the ticket's thread, `triggers.py`). Created
+thread (it answers in the mentioning message's thread), to a ticket assigned to it
+(`work_item_id`: its task; it answers in the ticket's thread, `triggers.py`), or the
+work of an automation that came due (`automation_id`; its lane is the automation,
+plan M7). Created
 `queued` in the transaction of the message or the assignment that asks
 (`trigger_message_id`: the message; none for an assignment); `chain_depth` counts the
 handovers from agent to agent that led to it (at most `MAX_CHAIN_DEPTH`). A worker
@@ -210,8 +212,11 @@ class Run(UuidPk, OrgScoped, Base):
         Index("ix_run_agent_id", "agent_id"),
         Index("ix_run_trigger_message_id", "trigger_message_id"),
         Index("ix_run_work_item_id", "work_item_id"),
+        Index("ix_run_automation_id", "automation_id"),
         CheckConstraint(
-            "trigger_message_id IS NOT NULL OR work_item_id IS NOT NULL", name="trigger"
+            "trigger_message_id IS NOT NULL OR work_item_id IS NOT NULL "
+            "OR automation_id IS NOT NULL",
+            name="trigger",
         ),
         CheckConstraint(f"chain_depth BETWEEN 0 AND {MAX_CHAIN_DEPTH}", name="chain_depth"),
     )
@@ -235,11 +240,15 @@ class Run(UuidPk, OrgScoped, Base):
     chain_depth: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
-    # The root of the channel thread a mention's run answers in: its lane. NULL: the
-    # conversation is the lane (a DM, a page thread, a ticket thread).
-    lane_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE")
+    # The automation that fired the run (plan M7; `modules/automations`).
+    automation_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("automation.id", ondelete="CASCADE")
     )
+    # The lane, where one run is open at a time: the root of the channel thread a
+    # mention's run answers in, or the automation that fired the run (its runs never
+    # overlap, whatever their place). NULL: the conversation is the lane (a DM, a page
+    # thread, a ticket thread). No foreign key: it names a message or an automation.
+    lane_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     state: Mapped[RunState] = mapped_column(String(16), nullable=False)
     stop_reason: Mapped[StopReason | None] = mapped_column(String(32))
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
