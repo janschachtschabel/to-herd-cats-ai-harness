@@ -15,7 +15,7 @@ export function CardState({ tone, children }: { tone: Tone; children: ReactNode 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap',
         TONES[tone],
       )}
     >
@@ -48,7 +48,7 @@ export function CardFrame({
         <span aria-hidden className="text-violet-700 dark:text-violet-300">
           {icon}
         </span>
-        <h3 className="min-w-0 flex-1 font-medium">{title}</h3>
+        <h3 className="min-w-48 flex-1 font-medium">{title}</h3>
         {state}
       </header>
       {children}
