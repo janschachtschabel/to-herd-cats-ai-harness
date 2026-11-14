@@ -31,6 +31,11 @@ const AgentAdminPage = lazyRouteComponent(
   'AgentAdminPage',
 )
 
+const SkillsAdminPage = lazyRouteComponent(
+  () => import('@/features/skills/SkillsAdminPage'),
+  'SkillsAdminPage',
+)
+
 /** A page someone without the right must not even learn exists: not found. */
 function requirePermission(me: Me, permission: Permission): void {
   if (!hasPermission(me, permission)) throw notFound()
@@ -145,6 +150,14 @@ const agentRoute = createRoute({
   },
 })
 
+/** Every skill of the organisation (`skill.manage`). */
+const skillsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/skills',
+  loader: ({ context }) => requirePermission(context.me, 'skill.manage'),
+  component: SkillsAdminPage,
+})
+
 /** The administration (`/admin/...`): each page only for those with its right. */
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
@@ -159,4 +172,5 @@ export const adminTree = adminRoute.addChildren([
   aiUsageRoute,
   agentsRoute,
   agentRoute,
+  skillsRoute,
 ])

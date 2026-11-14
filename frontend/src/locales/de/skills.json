@@ -1,0 +1,115 @@
+{
+  "nav": {
+    "skills": "Skills"
+  },
+  "skills": {
+    "tab": "Skills",
+    "title": "Skills",
+    "description": "Arbeitsanleitungen für Agenten (SKILL.md): organisationsweit oder für einen Bereich. Agenten sehen Name und Beschreibung und laden den Text, wenn sie ihn brauchen.",
+    "spaceTitle": "Skills dieses Bereichs",
+    "spaceDescription": "Arbeitsanleitungen, die Agenten in diesem Bereich nutzen können.",
+    "noAccess": "Skills sehen nur Personen mit KI.",
+    "list": {
+      "label": "Skills",
+      "empty": "Noch keine Skills.",
+      "noMatch": "Keine Skills mit diesem Namen."
+    },
+    "scope": {
+      "all": "Überall",
+      "org": "Organisationsweit",
+      "space": "Bereich",
+      "filter": "Wo",
+      "target": "Wohin"
+    },
+    "state": {
+      "active": "Aktiv",
+      "archived": "Archiviert"
+    },
+    "author": "von {{name}}",
+    "unknownAuthor": "unbekannt",
+    "filter": {
+      "search": "Name enthält",
+      "state": "Zustand"
+    },
+    "editor": {
+      "write": "Schreiben",
+      "preview": "Vorschau",
+      "empty": "Noch nichts geschrieben.",
+      "tabs": "Ansicht: {{label}}"
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "Kleinbuchstaben, Ziffern und Bindestriche, z. B. protokoll-schreiben.",
+      "description": "Beschreibung",
+      "descriptionHint": "Sagt dem Agenten, wann der Skill hilft.",
+      "content": "Anweisungen (Markdown)"
+    },
+    "form": {
+      "hint": "Ein Skill ist Text: Nichts darin wird ausgeführt."
+    },
+    "create": {
+      "open": "Skill anlegen",
+      "title": "Skill anlegen",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "title": "{{name}} bearbeiten"
+    },
+    "archive": "Archivieren",
+    "unarchive": "Wieder aktivieren",
+    "export": "Exportieren",
+    "text": "Text des Skills",
+    "versions": {
+      "title": "Versionen",
+      "number": "Version {{number}}",
+      "viewNamed": "Version {{number}} ansehen",
+      "restoreNamed": "Version {{number}} wiederherstellen",
+      "restoreTitle": "Version wiederherstellen?",
+      "restoreText": "Beschreibung und Text von Version {{number}} werden als neue Version übernommen.",
+      "restore": "Wiederherstellen"
+    },
+    "import": {
+      "open": "Importieren",
+      "title": "Skills importieren",
+      "description": "Eine SKILL.md oder ein ZIP mit Skill-Ordnern (je Ordner eine SKILL.md).",
+      "safe": "Nichts aus einem Skill wird ausgeführt: Übernommen wird nur der Text der SKILL.md.",
+      "file": "Datei (SKILL.md oder ZIP)",
+      "fileHint": "Höchstens 10 MB.",
+      "submit": "Importieren",
+      "created_one": "{{count}} Skill angelegt",
+      "created_other": "{{count}} Skills angelegt",
+      "skipped_one": "{{count}} Eintrag übersprungen",
+      "skipped_other": "{{count}} Einträge übersprungen",
+      "ignored": "Nicht übernommen: {{fields}}",
+      "reasons": {
+        "unsafePath": "Unsicherer Pfad im Archiv.",
+        "notInSkill": "Liegt in keinem Skill-Ordner.",
+        "fileUnsupported": "Nur die SKILL.md eines Skills wird übernommen; weitere Dateien nicht.",
+        "tooDeep": "Zu tief verschachtelt (höchstens 4 Ebenen).",
+        "tooMany": "Zu viele Skills in einem Archiv (höchstens 100).",
+        "tooLarge": "Die Datei ist zu groß.",
+        "unreadable": "Die Datei ließ sich nicht lesen.",
+        "invalidText": "Kein gültiger Text (UTF-8).",
+        "frontmatterInvalid": "Der Kopf (Front Matter) ist ungültig.",
+        "nameInvalid": "Der Name ist ungültig (Kleinbuchstaben, Ziffern und Bindestriche, höchstens 64 Zeichen).",
+        "descriptionInvalid": "Die Beschreibung fehlt oder ist zu lang.",
+        "contentInvalid": "Der Text fehlt oder ist zu lang.",
+        "nameMismatch": "Der Name passt nicht zum Ordner.",
+        "duplicate": "Derselbe Name kommt im Import zweimal vor.",
+        "exists": "Diesen Namen gibt es hier schon.",
+        "unknown": "Nicht übernommen."
+      }
+    }
+  },
+  "errors": {
+    "skill": {
+      "not_found": "Diesen Skill gibt es nicht (mehr).",
+      "name_invalid": "Der Name ist ungültig (Kleinbuchstaben, Ziffern und Bindestriche, höchstens 64 Zeichen).",
+      "description_invalid": "Die Beschreibung fehlt oder ist zu lang (höchstens 1.024 Zeichen).",
+      "content_invalid": "Der Text fehlt oder ist zu lang (höchstens 50.000 Zeichen).",
+      "name_taken": "Einen Skill mit diesem Namen gibt es hier schon (auch archiviert).",
+      "state_conflict": "Der Skill ist schon in diesem Zustand.",
+      "version_not_found": "Diese Version gibt es nicht."
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "nav": {
+    "skills": "Skills"
+  },
+  "skills": {
+    "tab": "Skills",
+    "title": "Skills",
+    "description": "Work instructions for agents (SKILL.md): organisation-wide or for one space. Agents see the name and description and load the text when they need it.",
+    "spaceTitle": "Skills of this space",
+    "spaceDescription": "Work instructions agents can use in this space.",
+    "noAccess": "Only people with AI see skills.",
+    "list": {
+      "label": "Skills",
+      "empty": "No skills yet.",
+      "noMatch": "No skills with this name."
+    },
+    "scope": {
+      "all": "Everywhere",
+      "org": "Organisation-wide",
+      "space": "Space",
+      "filter": "Where",
+      "target": "Where to"
+    },
+    "state": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "author": "by {{name}}",
+    "unknownAuthor": "unknown",
+    "filter": {
+      "search": "Name contains",
+      "state": "State"
+    },
+    "editor": {
+      "write": "Write",
+      "preview": "Preview",
+      "empty": "Nothing written yet.",
+      "tabs": "View: {{label}}"
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "Lower-case letters, digits and hyphens, e.g. write-minutes.",
+      "description": "Description",
+      "descriptionHint": "Tells the agent when the skill helps.",
+      "content": "Instructions (Markdown)"
+    },
+    "form": {
+      "hint": "A skill is text: nothing in it is run."
+    },
+    "create": {
+      "open": "Create skill",
+      "title": "Create skill",
+      "submit": "Create"
+    },
+    "edit": {
+      "title": "Edit {{name}}"
+    },
+    "archive": "Archive",
+    "unarchive": "Make active again",
+    "export": "Export",
+    "text": "Text of the skill",
+    "versions": {
+      "title": "Versions",
+      "number": "Version {{number}}",
+      "viewNamed": "View version {{number}}",
+      "restoreNamed": "Restore version {{number}}",
+      "restoreTitle": "Restore version?",
+      "restoreText": "The description and text of version {{number}} become a new version.",
+      "restore": "Restore"
+    },
+    "import": {
+      "open": "Import",
+      "title": "Import skills",
+      "description": "A SKILL.md, or a ZIP of skill folders (one SKILL.md per folder).",
+      "safe": "Nothing in a skill is run: only the text of the SKILL.md is taken.",
+      "file": "File (SKILL.md or ZIP)",
+      "fileHint": "At most 10 MB.",
+      "submit": "Import",
+      "created_one": "{{count}} skill created",
+      "created_other": "{{count}} skills created",
+      "skipped_one": "{{count}} entry skipped",
+      "skipped_other": "{{count}} entries skipped",
+      "ignored": "Not kept: {{fields}}",
+      "reasons": {
+        "unsafePath": "Unsafe path in the archive.",
+        "notInSkill": "Not inside a skill folder.",
+        "fileUnsupported": "Only a skill's SKILL.md is taken; other files are not.",
+        "tooDeep": "Nested too deeply (at most 4 levels).",
+        "tooMany": "Too many skills in one archive (at most 100).",
+        "tooLarge": "The file is too large.",
+        "unreadable": "The file could not be read.",
+        "invalidText": "Not valid text (UTF-8).",
+        "frontmatterInvalid": "The header (front matter) is invalid.",
+        "nameInvalid": "The name is invalid (lower-case letters, digits and hyphens, at most 64 characters).",
+        "descriptionInvalid": "The description is missing or too long.",
+        "contentInvalid": "The text is missing or too long.",
+        "nameMismatch": "The name does not match the folder.",
+        "duplicate": "The same name appears twice in the import.",
+        "exists": "This name exists here already.",
+        "unknown": "Not taken."
+      }
+    }
+  },
+  "errors": {
+    "skill": {
+      "not_found": "This skill does not exist (any more).",
+      "name_invalid": "The name is invalid (lower-case letters, digits and hyphens, at most 64 characters).",
+      "description_invalid": "The description is missing or too long (at most 1,024 characters).",
+      "content_invalid": "The text is missing or too long (at most 50,000 characters).",
+      "name_taken": "A skill with this name exists here already (perhaps archived).",
+      "state_conflict": "The skill is in this state already.",
+      "version_not_found": "This version does not exist."
+    }
+  }
+}

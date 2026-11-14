@@ -32,6 +32,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       'dm.inspect',
       'ai.manage',
       'agent.manage',
+      'skill.manage',
     ],
   },
 ]
@@ -45,6 +46,7 @@ export interface AdminLink {
     | '/admin/dm-inspect'
     | '/admin/ai'
     | '/admin/agents'
+    | '/admin/skills'
   labelKey:
     | 'nav.users'
     | 'nav.groups'
@@ -53,6 +55,7 @@ export interface AdminLink {
     | 'nav.dmInspect'
     | 'nav.ai'
     | 'nav.agents'
+    | 'nav.skills'
   permission: Permission
 }
 
@@ -64,6 +67,7 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/dm-inspect', labelKey: 'nav.dmInspect', permission: 'dm.inspect' },
   { to: '/admin/ai', labelKey: 'nav.ai', permission: 'ai.manage' },
   { to: '/admin/agents', labelKey: 'nav.agents', permission: 'agent.manage' },
+  { to: '/admin/skills', labelKey: 'nav.skills', permission: 'skill.manage' },
 ]
 
 function holds(me: Me | null, permission: Permission): boolean {

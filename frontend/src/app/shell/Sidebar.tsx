@@ -3,6 +3,7 @@ import {
   Bot,
   Eye,
   History,
+  ScrollText,
   Search,
   Shield,
   Sparkles,
@@ -29,6 +30,7 @@ const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/dm-inspect': Eye,
   '/admin/ai': Sparkles,
   '/admin/agents': Bot,
+  '/admin/skills': ScrollText,
 }
 
 function AdminSection() {

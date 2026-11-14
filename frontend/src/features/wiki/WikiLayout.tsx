@@ -60,7 +60,9 @@ function WikiFrame({ space }: { space: Space }) {
         ? 'sprints'
         : matchRoute({ to: '/spaces/$spaceId/backlog', params })
           ? 'backlog'
-          : 'wiki'
+          : matchRoute({ to: '/spaces/$spaceId/skills', params })
+            ? 'skills'
+            : 'wiki'
 
   return (
     <WikiContext.Provider value={wiki}>
@@ -99,7 +101,7 @@ function WikiFrame({ space }: { space: Space }) {
           <SpaceTransferMenu />
         </div>
       </header>
-      <SpaceTabs space={space} current={view} />
+      <SpaceTabs space={space} me={me} current={view} />
       {view === 'wiki' ? (
         <div className="grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
           <WikiTreePanel />

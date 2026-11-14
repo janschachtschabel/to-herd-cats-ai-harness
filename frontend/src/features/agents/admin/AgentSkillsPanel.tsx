@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,7 +43,13 @@ export function AgentSkillsPanel({ agentId, onReload }: { agentId: string; onRel
             return (
               <li key={skill.id} className="flex items-start justify-between gap-2 py-2">
                 <div className="min-w-0">
-                  <span className="font-medium">{skill.name}</span>
+                  <Link
+                    to="/skills/$skillId"
+                    params={{ skillId: skill.id }}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {skill.name}
+                  </Link>
                   <p className="text-muted-foreground">{skill.description}</p>
                   {reason && (
                     <Badge variant="destructive" className="mt-1 h-auto whitespace-normal">

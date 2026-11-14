@@ -167,3 +167,8 @@ export function useImportSkills(spaceId: string | null) {
 export function skillExportUrl(skillId: string): string {
   return `/api/skills/${encodeURIComponent(skillId)}/export`
 }
+
+/** The i18n key of an import's skip reason (`name_mismatch` → `nameMismatch`). */
+export function reasonKey(reason: string): string {
+  return reason.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())
+}
