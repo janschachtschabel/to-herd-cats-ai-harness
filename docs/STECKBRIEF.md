@@ -953,11 +953,12 @@ Stunde wegen Fehlschlägen angehalten). Bedeutung und Abhilfe in
 [`AGENTEN.md`](AGENTEN.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Stand M6)
+## Tests (Backend Stand M7, sonst M6)
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL) | 1.716 (Backend-Stand von Commit `c1e700a`, gleich dem von `aab401b`) | 14.11.2026: 1.715 grün, 1 rot: `test_run_replay.py::test_a_run_goes_on_after_its_last_recorded_step` (der Stub gab die zweite vorbereitete Antwort nicht zurück; unter Last der Maschine, danach die Datei allein dreimal grün); 27:40 min. ruff, ruff format, mypy (strict, 363 Dateien) sauber. Ein später hinzugekommener Test (`95f8273`) ist hier nicht mitgezählt |
+| Backend (`pytest`, echtes PostgreSQL), M7 | 2.037 (Backend-Stand von Commit `51d3dc5`) | 14.11.2026: 2.034 grün, 3 rot: `test_wiki_review_pass.py::test_a_due_page_is_reminded_once_per_interval` (der Test rechnete „später am Tag“ als jetzt + 3 h und lief nach 21 Uhr UTC; behoben in `4631d15`), `test_run_cancel_races.py::test_a_cancel_before_the_finish_wins` (409 `conflict.retry` der kurzen Sperrgrenze unter Last, danach ein Deadlock beim Leeren der Tabellen) und als Folge `::test_a_cancel_during_the_finish_waits_and_finds_it_done` (Reste des vorigen Tests); die Datei allein dreimal grün; 33:06 min. ruff, ruff format, mypy (strict, 413 Dateien) sauber |
+| Backend (`pytest`, echtes PostgreSQL), M6 | 1.716 (Backend-Stand von Commit `c1e700a`, gleich dem von `aab401b`) | 14.11.2026: 1.715 grün, 1 rot: `test_run_replay.py::test_a_run_goes_on_after_its_last_recorded_step` (der Stub gab die zweite vorbereitete Antwort nicht zurück; unter Last der Maschine, danach die Datei allein dreimal grün); 27:40 min. ruff, ruff format, mypy (strict, 363 Dateien) sauber. Ein später hinzugekommener Test (`95f8273`) ist hier nicht mitgezählt |
 | Frontend (`vitest`) | 412 in 71 Dateien (Stand `aab401b`) | 14.11.2026: 411 grün, 1 rot unter Last (`SkillProposals.test.tsx`, „a space's moderators find them beside the skills“: die Navigation „Skills und Vorschläge“ nicht gefunden), die Datei allein grün (10 von 10) |
 | Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 44 in 13 Dateien (Stand `aab401b`, gezählt mit `playwright test --list`): 18 Live-Bearbeitung, 5 Nachrichten, 13 Tickets, 8 KI und Agenten; dazu später 7 in `agents-work.spec.mjs` (im Quelltext gezählt) | für diesen Steckbrief nicht gelaufen |
 | Compose (`smoke.sh`) | einfach und `SMOKE_NODES=1` | beide `SMOKE OK` mit dem Image der Demo (13.11.2026); für M6 nicht wiederholt (`docker build` geht in dieser Sandbox nicht) |
