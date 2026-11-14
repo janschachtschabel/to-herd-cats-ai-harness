@@ -11,6 +11,7 @@ from app.core.access_repository import person_reads_space
 from app.core.principal import PrincipalType
 from app.modules.agents.models import Agent, AgentStatus
 from app.modules.groups.models import Group
+from app.modules.spaces.models import SpaceMember
 from app.modules.users.models import User
 
 
@@ -38,8 +39,9 @@ class DirectoryRepository:
         """Active people, groups and agents that are not drafts, whose name contains
         `text`; case-insensitive, `%` and `_` taken literally. Never the email: members
         must not probe addresses.
-        With `space_id`, only the people who may read that space. Personal agents only
-        for their owner (`viewer`), never for anyone else."""
+        With `space_id`, only the people who may read that space and the agents that
+        are its members. Personal agents only for their owner (`viewer`), never for
+        anyone else."""
         parts = []
         if PrincipalType.USER in types:
             people = select(
@@ -55,18 +57,24 @@ class DirectoryRepository:
                 people = people.where(person_reads_space(literal(space_id)))
             parts.append(people)
         if PrincipalType.AGENT in types:
-            parts.append(
-                select(
-                    literal(PrincipalType.AGENT.value, String).label("type"),
-                    Agent.id.label("id"),
-                    Agent.name.label("name"),
-                ).where(
-                    Agent.org_id == org_id,
-                    Agent.status != AgentStatus.DRAFT,
-                    Agent.name.icontains(text, autoescape=True),
-                    or_(Agent.owner_user_id.is_(None), Agent.owner_user_id == viewer),
-                )
+            agents = select(
+                literal(PrincipalType.AGENT.value, String).label("type"),
+                Agent.id.label("id"),
+                Agent.name.label("name"),
+            ).where(
+                Agent.org_id == org_id,
+                Agent.status != AgentStatus.DRAFT,
+                Agent.name.icontains(text, autoescape=True),
+                or_(Agent.owner_user_id.is_(None), Agent.owner_user_id == viewer),
             )
+            if space_id is not None:
+                member = select(SpaceMember.member_id).where(
+                    SpaceMember.space_id == space_id,
+                    SpaceMember.member_type == PrincipalType.AGENT,
+                    SpaceMember.member_id == Agent.id,
+                )
+                agents = agents.where(member.exists())
+            parts.append(agents)
         if PrincipalType.GROUP in types:
             parts.append(
                 select(

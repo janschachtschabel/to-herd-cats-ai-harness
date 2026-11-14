@@ -8638,7 +8638,7 @@ export interface operations {
                 cursor?: string | null;
                 q?: string;
                 type?: ("user" | "group" | "agent") | null;
-                /** @description only people who read this space */
+                /** @description only people who read this space, and its member agents */
                 space_id?: string | null;
             };
             header?: never;

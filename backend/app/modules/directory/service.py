@@ -3,8 +3,9 @@ admins without `user.manage` or `group.manage` can add members. Needs `directory
 (everyone but guests); shows only active people. With a space, only the people who may
 read it (and the caller must read it too: otherwise 404, as for an unknown space).
 Agents (not drafts) appear only for people with `ai.use` (plan M5: whoever has no AI
-sees no agent), and never with a space; a personal agent only for its owner (plan M6),
-admins included."""
+sees no agent); with a space, only the agents that are its members (plan M6 task 12:
+those a mention there asks and a ticket there may go to); a personal agent only for its
+owner (plan M6), admins included."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +30,7 @@ class DirectoryService:
         after = decode_key_cursor(query.cursor) if query.cursor else None
         types = frozenset({query.type}) if query.type else ALL_TYPES
         if query.space_id is not None:
-            types = types & {PrincipalType.USER}
+            types = types & {PrincipalType.USER, PrincipalType.AGENT}
         if PrincipalType.AGENT in types and not await can(self.session, actor, Action.AI_USE):
             types = types - {PrincipalType.AGENT}
         rows = await self.directory.search(

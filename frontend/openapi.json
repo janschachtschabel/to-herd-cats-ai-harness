@@ -13864,7 +13864,7 @@
             }
           },
           {
-            "description": "only people who read this space",
+            "description": "only people who read this space, and its member agents",
             "in": "query",
             "name": "space_id",
             "required": false,
@@ -13878,7 +13878,7 @@
                   "type": "null"
                 }
               ],
-              "description": "only people who read this space",
+              "description": "only people who read this space, and its member agents",
               "title": "Space Id"
             }
           }
