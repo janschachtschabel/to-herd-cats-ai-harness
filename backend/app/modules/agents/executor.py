@@ -107,7 +107,9 @@ class Executor:
                 return Outcome("completed")
             target = _target(connection, agent.model)
             deadline = self.clock() + agent.max_runtime_seconds
-            run = Working(claimed, agent, connection.id, connection.secret_ref, deadline)
+            run = Working(
+                claimed, agent, connection.id, target.model, connection.secret_ref, deadline
+            )
         turns = [context.Turn("agent" if s.by_agent else "person", s.text) for s in said]
         instructions = context.instructions(agent.name, agent.instructions)
         return run, target, context.history(turns, instructions), instructions

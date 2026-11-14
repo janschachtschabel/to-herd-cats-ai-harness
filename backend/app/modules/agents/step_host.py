@@ -36,6 +36,7 @@ class Working:
     claimed: Claimed
     agent: Agent
     connection_id: uuid.UUID
+    model: str  # the model the calls go to, as at the start (usage is booked on it)
     secret_ref: str | None
     deadline: float
     reads: Reads = field(default_factory=Reads)
@@ -165,7 +166,7 @@ class RunHost:
             session,
             org_id=claimed.org_id,
             connection_id=self.run.connection_id,
-            model=self.run.agent.model,
+            model=self.run.model,
             tokens_in=reply.tokens_in,
             tokens_out=reply.tokens_out,
             tokens_cached=reply.tokens_cached,

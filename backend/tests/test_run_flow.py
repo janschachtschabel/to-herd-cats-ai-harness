@@ -5,6 +5,8 @@ messages waiting for one run that answers them together, and the stop notice."""
 import json
 import uuid
 
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import func, select
 
 from app.core.outbox import Event, EventOutbox
@@ -13,6 +15,7 @@ from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopRe
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.live_events import decode, of_event
 from app.modules.messaging.models import Message
+from app.runtime.models import wrap_model
 from tests.factories_agents import Bench
 
 
@@ -133,3 +136,24 @@ async def test_a_run_whose_question_was_deleted_sends_nothing(bench: Bench) -> N
     assert len(bench.stub.state.log) == 1
     kinds = [m["kind"] for m in await bench.messages()]
     assert kinds.count("agent") <= 1 and "system" not in kinds
+
+
+async def test_usage_names_the_model_the_call_went_to(bench: Bench) -> None:
+    """Finding 13: an edit of the agent during the run does not move its usage."""
+    bench.connection.models = ["m1", "m2"]
+    await bench.session.flush()
+    calls: list[int] = []
+
+    async def model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        calls.append(1)
+        if len(calls) == 1:
+            bench.agent.model = "m2"
+            await bench.session.flush()
+            return ModelResponse(parts=[ToolCallPart("search", {"query": "x"})])
+        return ModelResponse(parts=[TextPart("done")])
+
+    executor = bench.executor(make_model=lambda target, timeout: wrap_model(FunctionModel(model)))
+    await bench.say("Hi")
+    assert await bench.run_next(executor) == StopReason.COMPLETED
+    models = (await bench.session.scalars(select(UsageRecord.model))).all()
+    assert models == ["m1", "m1"]
