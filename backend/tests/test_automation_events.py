@@ -12,11 +12,12 @@ from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
+from uuid_utils.compat import uuid7
 
 from app.core.outbox import Event
 from app.modules.agents.models import RunState, StopReason
 from app.modules.automations import runs as automation_runs
-from app.modules.automations.event_models import AutomationEvent
+from app.modules.automations.event_models import MAX_OBJECTS, AutomationEvent
 from app.modules.automations.event_rules import on_event
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import FiringOutcome
@@ -239,3 +240,34 @@ async def test_what_a_run_is_told_outlasts_the_events_it_took(work: Work) -> Non
     assert told is not None and told.event is not None
     assert (told.event.type, told.event.count) == ("ticket.created", 1)
     assert told.event.objects == [{"ticket_id": made["id"]}]
+
+
+async def test_a_run_is_told_how_many_waited_and_the_newest_twenty(work: Work) -> None:
+    """However many events wait, the term counts them in SQL and the run is told the
+    count and the ids of the newest MAX_OBJECTS objects."""
+    bench = work.bench
+    rule = await ruled(bench, await _channel(work))
+    await work.ticket("Erstes")
+    await take_in(bench, "ticket.created", T0)
+    await finish_runs(bench.session)
+    made = [str(uuid7()) for _ in range(MAX_OBJECTS + 5)]
+    bench.session.add_all(
+        AutomationEvent(
+            org_id=rule.org_id,
+            automation_id=rule.id,
+            event_id=uuid7(),
+            subject_id=uuid.UUID(ticket_id),
+            ids={"ticket_id": ticket_id},
+            depth=0,
+        )
+        for ticket_id in made
+    )
+    end = T0 + timedelta(seconds=QUIET)
+    rule.next_due_at = end
+    await bench.session.flush()
+    fired = await fire_next(bench.session, end)
+    assert fired is not None and fired.run_id is not None
+    told = await automation_runs.assignment(bench.session, rule.org_id, fired.run_id)
+    assert told is not None and told.event is not None
+    assert told.event.count == MAX_OBJECTS + 5
+    assert told.event.objects == [{"ticket_id": t} for t in reversed(made)][:MAX_OBJECTS]

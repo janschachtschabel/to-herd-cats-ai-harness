@@ -2,7 +2,9 @@
 older than FIRING_RETENTION (with the events they took) and events a term took more
 than EVENT_RETENTION ago, in bounded batches, but never what a run still open may
 read (its term, the events its term took) and never an event that still waits for
-its quiet time to end, however old. Real commits (the due loop's own sessions)."""
+an active rule's quiet time to end, however old. Waiting events of a deleted rule go,
+and those a paused rule took in more than EVENT_RETENTION ago (review M7, finding
+11). Real commits (the due loop's own sessions)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -19,6 +21,7 @@ from app.modules.automations.models import (
     AutomationKind,
     AutomationState,
     FiringOutcome,
+    PausedReason,
 )
 from app.worker.due import EVENT_RETENTION, FIRING_RETENTION, DueLoop
 from tests.factories_automations import finish_runs
@@ -60,7 +63,9 @@ def _firing(place: dict, rule_id: uuid.UUID, at: datetime, outcome: FiringOutcom
     )
 
 
-def _event(place: dict, rule_id: uuid.UUID, firing_id: uuid.UUID | None) -> AutomationEvent:
+def _event(
+    place: dict, rule_id: uuid.UUID, firing_id: uuid.UUID | None, taken_at: datetime = NOW
+) -> AutomationEvent:
     return AutomationEvent(
         org_id=place["org"],
         automation_id=rule_id,
@@ -69,6 +74,7 @@ def _event(place: dict, rule_id: uuid.UUID, firing_id: uuid.UUID | None) -> Auto
         ids={},
         depth=0,
         firing_id=firing_id,
+        taken_at=taken_at,
     )
 
 
@@ -170,3 +176,31 @@ async def test_the_cleanup_goes_in_bounded_batches_at_most_once_a_while(
         await session.commit()
     assert await loop.cleanup_if_due() is None  # not again so soon
     assert len((await _log(real_db))[0]) == 1
+
+
+async def test_waiting_events_of_a_deleted_rule_and_of_one_paused_long_go(
+    real_db: RealDb, make_real_client: MakeRealClient, openai_stub: OpenAIStub
+) -> None:
+    place = await _place(real_db, make_real_client, openai_stub)
+    rules = {name: await _rule(real_db, place) for name in ("gone", "long", "short", "busy")}
+    long_ago, lately = NOW - EVENT_RETENTION - timedelta(days=1), NOW - timedelta(days=1)
+    async with real_db.database.session_factory() as session:
+        for name, state in (("gone", "deleted"), ("long", "paused"), ("short", "paused")):
+            rule = await session.get(Automation, rules[name])
+            assert rule is not None
+            rule.state = AutomationState(state)
+            rule.paused_reason = PausedReason.MANUAL if state == "paused" else None
+        session.add_all(
+            [
+                _event(place, rules["gone"], None, lately),
+                _event(place, rules["long"], None, long_ago),
+                _event(place, rules["short"], None, lately),
+                _event(place, rules["busy"], None, long_ago),  # active: it fires them
+            ]
+        )
+        await session.commit()
+    loop = DueLoop(real_db.database, clock=SettableClock(NOW))
+    assert await loop.cleanup() == (0, 2)
+    async with real_db.database.session_factory() as session:
+        left = set(await session.scalars(select(AutomationEvent.automation_id)))
+    assert left == {rules["short"], rules["busy"]}

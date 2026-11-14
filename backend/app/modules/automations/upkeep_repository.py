@@ -5,7 +5,7 @@ Nothing of it is shown to anyone."""
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import ColumnElement, Select, delete, exists, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import locked_batch
@@ -70,6 +70,28 @@ class UpkeepRepository:
             .limit(limit)
             .with_for_update(of=AutomationEvent, skip_locked=True),
             "doomed_events",
+        )
+        stmt = delete(AutomationEvent).where(
+            AutomationEvent.automation_id == doomed.c.automation_id,
+            AutomationEvent.event_id == doomed.c.event_id,
+        )
+        return int((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
+
+    async def delete_waiting_of_idle_rules(self, cutoff: datetime, limit: int) -> int:
+        """Up to `limit` events still waiting with a rule that will not fire them:
+        a deleted one, or a paused one that took them in before `cutoff` (a paused
+        rule takes in nothing new, so it has been paused about that long)."""
+        rows = cast(Select[Any], select(AutomationEvent.automation_id, AutomationEvent.event_id))
+        idle = or_(
+            Automation.state == AutomationState.DELETED,
+            and_(Automation.state == AutomationState.PAUSED, AutomationEvent.taken_at < cutoff),
+        )
+        doomed = locked_batch(
+            rows.join(Automation, Automation.id == AutomationEvent.automation_id)
+            .where(AutomationEvent.firing_id.is_(None), idle)
+            .limit(limit)
+            .with_for_update(of=AutomationEvent, skip_locked=True),
+            "doomed_waiting",
         )
         stmt = delete(AutomationEvent).where(
             AutomationEvent.automation_id == doomed.c.automation_id,

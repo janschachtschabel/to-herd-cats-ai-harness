@@ -1497,8 +1497,14 @@ Zeilen eines anderen Workers übersprungen):
   `automation_firing.fired_at`, Migration `a3d5f7b9c1e2`);
 - nie einen Termin, dessen Lauf noch offen ist, und nie seine Ereignisse (der Lauf liest
   seinen Auftrag aus dem Termin, die Regel „nicht auf die eigene Wirkung“ seine
-  Ereignisse); nie ein Ereignis, das noch auf das Ende einer Ruhezeit wartet, wie alt es
-  auch ist.
+  Ereignisse); nie ein Ereignis, das bei einer aktiven Regel noch auf das Ende einer
+  Ruhezeit wartet, wie alt es auch ist;
+- wartende Ereignisse einer gelöschten Regel, und die einer angehaltenen Regel, die sie
+  vor mehr als 7 Tagen aufgenommen hat (`automation_event.taken_at`; eine angehaltene
+  Regel nimmt nichts Neues auf, sie ruht also so lange). Ein Termin zählt die
+  wartenden Ereignisse in SQL und liest nur die Kennungen der neuesten 20; dem Lauf
+  werden Art, Anzahl und diese Kennungen beim Feuern in die Zeile des Termins kopiert,
+  jede Wiederaufnahme liest diese Kopie, nie die Regel.
 
 Die Fristen sind Konstanten in `app/worker/due.py`, keine Einstellungen. Folge: Eine
 Aufgabe, die 90 Tage nicht gefeuert hat, zeigt keinen letzten Lauf mehr (ihre Läufe
@@ -1625,6 +1631,11 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
 - M7, Aufbewahrung (Migration `a3d5f7b9c1e2`): nur ein Index. Ein Worker des vorigen
   Releases löscht nichts aus dem Protokoll; das holt der erste Worker dieses Releases
   nach.
+- M7, Nachbesserung nach Review (Migration `b7e9c1d3f5a7`): neue Spalten
+  `automation.term_errors`, `automation_firing.event_type/event_count/event_objects`,
+  `automation_event.taken_at` (mit Vorgabewerten oder leer). Ein Pod des vorigen
+  Releases schreibt sie nicht: Ein Lauf, dessen Termin ein alter Worker gefeuert hat
+  und den ein neuer aufnimmt, bekommt nur den Auftrag, keine Ereignisse genannt.
 - M7 zusammengefasst: Worker zuerst und zügig ersetzen. Ein Worker des vorigen Releases
   greift Termine, die er nicht kennt, und rollt sie zurück (sie bleiben fällig, bis ein
   neuer Worker sie feuert); `HerdAutomationsLagging` meldet es, wenn es dauert. Während

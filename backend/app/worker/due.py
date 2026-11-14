@@ -23,7 +23,8 @@ At most every CLEANUP_EVERY_SECONDS a round also removes, in batches of CLEANUP_
 (one transaction each), what the automations' log no longer needs (`cleanup`): the
 events a term took, EVENT_RETENTION after that term, and terms older than
 FIRING_RETENTION with their events; never a term whose run is still open, never an
-event still waiting for its quiet time's end.
+event still waiting for an active rule's quiet time to end. Events waiting with a
+deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago.
 
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
@@ -192,12 +193,18 @@ class DueLoop:
 
     async def cleanup(self) -> tuple[int, int]:
         """Remove what the log no longer needs, batch by batch (one transaction each):
-        events a term took more than EVENT_RETENTION ago, then terms older than
-        FIRING_RETENTION; never what an open run may read, never a waiting event. How
-        many terms and events."""
+        events a term took more than EVENT_RETENTION ago, events waiting with a deleted
+        rule or (taken in more than EVENT_RETENTION ago) a paused one, then terms older
+        than FIRING_RETENTION; never what an open run may read, never what an active
+        rule still waits to fire. How many terms and events."""
         now = self.clock.now()
         events = await self._batches(
             lambda upkeep: upkeep.delete_events_taken_before(
+                now - EVENT_RETENTION, self.cleanup_batch
+            )
+        )
+        events += await self._batches(
+            lambda upkeep: upkeep.delete_waiting_of_idle_rules(
                 now - EVENT_RETENTION, self.cleanup_batch
             )
         )
