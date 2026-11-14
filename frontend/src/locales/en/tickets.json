@@ -59,8 +59,7 @@
       "chooseParent": "Change",
       "tags": "Tags",
       "sprint": "Sprint",
-      "noSprint": "No sprint (backlog)",
-      "someSprint": "An earlier sprint"
+      "noSprint": "No sprint (backlog)"
     },
     "filters": {
       "label": "Filter tickets",

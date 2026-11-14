@@ -204,3 +204,18 @@ async def test_one_timeline_entry_per_sprint_change_however_often_delivered(
 async def _count_events(session: AsyncSession) -> dict[str, int]:
     rows = await session.execute(select(EventOutbox.type, func.count()).group_by(EventOutbox.type))
     return dict(rows.all())  # type: ignore[arg-type]
+
+
+async def test_a_ticket_names_its_sprint_however_many_the_space_has(desk: Desk) -> None:
+    """Module review M4b, finding 10: the ticket carries its sprint's id, name and
+    state (a sprint of its own space, so whoever sees the ticket may see it), not only
+    an id the client would have to find among the first 100 sprints."""
+    sprint = await new_sprint(desk.moderator, desk.space_id, "Benannt")
+    ticket = await new_ticket(desk.editor, desk.space_id)
+    assert ticket["sprint"] is None
+    moved = await _in_sprint(desk.editor, ticket, sprint["id"])
+    assert moved["sprint"] == {"id": sprint["id"], "name": "Benannt", "state": "planned"}
+    shown = (await desk.viewer.get(f"/api/tickets/{ticket['number']}")).json()
+    assert shown["sprint"] == moved["sprint"]
+    listed = (await desk.viewer.get("/api/tickets", params={"sprint": sprint["id"]})).json()
+    assert "sprint" not in listed["items"][0]  # rows keep the id only

@@ -255,7 +255,9 @@ Jeder Sprint zeigt Name, Zustand, Zeitraum und Ziel; aufgeklappt seine Tickets.
   eigenen Bereichs oder „Kein Sprint (Vorrat)“. Ein Sprint eines anderen Bereichs, ein
   abgeschlossener oder ein unbekannter ergeben dieselbe Antwort, 422
   `ticket.sprint_invalid`; die Datenbank hält per Fremdschlüssel, dass der Sprint eines
-  Tickets zu dessen Bereich gehört.
+  Tickets zu dessen Bereich gehört. Das Ticket selbst nennt seinen Sprint (`sprint`: Id,
+  Name, Zustand), auch wenn der Bereich mehr als 100 Sprints hat; Listenzeilen tragen
+  nur `sprint_id`.
 - Löschen lässt sich ein Sprint nicht. Wer die Sprints eines Bereichs nicht sehen darf,
   bekommt für den Bereich 404 `space.not_found` und für einen Sprint 404
   `sprint.not_found`, wie für einen, den es nicht gibt.

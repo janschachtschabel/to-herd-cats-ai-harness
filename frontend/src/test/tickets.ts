@@ -52,6 +52,7 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     ...makeTicketSummary(overrides),
     description_md: 'Beim **Anmelden** passiert nichts.',
     children: { open: 0, active: 0, review: 0, done: 0, cancelled: 0 },
+    sprint: null,
     ...overrides,
   }
 }

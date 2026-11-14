@@ -4472,7 +4472,8 @@ export interface components {
         TicketKind: "epic" | "story" | "task" | "bug";
         /**
          * TicketOut
-         * @description A ticket with its description and how many children it has per category.
+         * @description A ticket with its description, how many children it has per category and its
+         *     sprint by name (module review M4b, finding 10).
          */
         TicketOut: {
             assignee: components["schemas"]["PersonOut"] | null;
@@ -4504,6 +4505,7 @@ export interface components {
              * Format: uuid
              */
             space_id: string;
+            sprint: components["schemas"]["TicketSprintOut"] | null;
             /** Sprint Id */
             sprint_id: string | null;
             status: components["schemas"]["StatusRef"];
@@ -4523,6 +4525,20 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+        };
+        /**
+         * TicketSprintOut
+         * @description The ticket's sprint (one of its own space).
+         */
+        TicketSprintOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            state: components["schemas"]["SprintState"];
         };
         /**
          * TicketSummaryOut

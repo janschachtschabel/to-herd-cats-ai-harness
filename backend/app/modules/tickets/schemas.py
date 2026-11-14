@@ -12,6 +12,8 @@ from app.modules.tickets.models import (
     MAX_TAGS,
     MAX_TITLE_CHARS,
     Priority,
+    Sprint,
+    SprintState,
     StatusCategory,
     TicketKind,
     ticket_key,
@@ -181,20 +183,36 @@ class TicketSummaryOut(BaseModel):
         return cls.model_validate(cls.fields_of(view))
 
 
+class TicketSprintOut(BaseModel):
+    """The ticket's sprint (one of its own space)."""
+
+    id: uuid.UUID
+    name: str
+    state: SprintState
+
+
 class TicketOut(TicketSummaryOut):
-    """A ticket with its description and how many children it has per category."""
+    """A ticket with its description, how many children it has per category and its
+    sprint by name (module review M4b, finding 10)."""
 
     description_md: str
     children: ChildCounts
+    sprint: TicketSprintOut | None
 
     @classmethod
-    def full(cls, view: TicketView, children: dict[StatusCategory, int]) -> "TicketOut":
+    def full(
+        cls, view: TicketView, children: dict[StatusCategory, int], sprint: Sprint | None
+    ) -> "TicketOut":
         counts = ChildCounts(**{c.value: children.get(c, 0) for c in StatusCategory})
+        shown = None
+        if sprint is not None:
+            shown = TicketSprintOut(id=sprint.id, name=sprint.name, state=sprint.state)
         return cls.model_validate(
             {
                 **cls.fields_of(view),
                 "description_md": view.ticket.description_md,
                 "children": counts,
+                "sprint": shown,
             }
         )
 

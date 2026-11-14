@@ -6530,7 +6530,7 @@
         "type": "string"
       },
       "TicketOut": {
-        "description": "A ticket with its description and how many children it has per category.",
+        "description": "A ticket with its description, how many children it has per category and its\nsprint by name (module review M4b, finding 10).",
         "properties": {
           "assignee": {
             "anyOf": [
@@ -6603,6 +6603,16 @@
             "title": "Space Id",
             "type": "string"
           },
+          "sprint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketSprintOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sprint_id": {
             "anyOf": [
               {
@@ -6664,9 +6674,34 @@
           "updated_at",
           "status_changed_at",
           "description_md",
-          "children"
+          "children",
+          "sprint"
         ],
         "title": "TicketOut",
+        "type": "object"
+      },
+      "TicketSprintOut": {
+        "description": "The ticket's sprint (one of its own space).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SprintState"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "state"
+        ],
+        "title": "TicketSprintOut",
         "type": "object"
       },
       "TicketSummaryOut": {

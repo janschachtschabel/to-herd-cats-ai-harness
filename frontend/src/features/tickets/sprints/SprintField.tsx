@@ -20,14 +20,14 @@ export function SprintField({
 }) {
   const { t } = useTranslation()
   const choices = useSprintChoices(ticket.space_id)
-  const current = choices.data?.find((sprint) => sprint.id === ticket.sprint_id)
-  const name = !ticket.sprint_id
+  // The ticket names its own sprint (module review M4b, finding 10), however many
+  // sprints its space has; the choices only offer the open ones.
+  const current = ticket.sprint
+  const name = !current
     ? t('tickets.fields.noSprint')
-    : current
-      ? current.state === 'planned'
-        ? current.name
-        : t(`tickets.sprints.option.${current.state}`, { name: current.name })
-      : t('tickets.fields.someSprint')
+    : current.state === 'planned'
+      ? current.name
+      : t(`tickets.sprints.option.${current.state}`, { name: current.name })
   return (
     <FieldRow label={t('tickets.fields.sprint')} editable={editable}>
       {(id) => (
@@ -43,8 +43,8 @@ export function SprintField({
               {openSprints(choices.data).map((sprint) => (
                 <SprintOption key={sprint.id} sprint={sprint} />
               ))}
-              {ticket.sprint_id && current?.state !== 'active' && current?.state !== 'planned' && (
-                <option value={ticket.sprint_id} disabled>
+              {current?.state === 'closed' && (
+                <option value={current.id} disabled>
                   {name}
                 </option>
               )}

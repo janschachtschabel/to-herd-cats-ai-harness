@@ -226,15 +226,14 @@ describe('ticket view', () => {
     expect(api.find('PATCH', '/api/tickets/42')[1]!.body).toEqual({ sprint_id: null, version: 3 })
   })
 
-  test('a ticket in a closed sprint names it, without a hint to move it', async () => {
-    const closed = makeSprint({
-      name: 'Sprint 10',
-      state: 'closed',
-      tally: { planned: 3, done: 3, carried: 0 },
+  test('a ticket names its sprint from itself, also one past the first page of sprints', async () => {
+    // Module review M4b, finding 10: the sprint list is not asked for the name.
+    const closed = makeSprint({ name: 'Sprint 10', state: 'closed' })
+    const ticket = makeTicket({
+      sprint_id: closed.id,
+      sprint: { id: closed.id, name: closed.name, state: 'closed' },
     })
-    ticketApi('viewer', makeTicket({ sprint_id: closed.id }), {
-      'GET /api/spaces/:id/sprints': page([closed]),
-    })
+    ticketApi('viewer', ticket, { 'GET /api/spaces/:id/sprints': page([]) })
     await renderApp('/tickets/42')
     const fields = await screen.findByRole('complementary', { name: 'Felder des Tickets' })
     expect(await within(fields).findByText('Sprint 10 (abgeschlossen)')).toBeInTheDocument()

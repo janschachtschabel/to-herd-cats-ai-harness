@@ -81,8 +81,9 @@ def assignee_filter(value: str | None, actor: Actor) -> dict[str, Any]:
 
 
 async def full_ticket(session: AsyncSession, actor: Actor, view: TicketView) -> TicketOut:
-    children = await TicketService(session).children(actor, view)
-    return TicketOut.full(view, children)
+    service = TicketService(session)
+    children = await service.children(actor, view)
+    return TicketOut.full(view, children, await service.sprint_of(actor, view))
 
 
 @space_tickets.post("", response_model=TicketOut, status_code=201)

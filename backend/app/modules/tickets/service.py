@@ -44,7 +44,7 @@ from app.modules.tickets.models import (
     WorkItem,
 )
 from app.modules.tickets.repository import TicketRepository, TicketView
-from app.modules.tickets.sprints import check_sprint, hold_for_move
+from app.modules.tickets.sprints import check_sprint, hold_for_move, sprint_repository
 from app.modules.tickets.statuses import status_repository
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
@@ -128,6 +128,12 @@ class TicketService:
     async def children(self, actor: Actor, view: TicketView) -> dict[StatusCategory, int]:
         """For a ticket the actor has read."""
         return await ticket_repository(self.session, actor).children_counts(view.ticket.id)
+
+    async def sprint_of(self, actor: Actor, view: TicketView) -> Sprint | None:
+        """For a ticket the actor has read: its sprint (of the same space, so seen)."""
+        if view.ticket.sprint_id is None:
+            return None
+        return await sprint_repository(self.session, actor).get(view.ticket.sprint_id)
 
     async def update(
         self, actor: Actor, number: int, version: int, values: dict[str, Any]

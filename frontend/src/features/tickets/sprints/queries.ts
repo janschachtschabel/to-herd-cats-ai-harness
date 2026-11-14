@@ -19,8 +19,9 @@ export function useSprints(spaceId: string) {
   return usePaged(sprintsQuery(spaceId))
 }
 
-/** The sprints a ticket can go into (active and planned) and the closed ones of the
- *  first page, for naming a ticket's sprint: one request of at most 100. */
+/** The sprints a ticket can go into (active and planned, listed first) and the closed
+ *  ones of the first page: one request of at most 100. A ticket names its own sprint
+ *  (`Ticket.sprint`). */
 export const sprintChoicesQuery = (spaceId: string) =>
   queryOptions({
     queryKey: [...ticketKeys.sprints(spaceId), 'choices'],

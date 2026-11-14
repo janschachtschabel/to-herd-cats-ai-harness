@@ -59,8 +59,7 @@
       "chooseParent": "Ändern",
       "tags": "Tags",
       "sprint": "Sprint",
-      "noSprint": "Kein Sprint (Vorrat)",
-      "someSprint": "Ein früherer Sprint"
+      "noSprint": "Kein Sprint (Vorrat)"
     },
     "filters": {
       "label": "Tickets filtern",
