@@ -126,6 +126,7 @@ Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
 [Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md), [Demo M6](docs/demo/m6.md),
+[Demo M7](docs/demo/m7.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
