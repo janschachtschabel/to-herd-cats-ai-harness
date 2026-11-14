@@ -102,6 +102,25 @@ async def resume_automation(
     return automation_out(view)
 
 
+@automations.post("/{automation_id}/run", response_model=AutomationOut)
+async def run_automation_now(
+    automation_id: uuid.UUID, actor: ActorDep, session: SessionDep
+) -> AutomationOut:
+    """One term out of turn (its owner; not an event rule): `last_run` tells how it
+    went (`started`, or why not, e.g. `skipped_busy`)."""
+    return automation_out(await AutomationControl(session).run_now(actor, automation_id))
+
+
+@automations.post("/{automation_id}/take-over", response_model=AutomationOut)
+async def take_over_automation(
+    automation_id: uuid.UUID, body: VersionIn, actor: ActorDep, session: SessionDep
+) -> AutomationOut:
+    """The caller becomes its owner (who sees it and could make it); a paused one
+    resumes."""
+    view = await AutomationControl(session).take_over(actor, automation_id, body.version)
+    return automation_out(view)
+
+
 @automations.delete("/{automation_id}", status_code=204)
 async def delete_automation(
     automation_id: uuid.UUID,

@@ -237,6 +237,8 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/automations/{automation_id}/pause", "automation"),
     ("POST", "/api/automations/{automation_id}/resume", "automation"),
     ("DELETE", "/api/automations/{automation_id}", "automation"),
+    ("POST", "/api/automations/{automation_id}/run", "automation"),
+    ("POST", "/api/automations/{automation_id}/take-over", "automation"),
 ]
 
 
@@ -377,6 +379,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/automations/{automation_id}"): {"instruction": "x", "version": 1},
     ("POST", "/api/automations/{automation_id}/pause"): {"version": 1},
     ("POST", "/api/automations/{automation_id}/resume"): {"version": 1},
+    ("POST", "/api/automations/{automation_id}/take-over"): {"version": 1},
     ("POST", "/api/automations/preview"): {
         "schedule": {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"}
     },

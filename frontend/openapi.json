@@ -15816,6 +15816,104 @@
         ]
       }
     },
+    "/api/automations/{automation_id}/run": {
+      "post": {
+        "description": "One term out of turn (its owner; not an event rule): `last_run` tells how it\nwent (`started`, or why not, e.g. `skipped_busy`).",
+        "operationId": "run_automation_now_api_automations__automation_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Automation Now",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/{automation_id}/take-over": {
+      "post": {
+        "description": "The caller becomes its owner (who sees it and could make it); a paused one\nresumes.",
+        "operationId": "take_over_automation_api_automations__automation_id__take_over_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Take Over Automation",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
     "/api/channels": {
       "get": {
         "description": "The channels of every space the caller may read, by name.",

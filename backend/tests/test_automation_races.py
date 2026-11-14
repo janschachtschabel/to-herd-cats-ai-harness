@@ -4,11 +4,13 @@ own; one wins, the other answers 409 `automation.version_conflict` (or 404 when 
 winner deleted it)."""
 
 import asyncio
+import uuid
 from typing import Any
 
 from httpx import AsyncClient, Response
 
 from tests.factories import login
+from tests.factories_automations import runs_of
 from tests.real_db import MakeRealClient, RealDb
 from tests.support.openai_stub import OpenAIStub
 from tests.test_automation_due_loop import _place
@@ -70,7 +72,27 @@ async def test_two_changes_with_one_version_one_wins(
         )
     )
     _one_wins(
-        await asyncio.gather(a.delete(f"{path}?version=4"), b.delete(f"{path}?version=4")),
+        await asyncio.gather(
+            a.post(f"{path}/take-over", json={"version": 4}),
+            b.post(f"{path}/take-over", json={"version": 4}),
+        )
+    )
+    _one_wins(
+        await asyncio.gather(a.delete(f"{path}?version=5"), b.delete(f"{path}?version=5")),
         gone=True,
     )
     assert (await a.get(path)).status_code == 404
+
+
+async def test_run_now_twice_at_once_starts_one_run(
+    real_db: RealDb, make_real_client: MakeRealClient, openai_stub: OpenAIStub
+) -> None:
+    (a, b), made = await _made(real_db, make_real_client, openai_stub)
+    path = f"/api/automations/{made['id']}"
+    responses = await asyncio.gather(a.post(f"{path}/run"), b.post(f"{path}/run"))
+    assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
+    log = (await a.get(f"{path}/firings")).json()["items"]
+    assert sorted(f["outcome"] for f in log) == ["skipped_busy", "started"]
+    async with real_db.database.session_factory() as session:
+        runs = await runs_of(session, uuid.UUID(made["id"]))
+    assert [r.id for r in runs] == [uuid.UUID(next(f["run_id"] for f in log if f["run_id"]))]

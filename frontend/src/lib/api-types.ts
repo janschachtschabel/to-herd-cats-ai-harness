@@ -1092,6 +1092,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automations/{automation_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Automation Now
+         * @description One term out of turn (its owner; not an event rule): `last_run` tells how it
+         *     went (`started`, or why not, e.g. `skipped_busy`).
+         */
+        post: operations["run_automation_now_api_automations__automation_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/take-over": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take Over Automation
+         * @description The caller becomes its owner (who sees it and could make it); a paused one
+         *     resumes.
+         */
+        post: operations["take_over_automation_api_automations__automation_id__take_over_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels": {
         parameters: {
             query?: never;
@@ -9713,6 +9755,72 @@ export interface operations {
         };
     };
     resume_automation_api_automations__automation_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_automation_now_api_automations__automation_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    take_over_automation_api_automations__automation_id__take_over_post: {
         parameters: {
             query?: never;
             header?: never;
