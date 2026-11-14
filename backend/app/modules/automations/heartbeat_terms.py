@@ -10,8 +10,8 @@ the whole day. Windows that touch (whole days in a row) are one.
 The next term is one interval after "now" while that is still inside the window
 "now" is in; otherwise (the window closes first, or "now" is outside every window)
 it is the next opening, but never less than one interval after "now" (the last
-beat), also across a window's edge (review M7, finding 13). Outside the active hours no term comes. Daylight saving
-time: an opening (or close) whose local time does not exist that day falls to the
+beat), also across a window's edge (review M7, finding 13). Outside the active hours
+no term comes. Daylight saving time: an opening (or close) whose local time does not exist that day falls to the
 next valid instant (02:30 → 03:00); one that exists twice is the first; a window
 through a doubled hour lasts its real hours.
 """
