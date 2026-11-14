@@ -4,9 +4,12 @@ loaded. Changes to a space's statuses are serialised (`lock_space`), so the coun
 name and the required categories hold under concurrent requests.
 
 Locks against tickets moving in while a status is deleted (review focus 4): a ticket
-write takes its status `FOR KEY SHARE` (`lock_for_use`); a deletion takes the status
-`FOR UPDATE` first (`get(lock=True)`), so either the ticket's write commits before the
-deletion moves the status's tickets, or it finds the status gone.
+write takes its status `FOR NO KEY UPDATE` (`lock_for_use`, `first_of`:
+`with_for_update(key_share=True)` renders that); a deletion takes the status `FOR
+UPDATE` first (`get(lock=True)`), so either the ticket's write commits before the
+deletion moves the status's tickets, or it finds the status gone. The lock also keeps
+the status from changing its category while a ticket takes it; ticket writes into the
+same status wait for each other for the length of their short transactions.
 """
 
 import uuid
@@ -59,8 +62,9 @@ class StatusRepository:
         return await self.session.scalar(stmt)
 
     async def lock_for_use(self, space_id: uuid.UUID, status_id: uuid.UUID) -> TicketStatus | None:
-        """The space's status `status_id`, held (`FOR KEY SHARE`) so it cannot be deleted
-        before the ticket that takes it commits; None if the space has no such status."""
+        """The space's status `status_id`, held (`FOR NO KEY UPDATE`) so it cannot be
+        deleted or change its category before the ticket that takes it commits; None if
+        the space has no such status."""
         stmt = (
             select(TicketStatus)
             .where(
