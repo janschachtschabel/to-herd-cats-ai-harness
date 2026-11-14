@@ -25,19 +25,17 @@ async def test_an_admin_may_give_level_three(bench: Bench) -> None:
 async def test_max_level_follows_the_level_rule(
     bench: Bench, make_space: MakeSpace, make_user: Any
 ) -> None:
-    """Through the API only admins manage agents; the rule is held at function level
-    for someone who manages some or all of the agent's spaces."""
+    """Above 2 only admins (through the API only admins manage agents at all): someone
+    who manages every space of the agent is offered 2."""
     session = bench.session
     lead = await make_user(SystemRole.MEMBER)
     a = await make_space(SpaceKind.TEAM, members=[(lead, SpaceRole.ADMIN)])
-    b = await make_space(SpaceKind.TEAM, members=[(lead, SpaceRole.EDITOR)])
     leader = await actor_of(session, lead)
+    admin = await actor_of(session, bench.people.users["admin"])
     grants = GrantService(session)
-    assert await grants.max_level(leader, bench.agent) == 2  # no spaces: admins only
     await bench.join(a)
-    assert await grants.max_level(leader, bench.agent) == 3
-    await bench.join(b)
-    assert await grants.max_level(leader, bench.agent) == 2
+    assert grants.max_level(leader, bench.agent) == 2
+    assert grants.max_level(admin, bench.agent) == 3
 
 
 async def test_the_spaces_of_an_agent(bench: Bench, make_space: MakeSpace) -> None:
