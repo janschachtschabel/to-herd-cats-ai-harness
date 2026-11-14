@@ -68,7 +68,6 @@ def upgrade() -> None:
         "run_cancel_request",
         sa.Column("run_id", sa.UUID(), nullable=False),
         sa.Column("requested_by", sa.UUID(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("org_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
             ["org_id"],

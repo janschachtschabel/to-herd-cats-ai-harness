@@ -276,9 +276,6 @@ class RunCancelRequest(OrgScoped, Base):
     requested_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, nullable=False
-    )
 
 
 class RateWindow(OrgScoped, Base):

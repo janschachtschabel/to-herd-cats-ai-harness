@@ -10,7 +10,6 @@ from sqlalchemy import delete, exists, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.models_base import utcnow
 from app.core.principal import PrincipalType
 from app.modules.agents.models import Run, RunCancelRequest, RunState
 from app.modules.messaging.models import Message, MessageKind
@@ -41,7 +40,7 @@ class ControlRepository:
         """Once per run; a second request keeps the first."""
         stmt = (
             insert(RunCancelRequest)
-            .values(org_id=self.org_id, run_id=run_id, requested_by=user_id, created_at=utcnow())
+            .values(org_id=self.org_id, run_id=run_id, requested_by=user_id)
             .on_conflict_do_nothing(index_elements=[RunCancelRequest.run_id])
         )
         await self.session.execute(stmt)
