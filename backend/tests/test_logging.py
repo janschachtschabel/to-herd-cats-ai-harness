@@ -120,6 +120,17 @@ def test_log_level_is_applied():
         configure_logging(Settings())
 
 
+@pytest.mark.parametrize("name", ["httpx2", "httpcore2", "openai", "httpcore", "httpx"])
+def test_http_clients_stay_quiet_at_debug(name):
+    """Their DEBUG lines quote response headers (review M5, finding 4)."""
+    configure_logging(Settings(log_level="DEBUG"))
+    try:
+        assert not logging.getLogger(f"{name}.http11").isEnabledFor(logging.DEBUG)
+        assert logging.getLogger(name).isEnabledFor(logging.WARNING)
+    finally:
+        configure_logging(Settings())
+
+
 def test_uvicorn_color_message_is_not_a_field(capsys):
     logging.getLogger("uvicorn.error").info("plain", extra={"color_message": "\x1b[1mplain"})
     assert "color_message" not in json.loads(last_line(capsys, "plain"))

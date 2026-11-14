@@ -77,7 +77,7 @@ def _fields(record: logging.LogRecord) -> dict[str, Any]:
 
 
 # Loggers held at WARNING whatever the level (see `configure_logging`).
-QUIET_LOGGERS = ("httpx", "httpcore", "hpack")
+QUIET_LOGGERS = ("httpx", "httpcore", "hpack", "httpx2", "httpcore2", "openai")
 
 # Exceptions of these packages quote data in their message: SQLAlchemy appends the bound
 # parameters, PostgreSQL and asyncpg quote the value they rejected.
@@ -176,7 +176,8 @@ def configure_logging(settings: Settings) -> None:
             root.removeHandler(old)
     root.addHandler(handler)
     root.setLevel(settings.log_level.upper())
-    # The HTTP client's own lines: at DEBUG, httpcore traces each request; outbound calls
+    # The HTTP clients' own lines (httpx/httpcore, the run path's httpx2/httpcore2 and the
+    # OpenAI SDK): at DEBUG they trace each request and quote headers; outbound calls
     # to AI providers carry a key in a header. Their warnings still pass.
     for name in QUIET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
