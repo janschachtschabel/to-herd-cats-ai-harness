@@ -17,7 +17,7 @@ from app.core.actor import Actor
 from app.core.errors import ValidationFailed
 from app.core.outbox import Event, emit
 from app.modules.messaging.message_repository import MessageRepository
-from app.modules.messaging.models import Conversation, Message, MessageKind
+from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.thread_repository import PageThreadRepository
 from app.modules.wiki.events import PAGE_EVENTS
 from app.modules.wiki.visibility import PageReader
@@ -30,13 +30,17 @@ def bad_parent() -> ValidationFailed:
 async def lock_parent(
     repo: MessageRepository, conversation: Conversation, parent_id: uuid.UUID
 ) -> Message:
-    """The parent of a new reply, locked until the transaction ends."""
+    """The parent of a new reply, locked until the transaction ends. A system entry
+    takes no replies (a timeline entry), except one at the top level of a channel:
+    the term of an automation, whose thread its run answers in (plan M7 decision 3),
+    where its cards go and people may answer."""
     parent = await repo.get(parent_id, lock=True)
+    term = conversation.kind == ConversationKind.CHANNEL
     if (
         parent is None
         or parent.conversation_id != conversation.id
         or parent.parent_id
-        or parent.kind == MessageKind.SYSTEM
+        or (parent.kind == MessageKind.SYSTEM and not term)
     ):
         raise bad_parent()
     return parent

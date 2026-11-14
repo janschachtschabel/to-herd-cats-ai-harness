@@ -24,6 +24,7 @@ from tests.factories_agents import LEASE, Bench
 from tests.factories_automations import T0, fire, placed, reload, runs_of
 from tests.factories_tools import call
 from tests.factories_writing import Work, events, messages_in
+from tests.test_approvals import NEW, confirm
 from tests.test_run_replay import Crash, die_after, take_up_again
 
 ORDER = "Fasse die Tickets der Woche zusammen. GEHEIM-7"
@@ -181,3 +182,24 @@ async def test_its_owner_cancels_it_and_the_notice_goes_into_its_thread(work: Wo
     (notice,) = [m for m in said if m.parent_id == root.id]
     assert json.loads(notice.body_md)["to"] == "cancelled"
     assert (await reload(bench.session, automation.id)).failures == 0  # a cancel does not count
+
+
+async def test_a_card_of_a_channel_automation_goes_into_its_terms_thread(work: Work) -> None:
+    """The card is a reply under the term's entry; people may answer there too."""
+    bench, channel = work.bench, await _channel(work)
+    page_id = await work.page()
+    await confirm(work, "propose_page_change")
+    args = {"page_id": page_id, "content_md": NEW, "reason": "Klarer"}
+    bench.stub.state.replies.append(call("propose_page_change", **args))
+    await placed(bench, channel, instruction=ORDER)
+    await fire(bench)
+    assert await bench.run_next() is None  # waits for the release
+    said = await messages_in(bench.session, channel)
+    (root,) = [m for m in said if m.parent_id is None]
+    (card,) = [m for m in said if m.parent_id == root.id]
+    assert card.kind == MessageKind.APPROVAL
+    r = await bench.people.alice.post(
+        f"/api/conversations/{channel}/messages",
+        json={"body_md": "Danke, schaue ich an", "parent_id": str(root.id)},
+    )
+    assert r.status_code == 201, r.text

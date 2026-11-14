@@ -734,7 +734,9 @@ Rückfragen, Abbruch, Grenzen), mit diesen Besonderheiten:
 - Ort der Antwort: in der Direktnachricht der Eigentümerin mit dem Agenten oben; in
   einem Kanal eröffnet jeder Termin einen eigenen Thread, dessen Wurzel ein
   Systemeintrag `automation.started` ist (die Eigentümerin als Akteurin, die Aufgabe
-  per `automation_id`, nie der Auftragstext), und der Lauf antwortet darin; in einem
+  per `automation_id`, nie der Auftragstext), und der Lauf antwortet darin (auch seine
+  Freigabe- und Rückfragekarten stehen dort, und Personen können im Thread antworten:
+  ein Systemeintrag oben in einem Kanal nimmt Antworten an, jeder andere nicht); in einem
   Ticket-Thread steht derselbe Eintrag oben und die Antwort ebenfalls oben. Lese- und
   Schreibbereich folgen dem Ort wie in M6 (im Kanal liest der Lauf Seiten wie ein
   Betrachter des Bereichs, Entwürfe nur in der Direktnachricht). Der Ort der Antwort
