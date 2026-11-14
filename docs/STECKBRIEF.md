@@ -1,13 +1,14 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 6 (Agenten als Mitarbeiter) mit M5 Tasks 1 bis 7 (KI-Grundlage),
-14.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+Stand: Meilenstein 7 (Automatisierung) auf M6 (Agenten als Mitarbeiter) und M5 Tasks 1
+bis 7 (KI-Grundlage), 14.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
 (Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
 stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
-M3, die Tickets aus M4, die Sprints und Boards aus M4b und die Agenten aus M6
-(Abschnitte [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
-[Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b) und
-[Agenten (M6)](#agenten-m6)). Was nicht gemessen ist, steht unter
+M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6 und die
+Automatisierung aus M7 (Abschnitte
+[Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
+[Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b),
+[Agenten (M6)](#agenten-m6) und [Automatisierung (M7)](#automatisierung-m7)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -37,9 +38,13 @@ Agenten mit Direktnachricht und Laufschleife im Worker. **Vorhanden (M6):** Agen
 Mitarbeiter: Stufen 1 bis 3 mit Werkzeugfreigaben (22 Werkzeuge), Erwähnung in Kanal
 und Thread, Ticket-Zuweisung und Übergabe, Freigaben und Rückfragen, Laufansicht und
 Abbruch, Wiederaufnahme nach Absturz aus dem Journal, Seiten- und Skill-Vorschläge,
-Skills (SKILL.md), Gedächtnis je Bereich, persönliche Agenten. Hybride Suche und
-Embeddings (M5 Tasks 8 bis 11), Zeitpläne und Ereignisse (M7) und externe Werkzeuge
-(M8) folgen.
+Skills (SKILL.md), Gedächtnis je Bereich, persönliche Agenten. **Vorhanden (M7):**
+Aufgaben der Agenten ohne Anstoß im Gespräch: einmal, wiederkehrend (Cron mit
+Zeitzone), als Heartbeat mit Checkliste und aktiven Stunden und als Ereignis-Regel eines
+Bereichs (mit Ruhezeit und Tiefengrenze); jede gehört einer Person und hat einen Ort;
+Tagesbudgets in Tokens und Euro je Organisation, Person und Agent; Prüffrist für
+Wiki-Seiten mit täglichem Durchlauf. Hybride Suche und Embeddings (M5 Tasks 8 bis 11)
+und externe Werkzeuge (M8) folgen.
 
 | | |
 |---|---|
@@ -378,6 +383,105 @@ zeigt sie unter `GET /api/ai/usage` ([`KI.md`](KI.md#verbrauch-apiaiusage)). Ein
 mit n Schritten macht n Modellaufrufe; dazu kommt höchstens ein wiederholter Aufruf je
 Absturz.
 
+### Automatisierung (M7)
+
+**Lokale Messung** ohne Docker, 14.11.2026: getrennte Prozesse `HERD_ROLE=migrate`,
+`api` und ein oder drei `worker` aus dem Stand von Commit `90da855` an einer
+Wegwerf-Datenbank auf dem lokalen PostgreSQL (Port 5433), der Stub aus den Tests als
+Anbieter (eigener Prozess, Verbindung der Art `local`, antwortet sofort). Angelegt über
+die API: die Inhaberin, die Verbindung als Standard, ein aktiver Agent und ihre
+Direktnachricht mit ihm. Die Aufgaben, Seiten und Verbrauchszeilen der Messung hat ein
+Python-Skript direkt in die Datenbank geschrieben (an der API vorbei, also auch an der
+Obergrenze `HERD_AI_AUTOMATIONS_MAX`); dasselbe Skript hat gemessen (SQLAlchemy, httpx,
+`/proc/<pid>/status` alle 0,25 s; nicht eingecheckt). Die Maschine (4 vCPU) war von
+anderen Prozessen mitbenutzt; das Lastmittel steht bei jeder Zeile.
+
+**1.000 Aufgaben zugleich fällig.** 1.000 wiederkehrende Aufgaben (täglich, Ort die
+Direktnachricht, eine Eigentümerin, ein Agent), alle fällig zum selben Zeitpunkt T,
+20 s nach dem Start der Worker. „Verzug“ ist `fired_at − due_at` des Termins im
+Protokoll, „fertig“ das Ende des letzten Laufs nach T. Jeder Worker arbeitete die
+gestarteten Läufe zugleich ab (`HERD_RUN_CONCURRENCY` 4).
+
+| Worker | Verzug P50 / P95 / max | alle Läufe fertig | Gauge `herd_automations_oldest_due_seconds` max | Termine je Worker | Worker-RSS Leerlauf / max | Lastmittel |
+|---|---|---|---|---|---|---|
+| 1 | 52,1 / 98,4 / 103,6 s (ein zweiter Durchlauf: 102,6 s max) | 133,5 s | 101 s | 1.000 | 174 / 229 MiB | 1,1 → 1,6 |
+| 3 | 26,0 / 45,6 / 47,9 s | 66,7 s | 40 s | 310 / 365 / 325 | 173–174 / 220–223 MiB | 1,6 → 4,5 |
+| 3 | 32,3 / 62,5 / 65,4 s | 87,7 s | 61 s | 360 / 336 / 304 | 173–174 / 221–225 MiB | 4,5 → 8,2 |
+
+- **Genau einmal**, in jedem der vier Durchläufe: 1.000 Termine im Protokoll für 1.000
+  verschiedene Aufgaben, alle `started`; 1.000 Läufe, jeder genau einem Termin
+  zugeordnet (`automation_firing.run_id`), keine Aufgabe mit mehr als einem Lauf, alle
+  Läufe `completed`. Bei drei Workern summieren sich ihre Zähler
+  `herd_automation_firings_total{outcome="started"}` auf genau 1.000.
+- Der erste Termin wartete 0,3–0,6 s: Die Fälligkeits-Schleife schaut alle 5 s nach und
+  arbeitet danach ohne Pause, solange sie volle Stapel (50) findet.
+- **Wohin die Zeit geht:** Allein, ohne Laufschleife daneben (dieselbe
+  Fälligkeits-Schleife in einem eigenen Prozess), feuert ein Worker einen Termin in
+  21 ms (1.000 in 20,9 s): Rechte der Eigentümerin, Budgetprüfung, Lauf, Protokoll und
+  nächster Termin in einer Transaktion. Im Worker teilt sie sich die Event-Loop mit der
+  Laufschleife, die die eben gestarteten Läufe schon abarbeitet (der Stub antwortet
+  sofort, die Läufe sind reine Rechenarbeit); dann sind es rund 100 ms je Termin. Mit
+  einem echten Anbieter warten die Läufe meist auf das Netz, und die Schleife feuert
+  schneller.
+- Drei Worker teilen sich die Termine (`SKIP LOCKED`) und brauchen etwa die Hälfte der
+  Zeit; die Maschine hatte für drei Worker, API und PostgreSQL nur 4 vCPU.
+- Der Alarm `HerdAutomationsLagging` (ältester fälliger Termin über 3 Minuten, 5 Minuten
+  lang) bleibt bei 1.000 Terminen auf einmal und einem Worker still; nach diesen Zahlen
+  meldet er sich bei einem Worker ab etwa 2.000 zugleich fälligen Terminen, die länger
+  als 5 Minuten anstehen.
+
+**Kosten der Budgetprüfung je Modellaufruf.** `budget_exhausted` vor jedem Aufruf, im
+Prozess gemessen (300 Aufrufe je Fall, je eine Transaktion), mit 100.000
+Verbrauchszeilen des Tages und 100.000 des Vortags in der Organisation; Budgets so
+hoch, dass keines erreicht ist (dann werden alle Summen gebildet).
+
+| Fall | P50 / P95 / max | Lastmittel |
+|---|---|---|
+| kein Budget (eine Abfrage über `ai_budget`) | 1,3 / 1,9 / 25 ms | 6 |
+| Budgets für Organisation, Person und Agent; alle 100.000 Zeilen des Tages von dieser Person und diesem Agenten | 83 / 203 / 258 ms (erster Durchlauf: 72 / 108 / 123 ms) | 6–7 |
+| dieselben drei Budgets; die Zeilen verteilt (2 % der Person, 5 % des Agenten) | 63 / 94 / 116 ms | 6 |
+| Budgets nur für Person und Agent, Zeilen verteilt | 14 / 18 / 84 ms | 6 |
+
+- Die Summe der Organisation liest jede Zeile des Tages (Plan: paralleler Seq Scan,
+  rund 25 ms für 100.000 Zeilen); die Summen von Person und Agent gehen über ihre
+  Indizes (rund 5 ms für 6.000 Zeilen).
+- **Bewertung:** Eine Summentabelle ist für M7 nicht nötig. Ohne Budget kostet die
+  Prüfung eine indizierte Abfrage; mit Budgets für Personen und Agenten bleibt sie klein.
+  Ein Budget der Organisation kostet mit jeder Zeile des Tages mehr: bei 100.000
+  Modellaufrufen am Tag im Mittel des Tages rund 35 ms Datenbankzeit je Aufruf (gegen
+  Sekunden für den Aufruf selbst). Wer deutlich mehr Aufrufe am Tag mit einem Budget der
+  Organisation erwartet, braucht eine Tagessumme (Tabelle oder deckender Index); das
+  ist ein Folgepunkt, nicht gebaut.
+
+**Prüfdurchlauf über 10.000 fällige Seiten.** 10 Team-Bereiche mit Prüffrist 30 Tage,
+die Inhaberin jeweils Admin (Moderatorin), je 1.000 veröffentlichte Seiten, zuletzt vor
+31 Tagen geprüft. Ein Worker, danach gestartet.
+
+| Was | Zeit |
+|---|---|
+| Durchlauf fertig (alle 10 Bereiche für heute geprüft, 10.000 Ereignisse `page.review_due`) | 8,8 s nach dem Start des Workers (darin rund 2,5 s Prozessstart); die Ereignisse entstanden in 6,0 s (erster Durchlauf: 5,1 s) |
+| Outbox leer (je Seite ein Eintrag im Seiten-Thread und eine Aktivität, dazu der Blick der Ereignis-Regeln) | 172 s nach dem Start (Zustellung über 168 s; erster Durchlauf 167 s) |
+| `herd_outbox_oldest_pending_seconds` max | 154 s |
+| Worker-RSS max | 182 MiB |
+
+- Ergebnis: 10.000 verschiedene Seiten erinnert, 10.000 Einträge in den Seiten-Threads,
+  10.000 Aktivitäten, je Seite genau einmal. Lastmittel 4,7 → 1,5.
+- Der Durchlauf selbst ist schnell (Stapel von 100 Seiten je Transaktion); die Arbeit
+  liegt bei den Handlern der Outbox (rund 60 Ereignisse je Sekunde mit einem Worker).
+  Bei 10.000 Seiten, die am selben Tag fällig werden, bleibt `HerdOutboxBacklog`
+  (5 Minuten) still; ab etwa 20.000 am selben Tag würde er mit einem Worker kurz
+  anschlagen. Mehr Worker teilen sich die Bahnen der Outbox.
+
+**Worker-Speicher**: Leerlauf 173–174 MiB wie in M6; mit 1.000 Terminen und ihren
+Läufen bis 229 MiB, beim Prüfdurchlauf bis 182 MiB. Die Empfehlung für den Worker
+bleibt (Limit 384Mi).
+
+**Platz**: je Termin eine Zeile `automation_firing` (mit dem Auftragstext, wenn ein Lauf
+startete), je aufgenommenem Ereignis eine Zeile `automation_event` (nur IDs). Der Worker
+löscht Ereignisse 7 Tage nach ihrem Termin und Termine nach 90 Tagen, nie solange ihr
+Lauf noch offen ist ([`AGENTEN.md`](AGENTEN.md#aufbewahrung)). Läufe und ihr Journal
+bleiben wie in M6.
+
 ## Abhängigkeiten
 
 | Dienst | Pflicht | Hinweis |
@@ -430,7 +534,13 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Datenbankverbindungen mehr plus drei. Stirbt ein Worker, nimmt ein anderer seine Läufe
   nach Ablauf der Sperrfrist auf und setzt sie aus dem Journal fort (gemessen
   27–31 s bei 30 s Sperrfrist). Je Thread höchstens ein offener Lauf, gesichert durch
-  eindeutige Teilindizes, nicht durch eine Sperre im Speicher.
+  eindeutige Teilindizes, nicht durch eine Sperre im Speicher. **Aufgaben (M7):** Jeder
+  Worker feuert fällige Termine per `SKIP LOCKED`, je Termin eine Transaktion (Lauf oder
+  Vermerk, Protokoll, nächster Termin); ein eindeutiger Index je Aufgabe und Termin sichert
+  es zusätzlich. Gemessen: drei Worker, 1.000 zugleich fällige Termine, genau 1.000
+  Läufe, keiner doppelt ([Automatisierung (M7)](#automatisierung-m7)). Der tägliche
+  Prüfdurchlauf der Wiki-Seiten beansprucht Bereiche ebenso. Kein DBOS, kein
+  Leader-Prozess.
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -444,7 +554,12 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 
 ## Zeitpläne
 
-Keine Cronjobs. Die **Laufschleife** der Agenten (M5, M6) wacht bei jedem Commit mit
+Keine Cronjobs. Die **Fälligkeits-Schleife** jedes Workers (M7) schaut alle 5 s nach
+fälligen Terminen der Aufgaben (bis 50 je Durchlauf, ohne Pause weiter, solange es mehr
+gibt), geht in jeder Runde bis zu 20 Schritte des täglichen Prüfdurchlaufs der
+Wiki-Seiten (ein Bereich je Schritt, höchstens einmal je UTC-Tag) und löscht einmal je
+Minute Protokollzeilen der Aufgaben, die niemand mehr braucht (höchstens 1.000 je
+Transaktion). Die **Laufschleife** der Agenten (M5, M6) wacht bei jedem Commit mit
 Ereignissen auf (über das `NOTIFY` der Outbox), sonst jede Sekunde, und beendet in jeder
 Runde wartende Läufe, deren Frist abgelaufen ist; jeder laufende Lauf erneuert seine Sperrfrist alle
 `HERD_RUN_LEASE_SECONDS` / 3. Seit M3 läuft der **Worker** als Schleife: Er wacht bei jedem Commit
@@ -683,6 +798,13 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   Verbindung (`max_concurrency`, `requests_per_minute`) als Bremse; Erwähnungen in
   vielen Threads zugleich; Übergabeketten; mehr als zwei Worker; ein Rollout mit
   SIGTERM während laufender Läufe (gemessen ist nur SIGKILL).
+- **Automatisierung (M7):** Termine in Kanälen und Ticket-Threads (gemessen ist die
+  Direktnachricht: im Kanal kommt je Termin ein Systemeintrag dazu); Heartbeats und
+  Ereignis-Regeln unter Last (die Ruhezeit ist nur als Test mit drei Workern geprüft);
+  viele Eigentümerinnen und Agenten (gemessen: eine, einer); ein echter Anbieter; CPU von
+  Worker und Datenbank; die Budgetprüfung unter gleichzeitigen Läufen (gemessen im
+  Prozess, nacheinander); die Löschung alter Protokollzeilen bei großen Mengen; der
+  Prüfdurchlauf mit mehreren Workern unter Last (geprüft als Test).
 
 ### Empfehlung Request und Limit
 
@@ -802,6 +924,13 @@ in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der
 | `herd_runs_oldest_queued_seconds` | Gauge (nur mit Worker) | Alter des ältesten wartenden Laufs |
 | `herd_runs_stuck` | Gauge (nur mit Worker) | laufende Läufe mit abgelaufener Sperrfrist oder länger als jeder Lauf darf (zählt auch einen Lauf, der nach langem Warten wieder läuft; [`AGENTEN.md`](AGENTEN.md#bekannte-grenzen)) |
 | `herd_runs_waiting` | Gauge (nur mit Worker) | Läufe, die auf eine Freigabe oder Antwort warten |
+| `herd_automation_firings_total{outcome}` | Zähler (nur mit Worker) | gefeuerte Termine (Fälligkeits-Schleife und Ereignis-Regeln) je Ergebnis: `started`, `skipped_*`, `paused_owner` |
+| `herd_automations_due` | Gauge (nur mit Worker, alle 10 s) | fällige, noch nicht gefeuerte Aufgaben |
+| `herd_automations_oldest_due_seconds` | Gauge (nur mit Worker) | Wartezeit des ältesten fälligen Termins |
+| `herd_automations_paused{reason}` | Gauge (nur mit Worker) | angehaltene Aufgaben je Grund: `manual`, `owner`, `failing` |
+| `herd_budget_stops_total{scope}` | Zähler (nur mit Worker) | Läufe, die ein Tagesbudget beendet hat, je Geltung: `user`, `agent`, `organisation` |
+| `herd_wiki_review_reminders_total` | Zähler (nur mit Worker) | Seiten, deren Prüffrist der Durchlauf gemeldet hat |
+| `herd_wiki_review_spaces_unchecked` | Gauge (nur mit Worker) | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat |
 
 Alarme in der PrometheusRule des Charts: `HerdOutboxBacklog` (ältestes offenes
 Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (Zahl der aufgegebenen
@@ -811,7 +940,10 @@ ihres Releases, 5 Minuten, kritisch), dazu wie bisher `HerdNotReady` (deckt die
 Worker-Pods mit ab). Seit M6 für die Läufe der Agenten, je als Warnung: `HerdRunsStuck` (Läufe hängen,
 5 Minuten), `HerdRunsQueued` (ältester wartender Lauf älter als 5 Minuten) und
 `HerdRunsFailing` (mehr als die Hälfte der Läufe der letzten 15 Minuten, mindestens 3,
-endete mit `provider_refused` oder `error`, 5 Minuten lang); Bedeutung und Abhilfe in
+endete mit `provider_refused` oder `error`, 5 Minuten lang). Seit M7 für die Aufgaben,
+je als Warnung: `HerdAutomationsLagging` (ältester fälliger Termin über 3 Minuten,
+5 Minuten lang) und `HerdAutomationsFailing` (mindestens 5 Aufgaben mehr binnen einer
+Stunde wegen Fehlschlägen angehalten). Bedeutung und Abhilfe in
 [`AGENTEN.md`](AGENTEN.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
