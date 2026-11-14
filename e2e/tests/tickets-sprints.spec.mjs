@@ -116,7 +116,9 @@ test("a sprint is planned and started, filled from the backlog by keyboard, live
   ).toHaveValue(/.+/);
 });
 
-test("the daily view has a row per person, marks today's changes and filters by a click", async () => {
+test("the daily view has a row per person, marks today's changes and filters by a click", async ({
+  browser,
+}) => {
   const working = await status(anna, team.id, "In Arbeit");
   await change(anna, login.number, {
     assignee: { type: "user", id: benUser.id },
@@ -149,6 +151,17 @@ test("the daily view has a row per person, marks today's changes and filters by 
   await expect(personRow(a, "Nicht zugewiesen")).toHaveCount(0);
   await a.getByRole("button", { name: "Alle Personen zeigen" }).click();
   await expect(personRow(a, "Nicht zugewiesen")).toBeVisible();
+
+  // On a phone the rows scroll sideways inside the board, the page never does.
+  const phone = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  await signIn(phone, OWNER);
+  const p = await openLive(phone, `/spaces/${team.id}/board`);
+  await p.getByRole("checkbox", { name: "Nach Person gruppieren" }).check();
+  await expect(card(personRow(p, "Ben"), login.key)).toBeVisible();
+  await expect
+    .poll(() => p.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(375);
+  await phone.close();
 });
 
 test("my board gathers Ben's tickets from two spaces, moves by keyboard and menu, and explains a missing category", async () => {

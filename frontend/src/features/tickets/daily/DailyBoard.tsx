@@ -60,7 +60,9 @@ export function DailyBoard({
       {rows.length === 0 ? (
         <EmptyState text={t('tickets.daily.empty')} />
       ) : (
-        <div className="-mx-1 overflow-x-auto px-1 pb-3">
+        // `relative`: the cells' screen-reader counts (`sr-only`, absolute) stay inside
+        // this scroll box instead of widening the page (375 px).
+        <div className="relative -mx-1 overflow-x-auto px-1 pb-3">
           <div className="flex w-max min-w-full flex-col gap-3">
             <div
               className="grid auto-cols-[16rem] grid-flow-col gap-3 text-xs text-muted-foreground"
