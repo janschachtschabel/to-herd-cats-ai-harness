@@ -1,4 +1,5 @@
 import { createRoute, lazyRouteComponent, notFound } from '@tanstack/react-router'
+import { STOP_REASONS_ALL } from '@/features/agents/display'
 import { hasPermission } from '@/features/auth/queries'
 import type { RunFilters } from '@/features/runs/queries'
 import type { Me } from '@/lib/api'
@@ -24,19 +25,7 @@ const ApprovalsPage = lazyRouteComponent(
 )
 
 const RUN_STATES = new Set(['queued', 'running', 'waiting', 'done'])
-const STOP_REASONS = new Set([
-  'completed',
-  'max_steps',
-  'deadline',
-  'no_progress',
-  'rights_revoked',
-  'policy_blocked',
-  'provider_refused',
-  'error',
-  'cancelled',
-  'waiting_timeout',
-  'approval_expired',
-])
+const STOP_REASONS = new Set<string>(STOP_REASONS_ALL)
 
 /** A run list's filters from the address; anything unknown is dropped. */
 export function runSearch(search: Record<string, unknown>): RunFilters {

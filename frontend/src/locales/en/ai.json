@@ -249,6 +249,13 @@
       "approval_expired": "Nobody gave the release in time; the run was ended.",
       "cancelled": "The run was cancelled.",
       "waiting_timeout": "Nobody answered in time; the run was ended.",
+      "budget": "The daily AI budget is used up; the run stopped before its next model call.",
+      "budgetReached": "Reached: {{scope}}.",
+      "budgetScope": {
+        "user": "the daily limit of the person who asked",
+        "agent": "this agent's daily limit",
+        "organisation": "the organisation's daily limit"
+      },
       "unknown": "The run was ended.",
       "titleNamed": "{{name}} stopped without an answer:",
       "someAgent": "An agent"

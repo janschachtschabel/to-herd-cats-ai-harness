@@ -25,7 +25,8 @@
       "error": "Error",
       "cancelled": "Cancelled",
       "waiting_timeout": "No answer in time",
-      "approval_expired": "Release expired"
+      "approval_expired": "Release expired",
+      "budget": "Daily budget"
     },
     "places": {
       "dm": "Direct message",

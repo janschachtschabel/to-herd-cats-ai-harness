@@ -1,7 +1,7 @@
 import { Bot, CircleStop, EyeOff, Hourglass, Wrench } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { stopText } from '@/features/agents/display'
+import { budgetScopeText, stopText } from '@/features/agents/display'
 import type { Run } from '@/features/agents/queries'
 import { formatCost } from '@/features/ai/usage/period'
 import { EmptyState, ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
@@ -169,6 +169,11 @@ export function RunTimeline({
               title={t('runs.timeline.stop')}
             >
               <p className="mt-1 text-sm">{stopText(t, item.reason)}</p>
+              {item.reason === 'budget' && budgetScopeText(t, item.detail) && (
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {t('agents.stop.budgetReached', { scope: budgetScopeText(t, item.detail) })}
+                </p>
+              )}
             </Row>
           ),
         )}

@@ -25,7 +25,8 @@
       "error": "Fehler",
       "cancelled": "Abgebrochen",
       "waiting_timeout": "Keine Antwort rechtzeitig",
-      "approval_expired": "Freigabe abgelaufen"
+      "approval_expired": "Freigabe abgelaufen",
+      "budget": "Tagesbudget"
     },
     "places": {
       "dm": "Direktnachricht",

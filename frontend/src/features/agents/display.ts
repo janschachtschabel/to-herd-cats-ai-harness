@@ -27,11 +27,23 @@ const STOP_REASONS = [
   'cancelled',
   'waiting_timeout',
   'approval_expired',
-] as const
+  'budget',
+] as const satisfies readonly Schemas['StopReason'][]
 
 export type StopReason = Schemas['StopReason']
 /** Every stop reason, for filters (the order of the run view's filter). */
 export const STOP_REASONS_ALL: readonly StopReason[] = STOP_REASONS
+// A stop reason the API gains fails the type check here until it is worded.
+const EVERY_REASON: Exclude<StopReason, (typeof STOP_REASONS)[number]> extends never
+  ? true
+  : false = true
+void EVERY_REASON
+
+/** Whose daily budget stopped a run (the stop's `detail` for `budget`), in words. */
+export function budgetScopeText(t: TFunction, detail: string | null): string | null {
+  if (detail !== 'user' && detail !== 'agent' && detail !== 'organisation') return null
+  return t(`agents.stop.budgetScope.${detail}`)
+}
 
 /** Why a run ended, in words (an unknown reason gets a general sentence). */
 export function stopText(t: TFunction, reason: string | null | undefined): string {
