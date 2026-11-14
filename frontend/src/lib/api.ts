@@ -56,18 +56,28 @@ export interface Page<T> {
   next_cursor?: string | null
 }
 
-/** A backend error: `{"error": {"code", "message", "trace_id"}}`, or a transport failure. */
+/** A backend error: `{"error": {"code", "message", "trace_id", "details"?}}`, or a
+ *  transport failure. `details` is data the client acts on (e.g. the merge of a
+ *  proposal whose page moved on). */
 export class ApiError extends Error {
   readonly code: string
   readonly status: number
   readonly traceId: string | null
+  readonly details: Record<string, unknown> | null
 
-  constructor(code: string, status: number, message?: string, traceId?: string | null) {
+  constructor(
+    code: string,
+    status: number,
+    message?: string,
+    traceId?: string | null,
+    details?: Record<string, unknown> | null,
+  ) {
     super(message ?? code)
     this.name = 'ApiError'
     this.code = code
     this.status = status
     this.traceId = traceId ?? null
+    this.details = details ?? null
   }
 
   /** `<area>.version_conflict`, or a named one such as `ai.connection_version_conflict`. */
@@ -77,7 +87,7 @@ export class ApiError extends Error {
 }
 
 interface ErrorBody {
-  error?: { code?: string; message?: string; trace_id?: string }
+  error?: { code?: string; message?: string; trace_id?: string; details?: unknown }
 }
 
 // Who to tell when the session is gone; set once by the router (see app/router).
@@ -109,6 +119,10 @@ export const api = createClient<paths>({
 })
 api.use(sessionGuard)
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /** Data, or an ApiError carrying the backend's code, message and trace id. */
 export function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
   if (result.error !== undefined || !result.response.ok) {
@@ -118,6 +132,7 @@ export function unwrap<T>(result: { data?: T; error?: unknown; response: Respons
       result.response.status,
       body.error?.message,
       body.error?.trace_id,
+      isRecord(body.error?.details) ? body.error.details : null,
     )
   }
   return result.data as T

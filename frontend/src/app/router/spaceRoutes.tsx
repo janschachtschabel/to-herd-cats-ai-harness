@@ -29,6 +29,14 @@ const SpaceSkillsView = lazyRouteComponent(
   () => import('@/features/skills/SpaceSkillsView'),
   'SpaceSkillsView',
 )
+const ProposalsView = lazyRouteComponent(
+  () => import('@/features/proposals/ProposalsView'),
+  'ProposalsView',
+)
+const ProposalScreen = lazyRouteComponent(
+  () => import('@/features/proposals/ProposalScreen'),
+  'ProposalScreen',
+)
 const SkillPage = lazyRouteComponent(() => import('@/features/skills/SkillPage'), 'SkillPage')
 
 /** A space: its wiki (tree on the left), with the pages, the trash and the settings. */
@@ -115,6 +123,23 @@ const backlogRoute = createRoute({
   component: BacklogView,
 })
 
+/** A space's proposals (page editors) and one proposal with its diff and decision. */
+const proposalsRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/proposals',
+  component: ProposalsView,
+})
+
+const proposalRoute = createRoute({
+  getParentRoute: () => spaceRoute,
+  path: '/proposals/$proposalId',
+  loader: () => ProposalScreen.preload?.(),
+  component: function ProposalRoute() {
+    const { proposalId } = proposalRoute.useParams()
+    return <ProposalScreen proposalId={proposalId} />
+  },
+})
+
 /** A space's skills (`ai.use` or `skill.manage`, and a role in the space). */
 const skillsRoute = createRoute({
   getParentRoute: () => spaceRoute,
@@ -143,4 +168,6 @@ export const spaceTree = spaceRoute.addChildren([
   sprintsRoute,
   backlogRoute,
   skillsRoute,
+  proposalsRoute,
+  proposalRoute,
 ])

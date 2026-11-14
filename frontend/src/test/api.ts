@@ -97,11 +97,14 @@ function respond(status: number, body: unknown): Response {
   })
 }
 
-export function apiError(status: number, code: string, message = code): Reply {
-  return {
-    status,
-    body: { error: { code, message, trace_id: '4bf92f3577b34da6a3ce929d0e0e4736' } },
-  }
+export function apiError(
+  status: number,
+  code: string,
+  message = code,
+  details?: Record<string, unknown>,
+): Reply {
+  const error = { code, message, trace_id: '4bf92f3577b34da6a3ce929d0e0e4736' }
+  return { status, body: { error: details ? { ...error, details } : error } }
 }
 
 export function page<T>(items: T[], next_cursor: string | null = null): Page<T> {

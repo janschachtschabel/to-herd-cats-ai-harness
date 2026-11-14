@@ -43,6 +43,10 @@ const SYSTEM_KEYS = [
   'page.trashed',
   'page.restored',
   'page.version_restored',
+  'proposal.created',
+  'proposal.accepted',
+  'proposal.rejected',
+  'proposal.withdrawn',
 ] as const
 
 /** A timeline entry (page or ticket thread) in words, from its key and parameters. */

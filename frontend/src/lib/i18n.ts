@@ -4,6 +4,7 @@ import deAgents from '@/locales/de/agents.json'
 import deAi from '@/locales/de/ai.json'
 import de from '@/locales/de/common.json'
 import deMessaging from '@/locales/de/messaging.json'
+import deProposals from '@/locales/de/proposals.json'
 import deSkills from '@/locales/de/skills.json'
 import deTickets from '@/locales/de/tickets.json'
 import deWiki from '@/locales/de/wiki.json'
@@ -11,6 +12,7 @@ import enAgents from '@/locales/en/agents.json'
 import enAi from '@/locales/en/ai.json'
 import en from '@/locales/en/common.json'
 import enMessaging from '@/locales/en/messaging.json'
+import enProposals from '@/locales/en/proposals.json'
 import enSkills from '@/locales/en/skills.json'
 import enTickets from '@/locales/en/tickets.json'
 import enWiki from '@/locales/en/wiki.json'
@@ -33,7 +35,7 @@ function storedLocale(): Locale {
 type Tree = { [key: string]: string | Tree }
 
 /** One namespace from several files (`common.json`, `wiki.json`, `messaging.json`,
- *  `tickets.json`, `ai.json`, `agents.json`, `skills.json`): groups such as
+ *  `tickets.json`, `ai.json`, `agents.json`, `skills.json`, `proposals.json`): groups such as
  *  `errors` are merged key by key. */
 export function mergeResources(...trees: Tree[]): Tree {
   const out: Tree = {}
@@ -49,8 +51,30 @@ export function mergeResources(...trees: Tree[]): Tree {
 
 void i18n.use(initReactI18next).init({
   resources: {
-    de: { common: mergeResources(de, deWiki, deMessaging, deTickets, deAi, deAgents, deSkills) },
-    en: { common: mergeResources(en, enWiki, enMessaging, enTickets, enAi, enAgents, enSkills) },
+    de: {
+      common: mergeResources(
+        de,
+        deWiki,
+        deMessaging,
+        deTickets,
+        deAi,
+        deAgents,
+        deSkills,
+        deProposals,
+      ),
+    },
+    en: {
+      common: mergeResources(
+        en,
+        enWiki,
+        enMessaging,
+        enTickets,
+        enAi,
+        enAgents,
+        enSkills,
+        enProposals,
+      ),
+    },
   },
   ns: ['common'],
   defaultNS: 'common',

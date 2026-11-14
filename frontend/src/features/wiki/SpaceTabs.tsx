@@ -1,18 +1,20 @@
 import { Link } from '@tanstack/react-router'
 import { BookOpen, Inbox, Layers, ScrollText, SquareKanban, Timer } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ProposalsTab } from '@/features/proposals/ProposalsTab'
 import { skillAbilities } from '@/features/skills/abilities'
 import { ticketAbilities } from '@/features/tickets/abilities'
 import type { Me, Space } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { wikiAbilities } from './abilities'
 
-export type SpaceView = 'wiki' | 'board' | 'epics' | 'sprints' | 'backlog' | 'skills'
+export type SpaceView = 'wiki' | 'proposals' | 'board' | 'epics' | 'sprints' | 'backlog' | 'skills'
 
 const tab =
   'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
-/** The views of a space: its wiki (pages, trash, settings), with `ticket.read` its
- *  board, its epics, its sprints and its backlog, and its skills for those who may
+/** The views of a space: its wiki (pages, trash, settings), its proposals for page
+ *  editors (with the number of open ones), with `ticket.read` its board, its epics, its sprints and its backlog, and its skills for those who may
  *  read them (AI and a role in the space, or `skill.manage`). */
 export function SpaceTabs({
   space,
@@ -43,6 +45,9 @@ export function SpaceTabs({
         <BookOpen className="size-4" aria-hidden />
         {t('tickets.space.wiki')}
       </Link>
+      {wikiAbilities(space, me).edit && (
+        <ProposalsTab space={space} linkProps={look('proposals')} />
+      )}
       {ticketAbilities(space.my_role).read && (
         <>
           <Link to="/spaces/$spaceId/board" params={params} {...look('board')}>

@@ -1,7 +1,7 @@
 {
   "activity": {
     "reasons": {
-      "proposal": "hat einen Vorschlag in {{where}} gemacht oder entschieden"
+      "proposal": "hat einen Vorschlag zu einer Seite eingereicht oder entschieden ({{where}})"
     }
   },
   "search": {
@@ -134,7 +134,8 @@
         "human": "Bearbeitet",
         "import": "Importiert",
         "restore": "Wiederhergestellt",
-        "collab": "Live"
+        "collab": "Live",
+        "agent": "Von einem Agenten"
       },
       "kind": {
         "insert": "hinzugefügt:",

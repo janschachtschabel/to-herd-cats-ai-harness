@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
 import { agentKeys } from '@/features/agents/keys'
 import { noteRunProgress } from '@/features/agents/live'
+import { proposalEventKeys } from '@/features/proposals/live'
+import { proposalKeys } from '@/features/proposals/queries'
 import { ticketKeys } from '@/features/tickets/keys'
 import { sprintEventKeys, ticketEventKeys } from '@/features/tickets/live'
 import { useLive, type LiveEvent } from '@/lib/live'
@@ -28,7 +30,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
   const conversation = event.conversationId
   switch (event.type) {
     case 'resync':
-      return [messagingKeys.all, activityKeys.all, ticketKeys.all, agentKeys.runs]
+      return [messagingKeys.all, activityKeys.all, ticketKeys.all, agentKeys.runs, proposalKeys.all]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
       return [EVERYTHING]
@@ -71,6 +73,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return sprintEventKeys(queryClient, event.spaceId)
     case 'run.progress':
       return event.runId ? [agentKeys.run(event.runId)] : []
+    case 'proposal.changed':
+      return proposalEventKeys(event)
   }
 }
 

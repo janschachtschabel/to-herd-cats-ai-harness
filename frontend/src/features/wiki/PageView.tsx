@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/format'
 import type { WikiPage } from '@/lib/api'
 import { PageTickets } from '@/features/tickets/links/PageTickets'
 import { AiLockBadge } from '@/features/ai/policy/AiLockBadge'
+import { PageProposalsHint } from '@/features/proposals/PageProposalsHint'
 import { Attachments } from './attachments/Attachments'
 import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
@@ -44,6 +45,7 @@ export function PageView({ page }: { page: WikiPage }) {
             {page.status === 'draft' && <Badge variant="secondary">{t('wiki.page.draft')}</Badge>}
             {page.no_ai && <AiLockBadge moderates={abilities.moderate} />}
             <PageTags page={page} />
+            <PageProposalsHint pageId={page.id} />
             <span>
               {t('wiki.page.updated', { when: formatDateTime(page.updated_at, i18n.language) })}
             </span>

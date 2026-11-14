@@ -52,17 +52,19 @@ function WikiFrame({ space }: { space: Space }) {
   const { abilities } = wiki
   const matchRoute = useMatchRoute()
   const params = { spaceId: space.id }
-  const view: SpaceView = matchRoute({ to: '/spaces/$spaceId/board', params })
-    ? 'board'
-    : matchRoute({ to: '/spaces/$spaceId/epics', params })
-      ? 'epics'
-      : matchRoute({ to: '/spaces/$spaceId/sprints', params })
-        ? 'sprints'
-        : matchRoute({ to: '/spaces/$spaceId/backlog', params })
-          ? 'backlog'
-          : matchRoute({ to: '/spaces/$spaceId/skills', params })
-            ? 'skills'
-            : 'wiki'
+  const view: SpaceView = matchRoute({ to: '/spaces/$spaceId/proposals', params, fuzzy: true })
+    ? 'proposals'
+    : matchRoute({ to: '/spaces/$spaceId/board', params })
+      ? 'board'
+      : matchRoute({ to: '/spaces/$spaceId/epics', params })
+        ? 'epics'
+        : matchRoute({ to: '/spaces/$spaceId/sprints', params })
+          ? 'sprints'
+          : matchRoute({ to: '/spaces/$spaceId/backlog', params })
+            ? 'backlog'
+            : matchRoute({ to: '/spaces/$spaceId/skills', params })
+              ? 'skills'
+              : 'wiki'
 
   return (
     <WikiContext.Provider value={wiki}>

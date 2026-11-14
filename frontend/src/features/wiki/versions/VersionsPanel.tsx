@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import type { VersionSummary, WikiPage } from '@/lib/api'
@@ -89,6 +90,7 @@ export function VersionsPanel({ page }: { page: WikiPage }) {
                       {t('wiki.versions.number', { number: v.number })}
                       {v.label && <Badge variant="secondary">{v.label}</Badge>}
                       <Badge variant="outline">{t(`wiki.versions.source.${v.source}`)}</Badge>
+                      {v.ai && <AgentBadge />}
                     </div>
                     {v.change_summary && (
                       <p className="text-muted-foreground">{v.change_summary}</p>

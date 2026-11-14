@@ -1,11 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { ErrorState, LoadingState } from '@/features/shared/states'
 import { ApiError } from '@/lib/api'
-import { cn } from '@/lib/utils'
 import { WikiError } from '../WikiError'
+import { DiffLines } from './DiffLines'
 import { useDiff } from './queries'
-
-const MARK = { insert: '+', delete: '−', equal: ' ' } as const
 
 /** The line diff of two versions; a too large diff (422) says so. */
 export function DiffView({ pageId, from, to }: { pageId: string; from: number; to: number }) {
@@ -34,26 +32,7 @@ export function DiffView({ pageId, from, to }: { pageId: string; from: number; t
       {!changed ? (
         <p className="text-sm text-muted-foreground">{t('wiki.versions.noChanges')}</p>
       ) : (
-        <pre className="overflow-x-auto rounded-lg border text-xs leading-5">
-          {data.hunks.flatMap((hunk, h) =>
-            hunk.lines.map((line, i) => (
-              <div
-                key={`${h}-${i}`}
-                className={cn(
-                  'px-3 whitespace-pre-wrap',
-                  hunk.kind === 'insert' && 'bg-emerald-500/15',
-                  hunk.kind === 'delete' && 'bg-red-500/15',
-                )}
-              >
-                <span aria-hidden className="mr-2 select-none text-muted-foreground">
-                  {MARK[hunk.kind]}
-                </span>
-                <span className="sr-only">{t(`wiki.versions.kind.${hunk.kind}`)}</span>
-                {line}
-              </div>
-            )),
-          )}
-        </pre>
+        <DiffLines hunks={data.hunks} />
       )}
     </section>
   )

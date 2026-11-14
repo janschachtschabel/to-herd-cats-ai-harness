@@ -1,7 +1,7 @@
 {
   "activity": {
     "reasons": {
-      "proposal": "made or decided a proposal in {{where}}"
+      "proposal": "submitted or decided a proposal for a page ({{where}})"
     }
   },
   "search": {
@@ -134,7 +134,8 @@
         "human": "Edited",
         "import": "Imported",
         "restore": "Restored",
-        "collab": "Live"
+        "collab": "Live",
+        "agent": "By an agent"
       },
       "kind": {
         "insert": "added:",

@@ -1,0 +1,122 @@
+{
+  "messaging": {
+    "system": {
+      "proposal_created": "{{actor}} hat einen Vorschlag eingereicht.",
+      "proposal_accepted": "{{actor}} hat einen Vorschlag angenommen.",
+      "proposal_rejected": "{{actor}} hat einen Vorschlag abgelehnt.",
+      "proposal_withdrawn": "{{actor}} hat einen Vorschlag zurückgezogen."
+    }
+  },
+  "spaces": {
+    "agentWrite": {
+      "title": "Wie Agenten Seiten ändern",
+      "hint": "Gilt für Agenten, deren Stufe das Schreiben erlaubt (Stufe 3). Agenten der Stufe 2 schlagen immer nur vor.",
+      "values": {
+        "propose": "Vorschlagen",
+        "direct": "Direkt schreiben"
+      },
+      "explain": {
+        "propose": "Agenten schlagen Änderungen vor; ein Moderator nimmt sie an oder lehnt sie ab.",
+        "direct": "Agenten der Stufe 3 schreiben Seiten direkt. Vorher entsteht immer eine Version; Seiten mit KI-Sperre bleiben unberührt."
+      }
+    }
+  },
+  "proposals": {
+    "tab": "Vorschläge",
+    "tabCount_one": "{{count}} offener Vorschlag",
+    "tabCount_other": "{{count}} offene Vorschläge",
+    "title": "Vorschläge",
+    "hintModerator": "Änderungen an Seiten, die Agenten vorgeschlagen haben. Du nimmst sie an oder lehnst sie ab.",
+    "hintEditor": "Änderungen an Seiten, die Agenten vorgeschlagen haben. Annehmen oder ablehnen können Moderatoren.",
+    "noAccess": "Vorschläge sehen Personen, die Seiten dieses Bereichs bearbeiten.",
+    "filter": "Zustand",
+    "states": {
+      "open": "Offen",
+      "accepted": "Angenommen",
+      "rejected": "Abgelehnt",
+      "withdrawn": "Zurückgezogen"
+    },
+    "empty": {
+      "open": "Keine offenen Vorschläge.",
+      "accepted": "Noch keine angenommenen Vorschläge.",
+      "rejected": "Noch keine abgelehnten Vorschläge.",
+      "withdrawn": "Keine zurückgezogenen Vorschläge."
+    },
+    "change": "Änderung an „{{title}}“",
+    "newPage": "Neue Seite „{{title}}“",
+    "newPageUnder": "Neue Seite „{{title}}“ unter „{{parent}}“",
+    "somePage": "einer Seite",
+    "by": "von {{name}}",
+    "unknownAuthor": "Unbekannt",
+    "back": "Alle Vorschläge",
+    "reason": "Begründung",
+    "run_one": "Entstanden in einem Lauf ({{state}}, {{count}} Schritt).",
+    "run_other": "Entstanden in einem Lauf ({{state}}, {{count}} Schritte).",
+    "runStates": {
+      "queued": "wartet auf den Start",
+      "running": "läuft",
+      "waiting": "wartet",
+      "done": "beendet"
+    },
+    "outdated": "Die Seite hat sich seit dem Vorschlag geändert. Beim Annehmen zeigt ein Abgleich, was zusammenkommt.",
+    "diffLabel": "Änderungen des Vorschlags",
+    "tooLarge": "Die Texte sind zu lang für einen Vergleich.",
+    "noChange": "Der Vorschlag ändert den Inhalt nicht.",
+    "accept": "Annehmen",
+    "pageHint_one": "{{count}} offener Vorschlag zu dieser Seite",
+    "pageHint_other": "{{count}} offene Vorschläge zu dieser Seite",
+    "outcome": {
+      "accepted": "Angenommen von {{name}} am {{when}}",
+      "rejected": "Abgelehnt von {{name}} am {{when}}",
+      "withdrawn": "Zurückgezogen",
+      "reason": "Begründung: {{reason}}",
+      "openPage": "„{{title}}“ öffnen",
+      "openVersion": "„{{title}}“ öffnen (Version {{number}})"
+    },
+    "reject": {
+      "open": "Ablehnen",
+      "title": "Vorschlag ablehnen",
+      "hint": "Die Seite bleibt, wie sie ist. Wer den Vorschlag gemacht hat, sieht die Begründung.",
+      "reason": "Begründung (freiwillig)",
+      "reasonHint": "{{count}} von {{max}} Zeichen",
+      "submit": "Ablehnen"
+    },
+    "merge": {
+      "title": "Die Seite hat sich geändert",
+      "hint": "Seit dem Vorschlag wurde die Seite bearbeitet. Prüfe, was zusammenkommt, und nimm den zusammengeführten Text an.",
+      "again": "Die Seite hat sich inzwischen erneut geändert. Der Abgleich wurde neu berechnet.",
+      "meanwhile": "Was sich auf der Seite seither geändert hat",
+      "sameVersion": "Die Änderungen stecken in der neuesten Version (Live-Bearbeitung); der Abgleich unten zeigt sie.",
+      "tooLarge": "Die Texte sind zu lang für einen Abgleich hier. Lehne den Vorschlag ab oder übertrage die Änderung selbst in die Seite.",
+      "clean": "Vorschlag und Seite lassen sich ohne Konflikt zusammenführen.",
+      "conflicts_one": "{{count}} Stelle wurde auf beiden Seiten geändert. Wähle je Stelle, was gilt.",
+      "conflicts_other": "{{count}} Stellen wurden auf beiden Seiten geändert. Wähle je Stelle, was gilt.",
+      "region": "Konflikt {{number}}",
+      "sides": {
+        "base": "Ursprung",
+        "proposed": "Vorschlag",
+        "current": "Seite jetzt"
+      },
+      "nothing": "(nichts)",
+      "choices": {
+        "current": "Seite behalten",
+        "proposed": "Vorschlag übernehmen",
+        "both": "Beides"
+      },
+      "text": "Zusammengeführter Text",
+      "textHint": "Wird so in die Seite geschrieben. Eine andere Wahl oben setzt den Text neu zusammen.",
+      "submit": "Zusammengeführt annehmen"
+    }
+  },
+  "errors": {
+    "proposal": {
+      "not_found": "Diesen Vorschlag gibt es nicht (mehr).",
+      "not_open": "Über diesen Vorschlag wurde schon entschieden.",
+      "version_conflict": "Der Vorschlag hat sich inzwischen geändert; er wurde neu geladen.",
+      "base_outdated": "Die Seite hat sich seit dem Vorschlag geändert.",
+      "page_trashed": "Die Seite liegt inzwischen im Papierkorb; der Vorschlag lässt sich nicht annehmen.",
+      "page_no_ai": "Die Seite ist inzwischen für KI gesperrt; ein Vorschlag eines Agenten lässt sich nicht annehmen.",
+      "parent_gone": "Die übergeordnete Seite gibt es nicht mehr oder sie liegt im Papierkorb."
+    }
+  }
+}
