@@ -4,12 +4,11 @@ import type { Ticket } from '@/lib/api'
 import { FieldRow } from '../FieldRow'
 import type { useTicketSave } from '../useTicketSave'
 import { openSprints, useSprintChoices } from './queries'
-import { reopenedAfterClose } from './rules'
 import { SprintOption } from './SprintOption'
 
 /** The ticket's sprint: with `ticket.edit` the running or a planned sprint of its
- *  space, or none (the backlog). A closed sprint can be left, not chosen; an
- *  unfinished ticket still in one says so (it stays there until moved). */
+ *  space, or none (the backlog). A closed sprint can be left, not chosen (a ticket
+ *  reopened in one goes back to the backlog by itself). */
 export function SprintField({
   ticket,
   editable,
@@ -54,9 +53,6 @@ export function SprintField({
             <span id={id} aria-labelledby={`${id}-label`} className="text-sm">
               {name}
             </span>
-          )}
-          {reopenedAfterClose(ticket, current) && (
-            <p className="text-xs text-muted-foreground">{t('tickets.fields.closedSprintHint')}</p>
           )}
         </>
       )}

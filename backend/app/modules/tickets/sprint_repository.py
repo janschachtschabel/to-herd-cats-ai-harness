@@ -144,6 +144,37 @@ class SprintRepository:
         )
         return await self.session.scalar(stmt)
 
+    async def closed_among(self, ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+        """Which of the sprints `ids` are closed (a state that never changes again, so
+        it needs no lock)."""
+        if not ids:
+            return set()
+        stmt = select(Sprint.id).where(
+            self._visible(), Sprint.id.in_(ids), Sprint.state == SprintState.CLOSED
+        )
+        return set(await self.session.scalars(stmt))
+
+    async def lock_in_closed(
+        self, status_id: uuid.UUID
+    ) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
+        """The tickets of status `status_id` in a closed sprint, locked (`FOR UPDATE`) in
+        the order of their ids: (id, space id, sprint id) of each."""
+        closed = select(Sprint.id).where(
+            Sprint.org_id == self.scope.org_id, Sprint.state == SprintState.CLOSED
+        )
+        stmt = (
+            select(WorkItem.id, WorkItem.space_id, WorkItem.sprint_id)
+            .where(
+                WorkItem.org_id == self.scope.org_id,
+                WorkItem.status_id == status_id,
+                WorkItem.sprint_id.in_(closed),
+            )
+            .order_by(WorkItem.id)
+            .with_for_update(of=WorkItem)
+        )
+        rows = await self.session.execute(stmt)
+        return [(row[0], row[1], row[2]) for row in rows if row[2] is not None]
+
     async def lock_tickets(self, sprint_id: uuid.UUID) -> list[tuple[uuid.UUID, uuid.UUID]]:
         """The tickets in the sprint as committed now, locked (`FOR UPDATE`) in the order
         of their ids: (id, status id) of each."""

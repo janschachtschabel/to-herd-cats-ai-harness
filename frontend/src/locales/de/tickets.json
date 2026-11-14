@@ -60,8 +60,7 @@
       "tags": "Tags",
       "sprint": "Sprint",
       "noSprint": "Kein Sprint (Vorrat)",
-      "someSprint": "Ein früherer Sprint",
-      "closedSprintHint": "Der Sprint ist abgeschlossen, das Ticket aber nicht erledigt. Es bleibt dort, bis es jemand in einen anderen Sprint oder in den Vorrat legt."
+      "someSprint": "Ein früherer Sprint"
     },
     "filters": {
       "label": "Tickets filtern",
@@ -245,8 +244,7 @@
       "tally": "{{planned}} geplant · {{done}} erledigt · {{carried}} übertragen",
       "toggle": "Tickets von {{name}} zeigen",
       "noTickets": "Keine Tickets in diesem Sprint.",
-      "closedNote": "Erledigtes bleibt im abgeschlossenen Sprint. Was danach wieder geöffnet wurde, ist markiert und bleibt hier, bis es jemand in einen anderen Sprint oder in den Vorrat legt.",
-      "reopened": "Wieder offen nach dem Abschluss",
+      "closedNote": "Erledigtes und Verworfenes bleibt im abgeschlossenen Sprint. Wird ein Ticket danach wieder geöffnet, geht es zurück in den Vorrat.",
       "removeTicket": "{{key}} in den Vorrat legen",
       "removeStale": "Das Ticket wurde inzwischen geändert und blieb im Sprint; die Liste ist neu geladen.",
       "form": {

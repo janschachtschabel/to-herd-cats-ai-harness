@@ -27,6 +27,7 @@ from app.modules.tickets.assignment import check_assignment
 from app.modules.tickets.base import (
     editable,
     emit_change,
+    leaves_closed_sprint,
     readable,
     ticket_not_found,
     ticket_repository,
@@ -141,6 +142,11 @@ class TicketService:
         status = None
         if Field.STATUS in changes:
             status = await self._status(actor, ticket.space_id, values["status_id"])
+            if Field.SPRINT not in changes and await leaves_closed_sprint(
+                self.session, actor, ticket.sprint_id, status.category
+            ):
+                values = {**values, "sprint_id": None}
+                changes = {**changes, Field.SPRINT: (ticket.sprint_id, None)}
         if not changes:
             return await view_of(self.session, actor, repo, ticket.id)
         _apply(ticket, values, changes)

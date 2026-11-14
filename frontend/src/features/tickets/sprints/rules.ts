@@ -1,6 +1,5 @@
-import type { Sprint, TicketSummary } from '@/lib/api'
+import type { Sprint } from '@/lib/api'
 import type { TicketAbilities } from '../abilities'
-import { UNFINISHED } from '../display'
 
 /** The space's running sprint, if any (at most one, held by the database). */
 export function activeSprint(sprints: Sprint[]): Sprint | undefined {
@@ -31,13 +30,4 @@ export function sprintOffers(sprint: Sprint, sprints: Sprint[], abilities: Ticke
  *  planned one that starts first. */
 export function defaultTarget(sprints: Sprint[]): Sprint | undefined {
   return activeSprint(sprints) ?? nextPlanned(sprints)
-}
-
-/** Unfinished although its sprint closed: reopened after the close (it stays in the
- *  closed sprint until someone moves it, plan M4b, decision 4 of Task 1). */
-export function reopenedAfterClose(
-  ticket: Pick<TicketSummary, 'status'>,
-  sprint: Pick<Sprint, 'state'> | undefined,
-): boolean {
-  return sprint?.state === 'closed' && UNFINISHED.includes(ticket.status.category)
 }

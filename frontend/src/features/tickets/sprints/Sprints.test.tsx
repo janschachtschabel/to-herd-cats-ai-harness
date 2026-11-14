@@ -139,17 +139,17 @@ describe('sprints', () => {
     expect(within(dialog).getByRole('radio', { name: 'Zurück in den Vorrat' })).toBeChecked()
   })
 
-  test('a closed sprint shows its tickets; a reopened one is marked, not hidden', async () => {
-    const reopened = makeTicketSummary({ number: 7, title: 'Wieder offen', sprint_id: closed.id })
+  test('a closed sprint shows its tickets and says a reopened one goes to the backlog', async () => {
+    const finished = makeTicketSummary({ number: 7, title: 'Geliefert', sprint_id: closed.id })
     const api = sprintApi('viewer', [closed], {
       'GET /api/tickets': (call: Call) =>
-        page(call.query.get('sprint') === closed.id ? [reopened] : []),
+        page(call.query.get('sprint') === closed.id ? [finished] : []),
     })
     const { user } = await renderApp('/spaces/space-1/sprints')
     await user.click(await screen.findByRole('button', { name: 'Tickets von Sprint 10 zeigen' }))
     const item = sprintItem('Sprint 10')
-    expect(await within(item).findByRole('link', { name: /HC-7 Wieder offen/ })).toBeVisible()
-    expect(within(item).getByText('Wieder offen nach dem Abschluss')).toBeInTheDocument()
+    expect(await within(item).findByRole('link', { name: /HC-7 Geliefert/ })).toBeVisible()
+    expect(within(item).getByText(/wieder geöffnet, geht es zurück in den Vorrat/)).toBeVisible()
     expect(api.find('GET', '/api/tickets').at(-1)!.query.get('space_id')).toBe('space-1')
   })
 })

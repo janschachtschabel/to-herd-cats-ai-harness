@@ -60,8 +60,7 @@
       "tags": "Tags",
       "sprint": "Sprint",
       "noSprint": "No sprint (backlog)",
-      "someSprint": "An earlier sprint",
-      "closedSprintHint": "The sprint is closed, but the ticket is not finished. It stays there until someone moves it to another sprint or the backlog."
+      "someSprint": "An earlier sprint"
     },
     "filters": {
       "label": "Filter tickets",
@@ -245,8 +244,7 @@
       "tally": "{{planned}} planned · {{done}} done · {{carried}} carried over",
       "toggle": "Show the tickets of {{name}}",
       "noTickets": "No tickets in this sprint.",
-      "closedNote": "Finished tickets stay in the closed sprint. Those reopened afterwards are marked and stay here until someone moves them to another sprint or the backlog.",
-      "reopened": "Reopened after closing",
+      "closedNote": "Finished and cancelled tickets stay in the closed sprint. A ticket reopened afterwards goes back to the backlog.",
       "removeTicket": "Move {{key}} to the backlog",
       "removeStale": "The ticket was changed in the meantime and stayed in the sprint; the list has been reloaded.",
       "form": {

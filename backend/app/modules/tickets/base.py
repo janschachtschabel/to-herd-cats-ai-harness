@@ -15,8 +15,9 @@ from app.core.errors import Conflict, NotFound
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.tickets.events import Changes, ticket_event
-from app.modules.tickets.models import WorkItem
+from app.modules.tickets.models import StatusCategory, WorkItem
 from app.modules.tickets.repository import TicketRepository, TicketScope, TicketView
+from app.modules.tickets.sprint_repository import FINISHED, SprintRepository
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
 
@@ -109,3 +110,15 @@ async def view_of(
         raise ticket_not_found()
     (shown,) = await with_tags(session, actor, [view])
     return shown
+
+
+async def leaves_closed_sprint(
+    session: AsyncSession, actor: Actor, sprint_id: uuid.UUID | None, category: StatusCategory
+) -> bool:
+    """Whether a ticket of sprint `sprint_id` that goes to a status of `category`
+    returns to the backlog: reopened (an unfinished category) in a closed sprint
+    (module review M4b, finding 3)."""
+    if sprint_id is None or category in FINISHED:
+        return False
+    sprints = SprintRepository(session, ticket_repository(session, actor).scope)
+    return bool(await sprints.closed_among({sprint_id}))

@@ -226,7 +226,7 @@ describe('ticket view', () => {
     expect(api.find('PATCH', '/api/tickets/42')[1]!.body).toEqual({ sprint_id: null, version: 3 })
   })
 
-  test('an unfinished ticket in a closed sprint says it stays there until moved', async () => {
+  test('a ticket in a closed sprint names it, without a hint to move it', async () => {
     const closed = makeSprint({
       name: 'Sprint 10',
       state: 'closed',
@@ -238,9 +238,7 @@ describe('ticket view', () => {
     await renderApp('/tickets/42')
     const fields = await screen.findByRole('complementary', { name: 'Felder des Tickets' })
     expect(await within(fields).findByText('Sprint 10 (abgeschlossen)')).toBeInTheDocument()
-    expect(
-      within(fields).getByText(/Der Sprint ist abgeschlossen, das Ticket aber nicht erledigt/),
-    ).toBeInTheDocument()
+    expect(within(fields).queryByText(/Der Sprint ist abgeschlossen/)).not.toBeInTheDocument()
   })
 
   test('a ticket one may not see is not there, as a free number', async () => {

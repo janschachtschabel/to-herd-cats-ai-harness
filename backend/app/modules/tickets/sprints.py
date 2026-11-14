@@ -15,7 +15,8 @@ Rules:
   422 `sprint.next_missing` without one) or back to the backlog (`backlog`), and
   records the tally: tickets in the sprint, done, carried. Each moved ticket gets a new
   version and one `ticket.updated` event (field `sprint`), all in the closing's
-  transaction.
+  transaction; a ticket reopened later (an unfinished category) returns to the backlog
+  in that change (`base.leaves_closed_sprint`, `statuses.py`), the tally stays.
 Every change names the version it read (409 `sprint.version_conflict`), is one
 `sprint.*` event and, where it creates, starts or closes, audited.
 """

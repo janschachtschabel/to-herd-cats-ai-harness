@@ -11,7 +11,10 @@ Rules, checked under the space's status lock (`StatusRepository.lock_space`):
 - a status with tickets is deleted only with `replace_with`, another status of the
   same space, which takes its tickets (each gets a new version and a
   `ticket.updated` event);
-- positions stay 0, 1, 2 … in order: a status put somewhere moves the others along.
+- positions stay 0, 1, 2 … in order: a status put somewhere moves the others along;
+- a ticket of a closed sprint whose status turns unfinished (a deletion's replacement
+  or a category change) returns to the backlog in the same change (module review M4b,
+  finding 3).
 Every change is audited in its transaction.
 """
 
@@ -27,6 +30,7 @@ from app.core.access import Action, Actor, require, space_ids_with
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
 from app.modules.audit.recorder import changes, record, snapshot
+from app.modules.tickets.base import ticket_repository
 from app.modules.tickets.events import TICKET_UPDATED, Field, ticket_event
 from app.modules.tickets.models import (
     MAX_STATUSES,
@@ -34,6 +38,7 @@ from app.modules.tickets.models import (
     StatusCategory,
     TicketStatus,
 )
+from app.modules.tickets.sprint_repository import FINISHED, SprintRepository
 from app.modules.tickets.status_repository import StatusRepository, StatusScope
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
@@ -118,6 +123,8 @@ class StatusService:
         if category is not None and category != status.category:
             others = [s for s in existing if s.id != status.id]
             _require_categories([*(s.category for s in others), category])
+            if status.category in FINISHED and category not in FINISHED:
+                await self._reopened(actor, status)
             status.category = category
         if position is not None and position != status.position:
             others = [s for s in existing if s.id != status.id]
@@ -135,19 +142,24 @@ class StatusService:
         version: int,
         replace_with: uuid.UUID | None = None,
     ) -> builtins.list[tuple[uuid.UUID, uuid.UUID]]:
-        """Delete the status; its tickets go to `replace_with`. The tickets moved, as
-        (ticket id, space id)."""
+        """Delete the status; its tickets go to `replace_with`. A ticket of a closed
+        sprint that the replacement reopens (an unfinished category) returns to the
+        backlog in the same change (module review M4b, finding 3). The tickets moved,
+        as (ticket id, space id)."""
         repo, status = await self._managed(actor, status_id)
         existing = await repo.in_space(status.space_id)
         _check_version(status, version)
         others = [s for s in existing if s.id != status.id]
         _require_categories(s.category for s in others)
-        moved: builtins.list[tuple[uuid.UUID, uuid.UUID]] = []
+        moved: builtins.list[tuple[uuid.UUID, uuid.UUID, uuid.UUID | None]] = []
+        reopened: set[uuid.UUID] = set()
         if replace_with is not None:
             target = next((s for s in others if s.id == replace_with), None)
             if target is None:
                 raise ValidationFailed(code="ticket_status.replacement_invalid")
             moved = await repo.move_tickets(status.id, target.id)
+            if target.category not in FINISHED:
+                reopened = await self._back_to_backlog(actor, moved)
         elif await repo.in_use(status.id):
             raise Conflict("Name a status for its tickets", code="ticket_status.in_use")
         details: dict[str, Any] = {"name": status.name, "moved": len(moved)}
@@ -157,9 +169,12 @@ class StatusService:
         await repo.renumber(others)
         await self._audit(actor, "ticket_status.deleted", status, details)
         threads = await TicketThreadRepository(self.session, actor.org_id).thread_ids(
-            [ticket_id for ticket_id, _ in moved]
+            [ticket_id for ticket_id, _, _ in moved]
         )
-        for ticket_id, space_id in moved:  # each moved ticket changed: one event each
+        for ticket_id, space_id, sprint_id in moved:  # each moved ticket: one event each
+            changes: dict[Field, tuple[Any, Any]] = {Field.STATUS: (status.id, replace_with)}
+            if ticket_id in reopened:
+                changes[Field.SPRINT] = (sprint_id, None)
             await ticket_event(
                 self.session,
                 actor,
@@ -167,9 +182,41 @@ class StatusService:
                 ticket_id=ticket_id,
                 space_id=space_id,
                 conversation_id=threads.get(ticket_id),
-                changes={Field.STATUS: (status.id, replace_with)},
+                changes=changes,
             )
-        return moved
+        return [(ticket_id, space_id) for ticket_id, space_id, _ in moved]
+
+    async def _reopened(self, actor: Actor, status: TicketStatus) -> None:
+        """The status turns unfinished: its tickets in a closed sprint return to the
+        backlog (module review M4b, finding 3), one `ticket.updated` (field `sprint`)
+        each."""
+        sprints = SprintRepository(self.session, ticket_repository(self.session, actor).scope)
+        leaving = await sprints.lock_in_closed(status.id)
+        await sprints.move_tickets([ticket_id for ticket_id, _, _ in leaving], None)
+        threads = await TicketThreadRepository(self.session, actor.org_id).thread_ids(
+            [ticket_id for ticket_id, _, _ in leaving]
+        )
+        for ticket_id, space_id, sprint_id in leaving:
+            await ticket_event(
+                self.session,
+                actor,
+                TICKET_UPDATED,
+                ticket_id=ticket_id,
+                space_id=space_id,
+                conversation_id=threads.get(ticket_id),
+                changes={Field.SPRINT: (sprint_id, None)},
+            )
+
+    async def _back_to_backlog(
+        self, actor: Actor, moved: builtins.list[tuple[uuid.UUID, uuid.UUID, uuid.UUID | None]]
+    ) -> set[uuid.UUID]:
+        """Of the tickets just moved (and locked) into an unfinished status, those of a
+        closed sprint leave it; their ids."""
+        sprints = SprintRepository(self.session, ticket_repository(self.session, actor).scope)
+        closed = await sprints.closed_among({s for _, _, s in moved if s is not None})
+        leaving = [ticket_id for ticket_id, _, sprint_id in moved if sprint_id in closed]
+        await sprints.move_tickets(leaving, None)
+        return set(leaving)
 
     async def _managed(
         self, actor: Actor, status_id: uuid.UUID

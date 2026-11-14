@@ -144,17 +144,17 @@ class StatusRepository:
 
     async def move_tickets(
         self, from_id: uuid.UUID, to_id: uuid.UUID
-    ) -> list[tuple[uuid.UUID, uuid.UUID]]:
-        """Every ticket of status `from_id` into `to_id` (a new version each); the
-        (id, space_id) of each."""
+    ) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID | None]]:
+        """Every ticket of status `from_id` into `to_id` (a new version each, locked
+        until the transaction ends); the (id, space_id, sprint_id) of each."""
         stmt = (
             update(WorkItem)
             .where(WorkItem.org_id == self.scope.org_id, WorkItem.status_id == from_id)
             .values(status_id=to_id, version=WorkItem.version + 1)
-            .returning(WorkItem.id, WorkItem.space_id)
+            .returning(WorkItem.id, WorkItem.space_id, WorkItem.sprint_id)
             .execution_options(synchronize_session=False)
         )
-        return [(row[0], row[1]) for row in await self.session.execute(stmt)]
+        return [(row[0], row[1], row[2]) for row in await self.session.execute(stmt)]
 
     async def delete(self, status: TicketStatus) -> None:
         await self.session.delete(status)

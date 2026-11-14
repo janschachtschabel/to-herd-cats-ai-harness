@@ -243,10 +243,14 @@ Jeder Sprint zeigt Name, Zustand, Zeitraum und Ziel; aufgeklappt seine Tickets.
   Bilanz ändert sich später nicht mehr.
 - Ein abgeschlossener Sprint ändert sich nicht mehr (409 `sprint.state_invalid`) und
   nimmt keine Tickets mehr auf. Seine Tickets lassen sich aber herausnehmen.
-- **Wieder geöffnet:** Wird ein erledigtes Ticket eines abgeschlossenen Sprints später
-  wieder geöffnet, **bleibt es in diesem Sprint**, bis jemand es in einen anderen Sprint
-  oder in den Vorrat legt. Die Sprint-Liste markiert es („Wieder offen nach dem
-  Abschluss“, mit „… in den Vorrat legen“), das Ticket sagt es am Feld „Sprint“.
+- **Wieder geöffnet:** Kommt ein Ticket eines abgeschlossenen Sprints später in eine
+  unerledigte Kategorie (über das Feld „Status“, „Mein Board“, das Löschen seines Status
+  mit einem unerledigten Ersatz oder weil sein Status die Kategorie wechselt), **geht es
+  in derselben Änderung zurück in den Vorrat**: ein Ereignis `ticket.updated` mit den
+  Feldern `status` und `sprint` (beim Kategoriewechsel des Status nur `sprint`), je ein
+  Eintrag in der Diskussion. So zeigen Vorrat und Daily-Ansicht es wieder; ein
+  abgeschlossener Sprint hält nur Erledigtes und Verworfenes. Die Bilanz bleibt, wie sie
+  beim Abschluss war.
 - Am Ticket wählt das Feld **„Sprint“** einen laufenden oder geplanten Sprint des
   eigenen Bereichs oder „Kein Sprint (Vorrat)“. Ein Sprint eines anderen Bereichs, ein
   abgeschlossener oder ein unbekannter ergeben dieselbe Antwort, 422
@@ -367,10 +371,8 @@ SQL-Ausdruck. Die Ticket-Liste hat dazu ihr eigenes Textfeld.
   Treffer. Der Aufwand wächst linear; bei etwa zehnmal so vielen Tickets je Bereich
   braucht die Liste einen Index je Sortierung und das Board eine günstigere erste Seite.
 
-- **Ein wieder geöffnetes Ticket bleibt im abgeschlossenen Sprint** (Plan M4b): Es
-  wandert nicht von selbst in den laufenden Sprint oder den Vorrat; die Sprint-Liste und
-  das Ticket markieren es, bis es jemand verschiebt. Die Bilanz des Sprints bleibt, wie
-  sie beim Abschluss war.
+- **Ein wieder geöffnetes Ticket geht in den Vorrat, nicht in den laufenden Sprint**:
+  Wer es im laufenden Sprint haben will, legt es dort hinein.
 - **Die Daily-Ansicht ist groß:** Sie liefert je Zelle die ersten 20 Karten aller
   Personen auf einmal. Bei 21 Personen und 3.000 Tickets im Sprint sind das 1,4 MB und
   rund 0,2 s je Aufruf, unter zehn gleichzeitigen Aufrufen gut 2 s

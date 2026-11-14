@@ -1,17 +1,15 @@
 import { Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SaveError } from '@/features/shared/forms'
 import { ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import type { Sprint } from '@/lib/api'
 import { TicketRows } from '../TicketRows'
 import { usePutIntoSprint, useSprintTickets } from './queries'
-import { reopenedAfterClose } from './rules'
 
-/** The tickets of a sprint, by priority. In a closed sprint, what was reopened after
- *  the close is marked (it stays there until moved); from a running or planned sprint
- *  an editor puts a ticket back into the backlog. */
+/** The tickets of a sprint, by priority. A closed sprint keeps only finished tickets
+ *  (one reopened later goes back to the backlog); from a running or planned sprint an
+ *  editor puts a ticket back into the backlog. */
 export function SprintTickets({ sprint, editable }: { sprint: Sprint; editable: boolean }) {
   const { t } = useTranslation()
   const tickets = useSprintTickets(sprint.space_id, sprint.id)
@@ -35,25 +33,20 @@ export function SprintTickets({ sprint, editable }: { sprint: Sprint; editable: 
       ) : null}
       <TicketRows
         tickets={tickets.items}
-        action={(ticket) => (
-          <>
-            {reopenedAfterClose(ticket, sprint) && (
-              <Badge variant="destructive">{t('tickets.sprints.reopened')}</Badge>
-            )}
-            {removable && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={put.isPending}
-                aria-label={t('tickets.sprints.removeTicket', { key: ticket.key })}
-                title={t('tickets.sprints.removeTicket', { key: ticket.key })}
-                onClick={() => put.mutate({ tickets: [ticket], sprintId: null })}
-              >
-                <Undo2 aria-hidden />
-              </Button>
-            )}
-          </>
-        )}
+        action={(ticket) =>
+          removable && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={put.isPending}
+              aria-label={t('tickets.sprints.removeTicket', { key: ticket.key })}
+              title={t('tickets.sprints.removeTicket', { key: ticket.key })}
+              onClick={() => put.mutate({ tickets: [ticket], sprintId: null })}
+            >
+              <Undo2 aria-hidden />
+            </Button>
+          )
+        }
       />
       <LoadMore hasMore={tickets.hasMore} loading={tickets.loadingMore} onLoad={tickets.loadMore} />
     </div>
