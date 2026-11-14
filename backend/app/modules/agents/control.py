@@ -6,7 +6,7 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
   `queued` again and keeps its journal; the next take-up replays it and runs the tool
   call it waited on once more, which now finds its answer. A DM's queued run that had
   come in behind it and never started is dropped; what it would have answered, the
-  run queues when it ends (`executor.close`). Nothing else is dropped: another
+  run queues when it ends (`closing.close`). Nothing else is dropped: another
   thread's run in a channel has its own lane, and a ticket handed over to another
   agent keeps the run that follows. Nothing wakes the workers here: the answer's
   own outbox event does, else they look within a second.
@@ -37,8 +37,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
 from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository, due_waiting
-from app.modules.agents.executor import close
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS, RunState, StopReason
 

@@ -140,3 +140,18 @@ class NotificationRepository:
             .returning(Notification)
         )
         return list((await self.session.scalars(stmt)).all())
+
+    async def add_for_automation(
+        self, automation_id: uuid.UUID, wanted: Sequence[tuple[uuid.UUID, NotificationReason]]
+    ) -> list[Notification]:
+        """Notifications about an automation (it has no thread). Not unique: each
+        pause tells again (the due loop and a run's end write them once, in their
+        transaction)."""
+        if not wanted:
+            return []
+        rows = [
+            {"org_id": self.org_id, "user_id": u, "reason": r, "automation_id": automation_id}
+            for u, r in wanted
+        ]
+        stmt = insert(Notification).values(rows).returning(Notification)
+        return list((await self.session.scalars(stmt)).all())

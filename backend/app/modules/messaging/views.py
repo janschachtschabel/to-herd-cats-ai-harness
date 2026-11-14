@@ -61,6 +61,7 @@ class SystemEntry:
     new: SystemValue | None = None
     actor_type: PrincipalType = PrincipalType.USER  # an agent's change: `agent`
     run_id: uuid.UUID | None = None  # the agent's run that made the change
+    automation_id: uuid.UUID | None = None  # `automation.started`: whose term (plan M7)
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +146,7 @@ def _system_entry(
         new=names.of(key, body.get("to")),
         actor_type=PrincipalType.AGENT if actor in agents else PrincipalType.USER,
         run_id=_uuid(body.get("run_id")),
+        automation_id=_uuid(body.get("automation_id")),
     )
 
 

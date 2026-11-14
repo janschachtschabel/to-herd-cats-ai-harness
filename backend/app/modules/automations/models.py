@@ -13,13 +13,19 @@ with an instruction (`instruction`, the owner's words to the agent). Kinds:
 
 Heartbeats and event rules come as further kinds with columns of their own.
 
-`state`: `active` (fires when due), `paused` (`paused_reason`; keeps its next term,
-fires nothing), `done` (a `once` that fired). `version` guards the owner's edits.
+`state`: `active` (fires when due), `paused` (`paused_reason`: `manual`, `owner` (the
+owner lost a right the automation needs, plan M7 decision 2) or `failing` (three runs
+in a row did not end `completed`, decision 13); keeps its next term, fires nothing),
+`done` (a `once` that fired). `version` guards edits and the take-over (409).
 
 `automation_firing`: the log, one row per term that came due (`due_at`, the term;
 `fired_at`, when the due loop took it): `started` with the run it started
-(`run_id`), or why it started none (`skipped_busy`: the automation's previous run is
-still open; `skipped_paused_agent`: the agent is not active). The unique index per
+(`run_id`, and the instruction it was given, `instruction`), or why it started none
+(`skipped_busy`: the automation's previous run is still open; `skipped_paused_agent`:
+the agent may not run; `skipped_budget`: a daily budget is reached;
+`skipped_policy`: the place is closed to AI, archived, or its ticket is gone). A
+term at which the owner turned out to have lost a right it needs logs nothing: the
+automation is paused (`paused_reason = owner`) and keeps the term. The unique index per
 term backs up the row lock of the due loop: a term is logged once, whatever runs
 how many times.
 """
@@ -52,12 +58,16 @@ class AutomationState(StrEnum):
 
 class PausedReason(StrEnum):
     MANUAL = "manual"  # someone allowed to paused it
+    OWNER = "owner"  # its owner no longer acts, has no AI, or reaches agent or place no more
+    FAILING = "failing"  # three runs in a row did not end `completed`
 
 
 class FiringOutcome(StrEnum):
     STARTED = "started"
     SKIPPED_BUSY = "skipped_busy"
     SKIPPED_PAUSED_AGENT = "skipped_paused_agent"
+    SKIPPED_BUDGET = "skipped_budget"  # a daily budget of the owner, agent or org is reached
+    SKIPPED_POLICY = "skipped_policy"  # the place closed to AI, archived, or its ticket gone
 
 
 def _in(column: str, values: type[StrEnum]) -> str:
@@ -82,6 +92,7 @@ class Automation(UuidPk, OrgScoped, Base):
         CheckConstraint(
             f"char_length(instruction) BETWEEN 1 AND {MAX_INSTRUCTION_CHARS}", name="instruction"
         ),
+        CheckConstraint("failures >= 0", name="failures"),
         Index("ix_automation_due", "next_due_at", postgresql_where=text("state = 'active'")),
         Index("ix_automation_owner_user_id", "owner_user_id"),
         Index("ix_automation_agent_id", "agent_id"),
@@ -105,6 +116,11 @@ class Automation(UuidPk, OrgScoped, Base):
     state: Mapped[AutomationState] = mapped_column(String(16), nullable=False)
     paused_reason: Mapped[PausedReason | None] = mapped_column(String(32))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Runs in a row that did not end `completed` (decision 13): the third pauses it
+    # (`failing`); a completed run, that pause and a take-over set it back to 0.
+    failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
 
 
 class AutomationFiring(UuidPk, OrgScoped, Base):
@@ -112,6 +128,7 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
     __table_args__ = (
         CheckConstraint(_in("outcome", FiringOutcome), name="outcome"),
         CheckConstraint("run_id IS NULL OR outcome = 'started'", name="run"),
+        CheckConstraint("(outcome = 'started') = (instruction IS NOT NULL)", name="instruction"),
         Index("uq_automation_firing_term", "automation_id", "due_at", unique=True),
         Index("ix_automation_firing_run_id", "run_id"),
     )
@@ -125,3 +142,6 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
     run_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("run.id", ondelete="SET NULL")
     )
+    # What the started run was asked: the automation's instruction as the term fired,
+    # so every take-up of the run reads the same, whatever the owner edits meanwhile.
+    instruction: Mapped[str | None] = mapped_column(Text)

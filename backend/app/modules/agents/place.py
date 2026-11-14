@@ -10,6 +10,12 @@
 - A ticket's run is given the ticket as its task (one turn naming its key; the model
   reads it with `read_ticket`) and answers at the top level of the ticket's thread,
   where its comments go; the ticket gone: `completed`.
+- An automation's run (plan M7 decision 3) is given its instruction as its owner's
+  turn, the only turn it starts with (nothing earlier of the place; its tools read
+  the place like any other run's, framed as untrusted), and answers at the top level
+  of the owner's DM or a ticket's thread, or in a channel in the thread its term
+  opened (`automations/runs.py`); the instructions say a scheduled automation of the
+  owner asks. Its term gone (the automation deleted): `completed`.
 
 The message that asked the run is always kept when the conversation is cut to fit
 (`context.window`). Only the asking person's messages are their turns and only this
@@ -27,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.agents.executor_repository import Claimed
 from app.modules.agents.read_repository import ReadRepository, Said
 from app.modules.agents.scope import PlaceKind, place_of
+from app.modules.automations import runs as automation_runs
 from app.modules.tickets.models import ticket_key
 from app.runtime.context import Turn
 
@@ -42,19 +49,33 @@ class Asked:
     turns: list[Turn]
     reply_to: uuid.UUID | None = None  # the thread its messages go to (None: top level)
     asker: str | None = None  # the asker's name where others read too (None: alone)
+    automation_of: str | None = None  # an automation's run: its owner's name
 
 
 async def asked(session: AsyncSession, claimed: Claimed) -> Asked | None:
     """What the run answers, where, and for whom (None: nothing to answer)."""
     reads = ReadRepository(session, claimed.org_id)
-    found = await _asked(reads, claimed)
+    if claimed.automation_id is not None:
+        found = await _automated(session, claimed)
+    else:
+        found = await _asked(reads, claimed)
     if found is None:
         return None
     place = await place_of(session, claimed.org_id, claimed.conversation_id, claimed.user_id)
-    if place is None or place.kind == PlaceKind.ALONE:
+    alone = place is None or place.kind == PlaceKind.ALONE
+    if alone and claimed.automation_id is None:
         return found
-    name = await reads.person_name(claimed.user_id)
-    return Asked(found.turns, found.reply_to, name or "the person who asked")
+    name = await reads.person_name(claimed.user_id) or "the person who asked"
+    automation_of = name if claimed.automation_id is not None else None
+    return Asked(found.turns, found.reply_to, None if alone else name, automation_of)
+
+
+async def _automated(session: AsyncSession, claimed: Claimed) -> Asked | None:
+    found = await automation_runs.assignment(session, claimed.org_id, claimed.id)
+    if found is None:
+        return None
+    reply_to = found.thread.id if found.thread is not None else None
+    return Asked([Turn("person", found.instruction, keep=True)], reply_to)
 
 
 async def _asked(reads: ReadRepository, claimed: Claimed) -> Asked | None:

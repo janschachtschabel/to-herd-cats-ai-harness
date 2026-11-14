@@ -23,19 +23,10 @@ works.
   actor (`tools.py`), and its `run_event` with the full result. A step that cannot be
   recorded, or a tool that fails, ends the run with `error` at once (the call's usage
   is still recorded).
-- The end, in one transaction (`close`): the answer (`kind=agent`, `client_id` = the
-  run, so there is never a second one), or on any other stop a timeline notice
-  (`run.stopped` with the reason, for the client to word), where the run answers
-  (`place.py`: the DM, the mentioning message's thread, the ticket's thread); the run
-  `done`. A ticket's run that ends without its answer (not cancelled) gives the
-  agent's responsible person an activity entry (`run_stopped`). A cancel
-  request found there wins over any other end (`cancelled`, no answer). A message the
-  person sent after the run started that no queued run will answer (it came while the
-  run waited) gets a run of its own, queued in the same transaction; not after a
-  cancelled run, which writes nothing beyond its notice (a DM's run only). A run
-  whose question was deleted before it started (no person's message after the last
-  answer, the mentioning message deleted, the ticket gone) ends `completed` at once,
-  without a call, an answer or a notice.
+- The end, in one transaction: `closing.close`. A run whose question was deleted
+  before it started (no person's message after the last answer, the mentioning
+  message deleted, the ticket gone, the automation's term gone) ends `completed` at
+  once, without a call, an answer or a notice.
 
 Taking a run up again (plan M6 decision 1): the run replays its journal (`journal.py`)
 and goes on after its last recorded step, with what it had read restored; the
@@ -51,35 +42,26 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core import secrets
 from app.modules.agents import briefing, place
-from app.modules.agents.actor import allowed_actor, run_actor
-from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.actor import allowed_actor
+from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import replay
-from app.modules.agents.models import EventKind, Run, StopReason
-from app.modules.agents.notices import announce, notice, notify
+from app.modules.agents.models import StopReason
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
-from app.modules.agents.run_repository import RunRepository
-from app.modules.agents.standing import refusal, run_target
+from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
-from app.modules.messaging import threads
-from app.modules.messaging.models import MAX_BODY_CHARS, Message
-from app.modules.messaging.notification_models import NotificationReason
 from app.runtime import context, models
 from app.runtime.loop import Outcome, Recorded, run_loop
 
 MAX_RECOVERIES = 2  # a run taken up again this often after its worker died: `error`
-STOP_KEY = "run.stopped"
-STOP_SEQ = 0  # the stop's event; the steps' events count from 1
 
 ModelMaker = Callable[[models.ModelTarget, float], models.BuiltModel]
 
@@ -166,7 +148,7 @@ class Executor:
                 reply_to=found.reply_to,
             )
         instructions = context.instructions(
-            agent.name, agent.instructions, briefed.sections, found.asker
+            agent.name, agent.instructions, briefed.sections, found.asker, found.automation_of
         )
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps
@@ -208,76 +190,6 @@ class Executor:
             return await close(
                 session, steps, run, StopReason(outcome.reason), outcome.answer, outcome.detail
             )
-
-
-async def close(
-    session: AsyncSession,
-    steps: RunSteps,
-    run: Run,
-    reason: StopReason,
-    answer: str | None = None,
-    detail: str | None = None,
-) -> StopReason:
-    """End the run (locked by the caller) with its answer or a notice, and queue the
-    run for a question it leaves unanswered."""
-    claimed = steps.run
-    by = await ControlRepository(session, claimed.org_id).cancelled_by(run.id)
-    if by is not None:
-        reason, answer, detail = StopReason.CANCELLED, None, None
-    root = None
-    if claimed.trigger_message_id is not None:
-        reads = ReadRepository(session, claimed.org_id)
-        root = await reads.thread_root(claimed.trigger_message_id, lock=True)
-    if reason == StopReason.COMPLETED:
-        if answer is not None:
-            message = await steps.answer(answer[:MAX_BODY_CHARS], root)
-            if message is not None:
-                if root is not None:
-                    threads.count_reply(root, message)
-                    await session.flush()
-                await announce(session, claimed.org_id, claimed.agent_id, message)
-    else:
-        content = {"key": STOP_KEY, "actor": str(claimed.agent_id), "to": reason.value}
-        conversation = await steps.conversation()
-        message = await notice(
-            session, claimed.org_id, claimed.agent_id, conversation, claimed.id, content, root
-        )
-        if message is not None and claimed.work_item_id is not None and by is None:
-            await _tell_responsible(session, steps, message)
-    stop: dict[str, object] = {"reason": reason.value, "detail": detail}
-    if by is not None:
-        stop["by"] = str(by)
-    await steps.event(STOP_SEQ, EventKind.STOP, stop)
-    await WaitedRepository(session, claimed.org_id).expire_pending(run.id)
-    await steps.done(run, reason.value)
-    if reason != StopReason.CANCELLED and claimed.work_item_id is None and root is None:
-        await _follow_up(session, steps, run)  # a DM's run (cancelled: nothing more)
-    return reason
-
-
-async def _tell_responsible(session: AsyncSession, steps: RunSteps, message: Message) -> None:
-    """A ticket's run ended without its answer: the agent's responsible person learns
-    of it (`run_stopped`)."""
-    agent = await steps.agent()
-    if agent is not None:
-        reason = NotificationReason.RUN_STOPPED
-        user_id = agent.responsible_user_id
-        await notify(session, agent.org_id, agent.id, message, user_id, reason)
-
-
-async def _follow_up(session: AsyncSession, steps: RunSteps, run: Run) -> None:
-    """A run for the person's latest message after this run started, if no queued
-    run answers it and the person may still ask the agent."""
-    message_id = await ControlRepository(session, run.org_id).unanswered(run)
-    if message_id is None:
-        return
-    agent = await steps.agent()
-    person = await run_actor(session, run.org_id, run.user_id, run.agent_id)
-    if agent is None or person is None or await refusal(session, person, agent) is not None:
-        return
-    await RunRepository(session, run.org_id).enqueue(
-        run.agent_id, run.user_id, run.conversation_id, message_id
-    )
 
 
 def _target(connection: AiConnection, model: str) -> models.ModelTarget:

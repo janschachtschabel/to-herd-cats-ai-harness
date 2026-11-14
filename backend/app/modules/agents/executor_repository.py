@@ -60,10 +60,11 @@ class Claimed:
     attempt: int
     started_at: datetime
     recoveries: int = 0
-    trigger_message_id: uuid.UUID | None = None  # None: a ticket's run
+    trigger_message_id: uuid.UUID | None = None  # None: a ticket's or an automation's run
     work_item_id: uuid.UUID | None = None
     chain_depth: int = 0
     lease: float = 0.0  # seconds a step's commit extends the lease by (0: none)
+    automation_id: uuid.UUID | None = None  # an automation's run (`automations/runs.py`)
 
     @classmethod
     def of(cls, run: Run, lease: float = 0.0) -> "Claimed":
@@ -82,6 +83,7 @@ class Claimed:
             run.work_item_id,
             run.chain_depth,
             lease,
+            run.automation_id,
         )
 
 

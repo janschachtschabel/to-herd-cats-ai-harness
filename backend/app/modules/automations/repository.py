@@ -8,15 +8,24 @@ automation's organisation.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import exists, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
+from app.core.access_repository import person_holds_role
+from app.core.permissions import SpaceRole
+from app.core.principal import PrincipalType
 from app.modules.automations.models import (
     Automation,
     AutomationFiring,
     AutomationState,
     FiringOutcome,
+    PausedReason,
 )
+from app.modules.groups.models import GroupMember
+from app.modules.messaging.models import SYSTEM_AUTHOR, Conversation, ConversationKind, Message
+from app.modules.spaces.models import SpaceMember
+from app.modules.users.models import User
 
 
 async def claim_due(session: AsyncSession, now: datetime) -> Automation | None:
@@ -40,6 +49,20 @@ class AutomationRepository:
         self.session = session
         self.org_id = org_id
 
+    async def get(self, automation_id: uuid.UUID, *, lock: bool = False) -> Automation | None:
+        stmt = select(Automation).where(
+            Automation.org_id == self.org_id, Automation.id == automation_id
+        )
+        if lock:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        return await self.session.scalar(stmt)
+
+    async def place(self, automation: Automation) -> Conversation:
+        stmt = select(Conversation).where(
+            Conversation.org_id == self.org_id, Conversation.id == automation.conversation_id
+        )
+        return (await self.session.scalars(stmt)).one()  # the automation goes with it
+
     async def log(
         self,
         automation: Automation,
@@ -47,21 +70,88 @@ class AutomationRepository:
         fired_at: datetime,
         outcome: FiringOutcome,
         run_id: uuid.UUID | None = None,
+        *,
+        firing_id: uuid.UUID | None = None,
     ) -> None:
-        """The term's row in the log; a second row for the same term fails the
-        transaction (`uq_automation_firing_term`)."""
+        """The term's row in the log (a started run's with the instruction it was
+        given); a second row for the same term fails the transaction
+        (`uq_automation_firing_term`)."""
         assert automation.org_id == self.org_id
+        started = outcome == FiringOutcome.STARTED
         self.session.add(
             AutomationFiring(
+                id=firing_id or uuid7(),
                 org_id=self.org_id,
                 automation_id=automation.id,
                 due_at=due_at,
                 fired_at=fired_at,
                 outcome=outcome,
                 run_id=run_id,
+                instruction=automation.instruction if started else None,
             )
         )
         await self.session.flush()
+
+    async def firing_of(self, run_id: uuid.UUID) -> AutomationFiring | None:
+        """The term that started the run."""
+        stmt = select(AutomationFiring).where(
+            AutomationFiring.org_id == self.org_id, AutomationFiring.run_id == run_id
+        )
+        return await self.session.scalar(stmt)
+
+    async def thread_of(self, firing_id: uuid.UUID, *, lock: bool = False) -> Message | None:
+        """The thread a term opened in a channel: its system entry, the root (None at
+        any other place)."""
+        stmt = (
+            select(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(
+                Message.org_id == self.org_id,
+                Message.author_type == SYSTEM_AUTHOR,
+                Message.client_id == firing_id,
+                Message.parent_id.is_(None),
+                Conversation.kind == ConversationKind.CHANNEL,
+            )
+        )
+        if lock:
+            stmt = stmt.with_for_update(of=Message).execution_options(populate_existing=True)
+        return await self.session.scalar(stmt)
+
+    async def pause(self, automation: Automation, reason: PausedReason) -> None:
+        """Paused (locked by the caller); it keeps its next term."""
+        automation.state = AutomationState.PAUSED
+        automation.paused_reason = reason
+        automation.version += 1
+        await self.session.flush()
+
+    async def managers(self, space_id: uuid.UUID) -> list[uuid.UUID]:
+        """The active people who manage the space (`admin`) through a membership of
+        their own or of a group. System admins without one are left out, as for a
+        space's moderators (`proposals.repository`)."""
+        direct = exists().where(
+            SpaceMember.space_id == space_id,
+            SpaceMember.member_type == PrincipalType.USER,
+            SpaceMember.member_id == User.id,
+            SpaceMember.role == SpaceRole.ADMIN,
+        )
+        through_group = exists().where(
+            SpaceMember.space_id == space_id,
+            SpaceMember.member_type == PrincipalType.GROUP,
+            SpaceMember.role == SpaceRole.ADMIN,
+            GroupMember.group_id == SpaceMember.member_id,
+            GroupMember.member_type == PrincipalType.USER,
+            GroupMember.member_id == User.id,
+        )
+        stmt = (
+            select(User.id)
+            .where(
+                User.org_id == self.org_id,
+                or_(direct, through_group),
+                person_holds_role(literal(space_id), SpaceRole.ADMIN),
+            )
+            .order_by(User.id)
+        )
+        return list((await self.session.scalars(stmt)).all())
 
     async def advance(self, automation: Automation, next_due_at: datetime | None) -> None:
         """The automation's next term; none: it is done (a `once` that fired)."""

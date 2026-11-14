@@ -83,5 +83,5 @@ class DueLoop:
         async with self.database.session_factory() as session, session.begin():
             found = await fire_next(session, self.clock.now())
         if found is not None:  # committed
-            self.firings.labels(outcome=found.outcome.value).inc()
+            self.firings.labels(outcome=found.label).inc()
         return found

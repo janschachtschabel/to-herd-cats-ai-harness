@@ -8,7 +8,10 @@ the top level has no thread, so its notification names the proposal and its spac
 instead of a conversation and a message); `skill_proposal` (a skill proposal: made,
 for those who may decide it; decided, for a person author; plan M6 task 9: a skill
 has no thread, so it names the proposal and its space, NULL for an organisation-wide
-skill).
+skill); `automation` (an automation was paused: plan M7 decisions 2 and 13; it names
+the automation, `automation_id`, and no conversation: for the agent's responsible
+person and the managers of the place's space when its owner lost a right, for the
+owner when it kept failing).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -44,6 +47,19 @@ class NotificationReason(StrEnum):
     QUESTION = "question"  # a run's card asks me a question
     RUN_STOPPED = "run_stopped"  # a ticket's run of my agent ended or could not start
     SKILL_PROPOSAL = "skill_proposal"  # a skill proposal to decide, or mine decided
+    AUTOMATION = "automation"  # an automation was paused (its owner's rights, failures)
+
+
+TARGET = (
+    "(message_id IS NOT NULL AND conversation_id IS NOT NULL AND proposal_id IS NULL"
+    " AND skill_proposal_id IS NULL AND space_id IS NULL AND automation_id IS NULL)"
+    " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NOT NULL"
+    " AND skill_proposal_id IS NULL AND space_id IS NOT NULL AND automation_id IS NULL)"
+    " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NULL"
+    " AND skill_proposal_id IS NOT NULL AND automation_id IS NULL)"
+    " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NULL"
+    " AND skill_proposal_id IS NULL AND space_id IS NULL AND automation_id IS NOT NULL)"
+)
 
 
 class Notification(UuidPk, OrgScoped, Base):
@@ -52,23 +68,16 @@ class Notification(UuidPk, OrgScoped, Base):
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
             "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
-            " 'approval', 'question', 'run_stopped', 'skill_proposal')",
+            " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),
         Index("ix_notification_conversation_id", "conversation_id"),
         Index("ix_notification_message_id", "message_id"),
         # Bound to a message, or (a proposal without a thread) to the proposal, or to a
-        # skill proposal (in its space; none for an organisation-wide skill).
-        CheckConstraint(
-            "(message_id IS NOT NULL AND conversation_id IS NOT NULL AND proposal_id IS NULL"
-            " AND skill_proposal_id IS NULL AND space_id IS NULL)"
-            " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NOT NULL"
-            " AND skill_proposal_id IS NULL AND space_id IS NOT NULL)"
-            " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NULL"
-            " AND skill_proposal_id IS NOT NULL)",
-            name="target",
-        ),
+        # skill proposal (in its space; none for an organisation-wide skill), or to an
+        # automation.
+        CheckConstraint(TARGET, name="target"),
         Index(
             "uq_notification_proposal",
             "user_id",
@@ -86,6 +95,7 @@ class Notification(UuidPk, OrgScoped, Base):
             postgresql_where=text("skill_proposal_id IS NOT NULL"),
         ),
         Index("ix_notification_skill_proposal_id", "skill_proposal_id"),
+        Index("ix_notification_automation_id", "automation_id"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -110,6 +120,10 @@ class Notification(UuidPk, OrgScoped, Base):
     # proposal (`messaging/activity_sight.py`).
     skill_proposal_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("skill_proposal.id", ondelete="CASCADE")
+    )
+    # An automation that was paused (plan M7); who sees it: `activity_repository`.
+    automation_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("automation.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

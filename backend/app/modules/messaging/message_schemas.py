@@ -103,7 +103,9 @@ class SystemEntryOut(BaseModel):
     it (null if unknown; an agent with `type` `agent`), `number` the restored version
     (only for `page.version_restored`), `old`/`new` what a ticket field changed from
     and to (null where there was nothing, and always for title and description),
-    `run_id` the agent's run that made a ticket change (plan M6 task 6)."""
+    `run_id` the agent's run that made a ticket change (plan M6 task 6),
+    `automation_id` the automation whose term `automation.started` opened (plan M7;
+    `actor` is its owner)."""
 
     key: str
     actor: PersonNameOut | None
@@ -111,6 +113,7 @@ class SystemEntryOut(BaseModel):
     old: SystemValueOut | None
     new: SystemValueOut | None
     run_id: uuid.UUID | None = None
+    automation_id: uuid.UUID | None = None
 
     @classmethod
     def of(cls, entry: SystemEntry) -> "SystemEntryOut":
@@ -124,6 +127,7 @@ class SystemEntryOut(BaseModel):
             old=SystemValueOut.of(entry.old),
             new=SystemValueOut.of(entry.new),
             run_id=entry.run_id,
+            automation_id=entry.automation_id,
         )
 
 
