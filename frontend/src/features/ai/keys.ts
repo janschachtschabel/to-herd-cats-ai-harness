@@ -8,4 +8,5 @@ export const aiKeys = {
   userAssignments: ['ai', 'assignments', 'users'] as const,
   usage: (by: string, from: string, to: string) => ['ai', 'usage', by, from, to] as const,
   myUsage: ['ai', 'usage', 'me'] as const,
+  budgets: ['ai', 'budgets'] as const,
 }

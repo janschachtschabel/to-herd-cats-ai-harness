@@ -5,9 +5,10 @@ const TABS = [
   { to: '/admin/ai', labelKey: 'ai.tabs.connections' },
   { to: '/admin/ai/assignments', labelKey: 'ai.tabs.assignments' },
   { to: '/admin/ai/usage', labelKey: 'ai.tabs.usage' },
+  { to: '/admin/ai/budgets', labelKey: 'ai.tabs.budgets' },
 ] as const
 
-/** The three pages of the AI administration, as links (the current one marked). */
+/** The pages of the AI administration, as links (the current one marked). */
 export function AiAdminTabs() {
   const { t } = useTranslation()
   return (

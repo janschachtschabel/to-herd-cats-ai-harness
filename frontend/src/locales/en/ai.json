@@ -9,7 +9,8 @@
       "label": "AI administration",
       "connections": "Connections",
       "assignments": "Assignments",
-      "usage": "Usage"
+      "usage": "Usage",
+      "budgets": "Budgets"
     },
     "kinds": {
       "openai": "OpenAI",
@@ -184,6 +185,55 @@
       "unlockPage": "Lift the AI lock",
       "lockFile": "Lock {{name}} for AI",
       "unlockFile": "Lift the AI lock of {{name}}"
+    },
+    "budgets": {
+      "description": "Daily limits on AI usage per organisation, person or agent. The day is the UTC day. Once a limit is reached, a run ends before its next model call; a call in flight is never cut, so a limit can be passed by one call.",
+      "currencyNote": "A currency limit counts only calls with a stored price, and stops only those. Calls without a price count toward the token limit alone. Where several budgets apply, the tightest wins.",
+      "listLabel": "Budgets",
+      "empty": "No budget set yet. Without a budget, usage is not limited.",
+      "scopes": {
+        "organisation": "Organisation"
+      },
+      "subject": {
+        "user": "Person: {{name}}",
+        "agent": "Agent: {{name}}"
+      },
+      "gone": "(deleted)",
+      "exhausted": "Limit reached",
+      "todayTokens": "Tokens today",
+      "todayCost": "Cost today",
+      "unpriced": "Without a price",
+      "ofLimitTokens": "{{used}} of {{limit}} tokens",
+      "noTokenLimit": "{{used}} tokens (no token limit)",
+      "ofLimit": "{{used}} of {{limit}}",
+      "noCostLimit": "{{used}} (no currency limit)",
+      "unpricedCalls_one": "{{count}} call without a price (counts toward tokens only)",
+      "unpricedCalls_other": "{{count}} calls without a price (count toward tokens only)",
+      "edit": "Change budget {{subject}}",
+      "editTitle": "Change budget: {{subject}}",
+      "remove": "Remove budget {{subject}}",
+      "removeTitle": "Remove the budget?",
+      "removeText": "The daily limit for {{subject}} goes away. Other budgets still apply.",
+      "new": "Set a budget",
+      "scope": "Applies to",
+      "scopeOptions": {
+        "organisation": "The whole organisation",
+        "user": "A person",
+        "agent": "An agent"
+      },
+      "person": "Person",
+      "agent": "Agent",
+      "pickAgent": "Pick an agent",
+      "agentsNeedRight": "Agents can be picked by those who manage agents. Existing agent budgets can still be changed and removed in the list.",
+      "tokens": "Tokens per day",
+      "tokensHint": "Input and output together. Empty: no token limit.",
+      "cost": "Euros per day",
+      "costHint": "Counts only calls with a stored price. Empty: no currency limit.",
+      "errors": {
+        "tokens": "A whole number above 0.",
+        "cost": "An amount in euros, for example 5 or 2.50.",
+        "limitMissing": "Please give a token or a currency limit."
+      }
     }
   },
   "agents": {
@@ -319,7 +369,10 @@
       "group_not_found": "This group no longer exists.",
       "guest_not_assignable": "Guests get no AI.",
       "usage_period_invalid": "The period is invalid (at most 365 days).",
-      "provider_failed": "The provider did not return the model list."
+      "provider_failed": "The provider did not return the model list.",
+      "budget_version_conflict": "Someone changed this budget meanwhile.",
+      "budget_limit_missing": "Please give a token or a currency limit.",
+      "budget_not_found": "This budget no longer exists."
     },
     "agent": {
       "not_found": "This agent does not exist (any more).",

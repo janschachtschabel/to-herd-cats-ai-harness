@@ -9,7 +9,8 @@
       "label": "KI-Verwaltung",
       "connections": "Verbindungen",
       "assignments": "Zuordnung",
-      "usage": "Verbrauch"
+      "usage": "Verbrauch",
+      "budgets": "Budgets"
     },
     "kinds": {
       "openai": "OpenAI",
@@ -184,6 +185,55 @@
       "unlockPage": "KI-Sperre aufheben",
       "lockFile": "{{name}} für KI sperren",
       "unlockFile": "KI-Sperre von {{name}} aufheben"
+    },
+    "budgets": {
+      "description": "Tageslimits für den KI-Verbrauch je Organisation, Person oder Agent. Der Tag ist der UTC-Tag. Ist ein Limit erreicht, endet ein Lauf vor seinem nächsten Modellaufruf; ein laufender Aufruf wird nicht abgebrochen, ein Limit kann also um einen Aufruf überschritten werden.",
+      "currencyNote": "Ein Währungslimit zählt nur Aufrufe mit hinterlegtem Preis und stoppt nur solche. Aufrufe ohne Preis zählen allein für das Token-Limit. Gelten mehrere Budgets, greift das engste.",
+      "listLabel": "Budgets",
+      "empty": "Noch kein Budget gesetzt. Ohne Budget ist der Verbrauch nicht begrenzt.",
+      "scopes": {
+        "organisation": "Organisation"
+      },
+      "subject": {
+        "user": "Person: {{name}}",
+        "agent": "Agent: {{name}}"
+      },
+      "gone": "(gelöscht)",
+      "exhausted": "Limit erreicht",
+      "todayTokens": "Tokens heute",
+      "todayCost": "Kosten heute",
+      "unpriced": "Ohne Preis",
+      "ofLimitTokens": "{{used}} von {{limit}} Tokens",
+      "noTokenLimit": "{{used}} Tokens (kein Token-Limit)",
+      "ofLimit": "{{used}} von {{limit}}",
+      "noCostLimit": "{{used}} (kein Währungslimit)",
+      "unpricedCalls_one": "{{count}} Aufruf ohne Preis (zählt nur für Tokens)",
+      "unpricedCalls_other": "{{count}} Aufrufe ohne Preis (zählen nur für Tokens)",
+      "edit": "Budget {{subject}} ändern",
+      "editTitle": "Budget ändern: {{subject}}",
+      "remove": "Budget {{subject}} entfernen",
+      "removeTitle": "Budget entfernen?",
+      "removeText": "Das Tageslimit für {{subject}} entfällt. Andere Budgets gelten weiter.",
+      "new": "Budget setzen",
+      "scope": "Gilt für",
+      "scopeOptions": {
+        "organisation": "Die ganze Organisation",
+        "user": "Eine Person",
+        "agent": "Ein Agent"
+      },
+      "person": "Person",
+      "agent": "Agent",
+      "pickAgent": "Agent wählen",
+      "agentsNeedRight": "Agenten wählen kann, wer Agenten verwaltet. Bestehende Budgets von Agenten lassen sich in der Liste trotzdem ändern und entfernen.",
+      "tokens": "Tokens je Tag",
+      "tokensHint": "Eingabe und Ausgabe zusammen. Leer: kein Token-Limit.",
+      "cost": "Euro je Tag",
+      "costHint": "Zählt nur Aufrufe mit hinterlegtem Preis. Leer: kein Währungslimit.",
+      "errors": {
+        "tokens": "Eine ganze Zahl über 0.",
+        "cost": "Ein Betrag in Euro, zum Beispiel 5 oder 2,50.",
+        "limitMissing": "Bitte ein Token- oder ein Währungslimit angeben."
+      }
     }
   },
   "agents": {
@@ -319,7 +369,10 @@
       "group_not_found": "Diese Gruppe gibt es nicht mehr.",
       "guest_not_assignable": "Gäste bekommen keine KI.",
       "usage_period_invalid": "Der Zeitraum ist ungültig (höchstens 365 Tage).",
-      "provider_failed": "Der Anbieter hat die Modellliste nicht geliefert."
+      "provider_failed": "Der Anbieter hat die Modellliste nicht geliefert.",
+      "budget_version_conflict": "Jemand hat dieses Budget inzwischen geändert.",
+      "budget_limit_missing": "Bitte ein Token- oder ein Währungslimit angeben.",
+      "budget_not_found": "Dieses Budget gibt es nicht mehr."
     },
     "agent": {
       "not_found": "Diesen Agenten gibt es nicht (mehr).",

@@ -26,6 +26,10 @@ const AssignmentsPage = lazyRouteComponent(
   'AssignmentsPage',
 )
 const UsagePage = lazyRouteComponent(() => import('@/features/ai/usage/UsagePage'), 'UsagePage')
+const BudgetsPage = lazyRouteComponent(
+  () => import('@/features/ai/budgets/BudgetsPage'),
+  'BudgetsPage',
+)
 const AgentsPage = lazyRouteComponent(() => import('@/features/agents/AgentsPage'), 'AgentsPage')
 const AgentAdminPage = lazyRouteComponent(
   () => import('@/features/agents/admin/AgentAdminPage'),
@@ -130,6 +134,13 @@ const aiUsageRoute = createRoute({
   component: UsagePage,
 })
 
+const aiBudgetsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/budgets',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: BudgetsPage,
+})
+
 const agentsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/agents',
@@ -176,6 +187,7 @@ export const adminTree = adminRoute.addChildren([
   aiRoute,
   aiAssignmentsRoute,
   aiUsageRoute,
+  aiBudgetsRoute,
   agentsRoute,
   agentRoute,
   skillsRoute,
