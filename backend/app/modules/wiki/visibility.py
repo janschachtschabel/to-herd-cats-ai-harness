@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can, require, space_ids_with, visible_space_ids
 from app.core.errors import Conflict, NotFound
+from app.core.principal import Principal
 from app.modules.ai.policy_filters import ai_space_ids
 from app.modules.spaces.models import Space
 from app.modules.wiki.models import Page, PageStatus
@@ -34,11 +35,12 @@ def check_version(page: Page, version: int) -> None:
         raise Conflict(code="page.version_conflict", details={"current_version": page.version})
 
 
-def touch(page: Page, actor: Actor) -> None:
-    """Record a write to the row: a new version, by the actor."""
+def touch(page: Page, actor: Actor, author: Principal | None = None) -> None:
+    """Record a write to the row: a new version, by the actor (or for `author`)."""
+    who = author or actor.principal
     page.version += 1
-    page.updated_by_type = actor.principal.type
-    page.updated_by_id = actor.principal.id
+    page.updated_by_type = who.type
+    page.updated_by_id = who.id
 
 
 class PageReader:

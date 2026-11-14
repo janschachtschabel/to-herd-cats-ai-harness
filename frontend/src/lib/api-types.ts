@@ -1224,6 +1224,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Proposal */
+        get: operations["get_proposal_api_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Proposal
+         * @description 409 `proposal.base_outdated` when the page moved on (see the merge in the
+         *     error's `details`); accept again with `merged_content` and `page_version`.
+         */
+        post: operations["accept_proposal_api_proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Proposal */
+        post: operations["reject_proposal_api_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -1515,6 +1570,27 @@ export interface paths {
         };
         /** Page Tree */
         get: operations["page_tree_api_spaces__space_id__pages_tree_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/spaces/{space_id}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Proposals
+         * @description Newest first: those of the space the caller may see (page editors, and an
+         *     author their own).
+         */
+        get: operations["list_proposals_api_spaces__space_id__proposals_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2236,6 +2312,12 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * AgentWritePolicy
+         * @description How agents write pages in a space (plan M6 decision 8).
+         * @enum {string}
+         */
+        AgentWritePolicy: "propose" | "direct";
         /**
          * AiLockIn
          * @description Lock a page or a file for AI, or lift the lock; `version` as read (stale → 409).
@@ -3495,7 +3577,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal";
         /** OrgOut */
         OrgOut: {
             /**
@@ -3740,6 +3822,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[ProposalOut] */
+        Page_ProposalOut_: {
+            /** Items */
+            items: components["schemas"]["ProposalOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[RunEventOut] */
         Page_RunEventOut_: {
             /** Items */
@@ -3957,6 +4046,209 @@ export interface components {
             version: number;
         };
         /**
+         * ProposalAcceptIn
+         * @description `version`: the proposal's. `merged_content` with `page_version` (the page's
+         *     version it was merged against): the text to write instead of the proposal, after
+         *     a 409 `proposal.base_outdated`.
+         */
+        ProposalAcceptIn: {
+            /** Merged Content */
+            merged_content?: string | null;
+            /** Page Version */
+            page_version?: number | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProposalAuthorOut
+         * @description A person or an agent, by name (null if it is gone).
+         */
+        ProposalAuthorOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            type: components["schemas"]["PrincipalType"];
+        };
+        /** ProposalDeciderOut */
+        ProposalDeciderOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+        };
+        /**
+         * ProposalDetailOut
+         * @description With the proposed `content_md` and `diff`, line by line from the base (empty for
+         *     a new page) to it; null when the texts are beyond `HERD_DIFF_MAX_LINES`
+         *     (`too_large`). For an open change: `page_version`, the page's version now (name it
+         *     with `merged_content` when accepting); and when the page's content is no longer
+         *     the base, `current_content_md` and `merge` (null when too large).
+         */
+        ProposalDetailOut: {
+            /** Ai */
+            ai: boolean;
+            author: components["schemas"]["ProposalAuthorOut"];
+            /** Base Version */
+            base_version: number | null;
+            /** Content Md */
+            content_md: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Content Md */
+            current_content_md: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            decided_by: components["schemas"]["ProposalDeciderOut"] | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /** Diff */
+            diff: components["schemas"]["HunkOut"][] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ProposalKind"];
+            merge: components["schemas"]["ProposalMergeOut"] | null;
+            /** Page Id */
+            page_id: string | null;
+            /** Page Version */
+            page_version: number | null;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Reason */
+            reason: string;
+            /** Result Version */
+            result_version: number | null;
+            /** Run Id */
+            run_id: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            state: components["schemas"]["ProposalState"];
+            /** Title */
+            title: string | null;
+            /** Too Large */
+            too_large: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProposalKind
+         * @enum {string}
+         */
+        ProposalKind: "change" | "new";
+        /**
+         * ProposalMergeOut
+         * @description The three-way merge of base, proposal and the page now: `merged_content` when it
+         *     merges cleanly (null with conflicts), and the merge in `segments`.
+         */
+        ProposalMergeOut: {
+            /** Clean */
+            clean: boolean;
+            /** Merged Content */
+            merged_content: string | null;
+            /** Segments */
+            segments: components["schemas"]["ProposalSegmentOut"][];
+        };
+        /**
+         * ProposalOut
+         * @description A proposal without its content. `kind`: `change` of `page_id`, based on its
+         *     version `base_version`; or `new`, a page `title` under `parent_id` (null: the top
+         *     level), whose `page_id` is the page it became once accepted. `ai`: made by an agent
+         *     (`run_id`: its run). `decided_by`/`decided_at`: who accepted, rejected or (its
+         *     author's person) withdrew it, and when; `decision_reason`: a rejection's reason;
+         *     `result_version`: the page version an acceptance wrote (null if the page held
+         *     that content already). `version`: name it when deciding (stale → 409).
+         */
+        ProposalOut: {
+            /** Ai */
+            ai: boolean;
+            author: components["schemas"]["ProposalAuthorOut"];
+            /** Base Version */
+            base_version: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            decided_by: components["schemas"]["ProposalDeciderOut"] | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ProposalKind"];
+            /** Page Id */
+            page_id: string | null;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Reason */
+            reason: string;
+            /** Result Version */
+            result_version: number | null;
+            /** Run Id */
+            run_id: string | null;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            state: components["schemas"]["ProposalState"];
+            /** Title */
+            title: string | null;
+            /** Version */
+            version: number;
+        };
+        /** ProposalRejectIn */
+        ProposalRejectIn: {
+            /** Reason */
+            reason?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProposalSegmentOut
+         * @description `clean`: merged `lines`; `conflict`: the stretch as in the base, as proposed and
+         *     as on the page now (the other three lists are empty for the other kind).
+         */
+        ProposalSegmentOut: {
+            /** Base */
+            base: string[];
+            /** Current */
+            current: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "clean" | "conflict";
+            /** Lines */
+            lines: string[];
+            /** Proposed */
+            proposed: string[];
+        };
+        /**
+         * ProposalState
+         * @enum {string}
+         */
+        ProposalState: "open" | "accepted" | "rejected" | "withdrawn";
+        /**
          * Purpose
          * @enum {string}
          */
@@ -4161,8 +4453,11 @@ export interface components {
          * SpaceOut
          * @description `my_role` is the caller's role there, for display (system admins: `admin`).
          *     `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).
+         *     `agent_write_policy`: whether agents propose page changes (`propose`) or may write
+         *     pages directly (`direct`, plan M6 decision 8).
          */
         SpaceOut: {
+            agent_write_policy: components["schemas"]["AgentWritePolicy"];
             ai_policy: components["schemas"]["AiPolicy"];
             /** Allowed Locations */
             allowed_locations: components["schemas"]["DataLocation"][];
@@ -4193,6 +4488,7 @@ export interface components {
         SpaceRole: "viewer" | "editor" | "moderator" | "admin";
         /** SpaceUpdateIn */
         SpaceUpdateIn: {
+            agent_write_policy?: components["schemas"]["AgentWritePolicy"] | null;
             ai_policy?: components["schemas"]["AiPolicy"] | null;
             /** Allowed Locations */
             allowed_locations?: components["schemas"]["DataLocation"][] | null;
@@ -4963,6 +5259,8 @@ export interface components {
         };
         /** VersionOut */
         VersionOut: {
+            /** Ai */
+            ai: boolean;
             author: components["schemas"]["VersionAuthor"];
             /** Change Summary */
             change_summary: string | null;
@@ -4977,6 +5275,8 @@ export interface components {
             label: string | null;
             /** Number */
             number: number;
+            /** Run Id */
+            run_id: string | null;
             source: components["schemas"]["VersionSource"];
             /** Title */
             title: string;
@@ -4985,13 +5285,16 @@ export interface components {
          * VersionSource
          * @enum {string}
          */
-        VersionSource: "human" | "import" | "restore" | "collab";
+        VersionSource: "human" | "import" | "restore" | "collab" | "agent";
         /**
          * VersionSummaryOut
          * @description `change_summary` is free text, or `restore:<n>` for a version that brought
-         *     version n back (the client words it).
+         *     version n back (the client words it). `ai`: written for an agent (the AI mark,
+         *     spec 9: its author is an agent); `run_id`: the agent's run that wrote it.
          */
         VersionSummaryOut: {
+            /** Ai */
+            ai: boolean;
             author: components["schemas"]["VersionAuthor"];
             /** Change Summary */
             change_summary: string | null;
@@ -5004,6 +5307,8 @@ export interface components {
             label: string | null;
             /** Number */
             number: number;
+            /** Run Id */
+            run_id: string | null;
             source: components["schemas"]["VersionSource"];
             /** Title */
             title: string;
@@ -7987,6 +8292,107 @@ export interface operations {
             };
         };
     };
+    get_proposal_api_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_proposal_api_proposals__proposal_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalAcceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalRejectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_run_api_runs__run_id__get: {
         parameters: {
             query?: never;
@@ -8676,6 +9082,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TreeNodeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_proposals_api_spaces__space_id__proposals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description only this state */
+                state?: components["schemas"]["ProposalState"] | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProposalOut_"];
                 };
             };
             /** @description Validation Error */

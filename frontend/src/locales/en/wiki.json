@@ -1,4 +1,9 @@
 {
+  "activity": {
+    "reasons": {
+      "proposal": "made or decided a proposal in {{where}}"
+    }
+  },
   "search": {
     "title": "Search",
     "description": "Searches every page and message you may read. Arrow keys choose, Enter opens.",

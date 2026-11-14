@@ -118,6 +118,7 @@ class VersionSource(StrEnum):
     IMPORT = "import"
     RESTORE = "restore"  # an older state brought back as a new version
     COLLAB = "collab"  # saved from a live-editing session
+    AGENT = "agent"  # written for an agent (its run, or a proposal of it accepted)
 
 
 class PageVersion(UuidPk, OrgScoped, Base):
@@ -127,7 +128,9 @@ class PageVersion(UuidPk, OrgScoped, Base):
     __tablename__ = "page_version"
     __table_args__ = (
         UniqueConstraint("page_id", "number"),
-        CheckConstraint("source IN ('human', 'import', 'restore', 'collab')", name="source"),
+        CheckConstraint(
+            "source IN ('human', 'import', 'restore', 'collab', 'agent')", name="source"
+        ),
     )
 
     page_id: Mapped[uuid.UUID] = mapped_column(
@@ -143,6 +146,9 @@ class PageVersion(UuidPk, OrgScoped, Base):
     change_summary: Mapped[str | None] = mapped_column(String(MAX_SUMMARY_CHARS))
     label: Mapped[str | None] = mapped_column(String(MAX_LABEL_CHARS))
     session_key: Mapped[str | None] = mapped_column(String(100))
+    # The agent's run that wrote it (no foreign key: a version outlives its run, like
+    # `usage_record.run_id`); the AI mark is an agent as author (`version_schemas`).
+    run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

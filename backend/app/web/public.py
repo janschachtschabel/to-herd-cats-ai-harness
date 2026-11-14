@@ -30,6 +30,7 @@ from app.modules.messaging import router_dms as messaging_dms
 from app.modules.messaging import router_live as messaging_live
 from app.modules.messaging import router_social as messaging_social
 from app.modules.messaging.live import LiveHub
+from app.modules.proposals import router as proposals
 from app.modules.search.router import router as search_router
 from app.modules.spaces.router import router as spaces_router
 from app.modules.tags.router import router as tags_router
@@ -59,6 +60,8 @@ def api_router() -> APIRouter:
     api.include_router(wiki.pages)
     api.include_router(wiki.space_trash)
     api.include_router(page_versions)
+    api.include_router(proposals.space_proposals)
+    api.include_router(proposals.proposals)
     api.include_router(page_attachments)
     api.include_router(attachments)
     api.include_router(space_transfer)

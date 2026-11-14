@@ -2,6 +2,7 @@ import {
   AtSign,
   Check,
   CheckCheck,
+  FilePen,
   MessageSquare,
   MessageSquareReply,
   UserCheck,
@@ -99,6 +100,7 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   reply: MessageSquareReply,
   assignment: UserCheck,
   ticket_comment: MessageSquare,
+  proposal: FilePen,
 }
 
 function ActivityItem({ entry }: { entry: ActivityEntry }) {

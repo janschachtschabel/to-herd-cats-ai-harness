@@ -17,7 +17,7 @@ Aktion noch einmal.
 |---|---|
 | Leser (`viewer`) | veröffentlichte Seiten in ihrer aktuellen Fassung lesen, exportieren, suchen (keine Versionsgeschichte) |
 | Autor (`editor`) | dazu Seiten anlegen, bearbeiten (Markdown und live), umbenennen, verschieben, Tags setzen, Anhänge hochladen; Versionen ansehen, vergleichen, benennen und wiederherstellen; Entwürfe aller sehen, eigene veröffentlichen |
-| Moderator (`moderator`) | dazu fremde Entwürfe veröffentlichen, Seiten in den Papierkorb legen und wiederherstellen, Tags des Bereichs verwalten |
+| Moderator (`moderator`) | dazu fremde Entwürfe veröffentlichen, Seiten in den Papierkorb legen und wiederherstellen, Tags des Bereichs verwalten, Vorschläge annehmen und ablehnen |
 | Verwalter (`admin`) | dazu Mitglieder, Einstellungen, Import |
 
 Systemweit: Endgültiges Löschen aus dem Papierkorb (`page.purge`) und systemweite Tags
@@ -80,7 +80,7 @@ zählt sie nicht mit.
 ### Versionen, Papierkorb, Tags, Anhänge, Suche
 
 - **Versionen:** Jede Speicherung ist eine Version mit Person, Zeit und Quelle
-  (`human`, `collab`, `import`, `restore`). Live-Speicherungen derselben Sitzung werden
+  (`human`, `collab`, `import`, `restore`, `agent`). Live-Speicherungen derselben Sitzung werden
   über 60 s zu einer Version zusammengefasst. Zwei Versionen lassen sich vergleichen
   (bis 20.000 Zeilen), benennen und wiederherstellen (als neue Version). Die
   Versionsgeschichte sieht nur, wer die Seite bearbeiten darf; Leser sehen nur die
@@ -100,6 +100,57 @@ zählt sie nicht mit.
   `.md` je Seite (Front Matter `title`, `status`, `tags`) und den Anhängen; Import
   desselben Formats (Verwalter des Bereichs, bis 100 MiB, 2.000 Einträge). Jede Seite
   lässt sich auch einzeln als `.md` herunterladen.
+- **Versionen von Agenten:** Schreibt ein Agent (oder wird sein Vorschlag angenommen),
+  hat die Version die Quelle `agent`, den Agenten als Autor, den Lauf (`run_id`) und
+  das KI-Kennzeichen (`ai`); die Person, mit deren Rechten der Lauf schrieb, steht
+  nicht in der Version.
+
+### Vorschläge (seit M6)
+
+Agenten schreiben Seiten zunächst nicht selbst, sondern schlagen Änderungen vor. Ein
+Vorschlag ist entweder eine **Änderung** einer Seite (vorgeschlagener Inhalt, bezogen
+auf den Stand der Seite, als er entstand: Basisversion) oder eine **neue Seite** unter
+einer Seite oder auf oberster Ebene (Titel und Inhalt). Dazu kommt immer eine kurze
+Begründung, die beim Annehmen zum Änderungstext der Version wird.
+
+- **Wer sieht Vorschläge:** wer im Bereich Seiten bearbeiten darf (ab `editor`).
+  Leser sehen sie nicht: Ein Vorschlag zeigt unveröffentlichten Inhalt und den
+  früheren Stand der Seite, wie Entwürfe und Versionen. Vorschläge zu Seiten im
+  Papierkorb sind ausgeblendet. Die Liste je Bereich (`GET
+  /api/spaces/{id}/proposals`, Filter `state`) zeigt die neuesten zuerst, ein
+  Vorschlag (`GET /api/proposals/{id}`) zeigt den Unterschied zur Basis und, wenn die
+  Seite inzwischen geändert wurde, ihren aktuellen Inhalt und den Drei-Wege-Abgleich.
+- **Wer entscheidet:** Moderatoren (`page.moderate`) nehmen an oder lehnen ab (mit
+  optionaler Begründung); ein Agent entscheidet nie, auch nicht über eigene Vorschläge.
+  Jede Entscheidung nennt die `version` des Vorschlags (veraltet: 409).
+- **Annehmen** schreibt die Seite wie Speichern im Markdown-Editor: eine neue Version
+  (Quelle `agent` bei Vorschlägen von Agenten), eine neue Generation (offene
+  Live-Editoren laden neu). Nie in eine Seite im Papierkorb, nie in eine Seite mit
+  KI-Sperre, wenn ein Agent den Vorschlag gemacht hat (409 `proposal.page_no_ai`). Eine
+  neue Seite entsteht als Entwurf unter ihrer übergeordneten Seite, die noch existieren
+  muss (409 `proposal.parent_gone`).
+- **Seite inzwischen geändert:** Dann wird nichts übernommen. Die Antwort 409
+  `proposal.base_outdated` enthält den Drei-Wege-Abgleich (Basis, Vorschlag, aktueller
+  Stand; zeilenweise): bei sauberem Abgleich den zusammengeführten Text, sonst die
+  Konfliktstellen. Übernommen wird erst, wenn der Moderator den Text ausdrücklich
+  bestätigt (erneut annehmen mit `merged_content` und der aktuellen `page_version` der
+  Seite). Hat sich die Seite bis dahin wieder geändert, kommt erneut 409. Texte über
+  20.000 Zeilen (zusammen) werden nicht verglichen (`too_large`).
+- **Mitteilungen:** Neue Vorschläge erscheinen in der Aktivität der Moderatoren des
+  Bereichs (über ihre Mitgliedschaft, direkt oder über eine Gruppe; Administratoren ohne
+  Mitgliedschaft nicht), Entscheidungen in der Aktivität einer Person, die selbst
+  vorgeschlagen hat. Der Thread der Seite (bei neuen Seiten: der übergeordneten Seite)
+  bekommt je Vorschlag und Entscheidung einen Systemeintrag ohne Inhalt. Neue Seiten auf
+  oberster Ebene haben keinen solchen Thread: Sie stehen nur in der Liste des Bereichs.
+  Live geht jede Änderung als `proposal.changed` (nur Bereich und Vorschlag) an alle,
+  die im Bereich Seiten bearbeiten dürfen. In Kanälen erscheint nichts.
+- **Einstellung „Schreiben durch Agenten“** (`agent_write_policy`, Einstellungen des
+  Bereichs, `space.manage`): `propose` (Voreinstellung, Agenten schlagen vor) oder
+  `direct` (Agenten mit passender Stufe dürfen Seiten direkt schreiben; die
+  Werkzeuge kommen mit M6 Aufgabe 6).
+
+Vorschläge von Menschen (`human_review`) gibt es noch nicht; der Dienst nimmt sie an,
+eine Oberfläche oder Route dafür nicht.
 
 ## Grenzen der Markdown-Abbildung im Live-Editor
 

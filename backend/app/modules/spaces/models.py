@@ -20,6 +20,13 @@ class SpaceKind(StrEnum):
     PERSONAL = "personal"  # exactly one person, created with them
 
 
+class AgentWritePolicy(StrEnum):
+    """How agents write pages in a space (plan M6 decision 8)."""
+
+    PROPOSE = "propose"  # through proposals a moderator accepts (the default)
+    DIRECT = "direct"  # directly, for agents whose level allows it (`update_page`)
+
+
 class Space(UuidPk, OrgScoped, Base):
     """Where pages, tickets and channels live; the boundary of every permission."""
 
@@ -34,6 +41,7 @@ class Space(UuidPk, OrgScoped, Base):
             "AND (ai_policy = 'restricted') = (cardinality(allowed_locations) > 0)",
             name="allowed_locations",
         ),
+        CheckConstraint("agent_write_policy IN ('propose', 'direct')", name="agent_write_policy"),
     )
 
     kind: Mapped[SpaceKind] = mapped_column(String(16), nullable=False)
@@ -52,6 +60,13 @@ class Space(UuidPk, OrgScoped, Base):
     )
     allowed_locations: Mapped[list[str]] = mapped_column(
         ARRAY(String(16)), default=list, server_default=text("'{}'::varchar[]"), nullable=False
+    )
+    # Read by `proposals.service.agent_writes_directly` (the write tools ask it).
+    agent_write_policy: Mapped[AgentWritePolicy] = mapped_column(
+        String(16),
+        default=AgentWritePolicy.PROPOSE,
+        server_default=AgentWritePolicy.PROPOSE.value,
+        nullable=False,
     )
 
 

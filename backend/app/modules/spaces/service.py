@@ -101,7 +101,8 @@ class SpaceService:
         space = _found(await self.spaces.get_for_update(actor.org_id, space_id))
         if space.version != version:
             raise Conflict(code="spaces.version_conflict")
-        before = snapshot(space, ("name", "description", "icon", "ai_policy", "allowed_locations"))
+        fields = ("name", "description", "icon", "ai_policy", "allowed_locations")
+        before = snapshot(space, (*fields, "agent_write_policy"))
         if data.name is not None:
             space.name = data.name
         if "description" in data.model_fields_set:
@@ -111,6 +112,8 @@ class SpaceService:
         if data.ai_policy is not None:
             space.ai_policy = data.ai_policy
             space.allowed_locations = [str(loc) for loc in data.allowed_locations or ()]
+        if data.agent_write_policy is not None:
+            space.agent_write_policy = data.agent_write_policy
         space.version += 1
         await self.session.flush()
         if changed := changes(before, space):

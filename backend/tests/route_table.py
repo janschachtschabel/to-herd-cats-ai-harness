@@ -28,6 +28,8 @@ ship without a decision on who may call it. Guards:
   gets 404 `agent.not_found`, as for an unknown id (plan M5).
 - `run`: the person who asked, the agent's responsible person (each with `ai.use`) or
   `agent.manage`; everyone else gets 404 `run.not_found`.
+- `proposal`: a page editor in the proposal's space (or its author); everyone else
+  gets 404 `proposal.not_found`, as for an unknown id (plan M6).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -66,6 +68,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/pages/{page_id}/versions/{number}", "page"),
     ("PATCH", "/api/pages/{page_id}/versions/{number}", "page"),
     ("POST", "/api/pages/{page_id}/versions/{number}/restore", "page"),
+    ("GET", "/api/spaces/{space_id}/proposals", "space"),
+    ("GET", "/api/proposals/{proposal_id}", "proposal"),
+    ("POST", "/api/proposals/{proposal_id}/accept", "proposal"),
+    ("POST", "/api/proposals/{proposal_id}/reject", "proposal"),
     ("GET", "/api/pages/{page_id}/diff", "page"),
     ("PUT", "/api/pages/{page_id}/tags", "page"),
     ("POST", "/api/pages/{page_id}/attachments", "page"),
@@ -187,6 +193,7 @@ def concrete(
     message_id: object | None = None,
     status_id: object | None = None,
     sprint_id: object | None = None,
+    proposal_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -214,6 +221,7 @@ def concrete(
         "{sprint_id}": str(sprint_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
+        "{proposal_id}": str(proposal_id or uuid7()),
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -246,6 +254,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/pages/{page_id}/versions/{number}"): {"label": "X"},
     ("POST", "/api/pages/{page_id}/versions/{number}/restore"): {"version": 1},
     ("PUT", "/api/pages/{page_id}/tags"): {"tag_ids": [], "version": 1},
+    ("POST", "/api/proposals/{proposal_id}/accept"): {"version": 1},
+    ("POST", "/api/proposals/{proposal_id}/reject"): {"version": 1},
     ("POST", "/api/spaces/{space_id}/channels"): {"name": "x"},
     ("PATCH", "/api/conversations/{conversation_id}"): {"topic": "x", "version": 1},
     ("POST", "/api/conversations/{conversation_id}/archive"): {"version": 1},

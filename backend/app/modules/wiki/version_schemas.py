@@ -24,7 +24,8 @@ class VersionAuthor(BaseModel):
 
 class VersionSummaryOut(BaseModel):
     """`change_summary` is free text, or `restore:<n>` for a version that brought
-    version n back (the client words it)."""
+    version n back (the client words it). `ai`: written for an agent (the AI mark,
+    spec 9: its author is an agent); `run_id`: the agent's run that wrote it."""
 
     number: int
     title: str
@@ -33,6 +34,8 @@ class VersionSummaryOut(BaseModel):
     change_summary: str | None
     label: str | None
     created_at: datetime
+    ai: bool
+    run_id: uuid.UUID | None
 
     @classmethod
     def of(cls, row: NamedVersion) -> "VersionSummaryOut":
@@ -45,6 +48,8 @@ class VersionSummaryOut(BaseModel):
             change_summary=v.change_summary,
             label=v.label,
             created_at=v.created_at,
+            ai=v.author_type == PrincipalType.AGENT,
+            run_id=v.run_id,
         )
 
 

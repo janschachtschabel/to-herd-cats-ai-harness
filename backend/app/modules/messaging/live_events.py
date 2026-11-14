@@ -8,6 +8,7 @@ only, never content:
      "m": <message_id|null>, "p": <parent_id|null>, "u": <user_id|null>,
      "w": <ticket_id>, "s": <space_id> (ticket events only),
      "r": <sprint_id> (sprint events only, with "s"),
+     "x": <proposal_id> (proposal events only, with "s"),
      "n": <run_id>, "k": <step> (`run.progress` only)}
 
 `u` names the one person an event is for (`notification.created`,
@@ -19,7 +20,10 @@ ticket's space, gets them, the ticket as `w` and its space as `s` (a client refr
 that ticket and that space's lists only, review M4 P4). Sprint events
 (`sprint.created|updated|started|closed`, plan M4b) are one `sprint.changed` for the
 space `s`: whoever may read tickets there gets it, with the space's and the sprint's
-id (and nothing else). `run.progress` (plan M5 task 6) names an agent's run in a DM
+id (and nothing else). Proposal events (`proposal.created|accepted|rejected|
+withdrawn`, plan M6 task 5) are one `proposal.changed` for the space `s`, for whoever
+may edit pages there (who sees proposals), with the proposal's id. `run.progress`
+(plan M5 task 6) names an agent's run in a DM
 as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person).
 Every API process's hub
 (`live.py`) decodes it again; anything it cannot use is dropped. Payloads stay far
@@ -35,6 +39,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import Event
+from app.core.permissions import Action
 
 LIVE_CHANNEL = "herd_live"
 MAX_PAYLOAD_BYTES = 4000
@@ -61,11 +66,18 @@ LIVE_TYPES: dict[str, str] = {
     "sprint.started": "sprint.changed",
     "sprint.closed": "sprint.changed",
     "run.progress": "run.progress",
+    "proposal.created": "proposal.changed",
+    "proposal.accepted": "proposal.changed",
+    "proposal.rejected": "proposal.changed",
+    "proposal.withdrawn": "proposal.changed",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
-# Events for whoever may read tickets in the event's space (no conversation, no person).
-SPACE_TYPES = frozenset({"sprint.created", "sprint.updated", "sprint.started", "sprint.closed"})
+# Events for a space (no conversation, no person): sprints for whoever may read tickets
+# there, proposals for whoever may edit pages there (`LiveEvent.space_action`).
+SPRINT_TYPES = frozenset({"sprint.created", "sprint.updated", "sprint.started", "sprint.closed"})
+PROPOSAL_TYPES = frozenset(t for t, name in LIVE_TYPES.items() if name == "proposal.changed")
+SPACE_TYPES = SPRINT_TYPES | PROPOSAL_TYPES
 # Events for one person: the payload's `user_id` is who gets them.
 FOR_ONE_PERSON = frozenset(
     {"notification.created", "conversation.read", "activity.changed", "access.changed"}
@@ -81,15 +93,22 @@ class LiveEvent:
     parent_id: uuid.UUID | None
     user_id: uuid.UUID | None
     ticket_id: uuid.UUID | None = None
-    space_id: uuid.UUID | None = None  # ticket and sprint events only
+    space_id: uuid.UUID | None = None  # ticket, sprint and proposal events only
     sprint_id: uuid.UUID | None = None  # sprint events only
     run_id: uuid.UUID | None = None  # run.progress only, with `step`
     step: int | None = None
+    proposal_id: uuid.UUID | None = None  # proposal events only
 
     @property
     def for_space(self) -> bool:
-        """For the space's ticket readers: neither a conversation nor a person."""
+        """For people of the space (`space_action`): neither a conversation nor a
+        person."""
         return self.conversation_id is None and self.user_id is None and self.space_id is not None
+
+    @property
+    def space_action(self) -> Action:
+        """What a space event's recipients may do in the space."""
+        return Action.PAGE_EDIT if self.name == "proposal.changed" else Action.TICKET_READ
 
     def payload(self) -> str:
         data: dict[str, object] = {
@@ -109,12 +128,18 @@ class LiveEvent:
         if self.run_id is not None:
             data["n"] = str(self.run_id)
             data["k"] = self.step
+        if self.proposal_id is not None:
+            data["x"] = str(self.proposal_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
         """The server-sent event: its name and the ids a client reloads by (a ticket
         event also `ticket_id` and `space_id`; a sprint event only `space_id` and
-        `sprint_id`)."""
+        `sprint_id`; a proposal event only `space_id` and `proposal_id`)."""
+        if self.for_space and self.name == "proposal.changed":
+            return sse_frame(
+                self.name, {"space_id": str(self.space_id), "proposal_id": _text(self.proposal_id)}
+            )
         if self.for_space:
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "sprint_id": _text(self.sprint_id)}
@@ -161,6 +186,7 @@ def of_event(event: Event) -> LiveEvent | None:
             user_id=None,
             space_id=event.space_id,
             sprint_id=_uuid(payload.get("sprint_id")),
+            proposal_id=_uuid(payload.get("proposal_id")),
         )
     run = event.type == "run.progress"
     step = payload.get("step")
@@ -200,7 +226,7 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n")
+        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x")
         ids = {key: _strict_uuid(data.get(key)) for key in keys}
         org_id = _strict_uuid(data.get("o"))
         step = data.get("k")
@@ -222,6 +248,7 @@ def decode(raw: str) -> LiveEvent | None:
         ids["r"],
         ids["n"],
         step,
+        ids["x"],
     )
 
 

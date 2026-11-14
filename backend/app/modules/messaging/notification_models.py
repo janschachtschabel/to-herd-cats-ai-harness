@@ -1,7 +1,9 @@
 """Notifications (spec 6.1, 6.2): what the activity view ("Für mich") lists. Reasons:
 `mention` and `reply` (plan M3 decision 3); `assignment` (someone assigned me a ticket;
 the message is the timeline entry of the assignment) and `ticket_comment` (a comment
-on a ticket I am assigned to or reported; plan M4 decision 10).
+on a ticket I am assigned to or reported; plan M4 decision 10); `proposal` (a page
+proposal: made, for the space's moderators; decided, for its author; plan M6
+decision 8: the message is the proposal's entry in the page's thread).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -24,6 +26,7 @@ class NotificationReason(StrEnum):
     REPLY = "reply"
     ASSIGNMENT = "assignment"
     TICKET_COMMENT = "ticket_comment"
+    PROPOSAL = "proposal"
 
 
 class Notification(UuidPk, OrgScoped, Base):
@@ -31,7 +34,8 @@ class Notification(UuidPk, OrgScoped, Base):
     __table_args__ = (
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
-            "reason IN ('mention', 'reply', 'assignment', 'ticket_comment')", name="reason"
+            "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal')",
+            name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),
         Index("ix_notification_conversation_id", "conversation_id"),

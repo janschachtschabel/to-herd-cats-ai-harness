@@ -1,4 +1,9 @@
 {
+  "activity": {
+    "reasons": {
+      "proposal": "hat einen Vorschlag in {{where}} gemacht oder entschieden"
+    }
+  },
   "search": {
     "title": "Suche",
     "description": "Durchsucht alle Seiten und Nachrichten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",

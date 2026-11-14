@@ -1,17 +1,19 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
 a space, page, conversation, message, ticket status, ticket or sprint without a role
-answers 404 exactly like something that does not exist."""
+answers 404 exactly like something that does not exist; so does a page proposal."""
 
 from datetime import date
 
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
 from app.core.actor import Actor
 from app.core.principal import Principal, SystemRole
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
+from app.modules.proposals.service import ProposalService
 from app.modules.spaces.models import Space
 from app.modules.tickets.models import TicketStatus
 from app.modules.tickets.service import TicketService
@@ -70,6 +72,23 @@ async def test_page_routes_hide_pages_without_a_role(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == "page.not_found"
+
+
+async def test_proposal_routes_hide_proposals_without_a_role(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    page = await PageService(session).create(actor, team_space.id, None, "Geheim", "alt")
+    proposal = await ProposalService(session).propose_change(
+        actor, page.id, "neu", "Grund", author=Principal.agent(uuid7())
+    )
+    for method, template, guard in ROUTES:
+        if guard == "proposal":
+            path = concrete(template, team_space.id, page.id, proposal_id=proposal.id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "proposal.not_found"
 
 
 async def test_conversation_routes_hide_conversations_without_a_role(

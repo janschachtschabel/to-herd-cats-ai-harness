@@ -6,7 +6,8 @@ A session counts while it has not ended (logout sets `expires_at`, deactivation 
 administrator's sign-out delete it) and its person is active. Whether that person may
 see the conversation is `seen_by_person()`, the rule of `visible_conversations` from the
 person's side, with groups and memberships as they are when the statement runs; whether
-it may read a space's tickets (events for a space, plan M4b) is `person_holds_role`.
+it may read a space's tickets or edit its pages (events for a space, plans M4b and M6)
+is `person_holds_role`.
 """
 
 import uuid
@@ -76,9 +77,11 @@ async def space_readers(
     session: AsyncSession,
     session_ids: Collection[uuid.UUID],
     space_ids: Collection[uuid.UUID],
+    action: Action = Action.TICKET_READ,
 ) -> set[tuple[uuid.UUID, uuid.UUID]]:
     """Every (login session, space) of `session_ids` × `space_ids` where the session is
-    valid and its person may read the space's tickets now, in one statement."""
+    valid and its person may do `action` in the space now (read its tickets, or edit
+    its pages), in one statement."""
     if not session_ids or not space_ids:
         return set()
     space = aliased(Space)  # the rule looks the space up again: not the same row
@@ -90,7 +93,7 @@ async def space_readers(
             UserSession.id.in_(session_ids),
             space.id.in_(space_ids),
             _valid(),
-            person_holds_role(space.id, SPACE_ACTION_MIN_ROLE[Action.TICKET_READ]),
+            person_holds_role(space.id, SPACE_ACTION_MIN_ROLE[action]),
         )
     )
     return {(row[0], row[1]) for row in await session.execute(stmt)}

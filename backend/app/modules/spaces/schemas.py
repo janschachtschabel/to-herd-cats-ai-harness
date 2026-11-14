@@ -6,13 +6,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
 from app.modules.ai.models import AiPolicy, DataLocation
-from app.modules.spaces.models import Space, SpaceKind
+from app.modules.spaces.models import AgentWritePolicy, Space, SpaceKind
 from app.modules.spaces.repository import NamedMember
 
 
 class SpaceOut(BaseModel):
     """`my_role` is the caller's role there, for display (system admins: `admin`).
-    `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3)."""
+    `ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).
+    `agent_write_policy`: whether agents propose page changes (`propose`) or may write
+    pages directly (`direct`, plan M6 decision 8)."""
 
     id: uuid.UUID
     kind: SpaceKind
@@ -24,6 +26,7 @@ class SpaceOut(BaseModel):
     my_role: SpaceRole | None
     ai_policy: AiPolicy
     allowed_locations: list[DataLocation]
+    agent_write_policy: AgentWritePolicy
 
     @classmethod
     def of(cls, space: Space, my_role: SpaceRole | None) -> "SpaceOut":
@@ -38,6 +41,7 @@ class SpaceOut(BaseModel):
             my_role=my_role,
             ai_policy=space.ai_policy,
             allowed_locations=[DataLocation(loc) for loc in space.allowed_locations],
+            agent_write_policy=space.agent_write_policy,
         )
 
 
@@ -62,8 +66,9 @@ class SpaceUpdate(BaseModel):
     icon: str | None = Field(default=None, max_length=32)
     ai_policy: AiPolicy | None = None
     allowed_locations: list[DataLocation] | None = Field(default=None, max_length=3)
+    agent_write_policy: AgentWritePolicy | None = None
 
-    @field_validator("name", "ai_policy")
+    @field_validator("name", "ai_policy", "agent_write_policy")
     @classmethod
     def _not_cleared[T](cls, value: T | None) -> T:
         # Runs only for a value the client sent: null is not a name or a policy.

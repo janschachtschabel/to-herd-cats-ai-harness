@@ -735,6 +735,15 @@
         "title": "AgentUpdate",
         "type": "object"
       },
+      "AgentWritePolicy": {
+        "description": "How agents write pages in a space (plan M6 decision 8).",
+        "enum": [
+          "propose",
+          "direct"
+        ],
+        "title": "AgentWritePolicy",
+        "type": "string"
+      },
       "AiLockIn": {
         "additionalProperties": false,
         "description": "Lock a page or a file for AI, or lift the lock; `version` as read (stale \u2192 409).",
@@ -3864,7 +3873,8 @@
           "mention",
           "reply",
           "assignment",
-          "ticket_comment"
+          "ticket_comment",
+          "proposal"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -4600,6 +4610,33 @@
         "title": "Page[MessageOut]",
         "type": "object"
       },
+      "Page_ProposalOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ProposalOut]",
+        "type": "object"
+      },
       "Page_RunEventOut_": {
         "properties": {
           "items": {
@@ -5237,6 +5274,620 @@
         "title": "ProfileUpdateIn",
         "type": "object"
       },
+      "ProposalAcceptIn": {
+        "additionalProperties": false,
+        "description": "`version`: the proposal's. `merged_content` with `page_version` (the page's\nversion it was merged against): the text to write instead of the proposal, after\na 409 `proposal.base_outdated`.",
+        "properties": {
+          "merged_content": {
+            "anyOf": [
+              {
+                "maxLength": 200000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Content"
+          },
+          "page_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Version"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ProposalAcceptIn",
+        "type": "object"
+      },
+      "ProposalAuthorOut": {
+        "description": "A person or an agent, by name (null if it is gone).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "title": "ProposalAuthorOut",
+        "type": "object"
+      },
+      "ProposalDeciderOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProposalDeciderOut",
+        "type": "object"
+      },
+      "ProposalDetailOut": {
+        "description": "With the proposed `content_md` and `diff`, line by line from the base (empty for\na new page) to it; null when the texts are beyond `HERD_DIFF_MAX_LINES`\n(`too_large`). For an open change: `page_version`, the page's version now (name it\nwith `merged_content` when accepting); and when the page's content is no longer\nthe base, `current_content_md` and `merge` (null when too large).",
+        "properties": {
+          "ai": {
+            "title": "Ai",
+            "type": "boolean"
+          },
+          "author": {
+            "$ref": "#/components/schemas/ProposalAuthorOut"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "content_md": {
+            "title": "Content Md",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_content_md": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Content Md"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalDeciderOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HunkOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "merge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalMergeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
+          "page_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Version"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "result_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Version"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProposalState"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "too_large": {
+            "title": "Too Large",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "kind",
+          "state",
+          "page_id",
+          "parent_id",
+          "title",
+          "base_version",
+          "reason",
+          "author",
+          "ai",
+          "run_id",
+          "decided_by",
+          "decided_at",
+          "decision_reason",
+          "result_version",
+          "version",
+          "created_at",
+          "content_md",
+          "diff",
+          "too_large",
+          "page_version",
+          "current_content_md",
+          "merge"
+        ],
+        "title": "ProposalDetailOut",
+        "type": "object"
+      },
+      "ProposalKind": {
+        "enum": [
+          "change",
+          "new"
+        ],
+        "title": "ProposalKind",
+        "type": "string"
+      },
+      "ProposalMergeOut": {
+        "description": "The three-way merge of base, proposal and the page now: `merged_content` when it\nmerges cleanly (null with conflicts), and the merge in `segments`.",
+        "properties": {
+          "clean": {
+            "title": "Clean",
+            "type": "boolean"
+          },
+          "merged_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Content"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalSegmentOut"
+            },
+            "title": "Segments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "clean",
+          "merged_content",
+          "segments"
+        ],
+        "title": "ProposalMergeOut",
+        "type": "object"
+      },
+      "ProposalOut": {
+        "description": "A proposal without its content. `kind`: `change` of `page_id`, based on its\nversion `base_version`; or `new`, a page `title` under `parent_id` (null: the top\nlevel), whose `page_id` is the page it became once accepted. `ai`: made by an agent\n(`run_id`: its run). `decided_by`/`decided_at`: who accepted, rejected or (its\nauthor's person) withdrew it, and when; `decision_reason`: a rejection's reason;\n`result_version`: the page version an acceptance wrote (null if the page held\nthat content already). `version`: name it when deciding (stale \u2192 409).",
+        "properties": {
+          "ai": {
+            "title": "Ai",
+            "type": "boolean"
+          },
+          "author": {
+            "$ref": "#/components/schemas/ProposalAuthorOut"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalDeciderOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "page_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "result_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Version"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProposalState"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "kind",
+          "state",
+          "page_id",
+          "parent_id",
+          "title",
+          "base_version",
+          "reason",
+          "author",
+          "ai",
+          "run_id",
+          "decided_by",
+          "decided_at",
+          "decision_reason",
+          "result_version",
+          "version",
+          "created_at"
+        ],
+        "title": "ProposalOut",
+        "type": "object"
+      },
+      "ProposalRejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ProposalRejectIn",
+        "type": "object"
+      },
+      "ProposalSegmentOut": {
+        "description": "`clean`: merged `lines`; `conflict`: the stretch as in the base, as proposed and\nas on the page now (the other three lists are empty for the other kind).",
+        "properties": {
+          "base": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Base",
+            "type": "array"
+          },
+          "current": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Current",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "clean",
+              "conflict"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "proposed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Proposed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "lines",
+          "base",
+          "proposed",
+          "current"
+        ],
+        "title": "ProposalSegmentOut",
+        "type": "object"
+      },
+      "ProposalState": {
+        "enum": [
+          "open",
+          "accepted",
+          "rejected",
+          "withdrawn"
+        ],
+        "title": "ProposalState",
+        "type": "string"
+      },
       "Purpose": {
         "enum": [
           "chat",
@@ -5694,8 +6345,11 @@
         "type": "object"
       },
       "SpaceOut": {
-        "description": "`my_role` is the caller's role there, for display (system admins: `admin`).\n`ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).",
+        "description": "`my_role` is the caller's role there, for display (system admins: `admin`).\n`ai_policy`/`allowed_locations`: what AI may receive of the space (spec 7.3).\n`agent_write_policy`: whether agents propose page changes (`propose`) or may write\npages directly (`direct`, plan M6 decision 8).",
         "properties": {
+          "agent_write_policy": {
+            "$ref": "#/components/schemas/AgentWritePolicy"
+          },
           "ai_policy": {
             "$ref": "#/components/schemas/AiPolicy"
           },
@@ -5777,7 +6431,8 @@
           "version",
           "my_role",
           "ai_policy",
-          "allowed_locations"
+          "allowed_locations",
+          "agent_write_policy"
         ],
         "title": "SpaceOut",
         "type": "object"
@@ -5796,6 +6451,16 @@
       "SpaceUpdateIn": {
         "additionalProperties": false,
         "properties": {
+          "agent_write_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentWritePolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ai_policy": {
             "anyOf": [
               {
@@ -7746,6 +8411,10 @@
       },
       "VersionOut": {
         "properties": {
+          "ai": {
+            "title": "Ai",
+            "type": "boolean"
+          },
           "author": {
             "$ref": "#/components/schemas/VersionAuthor"
           },
@@ -7784,6 +8453,18 @@
             "title": "Number",
             "type": "integer"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "source": {
             "$ref": "#/components/schemas/VersionSource"
           },
@@ -7800,6 +8481,8 @@
           "change_summary",
           "label",
           "created_at",
+          "ai",
+          "run_id",
           "content_md"
         ],
         "title": "VersionOut",
@@ -7810,14 +8493,19 @@
           "human",
           "import",
           "restore",
-          "collab"
+          "collab",
+          "agent"
         ],
         "title": "VersionSource",
         "type": "string"
       },
       "VersionSummaryOut": {
-        "description": "`change_summary` is free text, or `restore:<n>` for a version that brought\nversion n back (the client words it).",
+        "description": "`change_summary` is free text, or `restore:<n>` for a version that brought\nversion n back (the client words it). `ai`: written for an agent (the AI mark,\nspec 9: its author is an agent); `run_id`: the agent's run that wrote it.",
         "properties": {
+          "ai": {
+            "title": "Ai",
+            "type": "boolean"
+          },
           "author": {
             "$ref": "#/components/schemas/VersionAuthor"
           },
@@ -7852,6 +8540,18 @@
             "title": "Number",
             "type": "integer"
           },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
           "source": {
             "$ref": "#/components/schemas/VersionSource"
           },
@@ -7867,7 +8567,9 @@
           "source",
           "change_summary",
           "label",
-          "created_at"
+          "created_at",
+          "ai",
+          "run_id"
         ],
         "title": "VersionSummaryOut",
         "type": "object"
@@ -12683,6 +13385,156 @@
         ]
       }
     },
+    "/api/proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_proposal_api_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{proposal_id}/accept": {
+      "post": {
+        "description": "409 `proposal.base_outdated` when the page moved on (see the merge in the\nerror's `details`); accept again with `merged_content` and `page_version`.",
+        "operationId": "accept_proposal_api_proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalAcceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{proposal_id}/reject": {
+      "post": {
+        "operationId": "reject_proposal_api_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
     "/api/runs/{run_id}": {
       "get": {
         "operationId": "get_run_api_runs__run_id__get",
@@ -14162,6 +15014,96 @@
         "summary": "Page Tree",
         "tags": [
           "wiki"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/proposals": {
+      "get": {
+        "description": "Newest first: those of the space the caller may see (page editors, and an\nauthor their own).",
+        "operationId": "list_proposals_api_spaces__space_id__proposals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "only this state",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ProposalState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only this state",
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ProposalOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Proposals",
+        "tags": [
+          "proposals"
         ]
       }
     },

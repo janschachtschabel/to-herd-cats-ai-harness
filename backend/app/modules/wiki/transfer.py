@@ -48,7 +48,8 @@ from app.modules.wiki.import_layout import (
 )
 from app.modules.wiki.models import MAX_CONTENT_CHARS, Page, PageStatus
 from app.modules.wiki.models import VersionSource as Source
-from app.modules.wiki.service import PageService, Siblings
+from app.modules.wiki.service import PageService
+from app.modules.wiki.siblings import Siblings
 
 _SESSION_SECONDS = 24 * 60 * 60  # the import's saves fold into each page's first version
 

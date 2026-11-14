@@ -158,6 +158,7 @@ export function makeSpace(overrides: Partial<Space> = {}): Space {
     my_role: 'admin',
     ai_policy: 'any',
     allowed_locations: [],
+    agent_write_policy: 'propose',
     ...overrides,
   }
 }
@@ -227,6 +228,8 @@ export function makeVersion(
     source: 'human',
     author: { type: 'user', id: 'author', name: 'Lea Löwe' },
     created_at: '2026-11-12T10:00:00Z',
+    ai: false,
+    run_id: null,
     ...overrides,
   }
 }

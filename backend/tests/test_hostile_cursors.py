@@ -71,6 +71,7 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/activity",
         "/api/admin/dm-inspect",
         "/api/admin/dm-inspect/{inspection_id}/messages",
+        "/api/spaces/{space_id}/proposals",
     } <= set(endpoints)
 
 

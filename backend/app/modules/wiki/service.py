@@ -22,10 +22,11 @@ from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.audit.recorder import record
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
+from app.modules.wiki.authorship import Authorship
 from app.modules.wiki.events import PAGE_CREATED, PAGE_PUBLISHED, page_event
 from app.modules.wiki.models import MAX_DEPTH, Page, PageStatus, VersionSource
 from app.modules.wiki.moves import PageMoves
-from app.modules.wiki.repository import PageRepository
+from app.modules.wiki.siblings import Siblings
 from app.modules.wiki.trash import PageTrash
 from app.modules.wiki.tree import child_path, depth_of, unique_slug
 from app.modules.wiki.versions import VersionService
@@ -118,15 +119,17 @@ class PageService:
         slug: str | None = None,
         source: VersionSource = VersionSource.HUMAN,
         session_key: str | None = None,
-        siblings: "Siblings | None" = None,
+        siblings: Siblings | None = None,
         publish: bool = False,
+        by: Authorship | None = None,
     ) -> Page:
         """A new draft at the end of its siblings. Its slug comes from `slug` if given
         (an imported file's name), else from the title; a sibling's slug gets a suffix.
         `session_key` lets later saves of the same session fold into its first version.
         `siblings` remembers slugs and order per parent across many creations. With
         `publish`, it is published at once if its parent is (or it has none): its
-        creator may publish an own draft, as `publish` allows."""
+        creator may publish an own draft, as `publish` allows. `by`: written for an
+        agent (`authorship.py`), which becomes the page's creator."""
         await require(self.session, actor, Action.PAGE_CREATE, space_id)
         pages = self.repo(actor)
         siblings = siblings or Siblings()
@@ -144,7 +147,7 @@ class PageService:
         slug = unique_slug(slug or title, taken)
         sort_order = await siblings.next_order(pages, space_id, parent_id)
         taken.add(slug)
-        who = actor.principal
+        who = by.principal if by else actor.principal
         page = await pages.add(
             Page(
                 org_id=actor.org_id,
@@ -164,7 +167,7 @@ class PageService:
             )
         )
         await VersionService(self.session).record(
-            page, actor, source, session_key=session_key, first=True
+            page, actor, source, session_key=session_key, first=True, by=by
         )
         details = {"space_id": str(space_id), "path": page.path}
         await record(self.session, actor, "page.created", "page", page.id, details)
@@ -189,10 +192,12 @@ class PageService:
         source: VersionSource = VersionSource.HUMAN,
         session_key: str | None = None,
         coalesce_seconds: int = 0,
+        by: Authorship | None = None,
     ) -> Page:
         """Change title and/or content, saved as a new version (folded into the newest
         one of the same session, see `VersionService.record`); a request that changes
-        nothing changes nothing. A content change ends the page's live sessions."""
+        nothing changes nothing. A content change ends the page's live sessions. `by`:
+        written for an agent (`authorship.py`)."""
         page = await self.readable(actor, page_id, lock=True)
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
         check_version(page, version)
@@ -203,7 +208,7 @@ class PageService:
             page.content_md, changed = content_md, True
             page.collab_generation += 1  # saved outside the live session: it ends
         if changed:
-            touch(page, actor)
+            touch(page, actor, by.principal if by else None)
             await self.session.flush()
             await VersionService(self.session).record(
                 page,
@@ -212,6 +217,7 @@ class PageService:
                 change_summary=change_summary,
                 session_key=session_key,
                 coalesce_seconds=coalesce_seconds,
+                by=by,
             )
         return page
 
@@ -254,45 +260,3 @@ class PageService:
         await record(self.session, actor, "page.published", "page", page.id)
         await page_event(self.session, actor, PAGE_PUBLISHED, page)
         return page
-
-
-class Siblings:
-    """Each parent, the slugs and the next sort order under it, read once per parent.
-    For many creations in one transaction (an import): it holds the tree lock, so
-    nobody else adds, moves or publishes pages of the space meanwhile. Without one,
-    `create` reads them each time."""
-
-    def __init__(self) -> None:
-        self._locked: set[uuid.UUID] = set()
-        self._parents: dict[uuid.UUID, Page | None] = {}
-        self._slugs: dict[uuid.UUID | None, set[str]] = {}
-        self._orders: dict[uuid.UUID | None, int] = {}
-
-    async def lock(self, pages: PageRepository, space_id: uuid.UUID) -> None:
-        """The space's tree lock, taken once (it holds until the transaction ends)."""
-        if space_id not in self._locked:
-            await pages.lock_tree(space_id)
-            self._locked.add(space_id)
-
-    async def parent(
-        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID
-    ) -> Page | None:
-        if parent_id not in self._parents:
-            self._parents[parent_id] = await pages.live_in_space(space_id, parent_id)
-        return self._parents[parent_id]
-
-    async def slugs(
-        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID | None
-    ) -> set[str]:
-        if parent_id not in self._slugs:
-            self._slugs[parent_id] = await pages.sibling_slugs(space_id, parent_id)
-        return self._slugs[parent_id]
-
-    async def next_order(
-        self, pages: PageRepository, space_id: uuid.UUID, parent_id: uuid.UUID | None
-    ) -> int:
-        if parent_id not in self._orders:
-            self._orders[parent_id] = await pages.next_sort_order(space_id, parent_id)
-        order = self._orders[parent_id]
-        self._orders[parent_id] = order + 1
-        return order

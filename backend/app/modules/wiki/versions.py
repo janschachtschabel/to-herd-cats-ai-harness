@@ -22,6 +22,7 @@ from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
 from app.modules.wiki import diffing
+from app.modules.wiki.authorship import Authorship
 from app.modules.wiki.events import PAGE_VERSION_RESTORED, page_event
 from app.modules.wiki.models import Page, PageVersion, VersionSource
 from app.modules.wiki.versions_repository import NamedVersion
@@ -49,6 +50,7 @@ class VersionService:
         session_key: str | None = None,
         coalesce_seconds: int = 0,
         first: bool = False,
+        by: Authorship | None = None,
     ) -> PageVersion:
         """The page's title and content as its next version, by the actor. The caller
         has checked the actor's rights and holds the page row (`readable(lock=True)`,
@@ -57,10 +59,16 @@ class VersionService:
         With `coalesce_seconds`, a save of the same author, source and `session_key`
         overwrites the newest version while that is younger than the window (counted
         from when it was first written); without a session key nothing is folded.
-        `first`: the page has just been created and has no version yet."""
+        `first`: the page has just been created and has no version yet. `by`: the
+        author when the write is for someone else (an agent; `authorship.py`)."""
         versions = self.reader.versions(actor)
+        author = by.principal if by else actor.principal
         latest = None if first else await versions.latest(page.id)
-        if latest is not None and _folds_into(latest, actor, source, session_key, coalesce_seconds):
+        if (
+            by is None
+            and latest is not None
+            and _folds_into(latest, actor, source, session_key, coalesce_seconds)
+        ):
             latest.title, latest.content_md = page.title, page.content_md
             if change_summary is not None:
                 latest.change_summary = change_summary
@@ -73,11 +81,12 @@ class VersionService:
                 number=latest.number + 1 if latest else 1,
                 title=page.title,
                 content_md=page.content_md,
-                author_type=actor.principal.type,
-                author_id=actor.principal.id,
+                author_type=author.type,
+                author_id=author.id,
                 source=source,
                 change_summary=change_summary,
                 session_key=session_key,
+                run_id=by.run_id if by else None,
             )
         )
 
