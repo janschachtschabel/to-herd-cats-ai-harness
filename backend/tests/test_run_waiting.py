@@ -8,7 +8,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.core.models_base import utcnow
 from app.modules.agents import control
@@ -17,7 +17,7 @@ from app.modules.agents.gauge_repository import open_runs
 from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.agents.step_host import RunHost
 from app.worker.runs import run_metrics
-from tests.factories_agents import LEASE, Bench
+from tests.factories_agents import LEASE, Bench, open_agent_dm
 from tests.support import probe_tools
 from tests.support.probe_tools import ANSWERED, WAIT_HOURS
 
@@ -138,6 +138,37 @@ async def test_nobody_answers_in_time(bench: Bench) -> None:
     assert await notices(bench) == ["waiting_timeout"]
     async with bench.unit()() as session:
         assert not await control.resume_waiting(session, run.org_id, run.id)
+
+
+async def test_a_waiting_run_that_cannot_be_ended_keeps_no_other_from_ending(
+    bench: Bench, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Each waiting run is ended in a savepoint of its own: one whose end fails stays
+    waiting (and is tried again at the next sweep), the others end."""
+    first = await waiting_run(bench)
+    bobs = await open_agent_dm(bench.people.bob, bench.agent)
+    bench.stub.state.replies.clear()  # the first run's answer is never asked for here
+    bench.stub.state.replies.extend([call("probe_wait", label="ok?")])
+    posted = await bench.say("Do it too", who="bob", dm=str(bobs["id"]))
+    assert await bench.run_next() is None
+    second = await bench.run_of(posted["agent_run"]["id"])
+    for run in (first, second):
+        run.wait_until = utcnow() - timedelta(seconds=1)
+    await bench.session.flush()
+    close = control.close
+
+    async def failing_close(session: Any, steps: Any, run: Run, *args: Any) -> Any:
+        if run.id == first.id:
+            await session.execute(text("SELECT 1/0"))  # a database error, mid-end
+        return await close(session, steps, run, *args)
+
+    monkeypatch.setattr(control, "close", failing_close)
+    async with bench.unit()() as session:
+        assert await control.sweep_waiting(session) == 1
+    assert (await bench.run_of(first.id)).state == RunState.WAITING
+    assert (await bench.run_of(second.id)).stop_reason == StopReason.WAITING_TIMEOUT
+    failed = [r for r in caplog.records if r.message == "runs.sweep_failed"]
+    assert [(r.run_id, r.error) for r in failed] == [(str(first.id), "DBAPIError")]  # type: ignore[attr-defined]
 
 
 async def test_a_waiting_run_asked_to_stop_ends_at_the_next_sweep(bench: Bench) -> None:

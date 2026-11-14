@@ -23,9 +23,11 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
 - `sweep_waiting`, from the run loop: waiting runs past `wait_until` end with
   `approval_expired` when they wait for a release, else `waiting_timeout`; those
   someone asked to stop with `cancelled`; each with its notice in the conversation,
-  like any other end (and what they waited for is `expired`).
+  like any other end (and what they waited for is `expired`); each in a savepoint, so
+  one that cannot be ended keeps no other from ending.
 """
 
+import logging
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +40,8 @@ from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.models import RunState, StopReason
 
 SWEEP_BATCH = 50
+
+logger = logging.getLogger(__name__)
 
 
 async def resume_waiting(session: AsyncSession, org_id: uuid.UUID, run_id: uuid.UUID) -> bool:
@@ -82,11 +86,20 @@ async def cancel(
 
 
 async def sweep_waiting(session: AsyncSession) -> int:
-    """End the waiting runs that are due (the caller commits); how many."""
-    runs = await due_waiting(session, utcnow(), SWEEP_BATCH)
-    for run in runs:
-        steps = RunSteps(session, Claimed.of(run))
-        released = await WaitedRepository(session, run.org_id).pending_approval(run.id)
-        reason = StopReason.APPROVAL_EXPIRED if released else StopReason.WAITING_TIMEOUT
-        await close(session, steps, run, reason)
-    return len(runs)
+    """End the waiting runs that are due (the caller commits); how many ended. Each in
+    a savepoint of its own: one whose end fails stays waiting (logged, ids and the
+    error class only) and is tried again at the next sweep; the others end."""
+    ended = 0
+    for run in await due_waiting(session, utcnow(), SWEEP_BATCH):
+        try:
+            async with session.begin_nested():
+                steps = RunSteps(session, Claimed.of(run))
+                released = await WaitedRepository(session, run.org_id).pending_approval(run.id)
+                reason = StopReason.APPROVAL_EXPIRED if released else StopReason.WAITING_TIMEOUT
+                await close(session, steps, run, reason)
+        except Exception as exc:
+            error = type(exc).__name__
+            logger.warning("runs.sweep_failed", extra={"run_id": str(run.id), "error": error})
+            continue
+        ended += 1
+    return ended

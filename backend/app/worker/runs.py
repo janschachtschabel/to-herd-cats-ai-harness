@@ -13,7 +13,8 @@ worker look stuck; hung runs have their own gauge and alert).
   takes them up again and goes on from their journal (a tool's effect and its entry
   in the journal are committed together, so nothing is done twice).
 - Every round also ends the waiting runs that are due (`control.sweep_waiting`:
-  `waiting_timeout`, or `cancelled` on request).
+  `waiting_timeout`, or `cancelled` on request), in a `try` of its own: a sweep that
+  fails (`runs.sweep_failed`) keeps no run from being claimed.
 
 Database connections: one at a time per run in progress (each step's short
 transaction, never during a provider call), plus one each for claiming, renewing and
@@ -127,8 +128,11 @@ class RunLoop:
         try:
             while not stop.is_set():
                 self.wake.clear()
-                try:
+                try:  # apart from the claims: a failing sweep must not stop them
                     await self.sweep_once()
+                except Exception as exc:
+                    logger.warning("runs.sweep_failed", extra={"error": type(exc).__name__})
+                try:
                     while len(self.held) < self.concurrency and not stop.is_set():
                         claimed = await self.claim()
                         if claimed is None:

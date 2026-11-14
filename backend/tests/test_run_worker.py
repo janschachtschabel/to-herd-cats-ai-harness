@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import func, select, text
 
 import app.modules.agents.router  # noqa: F401 -- registers the agent hooks
+import app.worker.runs as worker_runs
 from app.core.config import get_settings
 from app.core.db import Database
 from app.modules.agents.models import Agent, Run, RunState
@@ -155,3 +156,36 @@ async def test_the_gauges_count_waiting_runs(
     assert metrics.queued._value.get() == 2  # noqa: SLF001
     assert metrics.oldest_queued._value.get() >= 0  # noqa: SLF001
     assert metrics.stuck._value.get() == 0  # noqa: SLF001
+
+
+async def test_a_failing_sweep_does_not_stop_the_claims(
+    real_db: RealDb,
+    make_real_client: MakeRealClient,
+    openai_stub: OpenAIStub,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Ending the due waiting runs and claiming queued ones fail apart: while the sweep
+    fails every time, queued runs are still answered."""
+
+    async def broken(session: object) -> int:
+        raise RuntimeError("a waiting run whose end cannot be written")
+
+    monkeypatch.setattr(worker_runs, "sweep_waiting", broken)
+    await _setup(real_db, make_real_client, openai_stub)
+    loop = RunLoop(real_db.database, concurrency=2, lease=30)
+    stop = asyncio.Event()
+    task = asyncio.create_task(loop.serve(stop))
+
+    async def answered() -> bool:
+        async with real_db.database.session_factory() as session:
+            left = select(func.count()).select_from(Run).where(Run.state != RunState.DONE)
+            return await session.scalar(left) == 0
+
+    try:
+        await _until(answered)
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, timeout=10)
+    assert any(r.message == "runs.sweep_failed" for r in caplog.records)
+    assert not any(r.message == "runs.claim_failed" for r in caplog.records)
