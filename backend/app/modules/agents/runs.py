@@ -8,7 +8,9 @@ their run in full. Anyone else reads
 - a tool result only while they may read every space it came from (its `spaces`); an
   admin who reads such a space by admin right is noted (`space.admin_access`), as for
   a direct page read; otherwise, and for a result without noted spaces, the event
-  comes `redacted`: its step, tool name and source stay;
+  comes `redacted`: its step, tool name and source stay; so does a result that
+  marks itself the asker's (`ASKER_ONLY` in its attrs: `search_past_runs` with any
+  of the model's words or a hit from a run that read no space, review M6 finding 10);
 - never the model's own words, its text and its tool calls' arguments, nor a tool
   call's arguments: they are the conversation's content, which its person reads (an
   admin only through the audited inspection of the DM). Usage (tokens, cost,
@@ -37,6 +39,7 @@ MODEL_CALL_SHOWN = (
     "cost",
 )
 TOOL_CALL_SHOWN = ("step", "call_id", "name", "source", "duration_ms")
+ASKER_ONLY = "asker_only"  # a tool result's attr: only the asker reads its text
 
 
 def run_not_found() -> NotFound:
@@ -90,9 +93,9 @@ class RunService:
             return ShownEvent(event, kept, True)
         if event.kind == EventKind.TOOL_CALL:
             kept = _pick(content, TOOL_CALL_SHOWN)
-            if not await self._may_read_all(actor, content.get("spaces")):
-                return ShownEvent(event, kept, True)
             attrs = {k: v for k, v in (content.get("attrs") or {}).items() if k != "query"}
+            if attrs.get(ASKER_ONLY) or not await self._may_read_all(actor, content.get("spaces")):
+                return ShownEvent(event, kept, True)
             return ShownEvent(event, {**kept, "attrs": attrs, "text": content.get("text")}, False)
         return ShownEvent(event, content, False)
 

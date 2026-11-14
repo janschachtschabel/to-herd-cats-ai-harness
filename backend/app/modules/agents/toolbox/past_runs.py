@@ -10,6 +10,10 @@ also notes an admin's read by admin right):
   as they may repeat any of it;
 - what a hit read counts for the run's checks like a fresh read: its spaces and its
   pages and tickets where they are now (a page locked or trashed since: no hit).
+The result is the asker's alone in the run view (`runs.ASKER_ONLY`) once a hit holds
+the model's words or comes from a run that noted no space (or from such a result):
+the model's words are the conversation's content, which the run view shows nobody
+else, whatever spaces the other hits came from (review M6 finding 10).
 Outside a DM of the person alone with the agent, only runs of the same conversation:
 another conversation's audience is not this one's (plan M6 decision 5). A run whose
 conversation the person no longer sees is left out too.
@@ -31,7 +35,7 @@ from app.modules.agents.past_runs_repository import (
     event_reads,
 )
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.runs import may_read_all
+from app.modules.agents.runs import ASKER_ONLY, may_read_all
 from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
 from app.modules.ai.policy import ANY, connection_allowed, strictest
@@ -73,19 +77,22 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
     checker = _Checker(ctx)
     lines: list[str] = []
     spaces: set[uuid.UUID] = set()
+    private = False
     for hit in hits:
         noted = of_runs[hit.run_id] if _words(hit) else event_reads(hit.content)
         now = await checker.readable(hit, noted)
         if now is None:
             continue
         spaces |= now
+        private |= _words(hit) or not now or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
         ctx.reads.spaces |= now
         ctx.reads.pages |= noted.pages
         ctx.reads.tickets |= noted.tickets
         lines.append(_line(hit, args.query))
         if len(lines) == HITS:
             break
-    return ToolResult("past_runs", "\n".join(lines) or NOT_FOUND, {}, frozenset(spaces))
+    attrs = {ASKER_ONLY: "true"} if private else {}
+    return ToolResult("past_runs", "\n".join(lines) or NOT_FOUND, attrs, frozenset(spaces))
 
 
 class _Checker:

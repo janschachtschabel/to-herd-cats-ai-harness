@@ -676,7 +676,11 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
     stammt, jetzt lesbar ist und seine Richtlinie die Verbindung zulässt (dieselbe
     Regel wie bei der Schwärzung in `GET /api/runs/{id}/events`); die eigenen Worte des
     Modells nur, solange jeder Bereich lesbar ist, den ihr Lauf gelesen hat. Außerhalb
-    einer Direktnachricht allein mit dem Agenten nur Läufe desselben Gesprächs.
+    einer Direktnachricht allein mit dem Agenten nur Läufe desselben Gesprächs. Enthält
+    ein Ergebnis Worte des Modells oder einen Treffer aus einem Lauf, der keinen Bereich
+    gelesen hat, liest es in der Laufansicht nur die fragende Person (Attribut
+    `asker_only`; für alle anderen geschwärzt, gleich aus welchen Bereichen die übrigen
+    Treffer stammen).
   - `submit_result`: gibt das Ergebnis ab; sein Text ist die Antwort, der Lauf endet
     `completed` ohne weiteren Modellaufruf (auch nach einer Wiederaufnahme genau einmal).
   - `ask_user`: stellt der fragenden Person eine Frage (Karte im Gespräch, siehe
