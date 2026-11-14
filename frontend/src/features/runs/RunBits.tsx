@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { Activity } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Run } from '@/features/agents/queries'
+import { useRun, type Run } from '@/features/agents/queries'
+import { useMe } from '@/features/auth/queries'
 import { cn } from '@/lib/utils'
-import { stateText, stateTone } from './display'
+import { readsRuns, stateText, stateTone } from './display'
 
 const TONES = {
   active:
@@ -53,4 +54,13 @@ export function RunLink({
       {label ?? t('runs.link')}
     </Link>
   )
+}
+
+/** A link to a run only for those the API shows the run to: it asks for the run (if
+ *  the reader may read runs at all) and links once it is there; a 404 shows nothing. */
+export function VisibleRunLink({ runId, className }: { runId: string; className?: string }) {
+  const me = useMe()
+  const run = useRun(readsRuns(me) ? runId : null)
+  if (!run.data) return null
+  return <RunLink runId={runId} className={className} />
 }

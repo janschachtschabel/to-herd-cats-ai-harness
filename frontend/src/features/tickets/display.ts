@@ -67,6 +67,8 @@ export function ticketSystemText(t: TFunction, entry: SystemEntry, locale: strin
       params.to = name(entry.new, t('tickets.timeline.goneStatus'))
       break
     case 'ticket.assigned':
+      // An agent that gives the ticket on hands it over (its reason is its comment).
+      if (entry.actor?.type === 'agent') variant = 'handed'
       params.to = name(entry.new, someone)
       break
     case 'ticket.unassigned':

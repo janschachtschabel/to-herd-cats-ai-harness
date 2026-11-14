@@ -159,7 +159,8 @@
       "sprint_moved": "{{actor}} moved the ticket from {{from}} to {{to}}.",
       "sprint_removed": "{{actor}} moved the ticket from {{from}} to the backlog.",
       "someSprint": "a sprint",
-      "someSprintInto": "a sprint"
+      "someSprintInto": "a sprint",
+      "handed": "{{actor}} handed the ticket over to {{to}}."
     },
     "space": {
       "views": "Views of the space",

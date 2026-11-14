@@ -226,7 +226,8 @@
     },
     "badge": {
       "short": "AI",
-      "title": "Written by an AI"
+      "title": "Written by an AI",
+      "agent": "An AI agent"
     },
     "stop": {
       "title": "No answer:",
@@ -241,7 +242,9 @@
       "approval_expired": "Nobody gave the release in time; the run was ended.",
       "cancelled": "The run was cancelled.",
       "waiting_timeout": "Nobody answered in time; the run was ended.",
-      "unknown": "The run was ended."
+      "unknown": "The run was ended.",
+      "titleNamed": "{{name}} stopped without an answer:",
+      "someAgent": "An agent"
     },
     "noRun": {
       "ai_unavailable": "You have no AI assignment (any more); the agent does not answer.",
@@ -283,6 +286,10 @@
       "page": "Page",
       "hidden_one": "{{count}} source is not visible to you.",
       "hidden_other": "{{count}} sources are not visible to you."
+    },
+    "refused": {
+      "start": "{{name}} could not start: {{reason}}",
+      "handover": "{{name}} could not hand over: {{reason}}"
     }
   },
   "errors": {

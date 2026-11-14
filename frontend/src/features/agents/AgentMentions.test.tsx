@@ -48,7 +48,7 @@ describe('mentioning an agent', () => {
     const box = await screen.findByRole('combobox', { name: 'Nachricht an #allgemein' })
     await user.type(box, '@hi')
     const option = await screen.findByRole('option', { name: /Hilda/ })
-    expect(within(option).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+    expect(within(option).getByText('Ein KI-Agent')).toBeInTheDocument()
     // People and member agents together: no type filter, the space decides.
     const asked = api.find('GET', '/api/directory').at(-1)!
     expect(asked.query.get('space_id')).toBe('space-1')

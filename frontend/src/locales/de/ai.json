@@ -226,7 +226,8 @@
     },
     "badge": {
       "short": "KI",
-      "title": "Von einer KI geschrieben"
+      "title": "Von einer KI geschrieben",
+      "agent": "Ein KI-Agent"
     },
     "stop": {
       "title": "Keine Antwort:",
@@ -241,7 +242,9 @@
       "approval_expired": "Niemand hat die Freigabe rechtzeitig erteilt; der Lauf wurde beendet.",
       "cancelled": "Der Lauf wurde abgebrochen.",
       "waiting_timeout": "Niemand hat rechtzeitig geantwortet; der Lauf wurde beendet.",
-      "unknown": "Der Lauf wurde beendet."
+      "unknown": "Der Lauf wurde beendet.",
+      "titleNamed": "{{name}} hat ohne Antwort aufgehört:",
+      "someAgent": "Ein Agent"
     },
     "noRun": {
       "ai_unavailable": "Du hast keine KI-Zuordnung (mehr); der Agent antwortet nicht.",
@@ -283,6 +286,10 @@
       "page": "Seite",
       "hidden_one": "{{count}} Quelle ist für dich nicht sichtbar.",
       "hidden_other": "{{count}} Quellen sind für dich nicht sichtbar."
+    },
+    "refused": {
+      "start": "{{name}} konnte nicht beginnen: {{reason}}",
+      "handover": "{{name}} konnte nicht weitergeben: {{reason}}"
     }
   },
   "errors": {

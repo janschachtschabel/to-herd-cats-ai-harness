@@ -12,7 +12,8 @@ const NONE = new Set<string>()
 
 /** Who works on it. "Take" for an unassigned ticket (`ticket.edit`), "Let go" for
  *  one's own (or anyone's with `ticket.assign`), and with `ticket.assign` a picker of
- *  the people who may read the space's tickets. */
+ *  the people who may read the space's tickets and, for people with AI, the space's
+ *  member agents (the directory offers them; the API refuses the rest). */
 export function AssigneeField({
   ticket,
   abilities,
@@ -37,12 +38,11 @@ export function AssigneeField({
               control={{ id }}
               selected={null}
               exclude={NONE}
-              type="user"
               spaceId={ticket.space_id}
               onSelect={(entry) => {
-                if (!entry) return
+                if (!entry || entry.type === 'group') return
                 setPicking(false)
-                save.mutate({ assignee: { type: 'user', id: entry.id } })
+                save.mutate({ assignee: { type: entry.type, id: entry.id } })
               }}
             />
           ) : (

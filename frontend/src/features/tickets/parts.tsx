@@ -1,4 +1,5 @@
 import {
+  Bot,
   Bug,
   CalendarDays,
   CircleCheck,
@@ -8,6 +9,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import type { Schemas } from '@/lib/api'
 import { formatDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -64,16 +66,20 @@ export function PriorityLabel({ priority }: { priority: Priority }) {
   )
 }
 
+/** Who works on a ticket: a person, or an agent with the AI mark. */
 export function AssigneeLabel({ assignee }: { assignee: Schemas['PersonOut'] | null }) {
   const { t } = useTranslation()
+  const agent = assignee?.type === 'agent'
+  const Icon = agent ? Bot : UserRound
   return (
     <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-      <UserRound className="size-3.5 shrink-0" aria-hidden />
+      <Icon className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate">
         {assignee
           ? (assignee.name ?? t('tickets.fields.unknownPerson'))
           : t('tickets.fields.unassigned')}
       </span>
+      {agent && <AgentBadge of="agent" />}
     </span>
   )
 }

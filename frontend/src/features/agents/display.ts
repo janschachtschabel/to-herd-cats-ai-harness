@@ -6,6 +6,14 @@ export const AGENT_STATUSES: readonly AgentStatus[] = ['draft', 'active', 'pause
 
 /** The system message an agent's run leaves when it stops without an answer. */
 export const RUN_STOPPED = 'run.stopped'
+/** The system message of a run that could not start or hand over (plan M6 task 8). */
+export const RUN_REFUSED = 'run.refused'
+
+/** Whether a system message is a run notice (shown as one, with its reason). */
+export function isRunNotice(message: { kind: string; system?: { key: string } | null }): boolean {
+  const key = message.system?.key
+  return message.kind === 'system' && (key === RUN_STOPPED || key === RUN_REFUSED)
+}
 
 const STOP_REASONS = [
   'completed',

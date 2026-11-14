@@ -159,7 +159,8 @@
       "sprint_moved": "{{actor}} hat das Ticket von {{from}} nach {{to}} verschoben.",
       "sprint_removed": "{{actor}} hat das Ticket aus {{from}} in den Vorrat gelegt.",
       "someSprint": "einem Sprint",
-      "someSprintInto": "einen Sprint"
+      "someSprintInto": "einen Sprint",
+      "handed": "{{actor}} hat das Ticket an {{to}} übergeben."
     },
     "space": {
       "views": "Ansichten des Bereichs",

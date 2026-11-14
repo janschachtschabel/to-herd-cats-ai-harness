@@ -45,7 +45,7 @@ export function MentionPicker({
               <UserRound className="size-4 text-muted-foreground" aria-hidden />
             )}
             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-            {entry.type === 'agent' && <AgentBadge />}
+            {entry.type === 'agent' && <AgentBadge of="agent" />}
           </li>
         ))}
       </ul>

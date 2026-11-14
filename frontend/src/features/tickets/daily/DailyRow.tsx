@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import type { BoardCell, BoardRow, Schemas, TicketSummary } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { CATEGORY_DOT } from '../display'
@@ -61,6 +62,7 @@ export function DailyRow({
             </button>
           </h3>
         )}
+        {row.assignee?.type === 'agent' && <AgentBadge of="agent" />}
         <span className="text-xs text-muted-foreground">
           {t('tickets.daily.summary', { count, changed })}
         </span>

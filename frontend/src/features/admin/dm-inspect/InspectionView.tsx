@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
-import { RUN_STOPPED } from '@/features/agents/display'
+import { byAgent, isRunNotice } from '@/features/agents/display'
 import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
 import { MessageMarkdown } from '@/features/messaging/MessageMarkdown'
 import {
@@ -77,7 +77,7 @@ export function InspectionView({
       ) : (
         <ol className="flex flex-col gap-2" aria-label={t('dmInspect.messages')}>
           {messages.items.map((message) =>
-            message.kind === 'system' && message.system?.key === RUN_STOPPED ? (
+            isRunNotice(message) ? (
               <li key={message.id}>
                 <RunStoppedNotice message={message} />
               </li>
@@ -87,7 +87,7 @@ export function InspectionView({
                   <span className="font-semibold">
                     {message.author?.name ?? t('messaging.message.unknownAuthor')}
                   </span>
-                  {message.kind === 'agent' && <AgentBadge />}
+                  {byAgent(message) && <AgentBadge />}
                   <time dateTime={message.created_at} className="text-xs text-muted-foreground">
                     {formatDateTime(message.created_at, i18n.language)}
                   </time>

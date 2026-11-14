@@ -33,7 +33,8 @@ export function RunProgress({
   const name = run.data.agent_name
   // Steps done so far; the card names the one in progress.
   const step = Math.max(run.data.steps, active.step ?? 0) + 1
-  const where = place.kind === 'conversation' ? 'Thread' : ''
+  // A ticket's run (no message asked it) answers in the ticket's thread itself.
+  const where = place.kind === 'conversation' && threadId ? 'Thread' : ''
   const text =
     run.data.state === 'queued'
       ? t(`agents.progress.queued${where}`, { name })

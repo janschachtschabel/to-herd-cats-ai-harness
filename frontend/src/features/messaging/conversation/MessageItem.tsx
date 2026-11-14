@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
 import { AnswerSources } from '@/features/agents/AnswerSources'
-import { RUN_STOPPED } from '@/features/agents/display'
+import { byAgent, isRunNotice } from '@/features/agents/display'
 import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { TicketCards } from '@/features/tickets/TicketCard'
@@ -19,7 +19,8 @@ import { useDeleteMessage, useToggleReaction } from './queries'
 import { AddReaction, Reactions } from './Reactions'
 import { MessageTime } from './MessageTime'
 
-/** A system entry of a page or ticket thread: a grey line on the timeline. */
+/** A system entry of a page or ticket thread: a grey line on the timeline; an agent's
+ *  change carries the AI mark. */
 function SystemRow({ message }: { message: Message }) {
   const { t, i18n } = useTranslation()
   if (!message.system) return null
@@ -30,6 +31,7 @@ function SystemRow({ message }: { message: Message }) {
     >
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
       <span>{systemText(t, message.system, i18n.language)}</span>
+      {message.system.actor?.type === 'agent' && <AgentBadge />}
       <MessageTime iso={message.created_at} />
     </div>
   )
@@ -38,9 +40,7 @@ function SystemRow({ message }: { message: Message }) {
 /** One message: who, when, the text, reactions, its thread, and what one may do. An
  *  agent's answer carries the AI mark; a stopped run leaves a notice with its reason. */
 export function MessageItem({ message }: { message: Message }) {
-  if (message.kind === 'system' && message.system?.key === RUN_STOPPED) {
-    return <RunStoppedNotice message={message} />
-  }
+  if (isRunNotice(message)) return <RunStoppedNotice message={message} />
   if (message.kind === 'system') return <SystemRow message={message} />
   return <HumanMessage message={message} />
 }
@@ -67,7 +67,7 @@ function HumanMessage({ message }: { message: Message }) {
     >
       <header className="flex items-baseline gap-2">
         <span className="text-sm font-semibold">{author}</span>
-        {message.kind === 'agent' && <AgentBadge />}
+        {byAgent(message) && <AgentBadge />}
         <MessageTime iso={message.created_at} />
         {message.edited_at && !message.deleted_at && (
           <span className="text-xs text-muted-foreground">{t('messaging.message.edited')}</span>

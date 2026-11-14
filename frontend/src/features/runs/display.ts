@@ -1,5 +1,7 @@
 import type { TFunction } from 'i18next'
 import type { Run } from '@/features/agents/queries'
+import { hasPermission } from '@/features/auth/queries'
+import type { Me } from '@/lib/api'
 import { ticketKey } from '@/features/tickets/refs'
 import type { RunState } from './queries'
 
@@ -73,4 +75,10 @@ export function mayCancel(run: Run): boolean {
 /** A tool's name in words (unknown tools by their name). */
 export function toolText(t: TFunction, name: string): string {
   return t(`agents.tools.names.${name}`, { defaultValue: name })
+}
+
+/** Whether `me` may read runs at all (`ai.use`: their own and their agents';
+ *  `agent.manage`: every one). Which run a reader sees, the API decides. */
+export function readsRuns(me: Me | null | undefined): boolean {
+  return hasPermission(me, 'ai.use') || hasPermission(me, 'agent.manage')
 }

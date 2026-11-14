@@ -2,6 +2,7 @@ import { Bot, Loader2, UserRound, UsersRound } from 'lucide-react'
 import { useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -124,7 +125,11 @@ export function DirectoryCombobox({
                   <UserRound className="size-4 text-muted-foreground" aria-hidden />
                 )}
                 <span>{entry.name}</span>
-                <span className="sr-only">({t(`principals.${entry.type}`)})</span>
+                {entry.type === 'agent' ? (
+                  <AgentBadge of="agent" />
+                ) : (
+                  <span className="sr-only">({t(`principals.${entry.type}`)})</span>
+                )}
               </li>
             ))}
           </ul>
