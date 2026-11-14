@@ -190,6 +190,14 @@ class MessageKind(StrEnum):
     # An agent's message (its run in `run_id`): in a DM it takes part in, or in a
     # conversation of a space it is a member of (plan M6 task 6).
     AGENT = "agent"
+    # A run's card (plan M6 task 7), written for its agent like `agent`: a tool call
+    # waiting for a person's release, or the agent's question (`client_id`: the
+    # approval's or the question's id; `body_md`: the card's summary or the question).
+    APPROVAL = "approval"
+    QUESTION = "question"
+
+
+CARD_KINDS = frozenset({MessageKind.APPROVAL, MessageKind.QUESTION})
 
 
 SYSTEM_AUTHOR = "system"  # `author_type` of system messages, which have no author id
@@ -200,16 +208,21 @@ class Message(UuidPk, OrgScoped, Base):
     __table_args__ = (
         # A resend with the same key returns the first message (idempotent posting).
         UniqueConstraint("author_id", "client_id"),
-        CheckConstraint("kind IN ('human', 'system', 'agent')", name="kind"),
+        CheckConstraint(
+            "kind IN ('human', 'system', 'agent', 'approval', 'question')", name="kind"
+        ),
         CheckConstraint("author_type IN ('user', 'system', 'agent')", name="author_type"),
         CheckConstraint(
             "(kind = 'system') = (author_type = 'system')"
             " AND (author_type = 'system') = (author_id IS NULL)"
-            " AND (kind = 'agent') = (author_type = 'agent')",
+            " AND (kind IN ('agent', 'approval', 'question')) = (author_type = 'agent')",
             name="author",
         ),
         # An agent's message has a key (`client_id`: its run's answer, or a tool call).
-        CheckConstraint("kind <> 'agent' OR client_id IS NOT NULL", name="agent_run"),
+        CheckConstraint(
+            "kind NOT IN ('agent', 'approval', 'question') OR client_id IS NOT NULL",
+            name="agent_run",
+        ),
         CheckConstraint(f"char_length(body_md) <= {MAX_BODY_CHARS}", name="body_length"),
         # A system message names the event it was written for (`client_id`), once.
         CheckConstraint("author_type <> 'system' OR client_id IS NOT NULL", name="system_event"),

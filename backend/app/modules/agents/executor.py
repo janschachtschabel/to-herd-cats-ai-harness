@@ -52,6 +52,7 @@ from app.core.models_base import utcnow
 from app.core.outbox import EventActor, emit
 from app.core.principal import Principal
 from app.modules.agents.actor import allowed_actor, run_actor
+from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import replay
@@ -234,6 +235,7 @@ async def close(
     if by is not None:
         stop["by"] = str(by)
     await steps.event(STOP_SEQ, EventKind.STOP, stop)
+    await WaitedRepository(session, claimed.org_id).expire_pending(run.id)
     await steps.done(run, reason.value)
     if reason != StopReason.CANCELLED:  # cancelled: nothing more is written
         await _follow_up(session, steps, run)

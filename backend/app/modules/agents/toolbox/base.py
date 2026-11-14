@@ -18,6 +18,11 @@ release, a question). The host then sets the run `waiting` in the same transacti
 records no result for the call, and the call is run again once the run is resumed.
 What a tool read it notes in `ctx.reads` (the checks before every model call cover
 it, and the event records it for a replay).
+
+A tool an agent may use only with a person's release (`confirm`, plan M6 decision 4)
+names what a call would change (`subjects`: each object with its version and space;
+None for a call that changes nothing, such as `update_page`'s preview) and what a
+person must be able to do there to release it (`action`); see `approvals/gate.py`.
 """
 
 import uuid
@@ -31,6 +36,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
+from app.core.permissions import Action
 from app.modules.agents.actor import Reads
 from app.modules.ai.models import DataLocation
 from app.runtime.loop import ToolResult
@@ -67,6 +73,16 @@ class RunRef:
     agent_id: uuid.UUID
     user_id: uuid.UUID
     conversation_id: uuid.UUID
+    reply_to: uuid.UUID | None = None  # the thread its messages go to (None: top level)
+
+
+@dataclass(frozen=True, slots=True)
+class CallRef:
+    """The model's tool call a tool runs for: its step and the provider's call id
+    (unique together within a run; stable when the run is taken up again)."""
+
+    step: int
+    id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +92,18 @@ class ToolContext:
     location: DataLocation
     reads: Reads
     run: RunRef
+    call: CallRef | None = None  # None only outside a run (a tool called directly)
+
+
+@dataclass(frozen=True, slots=True)
+class Subject:
+    """An object a call would change, as it is now: a release is bound to `version`
+    (0 for what has none); `space_id` is where a person must be able to do it."""
+
+    kind: str
+    id: uuid.UUID
+    version: int
+    space_id: uuid.UUID | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +114,7 @@ class Wait:
 
 
 Runner = Callable[[ToolContext, Any], Awaitable[ToolResult | Wait]]
+Subjects = Callable[[ToolContext, Any], Awaitable[list[Subject] | None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,3 +127,5 @@ class ToolSpec:
     run: Runner
     level: int = 1
     effect: Effect = Effect.READ
+    subjects: Subjects | None = None  # None: the call changes no object (release: args)
+    action: Action | None = None  # what the releasing person must be able to do there

@@ -37,6 +37,8 @@ class NotificationReason(StrEnum):
     ASSIGNMENT = "assignment"
     TICKET_COMMENT = "ticket_comment"
     PROPOSAL = "proposal"
+    APPROVAL = "approval"  # a run's card asks me to release a tool call (plan M6 task 7)
+    QUESTION = "question"  # a run's card asks me a question
 
 
 class Notification(UuidPk, OrgScoped, Base):
@@ -44,7 +46,8 @@ class Notification(UuidPk, OrgScoped, Base):
     __table_args__ = (
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
-            "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal')",
+            "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
+            " 'approval', 'question')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),

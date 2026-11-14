@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.core.errors import NotFound
 from app.modules.agents.repository import AgentRepository
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import LEAKS, by, effect, key_for, leaks_into
 from app.modules.messaging.models import MAX_BODY_CHARS, ConversationKind
 from app.modules.messaging.service import ConversationService, MessageService
@@ -60,3 +60,12 @@ async def post_message(ctx: ToolContext, args: PostMessageArgs) -> ToolResult:
         return ToolResult("conversation", f"Posted message id={posted.message.id}.", attrs)
 
     return await effect(ctx, "conversation", attrs, write)
+
+
+async def post_subjects(ctx: ToolContext, args: PostMessageArgs) -> list[Subject] | None:
+    """The conversation (a release is bound to it, `approvals/gate.py`)."""
+    try:
+        conversation = await ConversationService(ctx.session).get(ctx.actor, args.conversation_id)
+    except NotFound:
+        return None
+    return [Subject("conversation", conversation.id, 0, conversation.space_id)]

@@ -34,6 +34,8 @@ ship without a decision on who may call it. Guards:
   else gets 404 `skill.not_found`, as for an unknown id (plan M6 task 9).
 - `proposal`: a page editor in the proposal's space (or its author); everyone else
   gets 404 `proposal.not_found`, as for an unknown id (plan M6).
+- `approval`, `question`: whoever may see the run (as `run`); everyone else gets 404
+  `approval.not_found` or `question.not_found`, as for an unknown id (plan M6 task 7).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -193,6 +195,12 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/runs/{run_id}", "run"),
     ("GET", "/api/runs/{run_id}/events", "run"),
     ("POST", "/api/runs/{run_id}/cancel", "run"),
+    ("GET", "/api/approvals", "session"),
+    ("GET", "/api/approvals/{approval_id}", "approval"),
+    ("GET", "/api/approvals/{approval_id}/diff", "approval"),
+    ("POST", "/api/approvals/{approval_id}/decide", "approval"),
+    ("GET", "/api/questions/{question_id}", "question"),
+    ("POST", "/api/questions/{question_id}/answer", "question"),
     ("GET", "/api/skills", "skill"),
     ("POST", "/api/skills", "skill"),
     ("GET", "/api/skills/{skill_id}", "skill"),
@@ -244,6 +252,8 @@ def concrete(
         "{sprint_id}": str(sprint_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
+        "{approval_id}": str(uuid7()),
+        "{question_id}": str(uuid7()),
         "{proposal_id}": str(proposal_id or uuid7()),
         "{skill_id}": str(skill_id or uuid7()),
     }
@@ -322,4 +332,6 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/skills/{skill_id}/archive"): {"version": 1},
     ("POST", "/api/skills/{skill_id}/unarchive"): {"version": 1},
     ("POST", "/api/skills/{skill_id}/versions/{number}/restore"): {"version": 1},
+    ("POST", "/api/approvals/{approval_id}/decide"): {"decision": "approve", "version": 1},
+    ("POST", "/api/questions/{question_id}/answer"): {"text": "x", "version": 1},
 }

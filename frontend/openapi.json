@@ -1004,6 +1004,192 @@
         "title": "AiPolicy",
         "type": "string"
       },
+      "ApprovalDecide": {
+        "additionalProperties": false,
+        "description": "`approve` or `reject`; `reason` goes to the model (as untrusted text) on a\nrejection; `version`: the approval's, as read.",
+        "properties": {
+          "decision": {
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decision",
+          "version"
+        ],
+        "title": "ApprovalDecide",
+        "type": "object"
+      },
+      "ApprovalOut": {
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text.",
+        "properties": {
+          "addressed_to": {
+            "format": "uuid",
+            "title": "Addressed To",
+            "type": "string"
+          },
+          "args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Args"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "diff_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Url"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ApprovalState"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "conversation_id",
+          "message_id",
+          "tool",
+          "summary",
+          "state",
+          "addressed_to",
+          "args",
+          "diff_url",
+          "decided_by",
+          "decided_at",
+          "reason",
+          "expires_at",
+          "created_at",
+          "version"
+        ],
+        "title": "ApprovalOut",
+        "type": "object"
+      },
+      "ApprovalState": {
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "expired"
+        ],
+        "title": "ApprovalState",
+        "type": "string"
+      },
       "AssigneeIn": {
         "description": "A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`\nand `ticket.assign`, and starts its work on the ticket.",
         "properties": {
@@ -1366,6 +1552,25 @@
           "cells"
         ],
         "title": "BoardRowOut",
+        "type": "object"
+      },
+      "CardOut": {
+        "description": "A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by\nid (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see\nit). The message's `body_md` is the card's summary or the question.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/MessageKind"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "CardOut",
         "type": "object"
       },
       "ChannelCreate": {
@@ -3448,13 +3653,15 @@
         "enum": [
           "human",
           "system",
-          "agent"
+          "agent",
+          "approval",
+          "question"
         ],
         "title": "MessageKind",
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first.",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first. `card`: set for a run's card (`kind`\n`approval` or `question`).",
         "properties": {
           "author": {
             "anyOf": [
@@ -3469,6 +3676,16 @@
           "body_md": {
             "title": "Body Md",
             "type": "string"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "client_id": {
             "anyOf": [
@@ -3671,6 +3888,16 @@
           "body_md": {
             "title": "Body Md",
             "type": "string"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "client_id": {
             "anyOf": [
@@ -4136,7 +4363,9 @@
           "reply",
           "assignment",
           "ticket_comment",
-          "proposal"
+          "proposal",
+          "approval",
+          "question"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -4546,6 +4775,33 @@
           "items"
         ],
         "title": "Page[AgentSpaceOut]",
+        "type": "object"
+      },
+      "Page_ApprovalOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ApprovalOut]",
         "type": "object"
       },
       "Page_AttachmentOut_": {
@@ -6292,6 +6548,133 @@
         "title": "Purpose",
         "type": "string"
       },
+      "QuestionAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "text",
+          "version"
+        ],
+        "title": "QuestionAnswer",
+        "type": "object"
+      },
+      "QuestionOut": {
+        "description": "An agent's question; `answer` only for the person asked.",
+        "properties": {
+          "addressed_to": {
+            "format": "uuid",
+            "title": "Addressed To",
+            "type": "string"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/QuestionState"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "conversation_id",
+          "message_id",
+          "question",
+          "state",
+          "addressed_to",
+          "answer",
+          "answered_at",
+          "expires_at",
+          "created_at",
+          "version"
+        ],
+        "title": "QuestionOut",
+        "type": "object"
+      },
+      "QuestionState": {
+        "enum": [
+          "pending",
+          "answered",
+          "expired"
+        ],
+        "title": "QuestionState",
+        "type": "string"
+      },
       "ReactionOut": {
         "description": "People who reacted with `emoji`; `mine`: the caller among them.",
         "properties": {
@@ -7928,7 +8311,8 @@
           "provider_refused",
           "error",
           "cancelled",
-          "waiting_timeout"
+          "waiting_timeout",
+          "approval_expired"
         ],
         "title": "StopReason",
         "type": "string"
@@ -12302,6 +12686,237 @@
         ]
       }
     },
+    "/api/approvals": {
+      "get": {
+        "description": "Those addressed to the caller, newest first (`state=pending`: to decide).",
+        "operationId": "my_approvals_api_approvals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "only this state",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ApprovalState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "only this state",
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ApprovalOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Approvals",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/approvals/{approval_id}": {
+      "get": {
+        "operationId": "get_approval_api_approvals__approval_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Approval",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/approvals/{approval_id}/decide": {
+      "post": {
+        "operationId": "decide_approval_api_approvals__approval_id__decide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecide"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Approval",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/approvals/{approval_id}/diff": {
+      "get": {
+        "description": "The page as it is now against the call's content, for the person asked (null:\ntoo large to compare).",
+        "operationId": "approval_diff_api_approvals__approval_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/components/schemas/HunkOut"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Approval Diff Api Approvals  Approval Id  Diff Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approval Diff",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
     "/api/attachments/{attachment_id}": {
       "delete": {
         "description": "`page.edit` on its page; the file goes when no other attachment uses it.",
@@ -14885,6 +15500,102 @@
         "summary": "Reject Proposal",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/questions/{question_id}": {
+      "get": {
+        "operationId": "get_question_api_questions__question_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Question",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/questions/{question_id}/answer": {
+      "post": {
+        "operationId": "answer_question_api_questions__question_id__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Question",
+        "tags": [
+          "approvals"
         ]
       }
     },

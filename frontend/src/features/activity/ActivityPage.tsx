@@ -3,8 +3,10 @@ import {
   Check,
   CheckCheck,
   FilePen,
+  MessageCircleQuestion,
   MessageSquare,
   MessageSquareReply,
+  ShieldCheck,
   UserCheck,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -101,6 +103,8 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   assignment: UserCheck,
   ticket_comment: MessageSquare,
   proposal: FilePen,
+  approval: ShieldCheck,
+  question: MessageCircleQuestion,
 }
 
 function ActivityItem({ entry }: { entry: ActivityEntry }) {

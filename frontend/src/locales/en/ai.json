@@ -238,6 +238,7 @@
       "policy_blocked": "Stopped by a space's AI policy: what was read may not go to this connection.",
       "provider_refused": "The provider refuses (access, credit or rate limit).",
       "error": "Something went wrong. Please try again later.",
+      "approval_expired": "Nobody gave the release in time; the run was ended.",
       "unknown": "The run was ended."
     },
     "noRun": {
@@ -300,6 +301,12 @@
     },
     "dm": {
       "agent_pair_only": "One talks to an agent only as a pair."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "approval": "asks you for a release in {{where}}",
+      "question": "asked you a question in {{where}}"
     }
   }
 }

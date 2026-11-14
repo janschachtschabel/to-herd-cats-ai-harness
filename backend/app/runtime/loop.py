@@ -66,6 +66,7 @@ Stop = Literal[
     "provider_refused",
     "error",
     "cancelled",
+    "approval_expired",
 ]
 
 

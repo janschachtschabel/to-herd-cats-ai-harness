@@ -40,7 +40,12 @@ async def test_ai_routes_do_not_exist_for_people_without_the_right(
 async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
     member_client: AsyncClient, guest_client: AsyncClient
 ) -> None:
-    codes = {"agent": "agent.not_found", "run": "run.not_found"}
+    codes = {
+        "agent": "agent.not_found",
+        "run": "run.not_found",
+        "approval": "approval.not_found",
+        "question": "question.not_found",
+    }
     for client in (member_client, guest_client):
         for method, template, guard in ROUTES:
             if guard in codes:

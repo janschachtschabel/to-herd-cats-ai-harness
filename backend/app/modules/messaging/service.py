@@ -123,13 +123,18 @@ class MessageService:
         client_id: uuid.UUID | None = None,
         mentions: Iterable[uuid.UUID] = (),
         by: Authorship | None = None,
+        card: MessageKind | None = None,
     ) -> Posted:
+        """`by`: written for an agent (`kind=agent`, or `card`: an approval or a
+        question card of its run, plan M6 task 7)."""
         conversation = await self.reader.readable(actor, conversation_id)
         await self.reader.require_post(actor, conversation)
         body_md = checked_body(body_md)
         asked = mentioning.asked(mentions) if by is None else []
         if by is not None and client_id is None:
             raise ValueError("an agent's message needs a client_id")
+        if card is not None and by is None:
+            raise ValueError("a card is an agent's")
         author = by.principal if by else actor.principal
         repo = self.repo(actor)
         parent = await threads.lock_parent(repo, conversation, parent_id) if parent_id else None
@@ -139,7 +144,7 @@ class MessageService:
                 "parent_id": parent_id,
                 "author_type": author.type,
                 "author_id": author.id,
-                "kind": MessageKind.HUMAN if by is None else MessageKind.AGENT,
+                "kind": MessageKind.HUMAN if by is None else (card or MessageKind.AGENT),
                 "body_md": body_md,
                 "client_id": client_id,
                 "run_id": by.run_id if by else None,

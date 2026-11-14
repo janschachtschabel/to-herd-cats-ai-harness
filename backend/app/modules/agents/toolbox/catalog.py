@@ -10,11 +10,13 @@ with `ctx.actor` in `ctx.session` (its effect and its journal entry commit toget
 it checks its rights itself, before it writes.
 """
 
+from app.core.permissions import Action
 from app.modules.agents.toolbox import (
     conversation,
     listing,
     message_tools,
     past_runs,
+    questions,
     reading,
     ticket_tools,
     wiki_tools,
@@ -101,6 +103,15 @@ CATALOG: dict[str, ToolSpec] = {
             READ,
         ),
         ToolSpec(
+            "ask_user",
+            "Ask the person you work for a question you cannot answer yourself, and wait "
+            "for the answer (it may take a while). Ask only what you need to go on.",
+            questions.AskUserArgs,
+            questions.ask_user,
+            1,
+            READ,
+        ),
+        ToolSpec(
             "submit_result",
             "Hand in your result: its text becomes your answer and ends your work. Call it "
             "alone, as your last step.",
@@ -117,6 +128,8 @@ CATALOG: dict[str, ToolSpec] = {
             wiki_tools.propose_page_change,
             2,
             PROPOSE,
+            wiki_tools.page_subjects,
+            Action.PAGE_EDIT,
         ),
         ToolSpec(
             "propose_new_page",
@@ -126,6 +139,8 @@ CATALOG: dict[str, ToolSpec] = {
             wiki_tools.propose_new_page,
             2,
             PROPOSE,
+            wiki_tools.new_page_subjects,
+            Action.PAGE_EDIT,
         ),
         ToolSpec(
             "comment_ticket",
@@ -134,6 +149,8 @@ CATALOG: dict[str, ToolSpec] = {
             ticket_tools.comment_ticket,
             2,
             WRITE,
+            ticket_tools.ticket_subjects,
+            Action.CHANNEL_POST,
         ),
         ToolSpec(
             "set_ticket_status",
@@ -143,6 +160,8 @@ CATALOG: dict[str, ToolSpec] = {
             ticket_tools.set_ticket_status,
             2,
             WRITE,
+            ticket_tools.ticket_subjects,
+            Action.TICKET_EDIT,
         ),
         ToolSpec(
             "create_ticket",
@@ -152,6 +171,8 @@ CATALOG: dict[str, ToolSpec] = {
             ticket_tools.create_ticket,
             2,
             WRITE,
+            ticket_tools.create_subjects,
+            Action.TICKET_CREATE,
         ),
         ToolSpec(
             "link_ticket_page",
@@ -160,6 +181,8 @@ CATALOG: dict[str, ToolSpec] = {
             ticket_tools.link_ticket_page,
             2,
             WRITE,
+            ticket_tools.link_subjects,
+            Action.TICKET_EDIT,
         ),
         ToolSpec(
             "update_page",
@@ -170,6 +193,8 @@ CATALOG: dict[str, ToolSpec] = {
             wiki_tools.update_page,
             3,
             WRITE,
+            wiki_tools.update_subjects,
+            Action.PAGE_EDIT,
         ),
         ToolSpec(
             "assign_ticket",
@@ -179,6 +204,8 @@ CATALOG: dict[str, ToolSpec] = {
             ticket_tools.assign_ticket,
             3,
             WRITE,
+            ticket_tools.ticket_subjects,
+            Action.TICKET_ASSIGN,
         ),
         ToolSpec(
             "post_message",
@@ -188,6 +215,8 @@ CATALOG: dict[str, ToolSpec] = {
             message_tools.post_message,
             3,
             WRITE,
+            message_tools.post_subjects,
+            Action.CHANNEL_POST,
         ),
     )
 }

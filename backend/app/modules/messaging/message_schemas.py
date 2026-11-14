@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.core.principal import PrincipalType
 from app.modules.messaging.agent_hooks import RunStart
 from app.modules.messaging.mentions import MAX_MENTIONS
-from app.modules.messaging.models import MAX_BODY_CHARS, MessageKind
+from app.modules.messaging.models import CARD_KINDS, MAX_BODY_CHARS, Message, MessageKind
 from app.modules.messaging.social_repository import ReactionSummary
 from app.modules.messaging.views import MessageView, SystemEntry, SystemValue
 
@@ -127,6 +127,15 @@ class SystemEntryOut(BaseModel):
         )
 
 
+class CardOut(BaseModel):
+    """A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by
+    id (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see
+    it). The message's `body_md` is the card's summary or the question."""
+
+    type: MessageKind
+    id: uuid.UUID
+
+
 class MessageOut(BaseModel):
     """`author` is null for system messages; those carry `system` instead (null for
     all others) and an empty `body_md`: their stored body holds ids the reader may not
@@ -135,7 +144,8 @@ class MessageOut(BaseModel):
     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
     `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
     `mentions`: the people mentioned who may see the conversation; `reactions`: by
-    emoji, the first reacted with first."""
+    emoji, the first reacted with first. `card`: set for a run's card (`kind`
+    `approval` or `question`)."""
 
     id: uuid.UUID
     conversation_id: uuid.UUID
@@ -153,6 +163,7 @@ class MessageOut(BaseModel):
     mentions: list[uuid.UUID]
     reactions: list[ReactionOut]
     system: SystemEntryOut | None
+    card: CardOut | None = None
 
     @classmethod
     def of(cls, view: MessageView) -> "MessageOut":
@@ -179,7 +190,14 @@ class MessageOut(BaseModel):
             mentions=view.mentions,
             reactions=[ReactionOut.of(r) for r in view.reactions],
             system=SystemEntryOut.of(view.system) if view.system else None,
+            card=_card(message),
         )
+
+
+def _card(message: Message) -> CardOut | None:
+    if message.kind not in CARD_KINDS or message.client_id is None:
+        return None
+    return CardOut(type=message.kind, id=message.client_id)
 
 
 class AgentRunOut(BaseModel):

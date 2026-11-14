@@ -670,6 +670,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Approvals
+         * @description Those addressed to the caller, newest first (`state=pending`: to decide).
+         */
+        get: operations["my_approvals_api_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Approval */
+        get: operations["get_approval_api_approvals__approval_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{approval_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Approval */
+        post: operations["decide_approval_api_approvals__approval_id__decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{approval_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Approval Diff
+         * @description The page as it is now against the call's content, for the person asked (null:
+         *     too large to compare).
+         */
+        get: operations["approval_diff_api_approvals__approval_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/attachments/{attachment_id}": {
         parameters: {
             query?: never;
@@ -1357,6 +1432,40 @@ export interface paths {
         put?: never;
         /** Reject Proposal */
         post: operations["reject_proposal_api_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Question */
+        get: operations["get_question_api_questions__question_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{question_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer Question */
+        post: operations["answer_question_api_questions__question_id__answer_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2734,6 +2843,87 @@ export interface components {
          */
         AiPolicy: "any" | "restricted" | "none";
         /**
+         * ApprovalDecide
+         * @description `approve` or `reject`; `reason` goes to the model (as untrusted text) on a
+         *     rejection; `version`: the approval's, as read.
+         */
+        ApprovalDecide: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "reject";
+            /** Reason */
+            reason?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ApprovalOut
+         * @description A tool call waiting for (or given) a person's release. `summary`: the tool and
+         *     the ids the call names. `args`: the call's arguments, only for the person asked
+         *     (null for others). `diff_url`: for a page's new content, where that person reads
+         *     the diff against the page as it is now (`GET`), instead of the text.
+         */
+        ApprovalOut: {
+            /**
+             * Addressed To
+             * Format: uuid
+             */
+            addressed_to: string;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Diff Url */
+            diff_url: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Message Id */
+            message_id: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            state: components["schemas"]["ApprovalState"];
+            /** Summary */
+            summary: string;
+            /** Tool */
+            tool: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ApprovalState
+         * @enum {string}
+         */
+        ApprovalState: "pending" | "approved" | "rejected" | "expired";
+        /**
          * AssigneeIn
          * @description A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`
          *     and `ticket.assign`, and starts its work on the ticket.
@@ -2906,6 +3096,20 @@ export interface components {
             assignee: components["schemas"]["PersonOut"] | null;
             /** Cells */
             cells: components["schemas"]["BoardCellOut"][];
+        };
+        /**
+         * CardOut
+         * @description A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by
+         *     id (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see
+         *     it). The message's `body_md` is the card's summary or the question.
+         */
+        CardOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["MessageKind"];
         };
         /** ChannelCreate */
         ChannelCreate: {
@@ -3737,7 +3941,7 @@ export interface components {
          * MessageKind
          * @enum {string}
          */
-        MessageKind: "human" | "system" | "agent";
+        MessageKind: "human" | "system" | "agent" | "approval" | "question";
         /**
          * MessageOut
          * @description `author` is null for system messages; those carry `system` instead (null for
@@ -3747,12 +3951,14 @@ export interface components {
          *     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
          *     `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
          *     `mentions`: the people mentioned who may see the conversation; `reactions`: by
-         *     emoji, the first reacted with first.
+         *     emoji, the first reacted with first. `card`: set for a run's card (`kind`
+         *     `approval` or `question`).
          */
         MessageOut: {
             author: components["schemas"]["MessageAuthorOut"] | null;
             /** Body Md */
             body_md: string;
+            card?: components["schemas"]["CardOut"] | null;
             /** Client Id */
             client_id: string | null;
             /**
@@ -3814,6 +4020,7 @@ export interface components {
             author: components["schemas"]["MessageAuthorOut"] | null;
             /** Body Md */
             body_md: string;
+            card?: components["schemas"]["CardOut"] | null;
             /** Client Id */
             client_id: string | null;
             /**
@@ -3985,7 +4192,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question";
         /** OrgOut */
         OrgOut: {
             /**
@@ -4143,6 +4350,13 @@ export interface components {
         Page_AgentSpaceOut_: {
             /** Items */
             items: components["schemas"]["AgentSpaceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ApprovalOut] */
+        Page_ApprovalOut_: {
+            /** Items */
+            items: components["schemas"]["ApprovalOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -4705,6 +4919,65 @@ export interface components {
          * @enum {string}
          */
         Purpose: "chat" | "embedding" | "both";
+        /** QuestionAnswer */
+        QuestionAnswer: {
+            /** Text */
+            text: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * QuestionOut
+         * @description An agent's question; `answer` only for the person asked.
+         */
+        QuestionOut: {
+            /**
+             * Addressed To
+             * Format: uuid
+             */
+            addressed_to: string;
+            /** Answer */
+            answer: string | null;
+            /** Answered At */
+            answered_at: string | null;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Message Id */
+            message_id: string | null;
+            /** Question */
+            question: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            state: components["schemas"]["QuestionState"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * QuestionState
+         * @enum {string}
+         */
+        QuestionState: "pending" | "answered" | "expired";
         /**
          * ReactionOut
          * @description People who reacted with `emoji`; `mine`: the caller among them.
@@ -5378,7 +5651,7 @@ export interface components {
          * StopReason
          * @enum {string}
          */
-        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error" | "cancelled" | "waiting_timeout";
+        StopReason: "completed" | "max_steps" | "deadline" | "no_progress" | "rights_revoked" | "policy_blocked" | "provider_refused" | "error" | "cancelled" | "waiting_timeout" | "approval_expired";
         /**
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page or
@@ -7670,6 +7943,137 @@ export interface operations {
             };
         };
     };
+    my_approvals_api_approvals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                /** @description only this state */
+                state?: components["schemas"]["ApprovalState"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApprovalOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_approval_api_approvals__approval_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_approval_api_approvals__approval_id__decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecide"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approval_diff_api_approvals__approval_id__diff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HunkOut"][] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     download_attachment_api_attachments__attachment_id__get: {
         parameters: {
             query?: {
@@ -9253,6 +9657,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_question_api_questions__question_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_question_api_questions__question_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionOut"];
                 };
             };
             /** @description Validation Error */

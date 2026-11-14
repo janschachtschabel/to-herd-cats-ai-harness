@@ -5,9 +5,9 @@
 - Entries per agent and tool (`agent_tool`) can only tighten: the effective grant is
   the stricter of the default and the entry. An entry can never open a tool the level
   blocks, nor a tool the catalog does not list (those are never offered at all).
-- A run offers the model only tools whose effective grant is `allow`. `confirm` needs
-  the release flow of plan M6 task 7; until then a `confirm` tool is not offered
-  (task 7 offers it and turns its call into a release request).
+- A run offers the model the tools whose effective grant is `allow` or `confirm`; a
+  call of a `confirm` tool waits for a person's release (`approvals/gate.py`, plan M6
+  task 7). `block` is never offered.
 - A level above 2 is given only by an admin, or by someone who manages every space the
   agent is a member of (an agent without spaces: admins only).
 """
@@ -46,8 +46,9 @@ def effective(level: int, spec: ToolSpec, entry: Grant | None) -> Grant:
 
 
 def allowed(level: int, specs: list[ToolSpec], entries: Mapping[str, Grant]) -> list[ToolSpec]:
-    """The tools a run may offer now (effective `allow`), in the catalog's order."""
-    return [s for s in specs if effective(level, s, entries.get(s.name)) == Grant.ALLOW]
+    """The tools a run may offer now (effective `allow` or `confirm`), in the catalog's
+    order."""
+    return [s for s in specs if effective(level, s, entries.get(s.name)) != Grant.BLOCK]
 
 
 async def may_grant_level(

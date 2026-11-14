@@ -238,6 +238,7 @@
       "policy_blocked": "Durch die KI-Richtlinie eines Bereichs gestoppt: Gelesenes darf nicht an diese Verbindung gehen.",
       "provider_refused": "Der Anbieter lehnt ab (Zugang, Guthaben oder Anfragegrenze).",
       "error": "Ein Fehler ist aufgetreten. Bitte später erneut versuchen.",
+      "approval_expired": "Niemand hat die Freigabe rechtzeitig erteilt; der Lauf wurde beendet.",
       "unknown": "Der Lauf wurde beendet."
     },
     "noRun": {
@@ -300,6 +301,12 @@
     },
     "dm": {
       "agent_pair_only": "Mit einem Agenten spricht man nur zu zweit."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "approval": "bittet dich in {{where}} um eine Freigabe",
+      "question": "hat dir in {{where}} eine Frage gestellt"
     }
   }
 }

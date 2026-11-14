@@ -73,6 +73,9 @@ LIVE_TYPES: dict[str, str] = {
     "proposal.accepted": "proposal.changed",
     "proposal.rejected": "proposal.changed",
     "proposal.withdrawn": "proposal.changed",
+    # A run's card was decided or answered (plan M6 task 7): its conversation reloads it.
+    "approval.decided": "card.changed",
+    "question.answered": "card.changed",
 }
 LIVE_NAMES = frozenset(LIVE_TYPES.values())
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})

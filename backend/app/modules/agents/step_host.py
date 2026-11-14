@@ -7,7 +7,9 @@ this take-up's (else `Lost`) and that nobody asked it to stop (else `cancelled`)
 tool runs inside its step's transaction, which then records its `run_event`: a tool
 that writes commits its effect together with its entry in the journal
 (`toolbox/base.py`). A tool that must wait for a person sets the run `waiting` in that
-transaction instead, and the host raises `Suspended` once it is committed."""
+transaction instead, and the host raises `Suspended` once it is committed. A tool the
+agent may use only with a person's release (`confirm`) passes `approvals/gate.py`
+first, in the same transaction."""
 
 import asyncio
 import time
@@ -23,12 +25,13 @@ from app.core.access import Actor
 from app.core.outbox import EventActor, emit
 from app.core.principal import Principal
 from app.modules.agents.actor import Reads, allowed_actor
+from app.modules.agents.approvals.gate import gate
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.models import Agent, EventKind, Run
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
-from app.modules.agents.toolbox.base import RunRef, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSpec, Wait
 from app.modules.agents.toolbox.policy import Grant, effective
 from app.modules.ai.models import DataLocation, UsageRecord
 from app.modules.ai.policy import ANY, connection_allowed, strictest
@@ -128,14 +131,16 @@ class RunHost:
         try:
             async with self.unit() as session:
                 steps, run, agent = await self._owned(session)
-                await self._granted(session, agent, spec)
+                grant = await self._granted(session, agent, spec)
                 actor = await self._actor(session, agent)
                 location = await self._location(steps)
                 reads = self.run.reads
                 pages, tickets = set(reads.pages), set(reads.tickets)
-                ctx = ToolContext(session, actor, location, reads, self._ref())
+                ref = CallRef(step, call.id)
+                ctx = ToolContext(session, actor, location, reads, self._ref(), ref)
                 started = time.perf_counter()
-                result = await spec.run(ctx, args)
+                held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
+                result = held if held is not None else await spec.run(ctx, args)
                 duration_ms = round((time.perf_counter() - started) * 1000)
                 if isinstance(result, Wait):
                     await steps.wait(run, result.until)
@@ -182,12 +187,15 @@ class RunHost:
         self.run.agent = agent
         return steps, run, agent
 
-    async def _granted(self, session: AsyncSession, agent: Agent, spec: ToolSpec) -> None:
-        """The tool is still allowed to the agent as it is now (level and entries)."""
+    async def _granted(self, session: AsyncSession, agent: Agent, spec: ToolSpec) -> Grant:
+        """The tool is still allowed to the agent as it is now (level and entries):
+        `allow`, or `confirm` (a person releases each call, `approvals/gate.py`)."""
         entries = await AgentRepository(session, agent.org_id).tool_entries(agent.id)
         entry = Grant(entries[spec.name]) if spec.name in entries else None
-        if effective(agent.level, spec, entry) != Grant.ALLOW:
+        grant = effective(agent.level, spec, entry)
+        if grant == Grant.BLOCK:
             raise Halt("rights_revoked")
+        return grant
 
     async def _actor(self, session: AsyncSession, agent: Agent) -> Actor:
         claimed = self.run.claimed

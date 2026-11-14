@@ -16,6 +16,7 @@ const STOP_REASONS = [
   'policy_blocked',
   'provider_refused',
   'error',
+  'approval_expired',
 ] as const
 
 /** Why a run ended, in words (an unknown reason gets a general sentence). */

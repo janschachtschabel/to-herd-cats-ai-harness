@@ -19,8 +19,9 @@ that waits, asking a run to stop, and ending waiting runs whose time ran out.
   No worker needs waking: the run that ends here needs none, and the notice's outbox
   event wakes the loops anyway.
 - `sweep_waiting`, from the run loop: waiting runs past `wait_until` end with
-  `waiting_timeout`, those someone asked to stop with `cancelled`, each with its notice
-  in the conversation, like any other end.
+  `approval_expired` when they wait for a release, else `waiting_timeout`; those
+  someone asked to stop with `cancelled`; each with its notice in the conversation,
+  like any other end (and what they waited for is `expired`).
 """
 
 import uuid
@@ -28,6 +29,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
+from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository, due_waiting
 from app.modules.agents.executor import close
 from app.modules.agents.executor_repository import Claimed, RunSteps
@@ -82,5 +84,7 @@ async def sweep_waiting(session: AsyncSession) -> int:
     runs = await due_waiting(session, utcnow(), SWEEP_BATCH)
     for run in runs:
         steps = RunSteps(session, Claimed.of(run))
-        await close(session, steps, run, StopReason.WAITING_TIMEOUT)
+        released = await WaitedRepository(session, run.org_id).pending_approval(run.id)
+        reason = StopReason.APPROVAL_EXPIRED if released else StopReason.WAITING_TIMEOUT
+        await close(session, steps, run, reason)
     return len(runs)

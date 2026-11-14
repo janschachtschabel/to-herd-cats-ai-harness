@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     run_lease_seconds: float = Field(default=30.0, ge=3)
     # Personal agents one person may have at most (plan M6 decision 13).
     ai_personal_agents_max: int = Field(default=5, ge=0, le=100)
+    # How long a run waits for a release or an answer (hours, plan M6 task 7) before it
+    # ends (`approval_expired`, `waiting_timeout`).
+    ai_approval_hours: float = Field(default=72.0, gt=0, le=720)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

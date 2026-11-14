@@ -200,8 +200,8 @@ async def test_a_run_offers_only_what_is_allowed(bench: Bench) -> None:
     offered = [t["function"]["name"] for t in bench.stub.state.log[0].body.get("tools", [])]
     level = bench.agent.level  # level 2: the reading tools and the proposing/ticket ones
     expected = [n for n, s in CATALOG.items() if s.level <= level]
-    assert offered == [n for n in expected if n not in ("read_page", "search")]
-    assert "search" not in offered  # `confirm` waits for the release flow (task 7)
+    assert offered == [n for n in expected if n != "read_page"]
+    assert "search" in offered  # `confirm` is offered; its call waits for a release
     tool_events = await bench.session.scalars(
         select(RunEvent).where(RunEvent.kind == EventKind.TOOL_CALL)
     )

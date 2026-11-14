@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.core.access import Action, can
 from app.core.errors import NotFound
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.writing import LEAKS, by, effect, leaks_into, refused
 from app.modules.proposals.models import MAX_REASON_CHARS
 from app.modules.proposals.service import ProposalService
@@ -159,6 +159,38 @@ async def update_page(ctx: ToolContext, args: UpdatePageArgs) -> ToolResult:
         return ToolResult("wiki", f"Page id={written.id} saved (version {written.version}).", attrs)
 
     return await effect(ctx, "wiki", attrs, write)
+
+
+# --- what a call changes (a release is bound to it, `approvals/gate.py`) -------------
+
+
+async def page_subjects(ctx: ToolContext, args: ProposePageChangeArgs) -> list[Subject] | None:
+    page = await _page(ctx, args.page_id)
+    return None if page is None else [_subject(page)]
+
+
+async def new_page_subjects(ctx: ToolContext, args: ProposeNewPageArgs) -> list[Subject] | None:
+    if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, args.space_id):
+        return None
+    subjects = [Subject("space", args.space_id, 0, args.space_id)]
+    if args.parent_id is not None:
+        parent = await _page(ctx, args.parent_id)
+        if parent is None:
+            return None
+        subjects.append(_subject(parent))
+    return subjects
+
+
+async def update_subjects(ctx: ToolContext, args: UpdatePageArgs) -> list[Subject] | None:
+    """Only the call with the preview's token writes; the preview changes nothing."""
+    page = await _page(ctx, args.page_id)
+    if page is None or args.token != _token(ctx, page, args.content_md):
+        return None
+    return [_subject(page)]
+
+
+def _subject(page: Page) -> Subject:
+    return Subject("page", page.id, page.version, page.space_id)
 
 
 async def _page(ctx: ToolContext, page_id: uuid.UUID) -> Page | None:

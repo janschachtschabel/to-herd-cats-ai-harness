@@ -85,6 +85,7 @@ class StopReason(StrEnum):
     ERROR = "error"
     CANCELLED = "cancelled"  # a `run_cancel_request`
     WAITING_TIMEOUT = "waiting_timeout"  # nobody answered by `wait_until`
+    APPROVAL_EXPIRED = "approval_expired"  # nobody decided a release in time (task 7)
 
 
 class EventKind(StrEnum):

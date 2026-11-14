@@ -28,7 +28,7 @@ from app.core.access import Action, can
 from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
 from app.modules.agents.toolbox.reading import ticket_scope
 from app.modules.agents.toolbox.writing import LEAKS, by, effect, key_for, leaks_into
 from app.modules.ai.models import AiPolicy
@@ -218,6 +218,36 @@ async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
         return ToolResult("ticket", f"Assigned {ticket_key(ticket.number)}.", attrs)
 
     return await effect(ctx, "ticket", attrs, write)
+
+
+# --- what a call changes (a release is bound to it, `approvals/gate.py`) -------------
+
+
+async def ticket_subjects(ctx: ToolContext, args: CommentTicketArgs) -> list[Subject] | None:
+    """For every tool that changes one ticket, named by `key`."""
+    ticket = await _ticket(ctx, args.key)
+    return None if ticket is None else [_subject(ticket)]
+
+
+async def create_subjects(ctx: ToolContext, args: CreateTicketArgs) -> list[Subject] | None:
+    if not await can(ctx.session, ctx.actor, Action.TICKET_READ, args.space_id):
+        return None
+    return [Subject("space", args.space_id, 0, args.space_id)]
+
+
+async def link_subjects(ctx: ToolContext, args: LinkTicketPageArgs) -> list[Subject] | None:
+    ticket = await _ticket(ctx, args.key)
+    try:
+        page = await PageReader(ctx.session).for_ai(ctx.actor, args.page_id)
+    except NotFound:
+        return None
+    if ticket is None:
+        return None
+    return [_subject(ticket), Subject("page", page.id, page.version, page.space_id)]
+
+
+def _subject(ticket: WorkItem) -> Subject:
+    return Subject("ticket", ticket.id, ticket.version, ticket.space_id)
 
 
 async def _ticket(ctx: ToolContext, key: str) -> WorkItem | None:

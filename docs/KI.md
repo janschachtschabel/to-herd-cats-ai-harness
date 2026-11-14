@@ -286,6 +286,8 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
     einer Direktnachricht allein mit dem Agenten nur Läufe desselben Gesprächs.
   - `submit_result`: gibt das Ergebnis ab; sein Text ist die Antwort, der Lauf endet
     `completed` ohne weiteren Modellaufruf (auch nach einer Wiederaufnahme genau einmal).
+  - `ask_user`: stellt der fragenden Person eine Frage (Karte im Gespräch, siehe
+    „Freigaben und Rückfragen“) und wartet auf die Antwort.
 
   Schreibende Werkzeuge (M6; `backend/app/modules/agents/toolbox/{wiki,ticket,message}_tools.py`)
   gehen durch dieselben Dienste wie Menschen, mit dem Akteur des Laufs (Rechte, Lese-
@@ -340,7 +342,7 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   403, 429; ohne Wiederholung), `error` (auch sofort, wenn ein Schritt nicht
   gespeichert werden kann oder ein Werkzeug scheitert; kein blindes Wiederholen),
   `cancelled` (Abbruch angefordert), `waiting_timeout` (niemand hat rechtzeitig
-  geantwortet). Die
+  geantwortet), `approval_expired` (niemand hat rechtzeitig freigegeben). Die
   Antwort ist eine Nachricht `kind: agent`
   mit `client_id` = Lauf-ID (genau einmal); bei jedem anderen Stopp steht im Gespräch
   ein Zeitleisten-Eintrag `system.key = "run.stopped"` mit dem Grund in
@@ -442,6 +444,60 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   sperren beide die Zeile des Laufs: Entweder sieht der Abschluss den Abbruch
   (`cancelled`, keine Antwort), oder der Abbruch findet den Lauf beendet (409); ebenso
   gegen eine gleichzeitige Wiederaufnahme eines wartenden Laufs.
+
+### Freigaben und Rückfragen (M6)
+
+`backend/app/modules/agents/approvals/`. Ein Werkzeug, dessen wirksame Freigabe am
+Agenten `confirm` ist, wird dem Modell angeboten wie jedes erlaubte; sein Aufruf läuft
+erst nach der Freigabe einer Person:
+
+- Der Aufruf legt eine **Freigabe** an (`approval`: Lauf, Schritt und Aufruf-ID,
+  Werkzeug, kanonische Argumente, betroffene Objekte mit Version und Bereich,
+  `fingerprint`), postet eine **Karte** im Gespräch des Laufs (Nachricht
+  `kind: approval` des Agenten, `card: {"type", "id"}`, Text: Werkzeug und die
+  genannten IDs, nie Inhalt) mit einem Aktivitätseintrag (Grund `approval`) für die
+  fragende Person, und der Lauf wartet (`HERD_AI_APPROVAL_HOURS`, Standard 72).
+  Ein Aufruf, der nichts ändert (die Vorschau von `update_page`), braucht keine
+  Freigabe.
+- **Fingerabdruck**: SHA-256 über Werkzeugname, Argumente als kanonisches JSON und
+  Art, ID, Version und Bereich jedes betroffenen Objekts. Je Werkzeug: Seite
+  (`propose_page_change`, `update_page` mit Token), Bereich und ggf. Elternseite
+  (`propose_new_page`), Ticket (`comment_ticket`, `set_ticket_status`,
+  `assign_ticket`), Bereich (`create_ticket`), Ticket und Seite (`link_ticket_page`),
+  Gespräch (`post_message`); lesende Werkzeuge nur Name und Argumente.
+- `POST /api/approvals/{id}/decide` (`decision: approve|reject`, `reason`, `version`):
+  nur die fragende Person, und nur, wenn sie die Wirkung jetzt selbst ausführen dürfte
+  (die Aktion des Werkzeugs in jedem betroffenen Bereich, mit ihren eigenen Rechten;
+  403 `approval.not_permitted`; andere, die die Freigabe sehen: 403
+  `approval.not_addressed`). 409: `approval.decided` (schon entschieden),
+  `approval.expired`, `approval.run_ended` (Lauf beendet oder Abbruch angefordert),
+  `approval.version_conflict`. Die Entscheidung setzt den Lauf in ihrer Transaktion
+  wieder auf `queued` (zuerst wird der Lauf gesperrt, dann die Freigabe; der Ablauf
+  sperrt in derselben Reihenfolge).
+- Beim Fortsetzen: Fingerabdruck neu berechnet; weicht er ab, läuft nichts und das
+  Werkzeugergebnis ist `approval_stale` (das Modell kann neu anfragen). Dann die Rechte
+  des Laufs erneut (Freigabe am Agenten, Person, Agent, Aktion je Objekt): entzogen →
+  `rights_revoked`. Abgelehnt → Werkzeugergebnis `approval_rejected` mit dem Grund
+  (gerahmt wie jedes Ergebnis). Abgelaufen → Stopgrund `approval_expired`. Endet ein
+  Lauf anders (Abbruch), sind seine offenen Freigaben und Fragen `expired`.
+- `GET /api/approvals?state=pending` (seitenweise): meine. `GET /api/approvals/{id}`:
+  wer den Lauf sehen darf (wie `GET /api/runs/{id}`), sonst 404
+  `approval.not_found`; die Argumente (`args`) und `diff_url` nur für die fragende
+  Person. `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
+  (nur für die fragende Person, bei Seitenwerkzeugen).
+- **Rückfragen**: `ask_user` legt `run_question` an, postet die Frage als Karte
+  (`kind: question`, Aktivität `question`), der Lauf wartet. `POST
+  /api/questions/{id}/answer` (`text` bis 4.000 Zeichen, `version`) nur durch die
+  fragende Person (403 `question.not_addressed`; 409 `question.answered`,
+  `question.expired`, `question.run_ended`, `question.version_conflict`); die Antwort
+  geht als gerahmtes Werkzeugergebnis an das Modell. Ohne Antwort endet der Lauf mit
+  `waiting_timeout`. `GET /api/questions/{id}` wie Freigaben (die Antwort nur für die
+  fragende Person).
+- Outbox und Live-Ereignisse tragen nur IDs (`approval.decided`,
+  `question.answered`, `message.created` der Karte, `notification.created`).
+- Die verantwortliche Person springt für die fragende nicht ein: Ein Lauf, dessen
+  Person nicht mehr aktiv ist, endet vor jedem Werkzeugaufruf mit `rights_revoked`,
+  fragt also nie (Läufe ohne fragende Person kommen erst mit M7).
 
 Betrieb:
 
