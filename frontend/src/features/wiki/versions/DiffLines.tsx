@@ -7,7 +7,8 @@ type Hunk = Schemas['HunkOut']
 const MARK = { insert: '+', delete: '−', equal: ' ' } as const
 
 /** Diff lines as `<ins>` and `<del>`: a visible + or − beside each changed line, its
- *  kind said to screen readers, and the colour only as a third cue. */
+ *  kind said to screen readers, and the colour only as a third cue. The mark is a
+ *  column of its own, so a long line wraps beside it, not under it. */
 export function DiffLines({ hunks }: { hunks: readonly Hunk[] }) {
   const { t } = useTranslation()
   return (
@@ -19,18 +20,20 @@ export function DiffLines({ hunks }: { hunks: readonly Hunk[] }) {
             <Tag
               key={`${h}-${i}`}
               className={cn(
-                'block px-3 whitespace-pre-wrap no-underline',
+                'flex px-3 no-underline',
                 hunk.kind === 'insert' && 'bg-emerald-500/15',
                 hunk.kind === 'delete' && 'bg-red-500/15',
               )}
             >
-              <span aria-hidden className="mr-2 text-muted-foreground select-none">
+              <span aria-hidden className="mr-2 shrink-0 text-muted-foreground select-none">
                 {MARK[hunk.kind]}
               </span>
-              {hunk.kind !== 'equal' && (
-                <span className="sr-only">{t(`wiki.versions.kind.${hunk.kind}`)} </span>
-              )}
-              {line}
+              <span className="min-w-0 whitespace-pre-wrap break-words">
+                {hunk.kind !== 'equal' && (
+                  <span className="sr-only">{t(`wiki.versions.kind.${hunk.kind}`)} </span>
+                )}
+                {line}
+              </span>
             </Tag>
           )
         }),
