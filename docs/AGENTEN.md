@@ -887,7 +887,8 @@ Rückfragen, Abbruch, Grenzen, Wiederaufnahme), mit diesen Besonderheiten:
 ist „bis“ nicht später als „von“, geht es über Mitternacht (Freitag 22:00–06:00 reicht
 bis Samstagmorgen), „von“ = „bis“ ist der ganze Tag, aneinanderstoßende Tage sind ein
 Fenster. Der nächste Termin liegt einen Abstand nach „jetzt“, solange er im Fenster
-liegt, sonst bei der nächsten Öffnung; außerhalb entsteht keiner. Eine Öffnung, deren
+liegt, sonst bei der nächsten Öffnung, aber nie weniger als einen Abstand nach dem
+letzten Termin, auch über den Rand eines Fensters hinweg; außerhalb entsteht keiner. Eine Öffnung, deren
 Ortszeit es nicht gibt, fällt auf den nächsten gültigen Zeitpunkt; ein Fenster über die
 doppelte Stunde dauert seine echten Stunden. Ein Termin, den die Schleife mehr als
 15 Minuten zu spät und außerhalb der Stunden holt, wird `skipped_off_hours`. Die

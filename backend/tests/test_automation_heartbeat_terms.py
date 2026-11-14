@@ -112,3 +112,27 @@ def test_terms_within_a_long_window_are_an_interval_apart() -> None:
     for a, b in zip(seen, seen[1:], strict=False):
         assert b - a == timedelta(minutes=45) or b.time() == time(8, 0)
         assert inside(OFFICE, b)
+
+
+def test_terms_are_never_closer_than_the_interval_across_a_window_edge() -> None:
+    """Active 09:00–08:59 every day, every 15 minutes: the beat at 08:58 is followed
+    at 09:13, not at the opening two minutes later (review M7, finding 13)."""
+    nearly_whole_day = Hours(frozenset(range(1, 8)), time(9), time(8, 59), "Europe/Berlin")
+    now = utc(2026, 11, 17, 7, 58)  # Tuesday 08:58 in Berlin, inside Monday's window
+    assert next_heartbeat(15, nearly_whole_day, now) == utc(2026, 11, 17, 8, 13)
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [(time(9), time(8, 59)), (time(9), time(9, 10)), (time(22), time(6)), (time(9), time(17))],
+)
+def test_a_week_of_terms_keeps_the_interval(start: time, end: time) -> None:
+    interval = 25  # not a divisor of the window: its last beat falls near the edge
+    hours = Hours(frozenset({MON, TUE, WED, FRI, SAT}), start, end, "Europe/Berlin")
+    at, terms = utc(2026, 11, 16, 0, 0), []
+    while at < utc(2026, 11, 23, 0, 0):
+        at = next_heartbeat(interval, hours, at)
+        terms.append(at)
+    gaps = [b - a for a, b in zip(terms, terms[1:], strict=False)]
+    assert min(gaps) >= timedelta(minutes=interval)
+    assert all(inside(hours, t) for t in terms)

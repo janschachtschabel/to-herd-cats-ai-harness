@@ -9,7 +9,8 @@ the whole day. Windows that touch (whole days in a row) are one.
 
 The next term is one interval after "now" while that is still inside the window
 "now" is in; otherwise (the window closes first, or "now" is outside every window)
-it is the next opening. Outside the active hours no term comes. Daylight saving
+it is the next opening, but never less than one interval after "now" (the last
+beat), also across a window's edge (review M7, finding 13). Outside the active hours no term comes. Daylight saving
 time: an opening (or close) whose local time does not exist that day falls to the
 next valid instant (02:30 → 03:00); one that exists twice is the first; a window
 through a doubled hour lasts its real hours.
@@ -94,9 +95,9 @@ def next_heartbeat(interval: int, hours: Hours, now: datetime) -> datetime:
     _aware(now)
     where = check(interval, hours)
     step = timedelta(minutes=interval)
+    soonest = now + step  # never closer to the last beat than the interval
     for opens, closes in _windows(hours, where, now):
-        if opens <= now < closes and now + step < closes:
-            return now + step
-        if opens > now:
-            return opens
+        candidate = max(opens, soonest)
+        if closes > now and candidate < closes:
+            return candidate
     raise TermError("automation.invalid_hours")  # a weekday comes within a week
