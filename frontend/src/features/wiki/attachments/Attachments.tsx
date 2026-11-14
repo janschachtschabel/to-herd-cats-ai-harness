@@ -2,7 +2,6 @@ import { Bot, BotOff, Copy, Paperclip, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { seesAiSettings } from '@/features/ai/display'
 import { useSetAttachmentAiLock } from '@/features/ai/lockQueries'
 import { AiLockBadge } from '@/features/ai/policy/AiLockBadge'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
@@ -16,9 +15,9 @@ import { useAttachments, useDeleteAttachment, useUploadAttachment } from './quer
 
 export function Attachments({ page }: { page: WikiPage }) {
   const { t, i18n } = useTranslation()
-  const { abilities, me } = useWiki()
+  const { abilities } = useWiki()
   const aiLock = useSetAttachmentAiLock(page.id)
-  const canLockAi = abilities.moderate && seesAiSettings(me)
+  const canLockAi = abilities.moderate // governance: `page.moderate`, no `ai.use` needed
   const list = useAttachments(page.id)
   const upload = useUploadAttachment(page.id)
   const remove = useDeleteAttachment(page.id)
@@ -81,7 +80,7 @@ export function Attachments({ page }: { page: WikiPage }) {
               >
                 {attachment.filename}
               </a>
-              {attachment.no_ai && <AiLockBadge />}
+              {attachment.no_ai && <AiLockBadge moderates={canLockAi} />}
               <span className="text-xs text-muted-foreground">
                 {formatBytes(attachment.size, i18n.language)} ·{' '}
                 {formatDateTime(attachment.created_at, i18n.language)}

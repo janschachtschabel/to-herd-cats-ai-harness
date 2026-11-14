@@ -9,16 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
+from app.core.permissions import SpaceRole
 from app.core.principal import Principal, SystemRole
 from app.modules.ai.models import AiConnection, AiPolicy, DataLocation
 from app.modules.ai.policy import ANY, NONE, Policy, connection_allowed, strictest
 from app.modules.ai.policy_filters import ai_readable, ai_space_ids
 from app.modules.audit.models import AuditLog
 from app.modules.orgs.models import Organization
-from app.modules.spaces.models import Space
+from app.modules.spaces.models import Space, SpaceKind
 from app.modules.users.models import User
 from app.modules.wiki.models import Attachment, Page
 from app.modules.wiki.service import PageService
+from tests.factories_agents import Bench
 from tests.factories_spaces import MakeSpace
 from tests.factories_wiki import Wiki, new_page
 
@@ -233,3 +235,29 @@ async def test_readable_by_ai_in_sql(
         )
     ).all()
     assert sorted(files) == sorted(f"{n} offen.txt" for n in EXPECTED[location])
+
+
+async def test_governance_needs_no_ai_of_ones_own(bench: Bench, make_space: MakeSpace) -> None:
+    """Review M5 finding 16: in an organisation with AI, a space admin and a moderator
+    who have no AI themselves set the policy and lock a page (`space.manage`,
+    `page.moderate`; `ai.use` is not asked)."""
+    users = bench.people.users
+    space = await make_space(
+        SpaceKind.TEAM, members=[(users["alice"], SpaceRole.ADMIN), (users["bob"], "moderator")]
+    )
+    for who in ("alice", "bob"):
+        r = await bench.people.admin.put(
+            f"/api/ai/assignments/users/{bench.people.id(who)}",
+            json={"no_ai": True, "version": None},
+        )
+        assert r.status_code == 200, r.text
+        me = (await getattr(bench.people, who).get("/api/auth/me")).json()
+        assert "ai.use" not in me["permissions"]
+    path = f"/api/spaces/{space.id}"
+    version = (await bench.people.alice.get(path)).json()["version"]
+    changed = await bench.people.alice.patch(path, json={"ai_policy": "none", "version": version})
+    assert changed.status_code == 200 and changed.json()["ai_policy"] == "none"
+    page = await new_page(bench.people.alice, space.id, "Plan")
+    lock = f"/api/pages/{page['id']}/ai-lock"
+    locked = await bench.people.bob.put(lock, json={"no_ai": True, "version": page["version"]})
+    assert locked.status_code == 200 and locked.json()["no_ai"] is True

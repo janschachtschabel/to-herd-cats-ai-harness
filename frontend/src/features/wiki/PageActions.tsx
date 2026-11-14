@@ -23,7 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { seesAiSettings } from '@/features/ai/display'
 import { useSetPageAiLock } from '@/features/ai/lockQueries'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import type { WikiPage } from '@/lib/api'
@@ -47,7 +46,7 @@ export function PageActions({ page }: { page: WikiPage }) {
   const publish = usePublishPage(page)
   const trash = useTrashPage(page)
   const aiLock = useSetPageAiLock(page)
-  const canLockAi = abilities.moderate && seesAiSettings(me)
+  const canLockAi = abilities.moderate // governance: `page.moderate`, no `ai.use` needed
   const close = (next: boolean) => !next && setOpen(null)
   const params = { spaceId: space.id, _splat: page.path }
 

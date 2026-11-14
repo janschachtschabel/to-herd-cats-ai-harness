@@ -26,8 +26,10 @@ export function usesAi(me: Me | null | undefined): boolean {
   return hasPermission(me, 'ai.use')
 }
 
-/** Whether AI settings of content are shown (space policy, the no-AI lock): to people
- *  who use AI or administer it. Everyone else sees nothing about AI. */
+/** Whether the no-AI lock of content is shown to a reader: to people who use AI or
+ *  administer it. Who governs content sees and sets its AI settings through that right
+ *  alone, AI or not (space policy: `space.manage`; the lock: `page.moderate`).
+ *  Everyone else sees nothing about AI. */
 export function seesAiSettings(me: Me | null | undefined): boolean {
   return usesAi(me) || hasPermission(me, 'ai.manage')
 }

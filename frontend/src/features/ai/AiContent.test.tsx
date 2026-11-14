@@ -46,16 +46,18 @@ describe('ai settings of content', () => {
     })
   })
 
-  test('without AI the settings say nothing about it and send no AI field', async () => {
+  test('a space admin without AI still sets the policy (governance, not use)', async () => {
     const space = makeSpace({ my_role: 'admin' })
     const api = spaceApi([], space)
     const { user, dialog } = await openSettings(space)
-    expect(within(dialog).queryByText('KI-Richtlinie')).not.toBeInTheDocument()
+    const policy = within(dialog).getByRole('group', { name: 'KI-Richtlinie' })
+    await user.click(within(policy).getByLabelText(/Keine KI/))
     await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
     await waitFor(() => expect(api.find('PATCH', `/api/spaces/${space.id}`)).toHaveLength(1))
-    const body = api.find('PATCH', `/api/spaces/${space.id}`)[0]?.body as object
-    expect(body).not.toHaveProperty('ai_policy')
-    expect(body).not.toHaveProperty('allowed_locations')
+    expect(api.find('PATCH', `/api/spaces/${space.id}`)[0]?.body).toMatchObject({
+      ai_policy: 'none',
+      version: 1,
+    })
   })
 
   function wikiApi(permissions: Permission[], role: Space['my_role'], current: WikiPage) {
@@ -105,15 +107,28 @@ describe('ai settings of content', () => {
     )
   })
 
-  test('without AI a moderator sees no lock, not even on a locked page', async () => {
+  test('a moderator without AI sees and sets the lock (governance, not use)', async () => {
     const current = makePage({ space_id: '00000000-0000-7000-8000-0000000000ab', no_ai: true })
-    const { space } = wikiApi([], 'moderator', current)
+    const { api, space } = wikiApi([], 'moderator', current)
     const { user } = await renderApp(`/spaces/${space.id}/p/${current.path}`)
     await screen.findByRole('heading', { level: 2, name: current.title })
-    expect(screen.queryByText('Für KI gesperrt')).not.toBeInTheDocument()
+    expect(screen.getByText('Für KI gesperrt')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
-    expect(await screen.findByRole('menuitem', { name: /Versionen/ })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /KI/ })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('menuitem', { name: 'KI-Sperre aufheben' }))
+    await waitFor(() =>
+      expect(api.find('PUT', `/api/pages/${current.id}/ai-lock`)[0]?.body).toEqual({
+        no_ai: false,
+        version: 1,
+      }),
+    )
+  })
+
+  test('a reader without AI sees nothing about AI, not even on a locked page', async () => {
+    const current = makePage({ space_id: '00000000-0000-7000-8000-0000000000ac', no_ai: true })
+    const { space } = wikiApi([], 'viewer', current)
+    await renderApp(`/spaces/${space.id}/p/${current.path}`)
+    await screen.findByRole('heading', { level: 2, name: current.title })
+    expect(screen.queryByText('Für KI gesperrt')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /für KI sperren/ })).not.toBeInTheDocument()
   })
 

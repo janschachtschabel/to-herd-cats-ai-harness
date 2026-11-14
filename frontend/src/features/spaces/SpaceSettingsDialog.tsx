@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useMe } from '@/features/auth/queries'
-import { seesAiSettings } from '@/features/ai/display'
 import { missingLocations, withAiPolicy } from '@/features/ai/policy/policy'
 import { SpaceAiPolicyFields } from '@/features/ai/policy/SpaceAiPolicyFields'
 import { Field, FormActions, SaveError } from '@/features/shared/forms'
@@ -47,7 +45,6 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const update = useUpdateSpace(space.id)
-  const showAi = seesAiSettings(useMe())
   const [version, setVersion] = useState(space.version)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -69,11 +66,11 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
   }
 
   const onSubmit = form.handleSubmit((values) => {
-    if (missingLocations(values, showAi)) {
+    if (missingLocations(values)) {
       form.setError('allowed_locations', { message: t('ai.policy.locationsRequired') })
       return
     }
-    update.mutate({ ...withAiPolicy(values, showAi), version }, { onSuccess: onDone })
+    update.mutate({ ...withAiPolicy(values), version }, { onSuccess: onDone })
   })
 
   return (
@@ -95,7 +92,7 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
           />
         )}
       </Field>
-      {showAi && <SpaceAiPolicyFields form={form} />}
+      <SpaceAiPolicyFields form={form} />
       <SaveError error={update.error} onReload={() => void reload()} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onDone}>

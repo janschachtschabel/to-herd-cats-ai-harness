@@ -42,7 +42,7 @@ export function PageView({ page }: { page: WikiPage }) {
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {page.status === 'draft' && <Badge variant="secondary">{t('wiki.page.draft')}</Badge>}
-            {page.no_ai && <AiLockBadge />}
+            {page.no_ai && <AiLockBadge moderates={abilities.moderate} />}
             <PageTags page={page} />
             <span>
               {t('wiki.page.updated', { when: formatDateTime(page.updated_at, i18n.language) })}
