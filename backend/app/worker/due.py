@@ -13,21 +13,33 @@ Each round also takes steps of the daily page review (`wiki/review_pass.py`), on
 transaction each, at most REVIEW_STEPS per round: spaces whose pages it has not been
 through today (UTC) are claimed `SKIP LOCKED`, their due pages reminded in batches.
 
-The time comes from a `Clock` (`app.core.clock`); tests set theirs. One database
-connection at a time. Outside the worker's readiness, like the run loop.
+At most every CLEANUP_EVERY_SECONDS a round also removes, in batches of CLEANUP_BATCH
+(one transaction each), what the automations' log no longer needs (`cleanup`): the
+events a term took, EVENT_RETENTION after that term, and terms older than
+FIRING_RETENTION with their events; never a term whose run is still open, never an
+event still waiting for its quiet time's end.
+
+The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
+reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
+due automations, the lag of the oldest due term, paused ones by reason, spaces the
+review has still to go through today). Up to two database connections at a time.
+Outside the worker's readiness, like the run loop.
 """
 
 import asyncio
 import logging
+import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
-
-from prometheus_client import Counter
+from datetime import UTC, timedelta
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
-from app.core.metrics import REGISTRY
 from app.modules.automations.firing import Fired, fire_next
+from app.modules.automations.metrics import automation_metrics
+from app.modules.automations.upkeep_repository import UpkeepRepository
 from app.modules.wiki.review_pass import Step, review_next
+from app.modules.wiki.review_repository import ReviewRepository
 
 logger = logging.getLogger(__name__)
 
@@ -35,30 +47,37 @@ POLL_SECONDS = 5.0
 BATCH = 50
 REVIEW_STEPS = 20
 MAX_ERROR_WAIT_SECONDS = 30.0
-
-_firings: Counter | None = None
-
-
-def firings_counter() -> Counter:
-    """Registered by the first due loop of a process (an API process exports none)."""
-    global _firings  # noqa: PLW0603 -- one registration per process
-    if _firings is None:
-        _firings = Counter(
-            "herd_automation_firings_total",
-            "Terms of automations fired by this worker, by outcome.",
-            ["outcome"],
-            registry=REGISTRY,
-        )
-    return _firings
+METRICS_SECONDS = 10.0
+FIRING_RETENTION = timedelta(days=90)  # terms in the log (with the events they took)
+EVENT_RETENTION = timedelta(days=7)  # events a term took, after that term
+CLEANUP_BATCH = 1000
+CLEANUP_EVERY_SECONDS = 60.0
 
 
 class DueLoop:
-    def __init__(self, database: Database, *, clock: Clock = SYSTEM_CLOCK) -> None:
+    def __init__(
+        self,
+        database: Database,
+        *,
+        clock: Clock = SYSTEM_CLOCK,
+        cleanup_batch: int = CLEANUP_BATCH,
+    ) -> None:
         self.database = database
         self.clock = clock
-        self.firings = firings_counter()
+        self.cleanup_batch = cleanup_batch
+        self._last_cleanup: float | None = None
+        self.metrics = automation_metrics()  # only processes with a worker export these
 
     async def serve(self, stop: asyncio.Event) -> None:
+        metering = asyncio.create_task(self._metrics_loop(stop))
+        try:
+            await self._serve(stop)
+        finally:
+            metering.cancel()
+            with suppress(asyncio.CancelledError):
+                await metering
+
+    async def _serve(self, stop: asyncio.Event) -> None:
         failures = 0
         while not stop.is_set():
             more = False
@@ -78,6 +97,7 @@ class DueLoop:
         """Fire due automations, then review steps; whether more may be due."""
         fired = await self.pass_once()
         steps = await self.review_once()
+        await self.cleanup_if_due()
         return fired == BATCH or steps == REVIEW_STEPS
 
     async def review_once(self) -> int:
@@ -92,7 +112,10 @@ class DueLoop:
 
     async def review_step(self) -> Step | None:
         async with self.database.session_factory() as session, session.begin():
-            return await review_next(session, self.clock.now())
+            step = await review_next(session, self.clock.now())
+        if step is not None:  # committed
+            self.metrics.review_reminders.inc(step.reminded)
+        return step
 
     async def pass_once(self) -> int:
         """Fire due automations, one transaction each, until none is due or BATCH
@@ -109,5 +132,63 @@ class DueLoop:
         async with self.database.session_factory() as session, session.begin():
             found = await fire_next(session, self.clock.now())
         if found is not None:  # committed
-            self.firings.labels(outcome=found.label).inc()
+            self.metrics.firings.labels(outcome=found.label).inc()
         return found
+
+    async def cleanup_if_due(self) -> tuple[int, int] | None:
+        """`cleanup` at most every CLEANUP_EVERY_SECONDS; None when not yet."""
+        now = time.monotonic()
+        if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_EVERY_SECONDS:
+            return None
+        self._last_cleanup = now
+        return await self.cleanup()
+
+    async def cleanup(self) -> tuple[int, int]:
+        """Remove what the log no longer needs, batch by batch (one transaction each):
+        events a term took more than EVENT_RETENTION ago, then terms older than
+        FIRING_RETENTION; never what an open run may read, never a waiting event. How
+        many terms and events."""
+        now = self.clock.now()
+        events = await self._batches(
+            lambda upkeep: upkeep.delete_events_taken_before(
+                now - EVENT_RETENTION, self.cleanup_batch
+            )
+        )
+        terms = await self._batches(
+            lambda upkeep: upkeep.delete_terms_before(now - FIRING_RETENTION, self.cleanup_batch)
+        )
+        return terms, events
+
+    async def _batches(self, step: Callable[[UpkeepRepository], Awaitable[int]]) -> int:
+        removed = 0
+        while True:
+            async with self.database.session_factory() as session, session.begin():
+                count = await step(UpkeepRepository(session))
+            removed += count
+            if count < self.cleanup_batch:
+                return removed
+
+    async def _metrics_loop(self, stop: asyncio.Event) -> None:
+        while not stop.is_set():
+            try:
+                async with asyncio.timeout(METRICS_SECONDS):
+                    await self.update_metrics()
+            except Exception as exc:  # the next round tries again
+                logger.warning("automations.metrics_failed", extra={"error": type(exc).__name__})
+            with suppress(TimeoutError):
+                await asyncio.wait_for(stop.wait(), timeout=METRICS_SECONDS)
+
+    async def update_metrics(self) -> None:
+        """The gauges, read from the database at the loop's clock."""
+        now = self.clock.now()
+        async with self.database.session_factory() as session:
+            upkeep = UpkeepRepository(session)
+            count, oldest = await upkeep.due(now)
+            paused = await upkeep.paused()
+            unchecked = await ReviewRepository(session).unchecked(now.astimezone(UTC).date())
+        self.metrics.due.set(count)
+        lag = (now - oldest).total_seconds() if oldest is not None else 0.0
+        self.metrics.oldest_due.set(max(lag, 0.0))
+        for reason, n in paused.items():
+            self.metrics.paused.labels(reason=reason.value).set(n)
+        self.metrics.review_spaces.set(unchecked)

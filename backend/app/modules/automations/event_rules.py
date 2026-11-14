@@ -43,17 +43,19 @@ EVENT_TYPES = frozenset(EventType)
 NOT_OBJECTS = frozenset({"conversation_id", "run_id"})
 
 
-async def on_event(session: AsyncSession, event: Event, now: datetime) -> None:
+async def on_event(session: AsyncSession, event: Event, now: datetime) -> list[str]:
+    """What the event did to the rules: the outcome of each term it fired now (for
+    the metric; a run started, a skip, a pause)."""
     if event.type not in EVENT_TYPES or event.space_id is None:
-        return
+        return []
     repo = EventRuleRepository(session, event.org_id)
     rules = await repo.rules_for(event.type, event.space_id)
     if not rules:
-        return
+        return []
     cause = await repo.cause(event.run_id) if event.run_id is not None else None
     depth = cause.depth + 1 if cause is not None else 0
-    for rule in rules:
-        await _take(session, repo, rule, event, cause, depth, now)
+    fired = [await _take(session, repo, rule, event, cause, depth, now) for rule in rules]
+    return [label for label in fired if label is not None]
 
 
 async def _take(
@@ -64,15 +66,16 @@ async def _take(
     cause: Cause | None,
     depth: int,
     now: datetime,
-) -> None:
+) -> str | None:
+    """The outcome of the term the event fired now; None: it fired none."""
     if cause is not None and cause.automation_id == rule.id and event.subject_id in cause.subjects:
-        return
+        return None
     if not await _matches(repo, rule, event) or not await event_sight.may_tell(
         session, rule, event
     ):
-        return
+        return None
     if not await repo.take(rule, event.id, event.subject_id, _ids(event), depth):
-        return
+        return None
     if depth > MAX_CHAIN_DEPTH:
         due_at = await repo.free_term(rule.id, now)
         firing_id = uuid7()
@@ -80,13 +83,14 @@ async def _take(
         outcome = FiringOutcome.SKIPPED_DEPTH
         await automations.log(rule, due_at, now, outcome, firing_id=firing_id)
         await repo.assign(rule.id, firing_id, only=event.id)
-        return
+        return outcome.value
     if rule.quiet_until is not None and now < rule.quiet_until:
         if rule.next_due_at is None:
             rule.next_due_at = rule.quiet_until
             await session.flush()
-        return
-    await _fire(session, repo, rule, await repo.free_term(rule.id, now), now)
+        return None
+    fired = await _fire(session, repo, rule, await repo.free_term(rule.id, now), now)
+    return fired.label
 
 
 async def fire_waiting(session: AsyncSession, rule: Automation, now: datetime) -> Fired | None:

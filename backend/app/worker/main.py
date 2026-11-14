@@ -24,7 +24,8 @@ routing and one for the metrics query at a time.
 Agent runs (`runs.py`) have a loop of their own beside these, outside `ready`; the
 outbox's NOTIFY wakes it too (a new message to an agent commits with an event). It
 adds up to `HERD_RUN_CONCURRENCY` + 3 database connections. Automations that come
-due fire in the due loop (`due.py`), also outside `ready`, with one connection.
+due fire in the due loop (`due.py`), also outside `ready`, with up to two connections
+(firing, gauges).
 """
 
 import asyncio

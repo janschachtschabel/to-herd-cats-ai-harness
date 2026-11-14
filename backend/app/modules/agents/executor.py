@@ -56,6 +56,7 @@ from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.policy import Grant, allowed
+from app.modules.ai.budget_metrics import budget_stops
 from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
 from app.runtime import context, models
@@ -192,9 +193,12 @@ class Executor:
             run = await steps.owned()
             if run is None:
                 raise Lost
-            return await close(
+            reason = await close(
                 session, steps, run, StopReason(outcome.reason), outcome.answer, outcome.detail
             )
+        if reason == StopReason.BUDGET:  # committed; the detail is the budget's scope
+            budget_stops().labels(scope=outcome.detail or "unknown").inc()
+        return reason
 
 
 def _target(connection: AiConnection, model: str) -> models.ModelTarget:

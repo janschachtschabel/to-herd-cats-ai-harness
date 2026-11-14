@@ -165,6 +165,15 @@ class ReviewRepository:
             key=lambda r: r.page_id,
         )
 
+    async def unchecked(self, today: date) -> int:
+        """How many spaces with an interval the pass has not been through today, across
+        organisations (the worker's gauge)."""
+        stmt = select(func.count()).where(
+            Space.review_interval_days.is_not(None),
+            or_(Space.review_checked_on.is_(None), Space.review_checked_on < today),
+        )
+        return int(await self.session.scalar(stmt) or 0)
+
     async def checked(self, space_id: uuid.UUID, today: date) -> None:
         """The pass went through the space today."""
         stmt = update(Space).where(Space.id == space_id).values(review_checked_on=today)

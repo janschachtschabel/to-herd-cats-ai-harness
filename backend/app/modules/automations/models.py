@@ -230,6 +230,7 @@ class AutomationFiring(UuidPk, OrgScoped, Base):
         CheckConstraint("NOT heartbeat_ok OR outcome = 'started'", name="heartbeat_ok"),
         Index("uq_automation_firing_term", "automation_id", "due_at", unique=True),
         Index("ix_automation_firing_run_id", "run_id"),
+        Index("ix_automation_firing_fired_at", "fired_at"),  # retention (`upkeep_repository`)
     )
 
     automation_id: Mapped[uuid.UUID] = mapped_column(
