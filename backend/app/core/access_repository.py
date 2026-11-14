@@ -89,7 +89,7 @@ class AccessRepository:
         remembered: dict[object, object] | None = self.session.info.get(_REMEMBERED)
         if remembered is None:
             return await self._facts(actor, space_id)
-        key = (actor.org_id, actor.principal, actor.group_ids, space_id)
+        key = (actor.org_id, actor.principal, actor.group_ids, actor.read_scope, space_id)
         facts = remembered.get(key)
         if not isinstance(facts, AccessFacts):
             facts = remembered[key] = await self._facts(actor, space_id)

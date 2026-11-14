@@ -18,6 +18,7 @@ from app.core.access import (
     space_role,
     visible_space_ids,
 )
+from app.core.access_repository import remembered_facts
 from app.core.actor import ReadScope
 from app.core.errors import NotFound
 from app.core.permissions import SpaceRole
@@ -105,3 +106,17 @@ async def test_an_empty_scope_sees_nothing(
     actor = _actor(person, {})
     assert await _ids(session, visible_space_ids(actor)) == set()
     assert dataclasses.replace(actor, read_scope=None) != actor
+
+
+async def test_remembered_facts_keep_scoped_and_unscoped_apart(
+    session: AsyncSession, make_user, make_space: MakeSpace
+) -> None:
+    """Review M5 finding 15: within `remembered_facts` the same person with and without
+    a scope gets their own answer."""
+    person = await make_user(SystemRole.MEMBER)
+    space = await make_space(SpaceKind.TEAM, members=[(person, SpaceRole.EDITOR)])
+    with remembered_facts(session):
+        assert await can(session, _actor(person), Action.PAGE_EDIT, space.id)
+        assert not await can(session, _actor(person, {}), Action.SPACE_READ, space.id)
+        scoped = _actor(person, {space.id: SpaceRole.VIEWER})
+        assert not await can(session, scoped, Action.PAGE_EDIT, space.id)
