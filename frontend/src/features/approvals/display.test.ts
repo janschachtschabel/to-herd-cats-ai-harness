@@ -17,6 +17,7 @@ describe("a release card's state", () => {
     expect(approvalView(approved, NOW)).toBe('approved')
     expect(approvalView({ ...approved, outcome: 'ran' }, NOW)).toBe('done')
     expect(approvalView({ ...approved, outcome: 'stale' }, NOW)).toBe('stale')
+    expect(approvalView({ ...approved, outcome: 'failed' }, NOW)).toBe('failed')
   })
 
   test('only the person asked decides, and only while it waits', () => {

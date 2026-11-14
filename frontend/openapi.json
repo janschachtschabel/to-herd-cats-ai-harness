@@ -1259,7 +1259,8 @@
       "ApprovalOutcome": {
         "enum": [
           "ran",
-          "stale"
+          "stale",
+          "failed"
         ],
         "title": "ApprovalOutcome",
         "type": "string"

@@ -13,7 +13,8 @@ optional `reason` for the model) before `expires_at`, else it is `expired`; it i
 `expired` too when its run ends otherwise (cancelled). `message_id`: the card in the
 run's conversation. `outcome`: what became of an approved call, set in the transaction
 where the run came back to it: `ran`, or `stale` (the fingerprint differed, so nothing
-ran); null while it waits, when rejected or expired, and when the run stopped before
+ran), or `failed` (the call's step timed out and was rolled back, recorded with the
+timeout); null while it waits, when rejected or expired, and when the run stopped before
 (its rights were gone).
 
 `run_question`: `ask_user`'s question to the same person, `answer`ed (bounded) or
@@ -59,6 +60,7 @@ class ApprovalState(StrEnum):
 class ApprovalOutcome(StrEnum):
     RAN = "ran"
     STALE = "stale"
+    FAILED = "failed"  # the step ran into its bound and was rolled back: it did not run
 
 
 class QuestionState(StrEnum):

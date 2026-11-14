@@ -1009,10 +1009,13 @@ erst nach der Freigabe einer Person:
   `redacted: true` (wie in der Laufansicht). `GET /api/approvals/{id}/diff`: die Seite jetzt gegen den Inhalt des Aufrufs
   (nur für die fragende Person, bei Seitenwerkzeugen).
   `step` und `call_id` nennen den Aufruf wie das Protokoll des Laufs. `outcome` sagt,
-  was nach der Freigabe aus ihm wurde: `ran` (ausgeführt) oder `stale` (nicht
-  ausgeführt, weil sich ein Objekt geändert hat); gesetzt in der Transaktion des
-  Aufrufs, zusammen mit Wirkung und Journaleintrag, und live als `card.changed`
-  gemeldet (Outbox `approval.settled`, nur IDs).
+  was nach der Freigabe aus ihm wurde: `ran` (ausgeführt), `stale` (nicht
+  ausgeführt, weil sich ein Objekt geändert hat) oder `failed` (nicht ausgeführt: der
+  Schritt lief in seine Sperr- oder Anweisungsgrenze und wurde ganz zurückgerollt; das
+  Modell bekam `tool_timeout`); gesetzt in der Transaktion des Aufrufs, zusammen mit
+  Wirkung und Journaleintrag (`failed` in der, die das Zeitlimit als Ergebnis
+  festhält), und live als `card.changed` gemeldet (Outbox `approval.settled`, nur
+  IDs). Die Karte zeigt „Nicht ausgeführt“.
 - **Rückfragen**: `ask_user` legt `run_question` an, postet die Frage als Karte
   (`kind: question`, Aktivität `question`), der Lauf wartet. `POST
   /api/questions/{id}/answer` (`text` bis 4.000 Zeichen, `version`) nur durch die
@@ -1114,7 +1117,7 @@ soll den Worker nicht als hängend erscheinen lassen.
 |---|---|
 | Agent, Werkzeugeinträge, Skills des Agenten | `agent`, `agent_tool`, `agent_skill` |
 | Lauf und Journal | `run`, `run_event` (Prompts, Modellantworten, Werkzeugargumente und -ergebnisse vollständig), `run_cancel_request` |
-| Freigaben und Rückfragen | `approval` (Argumente, Fingerabdruck, Entscheidung, `outcome` `ran`/`stale`), `run_question`; die Karten als Nachrichten `kind: approval|question` |
+| Freigaben und Rückfragen | `approval` (Argumente, Fingerabdruck, Entscheidung, `outcome` `ran`/`stale`/`failed`), `run_question`; die Karten als Nachrichten `kind: approval|question` |
 | Antworten, Kommentare | Nachrichten `kind: agent` (`client_id` = Lauf) |
 | Verbrauch | `usage_record` je Modellaufruf ([`KI.md`](KI.md#verbrauch-apiaiusage)) |
 | Vorschläge | `page_proposal`, `skill_proposal` |
@@ -1173,7 +1176,8 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
 - Neue Aufzählungswerte entstehen erst durch dieses Release: Zustand `waiting`,
   Stopgründe `cancelled`, `waiting_timeout`, `approval_expired`, Nachrichtenarten
   `approval` und `question`, Versionsquelle `agent`, Aktivitätsgründe `proposal`,
-  `approval`, `question`, `run_stopped`, `skill_proposal`, Läufe ohne auslösende
+  `approval`, `question`, `run_stopped`, `skill_proposal`, Freigabe-Ausgang `failed`
+  (Migration `a1c3e5f7b9d2`, nur die Prüfung erweitert), Läufe ohne auslösende
   Nachricht (Ticket-Läufe), Systemmeldungen als Antworten in Kanal-Threads. Ein Pod des
   vorigen Releases liest solche Zeilen nicht (Versionsliste, Aktivität, Laufansicht
   scheitern dort), bis er ersetzt ist.

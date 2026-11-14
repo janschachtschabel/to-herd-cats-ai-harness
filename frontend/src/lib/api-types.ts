@@ -3032,7 +3032,7 @@ export interface components {
          * ApprovalOutcome
          * @enum {string}
          */
-        ApprovalOutcome: "ran" | "stale";
+        ApprovalOutcome: "ran" | "stale" | "failed";
         /**
          * ApprovalState
          * @enum {string}

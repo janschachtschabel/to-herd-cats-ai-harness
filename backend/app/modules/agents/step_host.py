@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Actor
 from app.core.db_errors import is_timeout
 from app.modules.agents.actor import allowed_actor
-from app.modules.agents.approvals.gate import gate
+from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.models import (
@@ -175,10 +175,12 @@ class RunHost:
             return result
 
     async def _timed_out(self, step: int, call: ToolCall, args: Any) -> ToolResult:
-        """The call's result is the timeout, recorded like any result."""
+        """The call's result is the timeout, recorded like any result (a released call:
+        its approval `failed`)."""
         result = ToolResult(TIMED_OUT_SOURCE, TOOL_TIMED_OUT)
         async with self.unit() as session:
             steps, run, _ = await self._owned(session)
+            await settle_timed_out(session, self._ref(), CallRef(step, call.id))
             content = tool_content(step, call, args, result, 0)
             await steps.event(self._seq(), EventKind.TOOL_CALL, content)
             steps.keep(run)

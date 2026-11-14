@@ -28,6 +28,7 @@
       "approved": "Freigegeben",
       "done": "Freigegeben und ausgeführt",
       "stale": "Veraltet",
+      "failed": "Nicht ausgeführt",
       "rejected": "Abgelehnt",
       "expired": "Abgelaufen"
     },
@@ -35,6 +36,7 @@
       "approved": "Freigegeben am {{when}}. Der Agent führt es gleich aus.",
       "done": "Freigegeben am {{when}} und ausgeführt.",
       "stale": "Freigegeben am {{when}}, aber nicht ausgeführt: Der Inhalt hat sich seit der Anfrage geändert. Der Agent kann neu fragen.",
+      "failed": "Freigegeben am {{when}}, aber nicht ausgeführt: Der Schritt hat zu lange gedauert (andere Arbeit hielt die Daten) und wurde rückgängig gemacht. Der Agent kann es noch einmal versuchen.",
       "rejected": "Abgelehnt am {{when}}. Nichts wurde ausgeführt.",
       "expired": "Abgelaufen: Niemand hat rechtzeitig entschieden. Nichts wurde ausgeführt."
     },

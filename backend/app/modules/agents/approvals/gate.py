@@ -19,7 +19,9 @@ calls it, the host asks the gate first, in the call's transaction (`step_host.py
     result is `approval_stale`: the model may call it again and so ask anew. Then the
     run's rights are checked again for each object (`ToolSpec.action` where it is;
     the host checked the grant, the person and the agent before): if they are gone,
-    the run ends `rights_revoked`. Then the tool runs, checking its rights itself.
+    the run ends `rights_revoked`. Then the tool runs, checking its rights itself
+    (`outcome = ran`, with its effect; a step that times out is rolled back and
+    recorded `failed`, `settle_timed_out`).
 
 The fingerprint: SHA-256 over the tool's name, the arguments as canonical JSON (keys
 sorted) and each object's kind, id, version and space. Objects without a version
@@ -31,14 +33,16 @@ import json
 from typing import Any
 
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import can
 from app.core.models_base import utcnow
-from app.core.outbox import emit
+from app.core.outbox import Acting, EventActor, emit
+from app.core.principal import Principal
 from app.modules.agents.approvals import cards
 from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
-from app.modules.agents.toolbox.base import Subject, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.base import CallRef, RunRef, Subject, ToolContext, ToolSpec, Wait
 from app.modules.messaging.models import MessageKind
 from app.runtime.loop import Halt, ToolResult
 
@@ -99,19 +103,41 @@ async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult 
 async def _settle(ctx: ToolContext, approval: Approval, outcome: ApprovalOutcome) -> None:
     """Record what became of an approved call (rolled back with the call if the tool
     fails) and tell the card's readers."""
+    await settle(ctx.session, ctx.actor, ctx.run, approval, outcome)
+
+
+async def settle_timed_out(session: AsyncSession, run: RunRef, call: CallRef) -> None:
+    """A released call whose step timed out (rolled back, `outcome` with it): `failed`,
+    in the transaction that records the timeout as the call's result (module review
+    M6 2, finding 7). Nothing for a call without a release."""
+    repo = WaitedRepository(session, run.org_id)
+    found = await repo.for_call(Approval, run.id, call.step, call.id)
+    if found is None or found.state != ApprovalState.APPROVED or found.outcome is not None:
+        return
+    by = EventActor(run.org_id, Principal.agent(run.agent_id))
+    await settle(session, by, run, found, ApprovalOutcome.FAILED)
+
+
+async def settle(
+    session: AsyncSession,
+    by: Acting,
+    run: RunRef,
+    approval: Approval,
+    outcome: ApprovalOutcome,
+) -> None:
     approval.outcome = outcome
-    await ctx.session.flush()
+    await session.flush()
     await emit(
-        ctx.session,
+        session,
         type="approval.settled",
-        actor=ctx.actor,
+        actor=by,
         space_id=None,
         subject_type="approval",
         subject_id=approval.id,
         payload={
             "approval_id": str(approval.id),
-            "run_id": str(ctx.run.id),
-            "conversation_id": str(ctx.run.conversation_id),
+            "run_id": str(run.id),
+            "conversation_id": str(run.conversation_id),
             "message_id": str(approval.message_id) if approval.message_id else None,
         },
     )

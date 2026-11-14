@@ -2,8 +2,10 @@ import type { Message } from '@/lib/api'
 import type { Approval, Question } from './queries'
 
 /** What a release card shows: waiting; approved and still to run, run, or not run
- *  because the object changed meanwhile (`stale`); rejected; expired. */
-export type ApprovalView = 'pending' | 'approved' | 'done' | 'stale' | 'rejected' | 'expired'
+ *  because the object changed meanwhile (`stale`) or its step took too long and was
+ *  undone (`failed`); rejected; expired. */
+export type ApprovalView =
+  'pending' | 'approved' | 'done' | 'stale' | 'failed' | 'rejected' | 'expired'
 
 function expired(card: { state: string; expires_at: string }, now: number): boolean {
   return (
@@ -14,13 +16,14 @@ function expired(card: { state: string; expires_at: string }, now: number): bool
 /**
  * A release's state as the card shows it. After an approval the API's `outcome` tells
  * what became of the call: `stale` (the object changed since the person released it,
- * so nothing ran) or `ran`. Without one yet it is "approved".
+ * so nothing ran), `failed` (its step took too long and was undone) or `ran`. Without one yet it is "approved".
  */
 export function approvalView(approval: Approval, now: number): ApprovalView {
   if (expired(approval, now)) return 'expired'
   if (approval.state === 'pending') return 'pending'
   if (approval.state === 'rejected') return 'rejected'
   if (approval.outcome === 'stale') return 'stale'
+  if (approval.outcome === 'failed') return 'failed'
   return approval.outcome === 'ran' ? 'done' : 'approved'
 }
 

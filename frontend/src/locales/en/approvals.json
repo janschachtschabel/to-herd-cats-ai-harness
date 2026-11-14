@@ -28,6 +28,7 @@
       "approved": "Released",
       "done": "Released and carried out",
       "stale": "Stale",
+      "failed": "Not carried out",
       "rejected": "Rejected",
       "expired": "Expired"
     },
@@ -35,6 +36,7 @@
       "approved": "Released on {{when}}. The agent carries it out shortly.",
       "done": "Released on {{when}} and carried out.",
       "stale": "Released on {{when}}, but not carried out: the content changed since the request. The agent may ask again.",
+      "failed": "Released on {{when}}, but not carried out: the step took too long (other work held the data) and was undone. The agent may try again.",
       "rejected": "Rejected on {{when}}. Nothing was carried out.",
       "expired": "Expired: nobody decided in time. Nothing was carried out."
     },

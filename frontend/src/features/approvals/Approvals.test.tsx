@@ -168,6 +168,23 @@ describe('a release card', () => {
     expect(api.calls.some((c) => c.path.endsWith('/events'))).toBe(false)
   })
 
+  test('an approved call whose step timed out is shown as not carried out', async () => {
+    const approved = makeApproval({
+      id: 'ap-6',
+      state: 'approved',
+      outcome: 'failed',
+      decided_at: '2026-11-14T10:00:00Z',
+      version: 2,
+    })
+    const { channel } = channelWith(card('approval', 'ap-6', approved.summary), {
+      'GET /api/approvals/:id': approved,
+    })
+    await renderApp(`/c/${channel.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    expect(await within(shown).findByText('Nicht ausgeführt')).toBeInTheDocument()
+    expect(within(shown).getByText(/hat zu lange gedauert/)).toBeInTheDocument()
+  })
+
   test('someone else who sees the run sees the card without actions, and who decides', async () => {
     const pending = makeApproval({ id: 'ap-5', args: null, diff_url: null })
     const { channel } = channelWith(

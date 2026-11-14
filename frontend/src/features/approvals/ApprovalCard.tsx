@@ -19,6 +19,7 @@ const TONE: Record<ApprovalView, Tone> = {
   approved: 'ok',
   done: 'ok',
   stale: 'off',
+  failed: 'off',
   rejected: 'off',
   expired: 'off',
 }
