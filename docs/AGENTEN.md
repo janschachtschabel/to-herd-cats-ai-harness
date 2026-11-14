@@ -645,11 +645,16 @@ ruft das Modell, führt Werkzeuge über die Dienste aus und schreibt jeden Schri
   wird der Schritt zurückgerollt, und das Modell bekommt als Ergebnis
   `tool_timeout: …` (im Journal wie jedes Ergebnis); der Lauf geht weiter. Die Laufzeit
   (`max_runtime_seconds`) schneidet einen Werkzeugaufruf ab wie einen Modellaufruf
-  (`deadline`).
+  (`deadline`). Dieselbe Grenze gilt für die Prüfungen vor einem Modellaufruf und das
+  Festhalten danach, ab ihrer ersten Anweisung (auch für die Sperre der Zeile des
+  Laufs): Wartet einer davon länger, endet der Lauf mit `error` (der Verbrauch eines
+  schon gemachten Aufrufs wird nachgebucht), statt unbegrenzt zu hängen.
 - **Sperrfrist und lange Schritte:** Die Erneuerung der Sperrfristen eines Workers
   überspringt Läufe, deren Zeile gerade ein Schritt dieses Workers hält (er lebt ja);
   der Schritt setzt die Sperrfrist, wenn er festschreibt. Ein langer Schritt hält so
-  die übrigen Läufe des Workers nicht auf.
+  die übrigen Läufe des Workers nicht auf. `herd_runs_stuck` zählt einen Lauf, dessen
+  Zeile gerade ein Schritt hält, nicht mit, auch wenn seine Sperrfrist schon
+  abgelaufen ist (er arbeitet).
 - **Verklemmung:** Wählt die Datenbank einen Schritt als Opfer eines Deadlocks oder
   scheitert er an der Serialisierung (SQLSTATE `40P01`, `40001`), wird er einmal
   wiederholt (Log `runs.step_retried`); beim zweiten Mal endet der Lauf mit `error`.
@@ -1146,6 +1151,16 @@ IDs, Zähler und Codes.
 
 ### Bekannte Grenzen
 
+- **Ein Schritt über seine Sperrfrist hinaus zählt nicht für `max_concurrency`:**
+  Hält ein Schritt die Zeile seines Laufs länger als die Sperrfrist
+  (`HERD_RUN_LEASE_SECONDS`, 30 s; ein Schritt darf bis zu 5 s auf Sperren warten und
+  je Anweisung 20 s rechnen), steht `lease_until` bis zum Festschreiben in der
+  Vergangenheit, und das Aufnehmen eines weiteren Laufs auf derselben Verbindung zählt
+  ihn nicht mit; so kann die Verbindung kurz einen Lauf mehr bedienen. Den Lauf selbst
+  nimmt niemand auf (seine Zeile ist gesperrt). Eine genaue Zählung müsste gesperrte
+  Zeilen erkennen; als laufend zählen auch abgelaufene Läufe ohne Sperre würde einen
+  abgestürzten Lauf seine eigene Wiederaufnahme blockieren lassen. Werkzeugschritte
+  dauern Millisekunden bis Sekunden, daher bleibt es dabei.
 - **Verbrauch wird in zwei seltenen Fällen zu wenig gezählt**, nie doppelt: Ein
   Anbieteraufruf eines Workers, der danach abstürzt oder seine Sperrfrist verliert, ist
   bezahlt, aber nicht gebucht; und scheitern beim Abschluss eines Schritts sowohl das

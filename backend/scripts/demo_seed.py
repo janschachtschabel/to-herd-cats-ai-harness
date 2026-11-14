@@ -5,7 +5,7 @@ discussion that starts with the worker's system entries, and tickets (an epic wi
 stories, tasks and a bug in several statuses, assignments, tags, a linked page,
 comments, a ticket key in a channel; see scripts/demo_tickets.py) and sprints (one
 closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py);
-with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai.py) also agents at
+with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai_model.py) also agents at
 work (M6).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\

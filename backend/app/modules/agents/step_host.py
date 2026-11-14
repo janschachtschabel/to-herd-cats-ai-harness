@@ -11,11 +11,14 @@ transaction instead, and the host raises `Suspended` once it is committed. A too
 agent may use only with a person's release (`confirm`) passes `approvals/gate.py`
 first, in the same transaction.
 
-Bounds (module review M6, findings 3 and 14):
-- A tool's step waits for a lock at most `STEP_LOCK_TIMEOUT_SECONDS` and runs one
-  statement at most `STEP_STATEMENT_TIMEOUT_SECONDS` (never past the deadline); a
+Bounds (module review M6, findings 3 and 14; review 2, finding 8):
+- Every step (the checks before a model call, the record after it, a tool's step,
+  from its first statement, the run's row lock included) waits for a lock at most
+  `STEP_LOCK_TIMEOUT_SECONDS` and runs one statement at most
+  `STEP_STATEMENT_TIMEOUT_SECONDS` (a tool's step never past the deadline). A tool's
   step that exceeds them is rolled back, and the model gets `TOOL_TIMED_OUT` as the
-  call's result (recorded, so a replay gives it the same).
+  call's result (recorded, so a replay gives it the same); the checks before a model
+  call end the run `error`, a record that cannot be written too (its usage counted).
 - The run's deadline cuts a tool call as it cuts a model call (`deadline`): the
   statement bound ends a database wait there, an asyncio timeout a little later
   anything else.
@@ -105,7 +108,9 @@ class RunHost:
             raise
         except Exception as exc:  # the step cannot be recorded: count the call, stop now
             async with self.unit() as session:
-                if await RunSteps(session, self.run.claimed).owned() is None:
+                steps = RunSteps(session, self.run.claimed)
+                await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, STEP_STATEMENT_TIMEOUT_SECONDS)
+                if await steps.owned() is None:
                     raise Lost from exc
                 await self._usage(session, reply)
             raise Halt("error", detail=type(exc).__name__) from exc
@@ -150,9 +155,8 @@ class RunHost:
         self, step: int, call: ToolCall, args: Any, spec: ToolSpec
     ) -> ToolResult | Wait:
         async with self.unit() as session:
-            steps, run, agent = await self._owned(session)
             statement = min(STEP_STATEMENT_TIMEOUT_SECONDS, self.seconds_left())
-            await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, statement)
+            steps, run, agent = await self._owned(session, statement)
             grant = await self._granted(session, agent, spec)
             actor = await self._actor(session, agent)
             location = await self._location(steps)
@@ -188,9 +192,13 @@ class RunHost:
 
     # --- checks ----------------------------------------------------------------------
 
-    async def _owned(self, session: AsyncSession) -> tuple[RunSteps, Run, Agent]:
-        """The run's records, its row (locked) and its agent as now."""
+    async def _owned(
+        self, session: AsyncSession, statement: float = STEP_STATEMENT_TIMEOUT_SECONDS
+    ) -> tuple[RunSteps, Run, Agent]:
+        """The run's records, its row (locked) and its agent as now; the step's lock
+        waits and statements bounded from its first statement on."""
         steps = RunSteps(session, self.run.claimed)
+        await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, statement)
         run = await steps.owned()
         if run is None:
             raise Lost

@@ -12,23 +12,28 @@ connections; module review M6 2, finding 4 and the checks of findings 3 and 14).
 import asyncio
 import time
 import uuid
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 
+from app.core.db_errors import is_retryable, is_timeout
+from app.core.models_base import utcnow
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
+from app.modules.agents import step_host
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import Claimed, RunSteps, claim
+from app.modules.agents.gauge_repository import open_runs
 from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS, Agent, Run, RunCancelRequest
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.agents.step_host import RunHost, units_of
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.users.models import User
-from app.runtime.loop import Halt, ToolCall
+from app.runtime.loop import Halt, Reply, ToolCall
 from tests.factories import login
 from tests.factories_agents import LEASE, assign_default, make_connection
 from tests.factories_tickets import new_ticket
@@ -121,8 +126,6 @@ async def test_taking_a_ticket_against_a_step_that_changes_it_ends_well(
             await step.rollback()
         response = await asyncio.wait_for(request, timeout=10)
     took = time.monotonic() - started
-    from app.core.db_errors import is_retryable
-
     print(
         f"LOCKS status={response.status_code} body={response.text[:120]!r} "
         f"step_error={type(step_error).__name__ if step_error else None} took={took:.2f}s"
@@ -214,3 +217,51 @@ async def test_the_deadline_cuts_a_step_that_waits_for_its_row(
         assert len(rows) == 1
     async with factory() as session:
         assert await probe_tools.effects(session, claimed.id) == []
+
+
+async def _host(real_db: RealDb, claimed: Claimed) -> RunHost:
+    unit = units_of(real_db.database.session_factory)
+    prepared = await Executor(unit)._prepare(claimed)
+    assert isinstance(prepared, tuple)
+    return RunHost(unit, time.monotonic, prepared[0])
+
+
+async def test_the_steps_around_a_model_call_wait_for_the_runs_row_only_briefly(
+    real_db: RealDb,
+    make_real_client: MakeRealClient,
+    openai_stub: OpenAIStub,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The checks before a model call and its record lock the run's row like a tool's
+    step, with the same bound (review M6 2, finding 8)."""
+    monkeypatch.setattr(step_host, "STEP_LOCK_TIMEOUT_SECONDS", 0.3)
+    _, _, claimed = await _ticket_run(real_db, make_real_client, openai_stub)
+    host = await _host(real_db, claimed)
+    reply = Reply("ok", [], 1, 1, 0, 5, "m1")
+    async with real_db.database.session_factory() as holder, holder.begin():
+        await holder.execute(select(Run.id).where(Run.id == claimed.id).with_for_update())
+        for step in (host.before_model_call(1), host.after_model_call(1, reply)):
+            started = time.monotonic()
+            with pytest.raises(Exception) as raised:
+                await step
+            assert is_timeout(raised.value), raised.value
+            assert time.monotonic() - started < 3
+
+
+async def test_a_run_whose_step_holds_its_row_is_not_stuck(
+    real_db: RealDb, make_real_client: MakeRealClient, openai_stub: OpenAIStub
+) -> None:
+    """A step that holds the run's row past its lease is working: `herd_runs_stuck`
+    passes over it, and counts it once the row is free and the lease still past."""
+    _, _, claimed = await _ticket_run(real_db, make_real_client, openai_stub)
+    factory = real_db.database.session_factory
+    async with factory() as session, session.begin():
+        await session.execute(
+            update(Run).where(Run.id == claimed.id).values(lease_until=utcnow() - timedelta(1))
+        )
+    async with factory() as holder, holder.begin():
+        assert await RunSteps(holder, claimed).owned() is not None
+        async with factory() as session:
+            assert (await open_runs(session)).stuck == 0
+    async with factory() as session:
+        assert (await open_runs(session)).stuck == 1

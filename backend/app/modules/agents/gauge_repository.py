@@ -25,18 +25,19 @@ async def open_runs(session: AsyncSession) -> OpenRuns:
     """For the gauges, across organisations: queued runs, the age of the oldest one
     (seconds, 0 without one), stuck runs (running with a lease that ran out, no worker
     took them up again, or taken up longer ago than any run may run: `taken_at`, not
-    the first start, so a run resumed after a long wait is not stuck) and waiting
-    runs."""
+    the first start, so a run resumed after a long wait is not stuck; a row a step
+    holds is passed over, its run works, whatever its lease says) and waiting runs."""
     now = utcnow()
     queued = select(func.count(), func.min(Run.created_at)).where(Run.state == RunState.QUEUED)
     count, oldest = (await session.execute(queued)).one()
     overdue = now - timedelta(seconds=MAX_RUNTIME_SECONDS + STUCK_GRACE_SECONDS)
-    stuck = await session.scalar(
-        select(func.count()).where(
-            Run.state == RunState.RUNNING,
-            or_(Run.lease_until < now, Run.taken_at < overdue),
-        )
+    stuck_ids = (
+        select(Run.id)
+        .where(Run.state == RunState.RUNNING, or_(Run.lease_until < now, Run.taken_at < overdue))
+        .with_for_update(key_share=True, skip_locked=True)  # a step holding its row works
+        .subquery()
     )
+    stuck = await session.scalar(select(func.count()).select_from(stuck_ids))
     waiting = await session.scalar(select(func.count()).where(Run.state == RunState.WAITING))
     age = (now - oldest).total_seconds() if oldest is not None else 0.0
     return OpenRuns(int(count), max(age, 0.0), int(stuck or 0), int(waiting or 0))

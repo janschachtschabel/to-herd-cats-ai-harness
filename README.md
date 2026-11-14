@@ -282,7 +282,7 @@ Mit einem Modell legt dasselbe Skript auch Agenten bei der Arbeit an (Hilda und 
 Gedächtnisseite und eine wartende Freigabe): `HERD_DEMO_AI_KIND` schaltet das ein
 (`local`, `openai` oder `openai_compatible`, dazu `HERD_DEMO_AI_URL`; mit dem Stub
 außerdem `HERD_DEMO_AI_STUB`, damit die Demo seine Antworten vorgibt). Einzelheiten in
-`backend/scripts/demo_ai.py`.
+`backend/scripts/demo_ai.py` (das Modell: `demo_ai_model.py`).
 
 ### KI ausprobieren
 
