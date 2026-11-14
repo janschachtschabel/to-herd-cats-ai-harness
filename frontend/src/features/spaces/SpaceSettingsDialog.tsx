@@ -14,6 +14,7 @@ import type { Schemas, Space } from '@/lib/api'
 import { blankToNull, bodySchema } from '@/lib/schemas'
 import { AgentWritePolicyFields } from './AgentWritePolicyFields'
 import { spaceQuery, useUpdateSpace } from './queries'
+import { ReviewIntervalFields } from './ReviewIntervalFields'
 
 type Values = Schemas['SpaceUpdateIn']
 const schema = bodySchema('SpaceUpdateIn')
@@ -57,6 +58,7 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
       ai_policy: space.ai_policy,
       allowed_locations: space.allowed_locations,
       agent_write_policy: space.agent_write_policy,
+      review_interval_days: space.review_interval_days,
     },
   })
   const errors = form.formState.errors
@@ -96,6 +98,7 @@ export function SpaceSettingsForm({ space, onDone }: { space: Space; onDone: () 
       </Field>
       <SpaceAiPolicyFields form={form} />
       <AgentWritePolicyFields form={form} />
+      <ReviewIntervalFields form={form} />
       <SaveError error={update.error} onReload={() => void reload()} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onDone}>

@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import { wikiKeys } from '@/features/wiki/queries'
 import { api, unwrap, type Schemas, type SpaceMember } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
 
@@ -83,8 +84,13 @@ export function useUpdateSpace(spaceId: string) {
         }),
       ),
     onSuccess: (space) => {
+      const before = queryClient.getQueryData(spaceQuery(spaceId).queryKey)
       queryClient.setQueryData(spaceQuery(spaceId).queryKey, space)
       invalidateSpaceLists(queryClient)
+      // Which pages are due for review follows the interval.
+      if (before?.review_interval_days !== space.review_interval_days) {
+        void queryClient.invalidateQueries({ queryKey: wikiKeys.all })
+      }
     },
   })
 }

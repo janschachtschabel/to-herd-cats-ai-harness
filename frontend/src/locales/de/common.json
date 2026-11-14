@@ -206,6 +206,13 @@
       "addSubmit": "Hinzufügen",
       "noDirectory": "Gäste können keine Personen oder Gruppen suchen und deshalb keine Mitglieder hinzufügen.",
       "pickRequired": "Bitte eine Person oder Gruppe auswählen."
+    },
+    "review": {
+      "title": "Prüffrist für Seiten",
+      "hint": "Veröffentlichte Seiten, die so lange nicht geprüft wurden, gelten als „Prüfung fällig“; die Moderierenden bekommen einmal je Frist eine Aktivität.",
+      "on": "Seiten regelmäßig prüfen",
+      "days": "Prüfen alle … Tage",
+      "range": "Eine ganze Zahl von 7 bis 730 Tagen."
     }
   },
   "users": {

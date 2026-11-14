@@ -206,6 +206,13 @@
       "addSubmit": "Add",
       "noDirectory": "Guests cannot search for people or groups and therefore cannot add members.",
       "pickRequired": "Please choose a person or group."
+    },
+    "review": {
+      "title": "Review interval for pages",
+      "hint": "Published pages not reviewed for this long are “review due”; the moderators get one activity entry per interval.",
+      "on": "Review pages regularly",
+      "days": "Review every … days",
+      "range": "A whole number from 7 to 730 days."
     }
   },
   "users": {
