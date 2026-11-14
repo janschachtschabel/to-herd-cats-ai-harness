@@ -234,7 +234,7 @@
       "max_steps": "The agent reached its maximum number of steps.",
       "deadline": "The time for this run ran out.",
       "no_progress": "The agent made no progress (it repeated the same request).",
-      "rights_revoked": "Rights changed; the run was ended.",
+      "rights_revoked": "Rights changed or the agent was paused; the run was ended.",
       "policy_blocked": "Stopped by a space's AI policy: what was read may not go to this connection.",
       "provider_refused": "The provider refuses (access, credit or rate limit).",
       "error": "Something went wrong. Please try again later.",

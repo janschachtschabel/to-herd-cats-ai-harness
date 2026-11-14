@@ -234,7 +234,7 @@
       "max_steps": "Der Agent hat die Höchstzahl an Schritten erreicht.",
       "deadline": "Die Zeit für diesen Lauf ist abgelaufen.",
       "no_progress": "Der Agent kam nicht weiter (dieselbe Abfrage wiederholt).",
-      "rights_revoked": "Rechte haben sich geändert; der Lauf wurde beendet.",
+      "rights_revoked": "Rechte haben sich geändert oder der Agent wurde pausiert; der Lauf wurde beendet.",
       "policy_blocked": "Durch die KI-Richtlinie eines Bereichs gestoppt: Gelesenes darf nicht an diese Verbindung gehen.",
       "provider_refused": "Der Anbieter lehnt ab (Zugang, Guthaben oder Anfragegrenze).",
       "error": "Ein Fehler ist aufgetreten. Bitte später erneut versuchen.",

@@ -1,7 +1,8 @@
 # KI-Grundlage (M5): Verbindungen, Zuordnung, Verbrauch, Richtlinie, Agenten
 
-Betrieb und Verwaltung der KI-Anbindung. Stand: M5, Tasks 1 bis 4 (Agenten, Laufschleife
-und Oberfläche folgen).
+Betrieb und Verwaltung der KI-Anbindung. Stand: M5, Tasks 1 bis 7 mit den Korrekturen
+aus Modul-Review 1 (Verbindungen, Zuordnung, Verbrauch, Richtlinie, Agenten,
+Laufschleife, Oberfläche). Hybride Suche und Embeddings (Tasks 8 bis 11) folgen.
 
 ## Verbindungen (`/api/ai/connections`, Recht `ai.manage`)
 
@@ -65,9 +66,11 @@ Adresse und wählt nur geprüfte Adressen an (TLS weiterhin auf den Namen):
 - Proxy-Variablen der Umgebung (`HTTPS_PROXY`) werden nicht beachtet. Wer Anbieter nur
   über einen Proxy erreicht, setzt `HERD_AI_EGRESS_PROXY` (`http://[user:pass@]host:port`
   oder `https://…`, vom Betrieb gesetzt und vertraut): Aufrufe an Verbindungen außer
-  `local` gehen dann per `CONNECT` durch ihn; die Adressprüfung gilt weiter für das Ziel
-  (Adressliterale werden auch über den Proxy geprüft), TLS bleibt Ende zu Ende auf den
-  Namen des Anbieters. `local`-Verbindungen gehen nie über den Proxy.
+  `local` gehen dann per `CONNECT` durch ihn. Namen löst dann der Proxy auf, nicht der
+  Server: hier geprüft werden nur noch das Schema und Ziele, die als Adresse geschrieben
+  sind (Adressliterale); was ein Name dahinter erreicht, verantwortet der Proxy. TLS
+  bleibt Ende zu Ende auf den Namen des Anbieters. `local`-Verbindungen gehen nie über
+  den Proxy und werden immer hier geprüft.
 
 ## Wer nutzt welches Modell (`/api/ai/assignments`, `ai.manage`)
 
@@ -89,13 +92,31 @@ Jeder Modellaufruf und jeder Embedding-Stapel wird als `usage_record` gespeicher
 (Person, Agent, Lauf, Bereich, Verbindung, Modell, Token ein/aus/gecacht, Dauer,
 Kosten, wenn ein Preis hinterlegt ist; gecachte Token zählen als Eingabe).
 
-- `GET /api/ai/usage?from=&to=&by=day|user|space|connection&run_id=` (`ai.manage`):
-  Summen je Tag und Schlüssel, seitenweise. Standard: die letzten 30 Tage; höchstens
-  365 Tage (422 `ai.usage_period_invalid`). `cost` ist leer, wenn kein Aufruf einen Preis
-  hatte; `unpriced_calls` zählt die Aufrufe ohne Preis.
+- `GET /api/ai/usage?from=&to=&by=user|agent|space|connection&run_id=` (`ai.manage`):
+  Summen je UTC-Tag, ohne `by` nur je Tag, mit `by` zusätzlich je Person, Agent,
+  Bereich oder Verbindung (mit Namen, soweit bekannt); seitenweise. Standard: die
+  letzten 30 Tage; höchstens 365 Tage (422 `ai.usage_period_invalid`). `cost` ist leer,
+  wenn kein Aufruf einen Preis hatte; `unpriced_calls` zählt die Aufrufe ohne Preis.
+  Gebucht wird auf das Modell, an das der Aufruf ging (das des Agenten beim Start des
+  Laufs).
 - `GET /api/ai/usage/me` (`ai.use`): die eigenen Summen, ohne Verbindungsnamen.
 
+Bekannte Untererfassung (beides selten, beides nur zu wenig gezählt, nie doppelt):
+
+- Stirbt ein Worker während eines Anbieteraufrufs oder verliert er seine Sperrfrist,
+  ist dieser Aufruf bezahlt, aber nicht gebucht; der nächste Versuch bucht nur seine
+  eigenen Aufrufe.
+- Kann ein Schritt nicht gespeichert werden (etwa ein Datenbankfehler beim Schreiben von
+  `run_event`), endet der Lauf sofort mit `error`; der Verbrauch des Aufrufs wird in
+  einer eigenen Transaktion nachgebucht. Scheitert auch das, fehlt dieser eine Aufruf.
+  Zeichen, die die Datenbank nicht speichern kann (NUL, einzelne Surrogate), entfernt
+  der Server vorher aus Text und Argumenten des Modells, damit es dazu nicht kommt.
+
 ## KI-Richtlinie je Bereich und KI-Sperre
+
+Beides ist Verwaltung, nicht Nutzung: wer den Bereich verwaltet oder moderiert, setzt
+Richtlinie und Sperre auch ohne eigenes `ai.use` (die Oberfläche bietet sie dann
+ebenso an). Leser ohne KI sehen von beidem nichts.
 
 - `PATCH /api/spaces/{id}` (`space.manage`, mit `version`): `ai_policy` ist `any`
   (Standard), `restricted` (nur Verbindungen mit `data_location` in
@@ -105,7 +126,7 @@ Kosten, wenn ein Preis hinterlegt ist; gecachte Token zählen als Eingabe).
 - `PUT /api/pages/{id}/ai-lock` und `PUT /api/attachments/{id}/ai-lock`
   (`page.moderate`, Körper `{"no_ai": true, "version": n}`): sperrt eine Seite oder
   Datei für KI. Eine Datei auf einer gesperrten Seite gilt ebenfalls als gesperrt.
-- Ein Lauf, der Inhalte aus mehreren Bereichen liest, gilt die strengste ihrer
+- Für einen Lauf, der Inhalte aus mehreren Bereichen liest, gilt die strengste ihrer
   Richtlinien (`app/modules/ai/policy.py`); was KI lesen darf, filtern
   `ai_space_ids` und `ai_readable` (`app/modules/ai/policy_filters.py`) in SQL, in
   derselben Abfrage wie die Rechte.
@@ -125,8 +146,12 @@ Urheber von Nachrichten (`kind: agent`). In M5 ist jeder Agent Stufe 1: er liest
   (409 `agent.version_conflict`), Audit ohne den Text der Anweisungen. Wer schon
   gesprochen oder gelaufen ist, wird nicht gelöscht (409 `agent.in_use`), sondern
   pausiert.
+- Antworten nennen auch `responsible_name`, den Namen der verantwortlichen Person.
 - `GET /api/agents/{id}/profile` (`ai.use`): Name, Kurzvorstellung, Status; Entwürfe
-  sind für alle ohne `agent.manage` unsichtbar. Das Verzeichnis (`/api/directory`)
+  sind für alle ohne `agent.manage` unsichtbar, auch beim Hinzufügen als Mitglied
+  eines Bereichs (404 `agent.not_found`). Wer Agenten nicht sieht (weder `ai.use` noch
+  `agent.manage`), entfernt auch keinen aus einem Bereich: 404
+  `spaces.member_not_found` wie für ein unbekanntes Mitglied. Das Verzeichnis (`/api/directory`)
   nennt Agenten nur Personen mit `ai.use`.
 - `POST /api/dms` mit `{"agent_id": …}` (ohne weitere Personen, sonst 422
   `dm.agent_pair_only`): die Direktnachricht der Person mit dem Agenten; ohne `ai.use`
@@ -147,17 +172,35 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
 - Er liest mit den Rechten der Person, begrenzt auf die Bereiche des Agenten
   (`read_scope`): seine Mitgliedschaften und die offenen Bereiche. Vor jedem
   Modell- und Werkzeugaufruf wird das neu bestimmt; wer `ai.use` oder den Zugang zu
-  einem schon gelesenen Bereich verliert, beendet den Lauf (`rights_revoked`).
+  einem schon gelesenen Bereich verliert, beendet den Lauf (`rights_revoked`), ebenso
+  ein Agent, der währenddessen pausiert oder dessen verantwortliche Person deaktiviert
+  wird.
 - Werkzeuge: `search` (Volltext über Seiten und Tickets, nur in Bereichen, deren
   Richtlinie die Verbindung zulässt, ohne gesperrte Seiten), `read_page`,
   `read_ticket`. Ergebnisse gehen gerahmt (`<untrusted>`) und auf 8.000 Zeichen gekürzt
   an das Modell und vollständig in `run_event`.
 - Vor jedem Modellaufruf: die strengste Richtlinie aller gelesenen Bereiche (das
   Gespräch selbst zählt als `any`) muss den `data_location` der Verbindung erlauben,
-  sonst endet der Lauf mit `policy_blocked`, bevor etwas gesendet wird.
+  sonst endet der Lauf mit `policy_blocked`, bevor etwas gesendet wird. Gezählt wird
+  der Bereich, in dem gelesen wurde, und der, in dem die gelesene Seite oder das
+  Ticket jetzt liegt: wird eine Seite während des Laufs verschoben, gilt auch der neue
+  Bereich (für Richtlinie und Zugang); eine seither gesperrte, gelöschte oder in den
+  Papierkorb gelegte Seite und ein gelöschtes Ticket beenden den Lauf ebenfalls mit
+  `policy_blocked`. Das gilt auch für Treffer der Suche.
+- Der Verlauf: Gesendet werden die eigenen Nachrichten des Gesprächs (Person und
+  Agent, ohne Threads). Hat eine frühere Antwort des Agenten Inhalt aus einem Bereich
+  zitiert, gehört dieser Text nun zum Gespräch und geht mit dem Verlauf an das Modell,
+  auch wenn der Bereich seither strenger eingestellt ist oder der Agent eine andere
+  Verbindung nutzt (bewusst so entschieden: das Gespräch ist der Inhalt der Person
+  und zählt als `any`). Wer das nicht will, löscht die betreffende Antwort.
+- Ist die Nachricht, die einen Lauf ausgelöst hat, gelöscht, bevor er beginnt (keine
+  Nachricht der Person nach der letzten Antwort), endet er mit `completed` ohne
+  Aufruf, Antwort oder Hinweis.
 - Stopgründe: `completed`, `max_steps`, `deadline`, `no_progress` (dritter gleicher
   Werkzeugaufruf), `rights_revoked`, `policy_blocked`, `provider_refused` (401, 402,
-  403, 429; ohne Wiederholung), `error`. Die Antwort ist eine Nachricht `kind: agent`
+  403, 429; ohne Wiederholung), `error` (auch sofort, wenn ein Schritt nicht
+  gespeichert werden kann oder ein Werkzeug scheitert; kein blindes Wiederholen). Die
+  Antwort ist eine Nachricht `kind: agent`
   mit `client_id` = Lauf-ID (genau einmal); bei jedem anderen Stopp steht im Gespräch
   ein Zeitleisten-Eintrag `system.key = "run.stopped"` mit dem Grund in
   `system.new.value`.
@@ -165,12 +208,27 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   an die Person im Gespräch.
 - `GET /api/runs/{id}` und `GET /api/runs/{id}/events` (seitenweise): für die Person,
   die gefragt hat, und die verantwortliche Person (je mit `ai.use`) und für
-  `agent.manage`; sonst 404 `run.not_found`.
+  `agent.manage`; sonst 404 `run.not_found`. Die Person, die gefragt hat, sieht ihre
+  Läufe vollständig. Alle anderen sehen ein Werkzeugergebnis nur, solange sie jeden
+  Bereich lesen dürfen, aus dem es stammt (jedes Ergebnis nennt seine Bereiche in
+  `spaces`); sonst kommt das Ereignis mit `redacted: true` und nur Schritt,
+  Werkzeugname und Quelle. Wer als Admin einen Team- oder persönlichen Bereich nur
+  kraft Admin-Rechts liest, bekommt den Inhalt und einen Audit-Eintrag
+  `space.admin_access` (einmal je Admin, Bereich und Tag), wie beim direkten Lesen
+  einer Seite. Die eigenen Worte des Modells (Text und Argumente) gehören zum Gespräch
+  und bleiben der Person vorbehalten; Admins lesen sie nur über die begründete,
+  protokollierte Einsicht in Direktnachrichten, die Agenten-Nachrichten mit der
+  KI-Kennzeichnung und Stopps als Hinweis zeigt. Verbrauch, Modell und Stopp sehen alle,
+  denen der Lauf sichtbar ist.
 - Verbrauch wird je Modellaufruf einmal gebucht, in derselben Transaktion wie der
-  Schritt (`run_event`, eindeutig je Lauf, Versuch und Schritt).
+  Schritt (`run_event`, eindeutig je Lauf, Versuch und Schritt); Ausnahmen siehe
+  „Bekannte Untererfassung“.
 
 Betrieb:
 
+- Protokolle: Die HTTP-Clients (`httpx`, `httpcore`, `httpx2`, `httpcore2`, `openai`)
+  bleiben auch bei `HERD_LOG_LEVEL=DEBUG` auf WARNING, weil sie sonst Kopfzeilen der
+  Anbieter protokollieren.
 - `HERD_RUN_CONCURRENCY` (Standard 4): Läufe je Worker zugleich; dazu begrenzt
   `max_concurrency` der Verbindung über alle Worker, `requests_per_minute` die Aufrufe
   je Minute (Fenster in der Datenbank). Der Worker braucht dafür bis zu
