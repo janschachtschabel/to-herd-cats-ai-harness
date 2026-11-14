@@ -22,8 +22,8 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor
+from app.core.clock import SYSTEM_CLOCK
 from app.core.errors import Conflict, NotFound, ValidationFailed
-from app.core.models_base import utcnow
 from app.core.pagination import (
     Page,
     PageParams,
@@ -43,8 +43,9 @@ _ORDER = (BudgetScope.USER, BudgetScope.AGENT, BudgetScope.ORGANISATION)
 
 
 def utc_day(now: datetime | None = None) -> tuple[datetime, datetime]:
-    """The start and end of the UTC day of `now` (default: the current time)."""
-    day = (now or utcnow()).astimezone(UTC).date()
+    """The start and end of the UTC day of `now` (default: the clock's time, `core/
+    clock.py`, as for the due loop's terms and the booking of usage)."""
+    day = (now or SYSTEM_CLOCK.now()).astimezone(UTC).date()
     start = datetime.combine(day, time(), UTC)
     return start, start + timedelta(days=1)
 
@@ -78,16 +79,16 @@ async def budget_exhausted(
 ) -> BudgetScope | None:
     """The scope of a daily limit of the organisation, the person or the agent that is
     reached today (UTC), or None. `priced`: whether the call to come has a price (see
-    `has_price`); without, currency limits do not apply."""
+    `has_price`); without, currency limits do not apply. `now` defaults to the clock's
+    time. Two statements: the budgets, then one scan of the day's usage."""
     repo = BudgetRepository(session, org_id)
     budgets = sorted(await repo.applicable(user_id, agent_id), key=lambda b: _ORDER.index(b.scope))
     if not budgets:
         return None
     start, end = utc_day(now)
+    spent = await repo.spent_on({b.scope for b in budgets}, user_id, agent_id, start, end)
     for budget in budgets:
-        subject = budget.subject_id
-        spent = await repo.spent(budget.scope, [subject] if subject else [], start, end)
-        if reached(budget, spent.get(subject, NOTHING), priced=priced):
+        if reached(budget, spent[budget.scope], priced=priced):
             return budget.scope
     return None
 

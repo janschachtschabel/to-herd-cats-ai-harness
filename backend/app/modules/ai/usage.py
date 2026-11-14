@@ -16,6 +16,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor
+from app.core.clock import SYSTEM_CLOCK
 from app.core.errors import ValidationFailed
 from app.core.pagination import Page, PageParams, decode_key_cursor, encode_key_cursor
 from app.modules.ai.access import require_ai
@@ -66,7 +67,8 @@ async def record_usage(
     run_id: uuid.UUID | None = None,
     space_id: uuid.UUID | None = None,
 ) -> UsageRecord:
-    """The one way usage is written, in the caller's transaction."""
+    """The one way usage is written, in the caller's transaction, at the clock's time
+    (`core/clock.py`)."""
     if min(tokens_in, tokens_out, tokens_cached, duration_ms) < 0 or tokens_cached > tokens_in:
         raise ValueError("usage counts out of range")
     connection = await ConnectionRepository(session, org_id).get(connection_id)
@@ -89,6 +91,7 @@ async def record_usage(
         tokens_cached=tokens_cached,
         cost=cost,
         duration_ms=duration_ms,
+        created_at=SYSTEM_CLOCK.now(),  # the budgets' UTC day (`budgets.utc_day`)
     )
     return await UsageRepository(session, org_id).add(record)
 

@@ -157,8 +157,12 @@ Euro oder in beidem; mindestens eins muss gesetzt sein.
 **Wirkung.** Vor **jedem** Modellaufruf eines Laufs prüft der Schritt-Host die Budgets
 der Organisation, der auslösenden Person und des Agenten gegen die Summen des Tages aus
 `usage_record` (alle Aufrufe dieser Geltung, egal welcher Lauf; Indizes nach
-Organisation, Person bzw. Agent und Zeit). Jedes erreichte Limit zählt, also gewinnt das
-engste. Ist eins erreicht (Verbrauch ≥ Limit), endet der Lauf mit dem Stopgrund
+Organisation, Person bzw. Agent und Zeit; eine Abfrage summiert in einem Durchgang jede
+geltende Ebene mit `FILTER`, vor der Sperre der Zeile des Laufs, damit eine lange Summe
+weder einen Abbruch noch die Verlängerung des Leases aufhält). Jedes erreichte Limit
+zählt, also gewinnt das engste. Den Tag (UTC) nimmt die Prüfung aus der Uhr
+(`core/clock.py`), wie die Prüfung eines fälligen Termins und die Buchung des
+Verbrauchs: alle drei rechnen mit demselben Tag, auch unter der Uhr der Browsertests. Ist eins erreicht (Verbrauch ≥ Limit), endet der Lauf mit dem Stopgrund
 `budget`; im Journal steht als Detail die Geltung (`user`, `agent` oder
 `organisation`, bei mehreren die speziellste), im Gespräch bzw. Thread der übliche
 Hinweis „Lauf beendet“ mit `budget`; der Systemeintrag nennt die Geltung als
@@ -179,9 +183,12 @@ Aufruf, auch mitten im Lauf.
   Aufgabe) und wird mit `skipped_budget` übersprungen, statt einen Lauf zu starten, der
   sofort stoppte. Aufgaben haben kein eigenes Budget.
 - **Kosten der Prüfung** (Steckbrief, lokale Messung mit 100.000 Verbrauchszeilen des
-  Tages): ohne Budget eine Abfrage, rund 1 ms je Aufruf; mit Budgets für Person und
-  Agent rund 14 ms; mit einem Budget der Organisation 60–80 ms, denn ihre Summe liest
-  jede Zeile des Tages. Eine Tagessumme als eigene Tabelle gibt es nicht; sie lohnt sich
+  Tages): ohne Budget eine Abfrage, rund 1 ms je Aufruf; sonst zwei (die Budgets, dann
+  ein Durchgang über den Tag): mit Budgets für Person und Agent rund 5 ms (vorher, mit
+  einer Abfrage je Ebene, 7 ms); mit einem Budget der Organisation rund 20 ms (vorher
+  26 ms), denn ihre Summe liest jede Zeile des Tages (Review M7, Befund 9; Messung nach
+  Nachbesserung 1, 14.11.2026, mit 200 Personen und 20 Agenten). Die Grenzen des Tages
+  stehen als Werte in der Abfrage, damit der Plan die Spanne kennt. Eine Tagessumme als eigene Tabelle gibt es nicht; sie lohnt sich
   erst bei deutlich mehr Aufrufen am Tag mit einem Budget der Organisation.
 - **Metrik:** `herd_budget_stops_total{scope}` zählt die Läufe, die ein Budget beendet
   hat ([`AGENTEN.md`](AGENTEN.md#metriken-und-alarme)).

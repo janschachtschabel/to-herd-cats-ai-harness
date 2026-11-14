@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import event
+
 from app.modules.ai.budgets import budget_exhausted
 from app.modules.ai.models import AiBudget, BudgetScope
 from tests.factories_agents import Bench
@@ -90,3 +92,24 @@ async def test_the_tightest_limit_wins(bench: Bench) -> None:
     await budget(bench, BudgetScope.AGENT, tokens_per_day=100)
     await use(bench, agent=True)
     assert await exhausted(bench) == BudgetScope.AGENT
+
+
+async def test_every_applicable_budget_is_checked_with_one_scan(bench: Bench) -> None:
+    """The budgets that apply, then one scan of the day's usage that sums each scope
+    (`FILTER`), however many budgets apply."""
+    await budget(bench, BudgetScope.ORGANISATION, tokens_per_day=10**6)
+    await budget(bench, BudgetScope.USER, tokens_per_day=10**6)
+    await budget(bench, BudgetScope.AGENT, tokens_per_day=150)
+    await use(bench, agent=True)
+    seen: list[str] = []
+
+    def _seen(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        seen.append(statement)
+
+    sync_conn = (await bench.session.connection()).sync_connection
+    event.listen(sync_conn, "before_cursor_execute", _seen)
+    try:
+        assert await exhausted(bench) == BudgetScope.AGENT
+    finally:
+        event.remove(sync_conn, "before_cursor_execute", _seen)
+    assert len(seen) == 2 and "FROM usage_record" in seen[1], seen

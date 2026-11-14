@@ -4,13 +4,20 @@ answers), never cutting a call already sent, so a run passes a limit by at most 
 call. A limit changed during a run counts at the next call. Usage is booked to the
 run's person, its agent and the space of its place."""
 
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy import select
+from sqlalchemy import event, select
 
+from app.core.clock import SystemClock
+from app.core.models_base import utcnow
 from app.modules.agents.models import EventKind, RunEvent, StopReason
 from app.modules.ai.models import BudgetScope, UsageRecord
 from app.runtime.models import wrap_model
@@ -115,3 +122,56 @@ async def test_usage_is_booked_to_the_space_of_the_place(work: Work) -> None:
     assert {(r.user_id, r.agent_id) for r in booked} == {
         (bench.people.users["alice"].id, bench.agent.id)
     }
+
+
+async def test_the_day_of_the_check_and_of_the_booking_comes_from_the_clock(
+    bench: Bench, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check before a model call and the booking of its usage take the time from
+    `core/clock.py`, as the due loop's check when a term fires does: one UTC day for
+    both, also under the browser tests' clock."""
+    await budget(bench, BudgetScope.USER, tokens_per_day=100)
+    await use(bench, days_ago=1)  # 150 tokens of Alice's yesterday
+    yesterday = utcnow() - timedelta(days=1)
+    monkeypatch.setattr(SystemClock, "now", lambda self: yesterday)
+    await bench.say("Hallo")
+    assert await bench.run_next() == StopReason.BUDGET  # yesterday's limit, reached then
+    monkeypatch.setattr(SystemClock, "now", lambda self: yesterday - timedelta(days=1))
+    await bench.say("Vorgestern")
+    assert await bench.run_next() == StopReason.COMPLETED
+    booked = await bench.session.scalar(select(UsageRecord).where(UsageRecord.run_id.is_not(None)))
+    assert booked is not None and booked.created_at == yesterday - timedelta(days=1)
+
+
+@contextmanager
+def _statements(sync_conn: Any) -> Iterator[list[str]]:
+    seen: list[str] = []
+
+    def _seen(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        seen.append(statement)
+
+    event.listen(sync_conn, "before_cursor_execute", _seen)
+    try:
+        yield seen
+    finally:
+        event.remove(sync_conn, "before_cursor_execute", _seen)
+
+
+async def test_the_budget_is_summed_before_the_runs_row_is_locked(bench: Bench) -> None:
+    """The day's sums (one scan, however many budgets apply) come before the step locks
+    the run's row, so a long sum never holds a cancel or the worker's lease renewal."""
+    await budget(bench, BudgetScope.ORGANISATION, tokens_per_day=10**6)
+    await budget(bench, BudgetScope.USER, tokens_per_day=10**6)
+    await budget(bench, BudgetScope.AGENT, tokens_per_day=10**6)
+    await bench.say("Hallo")
+    with _statements((await bench.session.connection()).sync_connection) as seen:
+        assert await bench.run_next() == StopReason.COMPLETED
+    sums = [i for i, s in enumerate(seen) if "FROM usage_record" in s and "sum(" in s]
+    assert len(sums) == 1, "one scan of the day's usage for the three budgets"
+    step = max(i for i, s in enumerate(seen[: sums[0]]) if s.startswith("SAVEPOINT"))
+    lock = next(
+        i
+        for i, s in enumerate(seen)
+        if i > step and re.search(r"FROM run\b", s) and "FOR UPDATE" in s
+    )
+    assert sums[0] < lock, "the step locked the run's row before summing the day"

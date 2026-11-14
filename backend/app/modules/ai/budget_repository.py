@@ -7,8 +7,9 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import ColumnElement, func, literal, or_, select, tuple_
+from sqlalchemy import ColumnElement, bindparam, func, literal, or_, select, true, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
@@ -110,6 +111,42 @@ class BudgetRepository:
         )
         rows = (await self.session.execute(stmt)).all()
         return {r[0]: _spent(r[1], r[2], r[3]) for r in rows}
+
+    async def spent_on(
+        self,
+        scopes: Collection[BudgetScope],
+        user_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+    ) -> dict[BudgetScope, Spent]:
+        """The use in [start, end) of the organisation, the person and the agent, for
+        the scopes asked, in one scan: each scope's sums `FILTER`ed from the rows of
+        the span (all of the organisation's if it is asked, else the person's and the
+        agent's)."""
+        only = {
+            BudgetScope.ORGANISATION: true(),
+            BudgetScope.USER: UsageRecord.user_id == user_id,
+            BudgetScope.AGENT: UsageRecord.agent_id == agent_id,
+        }
+        asked = [scope for scope in BudgetScope if scope in scopes]
+        if not asked:
+            return {}
+        columns: list[ColumnElement[Any]] = []
+        for scope in asked:
+            where = only[scope]
+            tokens = func.sum(UsageRecord.tokens_in + UsageRecord.tokens_out).filter(where)
+            calls = func.count().filter(where) - func.count(UsageRecord.cost).filter(where)
+            columns += [func.coalesce(tokens, 0), func.sum(UsageRecord.cost).filter(where), calls]
+        rows = select(*columns).where(  # the day inline: a plan that knows the span
+            UsageRecord.org_id == self.org_id,
+            UsageRecord.created_at >= bindparam("start", start, literal_execute=True),
+            UsageRecord.created_at < bindparam("end", end, literal_execute=True),
+        )
+        if BudgetScope.ORGANISATION not in asked:
+            rows = rows.where(or_(only[BudgetScope.USER], only[BudgetScope.AGENT]))
+        row = (await self.session.execute(rows)).one()
+        return {scope: _spent(*row[3 * i : 3 * i + 3]) for i, scope in enumerate(asked)}
 
     async def agents(self, after: tuple[str, uuid.UUID] | None, limit: int) -> list[Agent]:
         """The organisation's agents (personal ones too) by name, then id."""

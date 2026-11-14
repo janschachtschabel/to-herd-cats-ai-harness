@@ -28,7 +28,8 @@ Bounds (module review M6, findings 3 and 14; review 2, finding 8):
 - Each step that writes sets the run's lease when it commits (`RunSteps.keep`): the
   worker's renewal passes over a row a step holds.
 - A daily budget reached (`ai/budgets.py`) ends the run with `budget` before the next
-  model call; a call already sent is never cut (plan M7 decision 10)."""
+  model call (summed before the run's row lock; the other checks come first); a call
+  already sent is never cut (plan M7 decision 10)."""
 
 import asyncio
 import time
@@ -64,7 +65,7 @@ from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSp
 from app.modules.agents.toolbox.policy import Grant, effective
 from app.modules.agents.working import Lost, Suspended, Unit, Working, once_more, units_of
 from app.modules.ai.budgets import budget_exhausted, has_price
-from app.modules.ai.models import AiConnection, DataLocation, UsageRecord
+from app.modules.ai.models import AiConnection, BudgetScope, DataLocation, UsageRecord
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.ai.usage import record_usage
 from app.modules.automations import runs as automation_runs
@@ -98,13 +99,17 @@ class RunHost:
     async def _admit(self) -> float:
         """The checks before a model call, and a place in the rate window (0.0)."""
         async with self.unit() as session:
+            steps = RunSteps(session, self.run.claimed)
+            await steps.limit_time(STEP_LOCK_TIMEOUT_SECONDS, STEP_STATEMENT_TIMEOUT_SECONDS)
+            connection = await steps.connection(self.run.connection_id)
+            spent = await self._exhausted(session, connection)  # before the row lock
             steps, _, agent = await self._owned(session)
             await self._actor(session, agent)
-            connection = await steps.connection(self.run.connection_id)
             if connection is None:
                 raise Halt("rights_revoked")
             await self._policy(session, connection.data_location)
-            await self._budget(session, connection)
+            if spent is not None:
+                raise Halt("budget", detail=spent.value)
             return await steps.take_rate(connection.id, connection.requests_per_minute)
 
     async def after_model_call(self, step: int, reply: Reply) -> None:
@@ -254,13 +259,15 @@ class RunHost:
         if now.blocked or not connection_allowed(location, policy):
             raise Halt("policy_blocked")
 
-    async def _budget(self, session: AsyncSession, connection: AiConnection) -> None:
-        """No daily budget of the organisation, the person or the agent is reached."""
+    async def _exhausted(
+        self, session: AsyncSession, connection: AiConnection | None
+    ) -> BudgetScope | None:
+        """The daily budget of the organisation, the person or the agent that is
+        reached, if one is; summed before the step locks the run's row, so the sum
+        never holds a cancel or the lease's renewal (module review M7, finding 9)."""
         c = self.run.claimed
         priced = has_price(connection, self.run.model)
-        scope = await budget_exhausted(session, c.org_id, c.user_id, c.agent_id, priced=priced)
-        if scope is not None:
-            raise Halt("budget", detail=scope.value)
+        return await budget_exhausted(session, c.org_id, c.user_id, c.agent_id, priced=priced)
 
     async def _location(self, steps: RunSteps) -> DataLocation:
         connection = await steps.connection(self.run.connection_id)
