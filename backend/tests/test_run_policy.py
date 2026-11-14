@@ -4,17 +4,19 @@ the tests search the log for a secret word from the space. `none` spaces and pag
 locked for AI are not there for a tool at all. The policy is read again before every
 model call, so a change during a run counts."""
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from app.core.permissions import SpaceRole
 from app.modules.agents.models import EventKind, RunEvent, StopReason
 from app.modules.ai.models import AiPolicy
 from app.modules.spaces.models import Space, SpaceKind
+from app.modules.tickets.models import WorkItem
 from app.modules.wiki.models import Page
 from app.runtime.models import wrap_model
 from tests.factories_agents import Bench
@@ -149,4 +151,67 @@ async def test_a_policy_changed_during_the_run_counts(bench: Bench, make_space: 
     executor = bench.executor(make_model=lambda target, timeout: wrap_model(FunctionModel(model)))
     await bench.say("Read it")
     assert await bench.run_next(executor) == StopReason.POLICY_BLOCKED
+    assert len(calls) == 2 and SECRET in calls[1]
+
+
+async def _moved_during_run(
+    bench: Bench, first: ToolCallPart, change: Callable[[], Awaitable[None]]
+) -> tuple[StopReason | None, list[str]]:
+    """Read with `first`, then `change` while the model "thinks" about the next step;
+    returns the stop and what each call sent (finding 3)."""
+    calls: list[str] = []
+
+    async def model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        calls.append(str(messages))
+        if len(calls) == 1:
+            return ModelResponse(parts=[first])
+        if len(calls) == 2:
+            await change()
+            return ModelResponse(parts=[ToolCallPart("search", {"query": "x"}, tool_call_id="c2")])
+        return ModelResponse(parts=[TextPart("sent again")])
+
+    executor = bench.executor(make_model=lambda target, timeout: wrap_model(FunctionModel(model)))
+    await bench.say("Read it")
+    return await bench.run_next(executor), calls
+
+
+@pytest.mark.parametrize("where", ["none", "unreadable", "trash"])
+async def test_a_page_moved_after_it_was_read_counts_where_it_is_now(
+    bench: Bench, make_space: MakeSpace, where: str
+) -> None:
+    _, page = await space_with_page(bench, make_space, AiPolicy.ANY)
+    if where == "none":
+        target, _ = await space_with_page(bench, make_space, AiPolicy.NONE, title="Other")
+    else:  # a space the agent is no member of
+        target = await make_space(SpaceKind.TEAM, members=[(bench.people.users["alice"], "editor")])
+
+    async def change() -> None:
+        values = {"trashed_at": func.now()} if where == "trash" else {"space_id": target.id}
+        await bench.session.execute(update(Page).where(Page.id == page["id"]).values(**values))
+
+    first = ToolCallPart("read_page", {"page_id": page["id"]}, tool_call_id="c1")
+    reason, calls = await _moved_during_run(bench, first, change)
+    expected = StopReason.RIGHTS_REVOKED if where == "unreadable" else StopReason.POLICY_BLOCKED
+    assert reason == expected
+    assert len(calls) == 2  # the third call, with the page's text again, never went out
+
+
+async def test_a_ticket_moved_after_it_was_read_counts_where_it_is_now(
+    bench: Bench, make_space: MakeSpace
+) -> None:
+    space, _ = await space_with_page(bench, make_space, AiPolicy.ANY, body="-")
+    target, _ = await space_with_page(bench, make_space, AiPolicy.ANY, title="Other")
+    there = await new_ticket(bench.people.alice, target.id, "There")
+    target.ai_policy = AiPolicy.NONE
+    ticket = await new_ticket(bench.people.alice, space.id, "Zebra", description_md=SECRET)
+
+    async def change() -> None:
+        values = {"space_id": target.id, "status_id": there["status"]["id"]}
+        await bench.session.execute(
+            update(WorkItem).where(WorkItem.id == ticket["id"]).values(**values)
+        )
+
+    first = ToolCallPart("read_ticket", {"key": f"HC-{ticket['number']}"}, tool_call_id="c1")
+    reason, calls = await _moved_during_run(bench, first, change)
+    assert reason == StopReason.POLICY_BLOCKED
     assert len(calls) == 2 and SECRET in calls[1]

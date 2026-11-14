@@ -144,9 +144,12 @@ class RunHost:
         return actor
 
     async def _policy(self, session: AsyncSession, location: DataLocation) -> None:
-        reads = ReadRepository(session, self.run.claimed.org_id)
-        policy = strictest([ANY, *await reads.policies(self.run.reads.spaces)])
-        if not connection_allowed(location, policy) or await reads.any_locked(self.run.reads.pages):
+        """The strictest current policy of every space read from, where it was read
+        and where its page or ticket is now."""
+        repo = ReadRepository(session, self.run.claimed.org_id)
+        now = await repo.now(self.run.reads)
+        policy = strictest([ANY, *await repo.policies(self.run.reads.spaces | now.spaces)])
+        if now.blocked or not connection_allowed(location, policy):
             raise Halt("policy_blocked")
 
     async def _location(self, steps: RunSteps) -> DataLocation:

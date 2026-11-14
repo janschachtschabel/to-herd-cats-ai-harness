@@ -5,17 +5,21 @@ every step, in short transactions of its own, none of them open while the provid
 works.
 
 - Before every model call: the run is still this attempt's; the person still acts and
-  has `ai.use`, the agent may run, and every space read so far is still visible to the
-  person and the agent together (`actor.allowed_actor`; else `rights_revoked`); the
-  current policies of those spaces, with the conversation as `any`, allow the
-  connection's data location now, and no page read has been locked for AI since
-  (else `policy_blocked`); then a place in the connection's `requests_per_minute`.
+  has `ai.use`, the agent may run, and every space read so far, where it was read and
+  where its page or ticket is now, is still visible to the person and the agent
+  together (`actor.allowed_actor`; else `rights_revoked`); the current policies of
+  those spaces, with the conversation as `any`, allow the connection's data location
+  now, and no page read has been locked for AI, trashed or deleted since, nor a ticket
+  deleted (else `policy_blocked`); then a place in the connection's
+  `requests_per_minute`.
 - After every model call, in one transaction: the step's `run_event`, its usage
   (`record_usage`) and the step counter. The event's key (run, attempt, step) is
   unique and the transaction checks the attempt first, so a call is recorded once,
   whatever worker died when.
 - Every tool call: the rights again, the tool through the services with the run's
-  actor (`tools.py`), and its `run_event` with the full result.
+  actor (`tools.py`), and its `run_event` with the full result. A step that cannot be
+  recorded, or a tool that fails, ends the run with `error` at once (the call's usage
+  is still recorded).
 - The end, in one transaction: the answer (`kind=agent`, `client_id` = the run, so
   there is never a second one), or on any other stop a timeline notice in the DM
   (`run.stopped` with the reason, for the client to word); the run `done`.

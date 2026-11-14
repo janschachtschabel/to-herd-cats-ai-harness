@@ -28,10 +28,13 @@ from app.modules.users.repository import UserRepository
 @dataclass(slots=True)
 class Reads:
     """What the run has read so far: its policy and rights are checked against all of
-    it before every model call (the conversation itself counts as policy `any`)."""
+    it before every model call (the conversation itself counts as policy `any`). The
+    spaces as they were at read time, and the pages and tickets, whose spaces are
+    looked up again for every check (a page moved since counts where it is now)."""
 
     spaces: set[uuid.UUID] = field(default_factory=set)
     pages: set[uuid.UUID] = field(default_factory=set)
+    tickets: set[uuid.UUID] = field(default_factory=set)
 
 
 async def run_actor(
@@ -52,14 +55,15 @@ async def allowed_actor(
 ) -> Actor | None:
     """The run's actor if the run may go on (None: `rights_revoked`): the person acts
     and has `ai.use`, the agent may run (`standing.agent_refusal`), and every space read
-    so far is still visible to the person and the agent together."""
+    so far, where it was read and where it is now, is still visible to the person and
+    the agent together."""
     actor = await run_actor(session, org_id, user_id, agent.id)
     if actor is None or not await can(session, actor, Action.AI_USE):
         return None
     if await agent_refusal(session, org_id, agent) is not None:
         return None
-    if reads.spaces:
-        still = await ReadRepository(session, org_id).still_visible(actor, reads.spaces)
-        if still != reads.spaces:
-            return None
+    repo = ReadRepository(session, org_id)
+    spaces = reads.spaces | (await repo.now(reads)).spaces
+    if spaces and await repo.still_visible(actor, spaces) != spaces:
+        return None
     return actor

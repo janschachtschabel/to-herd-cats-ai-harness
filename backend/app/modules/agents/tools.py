@@ -63,11 +63,13 @@ class RunTools:
         for hit in hits:
             self.reads.spaces.add(hit.space_id)
             if isinstance(hit, SearchHit):
+                self.reads.pages.add(hit.id)
                 lines.append(
                     f"- page id={hit.id} title={hit.title!r} space={hit.space_name!r}\n"
                     f"  {hit.snippet}"
                 )
             else:
+                self.reads.tickets.add(hit.id)
                 lines.append(
                     f"- ticket key={ticket_key(hit.number)} title={hit.title!r} "
                     f"kind={hit.kind} status={hit.status.name!r} space={hit.space_name!r}\n"
@@ -95,6 +97,7 @@ class RunTools:
         except NotFound:
             return ToolResult("ticket", NOT_FOUND, {"key": key})
         self.reads.spaces.add(ticket.space_id)
+        self.reads.tickets.add(ticket.id)
         fields = [
             f"key: {ticket_key(ticket.number)}",
             f"title: {ticket.title}",
