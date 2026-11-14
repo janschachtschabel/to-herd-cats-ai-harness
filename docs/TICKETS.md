@@ -350,7 +350,7 @@ SQL-Ausdruck. Die Ticket-Liste hat dazu ihr eigenes Textfeld.
 | Hierarchie | höchstens drei Ebenen (Epic, Story, Aufgabe oder Fehler) |
 | Karten je Nachricht | höchstens drei |
 | Sprint | Name 1 bis 80 Zeichen, Ziel höchstens 500; je Bereich höchstens ein laufender |
-| Daily-Ansicht | höchstens 100 Personenzeilen, je Zelle zuerst 20 Karten (`limit` höchstens 100) |
+| Daily-Ansicht | höchstens 100 Personenzeilen, je Zelle zuerst 20 Karten (`limit` höchstens 20, sonst 422) |
 | Mein Board | je Spalte zuerst 50 Karten; „Erledigt“ nur die letzten 14 Tage |
 
 ### Bekannte Grenzen
@@ -377,7 +377,9 @@ SQL-Ausdruck. Die Ticket-Liste hat dazu ihr eigenes Textfeld.
   Personen auf einmal. Bei 21 Personen und 3.000 Tickets im Sprint sind das 1,4 MB und
   rund 0,2 s je Aufruf, unter zehn gleichzeitigen Aufrufen gut 2 s
   ([Steckbrief](STECKBRIEF.md#sprints-und-boards-m4b)). Jedes Ticket-Ereignis des
-  Bereichs lädt sie bei allen neu, die sie offen haben.
+  Bereichs lädt sie bei allen neu, die sie offen haben. Die Karten tragen keine
+  Beschreibung (die Datenbank liefert sie dafür nicht); die API sendet JSON ungepackt,
+  ein Proxy mit gzip verkleinert die Antwort deutlich.
 - **„Seit dem letzten Arbeitstag“ in UTC, Montag bis Freitag:** Ohne Zeitzone der
   Organisation beginnt der Tag um 0 Uhr UTC (in Deutschland 1 oder 2 Uhr), Feiertage
   kennt die Regel nicht.

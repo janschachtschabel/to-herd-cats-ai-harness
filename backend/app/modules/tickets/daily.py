@@ -29,6 +29,8 @@ from app.modules.tickets.statuses import status_repository
 from app.modules.tickets.view_repository import board_position
 from app.modules.tickets.views import Column, encode
 
+MAX_CELL = 20  # tickets per cell at most (module review M4b, finding 5)
+
 MAX_ROWS = 100
 WORKING_DAYS = range(5)  # Monday (0) to Friday (4)
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import defer
 
 from app.core.principal import PrincipalType
 from app.modules.tickets.listing import Filters
@@ -78,7 +79,12 @@ class DailyRepository(ViewRepository):
         )
         inner = self._filtered(ranked, filters).subquery()
         top = select(inner.c.id).where(inner.c.rank <= limit)
-        stmt = self._views().where(WorkItem.id.in_(top)).order_by(*BOARD_KEY)
+        stmt = (
+            self._views()
+            .where(WorkItem.id.in_(top))
+            .order_by(*BOARD_KEY)
+            .options(defer(WorkItem.description_md))  # a card shows no description
+        )
         for row in await self.session.execute(stmt):
             view = self._view(row)
             found[(view.ticket.assignee_id, view.ticket.status_id)].append(view)

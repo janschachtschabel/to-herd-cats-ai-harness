@@ -4,9 +4,10 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Query
 
 from app.core.actor import Actor
+from app.core.errors import ValidationFailed
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
-from app.modules.tickets.daily import DailyBoard
+from app.modules.tickets.daily import MAX_CELL, DailyBoard
 from app.modules.tickets.listing import Filters
 from app.modules.tickets.models import TicketKind
 from app.modules.tickets.router import (
@@ -50,7 +51,10 @@ async def board(
     space_id: uuid.UUID,
     actor: ActorDep,
     session: SessionDep,
-    limit: Annotated[int, Query(ge=1, le=100, description="tickets per column")] = 50,
+    limit: Annotated[
+        int | None,
+        Query(ge=1, le=100, description="tickets per column (50) or per cell (20, at most 20)"),
+    ] = None,
     assignee: AssigneeQuery = None,
     kind: TicketKind | None = None,
     tag: TagQuery = None,
@@ -62,11 +66,14 @@ async def board(
 ) -> BoardOut:
     """The space's statuses in order, each with its count and first tickets; with
     `group_by=assignee` (the daily view) a row per person instead, `limit` tickets per
-    cell."""
+    cell (20 unless asked, at most 20, else 422)."""
     filters = _filters(actor, assignee, kind, tag, epic, sprint)
     if group_by == "assignee":
-        return BoardOut.of_daily(await DailyBoard(session).board(actor, space_id, filters, limit))
-    columns = await TicketViews(session).board(actor, space_id, filters, limit)
+        if limit is not None and limit > MAX_CELL:
+            raise ValidationFailed(f"At most {MAX_CELL} tickets per cell", code="validation_failed")
+        daily = await DailyBoard(session).board(actor, space_id, filters, limit or MAX_CELL)
+        return BoardOut.of_daily(daily)
+    columns = await TicketViews(session).board(actor, space_id, filters, limit or 50)
     return BoardOut(columns=[BoardColumnOut.of(c) for c in columns])
 
 

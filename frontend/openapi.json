@@ -12802,7 +12802,7 @@
     },
     "/api/spaces/{space_id}/board": {
       "get": {
-        "description": "The space's statuses in order, each with its count and first tickets; with\n`group_by=assignee` (the daily view) a row per person instead, `limit` tickets per\ncell.",
+        "description": "The space's statuses in order, each with its count and first tickets; with\n`group_by=assignee` (the daily view) a row per person instead, `limit` tickets per\ncell (20 unless asked, at most 20, else 422).",
         "operationId": "board_api_spaces__space_id__board_get",
         "parameters": [
           {
@@ -12816,17 +12816,23 @@
             }
           },
           {
-            "description": "tickets per column",
+            "description": "tickets per column (50) or per cell (20, at most 20)",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 50,
-              "description": "tickets per column",
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "tickets per column (50) or per cell (20, at most 20)",
+              "title": "Limit"
             }
           },
           {

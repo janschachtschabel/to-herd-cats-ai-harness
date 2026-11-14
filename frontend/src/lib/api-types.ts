@@ -1302,7 +1302,7 @@ export interface paths {
          * Board
          * @description The space's statuses in order, each with its count and first tickets; with
          *     `group_by=assignee` (the daily view) a row per person instead, `limit` tickets per
-         *     cell.
+         *     cell (20 unless asked, at most 20, else 422).
          */
         get: operations["board_api_spaces__space_id__board_get"];
         put?: never;
@@ -8037,8 +8037,8 @@ export interface operations {
     board_api_spaces__space_id__board_get: {
         parameters: {
             query?: {
-                /** @description tickets per column */
-                limit?: number;
+                /** @description tickets per column (50) or per cell (20, at most 20) */
+                limit?: number | null;
                 /** @description `me`, a person's id, or `none`: assigned to nobody */
                 assignee?: string | null;
                 kind?: components["schemas"]["TicketKind"] | null;
