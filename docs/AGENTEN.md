@@ -212,9 +212,10 @@ gehört in die Anweisungen; Avatar und Ersatzmodell gibt es nicht.
 ### Stufen und Werkzeugfreigaben
 
 Neue Agenten haben Stufe 2; Agenten aus M5 wurden bei der Migration Stufe 1. Eine Stufe
-über 2 vergibt nur ein Admin oder wer jeden Bereich verwaltet, in dem der Agent Mitglied
-ist (sonst 403 `agent.level_denied`; ohne Bereiche nur Admins); `max_level` in `GET
-/api/agents/{id}/tools` nennt die höchste Stufe, die man selbst geben darf. Stufe 4
+über 2 vergibt nur ein Admin (sonst 403 `agent.level_denied`): Agenten der Organisation
+ändert ohnehin nur, wer `agent.manage` hat, und persönliche Agenten bleiben bei 2;
+`max_level` in `GET /api/agents/{id}/tools` nennt die höchste Stufe, die man selbst
+geben darf. Stufe 4
 (extern handeln) kommt mit M8.
 
 Die Stufe ist eine **Voreinstellung**: Jedes Werkzeug ab seiner Mindeststufe steht auf
