@@ -181,7 +181,7 @@
   },
   "agents": {
     "title": "Agenten",
-    "description": "KI-Mitarbeiter, mit denen Personen mit KI in einer Direktnachricht sprechen. In M5 lesen Agenten nur.",
+    "description": "KI-Mitarbeiter: Sie antworten in Direktnachrichten und arbeiten so weit, wie ihre Stufe und ihre Werkzeuge es erlauben.",
     "noConnection": "Erst eine KI-Verbindung einrichten: Ein Agent braucht ein Modell.",
     "empty": "Noch keine Agenten.",
     "listLabel": "Agenten",

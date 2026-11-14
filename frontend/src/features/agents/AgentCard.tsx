@@ -1,4 +1,5 @@
-import { Bot, Pause, Pencil, Play, Trash2 } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Bot, Pause, Pencil, Play, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +33,10 @@ export function AgentCard({
           <Bot className="size-4 text-muted-foreground" aria-hidden />
           {agent.name}
         </h2>
-        <Badge variant={STATUS_VARIANT[agent.status]}>{t(`agents.status.${agent.status}`)}</Badge>
+        <span className="flex flex-wrap gap-1">
+          <Badge variant="outline">{t('agents.level.badge', { level: agent.level })}</Badge>
+          <Badge variant={STATUS_VARIANT[agent.status]}>{t(`agents.status.${agent.status}`)}</Badge>
+        </span>
       </div>
       {agent.intro && <p className="text-sm text-muted-foreground">{agent.intro}</p>}
       <p className="text-xs text-muted-foreground">
@@ -44,6 +48,12 @@ export function AgentCard({
         <Button size="sm" variant="outline" onClick={onEdit}>
           <Pencil aria-hidden />
           {t('actions.edit')}
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/admin/agents/$agentId" params={{ agentId: agent.id }}>
+            <SlidersHorizontal aria-hidden />
+            {t('agents.admin.open')}
+          </Link>
         </Button>
         <Button
           size="sm"

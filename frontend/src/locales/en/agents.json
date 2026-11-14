@@ -1,0 +1,106 @@
+{
+  "agents": {
+    "admin": {
+      "open": "Level, tools, skills",
+      "back": "All agents"
+    },
+    "level": {
+      "title": "Autonomy level",
+      "badge": "Level {{level}}",
+      "hint": "The level decides which tools the agent may use on its own. Below, single tools can be restricted further, never widened.",
+      "names": {
+        "1": "Level 1: read only",
+        "2": "Level 2: propose",
+        "3": "Level 3: write internally"
+      },
+      "explain": {
+        "1": "Reads pages, tickets and the conversation, and answers. Changes nothing.",
+        "2": "Reads like level 1, proposes changes to pages, comments and creates tickets. A person accepts proposals.",
+        "3": "Like level 2, writes pages directly (only in spaces that allow it), hands tickets on and writes messages in conversations it is a member of."
+      },
+      "withheld": "Only an admin, or whoever manages every space of the agent, gives level 3 (with no spaces, only an admin).",
+      "save": "Save level"
+    },
+    "tools": {
+      "title": "Tools",
+      "hint": "Each tool is allowed from a level up. Here it can only be tightened: only after a person approves, or blocked altogether.",
+      "tableLabel": "Tools of the agent",
+      "tool": "Tool",
+      "effective": "In effect",
+      "entry": "Restriction",
+      "entryFor": "Grant for {{name}}",
+      "fromLevel": "from level {{level}}",
+      "unavailable": "Not available: needs level {{level}}",
+      "effects": {
+        "read": "reads",
+        "propose": "proposes",
+        "write": "writes"
+      },
+      "grants": {
+        "allow": "Allowed",
+        "confirm": "After approval",
+        "block": "Blocked"
+      },
+      "choices": {
+        "default": "As the level (allowed)",
+        "confirm": "Only after approval",
+        "block": "Blocked"
+      },
+      "save": "Save grants",
+      "names": {
+        "search": "Search",
+        "read_page": "Read a page",
+        "read_ticket": "Read a ticket",
+        "list_tree": "Look at the page tree",
+        "list_versions": "Look at versions",
+        "search_tickets": "Search tickets",
+        "read_conversation": "Read the conversation",
+        "search_past_runs": "Search earlier runs",
+        "submit_result": "Hand in a result",
+        "load_skill": "Load a skill",
+        "ask_user": "Ask a question",
+        "propose_page_change": "Propose a change to a page",
+        "propose_new_page": "Propose a new page",
+        "comment_ticket": "Comment on a ticket",
+        "set_ticket_status": "Set a ticket's status (up to “In review”)",
+        "create_ticket": "Create a ticket",
+        "link_ticket_page": "Link a ticket to a page",
+        "update_memory": "Keep its memory",
+        "propose_skill": "Propose a skill",
+        "update_page": "Change a page directly",
+        "assign_ticket": "Hand a ticket on",
+        "post_message": "Write a message"
+      }
+    },
+    "spaces": {
+      "title": "Spaces",
+      "hint": "The agent works here with the role shown. Members are added in a space's settings.",
+      "listLabel": "Spaces of the agent",
+      "empty": "In no space yet. It still reads open spaces."
+    },
+    "skills": {
+      "title": "Skills",
+      "hint": "In a run the agent knows each skill's name and description and loads the text when it needs it.",
+      "listLabel": "Skills of the agent",
+      "empty": "No skills yet.",
+      "assign": "Assign skills",
+      "assignTitle": "Assign skills",
+      "assignHint": "Offered are the active skills you can see.",
+      "search": "Search skills by name",
+      "noneOffered": "No matching skills.",
+      "removeNamed": "Remove skill {{name}}",
+      "unavailable": {
+        "archived": "Not available: the skill is archived.",
+        "unreachable": "Not available: the agent does not read this skill's space."
+      }
+    }
+  },
+  "errors": {
+    "agent": {
+      "level_denied": "Only an admin, or whoever manages every space of the agent, gives level 3.",
+      "tool_unknown": "This tool does not exist (any more). Please reload.",
+      "skill_not_assignable": "At least one skill cannot be given to this agent (unknown, or outside its spaces).",
+      "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them."
+    }
+  }
+}

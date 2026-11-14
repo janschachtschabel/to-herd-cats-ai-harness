@@ -181,7 +181,7 @@
   },
   "agents": {
     "title": "Agents",
-    "description": "AI staff that people with AI talk to in a direct message. In M5 agents only read.",
+    "description": "AI colleagues: they answer in direct messages and work as far as their level and tools allow.",
     "noConnection": "Set up an AI connection first: an agent needs a model.",
     "empty": "No agents yet.",
     "listLabel": "Agents",

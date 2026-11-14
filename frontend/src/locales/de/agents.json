@@ -1,0 +1,106 @@
+{
+  "agents": {
+    "admin": {
+      "open": "Stufe, Werkzeuge, Skills",
+      "back": "Alle Agenten"
+    },
+    "level": {
+      "title": "Autonomiestufe",
+      "badge": "Stufe {{level}}",
+      "hint": "Die Stufe legt fest, welche Werkzeuge der Agent von sich aus nutzen darf. Einzelne Werkzeuge lassen sich darunter weiter einschränken, nie erweitern.",
+      "names": {
+        "1": "Stufe 1: nur lesen",
+        "2": "Stufe 2: vorschlagen",
+        "3": "Stufe 3: intern schreiben"
+      },
+      "explain": {
+        "1": "Liest Seiten, Tickets und das Gespräch und antwortet. Ändert nichts.",
+        "2": "Liest wie Stufe 1, schlägt Änderungen an Seiten vor, kommentiert und legt Tickets an. Vorschläge nimmt ein Mensch an.",
+        "3": "Wie Stufe 2, schreibt Seiten direkt (nur in Bereichen, die das erlauben), übergibt Tickets und schreibt Nachrichten in Gespräche, in denen er Mitglied ist."
+      },
+      "withheld": "Stufe 3 vergibt nur ein Admin oder wer jeden Bereich des Agenten verwaltet (ohne Bereiche nur ein Admin).",
+      "save": "Stufe speichern"
+    },
+    "tools": {
+      "title": "Werkzeuge",
+      "hint": "Jedes Werkzeug ist ab einer Stufe erlaubt. Hier lässt es sich nur verschärfen: nur nach Freigabe durch einen Menschen, oder ganz gesperrt.",
+      "tableLabel": "Werkzeuge des Agenten",
+      "tool": "Werkzeug",
+      "effective": "Wirksam",
+      "entry": "Einschränkung",
+      "entryFor": "Freigabe für {{name}}",
+      "fromLevel": "ab Stufe {{level}}",
+      "unavailable": "Nicht verfügbar: braucht Stufe {{level}}",
+      "effects": {
+        "read": "liest",
+        "propose": "schlägt vor",
+        "write": "schreibt"
+      },
+      "grants": {
+        "allow": "Erlaubt",
+        "confirm": "Nach Freigabe",
+        "block": "Gesperrt"
+      },
+      "choices": {
+        "default": "Wie die Stufe (erlaubt)",
+        "confirm": "Nur nach Freigabe",
+        "block": "Gesperrt"
+      },
+      "save": "Freigaben speichern",
+      "names": {
+        "search": "Suchen",
+        "read_page": "Seite lesen",
+        "read_ticket": "Ticket lesen",
+        "list_tree": "Seitenbaum ansehen",
+        "list_versions": "Versionen ansehen",
+        "search_tickets": "Tickets suchen",
+        "read_conversation": "Gespräch lesen",
+        "search_past_runs": "Frühere Läufe durchsuchen",
+        "submit_result": "Ergebnis abgeben",
+        "load_skill": "Skill laden",
+        "ask_user": "Rückfrage stellen",
+        "propose_page_change": "Änderung an einer Seite vorschlagen",
+        "propose_new_page": "Neue Seite vorschlagen",
+        "comment_ticket": "Ticket kommentieren",
+        "set_ticket_status": "Ticketstatus setzen (bis „Zur Prüfung“)",
+        "create_ticket": "Ticket anlegen",
+        "link_ticket_page": "Ticket mit Seite verknüpfen",
+        "update_memory": "Gedächtnis pflegen",
+        "propose_skill": "Skill vorschlagen",
+        "update_page": "Seite direkt ändern",
+        "assign_ticket": "Ticket übergeben",
+        "post_message": "Nachricht schreiben"
+      }
+    },
+    "spaces": {
+      "title": "Bereiche",
+      "hint": "Hier arbeitet der Agent mit der genannten Rolle. Mitglieder fügt man in den Einstellungen eines Bereichs hinzu.",
+      "listLabel": "Bereiche des Agenten",
+      "empty": "Noch in keinem Bereich. Offene Bereiche liest er trotzdem."
+    },
+    "skills": {
+      "title": "Skills",
+      "hint": "Im Lauf kennt der Agent Name und Beschreibung und lädt den Text, wenn er ihn braucht.",
+      "listLabel": "Skills des Agenten",
+      "empty": "Noch keine Skills.",
+      "assign": "Skills zuweisen",
+      "assignTitle": "Skills zuweisen",
+      "assignHint": "Angeboten werden die aktiven Skills, die du siehst.",
+      "search": "Skills nach Name suchen",
+      "noneOffered": "Keine passenden Skills.",
+      "removeNamed": "Skill {{name}} entfernen",
+      "unavailable": {
+        "archived": "Nicht verfügbar: Der Skill ist archiviert.",
+        "unreachable": "Nicht verfügbar: Der Agent liest den Bereich dieses Skills nicht."
+      }
+    }
+  },
+  "errors": {
+    "agent": {
+      "level_denied": "Stufe 3 vergibt nur ein Admin oder wer jeden Bereich des Agenten verwaltet.",
+      "tool_unknown": "Dieses Werkzeug gibt es nicht (mehr). Bitte neu laden.",
+      "skill_not_assignable": "Mindestens ein Skill lässt sich diesem Agenten nicht zuweisen (unbekannt oder außerhalb seiner Bereiche).",
+      "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben."
+    }
+  }
+}
