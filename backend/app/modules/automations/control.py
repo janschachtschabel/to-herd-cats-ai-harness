@@ -67,7 +67,9 @@ class AutomationControl:
         agent = await AgentRepository(self.session, actor.org_id).get(automation.agent_id)
         assert agent is not None  # the automation goes with its agent
         place = await AutomationRepository(self.session, actor.org_id).place(automation)
-        if not await owner_may_run(self.session, automation.owner_user_id, agent, place):
+        if not await owner_may_run(
+            self.session, automation.owner_user_id, agent, place, automation.kind
+        ):
             raise Conflict(code="automation.owner_unable")
         automation.state = AutomationState.ACTIVE
         automation.paused_reason = None

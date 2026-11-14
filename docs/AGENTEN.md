@@ -192,8 +192,8 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
   Tiefe 3 (Übergaben zählen mit); eine Regel reagiert nie auf das, was ihr eigener Lauf
   an seinem Objekt getan hat.
 - **Angehalten:** von Hand, oder vom System: wenn die Eigentümerin die Aufgabe nicht mehr
-  ausführen darf (nicht mehr aktiv, keine KI mehr, erreicht Agent oder Ort nicht mehr)
-  oder wenn drei Läufe in Folge nicht zu Ende kamen. Wer betroffen ist, bekommt eine
+  ausführen darf (nicht mehr aktiv, keine KI mehr, erreicht Agent oder Ort nicht mehr;
+  bei einer Ereignis-Regel auch, wenn sie den Bereich nicht mehr verwaltet) oder wenn drei Läufe in Folge nicht zu Ende kamen. Wer betroffen ist, bekommt eine
   Aktivität (die verantwortliche Person des Agenten und die Verwaltenden des Bereichs
   bzw. bei Fehlschlägen die Eigentümerin). Rechte wandern nie still: Wer die Aufgabe
   selbst anlegen dürfte, kann sie **übernehmen** und wird Eigentümerin.
@@ -478,9 +478,9 @@ einer Aufgabe. Was man nicht sieht, antwortet wie eine unbekannte ID (404).
 | Aktion | wer |
 |---|---|
 | anlegen | wer `ai.use` hat, den Agenten erreicht und am Ort schreiben darf; im Kanal und am Ticket muss der Agent Mitglied des Bereichs sein; Ereignis-Regeln nur, wer den Bereich verwaltet; persönliche Agenten nur ihre Eigentümerin, in ihrer Direktnachricht oder ihrem persönlichen Bereich |
-| ändern, jetzt ausführen | nur die Eigentümerin (wer ändert, verantwortet den Auftrag) |
+| ändern, jetzt ausführen | nur die Eigentümerin (wer ändert, verantwortet den Auftrag), solange sie die Aufgabe selbst anlegen dürfte |
 | anhalten, fortsetzen, löschen | die Eigentümerin, die Verwaltenden des Bereichs ihres Ortes, `agent.manage` |
-| übernehmen | wer sie sieht und sie selbst anlegen dürfte |
+| übernehmen | wer sie sieht und sie selbst anlegen dürfte (eine Ereignis-Regel also nur, wer den Bereich verwaltet) |
 | ansehen, Protokoll | wer sie sieht |
 
 Wer sie sieht, aber die Aktion nicht darf (etwa die verantwortliche Person des Agenten),

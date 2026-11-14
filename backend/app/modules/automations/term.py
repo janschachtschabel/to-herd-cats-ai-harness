@@ -8,7 +8,8 @@ In this order:
 
 - The agent not active (paused, or a draft): no run, `skipped_paused_agent`.
 - The owner may no longer run it (`standing.owner_may_run`: deactivated, no
-  `ai.use`, the agent or the place out of reach): the automation is paused
+  `ai.use`, the agent or the place out of reach, an event rule's space no longer
+  managed): the automation is paused
   (`paused_reason = owner`, `pausing.py`), nothing is logged and it keeps the term.
 - The agent may not run for another reason (its responsible person inactive, its
   connection unavailable, personal agents switched off): `skipped_paused_agent`.
@@ -84,7 +85,7 @@ async def fire(
     agent = await AgentRepository(session, automation.org_id).get(automation.agent_id)
     assert agent is not None  # the automation goes with its agent
     if agent.status == AgentStatus.ACTIVE and not await owner_may_run(
-        session, automation.owner_user_id, agent, place
+        session, automation.owner_user_id, agent, place, automation.kind
     ):
         await pausing.pause(session, automation, PausedReason.OWNER)
         return Fired(automation.id, due_at, None, None, PausedReason.OWNER)

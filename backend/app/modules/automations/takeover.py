@@ -1,8 +1,9 @@
 """Taking an automation over (plan M7 decision 2): a person who could make it
 themselves (`standing.may_own`: `ai.use`, the agent within reach, writing at its
-place) becomes its owner; it runs on with their rights and their name, and a paused
-one resumes (its next term, if past, fires once). Rights never move without this
-explicit step. The route comes with the management API (task 7).
+place, and for an event rule managing its space) becomes its owner; it runs on with
+their rights and their name, and a paused one resumes (its next term, if past, fires
+once). Rights never move without this explicit step. The route comes with the
+management API (task 7).
 
 - Someone without `ai.use` sees no automations: 404 `automation.not_found`, as for
   an unknown id.
@@ -42,7 +43,7 @@ async def take_over(
     agent = await AgentRepository(session, actor.org_id).get(automation.agent_id)
     assert agent is not None  # the automation goes with its agent
     place = await repo.place(automation)
-    if not await may_own(session, actor, agent, place):
+    if not await may_own(session, actor, agent, place, automation.kind):
         raise Forbidden(code="automation.not_allowed")
     before = automation.owner_user_id
     automation.owner_user_id = actor.principal.id

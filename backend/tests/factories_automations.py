@@ -7,6 +7,8 @@ from typing import Any
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import SpaceRole
+from app.core.principal import Principal
 from app.modules.agents.models import Run, RunState, StopReason
 from app.modules.automations.firing import Fired, fire_next
 from app.modules.automations.models import (
@@ -16,7 +18,9 @@ from app.modules.automations.models import (
     AutomationState,
     PausedReason,
 )
+from app.modules.messaging.models import Conversation
 from app.modules.messaging.notification_models import Notification
+from app.modules.spaces.repository import SpaceRepository
 from tests.factories_agents import Bench
 
 HOURLY = "0 * * * *"
@@ -166,8 +170,14 @@ async def ruled(
     instruction: str = "Sieh dir an, was neu ist.",
 ) -> Automation:
     """An event rule of the bench's agent at the place (a channel or a ticket's thread),
-    owned by `owner`."""
+    owned by `owner`, who manages the place's space (as an event rule's owner must,
+    `standing.may_own`)."""
     person = bench.people.users[owner]
+    conversation = await bench.session.get(Conversation, uuid.UUID(str(conversation_id)))
+    assert conversation is not None and conversation.space_id is not None
+    await SpaceRepository(bench.session).set_member(
+        conversation.space_id, Principal.user(person.id), SpaceRole.ADMIN
+    )
     row = Automation(
         org_id=person.org_id,
         owner_user_id=person.id,

@@ -10,6 +10,10 @@ its owner) and may write at its place:
   (`channel.post`; a ticket's thread also needs `ticket.read`) and the agent is a
   member (a personal agent is a member only of its owner's personal space).
 
+An event rule (`kind = event`) lives only in a channel or a ticket's thread, and its
+owner must manage that space (`space.manage`): the one rule for making, changing,
+taking over and keeping one (review M7, finding 1).
+
 The due loop asks it of the owner at every term (`owner_may_run`): a deactivated
 owner, or one who lost any of it, pauses the automation (`paused_reason = owner`); it
 never runs with rights its owner no longer has, and rights never move to someone
@@ -35,6 +39,7 @@ from app.modules.agents.standing import owned_by
 from app.modules.ai.models import AiConnection
 from app.modules.ai.policy import ANY, connection_allowed, strictest
 from app.modules.auth.context import AuthContext
+from app.modules.automations.models import AutomationKind
 from app.modules.messaging.models import Conversation, ConversationKind
 from app.modules.messaging.visibility import ConversationReader
 from app.modules.users.repository import UserRepository
@@ -51,9 +56,16 @@ async def person(session: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID) -
 
 
 async def may_own(
-    session: AsyncSession, actor: Actor, agent: Agent, conversation: Conversation
+    session: AsyncSession,
+    actor: Actor,
+    agent: Agent,
+    conversation: Conversation,
+    kind: AutomationKind,
 ) -> bool:
     if conversation.kind not in PLACES or conversation.org_id != actor.org_id:
+        return False
+    event = kind == AutomationKind.EVENT
+    if event and conversation.kind == ConversationKind.DM:
         return False
     if not await can(session, actor, Action.AI_USE):
         return False
@@ -68,6 +80,8 @@ async def may_own(
         return False
     if not await can(session, actor, Action.CHANNEL_POST, conversation.space_id):
         return False
+    if event and not await can(session, actor, Action.SPACE_MANAGE, conversation.space_id):
+        return False
     members = await AgentRepository(session, actor.org_id).member_space_ids(agent.id)
     return conversation.space_id in members
 
@@ -77,9 +91,10 @@ async def owner_may_run(
     owner_id: uuid.UUID,
     agent: Agent,
     conversation: Conversation,
+    kind: AutomationKind,
 ) -> bool:
     actor = await person(session, agent.org_id, owner_id)
-    return actor is not None and await may_own(session, actor, agent, conversation)
+    return actor is not None and await may_own(session, actor, agent, conversation, kind)
 
 
 async def _alone_with(

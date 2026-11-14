@@ -9,19 +9,18 @@ there. The same rules hold when its owner changes it (`service.update`).
   (404 `ticket.not_found`; the thread is opened if the ticket has none yet).
 - In a channel or a ticket's thread the agent must be a member of the space (422
   `automation.agent_not_member`; a personal agent is one only of its owner's personal
-  space). Then `standing.may_own`: the person may post there (403
-  `automation.not_allowed`).
-- An event rule needs a channel or a ticket's thread (422 `automation.invalid_place`),
-  and the person must manage the space (`space.manage`, 403
-  `automation.not_allowed`); a tag filter names a system tag or one of that space
-  (422 `automation.invalid_filter`).
+  space). Then `standing.may_own`: the person may post there, and for an event rule
+  manage the space (`space.manage`) (403 `automation.not_allowed`).
+- An event rule needs a channel or a ticket's thread (422 `automation.invalid_place`);
+  a tag filter names a system tag or one of that space (422
+  `automation.invalid_filter`).
 """
 
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, can
+from app.core.access import Actor
 from app.core.errors import Forbidden, ValidationFailed
 from app.modules.agents.models import Agent
 from app.modules.agents.repository import AgentRepository
@@ -69,13 +68,11 @@ async def check(
         members = await AgentRepository(session, actor.org_id).member_space_ids(agent.id)
         if place.space_id not in members:
             raise ValidationFailed(code="automation.agent_not_member")
-    if not await may_own(session, actor, agent, place):
+    if not await may_own(session, actor, agent, place, planned.kind):
         raise Forbidden(code="automation.not_allowed")
     if planned.kind != AutomationKind.EVENT:
         return
     assert place.space_id is not None
-    if not await can(session, actor, Action.SPACE_MANAGE, place.space_id):
-        raise Forbidden(code="automation.not_allowed")
     tag_id: uuid.UUID | None = planned.columns["filter_tag_id"]
     repo = ManageRepository(session, actor.org_id)
     if tag_id is not None and not await repo.tag_fits(tag_id, place.space_id):
