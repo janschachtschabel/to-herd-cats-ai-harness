@@ -1,6 +1,8 @@
 // Starts the app as it runs in production with role all (`python -m app.launch`: API,
-// SPA from frontend/dist, collab process as its child) on a scratch database, and
-// returns the teardown that stops it and drops the database.
+// SPA from frontend/dist, collab process as its child) on a scratch database, and a
+// local stand-in for an AI provider (the OpenAI stub of the backend tests, on the
+// public port + 3: no real provider, no network), and returns the teardown that stops
+// both and drops the database.
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,6 +13,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BACKEND = join(ROOT, "backend");
 const DIST = join(ROOT, "frontend", "dist");
 export const OWNER = { email: "anna@e2e.example", password: "e2e-password-123" };
+/** The server key for `enc:` secrets (the AI connections' keys) in the scratch app. */
+const SECRET_KEY = "e2e-secret-key-".padEnd(48, "k");
 
 function psql(adminUrl, sql) {
   execFileSync("psql", [adminUrl, "-qc", sql], { stdio: "ignore" });
@@ -58,12 +62,21 @@ export default async function globalSetup() {
       HERD_STATIC_DIR: DIST,
       HERD_DATA_DIR: dataDir,
       HERD_LOG_FORMAT: "text",
+      HERD_SECRET_KEY: SECRET_KEY,
     },
   });
+  const stub = spawn(
+    "uv",
+    ["run", "--no-sync", "python", "-m", "tests.support.openai_stub", "--port", String(port + 3)],
+    { cwd: BACKEND, stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore" },
+  );
   const exited = new Promise((resolve) => app.once("exit", resolve));
+  const stubExited = new Promise((resolve) => stub.once("exit", resolve));
   const teardown = async () => {
     if (app.exitCode === null) app.kill("SIGTERM");
+    if (stub.exitCode === null) stub.kill("SIGTERM");
     await exited;
+    await stubExited;
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
   };
@@ -71,6 +84,7 @@ export default async function globalSetup() {
     const deadline = Date.now() + 90_000;
     await ready(`http://127.0.0.1:${port + 1}/ready`, deadline);
     await ready(`http://127.0.0.1:${port + 2}/health`, deadline);
+    await ready(`http://127.0.0.1:${port + 3}/_stub/log`, deadline);
   } catch (error) {
     await teardown();
     throw error;
