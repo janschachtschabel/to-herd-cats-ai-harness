@@ -204,6 +204,9 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
 - **Fortsetzen** holt einen verpassten Termin einmal nach. **Jetzt ausführen** (nur die
   Eigentümerin, nicht für Ereignis-Regeln) löst einen Termin außer der Reihe aus, mit
   denselben Prüfungen. **Löschen** entfernt die Aufgabe; ihre Läufe bleiben einsehbar.
+  Die Zeile bleibt als Verlauf mit ihrem Auftrag gespeichert (der Lauf und sein
+  Protokoll verweisen darauf; jeder gestartete Termin hält eine Kopie 90 Tage), nur
+  angezeigt und ausgeführt wird sie nicht mehr.
 - **Übersprungen** wird ein Termin, wenn der vorige Lauf noch arbeitet, der Agent
   angehalten ist, der Ort archiviert oder für diese KI gesperrt ist, ein Tagesbudget
   erreicht ist, ein Heartbeat nach einem Ausfall außerhalb seiner Stunden käme oder eine
@@ -503,7 +506,10 @@ ausführen dürfte; sonst bleibt nur die Übernahme.
 **Obergrenze:** höchstens `HERD_AI_AUTOMATIONS_MAX` (Standard 20, 0 bis 1.000) aktive
 oder angehaltene Aufgaben je Eigentümerin; erledigte und gelöschte zählen nicht. Die
 Grenze gilt auch, wenn eine erledigte einmalige Aufgabe einen neuen Zeitpunkt bekommt
-(sie ist dann wieder aktiv) und bei der Übernahme (409 `automation.limit`).
+(sie ist dann wieder aktiv) und bei der Übernahme (409 `automation.limit`). Wer im Bereich nur
+liest, aber `ai.use` hat und den Agenten erreicht, kann bis zu dieser Grenze Aufgaben
+in jeden Kanal legen, in dem der Agent Mitglied ist; die Verwaltenden des Bereichs
+sehen, halten an und löschen sie.
 **Budgets** begrenzen den Verbrauch je Tag für die Organisation, eine Person oder einen
 Agenten ([`KI.md`](KI.md#budgets-apiaibudgets-aimanage)); Aufgaben haben kein eigenes
 Budget, ihr Verbrauch zählt bei ihrer Eigentümerin und ihrem Agenten.

@@ -20,14 +20,13 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, can
 from app.core.outbox import Acting, Event, EventActor, emit
 from app.core.principal import Principal
 from app.modules.agents.repository import AgentRepository
 from app.modules.automations.manage_repository import ManageRepository
 from app.modules.automations.models import Automation
 from app.modules.automations.repository import AutomationRepository
-from app.modules.automations.sight import sight_of
+from app.modules.automations.sight import sees, sight_of
 from app.modules.automations.standing import person
 
 CHANGED = "automation.updated"  # the change, for the worker
@@ -93,9 +92,4 @@ async def _sees(
     if actor is None:
         return False
     sight = await sight_of(session, actor)
-    if not sight.sees:
-        return False
-    if sight.manages_all or user_id in (automation.owner_user_id, responsible):
-        return True
-    space_id = event.space_id
-    return space_id is not None and await can(session, actor, Action.SPACE_MANAGE, space_id)
+    return await sees(session, sight, automation.owner_user_id, responsible, event.space_id)

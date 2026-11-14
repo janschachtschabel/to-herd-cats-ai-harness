@@ -107,12 +107,12 @@ class ReviewRepository:
         stmt = due_pages(now).where(Page.org_id == org_id, Page.id.in_(list(page_ids)))
         return set(await self.session.scalars(stmt))
 
-    async def mark_reviewed(self, page_id: uuid.UUID, at: datetime) -> None:
+    async def mark_reviewed(self, org_id: uuid.UUID, page_id: uuid.UUID, at: datetime) -> None:
         """Reviewed now; reminders start again. Neither `version` nor `updated_at`
         moves: nothing of the page changed."""
         stmt = (
             update(Page)
-            .where(Page.id == page_id)
+            .where(Page.org_id == org_id, Page.id == page_id)
             .values(reviewed_at=at, review_notified_at=None, updated_at=Page.updated_at)
         )
         await self.session.execute(stmt)

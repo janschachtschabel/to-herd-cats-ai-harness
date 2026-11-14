@@ -2,6 +2,7 @@
 space's review interval (set by those who manage the space), `reviewed_at` set on
 publishing, whether the review is due, "mark as reviewed" and the tree's filter."""
 
+import uuid
 from datetime import timedelta
 from typing import Any
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models_base import utcnow
 from app.modules.audit.models import AuditLog
 from app.modules.wiki.models import Page
+from app.modules.wiki.review_repository import ReviewRepository
 from tests.factories_wiki import Wiki, new_page, publish
 
 
@@ -185,3 +187,19 @@ async def test_the_tree_filters_due_pages(wiki: Wiki, session: AsyncSession) -> 
         f"/api/spaces/{wiki.space_id}/pages/tree", params={"review_due": "true"}
     )
     assert r.status_code == 404  # a team space the outsider cannot see
+
+
+async def test_marking_as_reviewed_touches_only_its_organisations_page(
+    wiki: Wiki, session: AsyncSession
+) -> None:
+    """Rule 2: the statement itself is scoped by the organisation (review M7 finding 14)."""
+    page = await _published(wiki, "Fremd")
+    await _age(session, page["id"], 40)
+    before = await session.scalar(select(Page.reviewed_at).where(Page.id == page["id"]))
+    await ReviewRepository(session).mark_reviewed(uuid.uuid4(), uuid.UUID(page["id"]), utcnow())
+    after = await session.scalar(
+        select(Page.reviewed_at)
+        .where(Page.id == page["id"])
+        .execution_options(populate_existing=True)
+    )
+    assert after == before

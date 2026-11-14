@@ -50,7 +50,7 @@ class ReviewService:
         await reader.require_in_space(actor, Action.PAGE_EDIT, page)
         if page.status != PageStatus.PUBLISHED:
             raise Conflict(code="page.not_published")
-        await self.reviews.mark_reviewed(page.id, self.clock.now())
+        await self.reviews.mark_reviewed(actor.org_id, page.id, self.clock.now())
         await record(self.session, actor, "page.reviewed", "page", page.id)
         await self.session.refresh(page)
         return page

@@ -8,6 +8,9 @@ listed only while its recipient may still see what it names.
   the agent's responsible person, and the people who manage the space of its place
   (`space.manage` there; a DM has no space).
 
+`seen` is the rule over an automation's columns (lists, activity); `sees` asks it of
+one automation's values (its live events).
+
 Imports nothing of messaging, so messaging may import it.
 """
 
@@ -15,7 +18,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, false, or_, true
+from sqlalchemy import ColumnElement, Select, false, literal, or_, select, true
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can, space_ids_with
@@ -51,3 +55,20 @@ def seen(
         responsible_id == sight.person_id,
         space_id.in_(sight.managed_ids),
     )
+
+
+async def sees(
+    session: AsyncSession,
+    sight: AutomationSight,
+    owner_id: uuid.UUID,
+    responsible_id: uuid.UUID | None,
+    space_id: uuid.UUID | None,
+) -> bool:
+    """The rule (`seen`) for one automation's values."""
+    rule = seen(
+        sight,
+        literal(owner_id, PG_UUID(as_uuid=True)),
+        literal(responsible_id, PG_UUID(as_uuid=True)),
+        literal(space_id, PG_UUID(as_uuid=True)),
+    )
+    return bool(await session.scalar(select(rule)))

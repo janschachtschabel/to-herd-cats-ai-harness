@@ -27,6 +27,7 @@ from sqlalchemy import (
     cast,
     column,
     exists,
+    false,
     func,
     literal,
     or_,
@@ -139,22 +140,24 @@ class ActivityRepository:
         about_skill = and_(Notification.skill_proposal_id.is_not(None), sees_skill)
         automation, agent = AUTOMATION.alias("seen_automation"), AGENT.alias("seen_agent")
         place = aliased(Conversation)
-        sees_automation = (
-            exists()
-            .where(
-                automation.c.id == Notification.automation_id,
-                automation.c.state != "deleted",  # deleted through the API: gone
-                agent.c.id == automation.c.agent_id,
-                place.id == automation.c.conversation_id,
-                automation_seen(
-                    self.automations,
-                    automation.c.owner_user_id,
-                    agent.c.responsible_user_id,
-                    place.space_id,
-                ),
+        sees_automation: ColumnElement[bool] = false()  # sees none: no sub-select at all
+        if self.automations.sees:
+            sees_automation = (
+                exists()
+                .where(
+                    automation.c.id == Notification.automation_id,
+                    automation.c.state != "deleted",  # deleted through the API: gone
+                    agent.c.id == automation.c.agent_id,
+                    place.id == automation.c.conversation_id,
+                    automation_seen(
+                        self.automations,
+                        automation.c.owner_user_id,
+                        agent.c.responsible_user_id,
+                        place.space_id,
+                    ),
+                )
+                .correlate_except(automation, agent, place)
             )
-            .correlate_except(automation, agent, place)
-        )
         about_automation = and_(Notification.automation_id.is_not(None), sees_automation)
         return and_(
             Notification.org_id == self.scope.org_id,
