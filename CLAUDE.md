@@ -215,8 +215,8 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   A ticket's sprint belongs to its space (foreign key `(sprint_id, space_id)`); lock
   sprints before tickets.
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
-  shared API helpers in `demo_api.py`) goes through the public API only; extend it and
-  its test with each milestone.
+  `demo_ai.py`, shared API helpers in `demo_api.py`) goes through the public API only;
+  extend it and its test with each milestone.
 - AI and agents:
   - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
     else does.

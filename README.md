@@ -277,6 +277,13 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=dem
   uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
 ```
 
+Mit einem Modell legt dasselbe Skript auch Agenten bei der Arbeit an (Hilda und Otto in
+„Team Nord“, ein Gespräch, ein Ticket bis „Zur Prüfung“, ein offener Vorschlag, eine
+Gedächtnisseite und eine wartende Freigabe): `HERD_DEMO_AI_KIND` schaltet das ein
+(`local`, `openai` oder `openai_compatible`, dazu `HERD_DEMO_AI_URL`; mit dem Stub
+außerdem `HERD_DEMO_AI_STUB`, damit die Demo seine Antworten vorgibt). Einzelheiten in
+`backend/scripts/demo_ai.py`.
+
 ### KI ausprobieren
 
 Ohne echten Anbieter geht es mit dem Stub aus den Tests (`backend/tests/support/openai_stub.py`;
