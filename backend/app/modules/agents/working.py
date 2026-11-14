@@ -42,6 +42,7 @@ class Working:
     seq: int = 0  # the last recorded; the journal counts on across take-ups
     tools: list[ToolSpec] = field(default_factory=list)  # allowed at the take-up
     reply_to: uuid.UUID | None = None  # the thread it answers in (`place.py`)
+    event_rule: bool = False  # an event rule's run (`toolbox/policy.watched`)
 
 
 Unit = Callable[[], AbstractAsyncContextManager[AsyncSession]]

@@ -59,6 +59,7 @@ from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.ai.budget_metrics import budget_stops
 from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
+from app.modules.automations.models import AutomationKind
 from app.runtime import context, models
 from app.runtime.loop import Outcome, Recorded, run_loop
 
@@ -147,6 +148,7 @@ class Executor:
                 seq=journal.seq,
                 tools=tools,
                 reply_to=found.reply_to,
+                event_rule=found.automation_kind == AutomationKind.EVENT,
             )
         instructions = context.instructions(
             agent.name,

@@ -192,7 +192,16 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
   wieder; was dazwischen geschieht, bekommt der nächste Lauf als Anzahl, nicht einzeln.
   **Tiefe:** Lösen Agenten mit ihren Läufen weitere Regeln aus, endet die Kette bei
   Tiefe 3 (Übergaben zählen mit); eine Regel reagiert nie auf das, was ihr eigener Lauf
-  an seinem Objekt getan hat.
+  an seinem Objekt getan hat. **Freigabe:** Was ein anderer ins Objekt schreibt (der Titel
+  eines Tickets, eine Seite), liest das Modell im Lauf der Eigentümerin. Deshalb fragt
+  dort jedes direkt schreibende Werkzeug der Stufe 3 (`update_page`, `assign_ticket`,
+  `post_message`), das sonst ohne Rückfrage liefe (`allow`), die Eigentümerin um
+  Freigabe (wie `confirm`, eine Karte am Ort und eine Aktivität). Werkzeuge der Stufe 2
+  (Tickets anlegen, kommentieren, Status, Vorschläge, Gedächtnis) bleiben, wie sie dem
+  Agenten erlaubt sind, damit Ketten von Regeln ohne Freigabe weiterlaufen; die Antwort
+  des Laufs in seinem Thread braucht keine. **Budget:** Läufe einer Ereignis-Regel gehen
+  auf das Budget der Eigentümerin (und des Agenten), nicht auf das der Person, die das
+  Ereignis ausgelöst hat.
 - **Angehalten:** von Hand, oder vom System: wenn die Eigentümerin die Aufgabe nicht mehr
   ausführen darf (nicht mehr aktiv, keine KI mehr, erreicht Agent oder Ort nicht mehr;
   bei einer Ereignis-Regel auch, wenn sie den Bereich nicht mehr verwaltet) oder wenn drei Läufe in Folge nicht zu Ende kamen. Wer betroffen ist, bekommt eine
@@ -933,6 +942,11 @@ Bereich des Ereignisses, je Regel gesperrt in fester Reihenfolge:
    (mit allen noch wartenden). Jeder Termin beginnt eine neue Ruhezeit; ohne wartende
    Ereignisse hat eine Regel keinen Termin und ist nie erledigt. Eine angehaltene Regel
    verpasst, was in ihrer Pause geschieht; Ereignisse, die schon warteten, behält sie.
+7. **Freigabe im Lauf:** Im Lauf einer Ereignis-Regel wird jedes Werkzeug der Stufe 3,
+   dessen Erlaubnis `allow` ist, wie `confirm` behandelt (`toolbox/policy.watched`,
+   geprüft vom Schritt-Host bei jedem Aufruf; `Working.event_rule` aus der Art der
+   Aufgabe). Die Freigabe geht an die Eigentümerin (die fragende Person des Laufs).
+   Stufe 2 bleibt unverändert (Review M7, Befund 8).
 
 Die Termine, die der Handler feuert, gehen durch dieselben Prüfungen (`term.fire`) und
 zählen in derselben Metrik, sobald seine Zustellung festgeschrieben ist.

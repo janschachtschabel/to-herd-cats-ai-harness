@@ -62,7 +62,7 @@ from app.modules.agents.step_records import (
     tool_content,
 )
 from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSpec, Wait
-from app.modules.agents.toolbox.policy import Grant, effective
+from app.modules.agents.toolbox.policy import Grant, effective, watched
 from app.modules.agents.working import Lost, Suspended, Unit, Working, once_more, units_of
 from app.modules.ai.budgets import budget_exhausted, has_price
 from app.modules.ai.models import AiConnection, BudgetScope, DataLocation, UsageRecord
@@ -228,10 +228,11 @@ class RunHost:
 
     async def _granted(self, session: AsyncSession, agent: Agent, spec: ToolSpec) -> Grant:
         """The tool is still allowed to the agent as it is now (level and entries):
-        `allow`, or `confirm` (a person releases each call, `approvals/gate.py`)."""
+        `allow`, or `confirm` (a person releases each call, `approvals/gate.py`; in an
+        event rule's run every direct write, `policy.watched`)."""
         entries = await AgentRepository(session, agent.org_id).tool_entries(agent.id)
         entry = Grant(entries[spec.name]) if spec.name in entries else None
-        grant = effective(agent.level, spec, entry)
+        grant = watched(effective(agent.level, spec, entry), spec, event_rule=self.run.event_rule)
         if grant == Grant.BLOCK:
             raise Halt("rights_revoked")
         return grant

@@ -8,6 +8,11 @@
 - A run offers the model the tools whose effective grant is `allow` or `confirm`; a
   call of a `confirm` tool waits for a person's release (`approvals/gate.py`, plan M6
   task 7). `block` is never offered.
+- In an event rule's run (`watched`) a tool of level 3 (`UNWATCHED_LEVEL`: a direct
+  write) whose grant is `allow` becomes `confirm`: the text of whoever caused the
+  event reaches the model with the owner's rights, so the owner releases each such
+  call (review M7, finding 8). Level 2 (tickets, comments, proposals) stays as
+  granted, so chains of rules go on; the run's own answer is no tool call.
 - A level above 2 is given only by an admin. (Spec 8.2 also names whoever manages every
   space of the agent; but changing an organisation's agent at all needs
   `agent.manage`, which only admins hold, and a personal agent stays at 2, so that
@@ -27,9 +32,11 @@ __all__ = [
     "default_grant",
     "effective",
     "may_grant_level",
+    "watched",
 ]
 
 FREE_LEVEL = 2  # up to this level anyone who may change the agent sets it
+UNWATCHED_LEVEL = 3  # from this level a tool writes directly (spec 8.2)
 
 
 def default_grant(level: int, spec: ToolSpec) -> Grant:
@@ -40,6 +47,14 @@ def effective(level: int, spec: ToolSpec, entry: Grant | None) -> Grant:
     grant = default_grant(level, spec)
     if entry is not None and entry.strictness > grant.strictness:
         return entry
+    return grant
+
+
+def watched(grant: Grant, spec: ToolSpec, *, event_rule: bool) -> Grant:
+    """The grant in a run: in an event rule's run a direct write that is `allow` asks
+    its owner (`confirm`)."""
+    if event_rule and spec.level >= UNWATCHED_LEVEL and grant == Grant.ALLOW:
+        return Grant.CONFIRM
     return grant
 
 
