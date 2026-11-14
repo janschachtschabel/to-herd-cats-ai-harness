@@ -9,12 +9,15 @@ from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.automations.control import AutomationControl
 from app.modules.automations.schemas import (
     AutomationCreate,
     AutomationOut,
+    AutomationUpdate,
     FiringOut,
     PreviewIn,
     PreviewOut,
+    VersionIn,
 )
 from app.modules.automations.service import AutomationService, AutomationView
 from app.modules.automations.views import automation_out, firing_out
@@ -72,6 +75,42 @@ async def get_automation(
     automation_id: uuid.UUID, actor: ActorDep, session: SessionDep
 ) -> AutomationOut:
     return automation_out(await AutomationService(session).get(actor, automation_id))
+
+
+@automations.patch("/{automation_id}", response_model=AutomationOut)
+async def update_automation(
+    automation_id: uuid.UUID, body: AutomationUpdate, actor: ActorDep, session: SessionDep
+) -> AutomationOut:
+    """Its words or its schedule (its owner only; the kind stays)."""
+    return automation_out(await AutomationService(session).update(actor, automation_id, body))
+
+
+@automations.post("/{automation_id}/pause", response_model=AutomationOut)
+async def pause_automation(
+    automation_id: uuid.UUID, body: VersionIn, actor: ActorDep, session: SessionDep
+) -> AutomationOut:
+    view = await AutomationControl(session).pause(actor, automation_id, body.version)
+    return automation_out(view)
+
+
+@automations.post("/{automation_id}/resume", response_model=AutomationOut)
+async def resume_automation(
+    automation_id: uuid.UUID, body: VersionIn, actor: ActorDep, session: SessionDep
+) -> AutomationOut:
+    """Runs again (`paused_reason` cleared, failures counted anew)."""
+    view = await AutomationControl(session).resume(actor, automation_id, body.version)
+    return automation_out(view)
+
+
+@automations.delete("/{automation_id}", status_code=204)
+async def delete_automation(
+    automation_id: uuid.UUID,
+    version: Annotated[int, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+) -> None:
+    """Gone for the API and never due again; its runs stay as history."""
+    await AutomationControl(session).delete(actor, automation_id, version)
 
 
 @automations.get("/{automation_id}/firings", response_model=Page[FiringOut])

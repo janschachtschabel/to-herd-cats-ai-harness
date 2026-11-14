@@ -1021,10 +1021,18 @@ export interface paths {
         get: operations["get_automation_api_automations__automation_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Automation
+         * @description Gone for the API and never due again; its runs stay as history.
+         */
+        delete: operations["delete_automation_api_automations__automation_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Automation
+         * @description Its words or its schedule (its owner only; the kind stays).
+         */
+        patch: operations["update_automation_api_automations__automation_id__patch"];
         trace?: never;
     };
     "/api/automations/{automation_id}/firings": {
@@ -1041,6 +1049,43 @@ export interface paths {
         get: operations["automation_log_api_automations__automation_id__firings_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause Automation */
+        post: operations["pause_automation_api_automations__automation_id__pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automations/{automation_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Automation
+         * @description Runs again (`paused_reason` cleared, failures counted anew).
+         */
+        post: operations["resume_automation_api_automations__automation_id__resume_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3460,7 +3505,20 @@ export interface components {
          * AutomationState
          * @enum {string}
          */
-        AutomationState: "active" | "paused" | "done";
+        AutomationState: "active" | "paused" | "done" | "deleted";
+        /**
+         * AutomationUpdate
+         * @description Only its owner; the kind stays (422 `automation.kind_immutable`); a new schedule
+         *     computes the next term anew.
+         */
+        AutomationUpdate: {
+            /** Instruction */
+            instruction?: string | null;
+            /** Schedule */
+            schedule?: (components["schemas"]["OnceIn"] | components["schemas"]["RecurringIn"] | components["schemas"]["HeartbeatIn"] | components["schemas"]["EventIn"]) | null;
+            /** Version */
+            version: number;
+        };
         /**
          * BoardCellOut
          * @description A person's tickets in one status: how many, how many changed status since the
@@ -9519,6 +9577,72 @@ export interface operations {
             };
         };
     };
+    delete_automation_api_automations__automation_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_automation_api_automations__automation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     automation_log_api_automations__automation_id__firings_get: {
         parameters: {
             query?: {
@@ -9540,6 +9664,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_FiringOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_automation_api_automations__automation_id__pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_automation_api_automations__automation_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationOut"];
                 };
             };
             /** @description Validation Error */

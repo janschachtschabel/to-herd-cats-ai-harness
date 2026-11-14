@@ -76,6 +76,7 @@ AUTOMATION = table(
     column("paused_reason", String),
     column("owner_user_id", Uuid),
     column("conversation_id", Uuid),
+    column("state", String),
 )
 # Its agent's responsible person, for who may see it (`automations/sight.py`).
 AGENT = table("agent", column("id", Uuid), column("responsible_user_id", Uuid))
@@ -142,6 +143,7 @@ class ActivityRepository:
             exists()
             .where(
                 automation.c.id == Notification.automation_id,
+                automation.c.state != "deleted",  # deleted through the API: gone
                 agent.c.id == automation.c.agent_id,
                 place.id == automation.c.conversation_id,
                 automation_seen(

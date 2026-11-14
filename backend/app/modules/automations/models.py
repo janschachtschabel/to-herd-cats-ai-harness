@@ -21,7 +21,9 @@ Event rules come as a further kind with columns of its own.
 `state`: `active` (fires when due), `paused` (`paused_reason`: `manual`, `owner` (the
 owner lost a right the automation needs, plan M7 decision 2) or `failing` (three runs
 in a row did not end `completed`, decision 13); keeps its next term, fires nothing),
-`done` (a `once` that fired). `version` guards edits and the take-over (409).
+`done` (a `once` that fired), `deleted` (deleted through the API: it never fires
+again and the API shows it no more, but its runs, their journal and its log stay as
+history). `version` guards every change through the API and the take-over (409).
 
 `automation_firing`: the log, one row per term that came due (`due_at`, the term;
 `fired_at`, when the due loop took it): `started` with the run it started
@@ -92,6 +94,7 @@ class AutomationState(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
     DONE = "done"
+    DELETED = "deleted"  # gone for the API; its runs and log stay as history
 
 
 class PausedReason(StrEnum):
@@ -128,7 +131,8 @@ class Automation(UuidPk, OrgScoped, Base):
         CheckConstraint("cron IS NULL OR time_zone IS NOT NULL", name="cron_zone"),
         CheckConstraint("kind <> 'once' OR time_zone IS NULL", name="once_zone"),
         CheckConstraint(
-            "kind = 'event' OR (state = 'done') = (next_due_at IS NULL)", name="next_due"
+            "kind = 'event' OR state = 'deleted' OR (state = 'done') = (next_due_at IS NULL)",
+            name="next_due",
         ),
         CheckConstraint("state <> 'done' OR kind = 'once'", name="done"),
         CheckConstraint(

@@ -233,6 +233,10 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/agents/{agent_id}/automations", "agent"),
     ("GET", "/api/spaces/{space_id}/automations", "space"),
     ("GET", "/api/automations/{automation_id}/firings", "automation"),
+    ("PATCH", "/api/automations/{automation_id}", "automation"),
+    ("POST", "/api/automations/{automation_id}/pause", "automation"),
+    ("POST", "/api/automations/{automation_id}/resume", "automation"),
+    ("DELETE", "/api/automations/{automation_id}", "automation"),
 ]
 
 
@@ -252,6 +256,7 @@ def concrete(
         "/api/ai/assignments/users/{user_id}",
         "/api/ai/budgets/{budget_id}",
         "/api/agents/{agent_id}",
+        "/api/automations/{automation_id}",
     )
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -369,6 +374,9 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "instruction": "x",
         "schedule": {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"},
     },
+    ("PATCH", "/api/automations/{automation_id}"): {"instruction": "x", "version": 1},
+    ("POST", "/api/automations/{automation_id}/pause"): {"version": 1},
+    ("POST", "/api/automations/{automation_id}/resume"): {"version": 1},
     ("POST", "/api/automations/preview"): {
         "schedule": {"kind": "recurring", "cron": "0 9 * * *", "time_zone": "UTC"}
     },

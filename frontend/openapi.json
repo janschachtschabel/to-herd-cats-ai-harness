@@ -1826,10 +1826,72 @@
         "enum": [
           "active",
           "paused",
-          "done"
+          "done",
+          "deleted"
         ],
         "title": "AutomationState",
         "type": "string"
+      },
+      "AutomationUpdate": {
+        "additionalProperties": false,
+        "description": "Only its owner; the kind stays (422 `automation.kind_immutable`); a new schedule\ncomputes the next term anew.",
+        "properties": {
+          "instruction": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "event": "#/components/schemas/EventIn",
+                    "heartbeat": "#/components/schemas/HeartbeatIn",
+                    "once": "#/components/schemas/OnceIn",
+                    "recurring": "#/components/schemas/RecurringIn"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OnceIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecurringIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HeartbeatIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EventIn"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AutomationUpdate",
+        "type": "object"
       },
       "BoardCellOut": {
         "description": "A person's tickets in one status: how many, how many changed status since the\nboard's `changed_since`, the first of them in board order, and the cursor for more\n(`GET /api/spaces/{space_id}/board/{status_id}?assignee=<id>|none`).",
@@ -15437,6 +15499,50 @@
       }
     },
     "/api/automations/{automation_id}": {
+      "delete": {
+        "description": "Gone for the API and never due again; its runs stay as history.",
+        "operationId": "delete_automation_api_automations__automation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Automation",
+        "tags": [
+          "automations"
+        ]
+      },
       "get": {
         "operationId": "get_automation_api_automations__automation_id__get",
         "parameters": [
@@ -15474,6 +15580,58 @@
           }
         },
         "summary": "Get Automation",
+        "tags": [
+          "automations"
+        ]
+      },
+      "patch": {
+        "description": "Its words or its schedule (its owner only; the kind stays).",
+        "operationId": "update_automation_api_automations__automation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Automation",
         "tags": [
           "automations"
         ]
@@ -15546,6 +15704,113 @@
           }
         },
         "summary": "Automation Log",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/{automation_id}/pause": {
+      "post": {
+        "operationId": "pause_automation_api_automations__automation_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Automation",
+        "tags": [
+          "automations"
+        ]
+      }
+    },
+    "/api/automations/{automation_id}/resume": {
+      "post": {
+        "description": "Runs again (`paused_reason` cleared, failures counted anew).",
+        "operationId": "resume_automation_api_automations__automation_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Automation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Automation",
         "tags": [
           "automations"
         ]

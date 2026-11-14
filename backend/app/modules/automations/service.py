@@ -113,8 +113,8 @@ class AutomationService:
     async def update(
         self, actor: Actor, automation_id: uuid.UUID, body: AutomationUpdate
     ) -> AutomationView:
-        automation = await self.locked(actor, automation_id, body.version)
-        if automation.owner_user_id != actor.principal.id:
+        automation, view = await self.locked(actor, automation_id, body.version)
+        if not view.may_edit:
             raise Forbidden(code="automation.not_allowed")
         if body.schedule is not None and body.schedule.kind != automation.kind:
             raise ValidationFailed(code="automation.kind_immutable")
@@ -179,17 +179,18 @@ class AutomationService:
         cursor = encode_id_cursor(items[-1].id) if more else None
         return Page[AutomationFiring](items=items, next_cursor=cursor)
 
-    async def locked(self, actor: Actor, automation_id: uuid.UUID, version: int) -> Automation:
-        """The automation the caller sees, locked, at the version the caller read."""
-        await self.get(actor, automation_id)
-        automation = await AutomationRepository(self.session, actor.org_id).get(
-            automation_id, lock=True
-        )
-        if automation is None:
-            raise automation_not_found()
+    async def locked(
+        self, actor: Actor, automation_id: uuid.UUID, version: int
+    ) -> tuple[Automation, AutomationView]:
+        """The automation the caller sees, locked, at the version the caller read, and
+        how the caller sees it."""
+        repo = AutomationRepository(self.session, actor.org_id)
+        automation = await repo.get(automation_id, lock=True)
+        view = await self.get(actor, automation_id)
+        assert automation is not None  # seen
         if automation.version != version:
             raise version_conflict(automation.version)
-        return automation
+        return automation, view
 
     def repo(self, actor: Actor) -> ManageRepository:
         return ManageRepository(self.session, actor.org_id)

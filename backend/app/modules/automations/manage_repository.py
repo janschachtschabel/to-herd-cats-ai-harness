@@ -88,6 +88,7 @@ class ManageRepository:
             .join(Conversation, Conversation.id == Automation.conversation_id)
             .where(
                 Automation.org_id == self.org_id,
+                Automation.state != AutomationState.DELETED,
                 seen(
                     sight,
                     Automation.owner_user_id,
