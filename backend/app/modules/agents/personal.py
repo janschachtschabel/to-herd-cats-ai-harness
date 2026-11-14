@@ -8,10 +8,10 @@
 - **Owner and responsible**: the owner is the responsible person (another one: 422
   `agent.responsible_invalid`), and is billed: only the owner talks to the agent, so
   every run asks as the owner.
-- **Connection and model**: the owner's assignment (`ai/effective.py`), taken anew with
+- **Connection and model**: the owner's assignment (`ai/effective.py`), stored with
   every change (while the owner has AI); given ones must be those (422 `ai.connection_not_found`,
-  `ai.model_unknown`). While the owner's assignment differs, the agent does not run
-  (`agent.connection_unavailable`, `standing.py`) until it is saved again.
+  `ai.model_unknown`). A run takes the owner's assignment as it is when it starts
+  (`standing.run_target`), so a change by an admin applies from the next run.
 - **Level**: at most 2 (403 `agent.level_denied`), also when an admin sets it.
 - **Spaces**: a member (`editor`) of its owner's personal space only, from its creation;
   adding it to any other space is refused (422 `agent.personal_space_only`; to

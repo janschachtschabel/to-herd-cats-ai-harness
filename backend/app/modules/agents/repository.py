@@ -116,8 +116,9 @@ class AgentRepository:
         stmt = select(Agent.id, Agent.name).where(Agent.org_id == self.org_id, Agent.id.in_(ids))
         return {agent_id: name for agent_id, name in await self.session.execute(stmt)}
 
-    async def standing(self, agent: Agent) -> Standing:
-        """The agent's status, its responsible person and its connection, as now."""
+    async def standing(self, agent: Agent, connection_id: uuid.UUID, model: str) -> Standing:
+        """The agent's status, its responsible person, and the connection and model it
+        runs on (`standing.run_target`), as now."""
         responsible = (
             select(User.is_active)
             .where(User.org_id == self.org_id, User.id == agent.responsible_user_id)
@@ -128,8 +129,8 @@ class AgentRepository:
             func.coalesce(responsible, False),
             AiConnection.enabled,
             AiConnection.purpose.in_(("chat", "both")),
-            AiConnection.models.contains([agent.model]),
-        ).join(AiConnection, AiConnection.id == Agent.connection_id)
+            AiConnection.models.contains([model]),
+        ).join(AiConnection, AiConnection.id == connection_id)
         row = (await self.session.execute(stmt.where(Agent.id == agent.id))).one()
         return Standing(AgentStatus(row[0]), *(bool(v) for v in row[1:]))
 

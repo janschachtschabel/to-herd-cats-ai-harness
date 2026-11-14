@@ -63,7 +63,7 @@ from app.modules.agents.notices import announce, notice, notify
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
-from app.modules.agents.standing import refusal
+from app.modules.agents.standing import refusal, run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.policy import Grant, allowed
@@ -129,7 +129,9 @@ class Executor:
             actor = await allowed_actor(session, org, user, agent, journal.reads, conversation)
             if actor is None:
                 return Outcome("rights_revoked")
-            connection = await steps.connection(agent.connection_id)
+            uses = await run_target(session, org, agent)  # a personal agent: its owner's now
+            assert uses is not None  # agent_refusal checked it
+            connection = await steps.connection(uses.connection_id)
             assert connection is not None  # agent_refusal checked it
             location = DataLocation(connection.data_location)
             briefed = await briefing.brief(session, actor, agent, location, place_space)
@@ -138,7 +140,7 @@ class Executor:
             found = await place.asked(session, claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
-            target = _target(connection, agent.model)
+            target = _target(connection, uses.model)
             deadline = self.clock() + agent.max_runtime_seconds
             entries = await AgentRepository(session, org).tool_entries(agent.id)
             grants = {name: Grant(policy) for name, policy in entries.items()}

@@ -1,9 +1,9 @@
 """Who reaches a personal agent, and when it stops (plan M6 task 10): only its owner
 talks to it (DM, profile, directory hide it from everyone else, admins too); it stays
 in its owner's personal space (adding it anywhere else is refused, also for admins);
-its runs are billed to the owner; and it stops working when the owner loses AI, is
-deactivated, the organisation switches personal agents off, or the owner's model is
-no longer the agent's."""
+its runs are billed to the owner and use the owner's connection and model as they
+are when the run starts; and it stops working when the owner loses AI, is
+deactivated, or the organisation switches personal agents off."""
 
 import uuid
 from typing import Any
@@ -117,7 +117,9 @@ async def test_it_stops_when_personal_agents_are_switched_off(bench: Bench) -> N
     assert (await ask(bench, dm["id"], "Again"))["agent_run"]["id"] is not None
 
 
-async def test_it_follows_its_owners_model_only_when_saved_again(bench: Bench) -> None:
+async def test_it_follows_its_owners_assignment_at_the_next_run(bench: Bench) -> None:
+    """An admin changes the owner's assignment: the next run takes the owner's new
+    connection and model, without the agent being saved again (review M6 finding 13)."""
     agent = await pia(bench)
     dm = await open_agent_dm(bench.people.alice, agent)
     other = await make_connection(bench.people.admin, bench.stub, name="Other", models=["m9"])
@@ -127,16 +129,15 @@ async def test_it_follows_its_owners_model_only_when_saved_again(bench: Bench) -
         json={"target": {"connection_id": other["id"], "model": "m9"}, "version": None},
     )
     assert r.status_code == 200, r.text
-    refused = await ask(bench, dm["id"])
-    assert refused["agent_run"] == {
-        "id": None,
-        "reason": "agent.connection_unavailable",
-        "agent_id": str(agent.id),
-    }
-    saved = await bench.people.alice.patch(f"{AGENTS}/{agent.id}", json={"version": 1})
-    assert saved.status_code == 200, saved.text
-    assert (saved.json()["connection_id"], saved.json()["model"]) == (other["id"], "m9")
-    assert (await ask(bench, dm["id"], "Now?"))["agent_run"]["id"] is not None
+    assert await agent_refusal(bench.session, agent.org_id, agent) is None
+    posted = await ask(bench, dm["id"])
+    assert posted["agent_run"]["id"] is not None, posted
+    bench.stub.state.replies.append({"content": "Mit m9."})
+    assert await bench.run_next() == StopReason.COMPLETED
+    (sent,) = [q.body for q in bench.stub.state.log if q.path.endswith("/chat/completions")]
+    assert sent["model"] == "m9"
+    usage = (await bench.session.scalars(select(UsageRecord.connection_id))).all()
+    assert [str(c) for c in usage] == [other["id"]]
 
 
 async def test_a_run_for_anyone_but_its_owner_never_starts_nor_runs(

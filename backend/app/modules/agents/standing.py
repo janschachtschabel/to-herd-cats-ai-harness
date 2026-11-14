@@ -8,13 +8,17 @@ draft agent exists only for those with `agent.manage`.
 A message to an agent starts a run only if, at that moment, the person has `ai.use`,
 the agent is `active`, its responsible person is active and its connection is enabled,
 made for chat and still offers the agent's model. A personal agent (`personal.py`)
-answers only its owner, and only while the owner has AI, the organisation allows
-personal agents and the agent's connection and model are the owner's. Otherwise the message is kept
+answers only its owner, and only while the owner has AI and the organisation allows
+personal agents; it runs on the owner's connection and model as they are when the
+run starts (`run_target`), so an admin's change of the owner's assignment applies
+from the next run without saving the agent (review M6 finding 13). Otherwise the
+message is kept
 without a run and the answer says why, as a code the client words (`Refusal`). The
 run checks the same again before every model call (`modules/agents/actor.py`).
 """
 
 import uuid
+from dataclasses import dataclass
 from enum import StrEnum
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +41,21 @@ class Refusal(StrEnum):
     PERSONAL_DISABLED = "agent.personal_disabled"  # the organisation stopped personal agents
     NOT_FOUND = "agent.not_found"  # someone else's personal agent: not there for them
     HANDOVER_LIMIT = "run.handover_limit"  # a run at the chain's end hands over no more
+
+
+@dataclass(frozen=True, slots=True)
+class Target:
+    connection_id: uuid.UUID
+    model: str
+
+
+async def run_target(session: AsyncSession, org_id: uuid.UUID, agent: Agent) -> Target | None:
+    """The connection and model a run of the agent uses now: an organisation agent's
+    own; a personal agent's owner's effective assignment (None: the owner has no AI)."""
+    if agent.owner_user_id is None:
+        return Target(agent.connection_id, agent.model)
+    found = await effective_assignment(session, org_id, agent.owner_user_id)
+    return Target(found.connection_id, found.model) if found is not None else None
 
 
 def agent_not_found() -> NotFound:
@@ -62,12 +81,15 @@ def owned_by(agent: Agent, actor: Actor) -> bool:
 
 async def agent_refusal(session: AsyncSession, org_id: uuid.UUID, agent: Agent) -> Refusal | None:
     """Why the agent may not run now (None: it may). A personal agent also needs its
-    owner's AI, the organisation's switch, and the owner's connection and model."""
-    if agent.owner_user_id is not None:
-        why = await _personal_refusal(session, org_id, agent, agent.owner_user_id)
-        if why is not None:
-            return why
-    standing = await AgentRepository(session, org_id).standing(agent)
+    owner's AI and the organisation's switch; its connection is the owner's."""
+    target = await run_target(session, org_id, agent)
+    if target is None:
+        return Refusal.AI_UNAVAILABLE
+    if agent.owner_user_id is not None and not await personal_agents_allowed(session, org_id):
+        return Refusal.PERSONAL_DISABLED
+    standing = await AgentRepository(session, org_id).standing(
+        agent, target.connection_id, target.model
+    )
     if standing.status == AgentStatus.DRAFT:
         return Refusal.AGENT_DRAFT
     if standing.status == AgentStatus.PAUSED:
@@ -86,16 +108,3 @@ async def refusal(session: AsyncSession, actor: Actor, agent: Agent) -> Refusal 
     if not owned_by(agent, actor):
         return Refusal.NOT_FOUND
     return await agent_refusal(session, actor.org_id, agent)
-
-
-async def _personal_refusal(
-    session: AsyncSession, org_id: uuid.UUID, agent: Agent, owner: uuid.UUID
-) -> Refusal | None:
-    target = await effective_assignment(session, org_id, owner)
-    if target is None:
-        return Refusal.AI_UNAVAILABLE
-    if not await personal_agents_allowed(session, org_id):
-        return Refusal.PERSONAL_DISABLED
-    if (target.connection_id, target.model) != (agent.connection_id, agent.model):
-        return Refusal.CONNECTION_UNAVAILABLE
-    return None

@@ -351,9 +351,11 @@ Ein persönlicher Agent gehört einer Person (`owner_user_id`).
 - **Verwalten**: Die Besitzerin (mit `ai.use`) liest, ändert, pausiert und löscht ihre
   Agenten (Löschen nur ungenutzt, sonst 409 `agent.in_use`) und setzt ihre
   Werkzeugfreigaben, über dieselben Endpunkte wie `agent.manage`, mit `version` (409).
-  Jede Änderung übernimmt Verbindung und Modell neu aus ihrer Zuordnung: Ändert ein
-  Admin ihre Zuordnung, antwortet der Agent mit `agent.connection_unavailable`, bis er
-  einmal gespeichert wird (`PATCH` nur mit `version` genügt).
+  Jede Änderung übernimmt Verbindung und Modell neu aus ihrer Zuordnung. Ein Lauf nimmt
+  Verbindung und Modell der Besitzerin so, wie ihre Zuordnung beim Start des Laufs ist:
+  Ändert ein Admin ihre Zuordnung, arbeitet schon der nächste Lauf damit, ohne dass der
+  Agent gespeichert werden muss (ein laufender Lauf bleibt bei seiner). Hat sie keine KI
+  mehr, startet kein Lauf (`ai.unavailable`).
 - **Reden**: Nur die Besitzerin erreicht ihn: Direktnachricht, Profil, Verzeichnis und
   Erwähnungen verbergen ihn vor allen anderen, auch vor Admins (404
   `agent.not_found`). Läufe fragen daher immer als Besitzerin, ihre Rechte gelten, der
@@ -1075,8 +1077,10 @@ IDs, Zähler und Codes.
   Ticket) bis zu 72 Stunden; Erwähnungen dort antworten so lange „Lauf wartet“.
 - Wird ein Werkzeug während des Wartens gesperrt, bietet die Wiederaufnahme es nicht
   mehr an; der eingespielte Aufruf läuft nicht, der Lauf kann aber zu Ende kommen.
-- Ein persönlicher Agent, dessen Eigentümerin eine andere Zuordnung bekam, antwortet
-  `agent.connection_unavailable`, bis er einmal gespeichert wird.
+- Ein persönlicher Agent zählt für `max_concurrency` bei der Verbindung, die zuletzt an
+  ihm gespeichert wurde, auch wenn ein Lauf nach einer geänderten Zuordnung schon die
+  neue nutzt; die Anzeige von Verbindung und Modell am Agenten folgt ebenfalls erst beim
+  nächsten Speichern.
 - Für Agenten aus anderen Systemen (agentskills.io) sind Skripte in Skills nur Text;
   ein Werkzeug, das Code ausführt, gibt es nicht.
 
