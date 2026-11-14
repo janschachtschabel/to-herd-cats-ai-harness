@@ -21,7 +21,7 @@ from app.modules.messaging.models import MessageKind
 from app.modules.tickets.models import WorkItem
 from app.modules.tickets.thread_repository import TicketThreadRepository
 from tests.factories_agents import LEASE, Bench
-from tests.factories_automations import T0, fire, placed, runs_of
+from tests.factories_automations import T0, fire, placed, reload, runs_of
 from tests.factories_tools import call
 from tests.factories_writing import Work, events, messages_in
 from tests.test_run_replay import Crash, die_after, take_up_again
@@ -166,3 +166,18 @@ async def test_a_run_taken_up_again_asks_with_the_same_instruction(
     said = await bench.messages()
     assert said[-1]["body_md"] == "Fertig"
     assert len([m for m in said if m["kind"] == "agent"]) == 1
+
+
+async def test_its_owner_cancels_it_and_the_notice_goes_into_its_thread(work: Work) -> None:
+    bench, channel = work.bench, await _channel(work)
+    automation = await placed(bench, channel, instruction=ORDER)
+    fired = await fire(bench)
+    r = await bench.people.alice.post(f"/api/runs/{fired.run_id}/cancel")
+    assert r.status_code == 200, r.text
+    run = await bench.run_of(fired.run_id)
+    assert (run.state, run.stop_reason) == (RunState.DONE, StopReason.CANCELLED)
+    said = await messages_in(bench.session, channel)
+    (root,) = [m for m in said if m.parent_id is None]
+    (notice,) = [m for m in said if m.parent_id == root.id]
+    assert json.loads(notice.body_md)["to"] == "cancelled"
+    assert (await reload(bench.session, automation.id)).failures == 1  # not completed
