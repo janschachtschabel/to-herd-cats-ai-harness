@@ -1,9 +1,18 @@
 // Starts the app as it runs in production with role all (`python -m app.launch`: API,
-// SPA from frontend/dist, collab process as its child) on a scratch database, and a
-// local stand-in for an AI provider (the OpenAI stub of the backend tests, on the
+// SPA from frontend/dist, worker, collab process as its child) on a scratch database,
+// and a local stand-in for an AI provider (the OpenAI stub of the backend tests, on the
 // public port + 3: no real provider, no network), and returns the teardown that stops
 // both and drops the database.
+//
+// Restarting the worker (plan M6 task 13): in role all the worker runs in the app's
+// process, so a test restarts the app. The app is started as a process group of its
+// own (uv, python and the collab child); a control route on the public port + 4,
+// `POST /restart-app`, kills that group with SIGKILL (a crash: no orderly stop, the
+// runs in progress keep their lease), starts the app again on the same database and
+// answers once it is ready (`restartApp()` in tests/ai-helpers.mjs). The runs' lease is
+// 5 s here (HERD_RUN_LEASE_SECONDS), so the new worker takes a crashed run up soon.
 import { execFileSync, spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -48,47 +57,90 @@ export default async function globalSetup() {
   // For what the tests make through the backend itself (`seedProposal`): the workers
   // inherit this process's environment.
   process.env.HERD_E2E_DATABASE_URL = databaseUrl;
-  const app = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
-    cwd: BACKEND,
-    stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore",
-    env: {
-      ...process.env,
-      HERD_ROLE: "all",
-      HERD_ENVIRONMENT: "development",
-      HERD_DATABASE_URL: databaseUrl,
-      HERD_PUBLIC_PORT: String(port),
-      HERD_INTERNAL_PORT: String(port + 1),
-      HERD_COLLAB_PORT: String(port + 2),
-      HERD_COLLAB_URL: `ws://127.0.0.1:${port + 2}`,
-      HERD_INTERNAL_TOKEN: "e2e-".padEnd(48, "x"),
-      HERD_BOOTSTRAP_ADMIN_EMAIL: OWNER.email,
-      HERD_BOOTSTRAP_ADMIN_PASSWORD: OWNER.password,
-      HERD_STATIC_DIR: DIST,
-      HERD_DATA_DIR: dataDir,
-      HERD_LOG_FORMAT: "text",
-      HERD_SECRET_KEY: SECRET_KEY,
-    },
+  const appEnv = {
+    ...process.env,
+    HERD_ROLE: "all",
+    HERD_ENVIRONMENT: "development",
+    HERD_DATABASE_URL: databaseUrl,
+    HERD_PUBLIC_PORT: String(port),
+    HERD_INTERNAL_PORT: String(port + 1),
+    HERD_COLLAB_PORT: String(port + 2),
+    HERD_COLLAB_URL: `ws://127.0.0.1:${port + 2}`,
+    HERD_INTERNAL_TOKEN: "e2e-".padEnd(48, "x"),
+    HERD_BOOTSTRAP_ADMIN_EMAIL: OWNER.email,
+    HERD_BOOTSTRAP_ADMIN_PASSWORD: OWNER.password,
+    HERD_STATIC_DIR: DIST,
+    HERD_DATA_DIR: dataDir,
+    HERD_LOG_FORMAT: "text",
+    HERD_SECRET_KEY: SECRET_KEY,
+    HERD_RUN_LEASE_SECONDS: "5",
+  };
+  const startApp = () => {
+    const child = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
+      cwd: BACKEND,
+      stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore",
+      env: appEnv,
+      detached: true, // a process group of its own: the restart kills all of it
+    });
+    return { child, exited: new Promise((resolve) => child.once("exit", resolve)) };
+  };
+  const killGroup = (child, signal) => {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {
+      // already gone
+    }
+  };
+  let app = startApp();
+  // Should this process end without the teardown, the app's group goes with it.
+  const orphanGuard = () => killGroup(app.child, "SIGKILL");
+  process.once("exit", orphanGuard);
+  const appReady = async () => {
+    const deadline = Date.now() + 90_000;
+    await ready(`http://127.0.0.1:${port + 1}/ready`, deadline);
+    await ready(`http://127.0.0.1:${port + 2}/health`, deadline);
+  };
+  let restarting = Promise.resolve();
+  const control = createServer((request, response) => {
+    if (request.method !== "POST" || request.url !== "/restart-app") {
+      response.writeHead(404).end();
+      return;
+    }
+    restarting = restarting.then(async () => {
+      try {
+        killGroup(app.child, "SIGKILL");
+        await app.exited;
+        app = startApp();
+        await appReady();
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ pid: app.child.pid }));
+      } catch (error) {
+        response.writeHead(500).end(String(error));
+      }
+    });
   });
+  await new Promise((resolve) => control.listen(port + 4, "127.0.0.1", resolve));
   const stub = spawn(
     "uv",
     ["run", "--no-sync", "python", "-m", "tests.support.openai_stub", "--port", String(port + 3)],
     { cwd: BACKEND, stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore" },
   );
-  const exited = new Promise((resolve) => app.once("exit", resolve));
   const stubExited = new Promise((resolve) => stub.once("exit", resolve));
   const teardown = async () => {
-    if (app.exitCode === null) app.kill("SIGTERM");
+    control.closeAllConnections();
+    await new Promise((resolve) => control.close(resolve));
+    await restarting;
+    if (app.child.exitCode === null) killGroup(app.child, "SIGTERM");
     if (stub.exitCode === null) stub.kill("SIGTERM");
-    await exited;
+    await app.exited;
     await stubExited;
+    process.removeListener("exit", orphanGuard);
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
   };
   try {
-    const deadline = Date.now() + 90_000;
-    await ready(`http://127.0.0.1:${port + 1}/ready`, deadline);
-    await ready(`http://127.0.0.1:${port + 2}/health`, deadline);
-    await ready(`http://127.0.0.1:${port + 3}/_stub/log`, deadline);
+    await appReady();
+    await ready(`http://127.0.0.1:${port + 3}/_stub/log`, Date.now() + 90_000);
   } catch (error) {
     await teardown();
     throw error;

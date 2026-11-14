@@ -51,7 +51,8 @@ class LoggedRequest:
 class StubState:
     log: list[LoggedRequest] = field(default_factory=list)
     # Chat replies, in order: {"content": "..."} or {"tool_calls": [{"name", "arguments"}]};
-    # without one, the reply is "stub reply".
+    # without one, the reply is "stub reply". A reply's "delay" (seconds) is waited
+    # after it was taken from the queue: a request cut off meanwhile used up its reply.
     replies: deque[dict[str, Any]] = field(default_factory=deque)
     # Status codes for the next requests (any route but /_stub).
     failures: deque[int] = field(default_factory=deque)
@@ -88,8 +89,7 @@ def _vector(text: str, dimension: int) -> list[float]:
     return [v / norm for v in raw]
 
 
-def _chat(state: StubState, body: dict[str, Any]) -> dict[str, Any]:
-    reply = state.replies.popleft() if state.replies else {"content": "stub reply"}
+def _chat(reply: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
     message: dict[str, Any] = {"role": "assistant", "content": reply.get("content")}
     finish = "stop"
     if calls := reply.get("tool_calls"):
@@ -139,7 +139,10 @@ def build_app(state: StubState, prefix: str = "/v1") -> Starlette:
             data = [{"id": m, "object": "model", "owned_by": "stub"} for m in state.models]
             return JSONResponse({"object": "list", "data": data})
         if path == "/chat/completions" and isinstance(body, dict):
-            return JSONResponse(_chat(state, body))
+            reply = state.replies.popleft() if state.replies else {"content": "stub reply"}
+            if reply.get("delay"):
+                await asyncio.sleep(float(reply["delay"]))
+            return JSONResponse(_chat(reply, body))
         if path == "/embeddings" and isinstance(body, dict):
             inputs = body.get("input")
             texts = [inputs] if isinstance(inputs, str) else list(inputs or [])
