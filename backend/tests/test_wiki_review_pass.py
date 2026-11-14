@@ -83,7 +83,8 @@ async def test_a_due_page_is_reminded_once_per_interval(wiki: Wiki, session: Asy
     assert (event.subject_type, event.space_id) == ("page", wiki.space.id)
     assert event.payload == {"page_id": old["id"]}  # ids only, never a title
     assert (event.actor_type, event.actor_id) == ("user", wiki.users["editor"].id)
-    assert await _pass(session, now + timedelta(hours=3)) == []  # checked today
+    later_today = now.replace(hour=23, minute=59, second=59)  # whenever the test runs
+    assert await _pass(session, later_today) == []  # checked today
     assert await _pass(session, now + timedelta(days=1)) == [0]  # a new day: nothing new
     assert await _pass(session, now + timedelta(days=29)) == [0]
     # Unanswered for a whole interval: reminded again (and the fresh page is due now).
