@@ -45,6 +45,7 @@ class Said:
     text: str
     author_id: uuid.UUID | None = None
     author_name: str | None = None
+    message_id: uuid.UUID | None = None
 
 
 class ReadRepository:
@@ -64,7 +65,14 @@ class ReadRepository:
         )
         at = func.coalesce(answered, Message.created_at)
         stmt = (
-            select(Message.kind, Message.body_md, Message.author_id, self._author_name(), at)
+            select(
+                Message.kind,
+                Message.body_md,
+                Message.author_id,
+                self._author_name(),
+                Message.id,
+                at,
+            )
             .where(
                 Message.org_id == self.org_id,
                 Message.conversation_id == conversation_id,
@@ -78,9 +86,11 @@ class ReadRepository:
         )
         rows = list(reversed((await self.session.execute(stmt)).all()))
         rows.sort(
-            key=lambda row: row[4] or until
+            key=lambda row: row[5] or until
         )  # stable: messages of one moment keep their order
-        return [Said(k == MessageKind.AGENT, body, by, name) for k, body, by, name, _ in rows]
+        return [
+            Said(k == MessageKind.AGENT, body, by, name, mid) for k, body, by, name, mid, _ in rows
+        ]
 
     async def thread_root(self, trigger_id: uuid.UUID, *, lock: bool = False) -> Message | None:
         """The thread a mention's run answers in: the root of the mentioning message's
@@ -105,7 +115,9 @@ class ReadRepository:
         """A thread as a mention's run answers it: the people's and the agents' messages
         in it written up to `until` (the run's start), oldest first."""
         stmt = (
-            select(Message.kind, Message.body_md, Message.author_id, self._author_name())
+            select(
+                Message.kind, Message.body_md, Message.author_id, self._author_name(), Message.id
+            )
             .where(
                 Message.org_id == self.org_id,
                 or_(Message.id == root_id, Message.parent_id == root_id),
@@ -117,7 +129,9 @@ class ReadRepository:
             .limit(HISTORY_MESSAGES)
         )
         rows = reversed((await self.session.execute(stmt)).all())
-        return [Said(k == MessageKind.AGENT, body, by, name) for k, body, by, name in rows]
+        return [
+            Said(k == MessageKind.AGENT, body, by, name, mid) for k, body, by, name, mid in rows
+        ]
 
     async def person_name(self, user_id: uuid.UUID) -> str | None:
         stmt = select(User.name).where(User.org_id == self.org_id, User.id == user_id)

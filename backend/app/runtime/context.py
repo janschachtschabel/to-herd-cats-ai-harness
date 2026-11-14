@@ -2,8 +2,10 @@
 instructions with the frame rule, the sections its host adds after them (the skills
 it may load, its memory: already framed where they hold data), and the conversation
 so far, limited by characters
-(`history_window`, ported from ai-1): the newest turn always stays, older turns are
-dropped whole, oldest first. A turn is one message: the asking person's (`person`),
+(`history_window`, ported from ai-1): the asker's triggering message (`keep`) always
+stays, then as many of the newest others as fit; older turns are dropped whole,
+oldest first (review M6 2, finding 6: others posting at length after a mention must
+not push the question out). A turn is one message: the asking person's (`person`),
 the agent's own earlier answer (`agent`), or anyone else's in the conversation
 (`other`: another person, another agent). Only the first are user turns and only the
 second assistant turns; each run of others' messages goes to the model as one
@@ -44,6 +46,7 @@ class Turn:
     author: Literal["person", "agent", "other"]
     text: str
     name: str = ""  # `other`: who wrote it
+    keep: bool = False  # the message that asked the run: never dropped
 
 
 def instructions(
@@ -66,15 +69,19 @@ def _quoted(name: str) -> str:
 
 
 def window(turns: Sequence[Turn], max_chars: int = HISTORY_CHARS) -> list[Turn]:
-    """As many of the newest turns as fit into `max_chars` (at least the newest)."""
-    kept: list[Turn] = []
-    budget = max_chars
-    for turn in reversed(turns):
-        if kept and len(turn.text) > budget:
+    """The turns to keep (`keep`), and as many of the newest others as fit into
+    `max_chars` with them (at least the newest turn), in their order."""
+    pinned = {i for i, turn in enumerate(turns) if turn.keep}
+    budget = max_chars - sum(len(turns[i].text) for i in pinned)
+    kept = set(pinned)
+    for i in reversed(range(len(turns))):
+        if i in pinned:
+            continue
+        if kept and len(turns[i].text) > budget:
             break
-        kept.append(turn)
-        budget -= len(turn.text)
-    return list(reversed(kept))
+        kept.add(i)
+        budget -= len(turns[i].text)
+    return [turn for i, turn in enumerate(turns) if i in kept]
 
 
 def history(turns: Sequence[Turn], instructions_text: str) -> Messages:

@@ -1029,7 +1029,7 @@ erst nach der Freigabe einer Person:
 | Warten auf Freigabe oder Antwort | `HERD_AI_APPROVAL_HOURS`, Standard 72 h, höchstens 720 |
 | Übergaben | Kettentiefe höchstens 3 |
 | Anweisungen | 20.000 Zeichen |
-| Gesprächsverlauf im Prompt | 24.000 Zeichen (die neuesten 200 Nachrichten, dann nach Zeichen gekürzt) |
+| Gesprächsverlauf im Prompt | 24.000 Zeichen (die neuesten 200 Nachrichten, dann nach Zeichen gekürzt; die Nachricht, die den Lauf auslöste, bleibt immer, zuerst fallen die ältesten anderen) |
 | Werkzeugergebnis im Prompt | 8.000 Zeichen (im Journal vollständig) |
 | Skill-Text je `load_skill` | 7.000 Zeichen je Teil, Skill höchstens 50.000 |
 | Skills im Kontext | 25, Beschreibung je 300 Zeichen |

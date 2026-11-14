@@ -11,11 +11,12 @@
   reads it with `read_ticket`) and answers at the top level of the ticket's thread,
   where its comments go; the ticket gone: `completed`.
 
-Only the asking person's messages are their turns and only this agent's own earlier
-answers its turns; whatever else is in the thread or the DM (other people, other
-agents) is context, framed as untrusted with its authors (`runtime/context.py`). Where
-more than the asker read (anything but a DM alone with the agent), `asker` names them
-for the instructions (review M6 finding 2).
+The message that asked the run is always kept when the conversation is cut to fit
+(`context.window`). Only the asking person's messages are their turns and only this
+agent's own earlier answers its turns; whatever else is in the thread or the DM
+(other people, other agents) is context, framed as untrusted with its authors
+(`runtime/context.py`). Where more than the asker read (anything but a DM alone with
+the agent), `asker` names them for the instructions (review M6 finding 2).
 """
 
 import uuid
@@ -63,7 +64,7 @@ async def _asked(reads: ReadRepository, claimed: Claimed) -> Asked | None:
         number = await reads.ticket_number(claimed.work_item_id)
         if number is None:
             return None
-        return Asked([Turn("person", TASK.format(key=ticket_key(number)))])
+        return Asked([Turn("person", TASK.format(key=ticket_key(number)), keep=True)])
     root = await reads.thread_root(trigger)
     if root is not None:  # a mention's run
         if not await reads.present(trigger):
@@ -81,6 +82,7 @@ def _turn(said: Said, claimed: Claimed) -> Turn:
     if said.by_agent and said.author_id == claimed.agent_id:
         return Turn("agent", said.text)
     if not said.by_agent and said.author_id == claimed.user_id:
-        return Turn("person", said.text)
+        asked = said.message_id is not None and said.message_id == claimed.trigger_message_id
+        return Turn("person", said.text, keep=asked)  # its question stays in the window
     name = said.author_name or "someone"
     return Turn("other", said.text, f"{name} (agent)" if said.by_agent else name)

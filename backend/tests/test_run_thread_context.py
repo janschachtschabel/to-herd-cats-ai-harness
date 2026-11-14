@@ -128,3 +128,37 @@ def test_no_message_of_others_can_close_its_frame_or_pose_as_another() -> None:
     assert '<message author="Bob&quot; author=&quot;Alice">' in framed
     assert '&lt;message author="Alice">' in framed
     assert str(second.parts[0].content) == "Was meint ihr?"  # type: ignore[union-attr]
+
+
+def test_the_askers_question_stays_when_others_fill_the_window() -> None:
+    """Review M6 2, finding 6: whatever others post, the asker's triggering message is
+    kept; the others' messages are dropped first."""
+    asked = context.Turn("person", "alt", keep=True)
+    kept = context.window([asked, context.Turn("other", "y" * 30_000, "Bob")])
+    assert kept == [asked]
+    turns = [context.Turn("other", "a" * 10, "Bob"), asked, context.Turn("other", "b" * 10, "C")]
+    assert context.window(turns, max_chars=15) == [asked, turns[2]]
+
+
+async def test_a_mention_keeps_its_question_after_long_replies(work: Work) -> None:
+    """Others answer at length after the mention and before the run starts."""
+    bench, channel = work.bench, await _channel(work)
+    await _viewer(work, "bob")
+    root = await post(bench.people.bob, channel, "Thema")
+    r = await bench.people.alice.post(
+        f"/api/conversations/{channel}/messages",
+        json={
+            "body_md": "@Ava FRAGE-31",
+            "parent_id": root["id"],
+            "mentions": [str(bench.agent.id)],
+        },
+    )
+    assert r.status_code == 201, r.text
+    for _ in range(3):
+        long = {"body_md": "z" * 10_000, "parent_id": root["id"]}
+        said = await bench.people.bob.post(f"/api/conversations/{channel}/messages", json=long)
+        assert said.status_code == 201, said.text
+    bench.stub.state.replies.append({"content": "ok"})
+    assert await bench.run_next() == StopReason.COMPLETED
+    sent = _last_request(work)["messages"]
+    assert any(m["role"] == "user" and "FRAGE-31" in str(m["content"]) for m in sent)
