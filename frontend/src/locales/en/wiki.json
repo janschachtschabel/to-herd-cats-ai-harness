@@ -286,6 +286,10 @@
         "rule": "Divider",
         "unlink": "Remove link"
       }
+    },
+    "memory": {
+      "mark": "Kept by agents",
+      "note": "An agent keeps this page as its memory for this space and reads it at the start of every run. You can correct it like any other page."
     }
   },
   "errors": {

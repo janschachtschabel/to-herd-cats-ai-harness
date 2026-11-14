@@ -1,19 +1,40 @@
 import { describe, expect, test } from 'vitest'
 import type { TreeNode } from '@/lib/api'
-import { ancestorsOf, buildTree, moveTargets, siblingsOf } from './tree'
+import { ancestorsOf, buildTree, isMemory, moveTargets, siblingsOf } from './tree'
 
-function node(id: string, parent: string | null, sort: number, title = id): TreeNode {
+function node(id: string, parent: string | null, sort: number, title = id, path = id): TreeNode {
   return {
     id,
     parent_id: parent,
     title,
-    slug: id,
-    path: id,
+    slug: path.split('/').at(-1)!,
+    path,
     sort_order: sort,
     status: 'published',
     tags: [],
   }
 }
+
+describe("the agents' memory", () => {
+  test('its top-level folder comes last, whatever its sort order', () => {
+    const tree = buildTree([
+      node('m', null, -5, 'Agenten', '_agenten'),
+      node('h', 'm', 0, 'Hilda', '_agenten/hilda'),
+      node('b', null, 2, 'B'),
+      node('a', null, 1, 'A'),
+    ])
+    expect(tree.map((n) => n.id)).toEqual(['a', 'b', 'm'])
+    expect(tree[2]!.children.map((n) => n.id)).toEqual(['h'])
+  })
+
+  test('is the folder `_agenten` at the top and what lies below it', () => {
+    expect(isMemory({ path: '_agenten' })).toBe(true)
+    expect(isMemory({ path: '_agenten/hilda/gedaechtnis' })).toBe(true)
+    expect(isMemory({ path: 'agenten' })).toBe(false)
+    expect(isMemory({ path: '_agenten-alt' })).toBe(false)
+    expect(isMemory({ path: 'handbuch/_agenten' })).toBe(false)
+  })
+})
 
 describe('buildTree', () => {
   test('nests children under their parents, siblings by sort order', () => {

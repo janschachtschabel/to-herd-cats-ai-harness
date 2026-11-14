@@ -10,6 +10,7 @@ import type { WikiPage } from '@/lib/api'
 import { PageTickets } from '@/features/tickets/links/PageTickets'
 import { AiLockBadge } from '@/features/ai/policy/AiLockBadge'
 import { PageProposalsHint } from '@/features/proposals/PageProposalsHint'
+import { AgentWritten, MemoryNote } from './AgentWritten'
 import { Attachments } from './attachments/Attachments'
 import { MarkdownContent } from './MarkdownContent'
 import { extractHeadings } from './markdown'
@@ -49,6 +50,7 @@ export function PageView({ page }: { page: WikiPage }) {
             <span>
               {t('wiki.page.updated', { when: formatDateTime(page.updated_at, i18n.language) })}
             </span>
+            <AgentWritten page={page} />
           </div>
         </div>
         <div className="flex items-start gap-2">
@@ -61,6 +63,7 @@ export function PageView({ page }: { page: WikiPage }) {
           <PageActions page={page} />
         </div>
       </div>
+      <MemoryNote page={page} />
       <div
         className={
           discussing

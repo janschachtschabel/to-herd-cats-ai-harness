@@ -9,8 +9,28 @@ function bySortOrder(a: TreeNode, b: TreeNode): number {
   return a.sort_order - b.sort_order || a.title.localeCompare(b.title)
 }
 
+/** The top-level folder of the agents' memory pages (`_agenten/<agent>/gedaechtnis`,
+ *  plan M6 decision 10); only an agent's memory makes a page with this slug. */
+export const MEMORY_FOLDER = '_agenten'
+
+/** Whether a page is the memory folder or lies below it. */
+export function isMemory(page: Pick<TreeNode, 'path'>): boolean {
+  return page.path === MEMORY_FOLDER || page.path.startsWith(`${MEMORY_FOLDER}/`)
+}
+
+/** Whether a page is an agent's memory page itself (below the agent's folder). */
+export function isMemoryPage(page: Pick<TreeNode, 'path'>): boolean {
+  return isMemory(page) && page.path.split('/').length >= 3
+}
+
+/** Top-level pages: by sort order, the memory folder last. */
+function topLevel(a: TreeNode, b: TreeNode): number {
+  return Number(a.path === MEMORY_FOLDER) - Number(b.path === MEMORY_FOLDER) || bySortOrder(a, b)
+}
+
 /** The flat list (ordered by path) as a tree: children under their parents, siblings
- *  by `sort_order`. A page whose parent is not in the list is shown at the top. */
+ *  by `sort_order`, the agents' memory folder last. A page whose parent is not in the
+ *  list is shown at the top. */
 export function buildTree(nodes: readonly TreeNode[]): TreeItem[] {
   const items = new Map<string, TreeItem>(nodes.map((n) => [n.id, { ...n, children: [] }]))
   const roots: TreeItem[] = []
@@ -23,8 +43,8 @@ export function buildTree(nodes: readonly TreeNode[]): TreeItem[] {
     list.sort(bySortOrder)
     list.forEach((item) => sort(item.children))
   }
-  sort(roots)
-  return roots
+  roots.forEach((item) => sort(item.children))
+  return roots.sort(topLevel)
 }
 
 /** The pages above `id`, from the top down. */

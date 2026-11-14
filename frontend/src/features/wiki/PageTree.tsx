@@ -1,11 +1,11 @@
 // Ported-from: to-herd-cats-ai@46352bb:frontend/src/features/wiki/PageTree.tsx
 import { Link, useParams } from '@tanstack/react-router'
-import { ChevronRight, FilePen } from 'lucide-react'
+import { Bot, ChevronRight, FilePen } from 'lucide-react'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TreeNode } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { buildTree, type TreeItem } from './tree'
+import { buildTree, isMemory, type TreeItem } from './tree'
 
 const ITEM = '[role="treeitem"]'
 
@@ -167,6 +167,13 @@ function Item({ node, spaceId, activePath, collapsed, toggle, depth, tabbable }:
           <span id={labelId} className="truncate">
             {node.title}
           </span>
+          {isMemory(node) && (
+            <Bot
+              role="img"
+              aria-label={t('wiki.memory.mark')}
+              className="size-3.5 shrink-0 text-violet-700 dark:text-violet-300"
+            />
+          )}
           {node.status === 'draft' && (
             <FilePen
               role="img"

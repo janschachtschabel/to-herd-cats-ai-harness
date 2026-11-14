@@ -286,6 +286,10 @@
         "rule": "Trennlinie",
         "unlink": "Link entfernen"
       }
+    },
+    "memory": {
+      "mark": "Von Agenten geführt",
+      "note": "Ein Agent führt diese Seite als sein Gedächtnis für diesen Bereich und liest sie zu Beginn jedes Laufs. Du kannst sie korrigieren wie jede andere Seite."
     }
   },
   "errors": {
