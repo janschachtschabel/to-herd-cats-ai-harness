@@ -3,6 +3,7 @@
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
+from app.core.outbox import EventOutbox
 from app.core.principal import SystemRole
 from app.modules.auth.models import UserSession
 from app.modules.users.models import User
@@ -142,3 +143,22 @@ async def test_admin_still_manages_admins_and_members(
         "/api/auth/login", json={"email": member.email, "password": PASSWORD}, headers=CSRF
     )
     assert r.status_code == 200
+
+
+async def test_a_role_change_tells_the_person_their_access_changed(
+    owner: AsyncClient, member: User, session
+) -> None:
+    """Member → guest removes rights such as `ai.use`; open clients reload (review M5
+    finding 7). A change of name only says nothing."""
+    events = select(EventOutbox.type).where(EventOutbox.subject_id == member.id)
+    r = await owner.patch(
+        f"/api/admin/users/{member.id}", json={"name": "Renamed", "version": member.version}
+    )
+    assert r.status_code == 200
+    assert "access.changed" not in (await session.scalars(events)).all()
+    r = await owner.patch(
+        f"/api/admin/users/{member.id}",
+        json={"system_role": "guest", "version": r.json()["version"]},
+    )
+    assert r.status_code == 200
+    assert list((await session.scalars(events)).all()).count("access.changed") == 1

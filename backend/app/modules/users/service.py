@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require
+from app.core.access_events import access_changed
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
@@ -94,6 +95,8 @@ class UserService:
         await self.session.flush()
         if changed := changes(before, user):
             await self._audit(actor, "user.updated", user, {"changes": changed})
+        if role_changes:  # rights such as `ai.use` follow the role: open clients reload
+            await access_changed(self.session, actor, [user.id], space_id=None)
         if data.password is not None:
             await self._audit(actor, "user.password_changed", user)
         return user
