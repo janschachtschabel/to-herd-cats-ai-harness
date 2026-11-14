@@ -11,7 +11,8 @@ from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import MAX_HANDOVERS_PER_RUN, RunCancelRequest, StopReason
+from app.modules.agents.models import MAX_HANDOVERS_PER_RUN, StopReason
+from app.modules.agents.run_control_models import RunCancelRequest
 from app.modules.spaces.repository import SpaceRepository
 from tests.factories_tools import call
 from tests.factories_writing import Work, set_level

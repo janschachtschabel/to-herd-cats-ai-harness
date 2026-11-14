@@ -38,11 +38,11 @@ from app.core.repository import limit_time, locked_batch
 from app.modules.agents.models import (
     Agent,
     EventKind,
-    RateWindow,
     Run,
     RunEvent,
     RunState,
 )
+from app.modules.agents.run_control_models import RateWindow
 from app.modules.ai.models import AiConnection
 from app.modules.messaging.models import Conversation, Message, MessageKind
 

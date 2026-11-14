@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db_errors import is_timeout
 from app.core.errors import RetryConflict
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Run, RunCancelRequest, RunState
+from app.modules.agents.models import Run, RunState
+from app.modules.agents.run_control_models import RunCancelRequest
 from app.modules.messaging.models import Message, MessageKind
 
 
