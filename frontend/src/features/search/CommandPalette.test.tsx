@@ -126,6 +126,36 @@ describe('search', () => {
   })
 })
 
+test("an agent's message hit carries the AI mark", async () => {
+  const message: MessageHit = {
+    type: 'message',
+    id: '00000000-0000-7000-b000-000000000003',
+    parent_id: null,
+    conversation: {
+      id: 'chan-1',
+      kind: 'channel',
+      name: 'allgemein',
+      space_id: space.id,
+      page_id: null,
+      ticket_number: null,
+    },
+    author: { type: 'agent', id: 'hilda', name: 'Hilda' },
+    created_at: '2026-11-13T09:00:00Z',
+    snippet: '⟦Urlaub⟧ sind 30 Tage.',
+    score: 2,
+  }
+  mockApi({
+    'GET /api/auth/me': makeMe(['ai.use']),
+    'GET /api/spaces': page([space]),
+    'GET /api/search': page([message]),
+  })
+  const { user } = await renderApp('/spaces')
+  await user.keyboard('{Control>}k{/Control}')
+  await user.type(await screen.findByRole('combobox', { name: 'Suchbegriff' }), 'urlaub')
+  const first = (await screen.findAllByRole('option'))[0]!
+  expect(within(first).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+})
+
 describe('ticket hits', () => {
   test('a key finds its ticket first; Enter opens the ticket', async () => {
     const ticket: TicketHit = {

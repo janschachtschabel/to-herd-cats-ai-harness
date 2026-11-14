@@ -164,6 +164,8 @@ describe('skills', () => {
       within(dialog).getByText(/Nur die SKILL.md eines Skills wird übernommen/),
     ).toBeInTheDocument()
     expect(within(dialog).getByText(/Diesen Namen gibt es hier schon/)).toBeInTheDocument()
+    // The result keeps the note that nothing of a skill is executed.
+    expect(within(dialog).getByText(/Nichts aus einem Skill wird ausgeführt/)).toBeInTheDocument()
     const call = api.find('POST', '/api/skills/import')[0]
     expect(call?.headers.get('Content-Type')).toBe('application/zip')
     expect(call?.query.get('space_id')).toBeNull()

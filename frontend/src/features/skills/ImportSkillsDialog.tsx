@@ -93,6 +93,10 @@ function ImportResult({ result, onDone }: { result: SkillImport; onDone: () => v
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4 text-sm">
+      {/* The result stands beside the reminder that nothing of a skill runs. */}
+      <Alert>
+        <AlertDescription>{t('skills.import.safe')}</AlertDescription>
+      </Alert>
       <section aria-labelledby="import-created">
         <h3 id="import-created" className="mb-1 font-medium">
           {t('skills.import.created', { count: result.created.length })}

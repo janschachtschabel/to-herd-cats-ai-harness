@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import { useMe } from '@/features/auth/queries'
 import { conversationLabel } from '@/features/messaging/display'
 import { plainMentions } from '@/features/messaging/mentions'
@@ -142,6 +143,11 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
         <p className="text-sm">
           {unread && <span className="sr-only">{t('activity.unread')} </span>}
           <span className="font-medium">{author}</span>{' '}
+          {entry.author?.type === 'agent' && (
+            <>
+              <AgentBadge />{' '}
+            </>
+          )}
           {t(`activity.reasons.${entry.reason}`, { where })}
         </p>
         {entry.snippet && (

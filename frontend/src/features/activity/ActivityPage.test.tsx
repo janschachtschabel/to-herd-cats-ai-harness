@@ -35,6 +35,18 @@ describe('activity', () => {
     expect(api.find('POST', `/api/activity/${entry.id}/read`)).toHaveLength(1)
   })
 
+  test("an agent's release request carries the AI mark", async () => {
+    const entry = makeActivity({
+      reason: 'approval',
+      author: { type: 'agent', id: 'hilda', name: 'Hilda' },
+      snippet: 'propose_page_change: page_id=p-1',
+    })
+    mockApi({ ...shellRoutes(makeMe(['ai.use'])), 'GET /api/activity': page([entry]) })
+    await renderApp('/activity')
+    const item = (await screen.findByText('Hilda')).closest('li')!
+    expect(within(item).getByText('Von einer KI geschrieben')).toBeInTheDocument()
+  })
+
   test('nothing for me says so', async () => {
     mockApi({ ...shellRoutes(makeMe([])), 'GET /api/activity': page([]) })
     await renderApp('/activity')

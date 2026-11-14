@@ -1,5 +1,6 @@
 import { FileText, Hash, MessageSquare, SquareKanban, UsersRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import { StatusBadge } from '@/features/tickets/parts'
 import { ticketKey } from '@/features/tickets/refs'
 import { formatDateTime } from '@/lib/format'
@@ -72,6 +73,7 @@ export function SearchHitRow({ hit }: { hit: AnyHit }) {
               author: hit.author?.name ?? t('messaging.message.unknownAuthor'),
             })}
           </span>
+          {hit.author?.type === 'agent' && <AgentBadge />}
         </span>
         <time dateTime={hit.created_at} className="shrink-0 text-xs text-muted-foreground">
           {formatDateTime(hit.created_at, i18n.language)}
