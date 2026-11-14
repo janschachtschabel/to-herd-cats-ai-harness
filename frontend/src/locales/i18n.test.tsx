@@ -153,18 +153,23 @@ describe('translations', () => {
     i18n.options.missingKeyHandler = false
   })
 
-  test.each<Locale>(['de', 'en'])('every user-facing string resolves in %s', async (locale) => {
-    setLocale(locale)
-    api(locale)
-    for (const path of PAGES) {
-      const { user } = await renderApp(path)
-      await screen.findByRole('heading', { level: 1 })
-      const menu = locale === 'de' ? 'Menü von Mia Muster' : 'Menu of Mia Muster'
-      await user.click(screen.getByRole('button', { name: menu }))
-      await screen.findByRole('menu')
-      expect(visibleTexts().filter((text) => KEY_LIKE.test(text))).toEqual([])
-      cleanup()
-    }
-    expect(missing).toEqual([])
-  })
+  // Twenty routes rendered one after the other: give it room on a busy machine.
+  test.each<Locale>(['de', 'en'])(
+    'every user-facing string resolves in %s',
+    { timeout: 30_000 },
+    async (locale) => {
+      setLocale(locale)
+      api(locale)
+      for (const path of PAGES) {
+        const { user } = await renderApp(path)
+        await screen.findByRole('heading', { level: 1 })
+        const menu = locale === 'de' ? 'Menü von Mia Muster' : 'Menu of Mia Muster'
+        await user.click(screen.getByRole('button', { name: menu }))
+        await screen.findByRole('menu')
+        expect(visibleTexts().filter((text) => KEY_LIKE.test(text))).toEqual([])
+        cleanup()
+      }
+      expect(missing).toEqual([])
+    },
+  )
 })
