@@ -7,13 +7,14 @@ from typing import Any
 import pytest
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.core.permissions import SpaceRole
 from app.modules.agents.models import AgentStatus, StopReason
+from app.modules.audit.models import ADMIN_ACCESS, AuditLog
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.runtime.models import wrap_model
-from tests.factories_agents import Bench, assign_default
+from tests.factories_agents import Bench, assign_default, open_agent_dm
 from tests.factories_spaces import MakeSpace
 from tests.factories_wiki import new_page, publish
 
@@ -149,3 +150,38 @@ async def test_a_message_without_ai_starts_no_run(bench: Bench) -> None:
     await assign_default(bench.people.admin, None)
     posted = await bench.say("Hello?")
     assert posted["agent_run"] == {"id": None, "reason": "ai.unavailable"}
+
+
+async def test_an_admin_asking_gains_no_reach_and_is_noted(
+    bench: Bench, make_space: MakeSpace
+) -> None:
+    """Ruling (f): an admin (no member) asks; the run reads the agent's space by the
+    admin's right and notes it like any admin read, and nothing beyond the agent's."""
+    alice = bench.people.users["alice"]
+    with_agent = await make_space(SpaceKind.TEAM, members=[(alice, SpaceRole.EDITOR)])
+    without = await make_space(SpaceKind.TEAM, members=[(alice, SpaceRole.EDITOR)])
+    await bench.join(with_agent)
+    writer = bench.people.alice  # the admin's own writes would be noted already
+    readable = await publish(
+        writer, await new_page(writer, with_agent.id, "Seen", content_md=SECRET)
+    )
+    hidden = await publish(
+        writer, await new_page(writer, without.id, "Hidden", content_md="Hidden99")
+    )
+    entries = select(AuditLog.actor_id, AuditLog.target_id).where(AuditLog.action == ADMIN_ACCESS)
+    before = set((await bench.session.execute(entries)).all())
+    dm = await open_agent_dm(bench.people.admin, bench.agent)
+    bench.stub.state.replies.extend(
+        [
+            call("read_page", page_id=readable["id"]),
+            call("read_page", page_id=hidden["id"]),
+            {"content": "-"},
+        ]
+    )
+    await bench.say("Read both", who="admin", dm=dm["id"])
+    assert await bench.run_next() == StopReason.COMPLETED
+    texts = bench.stub.state.texts()
+    assert SECRET in texts and "Hidden99" not in texts
+    added = set((await bench.session.execute(entries)).all()) - before
+    admin = bench.people.users["admin"].id
+    assert (admin, with_agent.id) in added and (admin, without.id) not in added

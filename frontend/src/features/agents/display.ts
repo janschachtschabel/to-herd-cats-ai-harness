@@ -49,13 +49,19 @@ export function agentOf(conversation: Conversation): { id: string; name: string 
 /** What a tool answers when it found nothing it may show (the backend's NOT_FOUND). */
 const NOT_FOUND = 'Nothing found (or not readable).'
 
-/** The sources an answer used: the pages and tickets its run read (found ones only). */
-export function sourcesOf(events: readonly Schemas['RunEventOut'][]): Source[] {
+/** The sources an answer used: the pages and tickets its run read (found ones only),
+ *  and how many results were redacted for the reader (spaces they may not read). */
+export function sourcesOf(events: readonly Schemas['RunEventOut'][]): Sources {
   const seen = new Set<string>()
   const sources: Source[] = []
+  let hidden = 0
   for (const event of events) {
     if (event.kind !== 'tool_call') continue
     const content = event.content as { source?: unknown; attrs?: Record<string, unknown> }
+    if (event.redacted) {
+      if (content.source === 'wiki' || content.source === 'ticket') hidden += 1
+      continue
+    }
     const text = (event.content as { text?: unknown }).text
     if (text === NOT_FOUND) continue
     const attrs = content.attrs ?? {}
@@ -71,7 +77,8 @@ export function sourcesOf(events: readonly Schemas['RunEventOut'][]): Source[] {
     seen.add(key)
     sources.push(source)
   }
-  return sources
+  return { sources, hidden }
 }
 
 export type Source = { kind: 'page'; id: string } | { kind: 'ticket'; key: string }
+export type Sources = { sources: Source[]; hidden: number }

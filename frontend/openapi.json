@@ -5108,7 +5108,7 @@
         "type": "object"
       },
       "RunEventOut": {
-        "description": "One step of a run, with its full content (model call: usage and the answer's\nparts; tool call: name, arguments, result; stop: the reason).",
+        "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything.",
         "properties": {
           "attempt": {
             "title": "Attempt",
@@ -5132,6 +5132,10 @@
           "kind": {
             "$ref": "#/components/schemas/EventKind"
           },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
           "seq": {
             "title": "Seq",
             "type": "integer"
@@ -5143,6 +5147,7 @@
           "seq",
           "kind",
           "content",
+          "redacted",
           "created_at"
         ],
         "title": "RunEventOut",

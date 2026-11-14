@@ -12,7 +12,8 @@ import { sourcesOf, type Source } from './display'
 import { useRunEvents } from './queries'
 
 /** Under an agent's answer: the pages and tickets its run read, loaded when asked
- *  (the run's steps are readable by whom it concerns; others see nothing). */
+ *  (the run's steps are readable by whom it concerns; others see nothing). A result
+ *  from a space the reader may not read comes redacted and is only counted. */
 export function AnswerSources({ runId }: { runId: string }) {
   const { t } = useTranslation()
   const me = useMe()
@@ -32,10 +33,10 @@ export function AnswerSources({ runId }: { runId: string }) {
   if (events.isError) {
     return <p className="text-xs text-destructive">{errorMessage(t, events.error)}</p>
   }
-  const sources = sourcesOf(events.data.items)
+  const { sources, hidden } = sourcesOf(events.data.items)
   return (
     <div className="mt-1 text-xs">
-      {sources.length === 0 ? (
+      {sources.length === 0 && hidden === 0 ? (
         <p className="text-muted-foreground">{t('agents.sources.none')}</p>
       ) : (
         <>
@@ -46,6 +47,11 @@ export function AnswerSources({ runId }: { runId: string }) {
                 <SourceLink source={source} />
               </li>
             ))}
+            {hidden > 0 && (
+              <li className="text-muted-foreground">
+                {t('agents.sources.hidden', { count: hidden })}
+              </li>
+            )}
           </ul>
         </>
       )}

@@ -266,7 +266,9 @@
       "show": "Show sources",
       "none": "No sources read.",
       "title": "Read:",
-      "page": "Page"
+      "page": "Page",
+      "hidden_one": "{{count}} source is not visible to you.",
+      "hidden_other": "{{count}} sources are not visible to you."
     }
   },
   "errors": {

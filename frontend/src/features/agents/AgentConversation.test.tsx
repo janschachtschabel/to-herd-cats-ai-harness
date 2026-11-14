@@ -81,6 +81,7 @@ describe('a direct message with an agent', () => {
             attrs: { id: handbook.id },
             text: '# Urlaub',
           },
+          redacted: false,
           created_at: '2026-11-13T09:00:00Z',
         },
       ]),
@@ -99,6 +100,30 @@ describe('a direct message with an agent', () => {
       'href',
       `/spaces/${handbook.space_id}/p/urlaub`,
     )
+  })
+
+  test('a source the reader may not see is named as such, not linked', async () => {
+    const { dm } = dmApi(['ai.use'], [agentAnswer('Siehe Handbuch.')], {
+      'GET /api/runs/:id/events': page([
+        {
+          id: 'e1',
+          attempt: 1,
+          seq: 2,
+          kind: 'tool_call',
+          content: { step: 1, call_id: 'c1', name: 'read_page', source: 'wiki' },
+          redacted: true,
+          created_at: '2026-11-13T09:00:00Z',
+        },
+      ]),
+    })
+    const { user } = await renderApp(`/c/${dm.id}`)
+    const answer = await screen.findByRole('article', { name: 'Nachricht von Hilda' })
+    await user.click(within(answer).getByRole('button', { name: 'Quellen anzeigen' }))
+    expect(
+      await within(answer).findByText('1 Quelle ist für dich nicht sichtbar.'),
+    ).toBeInTheDocument()
+    expect(within(answer).queryByRole('link')).toBeNull()
+    expect(within(answer).queryByText('Keine Quellen gelesen.')).toBeNull()
   })
 
   test('sending to a paused agent says that it will not answer now', async () => {

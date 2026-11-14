@@ -114,6 +114,7 @@ class RunHost:
                     "source": result.source,
                     "attrs": result.attrs,
                     "text": result.text,
+                    "spaces": sorted(str(space_id) for space_id in result.spaces),
                 }
                 await steps.event(self._seq(), EventKind.TOOL_CALL, content)
         except (Lost, Halt):

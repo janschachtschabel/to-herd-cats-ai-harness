@@ -3883,8 +3883,10 @@ export interface components {
         };
         /**
          * RunEventOut
-         * @description One step of a run, with its full content (model call: usage and the answer's
-         *     parts; tool call: name, arguments, result; stop: the reason).
+         * @description One step of a run (model call: usage and the answer's parts; tool call: name,
+         *     arguments, result, the spaces it came from; stop: the reason). `redacted`: parts
+         *     the reader may not read are left out (`agents/runs.py`); the asking person always
+         *     gets everything.
          */
         RunEventOut: {
             /** Attempt */
@@ -3904,6 +3906,8 @@ export interface components {
              */
             id: string;
             kind: components["schemas"]["EventKind"];
+            /** Redacted */
+            redacted: boolean;
             /** Seq */
             seq: number;
         };

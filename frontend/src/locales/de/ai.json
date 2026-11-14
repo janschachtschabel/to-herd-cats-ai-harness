@@ -266,7 +266,9 @@
       "show": "Quellen anzeigen",
       "none": "Keine Quellen gelesen.",
       "title": "Gelesen:",
-      "page": "Seite"
+      "page": "Seite",
+      "hidden_one": "{{count}} Quelle ist für dich nicht sichtbar.",
+      "hidden_other": "{{count}} Quellen sind für dich nicht sichtbar."
     }
   },
   "errors": {

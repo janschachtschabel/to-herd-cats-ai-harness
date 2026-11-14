@@ -20,6 +20,7 @@ database cannot store (`storable`).
 import asyncio
 import re
 import time
+import uuid
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -88,11 +89,13 @@ class Reply:
 
 @dataclass(frozen=True, slots=True)
 class ToolResult:
-    """`text` for the model (framed and cut by the loop); `source` names it."""
+    """`text` for the model (framed and cut by the loop); `source` names it; `spaces`:
+    where the text came from (the host's record, never sent)."""
 
     source: str
     text: str
     attrs: dict[str, str] = field(default_factory=dict)
+    spaces: frozenset[uuid.UUID] = frozenset()
 
 
 class StepHost(Protocol):

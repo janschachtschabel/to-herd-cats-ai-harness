@@ -16,10 +16,10 @@ from app.modules.agents.models import (
     AgentStatus,
     EventKind,
     Run,
-    RunEvent,
     RunState,
     StopReason,
 )
+from app.modules.agents.runs import ShownEvent
 
 Name = Annotated[
     str,
@@ -154,23 +154,28 @@ class RunOut(BaseModel):
 
 
 class RunEventOut(BaseModel):
-    """One step of a run, with its full content (model call: usage and the answer's
-    parts; tool call: name, arguments, result; stop: the reason)."""
+    """One step of a run (model call: usage and the answer's parts; tool call: name,
+    arguments, result, the spaces it came from; stop: the reason). `redacted`: parts
+    the reader may not read are left out (`agents/runs.py`); the asking person always
+    gets everything."""
 
     id: uuid.UUID
     attempt: int
     seq: int
     kind: EventKind
     content: dict[str, Any]
+    redacted: bool
     created_at: datetime
 
     @classmethod
-    def of(cls, event: RunEvent) -> "RunEventOut":
+    def of(cls, shown: ShownEvent) -> "RunEventOut":
+        event = shown.event
         return cls(
             id=event.id,
             attempt=event.attempt,
             seq=event.seq,
             kind=event.kind,
-            content=event.content,
+            content=shown.content,
+            redacted=shown.redacted,
             created_at=event.created_at,
         )

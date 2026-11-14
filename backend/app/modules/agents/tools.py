@@ -75,7 +75,8 @@ class RunTools:
                     f"kind={hit.kind} status={hit.status.name!r} space={hit.space_name!r}\n"
                     f"  {hit.snippet}"
                 )
-        return ToolResult("search", "\n".join(lines) or NOT_FOUND, {"query": query})
+        found = frozenset(hit.space_id for hit in hits)
+        return ToolResult("search", "\n".join(lines) or NOT_FOUND, {"query": query}, found)
 
     async def _page(self, page_id: uuid.UUID) -> ToolResult:
         try:
@@ -84,7 +85,8 @@ class RunTools:
             return ToolResult("wiki", NOT_FOUND, {"id": str(page_id)})
         self.reads.spaces.add(page.space_id)
         self.reads.pages.add(page.id)
-        return ToolResult("wiki", f"# {page.title}\n\n{page.content_md}", {"id": str(page.id)})
+        text = f"# {page.title}\n\n{page.content_md}"
+        return ToolResult("wiki", text, {"id": str(page.id)}, frozenset({page.space_id}))
 
     async def _ticket(self, key: str) -> ToolResult:
         number = key_number(key)
@@ -111,7 +113,8 @@ class RunTools:
             f"tags: {', '.join(tag.name for tag in view.tags) or '-'}",
         ]
         text = "\n".join(fields) + "\n\n" + ticket.description_md
-        return ToolResult("ticket", text, {"key": ticket_key(ticket.number)})
+        attrs = {"key": ticket_key(ticket.number)}
+        return ToolResult("ticket", text, attrs, frozenset({ticket.space_id}))
 
     def _ticket_scope(self) -> TicketScope:
         """The spaces where the run may read tickets, without those AI may not read."""
