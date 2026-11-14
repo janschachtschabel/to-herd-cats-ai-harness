@@ -10,6 +10,14 @@ import { appRoute } from './base'
 const MyRunsPage = lazyRouteComponent(() => import('@/features/runs/RunsPages'), 'MyRunsPage')
 const AgentRunsPage = lazyRouteComponent(() => import('@/features/runs/RunsPages'), 'AgentRunsPage')
 const RunScreen = lazyRouteComponent(() => import('@/features/runs/RunScreen'), 'RunScreen')
+const MyAgentsPage = lazyRouteComponent(
+  () => import('@/features/agents/personal/MyAgentsPage'),
+  'MyAgentsPage',
+)
+const PersonalAgentPage = lazyRouteComponent(
+  () => import('@/features/agents/personal/PersonalAgentPage'),
+  'PersonalAgentPage',
+)
 const ApprovalsPage = lazyRouteComponent(
   () => import('@/features/approvals/ApprovalsPage'),
   'ApprovalsPage',
@@ -107,4 +115,41 @@ const approvalsRoute = createRoute({
   component: ApprovalsPage,
 })
 
-export const aiWorkRoutes = [myRunsRoute, runRoute, agentRunsRoute, approvalsRoute]
+/** One's personal agents: for people with AI (whether new ones may be made, the page
+ *  says from `agent.create_personal`). */
+function requireAi(me: Me): void {
+  if (!hasPermission(me, 'ai.use')) throw notFound()
+}
+
+const myAgentsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/my-agents',
+  loader: ({ context }) => {
+    requireAi(context.me)
+    return MyAgentsPage.preload?.()
+  },
+  component: MyAgentsPage,
+})
+
+/** One of my agents (anyone else's answers 404 from the API, in words). */
+const personalAgentRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/my-agents/$agentId',
+  loader: ({ context }) => {
+    requireAi(context.me)
+    return PersonalAgentPage.preload?.()
+  },
+  component: function PersonalAgentRoute() {
+    const { agentId } = personalAgentRoute.useParams()
+    return <PersonalAgentPage agentId={agentId} />
+  },
+})
+
+export const aiWorkRoutes = [
+  myRunsRoute,
+  runRoute,
+  agentRunsRoute,
+  approvalsRoute,
+  myAgentsRoute,
+  personalAgentRoute,
+]

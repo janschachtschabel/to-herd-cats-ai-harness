@@ -1,24 +1,60 @@
-import { Link } from '@tanstack/react-router'
-import { Activity, Bot, Pause, Pencil, Play, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import {
+  Activity,
+  Bot,
+  MessageSquare,
+  Pause,
+  Pencil,
+  Play,
+  SlidersHorizontal,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { SaveError } from '@/features/shared/forms'
-import { useDeleteAgent, useUpdateAgent, type Agent } from './queries'
+import { useDeleteAgent, useOpenAgentDm, useUpdateAgent, type Agent } from './queries'
 
 const STATUS_VARIANT = { active: 'secondary', paused: 'destructive', draft: 'outline' } as const
 
-/** One agent: name, status, model, introduction; edit, pause or activate, delete. */
+/** Talk to one's own agent: opens (or finds again) the direct message with it. */
+function TalkButton({ agentId }: { agentId: string }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const open = useOpenAgentDm()
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={open.isPending}
+      onClick={() =>
+        open.mutate(agentId, {
+          onSuccess: (dm) =>
+            void navigate({ to: '/c/$conversationId', params: { conversationId: dm.id } }),
+        })
+      }
+    >
+      <MessageSquare aria-hidden />
+      {t('agents.personal.talk')}
+    </Button>
+  )
+}
+
+/** One agent: name, status, model, introduction; edit, pause or activate, delete. In
+ *  the administration a personal agent is marked with its owner's name; on "my agents"
+ *  (`mine`) the settings are the owner's page and one can talk to it. */
 export function AgentCard({
   agent,
   connectionName,
   onEdit,
+  mine = false,
 }: {
   agent: Agent
   connectionName: string | null
   onEdit: () => void
+  mine?: boolean
 }) {
   const { t } = useTranslation()
   const update = useUpdateAgent(agent.id)
@@ -34,26 +70,43 @@ export function AgentCard({
           {agent.name}
         </h2>
         <span className="flex flex-wrap gap-1">
+          {agent.owner_user_id && !mine && (
+            <Badge variant="outline">
+              {t('agents.personal.owned', {
+                name: agent.responsible_name ?? t('agents.personal.unknownOwner'),
+              })}
+            </Badge>
+          )}
           <Badge variant="outline">{t('agents.level.badge', { level: agent.level })}</Badge>
           <Badge variant={STATUS_VARIANT[agent.status]}>{t(`agents.status.${agent.status}`)}</Badge>
         </span>
       </div>
       {agent.intro && <p className="text-sm text-muted-foreground">{agent.intro}</p>}
-      <p className="text-xs text-muted-foreground">
-        {t('agents.card.model', { model: agent.model, connection: connectionName ?? '–' })}
-        {' · '}
-        {t('agents.card.limits', { steps: agent.max_steps, seconds: agent.max_runtime_seconds })}
-      </p>
+      {!mine && (
+        <p className="text-xs text-muted-foreground">
+          {t('agents.card.model', { model: agent.model, connection: connectionName ?? '–' })}
+          {' · '}
+          {t('agents.card.limits', { steps: agent.max_steps, seconds: agent.max_runtime_seconds })}
+        </p>
+      )}
       <div className="mt-auto flex flex-wrap gap-2 pt-1">
         <Button size="sm" variant="outline" onClick={onEdit}>
           <Pencil aria-hidden />
           {t('actions.edit')}
         </Button>
+        {mine && agent.status === 'active' && <TalkButton agentId={agent.id} />}
         <Button size="sm" variant="outline" asChild>
-          <Link to="/admin/agents/$agentId" params={{ agentId: agent.id }}>
-            <SlidersHorizontal aria-hidden />
-            {t('agents.admin.open')}
-          </Link>
+          {mine ? (
+            <Link to="/my-agents/$agentId" params={{ agentId: agent.id }}>
+              <SlidersHorizontal aria-hidden />
+              {t('agents.personal.settings')}
+            </Link>
+          ) : (
+            <Link to="/admin/agents/$agentId" params={{ agentId: agent.id }}>
+              <SlidersHorizontal aria-hidden />
+              {t('agents.admin.open')}
+            </Link>
+          )}
         </Button>
         <Button size="sm" variant="outline" asChild>
           <Link to="/agents/$agentId/runs" params={{ agentId: agent.id }}>

@@ -127,7 +127,14 @@
       "targetText": "{{connection}} · {{model}}",
       "removePerson": "Zuordnung von {{name}} entfernen",
       "person": "Person",
-      "addPerson": "Zuordnen"
+      "addPerson": "Zuordnen",
+      "personal": {
+        "title": "Persönliche Agenten",
+        "hint": "Wer KI nutzt, darf eigene Agenten anlegen: nur im eigenen persönlichen Bereich, höchstens Stufe 2, auf das eigene Konto. Ausgeschaltet legt niemand neue an, und die vorhandenen antworten nicht mehr (sie bleiben erhalten).",
+        "label": "Persönliche Agenten erlauben",
+        "on": "Erlaubt.",
+        "off": "Ausgeschaltet: Persönliche Agenten antworten nicht."
+      }
     },
     "usage": {
       "description": "Verbrauch je Tag (UTC). Kosten nur, wo ein Preis hinterlegt ist.",

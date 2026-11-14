@@ -84,3 +84,13 @@ export function useRemoveUserAssignment() {
     onSuccess: refresh,
   })
 }
+
+/** Allow or stop personal agents for everyone with AI (with the overview's version). */
+export function useSetPersonalAgents() {
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: async (body: Schemas['PersonalAgentsIn']) =>
+      unwrap(await api.PUT('/api/ai/assignments/personal-agents', { body })),
+    onSuccess: refresh,
+  })
+}

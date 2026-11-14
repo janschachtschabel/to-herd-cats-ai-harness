@@ -127,7 +127,14 @@
       "targetText": "{{connection}} · {{model}}",
       "removePerson": "Remove {{name}}'s assignment",
       "person": "Person",
-      "addPerson": "Assign"
+      "addPerson": "Assign",
+      "personal": {
+        "title": "Personal agents",
+        "hint": "Whoever uses AI may make their own agents: only in their personal space, at most level 2, on their own account. Switched off, nobody makes new ones and the existing ones no longer answer (they are kept).",
+        "label": "Allow personal agents",
+        "on": "Allowed.",
+        "off": "Switched off: personal agents do not answer."
+      }
     },
     "usage": {
       "description": "Usage per day (UTC). Costs only where a price is stored.",

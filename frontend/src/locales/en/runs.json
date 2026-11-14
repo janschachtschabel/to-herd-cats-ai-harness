@@ -1,7 +1,8 @@
 {
   "nav": {
     "agentWork": "With agents",
-    "myRuns": "My runs"
+    "myRuns": "My runs",
+    "myAgents": "My agents"
   },
   "runs": {
     "link": "View run",

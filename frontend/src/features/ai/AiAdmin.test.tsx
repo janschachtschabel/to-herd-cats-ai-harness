@@ -184,7 +184,7 @@ describe('ai administration', () => {
     const api = mockApi({
       ...shell(AI_ADMIN),
       'GET /api/ai/connections': page([connection]),
-      'GET /api/ai/assignments': { default: null, version: 7 },
+      'GET /api/ai/assignments': { default: null, personal_agents: true, version: 7 },
       'GET /api/ai/assignments/groups': page([]),
       'GET /api/ai/assignments/users': page([]),
       'PUT /api/ai/assignments/default': (call) => ({

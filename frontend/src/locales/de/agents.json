@@ -93,6 +93,23 @@
         "archived": "Nicht verfügbar: Der Skill ist archiviert.",
         "unreachable": "Nicht verfügbar: Der Agent liest den Bereich dieses Skills nicht."
       }
+    },
+    "personal": {
+      "title": "Meine Agenten",
+      "description": "Deine eigenen Agenten: Sie arbeiten nur in deinem persönlichen Bereich, höchstens auf Stufe 2, mit deinem Modell und auf dein Konto.",
+      "create": "Agent anlegen",
+      "createTitle": "Eigenen Agenten anlegen",
+      "createHint": "Er nutzt dein Modell, du bist verantwortlich, und er ist Mitglied deines persönlichen Bereichs.",
+      "instructionsHint": "Was er tun soll und wie er antwortet; auch seine Persönlichkeit gehört hierher.",
+      "disabled": "Persönliche Agenten sind in dieser Organisation ausgeschaltet (oder du nutzt keine KI). Du kannst keine neuen anlegen, und vorhandene antworten nicht.",
+      "empty": "Du hast noch keine eigenen Agenten.",
+      "listLabel": "Meine Agenten",
+      "talk": "Gespräch öffnen",
+      "settings": "Stufe und Werkzeuge",
+      "back": "Zu meinen Agenten",
+      "levelCap": "Persönliche Agenten arbeiten höchstens auf Stufe 2.",
+      "owned": "Persönlich: {{name}}",
+      "unknownOwner": "unbekannt"
     }
   },
   "errors": {
@@ -100,7 +117,11 @@
       "level_denied": "Stufe 3 vergibt nur ein Admin oder wer jeden Bereich des Agenten verwaltet.",
       "tool_unknown": "Dieses Werkzeug gibt es nicht (mehr). Bitte neu laden.",
       "skill_not_assignable": "Mindestens ein Skill lässt sich diesem Agenten nicht zuweisen (unbekannt oder außerhalb seiner Bereiche).",
-      "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben."
+      "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben.",
+      "personal_disabled": "Persönliche Agenten sind in dieser Organisation ausgeschaltet.",
+      "personal_limit": "Du hast schon so viele eigene Agenten, wie erlaubt sind. Lösche einen, um einen neuen anzulegen.",
+      "personal_space_only": "Ein persönlicher Agent arbeitet nur im persönlichen Bereich seiner Person.",
+      "connection_unavailable": "Die KI-Verbindung des Agenten ist ausgeschaltet oder bietet das Modell nicht mehr an. Speichere den Agenten erneut, damit er die aktuelle Zuordnung übernimmt."
     }
   }
 }

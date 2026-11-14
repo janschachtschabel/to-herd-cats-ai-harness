@@ -93,6 +93,23 @@
         "archived": "Not available: the skill is archived.",
         "unreachable": "Not available: the agent does not read this skill's space."
       }
+    },
+    "personal": {
+      "title": "My agents",
+      "description": "Your own agents: they work only in your personal space, at most at level 2, with your model and on your account.",
+      "create": "New agent",
+      "createTitle": "New personal agent",
+      "createHint": "It uses your model, you are responsible, and it is a member of your personal space.",
+      "instructionsHint": "What it should do and how it answers; its personality belongs here too.",
+      "disabled": "Personal agents are switched off in this organisation (or you do not use AI). You cannot make new ones, and existing ones do not answer.",
+      "empty": "You have no agents of your own yet.",
+      "listLabel": "My agents",
+      "talk": "Open conversation",
+      "settings": "Level and tools",
+      "back": "Back to my agents",
+      "levelCap": "Personal agents work at most at level 2.",
+      "owned": "Personal: {{name}}",
+      "unknownOwner": "unknown"
     }
   },
   "errors": {
@@ -100,7 +117,11 @@
       "level_denied": "Only an admin, or whoever manages every space of the agent, gives level 3.",
       "tool_unknown": "This tool does not exist (any more). Please reload.",
       "skill_not_assignable": "At least one skill cannot be given to this agent (unknown, or outside its spaces).",
-      "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them."
+      "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them.",
+      "personal_disabled": "Personal agents are switched off in this organisation.",
+      "personal_limit": "You already have as many agents of your own as allowed. Delete one to make a new one.",
+      "personal_space_only": "A personal agent works only in its person's personal space.",
+      "connection_unavailable": "The agent's AI connection is off or no longer offers the model. Save the agent again so it takes the current assignment."
     }
   }
 }

@@ -1,7 +1,8 @@
 {
   "nav": {
     "agentWork": "Mit Agenten",
-    "myRuns": "Meine Läufe"
+    "myRuns": "Meine Läufe",
+    "myAgents": "Meine Agenten"
   },
   "runs": {
     "link": "Lauf ansehen",

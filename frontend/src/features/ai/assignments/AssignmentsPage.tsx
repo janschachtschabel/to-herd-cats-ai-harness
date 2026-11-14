@@ -6,6 +6,7 @@ import { useAssignments, useGroupAssignments } from '../assignmentQueries'
 import { useConnections } from '../queries'
 import { DefaultAssignment } from './DefaultAssignment'
 import { GroupAssignments } from './GroupAssignments'
+import { PersonalAgentsSwitch } from './PersonalAgentsSwitch'
 import { UserAssignments } from './UserAssignments'
 
 /** Who uses which model (`ai.manage`): person before group before the standard. */
@@ -47,6 +48,7 @@ export function AssignmentsPage() {
             onReload={reload}
           />
           <UserAssignments connections={connections.items} />
+          <PersonalAgentsSwitch overview={overview.data} onReload={reload} />
         </div>
       )}
     </div>

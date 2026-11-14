@@ -14,12 +14,15 @@ export function AgentLevelForm({
   maxLevel,
   version,
   onReload,
+  withheldNote,
 }: {
   agentId: string
   level: number
   maxLevel: number
   version: number
   onReload: () => void
+  /** Why higher levels are not offered (default: who may give level 3). */
+  withheldNote?: string
 }) {
   const { t } = useTranslation()
   const save = useSetAgentLevel(agentId)
@@ -56,7 +59,11 @@ export function AgentLevelForm({
             </label>
           ))}
         </div>
-        {withheld && <p className="text-xs text-muted-foreground">{t('agents.level.withheld')}</p>}
+        {withheld && (
+          <p className="text-xs text-muted-foreground">
+            {withheldNote ?? t('agents.level.withheld')}
+          </p>
+        )}
         <SaveError error={save.error} onReload={onReload} />
         <div>
           <Button type="submit" size="sm" disabled={save.isPending || chosen === level}>
