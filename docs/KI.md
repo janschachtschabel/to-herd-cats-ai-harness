@@ -303,7 +303,9 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
     `page.edit` für den Lauf), `comment_ticket` (Nachricht `kind: agent` im
     Ticket-Thread), `set_ticket_status` (höchstens Kategorie `review`; `done` und
     `cancelled` setzt nur eine Person, die Antwort nennt die erlaubten Status),
-    `create_ticket` (meldend: der Agent), `link_ticket_page` (einmal je Seite).
+    `create_ticket` (meldend: der Agent), `link_ticket_page` (einmal je Seite),
+    `propose_skill` und `update_memory` (Abschnitte „Skill-Vorschläge“ und
+    „Gedächtnis“).
   - Stufe 3: `update_page` in zwei Schritten: der erste Aufruf liefert den Diff zur
     aktuellen Version und ein `token` (gebunden an Lauf, Seite, Version und beide
     Inhalte), erst der zweite Aufruf mit diesem Token schreibt, als Version der Quelle
@@ -530,7 +532,9 @@ erst nach der Freigabe einer Person:
   (`propose_page_change`, `update_page` mit Token), Bereich und ggf. Elternseite
   (`propose_new_page`), Ticket (`comment_ticket`, `set_ticket_status`,
   `assign_ticket`), Bereich (`create_ticket`), Ticket und Seite (`link_ticket_page`),
-  Gespräch (`post_message`); lesende Werkzeuge nur Name und Argumente.
+  Gespräch (`post_message`), Gedächtnisseite mit Version, vor der ersten der Bereich
+  (`update_memory`), Skill mit Version bzw. Bereich oder Organisation
+  (`propose_skill`); lesende Werkzeuge nur Name und Argumente.
 - `POST /api/approvals/{id}/decide` (`decision: approve|reject`, `reason`, `version`):
   nur die fragende Person, und nur, wenn sie die Wirkung jetzt selbst ausführen dürfte
   (die Aktion des Werkzeugs in jedem betroffenen Bereich, mit ihren eigenen Rechten;
@@ -720,6 +724,57 @@ holt er mit `load_skill`.
   accepted|rejected` tragen nur IDs.
 - Rolling Update: Benachrichtigungen mit Grund `skill_proposal` schreibt erst dieses
   Release; ein Pod des vorigen liest sie erst, wenn es welche gibt.
+
+## Gedächtnis (`update_memory`, M6)
+
+`backend/app/modules/agents/memory.py` (Regeln), `memory_repository.py`, Werkzeug in
+`agents/toolbox/memory_tools.py`, Kontext über `agents/briefing.py`.
+
+- **Eine normale Wiki-Seite je Agent und Bereich** unter
+  `_agenten/<agent>/gedaechtnis` (Titel „Gedächtnis“, darüber die Ordner „Agenten“ mit
+  dem Slug `_agenten` und der Name des Agenten). Sie hat die Rechte des Bereichs,
+  Versionen, Generationen und das Live-Bearbeiten wie jede Seite; Menschen korrigieren
+  sie im Editor. Welche Seite es ist, steht in der Tabelle `agent_memory` (Agent,
+  Bereich, Seite; Fremdschlüssel mit `CASCADE`): Umbenennen oder Verschieben der Seite
+  oder des Agenten ändert nichts. Eine Seite im Papierkorb (oder, falls es je einen Weg
+  gäbe, in einem anderen Bereich) gilt nicht mehr; das nächste `update_memory` legt
+  eine neue an. Zwei Agenten mit gleichem Namen teilen sich den Ordner, die zweite
+  Seite heißt dann `gedaechtnis-2`.
+- **`update_memory(space_id, content)`** (Stufe 2, schreibend, direkt erlaubt, auch
+  wenn der Bereich Änderungen von Agenten nur als Vorschlag annimmt): ersetzt den
+  ganzen Text. Das erste Mal legt es die fehlenden Ordner und die Seite an,
+  veröffentlicht (unter der Baumsperre des Bereichs), danach eine neue Version. Jede
+  Version trägt Quelle `agent`, den Agenten als Urheber und die `run_id` (KI-Kennzeichen
+  wie bei `update_page`). Nur wo der Lauf `page.edit` hat (Rechte der Person ∩ Rolle
+  des Agenten ∩ Schreibbereich des Ortes; sonst „Not allowed here.“, ein unlesbarer
+  Bereich „nicht gefunden“), nur was das Publikum des Bereichs sehen darf (wie jedes
+  schreibende Werkzeug), nie auf einer für KI gesperrten Seite (403 `memory.locked`,
+  geprüft unter der Zeilensperre der Seite), höchstens 8.000 Zeichen (sonst
+  `memory.too_long` mit der Bitte zu kürzen). Wirkung und Journaleintrag in einer
+  Transaktion.
+- **Im Kontext** stehen nach den Skills die Gedächtnisseiten der Bereiche, die der
+  Lauf lesen darf (sein Lesebereich, also auch das Publikum des Ortes) und deren
+  KI-Richtlinie die Verbindung des Laufs zulässt; nicht gesperrt, im Papierkorb oder
+  außerhalb ihres Bereichs. Reihenfolge: der Bereich des Ortes zuerst, dann nach
+  Bereichsname. **Zusammen höchstens 4.000 Zeichen**: Jede Seite bekommt einen
+  gleichen Anteil am Rest (mindestens 400, solange so viel übrig ist); was eine Seite
+  nicht braucht, geht an die folgenden. Ein Schnitt endet mit
+  `[… cut: the rest of this memory page is not shown]`; Seiten ohne Platz fehlen, eine
+  Zeile nennt ihre Zahl. Rahmen und Überschriften kommen dazu. Jede Seite ist gerahmt
+  wie ein Werkzeugergebnis (`<untrusted source="memory" space=… space_id=…
+  page_id=…>`): Notizen, keine Anweisungen.
+- **Gelesen**: Bereiche und Seiten des geladenen Gedächtnisses zählen als gelesen
+  (Richtlinie und Rechte vor jedem Modellaufruf, Publikumsregel beim Schreiben). Folge:
+  Ein Lauf im Gespräch allein mit dem Agenten, der Gedächtnis aus Team-Bereich A
+  geladen hat, schreibt nichts in einen Bereich, dessen Publikum A nicht sieht, auch
+  nicht in dessen Gedächtnis. Das ist gewollt: So trägt das Gedächtnis kein Wissen aus
+  einem Team-Bereich in einen anderen.
+- Ohne Gedächtnis sagt der Kontext nichts dazu. Bei jeder Wiederaufnahme wird es neu
+  bestimmt.
+- **Seitenbaum**: Der Baum (`GET /api/spaces/{id}/pages/tree`) kommt flach nach Pfad;
+  Geschwister ordnet die Oberfläche nach `sort_order`. Den Ordner `_agenten` (Pfad
+  `_agenten` auf oberster Ebene) stellt die Oberfläche ans Ende; der Server ordnet ihn
+  nicht um.
 
 ## Testen ohne Anbieter
 

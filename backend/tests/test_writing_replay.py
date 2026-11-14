@@ -36,6 +36,7 @@ WRITING = {
     "create_ticket": 2,
     "link_ticket_page": 2,
     "propose_skill": 2,
+    "update_memory": 2,
     "update_page": 3,
     "assign_ticket": 3,
     "post_message": 3,
@@ -132,6 +133,13 @@ async def _skill(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int
     return args, lambda: _count(work.bench.session, SkillProposal)
 
 
+async def _memory(work: Work) -> tuple[dict[str, Any], Callable[[], Awaitable[int]]]:
+    args = {"space_id": str(work.space.id), "content": "Merke: Inventur."}
+    return args, lambda: _count(
+        work.bench.session, PageVersion, PageVersion.content_md == "Merke: Inventur."
+    )
+
+
 PREPARED: dict[str, Prepare] = {
     "propose_page_change": _proposal,
     "propose_new_page": _new_page,
@@ -142,6 +150,7 @@ PREPARED: dict[str, Prepare] = {
     "assign_ticket": _assign,
     "post_message": _post,
     "propose_skill": _skill,
+    "update_memory": _memory,
 }
 
 

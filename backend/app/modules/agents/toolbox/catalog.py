@@ -15,6 +15,7 @@ from app.core.permissions import Action
 from app.modules.agents.toolbox import (
     conversation,
     listing,
+    memory_tools,
     message_tools,
     past_runs,
     questions,
@@ -164,6 +165,18 @@ CATALOG: dict[str, ToolSpec] = {
             2,
             PROPOSE,
             skill_tools.propose_subjects,
+            Action.PAGE_EDIT,
+        ),
+        ToolSpec(
+            "update_memory",
+            "Replace your memory page in a space (by its id) with new Markdown: notes for "
+            "your later work there, at most 8,000 characters, always the whole text (your "
+            "memory as it is now is in your instructions). People can read and correct it.",
+            memory_tools.UpdateMemoryArgs,
+            memory_tools.update_memory,
+            2,
+            WRITE,
+            memory_tools.memory_subjects,
             Action.PAGE_EDIT,
         ),
         ToolSpec(

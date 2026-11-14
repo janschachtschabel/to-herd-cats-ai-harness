@@ -4,6 +4,7 @@ from app.core.models_base import Base
 from app.core.outbox import EventDelivery, EventOutbox
 from app.core.ratelimit import RateLimitHit
 from app.modules.agents.approvals.models import Approval, RunQuestion
+from app.modules.agents.memory_models import AgentMemory
 from app.modules.agents.models import (
     Agent,
     AgentTool,
@@ -49,6 +50,7 @@ from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
     "Agent",
+    "AgentMemory",
     "AgentSkill",
     "AgentTool",
     "AiConnection",

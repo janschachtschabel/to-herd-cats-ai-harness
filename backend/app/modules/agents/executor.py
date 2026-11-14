@@ -132,7 +132,9 @@ class Executor:
             connection = await steps.connection(agent.connection_id)
             assert connection is not None  # agent_refusal checked it
             location = DataLocation(connection.data_location)
-            added = await briefing.sections(session, actor, agent, location)
+            briefed = await briefing.brief(session, actor, agent, location, place_space)
+            journal.reads.spaces |= briefed.spaces  # the memory it gets is read
+            journal.reads.pages |= briefed.pages
             found = await place.asked(ReadRepository(session, org), claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
@@ -153,7 +155,7 @@ class Executor:
                 tools=tools,
                 reply_to=found.reply_to,
             )
-        instructions = context.instructions(agent.name, agent.instructions, added)
+        instructions = context.instructions(agent.name, agent.instructions, briefed.sections)
         history = context.history(found.turns, instructions)
         return run, target, history, instructions, journal.steps
 

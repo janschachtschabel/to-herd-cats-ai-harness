@@ -120,6 +120,7 @@ class PageService:
         content_md: str = "",
         *,
         slug: str | None = None,
+        exact_slug: bool = False,
         source: VersionSource = VersionSource.HUMAN,
         session_key: str | None = None,
         siblings: Siblings | None = None,
@@ -128,6 +129,8 @@ class PageService:
     ) -> Page:
         """A new draft at the end of its siblings. Its slug comes from `slug` if given
         (an imported file's name), else from the title; a sibling's slug gets a suffix.
+        With `exact_slug`, `slug` is taken as it is while no sibling has it (an agent's
+        memory folder `_agenten`, `agents/memory.py`, which a title never gives).
         `session_key` lets later saves of the same session fold into its first version.
         `siblings` remembers slugs and order per parent across many creations. With
         `publish`, it is published at once if its parent is (or it has none): its
@@ -147,7 +150,9 @@ class PageService:
             parent_path = parent.path
             publish = publish and parent.status == PageStatus.PUBLISHED
         taken = await siblings.slugs(pages, space_id, parent_id)
-        slug = unique_slug(slug or title, taken)
+        slug = (
+            slug if exact_slug and slug and slug not in taken else unique_slug(slug or title, taken)
+        )
         sort_order = await siblings.next_order(pages, space_id, parent_id)
         taken.add(slug)
         who = by.principal if by else actor.principal
