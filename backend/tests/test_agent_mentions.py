@@ -251,3 +251,21 @@ async def test_its_owner_asks_a_personal_agent_in_a_page_thread_of_their_space(w
     )
     assert asked.json()["agent_run"]["id"] is not None
     assert asked.json()["agent_run"]["agent_id"] == pia
+
+
+async def test_a_page_thread_locked_for_ai_never_reaches_the_model(work: Work) -> None:
+    """The thread of a page locked for AI (`no_ai`) is that page's discussion: like a
+    space closed to AI, the run ends `policy_blocked` before any model call."""
+    bench = work.bench
+    page = await publish(work.admin, await new_page(work.admin, work.space.id, "Gesperrt"))
+    lock = {"no_ai": True, "version": page["version"]}
+    r = await work.admin.put(f"/api/pages/{page['id']}/ai-lock", json=lock)
+    assert r.status_code == 200, r.text
+    thread = (await bench.people.alice.get(f"/api/pages/{page['id']}/thread")).json()["id"]
+    body = {"body_md": "@Ava Kennwort ZEBRA-4711", "mentions": [str(bench.agent.id)]}
+    asked = await bench.people.alice.post(f"/api/conversations/{thread}/messages", json=body)
+    assert asked.json()["agent_run"]["id"] is not None
+    assert await bench.run_next() == StopReason.POLICY_BLOCKED
+    assert not [r for r in bench.stub.state.log if r.path.endswith("/chat/completions")]
+    (notice,) = await _replies(work, asked.json()["id"])
+    assert notice["system"]["new"]["value"] == "policy_blocked"

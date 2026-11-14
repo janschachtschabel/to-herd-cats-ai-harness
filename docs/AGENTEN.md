@@ -893,6 +893,10 @@ Direktnachricht starten Läufe so:
 - **Richtlinie des Orts**: Was ein Lauf in einem Kanal oder Thread gefragt wird, ist
   Inhalt dieses Bereichs; dessen KI-Richtlinie gilt (z. B. `none` → `policy_blocked`
   vor dem ersten Aufruf), anders als in einer Direktnachricht, die als `any` zählt.
+  Im Thread einer Seite gilt zudem die Seite selbst als gelesen: Ist sie für KI
+  gesperrt (`no_ai`), endet ein Lauf, den eine Erwähnung dort startet, ebenso mit
+  `policy_blocked` vor dem ersten Aufruf (der Lauf entsteht, das Modell bekommt
+  nichts; der Thread zeigt den Hinweis).
 - **Ticket-Zuweisung** an einen Agenten (Regeln in `docs/TICKETS.md`): Der Lauf hat
   den Ticket-Thread als Ort, die zuweisende Person als Fragende und das Ticket als
   Aufgabe (`run.work_item_id`; das Modell bekommt den Schlüssel und liest das Ticket
@@ -1151,7 +1155,9 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   KI-Verwaltung testen; Netzfreigabe (`networkPolicy.aiEgress`) und Proxy prüfen;
   `HerdRunsFailing`.
 - **„Durch die Richtlinie des Bereichs gestoppt“ (`policy_blocked`):** Ein gelesener
-  Bereich lässt die Verbindung des Agenten nicht zu; das ist gewollt ([`KI.md`](KI.md)).
+  Bereich lässt die Verbindung des Agenten nicht zu, oder eine gelesene Seite (auch die
+  Seite, in deren Thread gefragt wurde) ist für KI gesperrt; das ist gewollt
+  ([`KI.md`](KI.md)).
 - **Viele wartende Läufe** (`herd_runs_waiting`): Freigaben bleiben liegen; die Liste
   „Freigaben“ der fragenden Personen zeigt sie.
 - Logs der Läufe: `runs.claim_failed`, `runs.failed`, `runs.renew_failed`,

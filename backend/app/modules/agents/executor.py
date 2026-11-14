@@ -11,7 +11,9 @@ works.
   those spaces, with the conversation as `any`, allow the connection's data location
   now, and no page read has been locked for AI, trashed or deleted since, nor a ticket
   deleted (else `policy_blocked`); a run in a channel or a thread has read its space
-  (what it is asked there is that space's content); then a place in the connection's
+  (what it is asked there is that space's content), and a run in a page's thread has
+  read that page (a page locked for AI ends it `policy_blocked` before any model
+  call); then a place in the connection's
   `requests_per_minute`.
 - After every model call, in one transaction: the step's `run_event`, its usage
   (`record_usage`) and the step counter. The event's key (run, attempt, step) is
@@ -122,9 +124,12 @@ class Executor:
                 return Outcome("error", detail="attempts")
             org, user = claimed.org_id, claimed.user_id
             journal = replay(await steps.journal())
-            place_space = (await steps.conversation()).space_id
+            where = await steps.conversation()
+            place_space = where.space_id
             if place_space is not None:  # a channel's or a thread's: its policy counts
                 journal.reads.spaces.add(place_space)
+            if where.page_id is not None:  # a page's thread: its `no_ai` counts too
+                journal.reads.pages.add(where.page_id)
             conversation = claimed.conversation_id
             actor = await allowed_actor(session, org, user, agent, journal.reads, conversation)
             if actor is None:
