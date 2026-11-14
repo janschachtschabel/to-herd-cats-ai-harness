@@ -82,13 +82,14 @@ async def test_every_change_is_one_system_message_however_often_delivered(
         "ticket.unassigned",
     ]
     entries = [m["system"] for m in items]
-    moderator = {"id": desk.id_of("moderator"), "name": "Desk moderator"}
+    moderator = {"id": desk.id_of("moderator"), "name": "Desk moderator", "type": "user"}
     assert entries[0] == {
         "key": "ticket.created",
         "actor": moderator,
         "number": None,
         "old": None,
         "new": None,
+        "run_id": None,
     }
     assert entries[1]["new"] == {"value": desk.id_of("editor"), "name": "Desk editor"}
     assert entries[2]["old"] == {"value": ticket["status"]["id"], "name": "Neu"}

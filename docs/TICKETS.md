@@ -120,9 +120,13 @@ Kategorie `cancelled` („Verworfen“). Zwischen Bereichen verschieben lässt e
 
 ### Zuweisung
 
-- Zugewiesen werden in M4 nur Personen (Agenten kommen mit M6), und nur wer die
-  Tickets des Bereichs lesen darf. Alles andere beantwortet die API gleich mit 422
-  `ticket.assignee_invalid`, ob es die Person gibt oder nicht.
+- Zugewiesen werden Personen, die die Tickets des Bereichs lesen dürfen, und (seit M6)
+  Agenten (`assignee: {"type": "agent", "id": …}`): nur wer selbst `ai.use` hat, nur
+  aktive Agenten (kein Entwurf), die Mitglied des Bereichs mit mindestens Rolle
+  `editor` sind. Alles andere beantwortet die API gleich mit 422
+  `ticket.assignee_invalid`, ob es die Person oder den Agenten gibt oder nicht. Ein
+  Agent kann auch der meldende sein (`reporter.type = "agent"`, über sein Werkzeug
+  `create_ticket`); Zeitleiste und Ereignisse nennen ihn dann mit dem Lauf (`run_id`).
 - **„Übernehmen“** weist ein nicht zugewiesenes Ticket sich selbst zu, **„Abgeben“**
   löst die eigene Zuweisung (beides mit `ticket.edit`). **„Jemandem zuweisen“** (mit
   `ticket.assign`) öffnet eine Personenauswahl mit genau den Personen, die den Bereich

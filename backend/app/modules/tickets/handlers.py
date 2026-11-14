@@ -63,8 +63,10 @@ CREATED = "created"  # the name of a creation's own entry
 
 
 def entries(event: Event) -> list[tuple[str, dict[str, object]]]:
-    """The timeline entries of a ticket event: (name, body), in their order."""
+    """The timeline entries of a ticket event: (name, body), in their order. A change an
+    agent's run wrote names the agent as `actor` and the run (`run_id`)."""
     actor = str(event.actor.id)
+    run_id = event.payload.get("run_id")
     found: list[tuple[str, dict[str, object]]] = []
     if event.type == TICKET_CREATED:
         found.append((CREATED, {"key": "ticket.created", "actor": actor}))
@@ -83,6 +85,9 @@ def entries(event: Event) -> list[tuple[str, dict[str, object]]]:
             if not body.get("to"):
                 body.pop("to", None)
         found.append((field.value, body))
+    if isinstance(run_id, str):
+        for _, body in found:
+            body["run_id"] = run_id
     return found
 
 

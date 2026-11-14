@@ -13,7 +13,13 @@ each delivery, metric labels); the worker imports this module (`app/worker/handl
   other than its author; on `proposal.accepted|rejected` for its author when that is a
   person other than whoever decided. Only for people who may see the page's thread when
   the handler runs. The entry is written here if the timeline handler has not run yet
-  (the two run in any order). A withdrawal notifies nobody.
+  (the two run in any order). A new page at the top level has no thread: its
+  notifications (for the moderators, who hold `page.moderate` there now) name the
+  proposal and its space instead (seen by the space's page editors, plan M6 task 6).
+  A withdrawal notifies nobody.
+
+The actor of a proposal made or withdrawn is its author (an agent), so the entry and
+the activity name the agent (`events.py`).
 """
 
 import json
@@ -84,18 +90,23 @@ async def notify_on_proposal(session: AsyncSession, event: Event) -> None:
     if proposal is None:
         return
     person = proposal.author_id if proposal.author_type == PrincipalType.USER else None
+    facts = ProposalFacts(session, event.org_id)
     if event.type == PROPOSAL_CREATED:
-        facts = ProposalFacts(session, event.org_id)
         wanted = {u for u in await facts.moderators(proposal.space_id) if u != person}
     else:
         wanted = {person} if person is not None and person != event.actor.id else set()
     if not wanted:
         return
+    repo = NotificationRepository(session, event.org_id)
+    if event.payload.get("page_id") is None:  # a new page at the top level: no thread
+        rows = [(u, NotificationReason.PROPOSAL) for u in sorted(wanted)]
+        for notification in await repo.add_for_proposal(proposal.id, proposal.space_id, rows):
+            await announce(session, event, notification)
+        return
     entry = await write_entry(session, event)
-    if entry is None:
+    if entry is None or entry.conversation_id is None:
         return
     readers = await readers_of(session, event.org_id, entry.conversation_id, wanted)
-    repo = NotificationRepository(session, event.org_id)
     rows = [(u, NotificationReason.PROPOSAL) for u in sorted(readers)]
     for notification in await repo.add(entry, rows):
         await announce(session, event, notification)

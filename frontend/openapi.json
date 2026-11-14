@@ -145,7 +145,7 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty.",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); `author` may be\nan agent (`type`).",
         "properties": {
           "author": {
             "anyOf": [
@@ -158,7 +158,14 @@
             ]
           },
           "conversation": {
-            "$ref": "#/components/schemas/ActivityConversation"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityConversation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "format": "date-time",
@@ -183,9 +190,16 @@
             "type": "string"
           },
           "message_id": {
-            "format": "uuid",
-            "title": "Message Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
           },
           "parent_id": {
             "anyOf": [
@@ -198,6 +212,16 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "read_at": {
             "anyOf": [
@@ -232,6 +256,27 @@
           "snippet"
         ],
         "title": "ActivityOut",
+        "type": "object"
+      },
+      "ActivityProposal": {
+        "description": "The proposal a notification is about when it has no thread to point at (a new\npage at the top level; its address: the space's proposals).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "space_id"
+        ],
+        "title": "ActivityProposal",
         "type": "object"
       },
       "AgentCreate": {
@@ -960,7 +1005,7 @@
         "type": "string"
       },
       "AssigneeIn": {
-        "description": "M4 assigns people only.",
+        "description": "A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`\nand `ticket.assign`, and starts its work on the ticket.",
         "properties": {
           "id": {
             "format": "uuid",
@@ -968,7 +1013,10 @@
             "type": "string"
           },
           "type": {
-            "const": "user",
+            "enum": [
+              "user",
+              "agent"
+            ],
             "title": "Type",
             "type": "string"
           }
@@ -3406,7 +3454,7 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first.",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first.",
         "properties": {
           "author": {
             "anyOf": [
@@ -3518,6 +3566,18 @@
           "reply_count": {
             "title": "Reply Count",
             "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "system": {
             "anyOf": [
@@ -3716,6 +3776,18 @@
           "reply_count": {
             "title": "Reply Count",
             "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "system": {
             "anyOf": [
@@ -5408,6 +5480,7 @@
         "type": "object"
       },
       "PersonNameOut": {
+        "description": "Who caused a timeline entry: a person, or (plan M6) an agent (`type`).",
         "properties": {
           "id": {
             "format": "uuid",
@@ -5417,6 +5490,10 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PrincipalType",
+            "default": "user"
           }
         },
         "required": [
@@ -7857,7 +7934,7 @@
         "type": "string"
       },
       "SystemEntryOut": {
-        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown), `number` the restored version (only for\n`page.version_restored`), `old`/`new` what a ticket field changed from and to\n(null where there was nothing, and always for title and description).",
+        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6).",
         "properties": {
           "actor": {
             "anyOf": [
@@ -7903,6 +7980,18 @@
                 "type": "null"
               }
             ]
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           }
         },
         "required": [

@@ -10,10 +10,20 @@ with `ctx.actor` in `ctx.session` (its effect and its journal entry commit toget
 it checks its rights itself, before it writes.
 """
 
-from app.modules.agents.toolbox import conversation, listing, past_runs, reading
+from app.modules.agents.toolbox import (
+    conversation,
+    listing,
+    message_tools,
+    past_runs,
+    reading,
+    ticket_tools,
+    wiki_tools,
+)
 from app.modules.agents.toolbox.base import Effect, ToolSpec
 
 READ = Effect.READ
+PROPOSE = Effect.PROPOSE
+WRITE = Effect.WRITE
 
 CATALOG: dict[str, ToolSpec] = {
     spec.name: spec
@@ -98,6 +108,86 @@ CATALOG: dict[str, ToolSpec] = {
             conversation.submit_result,
             1,
             READ,
+        ),
+        ToolSpec(
+            "propose_page_change",
+            "Propose new content for a wiki page (by its id): your full Markdown and a short "
+            "reason. A moderator accepts or rejects it.",
+            wiki_tools.ProposePageChangeArgs,
+            wiki_tools.propose_page_change,
+            2,
+            PROPOSE,
+        ),
+        ToolSpec(
+            "propose_new_page",
+            "Propose a new wiki page in a space (under parent_id, or at the top): title, "
+            "Markdown and a short reason. A moderator accepts or rejects it.",
+            wiki_tools.ProposeNewPageArgs,
+            wiki_tools.propose_new_page,
+            2,
+            PROPOSE,
+        ),
+        ToolSpec(
+            "comment_ticket",
+            "Comment on a ticket (by its key, such as HC-12) in its thread.",
+            ticket_tools.CommentTicketArgs,
+            ticket_tools.comment_ticket,
+            2,
+            WRITE,
+        ),
+        ToolSpec(
+            "set_ticket_status",
+            "Set a ticket's status (by its key) to one of its space's statuses, by name. You "
+            "may set statuses up to review; done and cancelled are set by people.",
+            ticket_tools.SetTicketStatusArgs,
+            ticket_tools.set_ticket_status,
+            2,
+            WRITE,
+        ),
+        ToolSpec(
+            "create_ticket",
+            "Create a ticket in a space: title, Markdown description, kind, priority and "
+            "optionally a parent ticket's key. Returns its key.",
+            ticket_tools.CreateTicketArgs,
+            ticket_tools.create_ticket,
+            2,
+            WRITE,
+        ),
+        ToolSpec(
+            "link_ticket_page",
+            "Link a wiki page (by its id) to a ticket (by its key).",
+            ticket_tools.LinkTicketPageArgs,
+            ticket_tools.link_ticket_page,
+            2,
+            WRITE,
+        ),
+        ToolSpec(
+            "update_page",
+            "Change a wiki page's content directly (only where the space allows it). First "
+            "call without token: you get the diff and a token. Then call again with the same "
+            "content, reason and that token to save.",
+            wiki_tools.UpdatePageArgs,
+            wiki_tools.update_page,
+            3,
+            WRITE,
+        ),
+        ToolSpec(
+            "assign_ticket",
+            "Assign a ticket (by its key) to a person or an agent (type and id), with the "
+            "reason for the handover, which is posted in the ticket's thread.",
+            ticket_tools.AssignTicketArgs,
+            ticket_tools.assign_ticket,
+            3,
+            WRITE,
+        ),
+        ToolSpec(
+            "post_message",
+            "Post a message in the conversation you answer in (reply_to: a message id), or "
+            "in a channel of a space you belong to.",
+            message_tools.PostMessageArgs,
+            message_tools.post_message,
+            3,
+            WRITE,
         ),
     )
 }

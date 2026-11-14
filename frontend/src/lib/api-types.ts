@@ -2375,11 +2375,13 @@ export interface components {
          * @description A notification: why, where, from whom, and the first 140 characters of the
          *     message's Markdown. `parent_id`: the thread the message is in (null: top level).
          *     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
-         *     `author` is who assigned, `snippet` is empty.
+         *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
+         *     level has no conversation and no message, but `proposal` (plan M6); `author` may be
+         *     an agent (`type`).
          */
         ActivityOut: {
             author: components["schemas"]["ActivityAuthor"] | null;
-            conversation: components["schemas"]["ActivityConversation"];
+            conversation: components["schemas"]["ActivityConversation"] | null;
             /**
              * Created At
              * Format: date-time
@@ -2392,18 +2394,33 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /**
-             * Message Id
-             * Format: uuid
-             */
-            message_id: string;
+            /** Message Id */
+            message_id: string | null;
             /** Parent Id */
             parent_id: string | null;
+            proposal?: components["schemas"]["ActivityProposal"] | null;
             /** Read At */
             read_at: string | null;
             reason: components["schemas"]["NotificationReason"];
             /** Snippet */
             snippet: string;
+        };
+        /**
+         * ActivityProposal
+         * @description The proposal a notification is about when it has no thread to point at (a new
+         *     page at the top level; its address: the space's proposals).
+         */
+        ActivityProposal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
         };
         /**
          * AgentCreate
@@ -2718,7 +2735,8 @@ export interface components {
         AiPolicy: "any" | "restricted" | "none";
         /**
          * AssigneeIn
-         * @description M4 assigns people only.
+         * @description A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`
+         *     and `ticket.assign`, and starts its work on the ticket.
          */
         AssigneeIn: {
             /**
@@ -2728,9 +2746,9 @@ export interface components {
             id: string;
             /**
              * Type
-             * @constant
+             * @enum {string}
              */
-            type: "user";
+            type: "user" | "agent";
         };
         /**
          * AssignmentsOut
@@ -3727,6 +3745,7 @@ export interface components {
          *     be allowed to see, `system` only what is named for the reader (review M4 P1). A
          *     deleted message keeps its place with `deleted_at` set and an empty `body_md`.
          *     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
+         *     `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
          *     `mentions`: the people mentioned who may see the conversation; `reactions`: by
          *     emoji, the first reacted with first.
          */
@@ -3766,6 +3785,8 @@ export interface components {
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
             reply_count: number;
+            /** Run Id */
+            run_id?: string | null;
             system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
@@ -3827,6 +3848,8 @@ export interface components {
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
             reply_count: number;
+            /** Run Id */
+            run_id?: string | null;
             system: components["schemas"]["SystemEntryOut"] | null;
         };
         /**
@@ -4388,7 +4411,10 @@ export interface components {
             /** New Password */
             new_password: string;
         };
-        /** PersonNameOut */
+        /**
+         * PersonNameOut
+         * @description Who caused a timeline entry: a person, or (plan M6) an agent (`type`).
+         */
         PersonNameOut: {
             /**
              * Id
@@ -4397,6 +4423,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** @default user */
+            type?: components["schemas"]["PrincipalType"];
         };
         /**
          * PersonOut
@@ -5355,9 +5383,10 @@ export interface components {
          * SystemEntryOut
          * @description A system message's timeline entry, for the client to word: `key` is the page or
          *     ticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused
-         *     it (null if unknown), `number` the restored version (only for
-         *     `page.version_restored`), `old`/`new` what a ticket field changed from and to
-         *     (null where there was nothing, and always for title and description).
+         *     it (null if unknown; an agent with `type` `agent`), `number` the restored version
+         *     (only for `page.version_restored`), `old`/`new` what a ticket field changed from
+         *     and to (null where there was nothing, and always for title and description),
+         *     `run_id` the agent's run that made a ticket change (plan M6 task 6).
          */
         SystemEntryOut: {
             actor: components["schemas"]["PersonNameOut"] | null;
@@ -5367,6 +5396,8 @@ export interface components {
             /** Number */
             number: number | null;
             old: components["schemas"]["SystemValueOut"] | null;
+            /** Run Id */
+            run_id?: string | null;
         };
         /**
          * SystemRole

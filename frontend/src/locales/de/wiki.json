@@ -1,5 +1,6 @@
 {
   "activity": {
+    "proposalWhere": "einem Bereich (neue Seite)",
     "reasons": {
       "proposal": "hat einen Vorschlag zu einer Seite eingereicht oder entschieden ({{where}})"
     }

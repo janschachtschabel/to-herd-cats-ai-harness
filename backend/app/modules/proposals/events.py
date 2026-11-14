@@ -3,7 +3,10 @@
 
 Subject: the proposal; space: its space. Payload: ids only, never a title, content
 or reason: `proposal_id`, and `page_id`, the page whose thread gets the entry (a
-change: its page; a new page: its parent, none at the top level). Handlers:
+change: its page; a new page: its parent, none at the top level); `author_id` when its
+author is a person (who always gets its live events, plan M6 task 6). The actor of a
+proposal made or withdrawn is its author (an agent's run: the agent); of a decision,
+whoever decided. Handlers:
 `proposal_timeline` and `notify_on_proposal` (`handlers.py`), and `publish_live`,
 which makes each one `proposal.changed` for the space's page editors.
 """
@@ -12,8 +15,8 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.actor import Actor
-from app.core.outbox import emit
+from app.core.outbox import Acting, emit
+from app.core.principal import PrincipalType
 from app.modules.proposals.models import PageProposal, ProposalKind
 
 PROPOSAL_CREATED = "proposal.created"
@@ -30,9 +33,15 @@ def thread_page_id(proposal: PageProposal) -> uuid.UUID | None:
 
 
 async def proposal_event(
-    session: AsyncSession, actor: Actor, type_: str, proposal: PageProposal
+    session: AsyncSession, actor: Acting, type_: str, proposal: PageProposal
 ) -> None:
     page_id = thread_page_id(proposal)
+    payload: dict[str, object] = {
+        "proposal_id": str(proposal.id),
+        "page_id": str(page_id) if page_id else None,
+    }
+    if proposal.author_type == PrincipalType.USER:
+        payload["author_id"] = str(proposal.author_id)
     await emit(
         session,
         type=type_,
@@ -40,8 +49,5 @@ async def proposal_event(
         space_id=proposal.space_id,
         subject_type="proposal",
         subject_id=proposal.id,
-        payload={
-            "proposal_id": str(proposal.id),
-            "page_id": str(page_id) if page_id else None,
-        },
+        payload=payload,
     )

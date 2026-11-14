@@ -26,10 +26,11 @@ class Group:
     """The tickets of one person (None: nobody) in one status."""
 
     assignee_id: uuid.UUID | None
-    assignee_name: str | None
+    assignee_name: str | None  # a person's (an agent's is named by `daily.py`)
     status_id: uuid.UUID
     count: int
     changed: int  # how many changed status since the moment asked about
+    assignee_type: PrincipalType | None = None
 
 
 class DailyRepository(ViewRepository):
@@ -37,7 +38,14 @@ class DailyRepository(ViewRepository):
         """Every (person, status) of the space's tickets under the filters."""
         changed = func.count().filter(WorkItem.status_changed_at >= since)
         stmt = (
-            select(WorkItem.assignee_id, User.name, WorkItem.status_id, func.count(), changed)
+            select(
+                WorkItem.assignee_id,
+                User.name,
+                WorkItem.status_id,
+                func.count(),
+                changed,
+                WorkItem.assignee_type,
+            )
             .outerjoin(
                 User,
                 and_(
@@ -47,11 +55,11 @@ class DailyRepository(ViewRepository):
                 ),
             )
             .where(self._visible(), self._in_space(space_id))
-            .group_by(WorkItem.assignee_id, User.name, WorkItem.status_id)
+            .group_by(WorkItem.assignee_id, User.name, WorkItem.status_id, WorkItem.assignee_type)
         )
         stmt = self._filtered(stmt, filters)
         return [
-            Group(row[0], row[1], row[2], int(row[3]), int(row[4]))
+            Group(row[0], row[1], row[2], int(row[3]), int(row[4]), row[5])
             for row in await self.session.execute(stmt)
         ]
 

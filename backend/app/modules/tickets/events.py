@@ -8,7 +8,9 @@ an event exists exactly when its change committed. One event per change:
   entry (`VALUED`): ids (status, assignee, parent, a page linked or unlinked) and
   enumeration values or dates. Tags are only named.
   A title or description change is only named, never carried (plan M4 Global
-  Constraints): payloads hold ids and enumeration values, never text.
+  Constraints): payloads hold ids and enumeration values, never text. A change an
+  agent's run wrote also names the run (`run_id`, plan M6 task 6); the event's actor
+  is then the agent.
 - `sprint.created`, `sprint.updated`, `sprint.started`, `sprint.closed` (plan M4b;
   payload `sprint_id` and `fields`, the names of the fields that changed); subject:
   the sprint. Closing a sprint also writes one `ticket.updated` (field `sprint`) per
@@ -80,9 +82,12 @@ def _text(value: Value) -> str | None:
 
 
 def payload(
-    ticket_id: uuid.UUID, conversation_id: uuid.UUID | None, changes: Changes
+    ticket_id: uuid.UUID,
+    conversation_id: uuid.UUID | None,
+    changes: Changes,
+    run_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
-    return {
+    found: dict[str, Any] = {
         "ticket_id": str(ticket_id),
         "conversation_id": str(conversation_id) if conversation_id else None,
         "fields": sorted(field.value for field in changes),
@@ -92,6 +97,9 @@ def payload(
             if field in VALUED
         },
     }
+    if run_id is not None:
+        found["run_id"] = str(run_id)
+    return found
 
 
 async def ticket_event(
@@ -103,6 +111,7 @@ async def ticket_event(
     space_id: uuid.UUID,
     conversation_id: uuid.UUID | None,
     changes: Changes,
+    run_id: uuid.UUID | None = None,
 ) -> None:
     await emit(
         session,
@@ -111,7 +120,7 @@ async def ticket_event(
         space_id=space_id,
         subject_type="ticket",
         subject_id=ticket_id,
-        payload=payload(ticket_id, conversation_id, changes),
+        payload=payload(ticket_id, conversation_id, changes, run_id),
     )
 
 

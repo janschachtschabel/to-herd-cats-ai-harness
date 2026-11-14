@@ -20,7 +20,7 @@ from app.modules.proposals.events import PROPOSAL_EVENTS
 from app.modules.proposals.handlers import notify_on_proposal, proposal_timeline
 from app.modules.proposals.service import ProposalService
 from app.worker.registry import REGISTRY
-from tests.factories_proposals import accept, agent_change, agent_new, reject
+from tests.factories_proposals import AGENT, accept, agent_change, agent_new, reject
 from tests.factories_wiki import Wiki, new_page
 from tests.test_access import actor_of
 
@@ -112,10 +112,10 @@ async def test_the_page_thread_tells_without_content(wiki: Wiki, session: AsyncS
     assert (await accept(wiki.moderator, change)).status_code == 200
     assert (await reject(wiki.moderator, top)).status_code == 200
     await _handle(session, times=2)
-    moderator, editor = str(wiki.users["moderator"].id), str(wiki.users["editor"].id)
-    assert await _entries(session, parent["id"]) == [
-        {"key": "proposal.created", "actor": editor},
-        {"key": "proposal.created", "actor": editor},
+    moderator, agent = str(wiki.users["moderator"].id), str(AGENT.id)
+    assert await _entries(session, parent["id"]) == [  # an agent's proposal names the agent
+        {"key": "proposal.created", "actor": agent},
+        {"key": "proposal.created", "actor": agent},
         {"key": "proposal.accepted", "actor": moderator},
     ]
     thread = (await wiki.editor.get(f"/api/pages/{parent['id']}/thread")).json()

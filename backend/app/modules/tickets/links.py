@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
 from app.core.access import Actor
+from app.core.authorship import Authorship
 from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams, decode_cursor, encode_cursor
 from app.modules.tickets import listing
@@ -45,17 +46,21 @@ class TicketLinks:
     def _repo(self, actor: Actor) -> LinkRepository:
         return LinkRepository(self.session, ticket_repository(self.session, actor).scope)
 
-    async def link(self, actor: Actor, number: int, page_id: uuid.UUID) -> None:
+    async def link(
+        self, actor: Actor, number: int, page_id: uuid.UUID, by: Authorship | None = None
+    ) -> bool:
+        """Whether the link is new; `by`: written for an agent (its run)."""
         _, ticket = await editable(self.session, actor, number)
         await PageReader(self.session).readable(actor, page_id)
         links = self._repo(actor)
         if not await links.link(ticket.id, page_id):
-            return  # already linked: nothing changes
+            return False  # already linked: nothing changes
         if await links.count(ticket.id) > MAX_LINKS:  # the error undoes the insert
             raise ValidationFailed(
                 f"A ticket links at most {MAX_LINKS} pages", code="ticket.too_many_pages"
             )
-        await self._emit(actor, ticket, None, page_id)
+        await self._emit(actor, ticket, None, page_id, by)
+        return True
 
     async def unlink(self, actor: Actor, number: int, page_id: uuid.UUID) -> None:
         _, ticket = await editable(self.session, actor, number)
@@ -92,6 +97,12 @@ class TicketLinks:
         return pagination.Page[TicketView](items=items, next_cursor=cursor)
 
     async def _emit(
-        self, actor: Actor, ticket: WorkItem, old: uuid.UUID | None, new: uuid.UUID | None
+        self,
+        actor: Actor,
+        ticket: WorkItem,
+        old: uuid.UUID | None,
+        new: uuid.UUID | None,
+        by: Authorship | None = None,
     ) -> None:
-        await emit_change(self.session, actor, TICKET_UPDATED, ticket, {Field.PAGE: (old, new)})
+        changes = {Field.PAGE: (old, new)}
+        await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes, by)

@@ -166,13 +166,13 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
         CheckConstraint(
             f"char_length(description_md) <= {MAX_DESCRIPTION_CHARS}", name="description_length"
         ),
-        # M4: people only; agents widen these checks in M6.
+        # People, and agents since M6 (plan M6 decision 7).
         CheckConstraint(
             "(assignee_type IS NULL) = (assignee_id IS NULL)"
-            " AND (assignee_type IS NULL OR assignee_type IN ('user'))",
+            " AND (assignee_type IS NULL OR assignee_type IN ('user', 'agent'))",
             name="assignee",
         ),
-        CheckConstraint("reporter_type IN ('user')", name="reporter_type"),
+        CheckConstraint("reporter_type IN ('user', 'agent')", name="reporter_type"),
         CheckConstraint("parent_id <> id", name="parent_not_self"),
         Index("ix_work_item_space_id_status_id", "space_id", "status_id"),
         Index("ix_work_item_assignee", "assignee_type", "assignee_id"),

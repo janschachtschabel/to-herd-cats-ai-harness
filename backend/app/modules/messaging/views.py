@@ -59,11 +59,13 @@ class SystemEntry:
     number: int | None
     old: SystemValue | None = None
     new: SystemValue | None = None
+    actor_type: PrincipalType = PrincipalType.USER  # an agent's change: `agent`
+    run_id: uuid.UUID | None = None  # the agent's run that made the change
 
 
 @dataclass(frozen=True, slots=True)
 class _Names:
-    people: dict[uuid.UUID, str]
+    people: dict[uuid.UUID, str]  # people and agents (whose ids name no person)
     statuses: dict[uuid.UUID, str]
     tickets: dict[uuid.UUID, str]  # keys (`HC-12`)
     sprints: dict[uuid.UUID, str]
@@ -126,7 +128,9 @@ def _refs(bodies: Sequence[dict[str, object]], keys: frozenset[str]) -> set[uuid
     return found
 
 
-def _system_entry(body: dict[str, object] | None, names: _Names) -> SystemEntry | None:
+def _system_entry(
+    body: dict[str, object] | None, names: _Names, agents: set[uuid.UUID]
+) -> SystemEntry | None:
     if body is None:
         return None
     key = str(body["key"])
@@ -139,6 +143,8 @@ def _system_entry(body: dict[str, object] | None, names: _Names) -> SystemEntry 
         number=number if isinstance(number, int) else None,
         old=names.of(key, body.get("from")),
         new=names.of(key, body.get("to")),
+        actor_type=PrincipalType.AGENT if actor in agents else PrincipalType.USER,
+        run_id=_uuid(body.get("run_id")),
     )
 
 
@@ -156,14 +162,18 @@ async def message_views(
         for m in messages
         if m.author_id is not None and m.author_type == PrincipalType.AGENT
     }
-    agent_names = await agent_hooks().names(session, actor.org_id, agents) if agents else {}
     people |= {a for b in present if (a := _uuid(b.get("actor"))) is not None}
     people |= _refs(present, PERSON_KEYS)
+    people_names = await UserRepository(session).names(actor.org_id, people)
+    # Ids on timeline entries that name no person: agents (an agent's change or an
+    # agent assignee, plan M6), named with the authors in one look-up.
+    agents |= {p for p in people if p not in people_names}
+    agent_names = await agent_hooks().names(session, actor.org_id, agents) if agents else {}
     hooks = ticket_hooks()
     tickets = hooks.names(session, actor.org_id, space_ids_with(actor, Action.TICKET_READ))
     numbers = await tickets.numbers(_refs(present, TICKET_KEYS))
     names = _Names(
-        people=await UserRepository(session).names(actor.org_id, people),
+        people={**agent_names, **people_names},
         statuses=await tickets.status_names(_refs(present, STATUS_KEYS)),
         tickets={ref: hooks.key(number) for ref, number in numbers.items()},
         sprints=await tickets.sprint_names(_refs(present, SPRINT_KEYS)),
@@ -175,7 +185,7 @@ async def message_views(
             mentions.get(m.id, []),
             reactions.get(m.id, []),
             author_name=_author_name(m, names.people, agent_names),
-            system=_system_entry(bodies[m.id], names),
+            system=_system_entry(bodies[m.id], names, set(agent_names)),
         )
         for m in messages
     ]

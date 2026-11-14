@@ -28,19 +28,30 @@ class ActivityAuthor(BaseModel):
     name: str
 
 
+class ActivityProposal(BaseModel):
+    """The proposal a notification is about when it has no thread to point at (a new
+    page at the top level; its address: the space's proposals)."""
+
+    id: uuid.UUID
+    space_id: uuid.UUID
+
+
 class ActivityOut(BaseModel):
     """A notification: why, where, from whom, and the first 140 characters of the
     message's Markdown. `parent_id`: the thread the message is in (null: top level).
     `read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:
-    `author` is who assigned, `snippet` is empty."""
+    `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
+    level has no conversation and no message, but `proposal` (plan M6); `author` may be
+    an agent (`type`)."""
 
     id: uuid.UUID
     reason: NotificationReason
     created_at: datetime
     read_at: datetime | None
     done_at: datetime | None
-    conversation: ActivityConversation
-    message_id: uuid.UUID
+    conversation: ActivityConversation | None
+    message_id: uuid.UUID | None
+    proposal: ActivityProposal | None = None
     parent_id: uuid.UUID | None
     author: ActivityAuthor | None
     snippet: str
@@ -50,23 +61,29 @@ class ActivityOut(BaseModel):
         n = entry.notification
         author = None
         if entry.author_id is not None and entry.author_name is not None:
-            author = ActivityAuthor(
-                type=PrincipalType.USER, id=entry.author_id, name=entry.author_name
-            )
-        return cls(
-            id=n.id,
-            reason=n.reason,
-            created_at=n.created_at,
-            read_at=n.read_at,
-            done_at=n.done_at,
-            conversation=ActivityConversation(
+            kind = PrincipalType(entry.author_type or PrincipalType.USER)
+            author = ActivityAuthor(type=kind, id=entry.author_id, name=entry.author_name)
+        conversation = None
+        if n.conversation_id is not None and entry.conversation_kind is not None:
+            conversation = ActivityConversation(
                 id=n.conversation_id,
                 kind=entry.conversation_kind,
                 name=entry.conversation_name,
                 space_id=entry.space_id,
                 page_id=entry.page_id,
                 ticket_number=entry.ticket_number,
-            ),
+            )
+        proposal = None
+        if n.proposal_id is not None and n.space_id is not None:
+            proposal = ActivityProposal(id=n.proposal_id, space_id=n.space_id)
+        return cls(
+            id=n.id,
+            reason=n.reason,
+            created_at=n.created_at,
+            read_at=n.read_at,
+            done_at=n.done_at,
+            conversation=conversation,
+            proposal=proposal,
             message_id=n.message_id,
             parent_id=entry.parent_id,
             author=author,

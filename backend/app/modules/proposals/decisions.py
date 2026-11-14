@@ -5,7 +5,10 @@ actor with a `read_scope` gets 403), naming the proposal's `version` (409).
 Accepting a change writes the page exactly as a Markdown save (`PageService.update`):
 a new version with the reason as its change text, written for the author (an agent:
 source `agent`, its run; `authorship.py`), and a new generation, so open live
-sessions end. Never into a page in the trash (409 `proposal.page_trashed`), never
+sessions end. Accepted with a merged text (`merged_content`, the moderator's
+confirmation or own resolution), the version is the moderator's (source `human`, no
+run): the text is no longer the author's; the proposal links it (`result_version_id`).
+Never into a page in the trash (409 `proposal.page_trashed`), never
 into a page locked for AI when the author is an agent (409 `proposal.page_no_ai`).
 
 The merge rule: when the page's content is still the base, the proposal applies as it
@@ -120,14 +123,15 @@ class ProposalDecisions:
                 raise await _outdated(proposal, page)
             content = merged_content
         before = page.version
+        merged = merged_content is not None  # the moderator's text: the moderator's version
         await self.pages.update(
             actor,
             page.id,
             content_md=content,
             version=page.version,
             change_summary=proposal.reason,
-            source=_source(author),
-            by=Authorship(author, proposal.run_id),
+            source=VersionSource.HUMAN if merged else _source(author),
+            by=None if merged else Authorship(author, proposal.run_id),
         )
         if page.version == before:  # the page holds this content already
             return None

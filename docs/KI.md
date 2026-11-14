@@ -287,6 +287,34 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   - `submit_result`: gibt das Ergebnis ab; sein Text ist die Antwort, der Lauf endet
     `completed` ohne weiteren Modellaufruf (auch nach einer Wiederaufnahme genau einmal).
 
+  Schreibende Werkzeuge (M6; `backend/app/modules/agents/toolbox/{wiki,ticket,message}_tools.py`)
+  gehen durch dieselben Dienste wie Menschen, mit dem Akteur des Laufs (Rechte, Lese-
+  und Schreibbereich, Rolle des Agenten, `no_ai`). Was sie schreiben, nennt den Agenten
+  als Autor und den Lauf (`run_id`); Ereignisse und Zeitleisten nennen den Agenten
+  (`actor.type = "agent"`, `run_id`). Nichts, was der Lauf in einem anderen Bereich
+  gelesen hat, geht in einen Bereich, dessen Publikum es nicht sehen darf (Antwort
+  „Not allowed: what you have read in this run …“, nichts geschrieben). Kein Werkzeug löscht, legt in den
+  Papierkorb oder entscheidet Vorschläge.
+  - Stufe 2: `propose_page_change`, `propose_new_page` (Vorschläge, nur mit
+    `page.edit` für den Lauf), `comment_ticket` (Nachricht `kind: agent` im
+    Ticket-Thread), `set_ticket_status` (höchstens Kategorie `review`; `done` und
+    `cancelled` setzt nur eine Person, die Antwort nennt die erlaubten Status),
+    `create_ticket` (meldend: der Agent), `link_ticket_page` (einmal je Seite).
+  - Stufe 3: `update_page` in zwei Schritten: der erste Aufruf liefert den Diff zur
+    aktuellen Version und ein `token` (gebunden an Lauf, Seite, Version und beide
+    Inhalte), erst der zweite Aufruf mit diesem Token schreibt, als Version der Quelle
+    `agent` mit neuer Generation (laufende Sitzungen enden). Nur in Bereichen mit
+    `agent_write_policy = direct`, sonst die Antwort „propose instead“; eine Seite mit
+    `no_ai` wird nie geschrieben (auch nicht, wenn sie zwischen Diff und Schreiben
+    gesperrt wird). `assign_ticket` (an Person oder Agent, mit Grund als Kommentar im
+    Ticket-Thread; Agenten nur als Mitglied mit mindestens Rolle `editor` des Bereichs).
+    `post_message` nur in das Gespräch des Laufs oder in einen Kanal eines Bereichs, in
+    dem der Agent Mitglied ist.
+  - Jede Wirkung steht in derselben Transaktion wie ihr Journaleintrag; nach einer
+    Wiederaufnahme wird der Aufruf aus dem Journal eingespielt, nicht wiederholt.
+    Abgelehnte Schreibversuche nehmen alles zurück (Savepoint) und antworten mit dem
+    Fehlercode (`Not allowed (…)`, `Refused (…)`, `Changed meanwhile (…)`).
+
   Listen lassen wie `search` schon in der Abfrage weg, was die Verbindung nicht
   empfangen darf (Richtlinie, `no_ai`); was nicht lesbar ist, antwortet wie nicht
   vorhanden. Jedes Ergebnis nennt die Bereiche, aus denen es stammt (`spaces`).

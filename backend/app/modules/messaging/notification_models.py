@@ -3,7 +3,9 @@
 the message is the timeline entry of the assignment) and `ticket_comment` (a comment
 on a ticket I am assigned to or reported; plan M4 decision 10); `proposal` (a page
 proposal: made, for the space's moderators; decided, for its author; plan M6
-decision 8: the message is the proposal's entry in the page's thread).
+decision 8: the message is the proposal's entry in the page's thread; a new page at
+the top level has no thread, so its notification names the proposal and its space
+instead of a conversation and a message).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -14,7 +16,15 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,17 +50,40 @@ class Notification(UuidPk, OrgScoped, Base):
         Index("ix_notification_user_id_id", "user_id", "id"),
         Index("ix_notification_conversation_id", "conversation_id"),
         Index("ix_notification_message_id", "message_id"),
+        # Bound to a message, or (a proposal without a thread) to the proposal.
+        CheckConstraint(
+            "(message_id IS NOT NULL AND conversation_id IS NOT NULL AND proposal_id IS NULL"
+            " AND space_id IS NULL) OR (message_id IS NULL AND conversation_id IS NULL"
+            " AND proposal_id IS NOT NULL AND space_id IS NOT NULL)",
+            name="target",
+        ),
+        Index(
+            "uq_notification_proposal",
+            "user_id",
+            "proposal_id",
+            "reason",
+            unique=True,
+            postgresql_where=text("message_id IS NULL"),
+        ),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
     )
     reason: Mapped[NotificationReason] = mapped_column(String(16), nullable=False)
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("conversation.id", ondelete="CASCADE")
     )
-    message_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE"), nullable=False
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("message.id", ondelete="CASCADE")
+    )
+    # A proposal with no thread to tell (a new page at the top level, plan M6 task 6),
+    # in its space (who may see it: the space's page editors).
+    proposal_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page_proposal.id", ondelete="CASCADE")
+    )
+    space_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("space.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

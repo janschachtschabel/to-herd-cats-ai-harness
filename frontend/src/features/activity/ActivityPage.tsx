@@ -111,12 +111,16 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const done = useMarkActivityDone(entry.id)
   const unread = !entry.read_at && !entry.done_at
   const Icon = REASON_ICONS[entry.reason]
-  const where = conversationLabel(t, entry.conversation, me?.user.id)
+  const where = entry.conversation
+    ? conversationLabel(t, entry.conversation, me?.user.id)
+    : t('activity.proposalWhere')
   const author = entry.author?.name ?? t('messaging.message.unknownAuthor')
 
   const go = () => {
     if (!entry.read_at) read.mutate()
-    open(messageTarget(entry.conversation, entry.message_id, entry.parent_id))
+    if (entry.conversation && entry.message_id) {
+      open(messageTarget(entry.conversation, entry.message_id, entry.parent_id))
+    }
   }
 
   return (

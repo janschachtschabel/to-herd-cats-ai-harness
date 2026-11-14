@@ -85,10 +85,21 @@ async def scopes(
         seen = await repo.read_by_all(set(agent_roles), place.people)
         return Scopes(_only(agent_roles, seen), WriteScope.of(seen))
     assert place.space_id is not None
-    audience = {place.space_id}
-    if not await repo.has_guests(place.space_id):
-        audience |= await repo.open_ids()
+    audience = await space_audience(session, org_id, place.space_id)
     return Scopes(_only(agent_roles, audience), WriteScope.of({place.space_id}))
+
+
+async def space_audience(
+    session: AsyncSession, org_id: uuid.UUID, space_id: uuid.UUID
+) -> set[uuid.UUID]:
+    """The spaces whose content the audience of a place in the space may receive: the
+    space, and the open spaces while it has no guest. A writing tool writes into a
+    space only what came from these (plan M6 review focus 1)."""
+    repo = ScopeRepository(session, org_id)
+    audience = {space_id}
+    if not await repo.has_guests(space_id):
+        audience |= await repo.open_ids()
+    return audience
 
 
 def _only(roles: dict[uuid.UUID, SpaceRole], spaces: set[uuid.UUID]) -> ReadScope:

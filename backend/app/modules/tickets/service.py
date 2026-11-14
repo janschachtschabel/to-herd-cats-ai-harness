@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
 from app.core.access import Action, Actor, require
+from app.core.authorship import Authorship
 from app.core.errors import ValidationFailed
 from app.core.pagination import PageParams
 from app.core.principal import Principal
@@ -72,7 +73,9 @@ class TicketService:
         due_on: date | None = None,
         parent_id: uuid.UUID | None = None,
         assignee: Principal | None = None,
+        by: Authorship | None = None,
     ) -> TicketView:
+        """`by`: written for an agent (its run): the reporter and the event's actor."""
         await require(self.session, actor, Action.TICKET_CREATE, space_id)
         repo = ticket_repository(self.session, actor)
         status = await self._status(actor, space_id, status_id)
@@ -96,15 +99,15 @@ class TicketService:
                 priority=priority,
                 assignee_type=assignee.type if assignee else None,
                 assignee_id=assignee.id if assignee else None,
-                reporter_type=actor.principal.type,
-                reporter_id=actor.principal.id,
+                reporter_type=(by.principal if by else actor.principal).type,
+                reporter_id=(by.principal if by else actor.principal).id,
                 due_on=due_on,
             )
         )
         changes: dict[Field, tuple[Any, Any]] = {}
         if assignee is not None:
             changes[Field.ASSIGNEE] = (None, assignee.id)
-        await emit_change(self.session, actor, TICKET_CREATED, ticket, changes)
+        await emit_change(self.session, actor, TICKET_CREATED, ticket, changes, by)
         await self._audit(actor, "ticket.created", ticket, {"number": ticket.number})
         await self._audit_changes(actor, ticket, changes, status)
         return await view_of(self.session, actor, repo, ticket.id)
@@ -136,9 +139,15 @@ class TicketService:
         return await sprint_repository(self.session, actor).get(view.ticket.sprint_id)
 
     async def update(
-        self, actor: Actor, number: int, version: int, values: dict[str, Any]
+        self,
+        actor: Actor,
+        number: int,
+        version: int,
+        values: dict[str, Any],
+        by: Authorship | None = None,
     ) -> TicketView:
-        """`values`: the fields the client sent (`TicketUpdate`), null ones included."""
+        """`values`: the fields the client sent (`TicketUpdate`), null ones included.
+        `by`: written for an agent (its run), the event's actor."""
         parent_id = values.get("parent_id")
         held: dict[uuid.UUID, Sprint] = {}
         if "sprint_id" in values:
@@ -158,7 +167,7 @@ class TicketService:
         _apply(ticket, values, changes)
         ticket.version += 1
         await self.session.flush()
-        await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes)
+        await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes, by)
         await self._audit_changes(actor, ticket, changes, status)
         return await view_of(self.session, actor, repo, ticket.id)
 

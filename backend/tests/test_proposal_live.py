@@ -80,3 +80,38 @@ async def test_proposal_changes_reach_page_editors_only(
     for stream in streams.values():
         await stream.expect_nothing()
         await stream.close()
+
+
+async def test_a_persons_proposal_reaches_its_author_even_as_a_viewer(
+    real_db: RealDb, live: LiveServer, pair: tuple[Person, Person]
+) -> None:
+    """Plan M6 task 6 (ruling c): an author always hears of their proposal."""
+    owner, _ = pair
+    viewer = await make_person(real_db, live, "author@real.example.com")
+    outsider = await make_person(real_db, live, "nobody@real.example.com")
+    space = (await owner.client.post("/api/spaces", json={"name": "T", "kind": "team"})).json()
+    await _member(owner, space["id"], viewer, "viewer")
+    page = await owner.client.post(
+        f"/api/spaces/{space['id']}/pages", json={"title": "Offen", "content_md": "alt"}
+    )
+    assert page.status_code == 201, page.text
+    published = await owner.client.post(
+        f"/api/pages/{page.json()['id']}/publish", json={"version": page.json()["version"]}
+    )
+    assert published.status_code == 200, published.text
+    await drain(real_db.database)
+    streams = {"viewer": await viewer.stream(real_db), "outsider": await outsider.stream(real_db)}
+    async with real_db.database.session_factory() as session:
+        user = await session.scalar(select(User).where(User.id == uuid.UUID(viewer.id)))
+        assert user is not None
+        actor = await actor_for(session, AuthContext(user=user))
+        proposal = await ProposalService(session).propose_change(
+            actor, uuid.UUID(page.json()["id"]), "neu", "Grund", author=Principal.user(user.id)
+        )
+        await session.commit()
+    await drain(real_db.database)
+    event = await streams["viewer"].until_event("proposal.changed")
+    assert event.data == {"space_id": space["id"], "proposal_id": str(proposal.id)}
+    await streams["outsider"].expect_nothing()
+    for stream in streams.values():
+        await stream.close()

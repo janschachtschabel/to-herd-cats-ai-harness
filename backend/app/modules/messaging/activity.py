@@ -7,7 +7,10 @@ read or done is idempotent; a change is emitted as `activity.changed` (the perso
 id only), so the person's other tabs can refresh.
 """
 
+import builtins
+import dataclasses
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +19,9 @@ from app.core.access import Actor
 from app.core.errors import NotFound
 from app.core.outbox import emit
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
+from app.core.principal import PrincipalType
 from app.modules.messaging.activity_repository import ActivityEntry, ActivityRepository
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.messaging.visibility import ConversationReader
 
 
@@ -39,7 +44,30 @@ class ActivityService:
     ) -> Page[ActivityEntry]:
         before = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self._repo(actor).page(before, params.limit + 1, only_open=only_open)
-        return id_page(rows, params.limit, lambda e: e.notification.id)
+        return id_page(await self._named(actor, rows), params.limit, lambda e: e.notification.id)
+
+    async def _named(
+        self, actor: Actor, rows: Sequence[ActivityEntry]
+    ) -> builtins.list[ActivityEntry]:
+        """Agents as authors (an agent's message, timeline entry or proposal, plan M6):
+        a person's name comes with the row; an author id that names no person is
+        looked up among the agents."""
+        ids = {
+            e.author_id
+            for e in rows
+            if e.author_id is not None
+            and e.author_name is None
+            and e.author_type in (None, PrincipalType.AGENT)
+        }
+        if not ids:
+            return list(rows)
+        names = await agent_hooks().names(self.session, actor.org_id, ids)
+        return [
+            dataclasses.replace(e, author_name=names[e.author_id], author_type=PrincipalType.AGENT)
+            if e.author_id in names and e.author_name is None
+            else e
+            for e in rows
+        ]
 
     async def count_open(self, actor: Actor) -> ActivityCount:
         open_, unread = await self._repo(actor).counts()

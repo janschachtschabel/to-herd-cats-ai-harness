@@ -20,10 +20,11 @@ conversation (one level; the services check it). A top-level message counts its
 replies (`reply_count`, `last_reply_at`), kept in the reply's transaction under a row
 lock on the parent. Deleting is soft: `deleted_at` is set and the text emptied.
 `system` messages (spec 6.2) exist only in page and ticket threads and (M5) in a DM
-with an agent, where they say why a run stopped; `agent` messages (an agent's answer)
-only in a DM the agent takes part in. Database triggers (migrations m3 messages, m4
-ticket threads, m5 agents) refuse them anywhere else and refuse to change a
-conversation's kind.
+with an agent, where they say why a run stopped; `agent` messages (an agent's answer
+or what its tools wrote, M6) only in a DM the agent takes part in or in a channel, page
+thread or ticket thread of a space the agent is a member of. Database triggers
+(migrations m3 messages, m4 ticket threads, m5 agents, m6 writing tools) refuse them
+anywhere else and refuse to change a conversation's kind.
 """
 
 import uuid
@@ -186,7 +187,9 @@ class MessageKind(StrEnum):
     HUMAN = "human"
     # Page and ticket threads, and a DM with an agent (a run's stop; database triggers).
     SYSTEM = "system"
-    AGENT = "agent"  # an agent's answer, in a DM it takes part in; `client_id` = the run
+    # An agent's message (its run in `run_id`): in a DM it takes part in, or in a
+    # conversation of a space it is a member of (plan M6 task 6).
+    AGENT = "agent"
 
 
 SYSTEM_AUTHOR = "system"  # `author_type` of system messages, which have no author id
@@ -205,7 +208,7 @@ class Message(UuidPk, OrgScoped, Base):
             " AND (kind = 'agent') = (author_type = 'agent')",
             name="author",
         ),
-        # An agent's answer names its run (`client_id`), once (with the unique key above).
+        # An agent's message has a key (`client_id`: its run's answer, or a tool call).
         CheckConstraint("kind <> 'agent' OR client_id IS NOT NULL", name="agent_run"),
         CheckConstraint(f"char_length(body_md) <= {MAX_BODY_CHARS}", name="body_length"),
         # A system message names the event it was written for (`client_id`), once.
@@ -242,6 +245,8 @@ class Message(UuidPk, OrgScoped, Base):
     kind: Mapped[MessageKind] = mapped_column(String(16), nullable=False)
     body_md: Mapped[str] = mapped_column(Text, nullable=False)
     client_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    # The agent's run that wrote it (an answer, or a tool's message: plan M6 task 6).
+    run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

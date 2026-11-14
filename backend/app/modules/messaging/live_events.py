@@ -9,6 +9,7 @@ only, never content:
      "w": <ticket_id>, "s": <space_id> (ticket events only),
      "r": <sprint_id> (sprint events only, with "s"),
      "x": <proposal_id> (proposal events only, with "s"),
+     "a": <author_id> (proposal events of a person's proposal only),
      "n": <run_id>, "k": <step> (`run.progress` only)}
 
 `u` names the one person an event is for (`notification.created`,
@@ -22,7 +23,9 @@ that ticket and that space's lists only, review M4 P4). Sprint events
 space `s`: whoever may read tickets there gets it, with the space's and the sprint's
 id (and nothing else). Proposal events (`proposal.created|accepted|rejected|
 withdrawn`, plan M6 task 5) are one `proposal.changed` for the space `s`, for whoever
-may edit pages there (who sees proposals), with the proposal's id. `run.progress`
+may edit pages there (who sees proposals), with the proposal's id, and for the
+proposal's author when that is a person who may read the space (`a`, plan M6 task 6:
+an author always hears of their proposal). `run.progress`
 (plan M5 task 6) names an agent's run in a DM
 as `n` and its steps so far as `k`, for whoever may see the DM `c` (its person).
 Every API process's hub
@@ -98,6 +101,7 @@ class LiveEvent:
     run_id: uuid.UUID | None = None  # run.progress only, with `step`
     step: int | None = None
     proposal_id: uuid.UUID | None = None  # proposal events only
+    author_id: uuid.UUID | None = None  # a person's proposal: its author gets it too
 
     @property
     def for_space(self) -> bool:
@@ -130,6 +134,8 @@ class LiveEvent:
             data["k"] = self.step
         if self.proposal_id is not None:
             data["x"] = str(self.proposal_id)
+        if self.author_id is not None:
+            data["a"] = str(self.author_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
@@ -187,6 +193,7 @@ def of_event(event: Event) -> LiveEvent | None:
             space_id=event.space_id,
             sprint_id=_uuid(payload.get("sprint_id")),
             proposal_id=_uuid(payload.get("proposal_id")),
+            author_id=_uuid(payload.get("author_id")) if event.type in PROPOSAL_TYPES else None,
         )
     run = event.type == "run.progress"
     step = payload.get("step")
@@ -226,7 +233,7 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x")
+        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a")
         ids = {key: _strict_uuid(data.get(key)) for key in keys}
         org_id = _strict_uuid(data.get("o"))
         step = data.get("k")
@@ -249,6 +256,7 @@ def decode(raw: str) -> LiveEvent | None:
         ids["n"],
         step,
         ids["x"],
+        ids["a"],
     )
 
 

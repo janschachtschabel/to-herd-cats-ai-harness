@@ -11,7 +11,10 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require, space_ids_with
+from app.core.authorship import Authorship, acting
 from app.core.errors import Conflict, NotFound
+from app.core.principal import PrincipalType
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.tags.models import SubjectType
 from app.modules.tags.repository import tag_repository
 from app.modules.tickets.events import Changes, ticket_event
@@ -74,18 +77,25 @@ async def editable(
 
 
 async def emit_change(
-    session: AsyncSession, actor: Actor, type_: str, ticket: WorkItem, changes: Changes
+    session: AsyncSession,
+    actor: Actor,
+    type_: str,
+    ticket: WorkItem,
+    changes: Changes,
+    by: Authorship | None = None,
 ) -> None:
-    """The change's one event, naming the ticket's thread."""
+    """The change's one event, naming the ticket's thread; `by`: written for an agent
+    (its run), which the event names as its actor."""
     thread = await TicketThreadRepository(session, actor.org_id).thread_for(ticket)
     await ticket_event(
         session,
-        actor,
+        acting(actor, by),
         type_,
         ticket_id=ticket.id,
         space_id=ticket.space_id,
         conversation_id=thread.id,
         changes=changes,
+        run_id=by.run_id if by else None,
     )
 
 
@@ -98,7 +108,41 @@ async def with_tags(
     tags = await tag_repository(session, actor).tags_for(
         SubjectType.TICKET, [v.ticket.id for v in views]
     )
-    return [dataclasses.replace(v, tags=tuple(tags.get(v.ticket.id, ()))) for v in views]
+    agents = await agent_names(session, actor.org_id, views)
+    return [
+        dataclasses.replace(
+            v,
+            tags=tuple(tags.get(v.ticket.id, ())),
+            assignee_name=_name(v.ticket.assignee_type, v.ticket.assignee_id, agents)
+            or v.assignee_name,
+            reporter_name=_name(v.ticket.reporter_type, v.ticket.reporter_id, agents)
+            or v.reporter_name,
+        )
+        for v in views
+    ]
+
+
+async def agent_names(
+    session: AsyncSession, org_id: uuid.UUID, views: Sequence[TicketView]
+) -> dict[uuid.UUID, str]:
+    """The names of the agents the views name as assignee or reporter (plan M6
+    decision 7); people's names come with the views."""
+    ids = {
+        pid
+        for v in views
+        for ptype, pid in (
+            (v.ticket.assignee_type, v.ticket.assignee_id),
+            (v.ticket.reporter_type, v.ticket.reporter_id),
+        )
+        if ptype == PrincipalType.AGENT and pid is not None
+    }
+    return await agent_hooks().names(session, org_id, ids) if ids else {}
+
+
+def _name(
+    ptype: PrincipalType | None, pid: uuid.UUID | None, agents: dict[uuid.UUID, str]
+) -> str | None:
+    return agents.get(pid) if ptype == PrincipalType.AGENT and pid is not None else None
 
 
 async def view_of(

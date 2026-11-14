@@ -27,9 +27,10 @@ Description = Annotated[str, Field(max_length=MAX_DESCRIPTION_CHARS, description
 
 
 class AssigneeIn(BaseModel):
-    """M4 assigns people only."""
+    """A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`
+    and `ticket.assign`, and starts its work on the ticket."""
 
-    type: Literal[PrincipalType.USER]
+    type: Literal[PrincipalType.USER, PrincipalType.AGENT]
     id: uuid.UUID
 
 

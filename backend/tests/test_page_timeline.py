@@ -42,10 +42,11 @@ async def test_publishing_writes_one_system_message_even_when_delivered_twice(
     editor = wiki.users["editor"]
     assert system["system"] == {
         "key": "page.published",
-        "actor": {"id": str(editor.id), "name": editor.name},
+        "actor": {"id": str(editor.id), "name": editor.name, "type": "user"},
         "number": None,
         "old": None,
         "new": None,
+        "run_id": None,
     }
     hidden = await messages(wiki.viewer, thread["id"], include_system="false")
     assert hidden == []

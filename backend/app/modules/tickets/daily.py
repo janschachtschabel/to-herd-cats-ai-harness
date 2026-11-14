@@ -21,6 +21,8 @@ from datetime import UTC, datetime, time, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, require
+from app.core.principal import PrincipalType
+from app.modules.messaging.agent_hooks import agent_hooks
 from app.modules.tickets.base import ticket_repository, with_tags
 from app.modules.tickets.daily_repository import DailyRepository, Group
 from app.modules.tickets.listing import Filters
@@ -57,6 +59,7 @@ class Row:
     assignee_id: uuid.UUID | None  # None: assigned to nobody
     assignee_name: str | None
     cells: list[Cell]
+    assignee_type: PrincipalType = PrincipalType.USER  # an agent's row: `agent`
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +70,17 @@ class Daily:
     truncated: bool
 
 
-def _people(groups: list[Group]) -> list[tuple[uuid.UUID, str | None]]:
-    named = {g.assignee_id: g.assignee_name for g in groups if g.assignee_id is not None}
+def _people(
+    groups: list[Group], agents: dict[uuid.UUID, str]
+) -> list[tuple[uuid.UUID, str | None]]:
+    """Whoever has tickets (people and agents, plan M6 decision 7), by name."""
+    named = {
+        g.assignee_id: agents.get(g.assignee_id)
+        if g.assignee_type == PrincipalType.AGENT
+        else g.assignee_name
+        for g in groups
+        if g.assignee_id is not None
+    }
     return sorted(named.items(), key=lambda p: ((p[1] or "").casefold(), str(p[0])))
 
 
@@ -82,7 +94,15 @@ class DailyBoard:
         statuses = await status_repository(self.session, actor).in_space(space_id)
         repo = DailyRepository(self.session, ticket_repository(self.session, actor).scope)
         groups = await repo.groups(space_id, filters, since)
-        people = _people(groups)
+        agent_ids = {
+            g.assignee_id
+            for g in groups
+            if g.assignee_type == PrincipalType.AGENT and g.assignee_id is not None
+        }
+        agents = (
+            await agent_hooks().names(self.session, actor.org_id, agent_ids) if agent_ids else {}
+        )
+        people = _people(groups, agents)
         shown = people[:MAX_ROWS]
         unassigned = any(g.assignee_id is None for g in groups)
         ids = [person_id for person_id, _ in shown]
@@ -101,7 +121,8 @@ class DailyBoard:
                 cursor = encode(board_position(items[-1])) if more else None
                 count, changed = (group.count, group.changed) if group else (0, 0)
                 row_cells.append(Cell(status.id, count, changed, items, cursor))
-            rows.append(Row(person_id, name, row_cells))
+            kind = PrincipalType.AGENT if person_id in agent_ids else PrincipalType.USER
+            rows.append(Row(person_id, name, row_cells, kind))
         totals = {s.id: sum(g.count for g in groups if g.status_id == s.id) for s in statuses}
         columns = [Column(s, totals[s.id], [], None) for s in statuses]
         return Daily(columns, rows, since, len(people) > MAX_ROWS)

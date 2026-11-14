@@ -10,7 +10,10 @@ Posting is idempotent per author and `client_id`: a resend returns the first mes
 with an agent queues the agent's run in the same transaction, if the person and the
 agent may (`agent_hooks.after_post`; `Posted.agent_run` says which run, or why none).
 Posting and editing take the ids the message mentions (`mentions.py`); those who may
-not see the conversation come back in `not_notified`. Every change is emitted
+not see the conversation come back in `not_notified`. An agent's run posts with the
+rights of the person who asked, written for the agent (`by`, plan M6 task 6): the
+message is the agent's (`kind=agent`, its run in `run_id`, a `client_id` from the
+tool call), mentions nobody and starts no run. Every change is emitted
 (`message.created|updated|deleted`, payload ids only) in its transaction; message
 text never goes into events or logs.
 """
@@ -23,6 +26,7 @@ from typing import NamedTuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can
+from app.core.authorship import Authorship, acting
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.outbox import emit
@@ -118,28 +122,33 @@ class MessageService:
         parent_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         mentions: Iterable[uuid.UUID] = (),
+        by: Authorship | None = None,
     ) -> Posted:
         conversation = await self.reader.readable(actor, conversation_id)
         await self.reader.require_post(actor, conversation)
         body_md = checked_body(body_md)
-        asked = mentioning.asked(mentions)
+        asked = mentioning.asked(mentions) if by is None else []
+        if by is not None and client_id is None:
+            raise ValueError("an agent's message needs a client_id")
+        author = by.principal if by else actor.principal
         repo = self.repo(actor)
         parent = await threads.lock_parent(repo, conversation, parent_id) if parent_id else None
         message = await repo.insert(
             {
                 "conversation_id": conversation.id,
                 "parent_id": parent_id,
-                "author_type": actor.principal.type,
-                "author_id": actor.principal.id,
-                "kind": MessageKind.HUMAN,
+                "author_type": author.type,
+                "author_id": author.id,
+                "kind": MessageKind.HUMAN if by is None else MessageKind.AGENT,
                 "body_md": body_md,
                 "client_id": client_id,
+                "run_id": by.run_id if by else None,
                 "created_at": utcnow(),
             }
         )
         if message is None:  # only with a client_id: its author sent it before
             assert client_id is not None
-            first = await repo.by_client_id(actor.principal.id, client_id)
+            first = await repo.by_client_id(author.id, client_id)
             if first is None or (first.conversation_id, first.parent_id) != (
                 conversation.id,
                 parent_id,
@@ -153,9 +162,9 @@ class MessageService:
         missed = await mentioning.mention(
             self.session, actor.org_id, conversation, message.id, asked
         )
-        await self._emit(actor, conversation, message, "message.created")
+        await self._emit(actor, conversation, message, "message.created", by)
         run = None
-        if conversation.kind == ConversationKind.DM:
+        if conversation.kind == ConversationKind.DM and by is None:
             run = await agent_hooks().after_post(self.session, actor, conversation, message)
         return Posted(message, True, missed, run)
 
@@ -258,13 +267,18 @@ class MessageService:
         return await can(self.session, actor, Action.CHANNEL_MANAGE, conversation.space_id)
 
     async def _emit(
-        self, actor: Actor, conversation: Conversation, message: Message, type_: str
+        self,
+        actor: Actor,
+        conversation: Conversation,
+        message: Message,
+        type_: str,
+        by: Authorship | None = None,
     ) -> None:
         parent = str(message.parent_id) if message.parent_id else None
         await emit(
             self.session,
             type=type_,
-            actor=actor,
+            actor=acting(actor, by),
             space_id=conversation.space_id,
             subject_type="message",
             subject_id=message.id,

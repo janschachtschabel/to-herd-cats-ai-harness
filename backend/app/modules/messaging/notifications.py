@@ -93,8 +93,12 @@ async def announce(session: AsyncSession, event: Event, notification: Notificati
         subject_id=notification.id,
         payload={
             "notification_id": str(notification.id),
-            "conversation_id": str(notification.conversation_id),
-            "message_id": str(notification.message_id),
+            "conversation_id": _text(notification.conversation_id),
+            "message_id": _text(notification.message_id),
             "user_id": str(notification.user_id),
         },
     )
+
+
+def _text(value: uuid.UUID | None) -> str | None:
+    return str(value) if value is not None else None

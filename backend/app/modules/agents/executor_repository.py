@@ -249,6 +249,7 @@ class RunSteps:
                 kind=MessageKind.AGENT,
                 body_md=text_md,
                 client_id=self.run.id,
+                run_id=self.run.id,
                 created_at=utcnow(),
             )
             .on_conflict_do_nothing(index_elements=["author_id", "client_id"])

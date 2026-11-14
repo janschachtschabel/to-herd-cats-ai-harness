@@ -13,7 +13,7 @@ from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal
 from app.modules.proposals.models import PageProposal
 from app.modules.proposals.service import ProposalService
-from app.modules.wiki.models import Page
+from app.modules.wiki.models import Page, PageVersion, VersionSource
 from tests.factories_proposals import (
     AGENT,
     RUN_ID,
@@ -174,6 +174,20 @@ async def test_a_moved_on_page_needs_the_merge_confirmed(wiki: Wiki, session: As
     )
     assert done.status_code == 200, done.text
     assert (await _page_row(session, page["id"])).content_md == "EINS\nzwei\ndrei\nVIER\n"
+    # A merged text is the moderator's version, linked from the proposal (ruling d).
+    row = await session.scalar(
+        select(PageProposal)
+        .where(PageProposal.id == proposal.id)
+        .execution_options(populate_existing=True)
+    )
+    assert row is not None and row.result_version_id is not None
+    version = await session.scalar(
+        select(PageVersion).where(PageVersion.id == row.result_version_id)
+    )
+    assert version is not None
+    moderator = wiki.users["moderator"].id
+    assert (version.author_type, version.author_id, version.run_id) == ("user", moderator, None)
+    assert (version.source, version.change_summary) == (VersionSource.HUMAN, "Tippfehler")
 
 
 async def test_a_conflict_is_never_applied_silently(wiki: Wiki, session: AsyncSession) -> None:

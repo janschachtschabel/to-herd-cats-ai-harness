@@ -1,4 +1,5 @@
-"""What messaging asks of agents (`messaging/agent_hooks.py`), registered on import
+"""What messaging and tickets ask of agents (`messaging/agent_hooks.py`,
+`tickets/agent_hooks.py`), registered on import
 (by the agent routes and the worker's handlers; not by the package, whose models the
 core's repositories import).
 
@@ -8,6 +9,10 @@ otherwise the message stays without one and the answer says why. Replies in a th
 start nothing, and so does a message while the conversation's run waits for a
 person's answer (`run.waiting`: that run answers first, and when it ends it queues a
 run for what came meanwhile).
+
+Tickets go to an agent (plan M6 decision 7) only from someone with `ai.use`, and only
+to an agent that is no draft and a member of the ticket's space with a role that may
+edit tickets there (it should comment and move the status).
 """
 
 import uuid
@@ -15,13 +20,17 @@ from collections.abc import Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.access import Action, can
 from app.core.actor import Actor
+from app.core.permissions import SPACE_ACTION_MIN_ROLE
 from app.core.principal import PrincipalType
+from app.modules.agents.models import AgentStatus
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import Refusal, refusal, visible_agent
 from app.modules.messaging.agent_hooks import RunStart, register_agent_hooks
 from app.modules.messaging.models import Conversation, ConversationKind, Message
+from app.modules.tickets.agent_hooks import register_assignee_hooks
 
 
 class _Hooks:
@@ -55,4 +64,19 @@ class _Hooks:
         return await AgentRepository(session, org_id).names(set(ids))
 
 
+class _Assignees:
+    async def assignable(
+        self, session: AsyncSession, actor: Actor, space_id: uuid.UUID, agent_id: uuid.UUID
+    ) -> bool:
+        if not await can(session, actor, Action.AI_USE):
+            return False
+        repo = AgentRepository(session, actor.org_id)
+        agent = await repo.get(agent_id)
+        if agent is None or agent.status == AgentStatus.DRAFT:
+            return False
+        role = (await repo.roles(agent_id)).get(space_id)
+        return role is not None and role >= SPACE_ACTION_MIN_ROLE[Action.TICKET_EDIT]
+
+
 register_agent_hooks(_Hooks())
+register_assignee_hooks(_Assignees())

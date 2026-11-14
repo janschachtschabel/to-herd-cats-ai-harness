@@ -77,8 +77,11 @@ class MessageAuthorOut(BaseModel):
 
 
 class PersonNameOut(BaseModel):
+    """Who caused a timeline entry: a person, or (plan M6) an agent (`type`)."""
+
     id: uuid.UUID
     name: str
+    type: PrincipalType = PrincipalType.USER
 
 
 class SystemValueOut(BaseModel):
@@ -97,27 +100,30 @@ class SystemValueOut(BaseModel):
 class SystemEntryOut(BaseModel):
     """A system message's timeline entry, for the client to word: `key` is the page or
     ticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused
-    it (null if unknown), `number` the restored version (only for
-    `page.version_restored`), `old`/`new` what a ticket field changed from and to
-    (null where there was nothing, and always for title and description)."""
+    it (null if unknown; an agent with `type` `agent`), `number` the restored version
+    (only for `page.version_restored`), `old`/`new` what a ticket field changed from
+    and to (null where there was nothing, and always for title and description),
+    `run_id` the agent's run that made a ticket change (plan M6 task 6)."""
 
     key: str
     actor: PersonNameOut | None
     number: int | None
     old: SystemValueOut | None
     new: SystemValueOut | None
+    run_id: uuid.UUID | None = None
 
     @classmethod
     def of(cls, entry: SystemEntry) -> "SystemEntryOut":
         actor = None
         if entry.actor_id is not None and entry.actor_name is not None:
-            actor = PersonNameOut(id=entry.actor_id, name=entry.actor_name)
+            actor = PersonNameOut(id=entry.actor_id, name=entry.actor_name, type=entry.actor_type)
         return cls(
             key=entry.key,
             actor=actor,
             number=entry.number,
             old=SystemValueOut.of(entry.old),
             new=SystemValueOut.of(entry.new),
+            run_id=entry.run_id,
         )
 
 
@@ -127,6 +133,7 @@ class MessageOut(BaseModel):
     be allowed to see, `system` only what is named for the reader (review M4 P1). A
     deleted message keeps its place with `deleted_at` set and an empty `body_md`.
     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
+    `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
     `mentions`: the people mentioned who may see the conversation; `reactions`: by
     emoji, the first reacted with first."""
 
@@ -137,6 +144,7 @@ class MessageOut(BaseModel):
     kind: MessageKind
     body_md: str
     client_id: uuid.UUID | None
+    run_id: uuid.UUID | None = None
     created_at: datetime
     edited_at: datetime | None
     deleted_at: datetime | None
@@ -162,6 +170,7 @@ class MessageOut(BaseModel):
             kind=message.kind,
             body_md="" if message.kind == MessageKind.SYSTEM else message.body_md,
             client_id=message.client_id,
+            run_id=message.run_id,
             created_at=message.created_at,
             edited_at=message.edited_at,
             deleted_at=message.deleted_at,

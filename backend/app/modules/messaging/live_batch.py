@@ -1,15 +1,16 @@
 """A batch of live events to the open streams that may have them (review M3 N1).
 
 The hub takes whatever is queued (at most BATCH_SIZE events) and answers who may get
-each of them in at most four statements for the whole batch, whatever its size:
+each of them in at most five statements for the whole batch, whatever its size:
 
 - `receiving_pairs`: every (login session, conversation) of the batch where the
   session is valid and its person may see the conversation now;
 - `valid_sessions`: the valid sessions among those an event without a conversation
   is for (one person's own events);
 - `space_readers`: every (login session, space) where the session is valid and its
-  person may read the space's tickets now (sprint events, plan M4b), and once more
-  for those who may edit its pages (proposal events, plan M6).
+  person may read the space's tickets now (sprint events, plan M4b), once more
+  for those who may edit its pages (proposal events, plan M6), and once more for a
+  proposal's author who may read the space (a person's proposal, plan M6 task 6).
 
 Nothing is remembered between batches, so a membership removed while a stream is
 open stops the next batch already. When the check fails (database error), every
@@ -68,6 +69,10 @@ async def deliver_batch(
             assert item.event.space_id is not None
             space_ids[item.event.space_action].add(item.event.space_id)
             space_sessions[item.event.space_action].update(c.session_id for c in targets)
+            authors = [c for c in targets if c.user_id == item.event.author_id]
+            if authors:
+                space_ids[Action.SPACE_READ].add(item.event.space_id)
+                space_sessions[Action.SPACE_READ].update(c.session_id for c in authors)
         elif item.event.conversation_id is None:
             person_sessions.update(c.session_id for c in targets)
         else:
@@ -105,7 +110,10 @@ def _may_have(
     readers: set[tuple[Action, uuid.UUID, uuid.UUID]],
 ) -> bool:
     if event.for_space:
-        return (event.space_action, connection.session_id, event.space_id) in readers
+        if (event.space_action, connection.session_id, event.space_id) in readers:
+            return True
+        author = event.author_id is not None and event.author_id == connection.user_id
+        return author and (Action.SPACE_READ, connection.session_id, event.space_id) in readers
     if event.conversation_id is not None:
         return (connection.session_id, event.conversation_id) in pairs
     return connection.session_id in valid

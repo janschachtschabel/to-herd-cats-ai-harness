@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import pagination
 from app.core.access import Action, Actor, require, space_ids_with, visible_space_ids
 from app.core.errors import Forbidden, NotFound, ValidationFailed
+from app.core.outbox import EventActor
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.core.principal import Principal, PrincipalType
 from app.modules.ai.models import AiPolicy
@@ -225,7 +226,9 @@ class ProposalService:
         rules.check_open(proposal, version)
         rules.decide(proposal, actor, ProposalState.WITHDRAWN)
         await self.session.flush()
-        await proposal_event(self.session, actor, PROPOSAL_WITHDRAWN, proposal)
+        await proposal_event(
+            self.session, EventActor(actor.org_id, author), PROPOSAL_WITHDRAWN, proposal
+        )
         return proposal
 
     async def _readable(self, actor: Actor, page_id: uuid.UUID, author: Principal) -> Page:
@@ -234,6 +237,10 @@ class ProposalService:
         return await self.reader.readable(actor, page_id)
 
     async def _made(self, actor: Actor, proposal: PageProposal) -> PageProposal:
+        """Stored, and its event names its author (the agent of a run) as the actor."""
         proposal = await self.repo(actor).add(proposal)
-        await proposal_event(self.session, actor, PROPOSAL_CREATED, proposal)
+        author = Principal(PrincipalType(proposal.author_type), proposal.author_id)
+        await proposal_event(
+            self.session, EventActor(actor.org_id, author), PROPOSAL_CREATED, proposal
+        )
         return proposal

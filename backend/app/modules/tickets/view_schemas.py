@@ -3,7 +3,6 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.core.principal import PrincipalType
 from app.modules.tickets.daily import Cell, Daily, Row
 from app.modules.tickets.models import StatusCategory
 from app.modules.tickets.repository import TicketView
@@ -81,9 +80,7 @@ class BoardRowOut(BaseModel):
     def of(cls, row: Row, since: datetime) -> "BoardRowOut":
         assignee = None
         if row.assignee_id is not None:
-            assignee = PersonOut(
-                type=PrincipalType.USER, id=row.assignee_id, name=row.assignee_name
-            )
+            assignee = PersonOut(type=row.assignee_type, id=row.assignee_id, name=row.assignee_name)
         return cls(assignee=assignee, cells=[BoardCellOut.of(c, since) for c in row.cells])
 
 

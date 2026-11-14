@@ -1,5 +1,6 @@
 {
   "activity": {
+    "proposalWhere": "a space (a new page)",
     "reasons": {
       "proposal": "submitted or decided a proposal for a page ({{where}})"
     }
