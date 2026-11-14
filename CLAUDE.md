@@ -3,26 +3,31 @@
 Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brainstorming → writing-plans → subagent-driven-development/executing-plans, TDD, verification-before-completion.
 
 Knowledge & agent cockpit for companies. The authority is the design spec
-`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4 (plans
-`docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
-`2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`) are built; the next
-milestone is M5 "KI-Grundlage" (spec 14), its plan is not written yet. Present:
-identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree, Markdown
-and live editor (`collab/` process, generations), versions, trash, tags, attachments
-(`HERD_DATA_DIR`), full-text search, import/export (M2); messaging: event outbox and
-worker role, channels, direct messages (2–9 people), threads, mentions, reactions, read
-state, page threads with a system timeline, notifications and the activity view, message
-search, live delivery over SSE (LISTEN/NOTIFY, several API nodes), audited admin
-inspection of DMs (M3); tickets: key `HC-<n>` numbered per org, kinds
-epic/story/task/bug with a three-level hierarchy, statuses per space whose category
-alone drives logic, assignment, list and "my tickets", board, epic overview, a ticket
-thread with a system timeline, ticket cards in messages (client-side, nothing written to
-channels), page links, tags, search (M4). Planned, not present: AI and agents (agent
-assignees and their ticket rules come in M6), DBOS (M6: the outbox dispatcher is a plain
-loop until then), embeddings, S3, collab with Redis. Operations: `README.md`
-(Betriebshinweise), `docs/STECKBRIEF.md` (update its measurements each milestone),
-`docs/WIKI.md` (wiki use and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging
-use, worker/outbox, SSE behind a proxy), `docs/TICKETS.md` (ticket use and operation).
+`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4 and M4b
+(plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`, `…-m2-wiki.md`,
+`2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
+`2026-11-13-m4b-boards-sprints.md`) are built; the next milestone is M5 "KI-Grundlage"
+(spec 14), its plan is not written yet. Present: identity, groups, spaces, roles,
+`can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
+process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
+search, import/export (M2); messaging: event outbox and worker role, channels, direct
+messages (2–9 people), threads, mentions, reactions, read state, page threads with a
+system timeline, notifications and the activity view, message search, live delivery over
+SSE (LISTEN/NOTIFY, several API nodes), audited admin inspection of DMs (M3); tickets:
+key `HC-<n>` numbered per org, kinds epic/story/task/bug with a three-level hierarchy,
+statuses per space whose category alone drives logic, assignment, list and "my tickets",
+board, epic overview, a ticket thread with a system timeline, ticket cards in messages
+(client-side, nothing written to channels), page links, tags, search (M4); sprints per
+space (at most one active; closing moves the unfinished to the next sprint or the backlog
+and keeps a tally), backlog, "my board" across spaces by status category, the board's
+daily view grouped by person with what changed status since the last working day (UTC,
+Monday to Friday) (M4b). Planned, not present: AI and agents (agent assignees and their
+ticket rules come in M6), DBOS (M6: the outbox dispatcher is a plain loop until then),
+embeddings, S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
+`docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
+and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
+behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
+boards).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -40,12 +45,15 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   LISTEN via `core/listen.py`, SSE `GET /api/stream`); frontend one `EventSource` per
   tab (`src/lib/live.ts`), events only invalidate TanStack Query keys.
 - Tickets: module `modules/tickets` (statuses, hierarchy, assignment, links, tagging,
-  views for board/epics/counts, search part; `base.py` holds what its services share),
+  views for board/epics/counts, search part; `base.py` holds what its services share;
+  M4b: `sprints.py`, `my_board.py`, `daily.py` with their repositories, routers and
+  schemas; `work_item.status_changed_at` is set by a trigger),
   thread kind `thread_ticket` in `modules/messaging`, handlers `ticket_timeline` and
   `notify_on_ticket`; the key prefix is the constant `KEY_PREFIX` (`tickets/models.py`)
   and `TICKET_PREFIX` (`frontend/src/features/tickets/refs.ts`). Frontend
-  `features/tickets` (board with `@dnd-kit/core`, no sortable); what to offer comes from
-  `ticketAbilities(my_role)`.
+  `features/tickets` (board with `@dnd-kit/core`, no sortable; `sprints/`, `my-board/`,
+  `daily/`); what to offer comes from `ticketAbilities(my_role)`. Sprint events go live
+  as one SSE name, `sprint.changed` (`space_id`, `sprint_id`).
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
@@ -172,9 +180,11 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   answers exactly like a free number (404 `ticket.not_found`, same shape and time
   class); lists, board, counts and search filter visible spaces in SQL. Nothing about a
   ticket is ever written into a channel or DM (acceptance M4; `e2e/tests/tickets-quiet`).
-- Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, shared API helpers in
-  `demo_api.py`) goes through the public API only; extend it and its test with each
-  milestone.
+  A ticket's sprint belongs to its space (foreign key `(sprint_id, space_id)`); lock
+  sprints before tickets.
+- Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
+  shared API helpers in `demo_api.py`) goes through the public API only; extend it and
+  its test with each milestone.
 - e2e on the board: dnd-kit's keyboard sensor listens for keys only after a timer of its
   own; after picking a card up, wait one turn of the page's timers before an arrow key.
 

@@ -5,10 +5,10 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 4 (Tickets) ist gebaut.** Aus M1: Anmeldung, Personen,
-Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine Rechteprüfung, Audit, die
-Oberfläche mit Navigation und Verwaltung, Image, Compose, Helm-Chart und CI. Aus M2
-ein Wiki in jedem Bereich:
+**Stand: Meilenstein 4 (Tickets) ist gebaut, dazu M4b (Boards und Sprints).** Aus M1:
+Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
+Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
+Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
 
 - **Seiten** in einem Baum (verschieben und sortieren per Dialog, per Tastatur
   bedienbar), Entwurf oder veröffentlicht, Wiki-Links `[[Titel]]`, Inhaltsverzeichnis.
@@ -59,6 +59,20 @@ Aus M4 Tickets:
 - **Verknüpfte Seiten** (von beiden Seiten, auch über Bereichsgrenzen; sichtbar nur, wer
   beide Enden sieht), **Tags** und **Suche** (Strg+K findet Tickets, auch über
   `HC-42`).
+
+Aus M4b Boards und Sprints:
+
+- **Sprints je Bereich** (Reiter „Sprints“): anlegen, starten (höchstens einer läuft),
+  abschließen mit der Wahl, ob Unerledigtes in den nächsten Sprint oder zurück in den
+  Vorrat geht; die Bilanz (geplant, erledigt, übertragen) bleibt am Sprint. Der Wechsel
+  des Sprints steht als Systemmeldung in der Ticket-Diskussion, nie in einem Kanal.
+- **Vorrat** (Reiter „Vorrat“): Tickets ohne Sprint, mehrere auf einmal „in Sprint
+  legen“. Am Ticket das Feld „Sprint“.
+- **Mein Board** (Seitenleiste): alle mir zugewiesenen Tickets aller Bereiche, Spalten
+  nach Kategorie; Ziehen setzt den ersten Status dieser Kategorie im Bereich des Tickets.
+- **Daily-Ansicht:** das Board eines Bereichs „nach Person gruppiert“, voreingestellt
+  auf den laufenden Sprint, mit Hervorhebung dessen, was seit dem letzten Arbeitstag den
+  Status gewechselt hat; ein Klick auf eine Person filtert auf sie.
 
 KI-Agenten folgen ab M5. Bedienung und Betrieb des Wikis:
 [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten: [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md),
@@ -207,10 +221,11 @@ an der API `npm run generate:api` im Frontend ausführen.
 
 Demodaten für eine frische Test-Installation (drei Personen, der Bereich „Team Nord“
 mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht,
-eine Seiten-Diskussion mit Systemmeldungen, dazu neun Tickets: ein Epic mit Stories,
+eine Seiten-Diskussion mit Systemmeldungen, dazu elf Tickets: ein Epic mit Stories,
 Aufgaben und einem Fehler in mehreren Status samt einem eigenen Status „Blockiert“,
 Zuweisungen, Tags, eine verknüpfte Seite, Kommentare und ein Ticket-Schlüssel im Kanal;
-der Worker muss laufen):
+drei Sprints: „Sprint 45“ abgeschlossen mit Bilanz, „Sprint 46“ laufend, „Sprint 47“
+geplant, und ein Vorrat; der Worker muss laufen):
 
 ```bash
 cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
@@ -256,7 +271,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M4. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M4b. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -540,6 +555,13 @@ kennen.
   dauerhaft) lassen die Outbox wachsen, Systemmeldungen kommen dann später
   ([Steckbrief](docs/STECKBRIEF.md#tickets-m4)). Keine neuen Einstellungen. Einzelheiten:
   [`docs/TICKETS.md`](docs/TICKETS.md#betrieb).
+- **Sprints und Boards (seit M4b):** zwei Migrationen, beide nur erweiternd (Tabelle
+  `sprint`, `work_item.sprint_id`, `work_item.status_changed_at` mit Trigger); keine neuen
+  Einstellungen. Das Abschließen eines Sprints ist eine Transaktion mit einem Ereignis je
+  verschobenem Ticket; der Worker arbeitet sie in der Bahn der Systemmeldungen ab,
+  andere Handler warten nicht darauf (gemessen im
+  [Steckbrief](docs/STECKBRIEF.md#sprints-und-boards-m4b)). „Seit dem letzten
+  Arbeitstag“ rechnet in UTC, Montag bis Freitag.
 - **Nachrichteninhalte** und Titel oder Beschreibungen von Tickets stehen nie im Log, in
   `NOTIFY`-Nutzlasten, in Ereignissen der Outbox oder in Metrik-Labels; Live-Ereignisse
   tragen nur IDs.

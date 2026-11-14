@@ -472,6 +472,14 @@ Agenten löschen nie. Delegation an andere Agenten erfolgt in v1 **nur über Tic
 
 *Geändert in M4: Die Fälligkeit ist ein Datum, `due_on` (DATE) statt `due_at`, ohne Uhrzeit und Zeitzone. Das Präfix des Schlüssels ist fest `HC` (ein einstellbares Präfix kommt, wenn es jemand braucht). Die Verknüpfungstabelle heißt `ticket_page_link`. Es gibt keine Handsortierung: In einer Board-Spalte gilt Priorität absteigend, Fälligkeit aufsteigend (ohne Datum zuletzt), Nummer. Plan M4, Entscheidungen 1, 7 und 8; Bedienung in `docs/TICKETS.md`.*
 
+*Ergänzt in M4b [Jan, 13.11.2026]: Sprints und Boards für das Daily. Plan M4b (`docs/superpowers/plans/2026-11-13-m4b-boards-sprints.md`); Bedienung in `docs/TICKETS.md`.*
+
+- **`sprint`**: `space_id`, `name`, `goal` (kurzer Text), `starts_on` und `ends_on` (Datum), `state` (`planned`, `active`, `closed`), Bilanz (geplant, erledigt, übertragen; beim Abschluss festgehalten), `version`. Team = Bereich: Ein Sprint gehört zu genau einem Bereich, je Bereich ist höchstens einer aktiv (eindeutiger Teilindex). `work_item.sprint_id`: höchstens ein Sprint des eigenen Bereichs; Tickets ohne Sprint bilden den **Vorrat**.
+- **Rechte**: Sprints sieht, wer `ticket.read` hat; anlegen, ändern, starten und abschließen mit `ticket.assign`; ein Ticket in einen Sprint legen mit `ticket.edit`.
+- **Abschluss**: Unerledigte Tickets (Kategorie nicht `done` oder `cancelled`) gehen nach Wahl in den nächsten geplanten Sprint oder zurück in den Vorrat; Erledigtes und Verworfenes bleibt. Ein später wieder geöffnetes Ticket bleibt im abgeschlossenen Sprint, bis jemand es verschiebt. Der Wechsel des Sprints ist eine Systemmeldung im Ticket-Thread (`ticket.sprint_changed`), nie eine Nachricht in einem Kanal.
+- **Ansichten** zusätzlich: Sprints und Vorrat je Bereich. **„Mein Board“**: alle mir zugewiesenen Tickets aus sichtbaren Bereichen, Spalten nach Kategorie; Ziehen setzt den ersten Status dieser Kategorie im Bereich des Tickets, „Erledigt“ zeigt die letzten 14 Tage. **Daily**: das Board des Bereichs nach Person gruppiert (eine Zeile je zugewiesener Person und „Nicht zugewiesen“, höchstens 100 Zeilen), voreingestellt auf den laufenden Sprint; hervorgehoben ist, was seit 0 Uhr UTC des letzten Arbeitstags (Montag bis Freitag) den Status gewechselt hat oder neu ist (`work_item.status_changed_at`). Ein Klick auf eine Person filtert auf sie. Ein bereichsübergreifendes Board einer anderen Person gibt es nicht; es verriete, in welchen Bereichen sie arbeitet.
+- Kein Schätzen, keine Burndown-Kurve; die Bilanz zählt Tickets. Kalender: M10.
+
 ### Tags
 
 Es gibt einen gemeinsamen Tag-Vorrat (`tag`: Name, Farbe, `space_id` oder systemweit) für Seiten, Tickets, Skills und Agenten. Tags dienen als Suchfilter und als Auslöser.

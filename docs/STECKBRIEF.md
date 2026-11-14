@@ -1,11 +1,11 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 4 (Tickets), 13.11.2026, Version 0.1.0. Der Steckbrief wird mit
+Stand: Meilenstein 4b (Boards und Sprints), 14.11.2026, Version 0.1.0. Der Steckbrief wird mit
 jedem Meilenstein aktualisiert (Spezifikation 12.7). Die Messwerte aus M2 (Image,
-Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3 und die Tickets aus M4
-sind ohne Docker gemessen, an Prozessen auf der Maschine (Abschnitte
-[Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker) und
-[Tickets (M4)](#tickets-m4)). Was nicht gemessen ist, steht unter
+Compose, `docker stats`) bleiben stehen; die Nachrichten aus M3, die Tickets aus M4 und
+die Sprints und Boards aus M4b sind ohne Docker gemessen, an Prozessen auf der Maschine
+(Abschnitte [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
+[Tickets (M4)](#tickets-m4) und [Sprints und Boards (M4b)](#sprints-und-boards-m4b)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -25,7 +25,9 @@ Verwaltung in Direktnachrichten mit Begründung und Audit. **Vorhanden (M4):** T
 Bereich (Epic, Story, Aufgabe, Fehler mit Hierarchie), Status-Workflow je Bereich nach
 Kategorien, Zuweisung, Liste und „Meine Tickets“, Board, Epic-Übersicht, Ticket-Diskussion
 mit Systemmeldungen, Ticket-Karten in Nachrichten, Verknüpfung mit Wiki-Seiten, Tags,
-Suche. KI folgt ab M5.
+Suche. **Vorhanden (M4b):** Sprints je Bereich (höchstens einer läuft; Abschluss mit
+Bilanz), Vorrat, „Mein Board“ über alle Bereiche nach Kategorie, Daily-Ansicht des
+Boards nach Person. KI folgt ab M5.
 
 | | |
 |---|---|
@@ -181,6 +183,62 @@ Datenbankanweisungen je Ereignis (vorher 8,8) und ist durch die CPU begrenzt (ru
 0,07–0,17 s im Stream an (vorher nach 30 s bzw. erst nach dem Ende der Sperre). Platz: `work_item` mit 10.000 Tickets 9,5 MB (mit Indizes), die ganze
 Datenbank 53 MB (mit 13.054 Systemmeldungen und der Outbox).
 
+### Sprints und Boards (M4b)
+
+Ohne Docker gemessen, 14.11.2026: getrennte Prozesse `HERD_ROLE=migrate`, `api` und
+`worker` aus dem Stand von Commit `7957f73` an einer Wegwerf-Datenbank auf dem lokalen
+PostgreSQL, Python-Skript mit httpx auf derselben Maschine (nicht eingecheckt). Die
+Maschine (4 Kerne) war von anderen Prozessen mitbenutzt, Lastmittel 3,4–5,7 während der
+Messung; die Zahlen sind deshalb eher zu hoch als zu niedrig. **Daten**, alle über die
+API angelegt: ein Team-Bereich mit **10.000 Tickets** (50 Epics, sonst wie in M4: Art,
+Priorität und Status zufällig über die fünf Standardstatus, 40 % mit Fälligkeit, die
+Hälfte unter einem Epic, 30 Wörter Beschreibung), 30 % der Admin-Person zugewiesen, 60 %
+über 20 weitere Personen verteilt, 10 % niemandem; **3.000 davon im laufenden Sprint**,
+ein zweiter Sprint geplant. Da alle Tickets am Messtag angelegt sind, ist in der
+Daily-Ansicht jede Karte „geändert“, und „Erledigt“ auf „Mein Board“ zeigt alle
+erledigten. Je Endpunkt 200 Anfragen nacheinander nach 10 zum Aufwärmen, dann 10
+Clients 20 s lang gleichzeitig. Abfragen gezählt wie in M4 (im Prozess, an derselben
+Datenbank, 3 davon für Sitzung und Rechte); sie hängen nicht von der Zahl der Tickets
+ab.
+
+| Funktion | Endpunkt | P50 / P95, 1 Client | Antwort | Abfragen |
+|---|---|---|---|---|
+| Mein Board (4 Spalten zu je 50 Karten mit Anzahl; der Admin-Person sind 3.000 zugewiesen) | `GET /api/tickets/my-board?limit=50` | 96 / 122 ms | 148 KB | 6 |
+| Mein Board, nächste 50 einer Spalte | `GET /api/tickets/my-board/{category}?cursor=…` | 78 / 108 ms | 36 KB | 5 |
+| Daily, ganzer Bereich (21 Zeilen × 5 Status, je Zelle 20 Karten) | `GET /api/spaces/{id}/board?group_by=assignee&limit=20` | 257 / 434 ms | 1,6 MB | 7 |
+| Daily, laufender Sprint (wie die Oberfläche fragt) | `…&group_by=assignee&sprint=…&limit=20` | 207 / 366 ms | 1,4 MB | 7 |
+| dasselbe mit 5 Karten je Zelle | `…&limit=5` | 92 / 225 ms | 0,4 MB | 7 |
+| Board des Sprints (50 je Spalte) | `GET /api/spaces/{id}/board?sprint=…&limit=50` | 35 / 46 ms | 186 KB | 7 |
+| Vorrat (unerledigt, nach Priorität, 50) | `GET /api/tickets?space_id=…&sprint=none&sort=priority&status_category=…&limit=50` | 24 / 32 ms | 35 KB | 4 |
+| Sprint-Liste | `GET /api/spaces/{id}/sprints?limit=100` | 7 / 11 ms | 0,5 KB | 4 |
+
+Unter 10 gleichzeitigen Clients (kein Fehler): Mein Board P50 314 ms, P95 621 ms, 29
+Anfragen/s; **Daily des Sprints P50 2,2 s, P95 3,3 s, 5 Anfragen/s**. Die Daily-Ansicht
+ist die teuerste Ansicht bisher: Ihre Zeit wächst mit der Zahl der gelieferten Karten
+(Zeilen × Status × Karten je Zelle; mit 5 statt 20 Karten je Zelle rund ein Drittel der
+Zeit und Größe), nicht mit der Zahl der Abfragen. Bei 100 Personenzeilen (der Grenze)
+wären es rund fünfmal so viele Karten. Für ein Daily, das ein Team einmal am Tag
+gemeinsam öffnet, reicht das; als Ansicht, die viele zugleich offen halten (jedes
+Ticket-Ereignis des Bereichs lädt sie neu), wäre eine kleinere erste Seite je Zelle
+günstiger.
+
+**Ticket in den Sprint legen:** 3.000 Änderungen mit 8 Clients 58 je Sekunde (P50
+133 ms, P95 192 ms); der Worker hielt mit (Outbox 0,3 s nach der letzten Änderung leer).
+
+**Sprint abschließen** (3.000 Tickets im Sprint, 590 erledigt, 628 verworfen, **1.782
+unerledigte in den nächsten Sprint**): Die Anfrage dauerte **2,9 s** (eine Transaktion;
+die Tickets des Sprints sind so lange gesperrt). Sie schreibt 1.783 Ereignisse (je
+verschobenem Ticket ein `ticket.updated`, dazu `sprint.closed`); daraus schreibt der
+Worker 1.782 Systemmeldungen, also noch einmal so viele `message.created`. **Ein
+Worker-Prozess hatte alle rund 3.570 Ereignisse 8,5 s nach dem Ende der Anfrage
+verteilt** (rund 420 je Sekunde, so viel wie mit Bahnen nach M4 gemessen). Während
+dieser Zeit kam eine Erwähnung in einem Kanal nach **183 ms** in der Aktivität der
+erwähnten Person an (andere Bahn, wartet nicht); die erste Systemmeldung eines in dieser
+Zeit angelegten Tickets dagegen erst nach **7,9 s**, weil sie in derselben Bahn
+(`ticket_timeline`) hinter den Systemmeldungen des Abschlusses stand. Platz: Tabelle
+`sprint` 96 KB, `work_item` 12 MB, die ganze Datenbank 92 MB (mit rund 25.500
+Systemmeldungen und der Outbox).
+
 **Kosten:** M2 bis M4 rufen keine kostenpflichtigen Dienste auf (keine KI, kein externer
 Speicher). Es fallen nur die Ressourcen unten an, dazu der Platz der Anhänge auf dem
 Volume (eine Datei je Inhalt und Organisation, höchstens 25 MiB je Anhang).
@@ -307,6 +365,13 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
   Datenbank, jeder Aufruf einmal nach einem Aufruf zum Aufwärmen. Zum Vergleich der
   Anlagen ein zweiter Lauf mit getrennten Prozessen (`migrate`, `api`, `worker`) auf
   einer zweiten Wegwerf-Datenbank.
+- **Sprints und Boards (M4b), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
+  PostgreSQL, daran `HERD_ROLE=migrate`, dann je ein Prozess `api` und `worker` aus dem
+  Stand von Commit `7957f73`; Python-Skript mit httpx auf derselben Maschine (nicht
+  eingecheckt; Ablauf oben unter [Sprints und Boards (M4b)](#sprints-und-boards-m4b)).
+  Die Outbox zählt das Skript direkt in der Datenbank (Ereignisse ohne
+  `dispatched_at` und `failed_at`, alle 0,25 s), die Zeitpunkte der Verteilung stehen in
+  `event_outbox.dispatched_at`. Abfragen gezählt wie bei den Tickets (M4).
 - **Nachrichten (M3), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
   PostgreSQL 16 (auf derselben Maschine, von anderen Prozessen mitbenutzt), daran
   `HERD_ROLE=migrate`, dann Knoten A und B (`HERD_ROLE=api`) und ein Worker
@@ -465,6 +530,12 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   Nachrichten und Tickets zusammen bei großen Mengen; ein zweiter Worker unter
   Anlagelast; Ticket-Ereignisse über zwei API-Knoten unter Last (die Demo
   `docs/demo/m4.md` prüft den Weg A → B mit zwei Knoten, ohne Last).
+- **Sprints und Boards (M4b):** CPU und Speicher während der Messung; die Daily-Ansicht
+  mit 100 Personenzeilen (gemessen sind 21) und in einem echten Browser mit 1,4 MB
+  Antwort; ein Abschluss mit mehr als 1.782 verschobenen Tickets und mehrere Abschlüsse
+  zugleich; zwei Worker beim Abschluss; „Mein Board“ einer Person mit Tickets in vielen
+  Bereichen (gemessen ist ein Bereich); eine Daily-Ansicht, in der nur ein Teil der
+  Karten seit dem letzten Arbeitstag geändert ist (hier alle).
 - Nachrichten: Speicher und CPU der Datenbank, echte Browser statt eines Skripts als
   Empfänger, mehr als ein Kanal oder viele Organisationen, Direktnachrichten und Threads
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
@@ -587,11 +658,11 @@ ihres Releases, 5 Minuten, kritisch), dazu wie bisher `HerdNotReady` (deckt die
 Worker-Pods mit ab). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Stand M4)
+## Tests (Stand M4b)
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL) | 980 | alle grün (13.11.2026, 8:07 min), dazu ruff, ruff format, mypy (strict) sauber |
-| Frontend (`vitest`) | 246 in 48 Dateien | alle grün (13.11.2026) |
-| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 31 in 10 Dateien: 18 Live-Bearbeitung, 5 Nachrichten, 8 Tickets | alle 31 in einem Lauf grün (4,4 min, davon gut 3 min die Öffnungsprobe der Live-Bearbeitung); die 8 Ticket-Tests zusätzlich in 3 Läufen grün (je rund 30 s mit Start der App, rund 24 s in den Tests) |
+| Backend (`pytest`, echtes PostgreSQL) | 1.275 (Stand des Branches mit M4b und den ersten M5-Teilen) | 14.11.2026: 1.274 grün, 1 rot: `test_dispatcher_lanes.py::test_a_hanging_handler_does_not_delay_the_others` (Zeitgrenze, unter Last der Maschine; danach allein dreimal grün); 11:40 min. ruff, ruff format, mypy (strict) sauber. Die 181 Tests zu Tickets, Sprints, „Mein Board“, Daily und Demo grün |
+| Frontend (`vitest`) | 282 in 52 Dateien | alle grün (14.11.2026) |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`) | 35 in 11 Dateien: 18 Live-Bearbeitung, 5 Nachrichten, 12 Tickets (davon 4 Sprints und Boards) | 14.11.2026 die 12 Ticket-Tests in einem Lauf grün (43 s), die 4 Sprint-Tests zusätzlich zweimal; die übrigen nicht erneut gelaufen (zuletzt alle 31 grün mit M4) |
 | Compose (`smoke.sh`) | einfach und `SMOKE_NODES=1` | beide `SMOKE OK` mit dem Image der Demo (13.11.2026) |
