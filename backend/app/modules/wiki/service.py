@@ -16,7 +16,7 @@ from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
-from app.core.access import Action, Actor, can, require
+from app.core.access import Action, Actor, can, require, sees_drafts
 from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_key_cursor, encode_key_cursor
@@ -66,7 +66,7 @@ class PageService:
         carries `parent_id` and `sort_order` for nesting and ordering siblings. With
         `tag_id`, only the pages carrying that tag; with `among`, only those it selects."""
         await require(self.session, actor, Action.SPACE_READ, space_id)
-        drafts = await can(self.session, actor, Action.PAGE_EDIT, space_id)
+        drafts = await sees_drafts(self.session, actor, space_id)
         after = decode_key_cursor(params.cursor) if params.cursor else None
         filters = [among] if among is not None else []
         if tag_id is not None:

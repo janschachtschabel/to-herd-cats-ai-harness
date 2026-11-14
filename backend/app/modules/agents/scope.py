@@ -15,6 +15,10 @@ rights apply as they are), held to
   (directly or through a group): guests read no open space, so its content would reach
   them (stricter than spec 5.6, which names S and the open spaces). S open: the same
   rule (S is one of the open spaces).
+- **drafts**: only in a DM alone. Everywhere else the run sees pages as a viewer of
+  the space does (published only), whatever role it holds: the audience of a place
+  is everyone who reads the space, and drafts are not theirs to read (review M6
+  finding 1; spec 5.6).
 - **write**: in a DM alone, wherever the person and the agent both may (their rights
   decide); otherwise only in the spaces above.
 
@@ -109,4 +113,5 @@ async def organisation_audience(session: AsyncSession, org_id: uuid.UUID) -> set
 
 
 def _only(roles: dict[uuid.UUID, SpaceRole], spaces: set[uuid.UUID]) -> ReadScope:
-    return ReadScope.of({sid: role for sid, role in roles.items() if sid in spaces})
+    """The agent's roles in these spaces only, and no drafts (a place of several)."""
+    return ReadScope.of({sid: r for sid, r in roles.items() if sid in spaces}, drafts=False)

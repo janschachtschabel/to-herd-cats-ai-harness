@@ -24,7 +24,7 @@ from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
-from app.core.access import Action, Actor, require, space_ids_with, visible_space_ids
+from app.core.access import Action, Actor, draft_space_ids, require, visible_space_ids
 from app.core.pagination import PageParams, decode_score_cursor, encode_score_cursor
 from app.modules.ai.models import DataLocation
 from app.modules.ai.policy_filters import ai_space_ids
@@ -139,7 +139,7 @@ class SearchService:
         tags = tag_repository(self.session, actor)
         among = [tags.subject_ids(SubjectType.PAGE, [t]) for t in tag_ids]
         readable = visible_space_ids(actor)
-        drafts = space_ids_with(actor, Action.PAGE_EDIT)
+        drafts = draft_space_ids(actor)
         if ai_spaces is not None:
             readable = readable.where(Space.id.in_(ai_spaces))
             drafts = drafts.where(Space.id.in_(ai_spaces))

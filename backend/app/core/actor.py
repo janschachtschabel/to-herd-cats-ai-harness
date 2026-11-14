@@ -14,13 +14,16 @@ class ReadScope:
     not listed is not there for it, and in a listed one its role is at most the one
     given. An agent's run acts as the person who asked, held to what the agent itself
     may do (`modules/agents/actor.py`); the check (`core/access.py`) applies it to
-    whatever actor carries it, without knowing why."""
+    whatever actor carries it, without knowing why. Without `drafts`, it sees pages
+    as a viewer does (published only), whatever its role: a run whose answer is read
+    by more than the person who asked (review M6 finding 1)."""
 
     roles: frozenset[tuple[uuid.UUID, SpaceRole]]
+    drafts: bool = True
 
     @classmethod
-    def of(cls, roles: Mapping[uuid.UUID, SpaceRole]) -> "ReadScope":
-        return cls(frozenset(roles.items()))
+    def of(cls, roles: Mapping[uuid.UUID, SpaceRole], *, drafts: bool = True) -> "ReadScope":
+        return cls(frozenset(roles.items()), drafts)
 
     def cap(self, space_id: uuid.UUID) -> SpaceRole | None:
         return next((role for sid, role in self.roles if sid == space_id), None)
@@ -66,6 +69,11 @@ class Actor:
     group_ids: frozenset[uuid.UUID]
     read_scope: ReadScope | None = None
     write_scope: WriteScope | None = None
+
+    @property
+    def sees_drafts(self) -> bool:
+        """Whether drafts may be shown at all (where `page.edit` is held)."""
+        return self.read_scope is None or self.read_scope.drafts
 
     def writes_in(self, space_id: uuid.UUID) -> bool:
         return self.write_scope is None or self.write_scope.allows(space_id)

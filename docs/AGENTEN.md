@@ -270,6 +270,15 @@ und er schreibt nur dorthin, wo sein Auftrag liegt.
 genau einer Person (sonst 422 `dm.agent_pair_only`), und Teilnehmende einer
 Direktnachricht ändern sich nie.
 
+**Entwürfe** liest ein Lauf nur in der Direktnachricht allein mit dem Agenten. An jedem
+anderen Ort sieht er Seiten wie ein Betrachter des Bereichs: nur veröffentlichte, auch
+wenn die fragende Person und der Agent dort Seiten bearbeiten dürfen. Denn den Kanal
+oder Thread lesen alle Mitglieder des Bereichs, Entwürfe aber nur, wer `page.edit` hat.
+Das gilt für `read_page`, `search`, `list_tree`, `list_versions` und den Diff von
+`update_page` (Inhalt, Titel und Ausschnitte): Ein Entwurf antwortet dort wie eine
+unbekannte Seite. Technisch ist das `ReadScope.drafts` am Akteur des Laufs, das
+`core/access.sees_drafts` und `draft_space_ids` auswerten.
+
 Beispiele:
 
 - Anna fragt Hilda in einer Direktnachricht zu zweit. Hilda liest Annas Team-Bereich

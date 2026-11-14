@@ -17,7 +17,7 @@ from typing import IO
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.access import Action, Actor, can
+from app.core.access import Actor, sees_drafts
 from app.core.slug import slugify
 from app.core.spool import spooled_file
 from app.core.storage import Storage, StoredFileMissing, get_storage
@@ -77,7 +77,7 @@ class PageExport:
 
     async def export_space(self, actor: Actor, space_id: uuid.UUID) -> Export:
         space = await SpaceService(self.session).get(actor, space_id)
-        drafts = await can(self.session, actor, Action.PAGE_EDIT, space_id)
+        drafts = await sees_drafts(self.session, actor, space_id)
         file = spooled_file(_SPOOL_BYTES)
         try:
             with zipfile.ZipFile(file, "w", zipfile.ZIP_DEFLATED) as zipped:

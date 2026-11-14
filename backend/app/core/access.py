@@ -13,7 +13,9 @@ is no other place that decides who may do what.
 - An actor with a `read_scope` (an agent's run, spec 5.6) sees only the spaces it
   lists, and holds at most the role it gives there, admins included. One with a
   `write_scope` (plan M6 decision 5) writes only in the spaces it lists (`viewer`
-  elsewhere, and no channel posts there), admins included.
+  elsewhere, and no channel posts there), admins included. A read scope without
+  `drafts` shows pages as to a viewer: drafts are seen (`draft_space_ids`,
+  `sees_drafts`) with `page.edit` and only by actors without such a scope.
 - When an admin gets into a team or personal space only through admin power (no
   membership of their own or through a group), `require` notes it in the audit log
   (spec 5.5), at most once per admin, space and UTC day. `can` only answers.
@@ -25,7 +27,7 @@ Each check is one SQL query (`AccessRepository.facts`); lists filter with the SQ
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import Select
+from sqlalchemy import Select, false
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access_repository import (
@@ -64,8 +66,10 @@ __all__ = [
     "Actor",
     "actor_for",
     "can",
+    "draft_space_ids",
     "my_roles",
     "require",
+    "sees_drafts",
     "space_ids_with",
     "space_role",
     "system_permissions",
@@ -90,6 +94,18 @@ def space_ids_with(actor: Actor, action: Action) -> Select[uuid.UUID]:
     """The ids of every space where `actor` may do the space action, as SQL for list
     filters (`can` for each space, in one statement)."""
     return ids_with_role_stmt(actor, SPACE_ACTION_MIN_ROLE[action])
+
+
+def draft_space_ids(actor: Actor) -> Select[uuid.UUID]:
+    """The ids of every space where `actor` sees drafts, as SQL for list filters:
+    where it holds `page.edit`, unless its read scope keeps it to published pages."""
+    stmt = space_ids_with(actor, Action.PAGE_EDIT)
+    return stmt if actor.sees_drafts else stmt.where(false())
+
+
+async def sees_drafts(session: AsyncSession, actor: Actor, space_id: uuid.UUID) -> bool:
+    """`draft_space_ids` for one space."""
+    return actor.sees_drafts and await can(session, actor, Action.PAGE_EDIT, space_id)
 
 
 async def space_role(session: AsyncSession, actor: Actor, space_id: uuid.UUID) -> SpaceRole | None:
