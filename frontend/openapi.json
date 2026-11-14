@@ -5693,7 +5693,7 @@
       },
       "SprintCreate": {
         "additionalProperties": false,
-        "description": "A new sprint, planned; `ends_on` is no earlier than `starts_on`.",
+        "description": "A new sprint, planned; `ends_on` is no earlier than `starts_on`, both between\n2000-01-01 and 2100-12-31 (else 422 `sprint.dates_invalid`).",
         "properties": {
           "ends_on": {
             "format": "date",
@@ -5839,7 +5839,7 @@
       },
       "SprintUpdate": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are (none can be null); a closed sprint does not\nchange (409 `sprint.state_invalid`).",
+        "description": "Fields left out stay as they are (none can be null); a closed sprint does not\nchange (409 `sprint.state_invalid`). Dates as for a new sprint.",
         "properties": {
           "ends_on": {
             "anyOf": [

@@ -339,7 +339,7 @@
       "active_exists": "In diesem Bereich läuft schon ein Sprint. Schließe ihn zuerst ab.",
       "state_invalid": "In diesem Zustand des Sprints geht das nicht (mehr).",
       "next_missing": "Es gibt keinen geplanten Sprint, in den die Tickets gehen könnten.",
-      "dates_invalid": "Das Ende liegt vor dem Beginn."
+      "dates_invalid": "Das Ende liegt vor dem Beginn, oder ein Datum liegt außerhalb der Jahre 2000 bis 2100."
     }
   }
 }

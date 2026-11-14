@@ -8,8 +8,8 @@ Rules:
 - states in order: planned → active → closed; at most one active sprint per space
   (409 `sprint.active_exists`; the unique index `uq_sprint_space_id_active` holds it
   under concurrent starts); only planned or active sprints change (409
-  `sprint.state_invalid`); a sprint ends no earlier than it starts (422
-  `sprint.dates_invalid`);
+  `sprint.state_invalid`); a sprint ends no earlier than it starts and lies between
+  2000-01-01 and 2100-12-31 (422 `sprint.dates_invalid`);
 - closing (an active sprint) moves its unfinished tickets (category neither `done` nor
   `cancelled`) to the space's next planned sprint (`next`: the one that starts first;
   422 `sprint.next_missing` without one) or back to the backlog (`backlog`), and
@@ -46,7 +46,13 @@ from app.modules.tickets.events import (
     sprint_event,
     ticket_event,
 )
-from app.modules.tickets.models import Sprint, SprintState, StatusCategory
+from app.modules.tickets.models import (
+    FIRST_SPRINT_DAY,
+    LAST_SPRINT_DAY,
+    Sprint,
+    SprintState,
+    StatusCategory,
+)
 from app.modules.tickets.sprint_repository import FINISHED, SprintRepository, order_key
 from app.modules.tickets.thread_repository import TicketThreadRepository
 
@@ -71,6 +77,10 @@ def _check_dates(starts_on: date, ends_on: date) -> None:
     if ends_on < starts_on:
         raise ValidationFailed(
             "A sprint ends no earlier than it starts", code="sprint.dates_invalid"
+        )
+    if starts_on < FIRST_SPRINT_DAY or ends_on > LAST_SPRINT_DAY:
+        raise ValidationFailed(
+            "A sprint lies between 2000-01-01 and 2100-12-31", code="sprint.dates_invalid"
         )
 
 

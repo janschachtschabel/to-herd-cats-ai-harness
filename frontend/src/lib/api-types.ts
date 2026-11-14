@@ -4109,7 +4109,8 @@ export interface components {
         };
         /**
          * SprintCreate
-         * @description A new sprint, planned; `ends_on` is no earlier than `starts_on`.
+         * @description A new sprint, planned; `ends_on` is no earlier than `starts_on`, both between
+         *     2000-01-01 and 2100-12-31 (else 422 `sprint.dates_invalid`).
          */
         SprintCreate: {
             /**
@@ -4191,7 +4192,7 @@ export interface components {
         /**
          * SprintUpdate
          * @description Fields left out stay as they are (none can be null); a closed sprint does not
-         *     change (409 `sprint.state_invalid`).
+         *     change (409 `sprint.state_invalid`). Dates as for a new sprint.
          */
         SprintUpdate: {
             /** Ends On */

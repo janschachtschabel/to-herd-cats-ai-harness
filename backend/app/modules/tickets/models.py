@@ -53,6 +53,15 @@ MAX_DESCRIPTION_CHARS = 100_000
 MAX_TAGS = 20  # per ticket
 MAX_SPRINT_NAME_CHARS = 80
 MAX_SPRINT_GOAL_CHARS = 500
+# A sprint's dates lie in these years: finite (the driver sends date.min and date.max as
+# -infinity and infinity, which the sprint list's order key cannot subtract).
+FIRST_SPRINT_DAY = date(2000, 1, 1)
+LAST_SPRINT_DAY = date(2100, 12, 31)
+SPRINT_DATES_RANGE_SQL = (
+    "isfinite(starts_on) AND isfinite(ends_on)"
+    f" AND starts_on >= DATE '{FIRST_SPRINT_DAY.isoformat()}'"
+    f" AND ends_on <= DATE '{LAST_SPRINT_DAY.isoformat()}'"
+)
 
 
 def ticket_key(number: int) -> str:
@@ -241,6 +250,7 @@ class Sprint(UuidPk, OrgScoped, Base):
     __table_args__ = (
         CheckConstraint(_in("state", SprintState), name="state"),
         CheckConstraint("ends_on >= starts_on", name="dates"),
+        CheckConstraint(SPRINT_DATES_RANGE_SQL, name="dates_range"),
         CheckConstraint(
             f"char_length(name) BETWEEN 1 AND {MAX_SPRINT_NAME_CHARS}", name="name_length"
         ),

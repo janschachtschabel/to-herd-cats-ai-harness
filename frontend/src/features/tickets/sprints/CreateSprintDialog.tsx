@@ -18,6 +18,8 @@ import { useCreateSprint } from './queries'
 
 type Values = Schemas['SprintCreate']
 const schema = bodySchema('SprintCreate')
+/** The days a sprint may use (the server refuses others, 422 `sprint.dates_invalid`). */
+const DAYS = { min: '2000-01-01', max: '2100-12-31' }
 
 /** A new sprint of the space, planned: name, goal, first and last day. */
 export function CreateSprintDialog({
@@ -67,10 +69,10 @@ function CreateSprintForm({ spaceId, onDone }: { spaceId: string; onDone: () => 
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('tickets.sprints.form.starts')} error={errors.starts_on?.message}>
-          {(props) => <Input {...props} type="date" {...form.register('starts_on')} />}
+          {(props) => <Input {...props} type="date" {...DAYS} {...form.register('starts_on')} />}
         </Field>
         <Field label={t('tickets.sprints.form.ends')} error={errors.ends_on?.message}>
-          {(props) => <Input {...props} type="date" {...form.register('ends_on')} />}
+          {(props) => <Input {...props} type="date" {...DAYS} {...form.register('ends_on')} />}
         </Field>
       </div>
       <SaveError error={create.error} />

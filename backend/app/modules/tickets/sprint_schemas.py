@@ -19,7 +19,8 @@ Goal = Annotated[str, Field(max_length=MAX_SPRINT_GOAL_CHARS, description="a sho
 
 
 class SprintCreate(BaseModel):
-    """A new sprint, planned; `ends_on` is no earlier than `starts_on`."""
+    """A new sprint, planned; `ends_on` is no earlier than `starts_on`, both between
+    2000-01-01 and 2100-12-31 (else 422 `sprint.dates_invalid`)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -31,7 +32,7 @@ class SprintCreate(BaseModel):
 
 class SprintUpdate(BaseModel):
     """Fields left out stay as they are (none can be null); a closed sprint does not
-    change (409 `sprint.state_invalid`)."""
+    change (409 `sprint.state_invalid`). Dates as for a new sprint."""
 
     model_config = ConfigDict(extra="forbid")
 

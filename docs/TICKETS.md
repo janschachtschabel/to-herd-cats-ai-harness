@@ -224,8 +224,9 @@ geplanten (frühester Beginn zuerst), dann die abgeschlossenen (zuletzt beendete
 Jeder Sprint zeigt Name, Zustand, Zeitraum und Ziel; aufgeklappt seine Tickets.
 
 - **Anlegen** („Neuer Sprint“): Name (1 bis 80 Zeichen), Ziel (ein Satz, höchstens 500
-  Zeichen), Beginn und Ende als Datum (das Ende nicht vor dem Beginn, sonst 422
-  `sprint.dates_invalid`). Ein neuer Sprint ist **geplant**. Name, Ziel und Zeitraum
+  Zeichen), Beginn und Ende als Datum (das Ende nicht vor dem Beginn, beide zwischen
+  2000-01-01 und 2100-12-31, sonst 422 `sprint.dates_invalid`; die Datenbank hält den
+  Zeitraum mit einem CHECK). Ein neuer Sprint ist **geplant**. Name, Ziel und Zeitraum
   ändert `PATCH /api/sprints/{id}`; die Oberfläche bietet das noch nicht an.
 - **Starten:** Je Bereich läuft **höchstens ein Sprint**. Läuft schon einer, steht am
   geplanten „Starten geht, sobald … abgeschlossen ist“; die API antwortet 409

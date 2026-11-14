@@ -339,7 +339,7 @@
       "active_exists": "A sprint is already running in this space. Close it first.",
       "state_invalid": "This is not possible (any more) in the sprint's state.",
       "next_missing": "There is no planned sprint for the tickets to go into.",
-      "dates_invalid": "The end lies before the start."
+      "dates_invalid": "The end lies before the start, or a date lies outside the years 2000 to 2100."
     }
   }
 }
