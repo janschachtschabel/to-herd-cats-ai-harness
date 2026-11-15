@@ -14,6 +14,8 @@
       "showDiff": "Änderung ansehen",
       "hideDiff": "Änderung ausblenden",
       "diffTooLarge": "Die Texte sind zu groß für einen Vergleich.",
+      "diff": "Änderung der Seite",
+      "personalTooLarge": "Diese Änderung ist zu groß, um sie dir vollständig zu zeigen. Was du nicht vollständig sehen kannst, kannst du nicht freigeben; du kannst nur ablehnen.",
       "args": "Angaben des Aufrufs",
       "personal": "Persönlich: Dieser Lauf hat gelesen, was nur du über deinen eigenen Zugang siehst, oder es steht in eurem Gespräch. Gibst du frei, wird genau der folgende Inhalt geschrieben, und andere können ihn lesen. Er ist danach nicht mehr als persönlich markiert.",
       "youDecide": "Du entscheidest.",
@@ -95,7 +97,8 @@
       "decided": "Diese Freigabe ist schon entschieden.",
       "expired": "Diese Freigabe ist abgelaufen; der Agent hat aufgehört zu warten.",
       "run_ended": "Der Lauf wartet nicht mehr darauf (er ist beendet oder wurde abgebrochen).",
-      "version_conflict": "Die Freigabe hat sich inzwischen geändert. Sie wurde neu geladen."
+      "version_conflict": "Die Freigabe hat sich inzwischen geändert. Sie wurde neu geladen.",
+      "not_shown_in_full": "Diese Änderung lässt sich nicht vollständig zeigen und deshalb nicht freigeben."
     },
     "question": {
       "not_found": "Diese Rückfrage gibt es nicht (mehr), oder du darfst sie nicht sehen.",

@@ -15,7 +15,8 @@ from app.modules.agents.approvals.models import (
     QuestionState,
     RunQuestion,
 )
-from app.modules.agents.approvals.service import PAGE_TOOLS, Shown
+from app.modules.agents.approvals.service import Shown
+from app.modules.agents.approvals.shown import PAGE_TOOLS
 
 
 class ApprovalExternalOut(BaseModel):

@@ -9,7 +9,7 @@ import { errorMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import { useNow } from '@/lib/useNow'
 import { ApprovalDecision } from './ApprovalDecision'
-import { ApprovalSubject } from './ApprovalSubject'
+import { ApprovalSubject, useReleasable } from './ApprovalSubject'
 import { CardFrame, CardState, type Tone } from './CardFrame'
 import { approvalView, externalToolOf, mayDecide, type ApprovalView } from './display'
 import { useApproval, useDecideApproval, type Approval } from './queries'
@@ -55,6 +55,7 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
   const view = approvalView(approval, now)
   const when = (iso: string | null) => (iso ? formatDateTime(iso, i18n.language) : '')
   const external = externalToolOf(approval)
+  const releasable = useReleasable(approval)
   return (
     <CardFrame
       icon={<ShieldCheck className="size-4" />}
@@ -101,7 +102,9 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
           )}
         </p>
       )}
-      {mayDecide(approval, meId, now) && <ApprovalDecision approval={approval} decide={decide} />}
+      {mayDecide(approval, meId, now) && (
+        <ApprovalDecision approval={approval} decide={decide} releasable={releasable} />
+      )}
       {decide.isError && (
         <p role="alert" className="text-xs text-destructive">
           {errorMessage(t, decide.error)}

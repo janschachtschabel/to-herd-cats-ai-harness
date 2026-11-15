@@ -14,6 +14,8 @@
       "showDiff": "Show the change",
       "hideDiff": "Hide the change",
       "diffTooLarge": "The texts are too large to compare.",
+      "diff": "Change to the page",
+      "personalTooLarge": "This change is too large to show you in full. What you cannot see in full you cannot release; you can only reject it.",
       "args": "The call's details",
       "personal": "Personal: this run read what only you see through your own access, or it is in your conversation. If you release it, exactly the content below is written, and others can read it. It is no longer marked personal after that.",
       "youDecide": "You decide.",
@@ -95,7 +97,8 @@
       "decided": "This release has been decided already.",
       "expired": "This release has expired; the agent stopped waiting.",
       "run_ended": "The run no longer waits for it (it finished or was cancelled).",
-      "version_conflict": "The release has changed meanwhile. It was reloaded."
+      "version_conflict": "The release has changed meanwhile. It was reloaded.",
+      "not_shown_in_full": "This change cannot be shown in full, so it cannot be released."
     },
     "question": {
       "not_found": "This question does not exist (any more), or you may not see it.",

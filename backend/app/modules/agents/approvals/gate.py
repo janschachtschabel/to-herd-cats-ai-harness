@@ -35,7 +35,9 @@ the tool, never an argument (`toolbox/external.py`).
 
 Under the personal mark (`agents/personal_mark.py`) a write others could read asks
 the same way, whatever the tool's grant (`step_host.py`); such an approval is
-`personal` and its card says that what is released goes where others read it.
+`personal` and its card says that what is released goes where others read it, and
+shows it in full. A call whose content cannot be shown in full is refused instead
+(`shown.py`).
 """
 
 import hashlib
@@ -53,6 +55,7 @@ from app.core.principal import Principal
 from app.modules.agents.approvals import cards
 from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.approvals.shown import NOT_SHOWN, shown_in_full
 from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.base import CallRef, RunRef, Subject, ToolContext, ToolSpec, Wait
 from app.modules.messaging.models import MessageKind
@@ -100,6 +103,10 @@ async def gate(
     if found is None:
         if subjects is None:
             return Passed.UNCHANGED  # (and finds what it may not, itself)
+        if personal and not await shown_in_full(
+            ctx.session, ctx.actor, spec.name, canonical, for_ai=True
+        ):  # she releases only what she sees in full (module review M8 3, H5)
+            return ToolResult("approval", NOT_SHOWN, {"tool": spec.name}, failed=True)
         return Wait((await _ask(ctx, spec, canonical, subjects, personal)).expires_at)
     if found.state == ApprovalState.PENDING:
         if found.expires_at <= utcnow():

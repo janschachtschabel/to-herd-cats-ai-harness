@@ -760,7 +760,10 @@ Recht 404 `ai.not_found`.
   jemand lesen könnte (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein
   Gedächtnis), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
-  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Allein mit ihr in
+  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte zeigt den
+  Inhalt vollständig; was sich nicht vollständig zeigen lässt (ein Vergleich über
+  `HERD_DIFF_MAX_LINES`), wird abgelehnt (`personal_release.too_large`), statt zur
+  Freigabe zu stehen (Review M8 3, Befund H5). Allein mit ihr in
   der Direktnachricht und in Bereichen, die außer ihr niemand liest (ihr persönlicher
   Bereich), geht alles ohne Freigabe weiter (Review M8 3, Befund H7). In einem Kanal, Thread oder
   einer Direktnachricht mit mehreren bleiben seine Antwort und seine Rückfrage

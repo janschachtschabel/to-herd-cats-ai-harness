@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { makeEvent, makeRun } from '@/test/runs'
-import { buildTimeline, externalOutcome, externalToolName } from './timeline'
+import { approvalOutcome, buildTimeline, externalOutcome, externalToolName } from './timeline'
 
 const TOOL = 'ext_0123456789ab_create_issue'
 const UNKNOWN =
@@ -89,5 +89,15 @@ describe('event kinds this version does not know', () => {
     const stop = makeEvent({ kind: 'stop', seq: 5, content: { reason: 'completed' } })
     const items = buildTimeline([model, answered, later, stop], makeRun({ state: 'done' }))
     expect(items.map((item) => item.kind)).toEqual(['model', 'tool', 'stop'])
+  })
+})
+
+describe('a personal release that could not be shown', () => {
+  test('is named for the person (module review M8 3, H5)', () => {
+    expect(approvalOutcome('Refused (personal_release.too_large): you have read …')).toBe(
+      'tooLarge',
+    )
+    expect(approvalOutcome('approval_stale: …')).toBe('stale')
+    expect(approvalOutcome('Refused (other)')).toBeNull()
   })
 })

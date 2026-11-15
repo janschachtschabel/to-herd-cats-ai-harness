@@ -183,9 +183,11 @@ export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineIt
 }
 
 /** What a release step answered the model: rejected or stale (the object changed). */
-export function approvalOutcome(result: string | null): 'rejected' | 'stale' | null {
+export function approvalOutcome(result: string | null): 'rejected' | 'stale' | 'tooLarge' | null {
   if (result?.startsWith('approval_rejected')) return 'rejected'
   if (result?.startsWith('approval_stale')) return 'stale'
+  // A personal release whose content could not be shown in full: never asked (H5).
+  if (result?.startsWith('Refused (personal_release.too_large)')) return 'tooLarge'
   return null
 }
 

@@ -9,13 +9,17 @@ import type { useDecideApproval, Approval } from './queries'
 const MAX_REASON = 500
 
 /** Approve, or reject with an optional reason, at the version the card shows. The
- *  card holds the decision, so a refusal stays in words after the card reloads. */
+ *  card holds the decision, so a refusal stays in words after the card reloads. A call
+ *  that is not `releasable` (a personal one the card cannot show in full) can only be
+ *  rejected. */
 export function ApprovalDecision({
   approval,
   decide,
+  releasable = true,
 }: {
   approval: Approval
   decide: ReturnType<typeof useDecideApproval>
+  releasable?: boolean
 }) {
   const { t } = useTranslation()
   const [rejecting, setRejecting] = useState(false)
@@ -62,14 +66,16 @@ export function ApprovalDecision({
         </form>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            disabled={decide.isPending}
-            onClick={() => decide.mutate({ decision: 'approve', version: approval.version })}
-          >
-            <Check aria-hidden />
-            {t('approvals.decide.approve')}
-          </Button>
+          {releasable && (
+            <Button
+              size="sm"
+              disabled={decide.isPending}
+              onClick={() => decide.mutate({ decision: 'approve', version: approval.version })}
+            >
+              <Check aria-hidden />
+              {t('approvals.decide.approve')}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

@@ -9,7 +9,9 @@ addressed to.
 Who decides or answers: only that person (403 `approval.not_addressed`,
 `question.not_addressed` for others who see it), and for an approval only while they
 may do it themselves now: the tool's action (`ToolSpec.action`) in each object's
-space, with their own rights (403 `approval.not_permitted`).
+space, with their own rights (403 `approval.not_permitted`). A personal release is
+approved only while its card can show its content in full (409
+`approval.not_shown_in_full`, `shown.py`).
 
 In one transaction, the run's row locked first and then the approval's (the same
 order as the sweep that ends a run whose time ran out): 409 `approval.expired` past
@@ -40,6 +42,7 @@ from app.modules.agents.approvals.models import (
     RunQuestion,
 )
 from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.approvals.shown import PAGE_TOOLS, shown_in_full
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.run_models import Run, RunState
 from app.modules.agents.runs import RunService
@@ -48,8 +51,6 @@ from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.proposals import rules
 from app.modules.wiki import diffing
 from app.modules.wiki.visibility import PageReader
-
-PAGE_TOOLS = frozenset({"update_page", "propose_page_change"})  # a diff to show
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +117,14 @@ class ApprovalService:
                 space_id = subject.get("space_id")
                 if space_id and not await can(self.session, actor, action, uuid.UUID(space_id)):
                     raise Forbidden(code="approval.not_permitted")
+        if (
+            approve
+            and approval.personal
+            and not await shown_in_full(
+                self.session, actor, approval.tool, approval.args, for_ai=False
+            )
+        ):  # she releases only what she sees in full (module review M8 3, H5)
+            raise Conflict(code="approval.not_shown_in_full")
         run = await _locked(self.session, actor, shown.run.id)
         repo = WaitedRepository(self.session, actor.org_id)
         locked = await repo.get(Approval, approval_id, lock=True)
