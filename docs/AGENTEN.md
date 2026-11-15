@@ -498,9 +498,10 @@ das Modell sieht:
 | `ask_user`, `submit_result`, die Antwort | erlaubt (eigenes Gespräch) |
 | `post_message` | ins eigene Gespräch erlaubt, in einen Kanal abgelehnt |
 | `propose_page_change` | zu einer Seite von X erlaubt, sonst abgelehnt |
+| `propose_new_page` | eine neue Seite in X erlaubt (seit M9; einen Vorschlag lesen nur die Bearbeitenden von X), sonst abgelehnt |
 | `update_page` | an einem Entwurf von X erlaubt, sonst abgelehnt |
 | `comment_ticket`, `set_ticket_status`, `create_ticket`, `link_ticket_page`, `assign_ticket` | abgelehnt |
-| `propose_new_page`, `propose_skill`, `update_memory` | abgelehnt |
+| `propose_skill`, `update_memory` | abgelehnt |
 
 Das eigene Gespräch des Laufs ist ausgenommen, weil dessen Publikum die Antwort
 ohnehin liest: die Person allein (sie durfte den Entwurf lesen) oder der Thread eines

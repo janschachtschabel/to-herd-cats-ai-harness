@@ -1,7 +1,7 @@
 """Every tool of the catalog after a draft of the space was read alone with the person
 (review M6 2, finding 1): what others than the space's editors may read is refused
-(`DRAFTS`), a proposal for a page of the space, `update_page` on a draft there and
-the run's own conversation are not. A tool added to the catalog must be named here."""
+(`DRAFTS`), a proposal for a page of the space or a new page in it (plan M9 task 8),
+`update_page` on a draft there and the run's own conversation are not. A tool added to the catalog must be named here."""
 
 from collections.abc import Awaitable, Callable
 
@@ -81,11 +81,14 @@ async def _memory(work: Work, ctx: ToolContext) -> str:
     return (await memory_tools.update_memory(ctx, args)).text
 
 
-async def _new_page(work: Work, ctx: ToolContext) -> str:
-    args = wiki_tools.ProposeNewPageArgs(
-        space_id=work.space.id, title="t", content_md="c", reason="r"
-    )
+async def _new_page_in(space_id: object, ctx: ToolContext) -> str:
+    args = wiki_tools.ProposeNewPageArgs(space_id=space_id, title="t", content_md="c", reason="r")
     return (await wiki_tools.propose_new_page(ctx, args)).text
+
+
+async def _new_page_elsewhere(work: Work, ctx: ToolContext) -> str:
+    """A new page in another space the agent edits: its editors are not the draft's."""
+    return await _new_page_in(work.private.id, ctx)
 
 
 async def _skill(work: Work, ctx: ToolContext) -> str:
@@ -120,7 +123,7 @@ REFUSED: dict[str, Call] = {
     "link_ticket_page": _link,
     "assign_ticket": _assign,
     "update_memory": _memory,
-    "propose_new_page": _new_page,
+    "propose_new_page": _new_page_elsewhere,
     "propose_skill": _skill,
     "update_page": _update_published,
     "post_message": _to_channel,
@@ -144,8 +147,13 @@ async def _to_own(work: Work, ctx: ToolContext) -> str:
     return (await message_tools.post_message(ctx, args)).text
 
 
+async def _new_page_here(work: Work, ctx: ToolContext) -> str:
+    return await _new_page_in(work.space.id, ctx)
+
+
 ALLOWED: dict[str, tuple[Call, str]] = {
     "propose_page_change": (_change_here, "Proposal id="),
+    "propose_new_page": (_new_page_here, "Proposal id="),
     "update_page": (_update_draft, "Diff of page"),
     "post_message": (_to_own, "Posted message"),
 }
@@ -180,3 +188,11 @@ async def test_what_only_the_editors_read_is_allowed(work: Work, name: str) -> N
     tool, done = ALLOWED[name]
     said = await tool(work, ctx)
     assert said.startswith(done), said
+
+
+async def test_propose_new_page_after_a_draft_read_stays_in_the_draft_space(work: Work) -> None:
+    """Plan M9 task 8: a new page's proposal is read only with `page.edit` in its space,
+    as the draft is; any other space is refused."""
+    ctx = await _after_a_draft(work)
+    assert (await _new_page_here(work, ctx)).startswith("Proposal id=")
+    assert await _new_page_elsewhere(work, ctx) == DRAFTS

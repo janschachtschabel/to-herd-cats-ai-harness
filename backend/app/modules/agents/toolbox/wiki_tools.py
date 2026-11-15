@@ -4,7 +4,9 @@
   moderator (`modules/proposals`); `propose_new_page` (level 2): a proposal for a new
   page. Both need `page.edit` in the page's space for the run (a proposal is what the
   person and the agent could have written themselves; stricter than reading), and the
-  page as AI may read it (`no_ai` or policy `none`: not found).
+  page as AI may read it (`no_ai` or policy `none`: not found). Only the space's
+  editors read a proposal, so after a draft read both go into that draft's space and
+  no other (plan M9 task 8).
 - `update_page` (level 3), in two steps: the first call returns the diff against the
   page as it is now and a `token` bound to the run, the page, its version, its
   content and the new content; the second call, with that token, writes, unless the
@@ -127,7 +129,8 @@ async def propose_new_page(ctx: WriteContext, args: ProposeNewPageArgs) -> ToolR
         await closed_to_ai(ctx, args.space_id)
     ):
         return refusal("wiki", NOT_FOUND, attrs)
-    if why := await leaks_into(ctx, args.space_id):
+    # A proposal is read only with `page.edit` in its space: a draft of it may go in.
+    if why := await leaks_into(ctx, args.space_id, editors_only=True):
         return refusal("wiki", why, attrs)
 
     async def write() -> ToolResult:
