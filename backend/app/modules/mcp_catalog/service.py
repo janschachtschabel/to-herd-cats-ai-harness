@@ -11,6 +11,7 @@ only suggests classifications, and every tool still waits for approval.
 
 import base64
 import binascii
+import re
 import uuid
 
 from pydantic import ValidationError
@@ -44,19 +45,26 @@ def _invalid(field: str) -> ValidationFailed:
     return ValidationFailed(code="mcp_catalog.install_invalid", details={"field": field})
 
 
+# Cursors are opaque (base64url) like everywhere else: over the catalogue, the last
+# entry id shown; over the problems, the next offset. Anything else, however it fails
+# to decode, is 422 `validation_failed`; an empty cursor is the first page.
+_ENTRY_POSITION = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+_PROBLEM_POSITION = re.compile(r"0|[1-9][0-9]{0,3}")
+
+
 def _cursor(position: str) -> str:
     return base64.urlsafe_b64encode(position.encode()).decode().rstrip("=")
 
 
-def _position(cursor: str | None) -> str:
-    if cursor is None:
-        return ""
+def _position(cursor: str | None, shape: re.Pattern[str]) -> str | None:
+    if not cursor:
+        return None
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         position = base64.b64decode(padded, altchars=b"-_", validate=True).decode("ascii")
     except (binascii.Error, UnicodeDecodeError, ValueError):
-        position = "\x00"
-    if not position.isprintable() or not position:
+        position = ""
+    if shape.fullmatch(position) is None or _cursor(position) != cursor:
         raise ValidationFailed("Invalid cursor", code="validation_failed")
     return position
 
@@ -68,7 +76,7 @@ class CatalogService:
     async def list(self, actor: Actor, params: PageParams) -> Page[CatalogEntry]:
         """By id; the cursor is the last id shown."""
         await require_ai(self.session, actor, Action.AI_MANAGE)
-        after = _position(params.cursor)
+        after = _position(params.cursor, _ENTRY_POSITION) or ""
         rest = [entry for key, entry in catalog().entries.items() if key > after]
         items = rest[: params.limit]
         more = len(rest) > params.limit
@@ -76,10 +84,7 @@ class CatalogService:
 
     async def problems(self, actor: Actor, params: PageParams) -> Page[Problem]:
         await require_ai(self.session, actor, Action.AI_MANAGE)
-        start = _position(params.cursor)
-        if start and not start.isdigit():
-            raise ValidationFailed("Invalid cursor", code="validation_failed")
-        offset = int(start or 0)
+        offset = int(_position(params.cursor, _PROBLEM_POSITION) or 0)
         found = catalog().problems
         items = list(found[offset : offset + params.limit])
         end = offset + len(items)

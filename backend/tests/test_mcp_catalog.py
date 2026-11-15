@@ -2,6 +2,7 @@
 `app/mcp/catalog/` (GitHub, GitLab) and the operator's in `HERD_MCP_CATALOG_DIR`,
 validated on load; a broken file is reported and skipped, never fatal."""
 
+import base64
 import logging
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,10 @@ from tests.factories_catalog import CATALOG, entry, oauth_option, write_entry
 from tests.factories_dms import People
 
 SECRET = "pw-IN-a-broken-FILE-77"
+
+
+def _b64(text: str) -> str:
+    return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 
 def test_the_shipped_entries_load_clean() -> None:
@@ -163,8 +168,12 @@ async def test_the_catalogue_is_listed_page_by_page(ai_people: People, catalog_d
     params = {"limit": 1, "cursor": first["next_cursor"]}
     second = (await ai_people.admin.get(f"{CATALOG}/problems", params=params)).json()
     assert [p["file"] for p in second["items"]] == ["b.yaml"] and second["next_cursor"] is None
-    bad = await ai_people.admin.get(CATALOG, params={"cursor": "%%%"})
-    assert bad.status_code == 422
+    for path in (CATALOG, f"{CATALOG}/problems"):
+        for cursor in ("%%%", _b64("[1, 2]"), _b64("9" * 5000), _b64("Github"), "Z2l0aHVi="):
+            bad = await ai_people.admin.get(path, params={"cursor": cursor})
+            assert bad.status_code == 422, (path, cursor, bad.text)
+            assert bad.json()["error"]["code"] == "validation_failed"
+        assert (await ai_people.admin.get(path, params={"cursor": ""})).status_code == 200
 
 
 def test_the_check_script_passes_the_shipped_entries_and_fails_a_broken_file(
