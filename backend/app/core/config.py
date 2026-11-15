@@ -122,6 +122,10 @@ class Settings(BaseSettings):
     # The operator's own catalogue entries (plan M8 task 9): a directory of YAML files
     # added to the shipped ones; a broken file is reported and skipped, never fatal.
     mcp_catalog_dir: Path | None = None
+    # Calls one agent run may send to external MCP servers at most (plan M8 task 13);
+    # the next is refused as a result, nothing is sent. They cost no model tokens, so no
+    # budget counts them: this cap is what bounds them.
+    mcp_max_calls_per_run: int = Field(default=20, ge=1, le=500)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

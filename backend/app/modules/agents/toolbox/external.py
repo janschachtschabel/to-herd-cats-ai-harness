@@ -77,6 +77,10 @@ _NOT_CONNECTED = (
     "external_tool_not_connected: the person you work for has not connected their own "
     "account for this server (under My connections). It was not called."
 )
+CALL_LIMIT = (
+    "external_tool_limit: this run has sent {limit} calls to external tools, the most one "
+    "run may. It was not called. Go on without it, or say what is left to do."
+)
 _CREDENTIAL = "external_tool_credential_unavailable: the server's access cannot be used now."
 _FAILED = "external_tool_failed: the server did not answer as it should ({status})."
 _TOOL_ERROR = "external_tool_error: the tool reported an error.\n"
@@ -164,6 +168,10 @@ def failure_of(remote: RemoteTool, error: ExternalToolError) -> ToolResult:
 
 def refused(remote: RemoteTool) -> ToolResult:
     return ToolResult(SOURCE, POLICY_REFUSED, _attrs(remote))
+
+
+def limited(remote: RemoteTool, limit: int) -> ToolResult:
+    return ToolResult(SOURCE, CALL_LIMIT.format(limit=limit), _attrs(remote))
 
 
 def unknown_outcome(remote: RemoteTool) -> ToolResult:

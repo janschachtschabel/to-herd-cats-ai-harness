@@ -112,6 +112,7 @@ services:
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
       HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
+      HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
     env_file: *ai-keys
     depends_on: *after-migrate
     stop_grace_period: 30s

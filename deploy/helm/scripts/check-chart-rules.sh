@@ -255,6 +255,17 @@ grep -q "HERD_MCP_CATALOG_DIR\|mcp-catalog" <<<"$(doc Deployment t-to-herd-cats-
   && fail "the worker gets the catalogue"
 if render --set mcp.catalogConfigMap=Bad_Name >/dev/null; then fail "mcp.catalogConfigMap took a bad name"; fi
 
+# MCP (M8 Task 13): the cap on a run's external calls reaches the worker (runs) only.
+out=$(render)
+grep -A1 -- "- name: HERD_MCP_MAX_CALLS_PER_RUN" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "20"' || fail "the worker has no HERD_MCP_MAX_CALLS_PER_RUN"
+out=$(render --set mcp.maxCallsPerRun=5)
+grep -A1 -- "- name: HERD_MCP_MAX_CALLS_PER_RUN" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "5"' || fail "mcp.maxCallsPerRun does not reach the worker"
+grep -q "HERD_MCP_MAX_CALLS_PER_RUN" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  && fail "the API gets the worker's cap on external calls"
+if render --set mcp.maxCallsPerRun=0 >/dev/null; then fail "mcp.maxCallsPerRun=0 rendered"; fi
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.

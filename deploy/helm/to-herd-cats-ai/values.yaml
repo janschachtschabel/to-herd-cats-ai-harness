@@ -73,10 +73,12 @@ ai:
 ## @param mcp.ratePerMinute Calls one access token may make to /mcp per minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_MCP_RATE_PER_MINUTE; API). Whether people may have tokens at all is the organisation's switch in the AI administration
 ## @param mcp.allowedHosts Private hosts external MCP servers may run on (an in-house GitLab): exact host names or private networks in CIDR form (HERD_MCP_ALLOWED_HOSTS; API and worker). Empty: public addresses only. Link-local and metadata addresses stay refused; a listed host is dialled directly, past HERD_AI_EGRESS_PROXY. With networkPolicy.enabled, networkPolicy.aiEgress must also let the pods reach it
 ## @param mcp.catalogConfigMap Name of an existing ConfigMap whose keys are catalogue entries (*.yaml; docs/MCP.md, "Katalog"), added to the shipped GitHub and GitLab entries: mounted read-only into the API pods at /etc/herd/mcp-catalog (HERD_MCP_CATALOG_DIR; API). A broken file is reported to the admin and skipped. Empty: the shipped entries only
+## @param mcp.maxCallsPerRun Calls one agent run may send to tools of external MCP servers, 1 to 500 (HERD_MCP_MAX_CALLS_PER_RUN; worker). The next is refused as the tool's result and nothing is sent; external calls cost no model tokens, so no budget counts them
 mcp:
   ratePerMinute: 120
   allowedHosts: []
   catalogConfigMap: ""
+  maxCallsPerRun: 20
 
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""

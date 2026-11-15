@@ -142,9 +142,10 @@
           "maxLength": 253,
           "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
           "description": "A ConfigMap of catalogue entries, mounted for HERD_MCP_CATALOG_DIR (API); empty: none"
-        }
+        },
+        "maxCallsPerRun": {"type": "integer", "minimum": 1, "maximum": 500, "description": "HERD_MCP_MAX_CALLS_PER_RUN (worker): calls one run may send to external MCP servers"}
       },
-      "required": ["ratePerMinute", "allowedHosts", "catalogConfigMap"],
+      "required": ["ratePerMinute", "allowedHosts", "catalogConfigMap", "maxCallsPerRun"],
       "description": "The MCP endpoint and its access tokens"
     },
     "collab": {

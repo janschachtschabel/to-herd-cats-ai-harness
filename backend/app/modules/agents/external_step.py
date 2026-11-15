@@ -10,8 +10,10 @@ it here). No transaction is open while the remote server answers.
    (`ToolCaller.prepare`: the server's shared connector, or the asking person's own;
    the secret lives only in the endpoint's headers, never in the journal). A write
    tool passes the release of the asking person (`approvals/gate.py`: waiting,
-   rejected and stale end the step as for any tool). Then, before anything is sent,
-   the call's `run_event` with `OUTCOME_UNKNOWN` as its result, committed.
+   rejected and stale end the step as for any tool). A run that has sent
+   `HERD_MCP_MAX_CALLS_PER_RUN` calls sends no more (`CALL_LIMIT` as the result).
+   Then, before anything is sent, the call's `run_event` with `OUTCOME_UNKNOWN` as its
+   result, committed.
 2. The call (`calls.execute`): the server lists its tools again and the tool is
    called only as approved; through the egress guard, with a deadline and a cap.
 3. A second transaction records the real result as a second `run_event` for the
@@ -28,6 +30,9 @@ write tool's release is used up: `ran`). A second transaction that runs out of t
 leaves that same entry as the result. A call that fails before anything is sent
 (unavailable, not connected, refused by the policy) records its failure as the
 result in the first transaction.
+
+Every call counts once in `herd_external_tool_calls_total` after its step committed
+(`external_metrics.py`); a step that waits for a release counts when it runs again.
 """
 
 import time
@@ -36,11 +41,14 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from app.core.config import get_settings
 from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
 from app.mcp.client import Refused
 from app.modules.agents.approvals.gate import gate
 from app.modules.agents.executor_repository import RunSteps
+from app.modules.agents.external_metrics import CallOutcome, count, outcome_of
+from app.modules.agents.external_repository import sent_calls
 from app.modules.agents.models import STEP_STATEMENT_TIMEOUT_SECONDS, EventKind, Run
 from app.modules.agents.step_checks import (
     granted,
@@ -76,6 +84,14 @@ class Host(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class _Ended:
+    """Nothing was sent: the result recorded in the first transaction, and why."""
+
+    result: ToolResult
+    outcome: CallOutcome
+
+
+@dataclass(frozen=True, slots=True)
 class _Sending:
     prepared: PreparedCall
     arguments: dict[str, Any]
@@ -86,9 +102,13 @@ class _Sending:
 async def call_external(
     host: Host, step: int, call: ToolCall, args: BaseModel, spec: ToolSpec
 ) -> ToolResult | Wait:
+    writes = spec.remote is not None and spec.remote.writes
     first = await once_more(host.run, lambda: _before(host, step, call, args, spec))
+    if isinstance(first, _Ended):
+        count(first.outcome, writes=writes)
+        return first.result
     if not isinstance(first, _Sending):
-        return first
+        return first  # waits for a release
     started = time.perf_counter()
     outcome: Outcome
     try:
@@ -97,18 +117,21 @@ async def call_external(
         outcome = error
     duration_ms = round((time.perf_counter() - started) * 1000)
     try:
-        return await once_more(
+        result = await once_more(
             host.run, lambda: _after(host, step, call, args, spec, first, outcome, duration_ms)
         )
     except Exception as exc:
         if is_timeout(exc):  # the call was sent: its first entry stands
+            count(CallOutcome.UNKNOWN, writes=writes)
             return first.placeholder
         raise
+    count(outcome_of(outcome), writes=writes)
+    return result
 
 
 async def _before(
     host: Host, step: int, call: ToolCall, args: BaseModel, spec: ToolSpec
-) -> ToolResult | Wait | _Sending:
+) -> _Ended | Wait | _Sending:
     remote = spec.remote
     assert remote is not None
     async with host.unit() as session:
@@ -118,17 +141,26 @@ async def _before(
         actor = await run_actor_now(session, host.run, agent)
         claimed = host.run.claimed
         server = await ServerRepository(session, claimed.org_id).get(remote.server_id)
+        refused = CallOutcome.REFUSED
         if server is not None and not await policy_allows(
             session, host.run, DataLocation(server.data_location)
         ):
-            return await _record(host, steps, run, step, call, args, external.refused(remote))
+            kept = await _record(host, steps, run, step, call, args, external.refused(remote))
+            return _Ended(kept, refused)
+        limit = get_settings().mcp_max_calls_per_run
+        if await sent_calls(session, claimed.org_id, claimed.id) >= limit:
+            capped = external.limited(remote, limit)
+            return _Ended(
+                await _record(host, steps, run, step, call, args, capped), CallOutcome.LIMITED
+            )
         try:
             prepared = await ToolCaller(session).prepare(
                 claimed.org_id, remote.server_id, remote.tool_name, on_behalf_of=claimed.user_id
             )
         except ExternalToolError as error:
             failed = external.failure_of(remote, error)
-            return await _record(host, steps, run, step, call, args, failed)
+            kept = await _record(host, steps, run, step, call, args, failed)
+            return _Ended(kept, outcome_of(error))
         location = await location_of(steps, host.run)
         ctx = ToolContext(
             session, actor, location, host.run.reads, host.ref(), CallRef(step, call.id)
@@ -140,8 +172,8 @@ async def _before(
         if isinstance(held, Wait):
             await steps.wait(run, held.until)
             return held
-        if held is not None:
-            return await _record(host, steps, run, step, call, args, held)
+        if held is not None:  # the release was rejected or is stale
+            return _Ended(await _record(host, steps, run, step, call, args, held), refused)
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder)
         personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL

@@ -62,10 +62,12 @@ services:
       # MCP (docs/MCP.md): calls per access token and minute; private hosts (names or
       # CIDR, comma separated) external MCP servers may run on (empty: none); the
       # directory, inside the container, of the operator's own catalogue entries
-      # (mount it read-only, e.g. in compose.override.yml; empty: the shipped ones).
+      # (mount it read-only, e.g. in compose.override.yml; empty: the shipped ones);
+      # calls one agent run may send to external MCP servers.
       HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
       HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
+      HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
     # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
     # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
     # default would hide them.

@@ -207,3 +207,10 @@ seccompProfile:
 - name: HERD_RUN_LEASE_SECONDS
   value: {{ .Values.ai.runLeaseSeconds | quote }}
 {{- end -}}
+
+{{/* MCP settings of the worker pods (agent runs call external tools). */}}
+{{- define "herd.mcpWorkerEnv" -}}
+- name: HERD_MCP_MAX_CALLS_PER_RUN
+  value: {{ .Values.mcp.maxCallsPerRun | quote }}
+{{ include "herd.mcpServersEnv" . }}
+{{- end -}}
