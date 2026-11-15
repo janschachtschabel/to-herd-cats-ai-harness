@@ -156,6 +156,13 @@
       "schemaProblem": {
         "schema_too_large": "Das Eingabeschema ist zu groß, um es einem Modell anzubieten (über 64 KiB, oder seine Struktur über 8.000 Zeichen). Das Werkzeug kann nicht freigegeben werden.",
         "schema_unsupported": "Das Eingabeschema lässt sich einem Modell nicht anbieten (zu tief verschachtelt, oder ein Feldname mit Zeichen außer Buchstaben, Ziffern, _ . -). Das Werkzeug kann nicht freigegeben werden."
+      },
+      "approvedNotKept": "Die freigegebene Fassung ist nicht gespeichert (Freigabe vor diesem Update); verglichen werden nur die Fingerabdrücke.",
+      "changedParts": "Geändert: {{parts}}",
+      "approvedVersion": "Freigegebene Fassung",
+      "parts": {
+        "description": "Beschreibung",
+        "schema": "Eingabeschema"
       }
     },
     "connectors": {

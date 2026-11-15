@@ -213,6 +213,8 @@ class ToolRepository:
             .values(
                 state=ToolState.CHANGED,
                 approved_fingerprint=None,
+                approved_description=None,
+                approved_input_schema=None,
                 version=McpServerTool.version + 1,
             )
         )

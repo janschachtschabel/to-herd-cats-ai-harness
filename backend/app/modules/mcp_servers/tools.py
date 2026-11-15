@@ -193,6 +193,7 @@ class ToolService:
             raise Conflict(code="mcp_tool.approved_limit", details={"limit": MAX_APPROVED_TOOLS})
         tool.state = ToolState.APPROVED
         tool.approved_fingerprint = tool.fingerprint
+        tool.approved_description, tool.approved_input_schema = tool.description, tool.input_schema
         return await self._saved(actor, tool, "mcp_tool.approved", {"state": tool.state})
 
     async def block(
@@ -201,6 +202,7 @@ class ToolService:
         tool = await self._current(actor, server_id, tool_id, version)
         tool.state = ToolState.BLOCKED
         tool.approved_fingerprint = None
+        tool.approved_description = tool.approved_input_schema = None
         return await self._saved(actor, tool, "mcp_tool.blocked", {"state": tool.state})
 
     async def classify(

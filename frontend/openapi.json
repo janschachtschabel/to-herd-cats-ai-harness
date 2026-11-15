@@ -13809,6 +13809,17 @@
       },
       "ToolOut": {
         "properties": {
+          "approved_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Description"
+          },
           "approved_fingerprint": {
             "anyOf": [
               {
@@ -13819,6 +13830,18 @@
               }
             ],
             "title": "Approved Fingerprint"
+          },
+          "approved_input_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Input Schema"
           },
           "classification": {
             "$ref": "#/components/schemas/Classification"
@@ -13900,6 +13923,8 @@
           "read_only_hint",
           "fingerprint",
           "approved_fingerprint",
+          "approved_description",
+          "approved_input_schema",
           "classification",
           "suggested_classification",
           "state",

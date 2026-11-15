@@ -12,6 +12,9 @@ suggested classifications a refresh applies to the tools it adds.
 name, description and input schema as last read; `approved_fingerprint` the one an
 admin approved. Only `state = approved` with both equal and the tool still listed may
 be called; a refresh that reads another fingerprint sets an approved tool `changed`.
+`approved_description` and `approved_input_schema` keep what was approved, while the
+approval stands, so the admin sees what changed before approving again (module review
+M8 1, finding 14).
 `input_schema` is stored up to 64 KiB (`schema_view.stored`); `schema_problem` says why
 a schema cannot be offered to a model (too large, unsupported names or depth).
 `classification` (`read`/`write`) is the admin's; the proposal is `read` only when the
@@ -120,6 +123,8 @@ class McpServerTool(UuidPk, OrgScoped, Timestamps, Base):
     read_only_hint: Mapped[bool] = mapped_column(Boolean, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     approved_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    approved_description: Mapped[str | None] = mapped_column(Text)
+    approved_input_schema: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     classification: Mapped[Classification] = mapped_column(String(16), nullable=False)
     state: Mapped[ToolState] = mapped_column(String(16), nullable=False)
     # The server no longer lists it (a later refresh that lists it again clears it).

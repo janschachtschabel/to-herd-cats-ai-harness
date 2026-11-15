@@ -37,6 +37,25 @@ export function toolNeedsAttention(tool: Pick<Tool, 'state' | 'missing'>): boole
   return view === 'new' || view === 'changed'
 }
 
+/** What changed since a tool's approval: its description, its input schema; null when
+ *  the approved version was not kept (an approval from before it was). */
+export type ChangedPart = 'description' | 'schema'
+
+export function changedParts(
+  tool: Pick<
+    Tool,
+    'description' | 'input_schema' | 'approved_description' | 'approved_input_schema'
+  >,
+): ChangedPart[] | null {
+  if (tool.approved_description == null || tool.approved_input_schema == null) return null
+  const parts: ChangedPart[] = []
+  if (tool.approved_description !== tool.description) parts.push('description')
+  if (JSON.stringify(tool.approved_input_schema) !== JSON.stringify(tool.input_schema)) {
+    parts.push('schema')
+  }
+  return parts
+}
+
 /** A remote server's answer (test, refresh) as a tone; the words say what happened. */
 export function remoteTone(status: RemoteStatus): 'ok' | 'refused' | 'failed' {
   if (status === 'ok') return 'ok'

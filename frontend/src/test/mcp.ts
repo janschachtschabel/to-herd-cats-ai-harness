@@ -40,6 +40,8 @@ export function makeTool(overrides: Partial<Tool> = {}): Tool {
     read_only_hint: true,
     fingerprint: 'f1',
     approved_fingerprint: null,
+    approved_description: null,
+    approved_input_schema: null,
     classification: 'read',
     suggested_classification: null,
     state: 'pending',

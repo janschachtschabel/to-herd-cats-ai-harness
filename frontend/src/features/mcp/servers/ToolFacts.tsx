@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import type { Tool, ToolView } from '../display'
+import { changedParts, type Tool, type ToolView } from '../display'
 
 const STATE_TONES: Record<ToolView, string> = {
   new: 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-100',
@@ -29,8 +29,36 @@ export function ToolStateBadge({ view }: { view: ToolView }) {
 
 const short = (fingerprint: string) => fingerprint.slice(0, 12)
 
+/** Which parts changed since the approval, and the approved version, folded (or that
+ *  it was not kept: an approval from before it was). */
+function ChangedSince({ tool }: { tool: Tool }) {
+  const { t } = useTranslation()
+  const parts = changedParts(tool)
+  if (parts === null) return <p className="mt-1 text-xs">{t('mcp.tools.approvedNotKept')}</p>
+  return (
+    <>
+      {parts.length > 0 && (
+        <p className="mt-1 text-xs font-medium">
+          {t('mcp.tools.changedParts', {
+            parts: parts.map((part) => t(`mcp.tools.parts.${part}`)).join(', '),
+          })}
+        </p>
+      )}
+      <details className="mt-1 text-xs">
+        <summary className="cursor-pointer font-medium select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none">
+          {t('mcp.tools.approvedVersion')}
+        </summary>
+        <p className="mt-1 break-words whitespace-pre-wrap">{tool.approved_description}</p>
+        <pre className="mt-1 max-h-72 overflow-auto font-mono break-words whitespace-pre-wrap">
+          {JSON.stringify(tool.approved_input_schema, null, 2)}
+        </pre>
+      </details>
+    </>
+  )
+}
+
 /** What the admin needs to decide: why a changed or missing tool is held back (with
- *  both fingerprints when the API has them), why a schema cannot be offered to a model
+ *  both fingerprints when the API has them, what changed and the approved version), why a schema cannot be offered to a model
  *  (then the tool cannot be approved), what the server and the catalogue say
  *  about reading or writing, what the classification means for agents, and the
  *  server's description and input schema, folded. */
@@ -53,6 +81,7 @@ export function ToolFacts({ tool, view }: { tool: Tool; view: ToolView }) {
               })}
             </p>
           )}
+          <ChangedSince tool={tool} />
         </div>
       )}
       {view === 'missing' && (

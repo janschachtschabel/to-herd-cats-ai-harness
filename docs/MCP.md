@@ -684,7 +684,13 @@ Recht 404 `ai.not_found`.
   eine Freigabe merkt sich genau diesen (`approved_fingerprint`). Liest ein Refresh
   einen anderen, wird ein freigegebenes Werkzeug `changed` und ist gesperrt, bis es
   erneut freigegeben wird (kehrt der Server zum freigegebenen Stand zurück, ist es
-  wieder `approved`). Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
+  wieder `approved`). Solange eine Freigabe steht, merkt sie sich auch die freigegebene
+  Beschreibung und das Schema (`approved_description`, `approved_input_schema`): bei
+  einem geänderten Werkzeug zeigt die Verwaltung, was sich geändert hat (Beschreibung,
+  Eingabeschema), und die freigegebene Fassung neben der neuen (Review M8 1, Befund 14;
+  nie in Logs). Für Freigaben von vor dem Update übernimmt die Migration `a6ce005832fd`
+  die Fassung nur, wo der Fingerabdruck noch der freigegebene ist; sonst zeigt die
+  Verwaltung nur die Fingerabdrücke. Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
   nicht freizugeben (409 `mcp_tool.missing`). Eine Organisation hält höchstens 200
   freigegebene Werkzeuge über alle Server (freigegeben oder seitdem `changed`; 409
   `mcp_tool.approved_limit`, gezählt in SQL, eine Freigabe nach der anderen): die

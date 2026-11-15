@@ -8661,8 +8661,14 @@ export interface components {
         };
         /** ToolOut */
         ToolOut: {
+            /** Approved Description */
+            approved_description: string | null;
             /** Approved Fingerprint */
             approved_fingerprint: string | null;
+            /** Approved Input Schema */
+            approved_input_schema: {
+                [key: string]: unknown;
+            } | null;
             classification: components["schemas"]["Classification"];
             /** Description */
             description: string;

@@ -156,6 +156,13 @@
       "schemaProblem": {
         "schema_too_large": "The input schema is too large to offer to a model (over 64 KiB, or its structure over 8,000 characters). The tool cannot be approved.",
         "schema_unsupported": "The input schema cannot be offered to a model (nested too deep, or a field name with characters other than letters, digits, _ . -). The tool cannot be approved."
+      },
+      "approvedNotKept": "The approved version was not kept (approved before this update); only the fingerprints can be compared.",
+      "changedParts": "Changed: {{parts}}",
+      "approvedVersion": "Approved version",
+      "parts": {
+        "description": "description",
+        "schema": "input schema"
       }
     },
     "connectors": {

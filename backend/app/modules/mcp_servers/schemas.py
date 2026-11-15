@@ -158,6 +158,10 @@ class ToolOut(BaseModel):
     read_only_hint: bool
     fingerprint: str
     approved_fingerprint: str | None
+    # What was approved, while the approval stands (beside `description` and
+    # `input_schema` for a `changed` tool; None for an approval from before M8's fixes).
+    approved_description: str | None
+    approved_input_schema: dict[str, Any] | None
     classification: Classification
     # What the server's catalogue entry suggests, if it was created from one and the
     # entry knows the tool; a suggestion, never an approval.
@@ -181,6 +185,8 @@ class ToolOut(BaseModel):
             read_only_hint=tool.read_only_hint,
             fingerprint=tool.fingerprint,
             approved_fingerprint=tool.approved_fingerprint,
+            approved_description=tool.approved_description,
+            approved_input_schema=tool.approved_input_schema,
             classification=tool.classification,
             suggested_classification=suggested,
             state=tool.state,
