@@ -96,7 +96,9 @@ describe('MCP administration', () => {
     const { user } = await renderApp('/admin/ai/mcp')
     const laptop = await screen.findByRole('article', { name: 'Laptop' })
     expect(within(laptop).getByText('Persönliches Token von Lea Löwe')).toBeInTheDocument()
+    expect(within(laptop).getByText('Alle Bereiche der Person')).toBeInTheDocument()
     const pipeline = screen.getByRole('article', { name: 'Pipeline' })
+    expect(within(pipeline).getByText('Alle Bereiche des Agenten')).toBeInTheDocument()
     expect(
       within(pipeline).getByText('Token des Agenten Codi (verantwortlich: Ben Bauer)'),
     ).toBeInTheDocument()

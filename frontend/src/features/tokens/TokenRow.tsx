@@ -44,7 +44,17 @@ export function TokenRow({
       {owner && <p className="text-sm text-muted-foreground">{owner}</p>}
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
         <Fact label={t('tokens.facts.scope')}>
-          <Scope spaceIds={token.space_ids} names={spaceNames} />
+          <Scope
+            spaceIds={token.space_ids}
+            names={spaceNames}
+            allLabel={
+              token.kind === 'agent'
+                ? t('tokens.scope.allAgent')
+                : owner
+                  ? t('tokens.scope.allOwner')
+                  : t('tokens.scope.all')
+            }
+          />
         </Fact>
         <Fact label={t('tokens.facts.lastUsed')}>
           {token.last_used_at ? when(token.last_used_at) : t('tokens.facts.never')}
@@ -89,16 +99,20 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/** `allLabel`: whose spaces a token for all of them reaches (mine, the person's, the
+ *  agent's). */
 function Scope({
   spaceIds,
   names,
+  allLabel,
 }: {
   spaceIds: readonly string[] | null
   names: ReadonlyMap<string, string>
+  allLabel: string
 }) {
   const { t } = useTranslation()
   const scope = scopeNames(spaceIds, names)
-  if (scope.all) return <>{t('tokens.scope.all')}</>
+  if (scope.all) return <>{allLabel}</>
   return (
     <span className="flex flex-wrap gap-1">
       {scope.named.map((name) => (

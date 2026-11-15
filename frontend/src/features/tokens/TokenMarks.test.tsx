@@ -25,7 +25,7 @@ const thread = makeConversation({ kind: 'thread_ticket', name: null, space_id: s
 function ticketApi(
   messages: ReturnType<typeof makeMessage>[],
   ticket = makeTicket(),
-  permissions = ['directory.read'],
+  permissions: Parameters<typeof makeMe>[0] = ['directory.read'],
 ) {
   return mockApi({
     ...shellRoutes(makeMe(permissions), [space]),
