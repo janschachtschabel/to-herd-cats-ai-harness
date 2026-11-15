@@ -29,6 +29,18 @@ class FreshStartRepository:
         )
         return await self.session.scalar(stmt)
 
+    async def hold(self, conversation_id: uuid.UUID) -> None:
+        """The conversation's row `FOR SHARE` until the transaction ends, as a person's
+        new message holds it (`messaging/dating.py`): a run queued now (a DM's
+        follow-up, `closing._follow_up`) commits before a fresh start, which then
+        cancels it, or waits for it (module review M8 5, L4)."""
+        stmt = (
+            select(Conversation.id)
+            .where(Conversation.org_id == self.org_id, Conversation.id == conversation_id)
+            .with_for_update(read=True)
+        )
+        await self.session.scalar(stmt)
+
     async def cut(self, conversation_id: uuid.UUID) -> datetime:
         """The database's clock now, but no earlier than anything the conversation
         holds (its messages, its runs' creation and start), whatever clock wrote them:

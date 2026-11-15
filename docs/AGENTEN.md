@@ -616,7 +616,11 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   der Person warten aufeinander an der Zeile des Gesprächs (`FOR NO KEY UPDATE` gegen
   `FOR SHARE`). Kam die Nachricht zuerst, wird ihr Lauf mit Hinweis abgebrochen; kommt
   sie danach, liegt sie hinter dem Schnitt (auch wenn die Uhr des API-Knotens
-  nachgeht), und ihr Lauf liest sie. Keiner endet stumm (Review M8 4, Befund K4).
+  nachgeht), und ihr Lauf liest sie. Ebenso der Lauf, den ein endender Lauf für ihre
+  Nachricht aus seiner Wartezeit einreiht: Er hält die Zeile wie ihre Nachricht und
+  wird abgebrochen; kam „Neu beginnen“ zuerst, wartet es auf den endenden Lauf und
+  antwortet 409 `conflict.retry`; die Oberfläche sendet es dann von selbst noch einmal
+  (wie jede Anfrage mit diesem Code), und das bricht ihn ab (Review M8 5, Befund L4). Keiner endet stumm (Review M8 4, Befund K4).
   Die Nachrichten davor bleiben, wie sie sind, markierte auch, und sie sieht sie
   weiter; im Gespräch zeigt eine Linie „Neu begonnen am …“, wo der Schnitt liegt.
   Das Abzeichen „Persönlich“ und die Freigabekarte unter der Marke nennen diesen

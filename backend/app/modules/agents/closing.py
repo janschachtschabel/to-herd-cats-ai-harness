@@ -13,9 +13,10 @@ request found there wins over any other end (`cancelled`, no answer).
 
 A DM's run leaves no question unanswered: a message the person sent after it started
 that no queued run will answer (it came while the run waited) gets a run of its
-own, queued in the same transaction; not after a cancelled run, which writes nothing
-beyond its notice, nor after one a daily budget stopped (the next would stop at
-once). An automation's run queues none (it answered no message): its end counts for
+own, queued in the same transaction under the DM's row (`FOR SHARE`, as her
+messages, so "Neu beginnen" cancels it); not after a cancelled run, which writes
+nothing beyond its notice, nor after one a daily budget stopped (the next would stop
+at once). An automation's run queues none (it answered no message): its end counts for
 its automation instead (`automations/runs.ended`: three failures in a row pause it).
 """
 
@@ -25,6 +26,7 @@ from app.modules.agents.actor import run_actor
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
+from app.modules.agents.fresh_start_repository import FreshStartRepository
 from app.modules.agents.notices import announce, notice, notify
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.run_models import EventKind, Run, StopReason
@@ -123,7 +125,11 @@ async def _tell_responsible(session: AsyncSession, steps: RunSteps, message: Mes
 
 async def _follow_up(session: AsyncSession, steps: RunSteps, run: Run) -> None:
     """A run for the person's latest message after this run started, if no queued
-    run answers it and the person may still ask the agent."""
+    run answers it and the person may still ask the agent. The DM's row is held first,
+    as her messages hold it: a fresh start comes after the run queued here and cancels
+    it, or it came first and waits for this run's row, which it gets only after this
+    transaction, so it yields (409 `conflict.retry`; module review M8 5, L4)."""
+    await FreshStartRepository(session, run.org_id).hold(run.conversation_id)
     message_id = await ControlRepository(session, run.org_id).unanswered(run)
     if message_id is None:
         return
