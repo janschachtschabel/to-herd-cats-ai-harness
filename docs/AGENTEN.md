@@ -576,14 +576,20 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
 - **Was die Person sieht**: In ihrer Direktnachricht trägt eine markierte Nachricht das
   Abzeichen „Persönlich“; ein Klick erklärt, was es heißt und wann der Agent vorher
   fragt. Die Freigabekarte unter der Marke sagt, dass genau der gezeigte Inhalt
-  geschrieben wird und danach nicht mehr markiert ist, und zeigt ihn vollständig und
+  geschrieben wird, jetzt oder später von anderen gelesen werden kann und danach nicht
+  mehr markiert ist, und zeigt ihn vollständig und
   aufgeklappt: alle Angaben des Aufrufs und bei einer Seitenänderung den ganzen
   Vergleich, ohne Knopf zum Öffnen (Review M8 3, Befund H5). Was sich so nicht
   vollständig zeigen lässt (ein Vergleich über `HERD_DIFF_MAX_LINES`), kann sie nicht
   freigeben: Der Aufruf wird abgelehnt, bevor eine Karte entsteht (das Modell liest
   `Refused (personal_release.too_large)`, die Laufansicht sagt es ihr in Worten), und
   eine schon gestellte Freigabe, die inzwischen zu groß ist (die Grenze wurde
-  gesenkt), lässt sich nur noch ablehnen (409 `approval.not_shown_in_full`).
+  gesenkt), lässt sich nur noch ablehnen (409 `approval.not_shown_in_full`). Beides
+  gilt nur für eine Freigabe, die die Marke verlangt: Fragt ein Werkzeug auf
+  `confirm` in einem markierten Lauf, ist seine Karte nur dann persönlich, wenn der
+  Aufruf ihre Freigabe auch unter der Marke bräuchte; eine Nachricht in ihre
+  Direktnachricht allein mit dem Agenten bekommt die gewöhnliche Karte (Review M8 4,
+  Befund K5).
 - **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
   Verlaufsfenster und Werkzeugergebnisse nichts Markiertes enthalten, beginnt und
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,

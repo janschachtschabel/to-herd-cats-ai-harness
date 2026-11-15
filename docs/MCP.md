@@ -760,8 +760,9 @@ Recht 404 `ai.not_found`.
   schreiben will (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein Gedächtnis,
   jeder Bereich), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
-  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte zeigt den
-  Inhalt vollständig; was sich nicht vollständig zeigen lässt (ein Vergleich über
+  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte sagt, dass
+  er jetzt oder später von anderen gelesen werden kann, und zeigt den Inhalt
+  vollständig (Review M8 4, Befund K5); was sich nicht vollständig zeigen lässt (ein Vergleich über
   `HERD_DIFF_MAX_LINES`), wird abgelehnt (`personal_release.too_large`), statt zur
   Freigabe zu stehen (Review M8 3, Befund H5). Ohne Freigabe schreibt er nur in sein
   eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten; markiert).

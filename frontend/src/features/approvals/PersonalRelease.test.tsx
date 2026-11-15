@@ -52,6 +52,9 @@ describe('a release card under the personal mark (module review M8 2, G2)', () =
     expect(within(shown).getByText(/^Persönlich:/)).toHaveTextContent(
       /genau der folgende Inhalt geschrieben/,
     )
+    expect(within(shown).getByText(/^Persönlich:/)).toHaveTextContent(
+      /kann jetzt oder später von anderen gelesen werden/,
+    )
     expect(within(shown).queryByRole('group')).toBeNull() // nothing folded (no <details>)
     const args = within(shown).getByRole('figure', { name: 'Angaben des Aufrufs' })
     expect(args).toHaveTextContent('Für alle: HC-1 ist erledigt.')

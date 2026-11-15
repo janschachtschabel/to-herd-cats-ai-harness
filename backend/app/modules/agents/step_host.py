@@ -38,17 +38,16 @@ Bounds (module review M6, findings 3 and 14; review 2, finding 8):
 import asyncio
 import time
 from collections.abc import Callable
-from dataclasses import replace
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
-from app.modules.agents.approvals.gate import Passed, gate, settle_timed_out
+from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_step import call_external
-from app.modules.agents.personal_mark import ReleaseFirst
+from app.modules.agents.personal_step import owes_release, run_tool
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.run_models import (
     STEP_LOCK_TIMEOUT_SECONDS,
@@ -193,12 +192,13 @@ class RunHost:
             started = time.perf_counter()
             with caused_by(run.id):  # what the tool emits names the run (plan M7)
                 held = None
-                if grant == Grant.CONFIRM:
-                    held = await gate(ctx, spec, args, personal=marked)
+                if grant == Grant.CONFIRM:  # personal: only if the mark owes it (K5)
+                    personal = marked and await owes_release(ctx, spec, args)
+                    held = await gate(ctx, spec, args, personal=personal)
                 if isinstance(held, ToolResult | Wait):
                     result: ToolResult | Wait = held
                 else:  # a release covers the mark too
-                    result = await _run(ctx, spec, args, held)
+                    result = await run_tool(ctx, spec, args, held)
             duration_ms = round((time.perf_counter() - started) * 1000)
             if isinstance(result, Wait):
                 await steps.wait(run, result.until)
@@ -259,26 +259,3 @@ class RunHost:
     def next_seq(self) -> int:
         self.run.seq += 1
         return self.run.seq
-
-
-async def _run(
-    ctx: ToolContext, spec: ToolSpec, args: Any, passed: Passed | None
-) -> ToolResult | Wait:
-    """The tool; under the personal mark a write others could read stops before its
-    effect (`ReleaseFirst`, its savepoint undone) and asks the person's release of the
-    call first (`personal_mark.py`); released, it runs again and writes. A call the
-    gate finds to change nothing (a preview) runs unreleased, `previewing`: it never
-    writes, and its result is the asker's alone (module review M8 3, H1)."""
-    if passed == Passed.RELEASED or not ctx.reads.personal:
-        return await spec.run(replace(ctx, released=passed == Passed.RELEASED), args)
-    if passed is None:
-        try:
-            async with ctx.session.begin_nested():
-                return await spec.run(ctx, args)
-        except ReleaseFirst:
-            held = await gate(ctx, spec, args, personal=True)
-            if not isinstance(held, Passed):
-                return held
-            if held == Passed.RELEASED:
-                return await spec.run(replace(ctx, released=True), args)
-    return await spec.run(replace(ctx, previewing=True), args)

@@ -33,11 +33,12 @@ sorted) and each object's kind, id, version and space. Objects without a version
 a tool that changed since the release makes it stale; its card names the server and
 the tool, never an argument (`toolbox/external.py`).
 
-Under the personal mark (`agents/personal_mark.py`) a write others could read asks
-the same way, whatever the tool's grant (`step_host.py`); such an approval is
-`personal` and its card says that what is released goes where others read it, and
-shows it in full. A call whose content cannot be shown in full is refused instead
-(`shown.py`).
+Under the personal mark (`agents/personal_mark.py`) every write but into the run's
+DM alone with the person asks the same way, whatever the tool's grant
+(`personal_step.py`); such an approval is `personal`, and so is a `confirm` grant's
+only when the call owes that release (module review M8 4, K5). A personal card says
+that what is released can be read by others now or later, and shows it in full; a
+call whose content cannot be shown in full is refused instead (`shown.py`).
 """
 
 import hashlib

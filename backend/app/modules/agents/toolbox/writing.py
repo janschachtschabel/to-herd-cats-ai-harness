@@ -215,10 +215,13 @@ async def effect(
     """Run `write` in a savepoint; a service's refusal undoes it and is the result.
     Under the personal mark, a call whose checks noted a write others read asks the
     person's release first (`release_first`); one that runs unreleased because the
-    gate found it to change nothing (`ToolContext.previewing`) never writes."""
+    gate found it to change nothing (`ToolContext.previewing`) never writes, nor does
+    a probe (`ToolContext.probing`, `personal_step.owes_release`)."""
     if isinstance(ctx, ToolContext) and ctx.previewing:
         return refusal(source, RELEASE_NEEDED, attrs)
     _ask_release(ctx)  # every other check passed: her release of exactly this
+    if isinstance(ctx, ToolContext) and ctx.probing:  # owes nothing; never writes
+        return refusal(source, RELEASE_NEEDED, attrs)
     try:
         async with ctx.session.begin_nested():
             return await write()

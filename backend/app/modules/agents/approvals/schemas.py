@@ -39,8 +39,9 @@ class ApprovalOut(BaseModel):
     asked; for everyone else both are null and `redacted` is true (as in the run
     view, review M6 finding 6). `external`: for a call of an external tool (it sends
     `args` to that server once released), else null. `personal`: asked because the
-    run carries the asker's personal mark: what is released is written (or sent)
-    where others read it (module review M8 2)."""
+    run carries the asker's personal mark and the call owes her release under it: what
+    is released is written (or sent) where others can read it now or later (module
+    review M8 2; M8 4, K5)."""
 
     id: uuid.UUID
     run_id: uuid.UUID
