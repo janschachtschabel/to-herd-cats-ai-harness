@@ -30,7 +30,8 @@ export function ToolStateBadge({ view }: { view: ToolView }) {
 const short = (fingerprint: string) => fingerprint.slice(0, 12)
 
 /** What the admin needs to decide: why a changed or missing tool is held back (with
- *  both fingerprints when the API has them), what the server and the catalogue say
+ *  both fingerprints when the API has them), why a schema cannot be offered to a model
+ *  (then the tool cannot be approved), what the server and the catalogue say
  *  about reading or writing, what the classification means for agents, and the
  *  server's description and input schema, folded. */
 export function ToolFacts({ tool, view }: { tool: Tool; view: ToolView }) {
@@ -57,6 +58,14 @@ export function ToolFacts({ tool, view }: { tool: Tool; view: ToolView }) {
       {view === 'missing' && (
         <p role="note" className="text-sm text-muted-foreground">
           {t('mcp.tools.missingNote')}
+        </p>
+      )}
+      {tool.schema_problem && (
+        <p
+          role="note"
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+        >
+          {t(`mcp.tools.schemaProblem.${tool.schema_problem}`)}
         </p>
       )}
       {tool.description && (

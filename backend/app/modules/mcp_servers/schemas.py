@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 
 from app.mcp.client import RemoteStatus
 from app.modules.ai.models import DataLocation
+from app.modules.mcp_servers.listing import problem_of
 from app.modules.mcp_servers.models import (
     MAX_NAME_CHARS,
     MAX_URL_CHARS,
@@ -17,6 +18,7 @@ from app.modules.mcp_servers.models import (
     McpServerTool,
     ToolState,
 )
+from app.modules.mcp_servers.schema_view import SchemaProblem
 
 Name = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_NAME_CHARS)
@@ -156,6 +158,9 @@ class ToolOut(BaseModel):
     suggested_classification: Classification | None
     state: ToolState
     missing: bool
+    # Why its input schema cannot be offered to a model (then it cannot be approved):
+    # `schema_too_large` (over 64 KiB, or too large to offer), `schema_unsupported`.
+    schema_problem: SchemaProblem | None
     version: int
     updated_at: datetime
 
@@ -174,6 +179,7 @@ class ToolOut(BaseModel):
             suggested_classification=suggested,
             state=tool.state,
             missing=tool.missing,
+            schema_problem=problem_of(tool),
             version=tool.version,
             updated_at=tool.updated_at,
         )

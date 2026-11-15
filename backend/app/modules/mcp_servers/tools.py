@@ -10,6 +10,9 @@ approved, blocked and classified one by one (`ai.manage`).
   tool whose fingerprint is no longer the approved one becomes `changed`) and marks
   what vanished `missing`.
 - An approval stores the fingerprint it approved; only that exact tool is callable.
+  A tool whose input schema cannot be offered to a model (`schema_view`: over 64 KiB,
+  a structure too large or too deep, a property name a model cannot take) is not
+  approvable (409 `mcp_tool.schema_problem`); the admin sees why (`schema_problem`).
 - Classifying a tool `read` that the server does not annotate read-only needs
   `confirm_loosen` (422 `mcp_tool.loosen_unconfirmed`).
 """
@@ -30,7 +33,7 @@ from app.modules.audit.recorder import record
 from app.modules.mcp_catalog.loader import catalog
 from app.modules.mcp_servers.endpoints import prepared_endpoint
 from app.modules.mcp_servers.errors import CredentialUnavailable, NotConnected
-from app.modules.mcp_servers.listing import apply, new_tool, usable
+from app.modules.mcp_servers.listing import apply, new_tool, problem_of, usable
 from app.modules.mcp_servers.models import Classification, McpServer, McpServerTool, ToolState
 from app.modules.mcp_servers.repository import ServerRepository, ToolRepository
 from app.modules.mcp_servers.schemas import RefreshOut, TestOut, ToolClassify
@@ -176,6 +179,8 @@ class ToolService:
         tool = await self._current(actor, server_id, tool_id, version)
         if tool.missing:
             raise Conflict(code="mcp_tool.missing")
+        if problem_of(tool) is not None:  # could never be offered to a model
+            raise Conflict(code="mcp_tool.schema_problem")
         tool.state = ToolState.APPROVED
         tool.approved_fingerprint = tool.fingerprint
         return await self._saved(actor, tool, "mcp_tool.approved", {"state": tool.state})

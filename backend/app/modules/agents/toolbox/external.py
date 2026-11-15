@@ -18,8 +18,12 @@ of the organisation's MCP servers as a `ToolSpec` beside the catalog's
   (`explicit`, `policy.py`), and only while usable (approved, listed exactly as
   approved, on an enabled server).
 - **Description**: what it is and from which server; the server's own words follow
-  framed as untrusted and cut to `MAX_DESCRIPTION_CHARS`. **Arguments**: the tool's
-  stored input schema (an object; else any object); the server checks them.
+  framed as untrusted and cut to `MAX_DESCRIPTION_CHARS`, and so do its words about
+  the arguments (`mcp_servers/schema_view.py`: descriptions, titles, allowed values,
+  defaults, examples, cut). **Arguments**: only the structure of the tool's stored
+  input schema (types, names, what is required, bounds; never a word of the server's);
+  the server checks them. A tool whose schema cannot be offered so (too large, too
+  deep, a name a model cannot take) is not usable (module review M8 1, finding 2).
 - **Results** are untrusted data (`source="mcp"`, framed and cut by the loop); a
   failure is a result with a fixed code, never the server's words. Neither ever
   grants anything.
@@ -43,6 +47,7 @@ from app.modules.agents.toolbox.base import (
     ToolContext,
     ToolSpec,
 )
+from app.modules.mcp_servers import schema_view
 from app.modules.mcp_servers.calls import UntrustedResult
 from app.modules.mcp_servers.errors import (
     CredentialUnavailable,
@@ -133,28 +138,34 @@ def usable(tool: McpServerTool, server: McpServer) -> bool:
         and tool.state == ToolState.APPROVED
         and tool.fingerprint == tool.approved_fingerprint
         and not tool.missing
+        and tool.schema_problem is None
     )
 
 
 async def offered_external(session: AsyncSession, org_id: uuid.UUID) -> list[ToolSpec]:
     """The organisation's usable external tools (the agent's entries pick from them)."""
     rows = await ToolRepository(session, org_id).of_org(usable_only=True)
-    return [spec_of(tool, server) for tool, server in rows]
+    viewed = [(tool, server, schema_view.view(tool.input_schema)) for tool, server in rows]
+    return [spec_of(t, s, v) for t, s, v in viewed if v.problem is None]
 
 
 async def every_external(session: AsyncSession, org_id: uuid.UUID) -> list[tuple[ToolSpec, bool]]:
     """Every external tool of the organisation, and whether it is usable now."""
     rows = await ToolRepository(session, org_id).of_org(usable_only=False)
-    return [(spec_of(tool, server), usable(tool, server)) for tool, server in rows]
+    found = []
+    for tool, server in rows:
+        seen = schema_view.view(tool.input_schema)
+        found.append((spec_of(tool, server, seen), usable(tool, server) and not seen.problem))
+    return found
 
 
-def spec_of(tool: McpServerTool, server: McpServer) -> ToolSpec:
+def spec_of(tool: McpServerTool, server: McpServer, seen: schema_view.View) -> ToolSpec:
     writes = tool.classification == Classification.WRITE
     remote = RemoteTool(server.id, tool.id, server.name, tool.name, writes)
     return ToolSpec(
         tool_name(tool),
-        _description(remote, tool.description),
-        _args_model(tool.input_schema),
+        _description(remote, tool.description, seen.words),
+        _args_model(seen.structure),
         _host_only,
         WRITE_LEVEL if writes else READ_LEVEL,
         Effect.WRITE if writes else Effect.READ,
@@ -209,24 +220,27 @@ def _attrs(remote: RemoteTool) -> dict[str, str]:
     return {"server": remote.server_name, "tool": remote.tool_name}
 
 
-def _description(remote: RemoteTool, described: str) -> str:
+def _description(remote: RemoteTool, described: str, about_args: str) -> str:
     what = (
         "acts outside; every call waits for the release of the person you work for"
         if remote.writes
         else "reads"
     )
+    server = remote.server_name
     words = described[:MAX_DESCRIPTION_CHARS]
-    framed = frame_untrusted("mcp_tool_description", words, server=remote.server_name)
-    return (
-        f"External tool {remote.tool_name} of the server {remote.server_name} ({what}). "
+    text = (
+        f"External tool {remote.tool_name} of the server {server} ({what}). "
         "What you send it leaves this system. Its own description, from that server:\n"
-        f"{framed}"
+        f"{frame_untrusted('mcp_tool_description', words, server=server)}"
     )
+    if about_args:
+        framed = frame_untrusted("mcp_tool_arguments", about_args, server=server)
+        text += f"\nWhat that server says about the arguments:\n{framed}"
+    return text
 
 
-def _args_model(stored: Any) -> type[ExternalArgs]:
-    schema = stored if isinstance(stored, dict) and stored.get("type") == "object" else None
-    shown: dict[str, Any] = copy.deepcopy(schema) if schema else {"type": "object"}
+def _args_model(structure: dict[str, Any]) -> type[ExternalArgs]:
+    shown = copy.deepcopy(structure)
     return type("ExternalToolArgs", (ExternalArgs,), {"schema_of": shown})
 
 

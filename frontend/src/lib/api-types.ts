@@ -7345,6 +7345,11 @@ export interface components {
             tokens_out: number;
         };
         /**
+         * SchemaProblem
+         * @enum {string}
+         */
+        SchemaProblem: "schema_too_large" | "schema_unsupported";
+        /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.
          */
@@ -8659,6 +8664,7 @@ export interface components {
             name: string;
             /** Read Only Hint */
             read_only_hint: boolean;
+            schema_problem: components["schemas"]["SchemaProblem"] | null;
             /**
              * Server Id
              * Format: uuid

@@ -10392,6 +10392,14 @@
         "title": "RunUsageOut",
         "type": "object"
       },
+      "SchemaProblem": {
+        "enum": [
+          "schema_too_large",
+          "schema_unsupported"
+        ],
+        "title": "SchemaProblem",
+        "type": "string"
+      },
       "SearchResults": {
         "description": "A page of hits of every kind, told apart by `type`.",
         "properties": {
@@ -13822,6 +13830,16 @@
             "title": "Read Only Hint",
             "type": "boolean"
           },
+          "schema_problem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchemaProblem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "server_id": {
             "format": "uuid",
             "title": "Server Id",
@@ -13863,6 +13881,7 @@
           "suggested_classification",
           "state",
           "missing",
+          "schema_problem",
           "version",
           "updated_at"
         ],

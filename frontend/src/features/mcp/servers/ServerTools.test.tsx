@@ -136,6 +136,15 @@ describe('a server’s tools', () => {
     )
   })
 
+  test('a tool whose schema cannot be offered to a model says why and cannot be approved', async () => {
+    const huge = makeTool({ id: 't-huge', name: 'huge_tool', schema_problem: 'schema_too_large' })
+    setup([huge])
+    await renderApp(`/admin/ai/mcp-servers/${SRV}`)
+    const row = await screen.findByRole('article', { name: 'huge_tool' })
+    expect(within(row).getByRole('note')).toHaveTextContent(/Eingabeschema ist zu groß/)
+    expect(within(row).queryByRole('button', { name: 'huge_tool freigeben' })).toBeNull()
+  })
+
   test('loosening to read a tool not marked read-only is asked once more', async () => {
     const api = setup([writer], {
       [`PATCH /api/ai/mcp-servers/${SRV}/tools/t-write`]: { ...writer, classification: 'read' },

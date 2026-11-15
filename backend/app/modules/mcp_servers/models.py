@@ -12,6 +12,8 @@ suggested classifications a refresh applies to the tools it adds.
 name, description and input schema as last read; `approved_fingerprint` the one an
 admin approved. Only `state = approved` with both equal and the tool still listed may
 be called; a refresh that reads another fingerprint sets an approved tool `changed`.
+`input_schema` is stored up to 64 KiB (`schema_view.stored`); `schema_problem` says why
+a schema cannot be offered to a model (too large, unsupported names or depth).
 `classification` (`read`/`write`) is the admin's; the proposal is `read` only when the
 server annotates the tool read-only (`read_only_hint`) and its catalogue entry
 suggests `read` (module review M8 1, finding 7).
@@ -122,4 +124,7 @@ class McpServerTool(UuidPk, OrgScoped, Timestamps, Base):
     state: Mapped[ToolState] = mapped_column(String(16), nullable=False)
     # The server no longer lists it (a later refresh that lists it again clears it).
     missing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Why its input schema cannot be offered to a model (`schema_view.SchemaProblem`),
+    # as of the last refresh: not usable, not approvable (module review M8 1, F2).
+    schema_problem: Mapped[str | None] = mapped_column(String(32))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

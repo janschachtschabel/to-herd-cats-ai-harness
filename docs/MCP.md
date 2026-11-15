@@ -642,7 +642,8 @@ Recht 404 `ai.not_found`.
 - **Werkzeugliste**: wird beim Anlegen und mit `POST …/{id}/refresh` eingelesen, ohne
   offene Transaktion, mit Zeitlimit (20 s) und Größenlimit (2 MiB); höchstens 500
   Werkzeuge, Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen
-  gespeichert bis 10.000 Zeichen. Das Ergebnis ist ein Zustand mit Zahlen
+  gespeichert bis 10.000 Zeichen, Eingabeschemas bis 64 KiB (ein größeres wird nicht
+  gespeichert; der Fingerabdruck umfasst es trotzdem ganz). Das Ergebnis ist ein Zustand mit Zahlen
   (`{"status", "new", "changed", "missing"}`), nie die Antwort des Servers. Gelesen wird
   mit dem geteilten Konnektor bzw. bei `personal` mit dem eigenen Konnektor der Admin-
   Person, falls vorhanden. `POST …/{id}/test` verbindet und zählt die Werkzeuge, ohne
@@ -657,6 +658,19 @@ Recht 404 `ai.not_found`.
   wieder `approved`). Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
   nicht freizugeben (409 `mcp_tool.missing`). Eine neue Adresse des Servers zieht alle
   Freigaben zurück.
+- **Eingabeschema und Modell** (Review M8 1, Befund 2): Jedes Wort eines Schemas ist
+  ein Wort des Servers. Ein Modell bekommt deshalb nur die **Struktur** (Typen,
+  Feldnamen, Pflichtfelder, Elemente, Verschachtelung, Zahl- und Längengrenzen, gängige
+  Formate); was der Server über die Argumente sagt (Beschreibung, Titel, erlaubte
+  Werte, Voreinstellung, Beispiele, Muster), geht je Feld auf 300 Zeichen und insgesamt
+  auf 2.000 Zeichen gekürzt und gerahmt als
+  `<untrusted source="mcp_tool_arguments" server=…>` in die Beschreibung des Werkzeugs.
+  Ein Werkzeug, dessen Schema sich so nicht anbieten lässt, hat `schema_problem`:
+  `schema_too_large` (über 64 KiB, oder die Struktur über 8.000 Zeichen) oder
+  `schema_unsupported` (tiefer als 8 Ebenen, oder ein Feldname außer
+  `A-Z a-z 0-9 _ . -`, höchstens 64 Zeichen). Es ist nicht freizugeben (409
+  `mcp_tool.schema_problem`), wird keinem Agenten angeboten, und die Verwaltung zeigt
+  den Grund.
 - **Einstufung** `read`/`write`: Vorschlag `read` nur, wenn der Server das Werkzeug als
   nur lesend kennzeichnet (`readOnlyHint`) **und** die Vorlage des Katalogs `read`
   vorschlägt, sonst `write`. Die Kennzeichnung allein ist eine unverbindliche Angabe
@@ -956,7 +970,7 @@ keine Variable, sondern die Einstellung der Organisation in der KI-Verwaltung
 | Laufzeit eines Tokens | 1 bis 365 Tage, Pflicht |
 | Bereiche eines Tokens | 1 bis 50 oder „alle meine“ |
 | `list_my_tickets` | 50 Tickets |
-| externer Server: Werkzeugliste | 20 s, 2 MiB, 500 Werkzeuge, Beschreibung gespeichert bis 10.000 Zeichen |
+| externer Server: Werkzeugliste | 20 s, 2 MiB, 500 Werkzeuge, Beschreibung gespeichert bis 10.000 Zeichen, Eingabeschema bis 64 KiB (dem Modell: Struktur bis 8.000 Zeichen, Worte des Servers gerahmt bis 2.000) |
 | externer Server: Aufruf | 60 s (und die Laufzeit des Laufs), Antwort 512 KiB, Ergebnis im Prompt 8.000 Zeichen, Beschreibung im Prompt 1.000 Zeichen |
 | externe Aufrufe je Lauf | `HERD_MCP_MAX_CALLS_PER_RUN` (Standard 20); externe Aufrufe kosten keine Modell-Tokens und zählen zu keinem Tagesbudget |
 | OAuth | Ablauf (`state`) 10 Minuten; Erneuerung 60 s vor Ablauf oder nach einem 401, Sperre der Zeile höchstens 30 s; Antworten des Anbieters 64 KiB |

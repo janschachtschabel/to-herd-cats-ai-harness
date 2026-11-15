@@ -137,7 +137,7 @@ class ToolRepository:
     async def of_org(self, *, usable_only: bool) -> list[tuple[McpServerTool, McpServer]]:
         """The organisation's tools with their servers, by server and tool name. With
         `usable_only`: only those a run may call now (approved, listed as approved,
-        still listed, on an enabled server)."""
+        still listed, a schema that may be offered, on an enabled server)."""
         stmt = (
             select(McpServerTool, McpServer)
             .join(McpServer, McpServer.id == McpServerTool.server_id)
@@ -150,6 +150,7 @@ class ToolRepository:
                 McpServerTool.state == ToolState.APPROVED,
                 McpServerTool.fingerprint == McpServerTool.approved_fingerprint,
                 McpServerTool.missing.is_(False),
+                McpServerTool.schema_problem.is_(None),
             )
         return [(tool, server) for tool, server in (await self.session.execute(stmt)).all()]
 

@@ -14,7 +14,8 @@ import { ToolFacts, ToolStateBadge } from './ToolFacts'
 /** One tool of a server: its state, its description and schema as the server sent
  *  them (untrusted text, shown as text), its classification (read or write, with the
  *  catalogue's suggestion), and approve or block. A tool the server no longer lists
- *  cannot be approved; a changed one needs a new approval. Loosening to "read" a tool
+ *  cannot be approved, nor one whose schema cannot be offered to a model; a changed one
+ *  needs a new approval. Loosening to "read" a tool
  *  the server does not mark read-only is asked once more. */
 export function ToolRow({ serverId, tool }: { serverId: string; tool: Tool }) {
   const { t } = useTranslation()
@@ -71,7 +72,7 @@ export function ToolRow({ serverId, tool }: { serverId: string; tool: Tool }) {
           </NativeSelect>
         </label>
         <div className="flex flex-wrap gap-2">
-          {view !== 'approved' && view !== 'missing' && (
+          {view !== 'approved' && view !== 'missing' && !tool.schema_problem && (
             <Button
               size="sm"
               disabled={change.isPending}

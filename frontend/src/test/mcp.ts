@@ -44,6 +44,7 @@ export function makeTool(overrides: Partial<Tool> = {}): Tool {
     suggested_classification: null,
     state: 'pending',
     missing: false,
+    schema_problem: null,
     version: 1,
     updated_at: AT,
     ...overrides,

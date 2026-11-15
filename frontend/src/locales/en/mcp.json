@@ -150,7 +150,11 @@
       "blockNamed": "Block {{name}}",
       "loosenTitle": "Classify as reading?",
       "loosenText": "The server does not mark {{name}} as read-only. Reading tools run without a release per call. Confirm only if you are sure it changes nothing.",
-      "loosenConfirm": "Classify as reading"
+      "loosenConfirm": "Classify as reading",
+      "schemaProblem": {
+        "schema_too_large": "The input schema is too large to offer to a model (over 64 KiB, or its structure over 8,000 characters). The tool cannot be approved.",
+        "schema_unsupported": "The input schema cannot be offered to a model (nested too deep, or a field name with characters other than letters, digits, _ . -). The tool cannot be approved."
+      }
     },
     "connectors": {
       "title": "Shared connectors",

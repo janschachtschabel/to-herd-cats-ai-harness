@@ -288,8 +288,9 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   - `/mcp` answers like the REST API would for an unknown id: never drafts, `no_ai`
     content, spaces the policy for its data location excludes, or anything outside the
     token's scope; no tool that needs a run or a release, no `assign_ticket`.
-  - What an external server returns (results, descriptions) is untrusted, framed and
-    cut; it never grants anything. A tool is callable only with its approved
+  - What an external server returns (results, descriptions, every word of a tool's
+    schema) is untrusted, framed and cut; a model gets a schema's structure only
+    (`mcp_servers/schema_view.py`); it never grants anything. A tool is callable only with its approved
     fingerprint; a changed one is blocked until re-approved; the catalogue only
     suggests. Write tools are level 4 and wait for the asker's release of the exact
     arguments; a lost worker never sends a call again (`external_outcome_unknown`).

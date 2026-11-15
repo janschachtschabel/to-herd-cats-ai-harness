@@ -7,6 +7,7 @@ import re
 import uuid
 
 from app.mcp.client import ListedTool
+from app.modules.mcp_servers import schema_view
 from app.modules.mcp_servers.models import (
     MAX_DESCRIPTION_CHARS,
     Classification,
@@ -50,7 +51,8 @@ def new_tool(
         server_id=server_id,
         name=listed.name,
         description=listed.description[:MAX_DESCRIPTION_CHARS],
-        input_schema=listed.input_schema,
+        input_schema=schema_view.stored(listed.input_schema),
+        schema_problem=schema_view.problem_of(listed.input_schema),
         read_only_hint=listed.read_only,
         fingerprint=fingerprint(listed),
         classification=Classification.READ if read else Classification.WRITE,
@@ -70,7 +72,8 @@ def apply(tool: McpServerTool, listed: ListedTool | None) -> bool:
         tool.missing = False
         tool.fingerprint = fingerprint(listed)
         tool.description = listed.description[:MAX_DESCRIPTION_CHARS]
-        tool.input_schema = listed.input_schema
+        tool.input_schema = schema_view.stored(listed.input_schema)
+        tool.schema_problem = schema_view.problem_of(listed.input_schema)
         tool.read_only_hint = listed.read_only
         matches = tool.fingerprint == tool.approved_fingerprint
         if tool.state == ToolState.APPROVED and not matches:
@@ -80,3 +83,11 @@ def apply(tool: McpServerTool, listed: ListedTool | None) -> bool:
     if (tool.fingerprint, tool.state, tool.missing, tool.read_only_hint) != before:
         tool.version += 1
     return tool.fingerprint != before[0]
+
+
+def problem_of(tool: McpServerTool) -> schema_view.SchemaProblem | None:
+    """Why the tool's schema cannot be offered: as of its refresh, or as stored (a
+    row from before the rule, `schema_view`)."""
+    if tool.schema_problem is not None:
+        return schema_view.SchemaProblem(tool.schema_problem)
+    return schema_view.problem_of(tool.input_schema)

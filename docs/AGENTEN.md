@@ -412,8 +412,11 @@ neuen fortgesetzt; eine offene Freigabe unter altem Namen wird beim Fortsetzen
   `agent.tool_unknown`.
 - **Beschreibung** für das Modell: Werkzeug, Server, ob es liest oder nach außen
   handelt; die Beschreibung des Servers folgt gerahmt als nicht vertrauenswürdig und
-  auf 1.000 Zeichen gekürzt. Argumente: das gespeicherte Eingabeschema; geprüft werden
-  sie vom Server.
+  auf 1.000 Zeichen gekürzt, ebenso gerahmt und gekürzt, was er über die Argumente
+  sagt (`mcp_tool_arguments`). Argumente: nur die Struktur des gespeicherten
+  Eingabeschemas, nie ein Wort des Servers; geprüft werden sie vom Server. Ein Werkzeug,
+  dessen Schema sich so nicht anbieten lässt (`schema_problem`), ist nicht brauchbar
+  ([`MCP.md`](MCP.md#externe-mcp-server); Review M8 1, Befund 2).
 - **Höchstens `HERD_MCP_MAX_CALLS_PER_RUN` Aufrufe je Lauf** (Standard 20, seit Task 13
   von M8). Gezählt werden die gesendeten Aufrufe (ihr erster Eintrag im Journal); was
   die Richtlinie, eine Freigabe oder ein fehlender Zugang zurückhielt, zählt nicht. Der
