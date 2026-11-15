@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.mcp.client import ListedTool
 from app.modules.audit.models import AuditLog
+from app.modules.mcp_servers import tools as tools_module
 from app.modules.mcp_servers.listing import new_tool
 from app.modules.mcp_servers.models import Classification
 from tests.factories_dms import People
@@ -180,6 +181,20 @@ async def test_the_tool_list_is_paginated(ai_people: People, mcp_egress: McpStub
         await ai_people.admin.get(path, params={"limit": 2, "cursor": first["next_cursor"]})
     ).json()
     assert [t["name"] for t in rest["items"]] == ["t2"] and rest["next_cursor"] is None
+
+
+async def test_over_the_cap_the_first_names_are_kept_whatever_the_order(
+    ai_people: People, mcp_egress: McpStub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Module review M8 1, finding 13: a server that reorders a list over the cap
+    makes no tool flip between listed and missing."""
+    monkeypatch.setattr(tools_module, "MAX_TOOLS", 2)
+    mcp_egress.state.tools = [{"name": f"t{n}", "description": "d"} for n in (3, 1, 2)]
+    made = await make_server(ai_people.admin, mcp_egress)
+    assert list(await tools_of(ai_people.admin, made["id"])) == ["t1", "t2"]
+    mcp_egress.state.tools.reverse()
+    refreshed = await _refresh(ai_people.admin, made["id"])
+    assert refreshed == {"status": "ok", "new": 0, "changed": 0, "missing": 0}
 
 
 async def test_odd_tool_names_are_skipped_and_long_descriptions_cut(

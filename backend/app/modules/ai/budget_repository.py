@@ -13,7 +13,7 @@ from sqlalchemy import ColumnElement, bindparam, func, literal, or_, select, tru
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
-from app.modules.agents.models import Agent
+from app.modules.agents.models import Agent, AgentKind
 from app.modules.ai.models import AiBudget, BudgetScope, UsageRecord
 from app.modules.users.models import User
 
@@ -149,8 +149,9 @@ class BudgetRepository:
         return {scope: _spent(*row[3 * i : 3 * i + 3]) for i, scope in enumerate(asked)}
 
     async def agents(self, after: tuple[str, uuid.UUID] | None, limit: int) -> list[Agent]:
-        """The organisation's agents (personal ones too) by name, then id."""
-        stmt = select(Agent).where(Agent.org_id == self.org_id)
+        """The organisation's agents (personal ones too, external ones not: they use no
+        model) by name, then id."""
+        stmt = select(Agent).where(Agent.org_id == self.org_id, Agent.kind != AgentKind.EXTERNAL)
         if after is not None:
             stmt = stmt.where(
                 tuple_(Agent.name, Agent.id) > tuple_(literal(after[0]), literal(after[1]))

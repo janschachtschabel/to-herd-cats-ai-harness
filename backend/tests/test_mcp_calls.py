@@ -9,6 +9,8 @@ import uuid
 from typing import Any
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -262,3 +264,25 @@ async def test_nothing_secret_reaches_logs_or_audit(
     for text in texts:
         for value in (SECRET, ARGUMENT, RESULT):
             assert value not in text
+
+
+async def test_no_trace_context_leaves_with_a_call(
+    ai_people: People, mcp_egress: McpStub, session: AsyncSession
+) -> None:
+    """Module review M8 1, finding 13: the SDK puts the current `traceparent` into
+    `_meta`; our trace id stays in the house."""
+    made = await _approved_server(ai_people, mcp_egress)
+    alice = ai_people.users["alice"]
+    ours = SpanContext(
+        trace_id=0x0AF7651916CD43DD8448EB211C80319C,
+        span_id=0xB7AD6B7169203331,
+        is_remote=False,
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+    )
+    with trace.use_span(NonRecordingSpan(ours)):
+        await _caller(session).call_tool(
+            alice.org_id, made["id"], "search_issues", {"q": "x"}, on_behalf_of=alice.id
+        )
+    sent = mcp_egress.state.texts()
+    assert "search_issues" in sent
+    assert "0af7651916cd43dd8448eb211c80319c" not in sent and "traceparent" not in sent

@@ -12,19 +12,28 @@ call `list_tools` and `call_tool` and get plain data back.
   it is in no error. What goes wrong becomes a `RemoteStatus`, never the server's
   words or an exception text (an SDK error may quote what the server answered).
 - Each operation opens its own session and closes it: nothing is kept in the process.
+- The SDK puts the current trace context (`traceparent`, `tracestate`) into each
+  request's `_meta`; `_Untraced` takes it out again, so no trace id of ours reaches an
+  external server (module review M8 1, finding 13).
 """
 
 import asyncio
+import dataclasses
 import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 import httpx2
 from mcp import Client
+from mcp.client._transport import TransportStreams, WriteStream
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, TextContent, Tool
+from mcp_types import JSONRPCNotification, JSONRPCRequest
 
 from app.core import egress_x2
 from app.core.egress import EgressBlocked, EgressRules
@@ -33,6 +42,7 @@ from app.core.egress import EgressBlocked, EgressRules
 # private hosts only as the operator lists them (`Endpoint.rules`).
 RULES = EgressRules(allow_private=False, allow_http=False)
 MAX_PAGES = 20
+TRACE_KEYS = frozenset({"traceparent", "tracestate", "baggage"})
 
 
 class RemoteStatus(StrEnum):
@@ -131,13 +141,58 @@ async def _run[T](
     )
     http.headers.update(endpoint.headers)
     http.event_hooks = {"response": [note]}
-    transport = streamable_http_client(endpoint.url, http_client=http, max_sse_event_size=max_bytes)
+    transport = _untraced(
+        streamable_http_client(endpoint.url, http_client=http, max_sse_event_size=max_bytes)
+    )
     try:
         async with asyncio.timeout(seconds), http:
             async with Client(transport, cache=None) as client:
                 return await work(client)
     except Exception as exc:  # the SDK wraps what its tasks raise in groups
         raise RemoteFailure(_status(exc, statuses)) from None
+
+
+@asynccontextmanager
+async def _untraced(
+    transport: AbstractAsyncContextManager[TransportStreams],
+) -> AsyncIterator[TransportStreams]:
+    async with transport as (read, write):
+        yield read, _Untraced(write)
+
+
+class _Untraced:
+    """The write stream, sending each message without the trace context in `_meta`."""
+
+    def __init__(self, inner: WriteStream[SessionMessage]) -> None:
+        self.inner = inner
+
+    async def send(self, item: SessionMessage, /) -> None:
+        message = item.message
+        if isinstance(message, JSONRPCRequest | JSONRPCNotification) and message.params:
+            meta = message.params.get("_meta")
+            if isinstance(meta, dict) and TRACE_KEYS & meta.keys():
+                kept = {k: v for k, v in meta.items() if k not in TRACE_KEYS}
+                params = {k: v for k, v in message.params.items() if k != "_meta"}
+                if kept:
+                    params["_meta"] = kept
+                bare = message.model_copy(update={"params": params or None})
+                item = dataclasses.replace(item, message=bare)
+        await self.inner.send(item)
+
+    async def aclose(self) -> None:
+        await self.inner.aclose()
+
+    async def __aenter__(self) -> Self:
+        await self.inner.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        return await self.inner.__aexit__(exc_type, exc_val, exc_tb)
 
 
 async def _all_tools(client: Client) -> list[ListedTool]:

@@ -1,22 +1,23 @@
-"""Plan M8 task 1: `TokenActorDep`, the dependency `/mcp` mounts (task 2), on a probe
-route: the token's actor for a good bearer header, 401 `token.invalid` in the error
+"""Plan M8 task 1: `TokenResolver`, what `/mcp` resolves its caller with (task 2), on a
+probe route: the token's actor for a good bearer header, 401 `token.invalid` in the error
 shape otherwise, agent tokens included (they act only from task 4 on)."""
 
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.errors import install_error_handlers
 from app.modules.agents.models import Agent, AgentKind, AgentStatus
 from app.modules.tokens.models import AccessToken, TokenKind, TokenMode
-from app.modules.tokens.resolve import TokenActorDep
+from app.modules.tokens.resolve import TokenResolver
 from app.modules.tokens.values import token_digest
 from app.modules.users.models import User
 from tests.app_session import session_override
@@ -29,7 +30,8 @@ async def probe(session: AsyncSession) -> AsyncIterator[AsyncClient]:
     install_error_handlers(app)
 
     @app.get("/probe")
-    async def _probe(found: TokenActorDep) -> dict[str, Any]:
+    async def _probe(authorization: Annotated[str | None, Header()] = None) -> dict[str, Any]:
+        found = await TokenResolver(session, get_settings()).resolve(authorization)
         return {"user": str(found.actor.principal.id), "mode": found.mode, "name": found.name}
 
     app.dependency_overrides[get_session] = session_override(session)

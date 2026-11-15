@@ -27,19 +27,16 @@ into an error.
 
 import hmac
 import uuid
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Annotated
 
-from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor, ReadScope, WriteScope
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
-from app.core.logging import bind_request_fields, log_context
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.core.ratelimit import WINDOW, RateLimiter
@@ -47,7 +44,6 @@ from app.modules.agents.models import AgentKind, AgentStatus
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.toolbox.base import Grant
 from app.modules.ai.models import DataLocation
-from app.modules.auth.deps import SessionDep, SettingsDep
 from app.modules.groups.repository import GroupRepository
 from app.modules.tokens.models import AccessToken, TokenKind, TokenMode
 from app.modules.tokens.repository import Found, TokenRepository
@@ -162,18 +158,3 @@ def _whose(found: Found) -> bool:
         and agent.status == AgentStatus.ACTIVE
         and agent.responsible_user_id == token.user_id
     )
-
-
-async def token_actor(
-    request: Request, session: SessionDep, settings: SettingsDep
-) -> AsyncIterator[TokenActor]:
-    """The caller of `/mcp`, from `Authorization: Bearer`; every log line of the
-    request names the person (never the token)."""
-    found = await TokenResolver(session, settings).resolve(request.headers.get("authorization"))
-    fields = {"org_id": str(found.actor.org_id), "actor": str(found.actor.principal)}
-    bind_request_fields(**fields)
-    with log_context(**fields):
-        yield found
-
-
-TokenActorDep = Annotated[TokenActor, Depends(token_actor, scope="function")]

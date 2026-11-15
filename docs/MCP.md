@@ -665,7 +665,8 @@ Recht 404 `ai.not_found`.
   (409 `mcp_server.version_conflict`).
 - **Werkzeugliste**: wird beim Anlegen und mit `POST …/{id}/refresh` eingelesen, ohne
   offene Transaktion, mit Zeitlimit (20 s) und Größenlimit (2 MiB); höchstens 500
-  Werkzeuge, Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen
+  Werkzeuge (bei mehr die ersten 500 nach Namen, gleich in welcher Reihenfolge der
+  Server sie nennt), Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen
   gespeichert bis 10.000 Zeichen, Eingabeschemas bis 64 KiB (ein größeres wird nicht
   gespeichert; der Fingerabdruck umfasst es trotzdem ganz). Das Ergebnis ist ein Zustand mit Zahlen
   (`{"status", "new", "changed", "missing"}`), nie die Antwort des Servers. Gelesen wird
@@ -780,8 +781,10 @@ Recht 404 `ai.not_found`.
   Verbindungsaufbau geprüft, Link-Local- und Metadaten-Adressen bleiben immer gesperrt
   (ein gelisteter Name, der plötzlich auf `169.254.169.254` zeigt, wird abgewiesen). Ein
   nicht gelisteter Name, der auf eine private Adresse auflöst, bleibt gesperrt. Ein
-  gelistetes Netz erlaubt jede Adresse darin, gleich über welchen Namen; deshalb sind
-  exakte Hostnamen die engere Wahl. Es bleibt bei https. Ein gelisteter Host wird direkt
+  gelistetes Netz erlaubt jede Adresse darin, gleich über welchen Namen (jeder Name,
+  der dorthin auflöst, darf gewählt werden; mit https und Zertifikatsprüfung bleibt es
+  dann bei einem TLS-Handshake mit einem internen Port); deshalb ist ein exakter
+  Hostname die engere Wahl. Es bleibt bei https. Ein gelisteter Host wird direkt
   gewählt, nicht über `HERD_AI_EGRESS_PROXY` (der Proxy ist für draußen gedacht). Das
   entscheidet jede Anfrage nach ihrem eigenen Host, auch beim Erkennen eines
   Autorisierungsservers: ein gelisteter interner Server mit einem öffentlichen
@@ -790,6 +793,9 @@ Recht 404 `ai.not_found`.
   zusätzlich öffnen. Gelesen wird die Einstellung von der API (Werkzeuglisten, Test)
   und vom Worker (Aufrufe in Läufen); Compose `HERD_MCP_ALLOWED_HOSTS`, Chart
   `mcp.allowedHosts` (Liste).
+- **Kein Trace-Kontext nach draußen**: das SDK legt den laufenden Trace-Kontext
+  (`traceparent`, `tracestate`) in `_meta` jeder Anfrage; der Client nimmt ihn vor dem
+  Senden heraus, keine Trace-ID der App erreicht einen externen Server.
 - **Tests** laufen gegen einen echten MCP-Server aus dem SDK
   (`backend/tests/support/mcp_stub.py`, https für `mcp.test` auf 127.0.0.1, skriptbar:
   Werkzeugliste, Ergebnisse, Verzögerung, Umleitung, Fehlerstatus, verlangter Kopf),

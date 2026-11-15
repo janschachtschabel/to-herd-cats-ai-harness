@@ -143,7 +143,9 @@ class ToolService:
         stored = {tool.name: tool for tool in await repo.all_of(server.id)}
         new = changed = missing = 0
         seen: set[str] = set()
-        for item in listed:
+        # by name (stable: of two with one name the first listed), so a list over the
+        # cap keeps the same tools however the server orders it
+        for item in sorted(listed, key=lambda t: t.name):
             if not usable(item) or item.name in seen or len(seen) >= MAX_TOOLS:
                 continue
             seen.add(item.name)

@@ -8,6 +8,8 @@ import pytest
 from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import BudgetScope
 from tests.factories_agents import Bench, make_agent
+from tests.factories_external_agents import make_external
+from tests.factories_writing import Work
 from tests.test_ai_budget_check import budget
 from tests.test_ai_budgets import BUDGETS, listed, put, use
 
@@ -24,6 +26,13 @@ async def test_who_administers_ai_finds_every_agent_by_name(bench: Bench) -> Non
     for who in ("alice", "gast"):
         refused = await getattr(bench.people, who).get(AGENTS)
         assert refused.status_code == 404 and refused.json()["error"]["code"] == "ai.not_found"
+
+
+async def test_external_agents_are_no_budget_subjects(work: Work) -> None:
+    """Module review M8 1, finding 13: an external agent uses no model, so no budget."""
+    await make_external(work, name="Aaron")
+    r = await work.admin.get(AGENTS)
+    assert [a["name"] for a in r.json()["items"]] == ["Ava"]
 
 
 @pytest.mark.parametrize(

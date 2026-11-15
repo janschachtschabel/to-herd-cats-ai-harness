@@ -2,7 +2,7 @@
 `token.not_found`), the AI administration's (`/ai/mcp`, `ai.manage`; otherwise
 404 `ai.not_found`) and an external agent's (`/agents/{id}/tokens`, `agent.manage`;
 otherwise 404 `agent.not_found`). These are session routes; `/mcp` itself takes the token
-(`resolve.TokenActorDep`)."""
+(`resolve.TokenResolver`)."""
 
 import uuid
 from typing import Annotated
