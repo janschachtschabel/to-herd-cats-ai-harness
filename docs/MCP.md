@@ -1,10 +1,10 @@
 # MCP: das System als MCP-Server und als MCP-Client
 
 Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
-`mcp.use`** (Plan M8, Task 1), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
+`mcp.use`** (Plan M8, Task 1), **der Endpunkt `/mcp`** mit lesenden und schreibenden
+Werkzeugen (Tasks 2 und 3), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
 **externe MCP-Server** mit Werkzeugfreigabe (Task 6), ihre Werkzeuge im Lauf (Task 7)
-und der **Katalog** mitgelieferter Vorlagen (Task 9). Der Endpunkt `/mcp` selbst und
-externe Agenten folgen.
+und der **Katalog** mitgelieferter Vorlagen (Task 9). Externe Agenten folgen.
 
 ## Zugangstoken
 
@@ -78,8 +78,8 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
   **KI-Richtlinie** für den Datenort des Endpunkts erlaubt. Wird der Person ein
   Bereich entzogen, ist er für das Token sofort weg.
 - Ein `read`-Token schreibt nirgends. Ein `write`-Token schreibt höchstens in den
-  Bereichen seines Umfangs und nur, was die Person dort selbst darf (welche
-  Werkzeuge es dafür gibt, beschreibt Task 3).
+  Bereichen seines Umfangs und nur, was die Person dort selbst darf (die Werkzeuge
+  dafür: [Der Endpunkt `/mcp`](#der-endpunkt-mcp)).
 - Ist die Person nicht mehr aktiv, wird sie Gast oder ist der Schalter aus,
   antwortet das Token 401.
 
@@ -110,6 +110,152 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
 (Akteur der Person mit Umfang, Modus, Token-Name und Datenort);
 `backend/app/modules/tokens/reach.py` sagt in SQL, was ein solcher Akteur lesen darf
 (`readable_space_ids`, `readable_spaces`, `readable_page_ids`).
+
+## Der Endpunkt `/mcp`
+
+Externe KI-Clients (Claude Code, Codex und jeder andere MCP-Client) lesen und arbeiten
+über `https://<Installation>/mcp` mit einem Zugangstoken (Plan M8, Tasks 2 und 3). Der
+Endpunkt spricht MCP über **Streamable HTTP, zustandslos**: jede Anfrage ist ein
+`POST` mit einer JSON-RPC-Nachricht und bekommt genau eine JSON-Antwort. Es gibt keine
+Sitzungen (`Mcp-Session-Id`), keine Server-Streams (`GET` und `DELETE` antworten 405)
+und nur **Werkzeuge** (`tools`), keine `resources`, `prompts` oder `sampling`. Jeder
+API-Knoten kann jede Anfrage beantworten; im Prozess bleibt nichts zurück. Clients mit
+dem Handshake (`initialize`, Protokoll 2025) und Clients des zustandslosen Protokolls
+(2026-07-28, `server/discover`) werden beide bedient.
+
+### Einen Client verbinden
+
+Zuerst unter den persönlichen Einstellungen ein Token anlegen (`read` zum Lesen,
+`write` zum Arbeiten; am besten nur mit den nötigen Bereichen) und den Klartext in eine
+Umgebungsvariable legen, etwa `HERD_TOKEN`. Das Token gehört nie in eine Datei, die
+eingecheckt wird, und nie in eine URL.
+
+Claude Code:
+
+```bash
+claude mcp add --transport http herd https://herd.example.com/mcp \
+  --header "Authorization: Bearer $HERD_TOKEN"
+```
+
+Codex (`~/.codex/config.toml`; das Token liest Codex aus der Umgebung):
+
+```toml
+[mcp_servers.herd]
+url = "https://herd.example.com/mcp"
+bearer_token_env_var = "HERD_TOKEN"
+```
+
+oder `codex mcp add herd --url https://herd.example.com/mcp --bearer-token-env-var HERD_TOKEN`.
+
+Hinter einem Reverse-Proxy muss `/mcp` wie `/api` an die API gehen (Pfad unverändert,
+`Authorization` durchreichen, keine Pufferung nötig: die Antworten sind kurz).
+
+### Werkzeuge
+
+Es sind die Werkzeuge des Katalogs der Agenten (`agents/toolbox/catalog.py`), mit
+denselben Beschreibungen und Argumenten, keine zweite Liste. Angeboten werden nur die,
+die ohne Lauf funktionieren.
+
+Mit jedem Token (lesend):
+
+| Werkzeug | Was es tut |
+|---|---|
+| `search` | Volltextsuche in Seiten und Tickets |
+| `read_page` | eine Seite (Markdown) nach ID |
+| `read_ticket` | ein Ticket nach Schlüssel (`HC-12`) |
+| `list_tree` | ohne `space_id` die lesbaren Bereiche, mit `space_id` dessen Seitenbaum |
+| `list_versions` | die Versionen einer Seite (ohne Inhalt; braucht wie für Personen `page.edit`, also ein `write`-Token) |
+| `search_tickets` | Tickets nach Text und Filtern |
+
+Zusätzlich mit einem `write`-Token:
+
+| Werkzeug | Was es tut |
+|---|---|
+| `create_ticket` | ein Ticket in einem Bereich anlegen |
+| `comment_ticket` | ein Ticket kommentieren (eine Nachricht im Ticket-Thread) |
+| `set_ticket_status` | den Status setzen, höchstens bis zur Kategorie „Prüfung“; „erledigt“ und „abgebrochen“ setzen Personen |
+| `link_ticket_page` | eine Seite mit einem Ticket verknüpfen |
+| `propose_page_change`, `propose_new_page` | einen Seitenvorschlag machen; eine moderierende Person entscheidet |
+| `update_page` | eine Seite direkt ändern, nur in Bereichen mit `agent_write_policy = direct` (sonst kommt der Hinweis, einen Vorschlag zu machen); in zwei Schritten: erst Diff und Prüfwert, dann mit demselben Inhalt und dem Prüfwert speichern |
+| `post_message` | eine Nachricht in einen Kanal eines Bereichs des Tokens |
+
+Nicht über `/mcp`: Werkzeuge, die einen Lauf brauchen (Rückfrage, Ergebnis, Gedächtnis,
+Skills, frühere Läufe, das Gespräch des Laufs), Werkzeuge mit Freigabe und
+`assign_ticket` (eine Übergabe startet Läufe von Agenten). Ein unbekannter
+Werkzeugname ist ein Protokollfehler (`-32602`).
+
+### Was ein Token liest und schreibt
+
+- Lesbar ist, was Abschnitt [Rechte eines Tokens](#rechte-eines-tokens) und
+  [Datenort](#datenort-des-endpunkts) sagen: Rechte der Person ∩ Umfang ∩
+  KI-Richtlinie für den Datenort des Endpunkts, nie Entwürfe, nie etwas mit KI-Sperre.
+  Was das Token nicht lesen darf, antwortet **genau wie eine unbekannte ID**
+  („Nothing found (or not readable).“), auch in der Suche und in Listen.
+- Geschrieben wird nur mit `write`-Token, nur in den Bereichen des Umfangs und nur, was
+  die Person dort selbst darf (ein `write`-Token einer lesenden Person schreibt nichts).
+- Was ein Token schreibt, gehört **seiner Person** und trägt das **KI-Kennzeichen**:
+  den Namen des Tokens in `via_token` an der Nachricht, am Ticket, am Seitenvorschlag
+  und an der Seitenversion (Quelle `mcp`; auch wenn ein Vorschlag angenommen wird).
+  Vorschläge und Versionen mit `via_token` haben `ai: true`. Nachrichten über ein Token
+  erwähnen niemanden und starten keinen Lauf eines Agenten.
+- Eine Ablehnung (nicht gefunden, nicht erlaubt, Status „erledigt“) und ein Konflikt
+  mit einer zwischenzeitlichen Änderung („Changed meanwhile (…): read it again.“) sind
+  **Werkzeugfehler** (`isError: true`); das Werkzeug hat dann nichts geschrieben.
+  Ungültige Argumente nennen nur die Felder, nie ihre Werte. Ein unerwarteter Fehler
+  ist „The call failed. Try again later.“, ohne Einzelheiten; was der Aufruf schon
+  geschrieben hatte, ist zurückgenommen.
+- Jeder Aufruf eines schreibenden Werkzeugs steht im **Audit** (`mcp.write_call` am
+  Token, mit Werkzeug und Ergebnisart, nie mit Inhalt).
+
+### Schutz des Endpunkts
+
+- **Kein Browser**: Eine Anfrage mit `Origin`-Kopf wird abgelehnt (403
+  `mcp.origin_refused`), gültiges Token oder nicht (Schutz vor DNS-Rebinding und vor
+  Seiten mit einem eingefügten Token). Es gibt keine CORS-Köpfe. Ein Sitzungs-Cookie
+  öffnet `/mcp` nicht.
+- **Token**: nur `Authorization: Bearer`; jede Art von ungültigem Token antwortet 401
+  `token.invalid` mit `WWW-Authenticate: Bearer realm="to-herd-cats-ai",
+  error="invalid_token"`. Ratenbegrenzung je Token wie oben (429 `mcp.rate_limited`,
+  `Retry-After`); jede HTTP-Anfrage zählt.
+- **Größen**: Anfragen höchstens `HERD_MAX_BODY_BYTES` (413), Antworten höchstens
+  1 MiB, der Text eines Werkzeugergebnisses höchstens 100.000 Zeichen (dahinter
+  gekürzt, mit Hinweis).
+- **Fehlerform**: Ablehnungen vor dem MCP-Teil (403, 401, 405, 429) kommen als
+  JSON-RPC-Fehler ohne `id`, mit dem üblichen Fehler (`code`, `message`, `trace_id`)
+  in `error.data`; Fehler im MCP-Teil als JSON-RPC-Fehler des SDK, ohne interne
+  Einzelheiten.
+
+### Nutzung je Token
+
+Jeder Werkzeugaufruf wird gezählt (`mcp_call`: Token, Werkzeug, Ergebnisart `ok`,
+`refused`, `invalid` oder `failed`, Dauer, Zeit; nur IDs, nie Argumente oder
+Ergebnisse) und in der Metrik `herd_mcp_calls_total{tool, outcome}`.
+
+- `GET /api/tokens/{id}/calls` (seitenweise, neueste zuerst): die Aufrufe eines eigenen
+  Tokens (`mcp.use`; fremde Token 404 `token.not_found`).
+- `GET /api/ai/mcp/tokens/{id}/calls`: dasselbe für jedes Token der Organisation
+  (`ai.manage`; sonst 404 `ai.not_found`).
+
+Logzeilen `mcp.tool_call` nennen Person, Werkzeug, Ergebnisart und Dauer; das Token
+selbst, Argumente und Ergebnisse stehen in keiner Logzeile (Test
+`test_mcp_endpoint_usage.py`).
+
+### Aufbau
+
+- `backend/app/mcp/endpoint.py`: die Route (`Origin`, Token, Methode, Fehlerform);
+  `backend/app/mcp/server.py`: je Anfrage ein `Server` des SDK (Low-Level, nur
+  `tools/list` und `tools/call`) mit einem zustandslosen Sitzungsmanager, die Antwort
+  gesammelt und als eine Antwort gesendet, nachdem die Transaktion der Anfrage steht.
+  Nur `backend/app/mcp/` importiert das SDK.
+- `backend/app/modules/mcp_tools/`: welche Werkzeuge (`exposed.py`), ein Aufruf
+  (`service.py`: Argumente prüfen, Savepoint, `mcp_call`, Audit), der Schreibkontext
+  des Tokens (`context.py`) und die Nutzung (`usage.py`). Lesende Werkzeuge nehmen
+  einen `CallContext`, schreibende einen `WriteContext`, den Läufe (`ToolContext`) und
+  Token (`TokenContext`) gleich bedienen; mypy hält die Werkzeuge von `/mcp` von
+  allem fern, was einen Lauf braucht.
+- Tests: `tests/test_mcp_endpoint.py`, `test_mcp_read_tools.py`,
+  `test_mcp_write_tools.py`, `test_mcp_endpoint_usage.py`, `test_mcp_offered_tools.py`
+  (ein echter Client des SDK über ASGI gegen die App).
 
 ## Konnektoren
 
