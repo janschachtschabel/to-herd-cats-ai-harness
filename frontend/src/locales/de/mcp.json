@@ -57,7 +57,7 @@
       "create": {
         "open": "Server hinzufügen",
         "title": "MCP-Server hinzufügen",
-        "description": "Nur Streamable HTTP über https. Beim Anlegen wird die Werkzeugliste eingelesen; jedes Werkzeug wartet dann auf Ihre Freigabe.",
+        "description": "Nur Streamable HTTP über https. Beim Anlegen wird die Werkzeugliste eingelesen; jedes Werkzeug wartet dann auf deine Freigabe.",
         "submit": "Hinzufügen und einlesen",
         "reading": "Liest Werkzeuge …"
       },
@@ -139,7 +139,7 @@
       "hintNone": "Der Server kennzeichnet es nicht als nur lesend.",
       "suggested": "Vorschlag des Katalogs: {{classification}}.",
       "suggestedDiffers": "Weicht von der Einstufung ab.",
-      "changedNote": "Beschreibung oder Eingabeschema haben sich seit der Freigabe geändert. Bis zur neuen Freigabe ist das Werkzeug gesperrt. Prüfen Sie die aktuelle Fassung unten.",
+      "changedNote": "Beschreibung oder Eingabeschema haben sich seit der Freigabe geändert. Bis zur neuen Freigabe ist das Werkzeug gesperrt. Prüfe die aktuelle Fassung unten.",
       "fingerprints": "Fingerabdruck freigegeben {{approved}} … · jetzt {{now}} …",
       "missingNote": "Der Server bietet dieses Werkzeug nicht mehr an; es kann nicht freigegeben werden.",
       "details": "Beschreibung und Eingabeschema (vom Server)",
@@ -149,7 +149,7 @@
       "block": "Sperren",
       "blockNamed": "{{name}} sperren",
       "loosenTitle": "Als lesend einstufen?",
-      "loosenText": "Der Server kennzeichnet {{name}} nicht als nur lesend. Lesende Werkzeuge laufen ohne Freigabe je Aufruf. Nur bestätigen, wenn Sie sicher sind, dass es nichts verändert.",
+      "loosenText": "Der Server kennzeichnet {{name}} nicht als nur lesend. Lesende Werkzeuge laufen ohne Freigabe je Aufruf. Nur bestätigen, wenn du sicher bist, dass es nichts verändert.",
       "loosenConfirm": "Als lesend einstufen"
     },
     "connectors": {
@@ -216,7 +216,7 @@
       "deleteTitle": "Konnektor löschen?",
       "deleteText": {
         "shared": "{{name}} wird gelöscht. Ein Server, der ihn nutzt, muss zuerst auf einen anderen Zugang umgestellt werden.",
-        "personal": "Ihr Zugang {{name}} wird gelöscht. Agenten können diesen Server danach nicht mehr für Sie nutzen."
+        "personal": "Dein Zugang {{name}} wird gelöscht. Agenten können diesen Server danach nicht mehr für dich nutzen."
       }
     },
     "clients": {
@@ -301,7 +301,7 @@
       },
       "install": {
         "title": "{{name}} einrichten",
-        "description": "Legt den Server an und liest seine Werkzeuge ein. Danach geben Sie jedes Werkzeug auf der Seite des Servers frei.",
+        "description": "Legt den Server an und liest seine Werkzeuge ein. Danach gibst du jedes Werkzeug auf der Seite des Servers frei.",
         "submit": "Einrichten",
         "fields": {
           "baseUrl": "Adresse der Instanz",
@@ -320,8 +320,8 @@
     },
     "my": {
       "title": "Meine Verbindungen",
-      "description": "Externe Server, die in Ihrem Namen handeln. Agenten, die Sie fragen, nutzen dafür Ihren eigenen Zugang; niemand sonst sieht oder nutzt ihn, auch kein Admin.",
-      "listLabel": "Server, die in Ihrem Namen handeln",
+      "description": "Externe Server, die in deinem Namen handeln. Agenten, die du fragst, nutzen dafür deinen eigenen Zugang; niemand sonst sieht oder nutzt ihn, auch kein Admin.",
+      "listLabel": "Server, die in deinem Namen handeln",
       "empty": "Kein Server verlangt einen persönlichen Zugang.",
       "notConnected": "Nicht verbunden",
       "connectNamed": "Mit {{name}} verbinden",
@@ -339,11 +339,11 @@
       },
       "denied": {
         "title": "Nicht verbunden",
-        "text": "Die Anmeldung wurde beim Anbieter abgelehnt oder abgebrochen. Sie können es erneut versuchen."
+        "text": "Die Anmeldung wurde beim Anbieter abgelehnt oder abgebrochen. Du kannst es erneut versuchen."
       },
       "failed": {
         "title": "Verbinden fehlgeschlagen",
-        "text": "Der Anbieter hat die Anmeldung nicht bestätigt. Versuchen Sie es erneut; hilft das nicht, prüft ein Admin die OAuth-App."
+        "text": "Der Anbieter hat die Anmeldung nicht bestätigt. Versuch es erneut; hilft das nicht, prüft ein Admin die OAuth-App."
       },
       "invalid": {
         "title": "Anmeldung abgelaufen",
@@ -355,7 +355,7 @@
     "connector": {
       "env_not_allowed": "Ein persönlicher Zugang kann keine Umgebungsvariable nutzen.",
       "header_name_invalid": "Dieser Name der Kopfzeile ist nicht erlaubt.",
-      "in_use": "Ein Server nutzt diesen Konnektor; stellen Sie ihn zuerst um.",
+      "in_use": "Ein Server nutzt diesen Konnektor; stell ihn zuerst um.",
       "name_taken": "Diesen Namen trägt schon ein Konnektor.",
       "not_found": "Diesen Konnektor gibt es nicht.",
       "not_oauth": "Das ist kein OAuth-Konnektor.",
@@ -363,7 +363,7 @@
       "oauth_fixed": "Die Art eines OAuth-Konnektors lässt sich nicht ändern.",
       "oauth_unconfigured": "OAuth ist nicht eingerichtet: Der Betrieb muss HERD_PUBLIC_URL setzen.",
       "server_invalid": "Für diesen Server ist kein persönlicher Zugang vorgesehen.",
-      "server_taken": "Sie haben für diesen Server schon einen Zugang.",
+      "server_taken": "Du hast für diesen Server schon einen Zugang.",
       "version_conflict": "Der Konnektor wurde inzwischen geändert."
     },
     "mcp_server": {
