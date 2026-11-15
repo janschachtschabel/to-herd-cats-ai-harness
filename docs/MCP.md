@@ -708,10 +708,15 @@ Recht 404 `ai.not_found`.
   `<untrusted source="mcp_tool_arguments" server=…>` in die Beschreibung des Werkzeugs.
   Ein Werkzeug, dessen Schema sich so nicht anbieten lässt, hat `schema_problem`:
   `schema_too_large` (über 64 KiB, oder die Struktur über 8.000 Zeichen) oder
-  `schema_unsupported` (tiefer als 8 Ebenen, oder ein Feldname außer
-  `A-Z a-z 0-9 _ . -`, höchstens 64 Zeichen). Es ist nicht freizugeben (409
-  `mcp_tool.schema_problem`), wird keinem Agenten angeboten, und die Verwaltung zeigt
-  den Grund.
+  `schema_unsupported` (tiefer als 8 Ebenen) oder `schema_property_names` (ein
+  Feldname, auch tief im Schema, der nicht mit einem Buchstaben oder `_` beginnt, andere
+  Zeichen als `A-Z a-z 0-9 _` enthält oder länger als 32 Zeichen ist; Review M8 2,
+  Befund G4). Es ist nicht freizugeben (409 `mcp_tool.schema_problem`), wird keinem
+  Agenten angeboten, und die Verwaltung zeigt den Grund. **Was bleibt:** Feldnamen sind
+  das einzige Wort des Servers, das ungerahmt an das Modell geht (es ist der Name des
+  Arguments). Die Regel hält sie kurz und schlicht, aber ein Name wie `ignore_rules`
+  bleibt ein Wort des Servers. Die Kontrolle dafür ist die Freigabe: Wer ein Werkzeug
+  freigibt, sieht sein Schema mit allen Feldnamen.
 - **Einstufung** `read`/`write`: Vorschlag `read` nur, wenn der Server das Werkzeug als
   nur lesend kennzeichnet (`readOnlyHint`) **und** die Vorlage des Katalogs `read`
   vorschlägt, sonst `write`. Die Kennzeichnung allein ist eine unverbindliche Angabe

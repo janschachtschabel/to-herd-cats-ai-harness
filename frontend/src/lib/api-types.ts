@@ -7371,7 +7371,7 @@ export interface components {
          * SchemaProblem
          * @enum {string}
          */
-        SchemaProblem: "schema_too_large" | "schema_unsupported";
+        SchemaProblem: "schema_too_large" | "schema_unsupported" | "schema_property_names";
         /**
          * SearchResults
          * @description A page of hits of every kind, told apart by `type`.

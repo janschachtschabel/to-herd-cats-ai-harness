@@ -431,6 +431,8 @@ Eine Stufe über 2 darf nur ein Admin vergeben.
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Ein neues Werkzeug wird nur dann als lesend vorgeschlagen, wenn der Server es als nur lesend kennzeichnet und die Vorlage des Katalogs lesend vorschlägt; die Kennzeichnung des Servers allein ist eine unverbindliche Angabe und schlägt nichts vor. Review M8 1, Befund 7.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Feldnamen im Eingabeschema eines externen Werkzeugs gehen als einziges Wort des Servers ungerahmt an das Modell. Sie müssen deshalb mit einem Buchstaben oder `_` beginnen, dürfen nur `A-Z a-z 0-9 _` enthalten und höchstens 32 Zeichen lang sein; ein Werkzeug mit anderen Namen ist ab der Aktualisierung nicht nutzbar (`schema_property_names`), und die Verwaltung zeigt den Grund. Ein Name innerhalb dieser Grenzen bleibt ein Wort des Servers; die Kontrolle ist die Freigabe. Review M8 2, Befund G4.*
+
 ### 8.3 Lauf
 
 1. **Auslöser** (8.4) legt `run` an (`queued`) → DBOS-Workflow `run_agent(run_id)`.

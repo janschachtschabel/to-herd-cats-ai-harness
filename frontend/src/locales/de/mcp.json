@@ -155,7 +155,8 @@
       "loosenConfirm": "Als lesend einstufen",
       "schemaProblem": {
         "schema_too_large": "Das Eingabeschema ist zu groß, um es einem Modell anzubieten (über 64 KiB, oder seine Struktur über 8.000 Zeichen). Das Werkzeug kann nicht freigegeben werden.",
-        "schema_unsupported": "Das Eingabeschema lässt sich einem Modell nicht anbieten (zu tief verschachtelt, oder ein Feldname mit Zeichen außer Buchstaben, Ziffern, _ . -). Das Werkzeug kann nicht freigegeben werden."
+        "schema_unsupported": "Das Eingabeschema lässt sich einem Modell nicht anbieten (zu tief verschachtelt). Das Werkzeug kann nicht freigegeben werden.",
+        "schema_property_names": "Ein Feldname im Eingabeschema ist zu lang oder enthält andere Zeichen als Buchstaben ohne Akzent, Ziffern und _ (höchstens 32 Zeichen, nicht mit einer Ziffer am Anfang). Feldnamen gehen ungerahmt an das Modell, deshalb kann das Werkzeug nicht freigegeben werden."
       },
       "approvedNotKept": "Die freigegebene Fassung ist nicht gespeichert (Freigabe vor diesem Update); verglichen werden nur die Fingerabdrücke.",
       "changedParts": "Geändert: {{parts}}",

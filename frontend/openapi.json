@@ -10424,7 +10424,8 @@
       "SchemaProblem": {
         "enum": [
           "schema_too_large",
-          "schema_unsupported"
+          "schema_unsupported",
+          "schema_property_names"
         ],
         "title": "SchemaProblem",
         "type": "string"

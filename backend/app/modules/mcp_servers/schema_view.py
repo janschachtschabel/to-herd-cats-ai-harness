@@ -12,7 +12,15 @@ A schema that cannot be offered that way has a `problem`, found at refresh (stor
 on the tool, shown to the admin, the tool cannot be approved) and again before a run
 offers it (rows stored before this rule): over `MAX_SCHEMA_BYTES` as JSON (then not
 even stored whole, `stored`), a structure over `MAX_STRUCTURE_CHARS`, deeper than
-`MAX_DEPTH`, or a property name outside `NAME` (names are offered as they are).
+`MAX_DEPTH` (`schema_unsupported`), or a property name outside `NAME`
+(`schema_property_names`).
+
+Property names are the one word of the server's that reaches the model unframed: a
+name is the argument's name, offered as it is. So they keep to a strict charset and
+length (module review M8 2, finding G4): a letter or `_`, then letters, digits and
+`_`, at most `MAX_NAME_CHARS`. What is left: a name within those bounds (say
+`ignore_rules`) is still the server's word; the admin's approval, which shows the
+schema, is the control for it.
 """
 
 import json
@@ -26,7 +34,8 @@ MAX_STRUCTURE_CHARS = 8_000
 MAX_DEPTH = 8
 MAX_WORD_CHARS = 300  # one property's words
 MAX_WORDS_CHARS = 2_000  # all of them (the frame cuts nothing more)
-NAME = re.compile(r"[A-Za-z0-9_.\-]{1,64}")
+MAX_NAME_CHARS = 32
+NAME = re.compile(rf"[A-Za-z_][A-Za-z0-9_]{{0,{MAX_NAME_CHARS - 1}}}")
 OBJECT: dict[str, Any] = {"type": "object"}
 
 _TYPES = {"object", "array", "string", "number", "integer", "boolean", "null"}
@@ -47,6 +56,7 @@ _UNIONS = ("anyOf", "oneOf", "allOf")
 class SchemaProblem(StrEnum):
     TOO_LARGE = "schema_too_large"
     UNSUPPORTED = "schema_unsupported"
+    NAMES = "schema_property_names"  # a property name outside `NAME`
 
 
 @dataclass(slots=True)
@@ -57,6 +67,10 @@ class View:
 
 
 class _Unsupported(Exception):
+    pass
+
+
+class _BadName(Exception):
     pass
 
 
@@ -79,6 +93,8 @@ def view(schema: Any) -> View:
         structure = _structure(schema, "", words, 0)
     except _Unsupported:
         return View(problem=SchemaProblem.UNSUPPORTED)
+    except _BadName:
+        return View(problem=SchemaProblem.NAMES)
     if size_of(structure) > MAX_STRUCTURE_CHARS:
         return View(problem=SchemaProblem.TOO_LARGE)
     return View(structure, "\n".join(words)[:MAX_WORDS_CHARS])
@@ -109,7 +125,7 @@ def _structure(node: Any, path: str, words: list[str], depth: int) -> dict[str, 
     properties = node.get("properties")
     if isinstance(properties, dict):
         if not all(NAME.fullmatch(name) for name in properties):
-            raise _Unsupported
+            raise _BadName
         out["properties"] = {
             name: _structure(sub, f"{path}.{name}" if path else name, words, depth + 1)
             for name, sub in properties.items()

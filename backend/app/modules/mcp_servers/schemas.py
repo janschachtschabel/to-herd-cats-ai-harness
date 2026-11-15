@@ -169,7 +169,8 @@ class ToolOut(BaseModel):
     state: ToolState
     missing: bool
     # Why its input schema cannot be offered to a model (then it cannot be approved):
-    # `schema_too_large` (over 64 KiB, or too large to offer), `schema_unsupported`.
+    # `schema_too_large` (over 64 KiB, or too large to offer), `schema_unsupported`
+    # (nested too deep), `schema_property_names` (a name outside `schema_view.NAME`).
     schema_problem: SchemaProblem | None
     version: int
     updated_at: datetime

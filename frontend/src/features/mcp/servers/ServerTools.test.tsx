@@ -167,6 +167,20 @@ describe('a server’s tools', () => {
     expect(within(row).queryByRole('button', { name: 'huge_tool freigeben' })).toBeNull()
   })
 
+  test('a field name outside the strict charset says so (review M8 2, G4)', async () => {
+    const named = makeTool({
+      id: 't-named',
+      name: 'named_tool',
+      schema_problem: 'schema_property_names',
+    })
+    setup([named])
+    await renderApp(`/admin/ai/mcp-servers/${SRV}`)
+    const row = await screen.findByRole('article', { name: 'named_tool' })
+    expect(within(row).getByRole('note')).toHaveTextContent(/Feldname im Eingabeschema/)
+    expect(within(row).getByRole('note')).toHaveTextContent(/höchstens 32 Zeichen/)
+    expect(within(row).queryByRole('button', { name: 'named_tool freigeben' })).toBeNull()
+  })
+
   test('loosening to read a tool not marked read-only is asked once more', async () => {
     const api = setup([writer], {
       [`PATCH /api/ai/mcp-servers/${SRV}/tools/t-write`]: { ...writer, classification: 'read' },
