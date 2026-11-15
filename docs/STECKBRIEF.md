@@ -973,17 +973,9 @@ auflösen kann. Die Größe mit Updates steht im Build-Protokoll der CI.
 
 ## Sicherheitshinweise
 
-- **Vertrauensbereich Collab-Prozess (Review M2 R14, umgesetzt in M9):** Das
-  Sitzungs-Cookie verlässt die API nicht. Für jede Live-Verbindung stellt das Relay
-  eine Berechtigung aus, die nur für genau eine Seite und Generation gilt, zehn
-  Minuten ab der letzten Prüfung, und nur als SHA-256 gespeichert ist. Ein
-  übernommener Collab-Prozess kann damit nur die Seiten lesen und überschreiben, die
-  gerade in ihm offen sind, im Namen der dort verbundenen Personen, solange sie die
-  Seite bearbeiten dürfen; er hält keine Anmeldung, mit der er die öffentliche API
-  aufrufen könnte, erreicht keine andere Seite, und mit erfundenen oder fremden
-  Berechtigungen beendet er keine Live-Sitzung. Im Chart trennt die NetworkPolicy den Collab-Pod zusätzlich von der
-  öffentlichen API; in Compose laufen beide im selben Container (`docs/WIKI.md`,
-  „Berechtigungen des Collab-Prozesses“).
+Die Sicherheitshinweise (Vertrauensbereich des Collab-Prozesses, Anmeldung, Sitzungen,
+Kryptografie, Verbindungen, Datenklassen, Protokolle) und die Prüfung gegen OWASP ASVS
+5.0 Stufe 2 mit offenen Lücken und Fragen stehen in [`SICHERHEIT.md`](SICHERHEIT.md).
 
 ## Betriebshinweise
 

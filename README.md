@@ -413,6 +413,10 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M8. Wer betreibt, sollte sie
 kennen.
 
+Die Prüfung gegen OWASP ASVS 5.0 Stufe 2, die Betriebsvoraussetzungen der Sicherheit
+(TLS am Ingress, eigener Hostname, Schutz der Protokolle) und die offenen Lücken stehen
+in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
+
 - **Sicherung** (M9): `python -m app.ops backup create|verify|list` schreibt und prüft
   Archive des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) nach
   `HERD_BACKUP_DIR`; `backup run` dazu mit Aufbewahrung und restic-Kopie, nach Zeitplan
