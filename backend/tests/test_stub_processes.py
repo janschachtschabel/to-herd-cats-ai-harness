@@ -76,3 +76,38 @@ def test_the_oauth_stub_serves_https_and_names_its_https_base(
     base = f"https://localhost:{port}"
     assert response.json()["issuer"] == base
     assert response.json()["token_endpoint"] == f"{base}/token"
+
+
+def test_a_scripted_tool_answers_late_and_the_list_does_not(
+    certificate: tuple[Path, Path], stopped: list[subprocess.Popen[bytes]]
+) -> None:
+    """`results: {tool: {"delay": s}}` holds only that tool's call (a worker lost while
+    an external call is in flight, in e2e); the tool list in the same exchange answers
+    at once."""
+    cert, key = certificate
+    port = free_port()
+    stopped.append(stub := _start("tests.support.mcp_stub", port, cert, key))
+    base = f"https://localhost:{port}"
+    _get(stub, f"{base}/_stub/log", cert)
+    trusted = ssl.create_default_context(cafile=str(cert))
+    script = {"results": {"search_issues": {"text": "late", "delay": 1.5}}}
+    assert httpx.post(f"{base}/_stub/script", json=script, verify=trusted).status_code == 200
+    headers = {
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2025-06-18",
+    }
+
+    def rpc(method: str, params: dict[str, object] | None = None) -> tuple[float, object]:
+        body: dict[str, object] = {"jsonrpc": "2.0", "id": 1, "method": method}
+        if params is not None:
+            body["params"] = params
+        started = time.monotonic()
+        response = httpx.post(f"{base}/mcp", json=body, headers=headers, verify=trusted)
+        assert response.status_code == 200, response.text
+        return time.monotonic() - started, response.json()["result"]
+
+    listed_in, _ = rpc("tools/list")
+    called_in, result = rpc("tools/call", {"name": "search_issues", "arguments": {"q": "x"}})
+    assert listed_in < 1.0
+    assert called_in >= 1.5
+    assert result["content"][0]["text"] == "late"  # type: ignore[index]

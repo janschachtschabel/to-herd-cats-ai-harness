@@ -5,7 +5,8 @@ request.
 Scriptable through `state` (shared with the test): the tool list (`tools`, dicts with
 `name`, `description`, `input_schema` and optionally `read_only`), what a call answers
 (`results` by tool name: `{"text": ...}`, `{"structured": ...}`, `{"is_error": True}`
-or `{"huge": n}` for a text of n bytes; without one it says which tool was called),
+or `{"huge": n}` for a text of n bytes, each with an optional `"delay"` in seconds
+before that call answers; without one it says which tool was called),
 `delay` (seconds before every answer), `redirect_to` (every MCP request answers 302
 there), `failures` (status codes for the next requests) and `require_header` (a
 `(name, value)` pair; without it a request answers 401). Every request is logged with
@@ -128,6 +129,8 @@ def build_server(state: McpStubState) -> Server[Any]:
         arguments = dict(params.arguments or {})
         state.calls.append((params.name, arguments))
         script = state.results.get(params.name, {})
+        if script.get("delay"):
+            await asyncio.sleep(float(script["delay"]))
         if "huge" in script:
             return CallToolResult(content=[TextContent(text="x" * int(script["huge"]))])
         text = script.get("text", f"called {params.name}")
