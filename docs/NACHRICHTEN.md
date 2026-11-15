@@ -72,7 +72,12 @@ Die Seitenleiste zeigt über den Bereichen „Aktivität“, „Kanäle“ und
   eigene Reaktion zurück.
 - **Gelesen:** Was im Gespräch sichtbar war, gilt als gelesen. Ungelesen zählen nur
   Nachrichten anderer auf oberster Ebene; Erwähnungen zählen auch in Threads. Die
-  Markierung „Neu“ zeigt, wo das Ungelesene beim Öffnen anfing.
+  Markierung „Neu“ zeigt, wo das Ungelesene beim Öffnen anfing: vor der ältesten
+  Nachricht nach dem eigenen Lesestand (`GET /api/conversations/{id}/read` →
+  `last_read_message_id`, `last_read_message_at`, die Zeit der gelesenen Nachricht;
+  beide leer, solange dort nichts gelesen ist, dann zählt der Ungelesen-Zähler). Ein
+  Gespräch, das man nicht sieht (auch über die Einsicht eines Admins), antwortet wie ein
+  unbekanntes (404 `conversation.not_found`).
 
 ### Seiten-Diskussion und Systemmeldungen
 
@@ -323,18 +328,20 @@ Browser lädt nach, was er zeigen will, mit seinen normalen Rechten.
   13–22 ms bei 239, 187–237 ms bei 200.239 Ungelesenen in einem Kanal). Live-Ereignisse
   lösen den Abruf aus; der Browser bündelt sie (ein Abruf je 250 ms), die Zählung selbst
   ist noch nicht begrenzt.
-- **Bekannte Grenze (für M6 vorgemerkt, Review M3 N13, Review M4 P11): IDs als
+- **Bekannte Grenze (Review M3 N13, Review M4 P11; mit M9 als Grenze belassen): IDs als
   Position.** Lesestand und `after`-Cursor sind Nachrichten-IDs (UUIDv7, also Zeit).
   Eine Systemmeldung bekommt die ID zur Zeit ihrer Änderung, nicht ihres Eintrags; der
   Worker schreibt sie erst danach. Das Fenster ist so groß wie der Rückstand der Outbox:
   gewöhnlich Millisekunden, bei einem Rückstau Sekunden bis Minuten. Eine Meldung, die in
   diesem Fenster hinter dem Lesestand einer Person landet, zählt für sie nie als
   ungelesen (das tun Systemmeldungen ohnehin nicht), und ein Abruf mit `after` überspringt
-  sie; der Browser lädt Seiten ganz neu und sieht sie also. Gelöst wird das mit der
-  Überarbeitung der Zähler in M6 (eine Sequenz in Commit-Reihenfolge oder ein Fenster).
-  Ebenfalls zurückgestellt: ein eigener Endpunkt für die Leseposition (N9) und ein
-  `NOTIFY` je Schreibvorgang (Review M3 N17; der Worker sendet seit den Bahnen eines je
-  Stapel).
+  sie; der Browser lädt Seiten ganz neu und sieht sie also. Eine Lösung (eine Sequenz
+  in Commit-Reihenfolge oder ein Fenster) ist nicht geplant: Betroffen sind nur
+  Systemmeldungen, die nie als ungelesen zählen. Der eigene Endpunkt für die
+  Leseposition (N9) ist mit M9 gebaut (siehe „Gelesen“). Ein `NOTIFY` je Schreibvorgang
+  (Review M3 N17) bleibt; der Worker sendet seit den Bahnen eines je Stapel, gleiche
+  NOTIFYs einer Transaktion fallen zusammen, die Schreibgrenze misst der Lasttest
+  (`docs/STECKBRIEF.md`).
 
 ### Betrieb hinter einem Reverse Proxy
 

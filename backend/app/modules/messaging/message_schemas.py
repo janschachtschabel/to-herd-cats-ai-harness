@@ -255,6 +255,14 @@ class ReadPosition(BaseModel):
     message_id: uuid.UUID
 
 
+class ReadPositionOut(BaseModel):
+    """The caller's read position: the message she read up to and when it was written;
+    both null before she read anything there."""
+
+    last_read_message_id: uuid.UUID | None
+    last_read_message_at: datetime | None
+
+
 class UnreadOut(BaseModel):
     """`unread`: others' top-level messages after the read position (not deleted);
     `mentions`: mentions of the caller after it, in threads too."""

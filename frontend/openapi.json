@@ -10575,6 +10575,41 @@
         "title": "ReadPosition",
         "type": "object"
       },
+      "ReadPositionOut": {
+        "description": "The caller's read position: the message she read up to and when it was written;\nboth null before she read anything there.",
+        "properties": {
+          "last_read_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Read Message At"
+          },
+          "last_read_message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Read Message Id"
+          }
+        },
+        "required": [
+          "last_read_message_id",
+          "last_read_message_at"
+        ],
+        "title": "ReadPositionOut",
+        "type": "object"
+      },
       "RecurringIn": {
         "additionalProperties": false,
         "properties": {
@@ -23172,6 +23207,48 @@
       }
     },
     "/api/conversations/{conversation_id}/read": {
+      "get": {
+        "description": "The caller's read position in the conversation (nulls before she read any).",
+        "operationId": "read_position_api_conversations__conversation_id__read_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadPositionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Position",
+        "tags": [
+          "messaging"
+        ]
+      },
       "post": {
         "description": "Read up to a message of the conversation (never backwards).",
         "operationId": "mark_read_api_conversations__conversation_id__read_post",

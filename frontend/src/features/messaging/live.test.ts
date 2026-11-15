@@ -19,6 +19,7 @@ const KEYS = {
   messagesB: [...messagingKeys.messages('b'), { includeSystem: true }],
   repliesA: messagingKeys.replies('a', 'p'),
   messageA: messagingKeys.message('a', 'p'),
+  readPositionA: messagingKeys.readPosition('a'),
   pageThread: messagingKeys.pageThread('page'),
   activity: activityKeys.list(false),
   activityCount: activityKeys.count,
@@ -116,6 +117,7 @@ describe('live invalidation', () => {
       'messagesB',
       'repliesA',
       'messageA',
+      'readPositionA',
       'pageThread',
       'activity',
       'activityCount',
@@ -232,7 +234,10 @@ describe('live invalidation', () => {
       'repliesA',
       'messageA',
     ])
-    expect(staleAfter({ type: 'conversation.read', conversationId: 'a' })).toEqual(['unread'])
+    expect(staleAfter({ type: 'conversation.read', conversationId: 'a' })).toEqual([
+      'unread',
+      'readPositionA',
+    ])
     expect(staleAfter({ type: 'channel.changed', conversationId: 'a' })).toEqual([
       'channels',
       'conversationA',
@@ -286,6 +291,7 @@ describe('coalescing', () => {
       [
         messagingKeys.dms,
         messagingKeys.unread,
+        messagingKeys.readPosition('a'),
         messagingKeys.messages('a'),
         messagingKeys.message('a'),
         agentKeys.runs,

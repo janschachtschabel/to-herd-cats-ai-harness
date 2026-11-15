@@ -71,7 +71,9 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         messagingKeys.message(conversation),
       ]
     case 'conversation.read':
-      return [messagingKeys.unread]
+      return conversation
+        ? [messagingKeys.unread, messagingKeys.readPosition(conversation)]
+        : [messagingKeys.unread]
     case 'channel.changed':
       return conversation
         ? [messagingKeys.channels, messagingKeys.conversation(conversation)]

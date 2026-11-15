@@ -8,7 +8,12 @@ from fastapi import APIRouter, Path, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
-from app.modules.messaging.message_schemas import ReactionOut, ReadPosition, UnreadOut
+from app.modules.messaging.message_schemas import (
+    ReactionOut,
+    ReadPosition,
+    ReadPositionOut,
+    UnreadOut,
+)
 from app.modules.messaging.reactions import ReactionService
 from app.modules.messaging.reads import ReadService
 
@@ -30,6 +35,16 @@ async def list_unread(
         for u in page.items
     ]
     return Page[UnreadOut](items=items, next_cursor=page.next_cursor)
+
+
+@reads.get("/{conversation_id}/read", response_model=ReadPositionOut)
+async def read_position(
+    conversation_id: uuid.UUID, actor: ActorDep, session: SessionDep
+) -> ReadPositionOut:
+    """The caller's read position in the conversation (nulls before she read any)."""
+    found = await ReadService(session).position(actor, conversation_id)
+    message_id, at = found if found is not None else (None, None)
+    return ReadPositionOut(last_read_message_id=message_id, last_read_message_at=at)
 
 
 @reads.post("/{conversation_id}/read", status_code=204)

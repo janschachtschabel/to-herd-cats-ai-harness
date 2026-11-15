@@ -44,6 +44,31 @@ export function firstUnreadId(
   return last
 }
 
+/** Where one has read up to: the message and when it was written. */
+export interface ReadMark {
+  id: string
+  at: string
+}
+
+/**
+ * The oldest unread message after the read position: walking back from the newest
+ * until the read message (or one written no later than it, should it be gone or not
+ * loaded), the last message that counts.
+ */
+export function firstAfterPosition(
+  newestFirst: readonly Message[],
+  position: ReadMark,
+  meId: string | undefined,
+): string | null {
+  const readAt = Date.parse(position.at)
+  let last: string | null = null
+  for (const message of newestFirst) {
+    if (message.id === position.id || Date.parse(message.created_at) <= readAt) break
+    if (countsAsUnread(message, meId)) last = message.id
+  }
+  return last
+}
+
 /** The rows of a conversation, oldest first: day separators, the "new" marker before
  *  `newBefore`, the fresh start before the first message after `freshStart` (at the
  *  end if none came yet), then the messages still on their way (those the server

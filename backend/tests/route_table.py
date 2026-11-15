@@ -122,6 +122,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/messages/{message_id}", "message"),
     ("DELETE", "/api/messages/{message_id}", "message"),
     ("GET", "/api/conversations/unread", "session"),
+    ("GET", "/api/conversations/{conversation_id}/read", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/read", "conversation"),
     ("POST", "/api/conversations/{conversation_id}/fresh-start", "conversation"),
     ("PUT", "/api/messages/{message_id}/reactions/{emoji}", "message"),

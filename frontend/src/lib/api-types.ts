@@ -2102,7 +2102,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read Position
+         * @description The caller's read position in the conversation (nulls before she read any).
+         */
+        get: operations["read_position_api_conversations__conversation_id__read_get"];
         put?: never;
         /**
          * Mark Read
@@ -7611,6 +7615,17 @@ export interface components {
              * Format: uuid
              */
             message_id: string;
+        };
+        /**
+         * ReadPositionOut
+         * @description The caller's read position: the message she read up to and when it was written;
+         *     both null before she read anything there.
+         */
+        ReadPositionOut: {
+            /** Last Read Message At */
+            last_read_message_at: string | null;
+            /** Last Read Message Id */
+            last_read_message_id: string | null;
         };
         /** RecurringIn */
         RecurringIn: {
@@ -14275,6 +14290,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageWriteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_position_api_conversations__conversation_id__read_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadPositionOut"];
                 };
             };
             /** @description Validation Error */

@@ -7,6 +7,8 @@ export const messagingKeys = {
   dms: ['messaging', 'dms'] as const,
   unread: ['messaging', 'unread'] as const,
   conversation: (id: string) => ['messaging', 'conversation', id] as const,
+  /** The caller's read position in one conversation. */
+  readPosition: (id: string) => ['messaging', 'read', id] as const,
   /** Top-level messages; the full key adds whether system messages are included. */
   messages: (id: string) => ['messaging', 'messages', id] as const,
   /** A thread's replies; `replies(id)` alone covers every thread of the conversation. */
