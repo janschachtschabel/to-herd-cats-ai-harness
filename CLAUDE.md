@@ -4,11 +4,11 @@ Arbeite nach den Superpowers-Skills (https://github.com/obra/superpowers): brain
 
 Knowledge & agent cockpit for companies. The authority is the design spec
 `docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md` (German). M1 to M4, M4b,
-M5 Tasks 1–7, M6 and M7 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`,
+M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-fundament.md`,
 `…-m2-wiki.md`, `2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
 `2026-11-13-m4b-boards-sprints.md`, `2026-11-13-m5-ki-grundlage.md`,
-`2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`) are
-built; next are M5 Tasks 8–12 and M8 (spec 14). Present: identity, groups, spaces, roles,
+`2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
+`2026-11-15-m8-oeffnung.md`) are built; next are M5 Tasks 8–12 and M9 (spec 14). Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -33,14 +33,21 @@ memory pages per agent and space, personal agents (M6); automations: one-off,
 recurring (cron in the automation's time zone), heartbeat and event-rule kinds fired
 exactly once by the worker's due loop (no DBOS, spec E10), a log of every term, pausing
 and take-over, budgets per org/person/agent and UTC day, the wiki's review interval and
-its daily pass (M7). Planned, not present: embeddings, hybrid search, Docling
-conversion (M5 Tasks 8–11), external tools/MCP (M8), S3, collab with Redis. Operations: `README.md` (Betriebshinweise),
+its daily pass (M7); opening over MCP: access tokens (personal and agent, hashed,
+shown once) and the right `mcp.use`, the stateless endpoint `/mcp` serving the
+catalog's tools within the person's rights, the token's spaces and the AI policy,
+external agents with ticket pick-up, external MCP servers with per-tool approval and
+fingerprints (write tools level 4, always released), connectors (bearer/header, OAuth
+with PKCE; shared or personal), the catalogue (GitHub, GitLab, operator files), a cap
+on external calls per run (M8). Planned, not present: embeddings, hybrid search,
+Docling conversion (M5 Tasks 8–11), S3, collab with Redis, OIDC (M9). Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
 boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
 `docs/AGENTEN.md` (agents and automations: use, admin, worker runs and the due loop,
-limits, metrics and alerts).
+limits, metrics and alerts), `docs/MCP.md` (tokens, `/mcp` with Claude Code and Codex,
+external agents, servers, connectors, catalogue, operation, metrics and alerts).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -79,7 +86,10 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `executor.py`, `step_host.py`, journal `journal.py`, cancel and waiting
   `control.py`), the tool catalog and tools (`toolbox/`, grants `grants.py`), approvals
   and questions (`approvals/`), memory (`memory.py`), run view (`run_view.py`), gauges
-  (`gauge_repository.py`). The worker's run loop is `app/worker/runs.py` (claims with
+  (`gauge_repository.py`); a step's checks (`step_checks.py`) and an external tool's
+  call in two transactions around the send (`external_step.py`, metric and cap:
+  `external_metrics.py`, `external_repository.py`); external agents (`agent.kind`,
+  no runs). The worker's run loop is `app/worker/runs.py` (claims with
   `SKIP LOCKED` and a lease, renewed every third).
 - Automations (`modules/automations`): terms and schedules (`term.py`, `terms.py`,
   `schedule.py`, `heartbeat_terms.py`), firing one term (`firing.py`, `runs.py`),
@@ -90,6 +100,17 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `(automation_id, due_at)`; it also runs the wiki's review pass,
   `modules/wiki/review_pass.py`, and the log's retention). Time comes from
   `core/clock.py`. Frontend `features/automations`.
+- MCP (M8): `app/mcp/` is the only code that imports the MCP SDK (`mcp`, `mcp_types`;
+  `tests/test_mcp_imports.py`): the endpoint (`endpoint.py`: Origin, token, POST only;
+  `server.py`: one stateless SDK server per request, JSON answers), the client
+  (`client.py`) and the shipped catalogue files (`catalog/*.yaml`). Modules: `tokens`
+  (hash, resolve to an actor per call, reach in SQL, `mcp.use`), `mcp_tools` (what
+  `/mcp` offers per token, one call, `mcp_call`), `connectors` (stored access; plaintext
+  only in `credentials.headers_for`), `oauth` (clients, flow, renewal under a row
+  lock), `mcp_servers` (servers, tools, fingerprints, `calls.py`), `mcp_catalog`.
+  Egress allow-list for private hosts: `core/egress_allowance.py`. Stubs:
+  `tests/support/mcp_stub.py`, `oauth_stub.py`. Frontend `features/{tokens,mcp}` and
+  the agents' external tools.
 - Runtime (`app/runtime/`): the only code that imports Pydantic AI (`loop.py` drives one
   step, `tools.py`, `models.py`, `context.py`; `untrusted.py` frames tool results);
   `tests/test_runtime_imports.py` enforces it.
@@ -257,6 +278,22 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   - New settings with the `HERD_AI_` prefix are refused as `env:` key references
     automatically (`RESERVED_NAMES`); add every new AI setting to Compose, the chart and
     `docs/AGENTEN.md`.
+- MCP (M8):
+  - Tokens: only the SHA-256 of 256 random bits is stored (`herd_pat_`/`herd_agt_`); the
+    clear text is shown once and never logged, audited, put in a URL or an error. Every
+    failure answers the same 401 `token.invalid`; rights are resolved on every call.
+  - `/mcp` answers like the REST API would for an unknown id: never drafts, `no_ai`
+    content, spaces the policy for its data location excludes, or anything outside the
+    token's scope; no tool that needs a run or a release, no `assign_ticket`.
+  - What an external server returns (results, descriptions) is untrusted, framed and
+    cut; it never grants anything. A tool is callable only with its approved
+    fingerprint; a changed one is blocked until re-approved; the catalogue only
+    suggests. Write tools are level 4 and wait for the asker's release of the exact
+    arguments; a lost worker never sends a call again (`external_outcome_unknown`).
+  - A result through the asker's own connector marks the run (`Reads.personal`, like
+    the draft mark): it writes nothing others may read.
+  - Settings use the `HERD_MCP_` prefix (never `HERD_AI_`); add each to both Compose
+    files, the chart (values, schema, chart rule) and `docs/MCP.md`.
 - Automations:
   - Code that schedules reads the time from a `Clock` (`core/clock.py`), never
     `datetime.now()`; tests pass a `SettableClock` (`tests/support/clock.py`) and never
