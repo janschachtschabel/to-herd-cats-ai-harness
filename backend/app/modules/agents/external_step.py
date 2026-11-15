@@ -40,8 +40,11 @@ result in the first transaction.
 
 Every call counts once in `herd_external_tool_calls_total` after its step committed
 (`external_metrics.py`); a step that waits for a release counts when it runs again.
+A call sent and then cut by the run's deadline (or the worker's end) before its answer
+was recorded counts as `unknown` (module review M8 1, finding 14).
 """
 
+import asyncio
 import time
 import uuid
 from dataclasses import dataclass
@@ -119,17 +122,14 @@ async def call_external(
         return first.result
     if not isinstance(first, _Sending):
         return first  # waits for a release
-    started = time.perf_counter()
-    outcome: Outcome
     try:
-        outcome = await execute(first.prepared, first.arguments)
-    except ExternalToolError as error:
-        outcome = error
-    duration_ms = round((time.perf_counter() - started) * 1000)
-    try:
+        outcome, duration_ms = await _send(first)
         result = await once_more(
             host.run, lambda: _after(host, step, call, args, spec, first, outcome, duration_ms)
         )
+    except asyncio.CancelledError:  # the run's deadline cut it: sent, its answer unrecorded
+        count(CallOutcome.UNKNOWN, writes=writes)
+        raise
     except Exception as exc:
         if is_timeout(exc):  # the call was sent: its first entry stands
             count(CallOutcome.UNKNOWN, writes=writes)
@@ -137,6 +137,16 @@ async def call_external(
         raise
     count(outcome_of(outcome), writes=writes)
     return result
+
+
+async def _send(first: _Sending) -> tuple[Outcome, int]:
+    started = time.perf_counter()
+    outcome: Outcome
+    try:
+        outcome = await execute(first.prepared, first.arguments)
+    except ExternalToolError as error:
+        outcome = error
+    return outcome, round((time.perf_counter() - started) * 1000)
 
 
 async def _before(

@@ -15,6 +15,7 @@ from app.core.metrics import REGISTRY
 from app.modules.agents import external_step
 from app.modules.agents.external_repository import sent_calls
 from app.modules.agents.run_models import EventKind, RunEvent, StopReason
+from app.modules.agents.step_host import RunHost
 from app.modules.agents.toolbox.external import CALL_LIMIT, OUTCOME_UNKNOWN, POLICY_REFUSED
 from app.modules.mcp_servers import calls
 from tests.factories_external import Ext, call
@@ -176,6 +177,22 @@ async def test_an_unrecorded_result_counts_as_unknown(
     assert ext.stub.state.calls == [("search_issues", {"q": "x"})]
     assert (await ext.tool_events())[-1]["text"] == OUTCOME_UNKNOWN
     assert before.delta("unknown") == 1 and before.delta("ok") == 0
+
+
+async def test_a_call_cut_by_the_runs_deadline_counts_as_unknown(
+    ext: Ext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Module review M8 1, finding 14: sent, then cut by the run's deadline before its
+    answer came: the first entry stands and the call counts as `unknown`."""
+    await ext.grant(search_issues="allow")
+    name = await ext.name("search_issues")
+    before = _Before()
+    monkeypatch.setattr(RunHost, "seconds_left", lambda self: 0.5)
+    ext.stub.state.results["search_issues"] = {"text": "late", "delay": 3}
+    assert await ask(ext, call(name, q="x")) == StopReason.DEADLINE
+    assert ext.stub.state.calls == [("search_issues", {"q": "x"})]
+    assert (await ext.tool_events())[-1]["text"] == OUTCOME_UNKNOWN
+    assert before.delta("unknown") == 1 and before.delta("timeout") == 0
 
 
 @pytest.mark.parametrize("limit", [0, 501])

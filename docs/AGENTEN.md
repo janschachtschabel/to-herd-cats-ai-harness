@@ -1607,7 +1607,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_budget_stops_total{scope}` | Zähler | Läufe, die dieser Worker an einem erreichten Tagesbudget beendet hat, je Geltung (`user`, `agent`, `organisation`); übersprungene Termine zählen als `skipped_budget` oben |
 | `herd_wiki_review_reminders_total` | Zähler | Seiten, deren Prüffrist der tägliche Durchlauf dieses Workers gemeldet hat ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)) |
 | `herd_wiki_review_spaces_unchecked` | Gauge | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat; tagsüber 0 |
-| `herd_external_tool_calls_total{outcome,effect}` | Zähler | Aufrufe externer MCP-Werkzeuge in Läufen dieses Workers (seit M8), gezählt nach dem Commit ihres Schritts, je Ergebnis (`ok`, `error`: das Werkzeug meldet selbst einen Fehler, `refused`: nicht gesendet wegen einer Regel, `limited`: Grenze des Laufs, `failed`, `timeout`, `unknown`: gesendet, Ergebnis nicht festgehalten) und Wirkung (`read`, `write`); nie Server, Werkzeug oder Argumente |
+| `herd_external_tool_calls_total{outcome,effect}` | Zähler | Aufrufe externer MCP-Werkzeuge in Läufen dieses Workers (seit M8), gezählt nach dem Commit ihres Schritts, je Ergebnis (`ok`, `error`: das Werkzeug meldet selbst einen Fehler, `refused`: nicht gesendet wegen einer Regel, `limited`: Grenze des Laufs, `failed`, `timeout`, `unknown`: gesendet, Ergebnis nicht festgehalten, auch wenn die Laufzeit den Aufruf abschnitt) und Wirkung (`read`, `write`); nie Server, Werkzeug oder Argumente |
 
 Die Metriken von `/mcp`, der OAuth-Erneuerung und des Katalogs (auch von API-Pods)
 stehen in [`MCP.md`](MCP.md#metriken-und-alarme).
