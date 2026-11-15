@@ -1,17 +1,21 @@
 """Who gets in through OIDC, and as whom (plan M9 decisions 13 and 14). Pure: the
 flow looks up the person by subject and by email, this decides.
 
-1. A known subject (`user_identity`) logs its person in; a deactivated person is
-   refused (`oidc.account_inactive`).
+1. A known subject (`user_identity`) logs its person in; a self-registered person
+   still awaiting an admin's approval is refused with `oidc.account_pending`, a
+   deactivated (or rejected) one with `oidc.account_inactive`.
 2. Otherwise the email must be present and verified (`oidc.email_unverified`).
 3. An active account with that email is linked only where the provider is
    authoritative for the address: Google for `@gmail.com` or when `hd` is the
    address's domain; a generic provider only with `trust_email`. Otherwise
-   `oidc.link_refused` (sign in with the password, then link in the profile).
+   `oidc.link_refused` (sign in with the password, then link in the profile). An
+   account awaiting approval or deactivated is refused as in 1, and not linked.
 4. Without an account: self-registration if the provider allows it and lists
    domains (`oidc.signup_closed` otherwise), for an address whose domain is listed
    exactly (no subdomains, no trailing dot); at Google a domain other than
-   `gmail.com` also needs `hd` equal to it (`oidc.domain_not_allowed`).
+   `gmail.com` also needs `hd` equal to it (`oidc.domain_not_allowed`). The new
+   account waits for an admin's approval (Jan's answer J2: nobody gets in without
+   it; `accounts.py`).
 
 `SIGNUP_GETS_NO_AI` is question J2: a self-registered person gets an own AI
 assignment "no AI" until an admin decides (costs and data leaving only by decision).
@@ -42,6 +46,7 @@ class ProviderRules:
 class ExistingUser:
     id: uuid.UUID
     active: bool
+    pending: bool = False  # self-registered and not yet approved (`awaiting_approval_since`)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +86,13 @@ def authoritative(rules: ProviderRules, email: str, hd: str | None) -> bool:
     return rules.trust_email
 
 
+def _usable(user: ExistingUser) -> Refuse | None:
+    """Why this account may not sign in (None: it may)."""
+    if user.pending:
+        return Refuse("oidc.account_pending")
+    return None if user.active else Refuse("oidc.account_inactive")
+
+
 def decide(
     rules: ProviderRules,
     claims: IdClaims,
@@ -88,14 +100,14 @@ def decide(
     by_email: ExistingUser | None,
 ) -> Admission:
     if by_subject is not None:
-        return Login(by_subject.id) if by_subject.active else Refuse("oidc.account_inactive")
+        return _usable(by_subject) or Login(by_subject.id)
     email = claims.email
     if not email or not claims.email_verified:
         return Refuse("oidc.email_unverified")
     if by_email is not None:
         if not authoritative(rules, email, claims.hd):
             return Refuse("oidc.link_refused")
-        return Link(by_email.id) if by_email.active else Refuse("oidc.account_inactive")
+        return _usable(by_email) or Link(by_email.id)
     if not rules.allow_signup or not rules.allowed_domains:
         return Refuse("oidc.signup_closed")
     domain = domain_of(email)

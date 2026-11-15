@@ -20,6 +20,7 @@ from app.modules.oidc.models import ProviderKind
 ANNA = uuid.UUID(int=1)
 ACTIVE = ExistingUser(ANNA, active=True)
 INACTIVE = ExistingUser(ANNA, active=False)
+PENDING = ExistingUser(ANNA, active=False, pending=True)  # self-registered, not yet approved
 
 GOOGLE = ProviderRules(
     ProviderKind.GOOGLE, trust_email=False, allow_signup=False, allowed_domains=frozenset()
@@ -43,6 +44,23 @@ def claims(
 MATRIX = [
     ("known subject logs in", GOOGLE, claims(verified=False), ACTIVE, None, Login(ANNA)),
     ("known subject, inactive", GOOGLE, claims(), INACTIVE, None, Refuse("oidc.account_inactive")),
+    ("known subject, pending", GOOGLE, claims(), PENDING, None, Refuse("oidc.account_pending")),
+    (
+        "email pending account",
+        GOOGLE,
+        claims(hd="example.com"),
+        None,
+        PENDING,
+        Refuse("oidc.account_pending"),
+    ),
+    (
+        "untrusted email of a pending account refuses link",
+        GOOGLE,
+        claims(),
+        None,
+        PENDING,
+        Refuse("oidc.link_refused"),
+    ),
     ("google gmail links", GOOGLE, claims("anna@gmail.com"), None, ACTIVE, Link(ANNA)),
     ("google hd links", GOOGLE, claims(hd="example.com"), None, ACTIVE, Link(ANNA)),
     ("google without hd refuses link", GOOGLE, claims(), None, ACTIVE, Refuse("oidc.link_refused")),
