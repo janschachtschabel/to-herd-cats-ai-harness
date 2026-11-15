@@ -3,6 +3,7 @@ import { useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { AgentBadge } from '@/features/agents/AgentBadge'
+import { ExternalMark } from '@/features/agents/external/ExternalMark'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -130,6 +131,7 @@ export function DirectoryCombobox({
                 ) : (
                   <span className="sr-only">({t(`principals.${entry.type}`)})</span>
                 )}
+                {entry.kind === 'external' && <ExternalMark />}
               </li>
             ))}
           </ul>

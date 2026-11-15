@@ -5,7 +5,8 @@ import { AgentBadge } from './AgentBadge'
 import { useAgentProfile } from './queries'
 
 /** In the header of a direct message with an agent: the AI mark, the agent's short
- *  introduction and, if it is paused, that it will not answer now. */
+ *  introduction and, if it is paused, that it will not answer now; an external agent
+ *  (plan M8) never answers here by itself. */
 export function AgentHeaderNote({ agentId }: { agentId: string }) {
   const { t } = useTranslation()
   const me = useMe()
@@ -16,6 +17,9 @@ export function AgentHeaderNote({ agentId }: { agentId: string }) {
         <AgentBadge />
       </div>
       {profile.data?.intro && <p className="text-sm text-muted-foreground">{profile.data.intro}</p>}
+      {profile.data?.kind === 'external' && (
+        <p className="text-sm text-muted-foreground">{t('agents.external.header')}</p>
+      )}
       {profile.data?.status === 'paused' && (
         <p className="text-sm text-amber-800 dark:text-amber-300">{t('agents.header.paused')}</p>
       )}

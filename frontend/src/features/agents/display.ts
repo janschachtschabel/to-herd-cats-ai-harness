@@ -62,6 +62,7 @@ const NO_RUN_REASONS = [
   'run.handover_limit',
   'agent.not_found',
   'agent.personal_disabled',
+  'agent.external',
 ] as const
 
 /** Why sending started no run (`agent_run.reason`), in words. */

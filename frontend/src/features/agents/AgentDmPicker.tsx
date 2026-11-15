@@ -17,8 +17,9 @@ export function AgentDmPicker({ onDone }: { onDone: () => void }) {
   const open = useOpenAgentDm()
   const [agent, setAgent] = useState<DirectoryEntry | null>(null)
 
+  const external = agent?.kind === 'external'
   const submit = () => {
-    if (!agent) return
+    if (!agent || external) return
     open.mutate(agent.id, {
       onSuccess: (dm) => {
         onDone()
@@ -43,9 +44,18 @@ export function AgentDmPicker({ onDone }: { onDone: () => void }) {
           />
         )}
       </Field>
+      {agent && external && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('agents.external.noDm', { name: agent.name })}
+        </p>
+      )}
       <SaveError error={open.error} />
       <div className="flex justify-end">
-        <Button variant="secondary" onClick={submit} disabled={!agent || open.isPending}>
+        <Button
+          variant="secondary"
+          onClick={submit}
+          disabled={!agent || external || open.isPending}
+        >
           {t('agents.dm.open')}
         </Button>
       </div>

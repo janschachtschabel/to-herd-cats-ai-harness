@@ -26,7 +26,14 @@
         "title": "Token des Agenten",
         "hint": "Damit arbeitet der Agent von außen. Die Aufrufe eines Tokens zeigen, was er über MCP getan hat.",
         "empty": "{{name}} hat noch kein Token."
-      }
+      },
+      "mark": "extern",
+      "markTitle": "Externer Agent, antwortet nicht von selbst",
+      "noDm": "{{name}} arbeitet von außen über MCP und antwortet hier nicht von selbst. Weise ihm stattdessen ein Ticket zu.",
+      "header": "Ein externer Agent: Er arbeitet von außen über MCP und antwortet hier nicht von selbst."
+    },
+    "noRun": {
+      "agent_external": "Der Agent arbeitet von außen über MCP und antwortet hier nicht von selbst. Deine Nachricht ist gespeichert; weise ihm für eine Aufgabe ein Ticket zu."
     }
   }
 }

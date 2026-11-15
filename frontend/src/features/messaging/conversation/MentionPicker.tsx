@@ -1,6 +1,7 @@
 import { Bot, Loader2, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AgentBadge } from '@/features/agents/AgentBadge'
+import { ExternalMark } from '@/features/agents/external/ExternalMark'
 import type { DirectoryEntry } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import type { MentionCandidates } from './mentionCandidates'
@@ -46,6 +47,7 @@ export function MentionPicker({
             )}
             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
             {entry.type === 'agent' && <AgentBadge of="agent" />}
+            {entry.kind === 'external' && <ExternalMark />}
           </li>
         ))}
       </ul>
