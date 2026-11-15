@@ -18,7 +18,8 @@ The same logic answers `GET /authorize` with a redirect (for a browser in e2e).
 
 In tests: the `oauth_stub` fixture (`tests/factories_oauth.py`) runs it with TLS for
 `oauth.test` in a thread; as a process: `python -m tests.support.oauth_stub --port
-8099` (plain http) with `/_stub/log`, `/_stub/reset`, `/_stub/script`.
+8099` (plain http; with `--certfile`/`--keyfile` https, and `--name` for the host
+name its metadata names) with `/_stub/log`, `/_stub/reset`, `/_stub/script`.
 """
 
 import argparse
@@ -321,9 +322,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8099)
+    parser.add_argument("--certfile", help="serve https with this certificate (PEM)")
+    parser.add_argument("--keyfile", help="the certificate's key (PEM)")
+    parser.add_argument("--name", help="the host name clients use (default: --host)")
     args = parser.parse_args()
-    state = OAuthStubState(base=f"http://{args.host}:{args.port}")
-    uvicorn.run(build_app(state), host=args.host, port=args.port, log_level="warning")
+    scheme = "https" if args.certfile else "http"
+    state = OAuthStubState(base=f"{scheme}://{args.name or args.host}:{args.port}")
+    uvicorn.run(
+        build_app(state),
+        host=args.host,
+        port=args.port,
+        log_level="warning",
+        ssl_certfile=args.certfile,
+        ssl_keyfile=args.keyfile,
+    )
 
 
 if __name__ == "__main__":

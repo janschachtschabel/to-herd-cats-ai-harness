@@ -14,7 +14,8 @@ code ever logging it.
 
 In tests: the `mcp_stub` fixture (`tests/factories_mcp.py`) runs it with TLS for the
 name `mcp.test` in a thread; `url` is its endpoint. As a process (e2e):
-`python -m tests.support.mcp_stub --port 8098` (plain http, endpoint `/mcp`) with
+`python -m tests.support.mcp_stub --port 8098` (plain http, endpoint `/mcp`; with
+`--certfile`/`--keyfile` https, for the name the certificate holds) with
 control routes under `/_stub` (`GET /_stub/log`, `POST /_stub/reset`,
 `POST /_stub/script` with any of `tools`, `results`, `delay`, `redirect_to`,
 `failures`, `require_header`).
@@ -270,8 +271,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8098)
+    parser.add_argument("--certfile", help="serve https with this certificate (PEM)")
+    parser.add_argument("--keyfile", help="the certificate's key (PEM)")
+    parser.add_argument("--name", help="the host name clients use (default: --host)")
     args = parser.parse_args()
-    uvicorn.run(build_app(McpStubState()), host=args.host, port=args.port, log_level="warning")
+    uvicorn.run(
+        build_app(McpStubState()),
+        host=args.host,
+        port=args.port,
+        log_level="warning",
+        ssl_certfile=args.certfile,
+        ssl_keyfile=args.keyfile,
+    )
 
 
 if __name__ == "__main__":
