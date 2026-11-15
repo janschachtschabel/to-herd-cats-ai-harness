@@ -235,8 +235,9 @@ Entscheidung 1).
 - **Aktualisierung:** Die Bahnen kommen mit einer Migration (`event_lane`,
   `event_outbox.routed_at`). Ein Worker der Vorversion kennt keine Bahnen und stellt
   noch selbst zu; der Zustellnachweis verhindert doppelte Wirkungen, bis er ersetzt ist.
-  Die Spalten `event_outbox.attempts` und `next_attempt_at` liest nur noch die
-  Vorversion; sie fallen in einem späteren Release weg.
+  Die Spalten `event_outbox.attempts` und `next_attempt_at` der Vorversion sind mit M9
+  entfallen (Migration `5b8d2f6a9c13`, vor der ersten Freigabe); ein Worker von vor den
+  Bahnen darf gegen dieses Schema nicht mehr laufen.
 - **Ohne Worker** entstehen Nachrichten weiter, aber niemand bekommt sie live,
   Benachrichtigungen und Systemmeldungen bleiben aus; die Ereignisse warten und werden
   nachgeholt, sobald ein Worker läuft. Ein Browser sieht neue Nachrichten dann erst beim

@@ -68,6 +68,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app scripts
+      - name: Released migrations only expand (alembic/RELEASED)
+        run: uv run python -m scripts.check_migrations
       - run: uv run pytest -q
       - name: Catalogue entries (app/mcp/catalog)
         run: uv run python -m scripts.check_mcp_catalog

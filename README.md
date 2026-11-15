@@ -360,7 +360,7 @@ und braucht dafür CREATEDB für die Rolle `herd` (einmal als Superuser:
 
 ```bash
 cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . \
-  && uv run mypy app scripts
+  && uv run mypy app scripts && uv run python -m scripts.check_migrations
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build \
   && node scripts/check-i18n.mjs && npm run check:api
 cd collab && npm run lint && npm test && npm run test:integration   # Integration: echte API,
@@ -482,6 +482,12 @@ kennen.
   Version hat vorab migriert). Nicht bereit ist er ohne Revision oder bei einer
   bekannten älteren. Deshalb müssen Migrationen mit der vorherigen Version verträglich
   sein: erst erweitern, frühestens eine Version später zurückbauen.
+  `backend/alembic/RELEASED` nennt die Revision der letzten Freigabe (leer bis zum
+  ersten Tag; beim Taggen auf den Head setzen). `scripts/check_migrations.py` (CI-Job
+  `backend`) lehnt in jeder späteren Revision Löschen, Umbenennen und Typwechsel ab
+  (`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute`
+  mit `DROP`/`RENAME`), außer die Revision erklärt `contract_of = "<Revision>"` und
+  diese gehört schon zur Freigabe; außerdem genau ein Head.
 - **Alarm `HerdNotReady`** braucht kube-state-metrics (`kube_pod_status_ready`,
   `kube_pod_container_info`). Ohne kube-state-metrics feuert er nie.
 - **Port 9090** (`/health`, `/ready`, `/metrics`) hat keine Anmeldung; ihn schützt nur
