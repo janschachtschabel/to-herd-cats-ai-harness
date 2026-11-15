@@ -798,6 +798,64 @@ export interface paths {
         patch: operations["update_connector_api_ai_connectors__connector_id__patch"];
         trace?: never;
     };
+    "/api/ai/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mcp Settings */
+        get: operations["get_mcp_settings_api_ai_mcp_get"];
+        /**
+         * Set Mcp Settings
+         * @description The switch for `mcp.use` and the data location, with the version read (409).
+         */
+        put: operations["set_mcp_settings_api_ai_mcp_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Tokens
+         * @description Every token of the organisation, newest first: metadata only.
+         */
+        get: operations["list_all_tokens_api_ai_mcp_tokens_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Any Token */
+        delete: operations["revoke_any_token_api_ai_mcp_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/my-connectors": {
         parameters: {
             query?: never;
@@ -2912,6 +2970,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Tokens
+         * @description My tokens, newest first (revoked and expired ones too).
+         */
+        get: operations["list_my_tokens_api_tokens_get"];
+        put?: never;
+        /**
+         * Create Token
+         * @description A new token; `secret` is its clear text, shown this once.
+         */
+        post: operations["create_token_api_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke My Token */
+        delete: operations["revoke_my_token_api_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2939,7 +3038,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -3066,6 +3165,38 @@ export interface components {
             id: string;
             /** Space Id */
             space_id: string | null;
+        };
+        /**
+         * AdminTokenOut
+         * @description A token in the admins' list: its metadata and whose it is.
+         */
+        AdminTokenOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["TokenKind"];
+            /** Last Used At */
+            last_used_at: string | null;
+            mode: components["schemas"]["TokenMode"];
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Space Ids */
+            space_ids: string[] | null;
+            user: components["schemas"]["TokenUserOut"];
         };
         /**
          * AgentCreate
@@ -4743,6 +4874,26 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** McpSettingsIn */
+        McpSettingsIn: {
+            data_location: components["schemas"]["DataLocation"];
+            /** Enabled */
+            enabled: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * McpSettingsOut
+         * @description `enabled`: whether every active person but guests holds `mcp.use`.
+         *     `data_location`: what an MCP client counts as for the spaces' AI policy.
+         */
+        McpSettingsOut: {
+            data_location: components["schemas"]["DataLocation"];
+            /** Enabled */
+            enabled: boolean;
+            /** Version */
+            version: number;
+        };
         /**
          * MeOut
          * @description `permissions`: the system-wide actions the caller holds; clients decide what to
@@ -5257,6 +5408,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AdminTokenOut] */
+        Page_AdminTokenOut_: {
+            /** Items */
+            items: components["schemas"]["AdminTokenOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AgentOut] */
         Page_AgentOut_: {
             /** Items */
@@ -5485,6 +5643,13 @@ export interface components {
         Page_TicketSummaryOut_: {
             /** Items */
             items: components["schemas"]["TicketSummaryOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[TokenOut] */
+        Page_TokenOut_: {
+            /** Items */
+            items: components["schemas"]["TokenOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -7204,6 +7369,102 @@ export interface components {
             tokens_reached: boolean;
             /** Unpriced Calls */
             unpriced_calls: number;
+        };
+        /**
+         * TokenCreatedOut
+         * @description `secret`: the token's clear text, shown this once and stored nowhere.
+         */
+        TokenCreatedOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["TokenKind"];
+            /** Last Used At */
+            last_used_at: string | null;
+            mode: components["schemas"]["TokenMode"];
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Secret */
+            secret: string;
+            /** Space Ids */
+            space_ids: string[] | null;
+        };
+        /**
+         * TokenIn
+         * @description `space_ids`: the spaces the token may reach (each one the person reads, else
+         *     422 `token.space_invalid`); left out or null: all the person's spaces.
+         *     `expires_in_days`: required, 1 to 365.
+         */
+        TokenIn: {
+            /** Expires In Days */
+            expires_in_days: number;
+            mode: components["schemas"]["TokenMode"];
+            /** Name */
+            name: string;
+            /** Space Ids */
+            space_ids?: string[] | null;
+        };
+        /**
+         * TokenKind
+         * @enum {string}
+         */
+        TokenKind: "personal" | "agent";
+        /**
+         * TokenMode
+         * @enum {string}
+         */
+        TokenMode: "read" | "write";
+        /** TokenOut */
+        TokenOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["TokenKind"];
+            /** Last Used At */
+            last_used_at: string | null;
+            mode: components["schemas"]["TokenMode"];
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Space Ids */
+            space_ids: string[] | null;
+        };
+        /** TokenUserOut */
+        TokenUserOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /**
          * TrashedPageOut
@@ -9447,6 +9708,120 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConnectorOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mcp_settings_api_ai_mcp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpSettingsOut"];
+                };
+            };
+        };
+    };
+    set_mcp_settings_api_ai_mcp_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_tokens_api_ai_mcp_tokens_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AdminTokenOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_any_token_api_ai_mcp_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -14171,6 +14546,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConversationOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_tokens_api_tokens_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TokenOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_token_api_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_my_token_api_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

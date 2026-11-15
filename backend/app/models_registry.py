@@ -47,11 +47,14 @@ from app.modules.tickets.models import (
     TicketStatus,
     WorkItem,
 )
+from app.modules.tokens.models import AccessToken, McpSetting
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
+    "AccessToken",
+    "McpSetting",
     "Agent",
     "AgentMemory",
     "AgentSkill",

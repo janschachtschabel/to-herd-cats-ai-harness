@@ -40,6 +40,9 @@ ship without a decision on who may call it. Guards:
   `skill` (without AI: 404 `skill.not_found`).
 - `approval`, `question`: whoever may see the run (as `run`); everyone else gets 404
   `approval.not_found` or `question.not_found`, as for an unknown id (plan M6 task 7).
+- `token`: `mcp.use` (the organisation's MCP switch on; no guest); everyone else gets
+  404 `token.not_found`, as for an unknown id (plan M8 task 1). The admins' list of
+  every token and the MCP settings are `ai`.
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -192,6 +195,13 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/ai/assignments/users", "ai"),
     ("PUT", "/api/ai/assignments/users/{user_id}", "ai"),
     ("DELETE", "/api/ai/assignments/users/{user_id}", "ai"),
+    ("GET", "/api/ai/mcp", "ai"),
+    ("PUT", "/api/ai/mcp", "ai"),
+    ("GET", "/api/ai/mcp/tokens", "ai"),
+    ("DELETE", "/api/ai/mcp/tokens/{token_id}", "ai"),
+    ("GET", "/api/tokens", "token"),
+    ("POST", "/api/tokens", "token"),
+    ("DELETE", "/api/tokens/{token_id}", "token"),
     ("GET", "/api/ai/usage", "ai"),
     ("GET", "/api/ai/usage/me", "ai"),
     ("GET", "/api/ai/budgets", "ai"),
@@ -292,6 +302,7 @@ def concrete(
         "{status_id}": str(status_id or uuid7()),
         "{connection_id}": str(uuid7()),
         "{connector_id}": str(uuid7()),
+        "{token_id}": str(uuid7()),
         "{sprint_id}": str(sprint_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
@@ -371,6 +382,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/ai/my-connectors/{connector_id}"): {"name": "X", "version": 1},
     ("PUT", "/api/ai/assignments/default"): {"target": None, "version": 1},
     ("PUT", "/api/ai/assignments/personal-agents"): {"enabled": True, "version": 1},
+    ("PUT", "/api/ai/mcp"): {"enabled": True, "data_location": "eu", "version": 1},
+    ("POST", "/api/tokens"): {"name": "X", "mode": "read", "expires_in_days": 1},
     ("PUT", "/api/ai/assignments/groups"): {"items": [], "version": 1},
     ("PUT", "/api/ai/assignments/users/{user_id}"): {"no_ai": True, "version": None},
     ("PUT", "/api/ai/budgets/organisation"): {"tokens_per_day": 1, "version": None},

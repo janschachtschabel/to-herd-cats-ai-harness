@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     # How long a run waits for a release or an answer (hours, plan M6 task 7) before it
     # ends (`approval_expired`, `waiting_timeout`).
     ai_approval_hours: float = Field(default=72.0, gt=0, le=720)
+    # Calls one access token may make to `/mcp` per minute, counted in Postgres across
+    # every API node (plan M8 decision 6).
+    mcp_rate_per_minute: int = Field(default=120, ge=1, le=10_000)
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")

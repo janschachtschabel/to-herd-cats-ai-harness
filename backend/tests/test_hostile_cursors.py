@@ -77,6 +77,8 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/skill-proposals",
         "/api/runs",
         "/api/agents/{agent_id}/runs",
+        "/api/tokens",
+        "/api/ai/mcp/tokens",
     } <= set(endpoints)
 
 
@@ -95,6 +97,8 @@ async def test_hostile_cursors_answer_422_everywhere(
     name: str, owner: AsyncClient, group: Group, member: User
 ) -> None:
     space_id = (await owner.post("/api/spaces", json={"kind": "team", "name": "T"})).json()["id"]
+    mcp = {"enabled": True, "data_location": "external", "version": 1}
+    assert (await owner.put("/api/ai/mcp", json=mcp)).status_code == 200  # `/api/tokens`
     page = await owner.post(f"/api/spaces/{space_id}/pages", json={"title": "Seite"})
     channel = await owner.post(f"/api/spaces/{space_id}/channels", json={"name": "k"})
     message = await owner.post(

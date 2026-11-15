@@ -37,6 +37,9 @@ class Action(StrEnum):
     # Own personal agents (spec 8.1, plan M6 decision 13): derived, `ai.use` while the
     # organisation allows personal agents.
     AGENT_CREATE_PERSONAL = "agent.create_personal"
+    # Access tokens for `/mcp` (plan M8 decision 5): derived, every active person but
+    # guests while the organisation's switch is on.
+    MCP_USE = "mcp.use"
 
 
 class SpaceRole(StrEnum):
@@ -104,8 +107,11 @@ ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADM
 
 # System-wide actions no role grants: `access.can` derives them (`ai.use` from the
 # person's AI assignment, plan M5 decision 5; `agent.create_personal` from `ai.use`
-# and the organisation's switch, plan M6 decision 13).
-DERIVED_ACTIONS: frozenset[Action] = frozenset({Action.AI_USE, Action.AGENT_CREATE_PERSONAL})
+# and the organisation's switch, plan M6 decision 13; `mcp.use` from the
+# organisation's MCP switch, plan M8 decision 5).
+DERIVED_ACTIONS: frozenset[Action] = frozenset(
+    {Action.AI_USE, Action.AGENT_CREATE_PERSONAL, Action.MCP_USE}
+)
 
 # System-wide actions per system role.
 SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {

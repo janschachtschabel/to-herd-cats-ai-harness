@@ -51,6 +51,7 @@ from app.modules.tickets import router as tickets
 from app.modules.tickets import sprint_router as ticket_sprints
 from app.modules.tickets import status_router as ticket_statuses
 from app.modules.tickets import view_router as ticket_views
+from app.modules.tokens import router as tokens_router
 from app.modules.users.router import router as users_router
 from app.modules.wiki import router as wiki
 from app.modules.wiki.attachments_router import attachments, page_attachments
@@ -112,6 +113,8 @@ def api_router() -> APIRouter:
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
     api.include_router(ai_budgets.budgets)
+    api.include_router(tokens_router.mcp_admin)
+    api.include_router(tokens_router.tokens)
     api.include_router(agents_router.agents)
     api.include_router(run_router.agent_runs)
     api.include_router(run_router.runs)

@@ -1,7 +1,8 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
 a space, page, conversation, message, ticket status, ticket or sprint without a role
 answers 404 exactly like something that does not exist; so does a page proposal, a
-skill proposal one may not decide, and a skill for people without AI."""
+skill proposal one may not decide, a skill for people without AI, and one's access
+tokens without `mcp.use`."""
 
 from datetime import date
 
@@ -55,6 +56,24 @@ async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
                 response = await client.request(method, concrete(template), json=body)
                 assert response.status_code == 404, (method, template, response.text)
                 assert response.json()["error"]["code"] == codes[guard]
+
+
+async def test_token_routes_do_not_exist_without_mcp_use(
+    owner: AsyncClient, member_client: AsyncClient, guest_client: AsyncClient
+) -> None:
+    """The switch off: nobody's (admins neither); on: still not a guest's."""
+    for switched_on in (False, True):
+        if switched_on:
+            body = {"enabled": True, "data_location": "external", "version": 1}
+            assert (await owner.put("/api/ai/mcp", json=body)).status_code == 200
+        clients = (guest_client,) if switched_on else (owner, member_client, guest_client)
+        for client in clients:
+            for method, template, guard in ROUTES:
+                if guard == "token":
+                    body = BODIES.get((method, template), {})
+                    response = await client.request(method, concrete(template), json=body)
+                    assert response.status_code == 404, (method, template, response.text)
+                    assert response.json()["error"]["code"] == "token.not_found"
 
 
 async def test_skill_routes_do_not_exist_for_people_without_ai(

@@ -5,7 +5,9 @@ is no other place that decides who may do what.
 - System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`), except the
   derived ones (`DERIVED_ACTIONS`): `ai.use` holds whoever the AI assignment gives a
   usable connection (`modules/ai/effective.py`), `agent.create_personal` whoever has
-  `ai.use` while the organisation allows personal agents; no role grants either.
+  `ai.use` while the organisation allows personal agents, `mcp.use` every active
+  person but guests while the organisation's MCP switch is on
+  (`modules/tokens/standing.py`); no role grants any of them.
 - Inside a space the effective role decides: the highest of the actor's direct role
   and its groups' roles; in `open` spaces everyone but a guest is at least `viewer`.
 - A space the actor may not read does not exist for it: `require` answers 404 as for
@@ -57,6 +59,7 @@ from app.modules.audit.recorder import record_admin_access
 from app.modules.auth.context import AuthContext
 from app.modules.groups.repository import GroupRepository
 from app.modules.spaces.models import SpaceKind
+from app.modules.tokens.standing import holds_mcp_use
 
 # Spaces an admin may open without a membership, but not unnoticed.
 ADMIN_ACCESS_AUDITED_KINDS = frozenset({SpaceKind.TEAM, SpaceKind.PERSONAL})
@@ -168,9 +171,12 @@ async def require(
 async def _derived(session: AsyncSession, actor: Actor, action: Action) -> bool:
     """`ai.use`: a person whose assignment gives a usable connection (active, no
     guest: `effective.judge` reads both afresh). `agent.create_personal`: `ai.use`
-    while the organisation allows personal agents."""
+    while the organisation allows personal agents. `mcp.use`: the person as now and
+    the organisation's switch (no AI assignment needed)."""
     if actor.principal.type != PrincipalType.USER:
         return False
+    if action == Action.MCP_USE:
+        return await holds_mcp_use(session, actor.org_id, actor.principal.id)
     if await effective_assignment(session, actor.org_id, actor.principal.id) is None:
         return False
     if action == Action.AGENT_CREATE_PERSONAL:

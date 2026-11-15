@@ -67,7 +67,8 @@
           "agent.manage",
           "skill.manage",
           "ai.use",
-          "agent.create_personal"
+          "agent.create_personal",
+          "mcp.use"
         ],
         "title": "Action",
         "type": "string"
@@ -391,6 +392,92 @@
           "space_id"
         ],
         "title": "ActivitySkillProposal",
+        "type": "object"
+      },
+      "AdminTokenOut": {
+        "description": "A token in the admins' list: its metadata and whose it is.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TokenKind"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TokenMode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "space_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Ids"
+          },
+          "user": {
+            "$ref": "#/components/schemas/TokenUserOut"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "mode",
+          "space_ids",
+          "expires_at",
+          "last_used_at",
+          "revoked_at",
+          "created_at",
+          "user"
+        ],
+        "title": "AdminTokenOut",
         "type": "object"
       },
       "AgentCreate": {
@@ -4624,6 +4711,52 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "McpSettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "data_location",
+          "version"
+        ],
+        "title": "McpSettingsIn",
+        "type": "object"
+      },
+      "McpSettingsOut": {
+        "description": "`enabled`: whether every active person but guests holds `mcp.use`.\n`data_location`: what an MCP client counts as for the spaces' AI policy.",
+        "properties": {
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "data_location",
+          "version"
+        ],
+        "title": "McpSettingsOut",
+        "type": "object"
+      },
       "MeOut": {
         "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without.",
         "properties": {
@@ -5952,6 +6085,33 @@
         "title": "Page[ActivityOut]",
         "type": "object"
       },
+      "Page_AdminTokenOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTokenOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AdminTokenOut]",
+        "type": "object"
+      },
       "Page_AgentOut_": {
         "properties": {
           "items": {
@@ -6841,6 +7001,33 @@
           "items"
         ],
         "title": "Page[TicketSummaryOut]",
+        "type": "object"
+      },
+      "Page_TokenOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TokenOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TokenOut]",
         "type": "object"
       },
       "Page_TrashedPageOut_": {
@@ -11372,6 +11559,255 @@
         "title": "TodayOut",
         "type": "object"
       },
+      "TokenCreatedOut": {
+        "description": "`secret`: the token's clear text, shown this once and stored nowhere.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TokenKind"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TokenMode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "space_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Ids"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "mode",
+          "space_ids",
+          "expires_at",
+          "last_used_at",
+          "revoked_at",
+          "created_at",
+          "secret"
+        ],
+        "title": "TokenCreatedOut",
+        "type": "object"
+      },
+      "TokenIn": {
+        "additionalProperties": false,
+        "description": "`space_ids`: the spaces the token may reach (each one the person reads, else\n422 `token.space_invalid`); left out or null: all the person's spaces.\n`expires_in_days`: required, 1 to 365.",
+        "properties": {
+          "expires_in_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TokenMode"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "space_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Ids"
+          }
+        },
+        "required": [
+          "name",
+          "mode",
+          "expires_in_days"
+        ],
+        "title": "TokenIn",
+        "type": "object"
+      },
+      "TokenKind": {
+        "enum": [
+          "personal",
+          "agent"
+        ],
+        "title": "TokenKind",
+        "type": "string"
+      },
+      "TokenMode": {
+        "enum": [
+          "read",
+          "write"
+        ],
+        "title": "TokenMode",
+        "type": "string"
+      },
+      "TokenOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TokenKind"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TokenMode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "space_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Ids"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "mode",
+          "space_ids",
+          "expires_at",
+          "last_used_at",
+          "revoked_at",
+          "created_at"
+        ],
+        "title": "TokenOut",
+        "type": "object"
+      },
+      "TokenUserOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TokenUserOut",
+        "type": "object"
+      },
       "TrashedPageOut": {
         "description": "A page that went into the trash on its own or with the pages below it; `path`\nand `parent_id` are where it was.",
         "properties": {
@@ -15244,6 +15680,165 @@
         "summary": "Update Connector",
         "tags": [
           "connectors"
+        ]
+      }
+    },
+    "/api/ai/mcp": {
+      "get": {
+        "operationId": "get_mcp_settings_api_ai_mcp_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Mcp Settings",
+        "tags": [
+          "ai"
+        ]
+      },
+      "put": {
+        "description": "The switch for `mcp.use` and the data location, with the version read (409).",
+        "operationId": "set_mcp_settings_api_ai_mcp_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Settings",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/mcp/tokens": {
+      "get": {
+        "description": "Every token of the organisation, newest first: metadata only.",
+        "operationId": "list_all_tokens_api_ai_mcp_tokens_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdminTokenOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All Tokens",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/mcp/tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_any_token_api_ai_mcp_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Any Token",
+        "tags": [
+          "ai"
         ]
       }
     },
@@ -23725,6 +24320,144 @@
         "summary": "Get Ticket Thread",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/tokens": {
+      "get": {
+        "description": "My tokens, newest first (revoked and expired ones too).",
+        "operationId": "list_my_tokens_api_tokens_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TokenOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List My Tokens",
+        "tags": [
+          "tokens"
+        ]
+      },
+      "post": {
+        "description": "A new token; `secret` is its clear text, shown this once.",
+        "operationId": "create_token_api_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Token",
+        "tags": [
+          "tokens"
+        ]
+      }
+    },
+    "/api/tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_my_token_api_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke My Token",
+        "tags": [
+          "tokens"
         ]
       }
     }
