@@ -43,6 +43,7 @@ from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.models import Run, RunState
 from app.modules.agents.runs import RunService
+from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.proposals import rules
 from app.modules.wiki import diffing
@@ -106,9 +107,11 @@ class ApprovalService:
             raise Forbidden(code="approval.not_addressed")
         approval = shown.row
         spec = CATALOG.get(approval.tool)
-        if spec is None:
+        if spec is None and not external.is_external(approval.tool):
             raise Forbidden(code="approval.not_permitted")
-        if (action := await spec.needs(self.session, actor, approval.args)) is not None:
+        # An external tool's call changes nothing here: the person asked decides alone.
+        action = await spec.needs(self.session, actor, approval.args) if spec else None
+        if action is not None:
             for subject in approval.subjects:
                 space_id = subject.get("space_id")
                 if space_id and not await can(self.session, actor, action, uuid.UUID(space_id)):

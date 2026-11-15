@@ -18,6 +18,14 @@ from app.modules.agents.approvals.models import (
 from app.modules.agents.approvals.service import PAGE_TOOLS, Shown
 
 
+class ApprovalExternalOut(BaseModel):
+    """The external MCP server and tool an approval's call goes to (plan M8 decision
+    8); their names are in `summary` ("<server> · <tool>")."""
+
+    server_id: uuid.UUID
+    tool_id: uuid.UUID
+
+
 class ApprovalOut(BaseModel):
     """A tool call waiting for (or given) a person's release. `summary`: the tool and
     the ids the call names. `args`: the call's arguments, only for the person asked
@@ -28,7 +36,8 @@ class ApprovalOut(BaseModel):
     `stale` (what it would change had changed, so nothing ran); null before.
     `reason`: the person's reason for a rejection, and `args`, only for the person
     asked; for everyone else both are null and `redacted` is true (as in the run
-    view, review M6 finding 6)."""
+    view, review M6 finding 6). `external`: for a call of an external tool (it sends
+    `args` to that server once released), else null."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -47,6 +56,7 @@ class ApprovalOut(BaseModel):
     decided_at: datetime | None
     reason: str | None
     redacted: bool
+    external: ApprovalExternalOut | None
     expires_at: datetime
     created_at: datetime
     version: int
@@ -73,10 +83,18 @@ class ApprovalOut(BaseModel):
             decided_at=a.decided_at,
             reason=a.reason if shown.addressed else None,
             redacted=not shown.addressed,
+            external=_external(a.subjects),
             expires_at=a.expires_at,
             created_at=a.created_at,
             version=a.version,
         )
+
+
+def _external(subjects: list[dict[str, Any]]) -> ApprovalExternalOut | None:
+    ids = {s.get("kind"): s.get("id") for s in subjects}
+    if "mcp_server" not in ids or "mcp_tool" not in ids:
+        return None
+    return ApprovalExternalOut(server_id=ids["mcp_server"], tool_id=ids["mcp_tool"])
 
 
 class ApprovalDecide(BaseModel):

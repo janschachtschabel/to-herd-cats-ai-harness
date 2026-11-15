@@ -3618,6 +3618,30 @@ export interface components {
             status?: components["schemas"]["AgentStatus"];
         };
         /**
+         * AgentExternalToolOut
+         * @description What an external tool is (plan M8 decision 8): its server and its name there;
+         *     `usable`: approved, unchanged and on an enabled server (else a run never gets it,
+         *     whatever the entry says).
+         */
+        AgentExternalToolOut: {
+            /**
+             * Server Id
+             * Format: uuid
+             */
+            server_id: string;
+            /** Server Name */
+            server_name: string;
+            /**
+             * Tool Id
+             * Format: uuid
+             */
+            tool_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Usable */
+            usable: boolean;
+        };
+        /**
          * AgentOut
          * @description An agent as those who manage it see it (`agent.manage`; a personal agent's
          *     owner); `responsible_name`: the responsible person's name; `owner_user_id`: a
@@ -3796,15 +3820,18 @@ export interface components {
         };
         /**
          * AgentToolOut
-         * @description One tool of the catalog for this agent: its own `level` (the lowest that allows
-         *     it) and `effect`; `default` (from the agent's level), `entry` (the agent's, or
-         *     null) and `effective` (the stricter of both; what a run gets).
+         * @description One tool for this agent: its own `level` (the lowest that allows it) and
+         *     `effect`; `default` (from the agent's level; an external tool's is `block`: it
+         *     needs an entry), `entry` (the agent's, or null) and `effective` (what a run gets).
+         *     `external`: set for an external MCP server's tool (name `ext_…`; a write tool is
+         *     level 4 and at most `confirm`), null for the catalog's.
          */
         AgentToolOut: {
             default: components["schemas"]["Grant"];
             effect: components["schemas"]["Effect"];
             effective: components["schemas"]["Grant"];
             entry: components["schemas"]["Grant"] | null;
+            external?: components["schemas"]["AgentExternalToolOut"] | null;
             /** Level */
             level: number;
             /** Name */
@@ -3813,8 +3840,10 @@ export interface components {
         /**
          * AgentToolsOut
          * @description An agent's tool grants: every tool of the catalog (a fixed, short list, so not
-         *     paged). `version`: the agent's. `max_level`: the highest level the caller may give
-         *     the agent (above 2: admins only).
+         *     paged), then the organisation's usable external tools and those with an entry
+         *     (approved ones only, so the list stays short). `version`: the agent's.
+         *     `max_level`: the highest level the caller may give the agent (above 2: admins
+         *     only).
          */
         AgentToolsOut: {
             /**
@@ -3909,6 +3938,23 @@ export interface components {
             version: number;
         };
         /**
+         * ApprovalExternalOut
+         * @description The external MCP server and tool an approval's call goes to (plan M8 decision
+         *     8); their names are in `summary` ("<server> · <tool>").
+         */
+        ApprovalExternalOut: {
+            /**
+             * Server Id
+             * Format: uuid
+             */
+            server_id: string;
+            /**
+             * Tool Id
+             * Format: uuid
+             */
+            tool_id: string;
+        };
+        /**
          * ApprovalOut
          * @description A tool call waiting for (or given) a person's release. `summary`: the tool and
          *     the ids the call names. `args`: the call's arguments, only for the person asked
@@ -3919,7 +3965,8 @@ export interface components {
          *     `stale` (what it would change had changed, so nothing ran); null before.
          *     `reason`: the person's reason for a rejection, and `args`, only for the person
          *     asked; for everyone else both are null and `redacted` is true (as in the run
-         *     view, review M6 finding 6).
+         *     view, review M6 finding 6). `external`: for a call of an external tool (it sends
+         *     `args` to that server once released), else null.
          */
         ApprovalOut: {
             /**
@@ -3954,6 +4001,7 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+            external: components["schemas"]["ApprovalExternalOut"] | null;
             /**
              * Id
              * Format: uuid

@@ -127,10 +127,24 @@ class AgentOut(BaseModel):
         )
 
 
+class AgentExternalToolOut(BaseModel):
+    """What an external tool is (plan M8 decision 8): its server and its name there;
+    `usable`: approved, unchanged and on an enabled server (else a run never gets it,
+    whatever the entry says)."""
+
+    server_id: uuid.UUID
+    server_name: str
+    tool_id: uuid.UUID
+    tool_name: str
+    usable: bool
+
+
 class AgentToolOut(BaseModel):
-    """One tool of the catalog for this agent: its own `level` (the lowest that allows
-    it) and `effect`; `default` (from the agent's level), `entry` (the agent's, or
-    null) and `effective` (the stricter of both; what a run gets)."""
+    """One tool for this agent: its own `level` (the lowest that allows it) and
+    `effect`; `default` (from the agent's level; an external tool's is `block`: it
+    needs an entry), `entry` (the agent's, or null) and `effective` (what a run gets).
+    `external`: set for an external MCP server's tool (name `ext_…`; a write tool is
+    level 4 and at most `confirm`), null for the catalog's."""
 
     name: str
     level: int
@@ -138,12 +152,15 @@ class AgentToolOut(BaseModel):
     default: Grant
     entry: Grant | None
     effective: Grant
+    external: AgentExternalToolOut | None = None
 
 
 class AgentToolsOut(BaseModel):
     """An agent's tool grants: every tool of the catalog (a fixed, short list, so not
-    paged). `version`: the agent's. `max_level`: the highest level the caller may give
-    the agent (above 2: admins only)."""
+    paged), then the organisation's usable external tools and those with an entry
+    (approved ones only, so the list stays short). `version`: the agent's.
+    `max_level`: the highest level the caller may give the agent (above 2: admins
+    only)."""
 
     agent_id: uuid.UUID
     level: int
@@ -166,6 +183,17 @@ class AgentToolsOut(BaseModel):
                     default=t.default,
                     entry=t.entry,
                     effective=t.effective,
+                    external=(
+                        AgentExternalToolOut(
+                            server_id=t.external.server_id,
+                            server_name=t.external.server_name,
+                            tool_id=t.external.tool_id,
+                            tool_name=t.external.tool_name,
+                            usable=t.external.usable,
+                        )
+                        if t.external
+                        else None
+                    ),
                 )
                 for t in shown.tools
             ],

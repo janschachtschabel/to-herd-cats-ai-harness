@@ -5,7 +5,15 @@ entries at once, with the agent's `version` (409 `agent.version_conflict`); a na
 catalog does not list is refused (422 `agent.tool_unknown`). Holders of
 `agent.manage` only (404 `agent.not_found` else); every change is audited.
 `max_level`: the highest level the caller may give the agent (`may_grant_level`), so
-a level they may not give is never offered (a personal agent's: 2)."""
+a level they may not give is never offered (a personal agent's: 2).
+
+External tools (plan M8 decision 8, `toolbox/external.py`) follow the catalog: every
+usable one of the organisation (approved and unchanged, on an enabled server), and
+every other one the agent has an entry for (its `effective` is then `block` and
+`usable` false, so the entry is kept but nothing is offered). An external tool is
+offered only with an entry (its `default` is `block`); a write tool needs level 4 and
+is at most `confirm`. Entries name an external tool by its `ext_…` name; a name that
+is no tool of the organisation is refused like an unknown one."""
 
 import uuid
 from dataclasses import dataclass
@@ -17,7 +25,9 @@ from app.core.errors import ValidationFailed
 from app.modules.agents.models import MAX_LEVEL, Agent
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.service import AgentService
+from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.catalog import CATALOG
+from app.modules.agents.toolbox.external import every_external
 from app.modules.agents.toolbox.policy import (
     FREE_LEVEL,
     Grant,
@@ -29,6 +39,15 @@ from app.modules.audit.recorder import record
 
 
 @dataclass(frozen=True, slots=True)
+class ExternalOf:
+    server_id: uuid.UUID
+    server_name: str
+    tool_id: uuid.UUID
+    tool_name: str
+    usable: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ToolGrant:
     name: str
     level: int
@@ -36,6 +55,7 @@ class ToolGrant:
     default: Grant
     entry: Grant | None
     effective: Grant
+    external: ExternalOf | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +78,8 @@ class GrantService:
         self, actor: Actor, agent_id: uuid.UUID, entries: dict[str, Grant], version: int
     ) -> AgentTools:
         await self.agents.get(actor, agent_id)  # 404 for those who do not manage agents
-        unknown = sorted(set(entries) - set(CATALOG))
+        externals = {spec.name for spec, _ in await every_external(self.session, actor.org_id)}
+        unknown = sorted(set(entries) - set(CATALOG) - externals)
         if unknown:
             raise ValidationFailed(code="agent.tool_unknown", details={"tools": unknown})
         agent = await self.agents.current(actor, agent_id, version)
@@ -72,22 +93,35 @@ class GrantService:
 
     async def _shown(self, actor: Actor, agent: Agent) -> AgentTools:
         stored = await AgentRepository(self.session, actor.org_id).tool_entries(agent.id)
-        tools = []
-        for spec in CATALOG.values():
-            entry = Grant(stored[spec.name]) if spec.name in stored else None
-            tools.append(
-                ToolGrant(
-                    spec.name,
-                    spec.level,
-                    spec.effect.value,
-                    default_grant(agent.level, spec),
-                    entry,
-                    effective(agent.level, spec, entry),
-                )
-            )
+        tools = [_grant(agent, spec, stored, None) for spec in CATALOG.values()]
+        for spec, usable in await every_external(self.session, actor.org_id):
+            if usable or spec.name in stored:
+                tools.append(_grant(agent, spec, stored, usable))
         return AgentTools(agent, tools, self.max_level(actor, agent))
 
     def max_level(self, actor: Actor, agent: Agent) -> int:
         if agent.owner_user_id is not None:  # personal agents stay at 2 (`personal.py`)
             return FREE_LEVEL
         return MAX_LEVEL if may_grant_level(actor, MAX_LEVEL) else FREE_LEVEL
+
+
+def _grant(agent: Agent, spec: ToolSpec, stored: dict[str, str], usable: bool | None) -> ToolGrant:
+    """`usable`: None for the catalog's tools; for an external one, whether a run may
+    call it now (else it counts as `block`)."""
+    entry = Grant(stored[spec.name]) if spec.name in stored else None
+    grant = effective(agent.level, spec, entry) if usable is not False else Grant.BLOCK
+    remote = spec.remote
+    of = None
+    if remote is not None:
+        of = ExternalOf(
+            remote.server_id, remote.server_name, remote.tool_id, remote.tool_name, bool(usable)
+        )
+    return ToolGrant(
+        spec.name,
+        spec.level,
+        spec.effect.value,
+        default_grant(agent.level, spec),
+        entry,
+        grant,
+        of,
+    )

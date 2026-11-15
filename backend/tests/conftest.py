@@ -42,6 +42,7 @@ from tests.factories_ai import (  # noqa: E402, F401
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_connectors import ai_people, secret_key  # noqa: E402, F401
 from tests.factories_dms import people  # noqa: E402, F401
+from tests.factories_external import ext  # noqa: E402, F401
 from tests.factories_groups import group, group_with_member, make_group  # noqa: E402, F401
 from tests.factories_mcp import _mcp_stub, mcp_egress, mcp_stub  # noqa: E402, F401
 from tests.factories_mcp_endpoint import connect, mcp_app, mcp_http  # noqa: E402, F401

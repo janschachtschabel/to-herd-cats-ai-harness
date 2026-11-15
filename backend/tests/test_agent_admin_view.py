@@ -16,10 +16,10 @@ from tests.test_access import actor_of
 AGENTS = "/api/agents"
 
 
-async def test_an_admin_may_give_level_three(bench: Bench) -> None:
+async def test_an_admin_may_give_level_four(bench: Bench) -> None:
     r = await bench.people.admin.get(f"{AGENTS}/{bench.agent.id}/tools")
     assert r.status_code == 200, r.text
-    assert r.json()["max_level"] == 3
+    assert r.json()["max_level"] == 4  # acting outside (plan M8 decision 8)
 
 
 async def test_max_level_follows_the_level_rule(
@@ -35,7 +35,7 @@ async def test_max_level_follows_the_level_rule(
     grants = GrantService(session)
     await bench.join(a)
     assert grants.max_level(leader, bench.agent) == 2
-    assert grants.max_level(admin, bench.agent) == 3
+    assert grants.max_level(admin, bench.agent) == 4
 
 
 async def test_the_spaces_of_an_agent(bench: Bench, make_space: MakeSpace) -> None:

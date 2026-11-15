@@ -1,7 +1,8 @@
 """The checks a run's step makes before it calls the model or a tool (`step_host.py`
 drives them): the run is still this take-up's and not asked to stop, the tool still
 granted, the person and the agent still allowed together, the policy of everything
-read still met, the daily budgets not reached, the connection still there."""
+read still met (for the model's connection, or an external tool's server), the daily
+budgets not reached, the connection still there."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,11 +76,20 @@ async def run_actor_now(session: AsyncSession, run: Working, agent: Agent) -> Ac
 async def check_policy(session: AsyncSession, run: Working, location: DataLocation) -> None:
     """The strictest current policy of every space read from, where it was read
     and where its page or ticket is now."""
+    if not await policy_allows(session, run, location):
+        raise Halt("policy_blocked")
+
+
+async def policy_allows(session: AsyncSession, run: Working, location: DataLocation) -> bool:
+    """Whether what the run read may go to `location` now (an external tool's server,
+    plan M8 decision 8); a page read since locked for AI, trashed or deleted, or a
+    ticket deleted, ends the run (`policy_blocked`) as before a model call."""
     repo = ReadRepository(session, run.claimed.org_id)
     now = await repo.now(run.reads)
-    policy = strictest([ANY, *await repo.policies(run.reads.spaces | now.spaces)])
-    if now.blocked or not connection_allowed(location, policy):
+    if now.blocked:
         raise Halt("policy_blocked")
+    policy = strictest([ANY, *await repo.policies(run.reads.spaces | now.spaces)])
+    return connection_allowed(location, policy)
 
 
 async def exhausted(

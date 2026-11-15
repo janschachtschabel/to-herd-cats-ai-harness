@@ -511,7 +511,7 @@
           "level": {
             "default": 2,
             "description": "autonomy level (spec 8.2); above 2: admins",
-            "maximum": 3.0,
+            "maximum": 4.0,
             "minimum": 1.0,
             "title": "Level",
             "type": "integer"
@@ -577,6 +577,42 @@
           "name"
         ],
         "title": "AgentCreate",
+        "type": "object"
+      },
+      "AgentExternalToolOut": {
+        "description": "What an external tool is (plan M8 decision 8): its server and its name there;\n`usable`: approved, unchanged and on an enabled server (else a run never gets it,\nwhatever the entry says).",
+        "properties": {
+          "server_id": {
+            "format": "uuid",
+            "title": "Server Id",
+            "type": "string"
+          },
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "tool_id": {
+            "format": "uuid",
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "server_id",
+          "server_name",
+          "tool_id",
+          "tool_name",
+          "usable"
+        ],
+        "title": "AgentExternalToolOut",
         "type": "object"
       },
       "AgentOut": {
@@ -954,7 +990,7 @@
         "type": "object"
       },
       "AgentToolOut": {
-        "description": "One tool of the catalog for this agent: its own `level` (the lowest that allows\nit) and `effect`; `default` (from the agent's level), `entry` (the agent's, or\nnull) and `effective` (the stricter of both; what a run gets).",
+        "description": "One tool for this agent: its own `level` (the lowest that allows it) and\n`effect`; `default` (from the agent's level; an external tool's is `block`: it\nneeds an entry), `entry` (the agent's, or null) and `effective` (what a run gets).\n`external`: set for an external MCP server's tool (name `ext_\u2026`; a write tool is\nlevel 4 and at most `confirm`), null for the catalog's.",
         "properties": {
           "default": {
             "$ref": "#/components/schemas/Grant"
@@ -969,6 +1005,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Grant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "external": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentExternalToolOut"
               },
               {
                 "type": "null"
@@ -996,7 +1042,7 @@
         "type": "object"
       },
       "AgentToolsOut": {
-        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged). `version`: the agent's. `max_level`: the highest level the caller may give\nthe agent (above 2: admins only).",
+        "description": "An agent's tool grants: every tool of the catalog (a fixed, short list, so not\npaged), then the organisation's usable external tools and those with an entry\n(approved ones only, so the list stays short). `version`: the agent's.\n`max_level`: the highest level the caller may give the agent (above 2: admins\nonly).",
         "properties": {
           "agent_id": {
             "format": "uuid",
@@ -1101,7 +1147,7 @@
             "anyOf": [
               {
                 "description": "autonomy level (spec 8.2); above 2: admins",
-                "maximum": 3.0,
+                "maximum": 4.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -1273,8 +1319,29 @@
         "title": "ApprovalDecide",
         "type": "object"
       },
+      "ApprovalExternalOut": {
+        "description": "The external MCP server and tool an approval's call goes to (plan M8 decision\n8); their names are in `summary` (\"<server> \u00b7 <tool>\").",
+        "properties": {
+          "server_id": {
+            "format": "uuid",
+            "title": "Server Id",
+            "type": "string"
+          },
+          "tool_id": {
+            "format": "uuid",
+            "title": "Tool Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_id",
+          "tool_id"
+        ],
+        "title": "ApprovalExternalOut",
+        "type": "object"
+      },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6).",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nthe ids the call names. `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6). `external`: for a call of an external tool (it sends\n`args` to that server once released), else null.",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1346,6 +1413,16 @@
             "format": "date-time",
             "title": "Expires At",
             "type": "string"
+          },
+          "external": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalExternalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "format": "uuid",
@@ -1432,6 +1509,7 @@
           "decided_at",
           "reason",
           "redacted",
+          "external",
           "expires_at",
           "created_at",
           "version"

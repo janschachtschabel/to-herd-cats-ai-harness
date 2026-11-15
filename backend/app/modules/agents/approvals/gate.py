@@ -26,7 +26,10 @@ calls it, the host asks the gate first, in the call's transaction (`step_host.py
 
 The fingerprint: SHA-256 over the tool's name, the arguments as canonical JSON (keys
 sorted) and each object's kind, id, version and space. Objects without a version
-(a space, a conversation) count by their id and space.
+(a space, a conversation) count by their id and space. An external tool's call
+(plan M8 decision 8) names its server and its tool with their versions: a server or
+a tool that changed since the release makes it stale; its card names the server and
+the tool, never an argument (`toolbox/external.py`).
 """
 
 import hashlib
@@ -43,6 +46,7 @@ from app.core.principal import Principal
 from app.modules.agents.approvals import cards
 from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
+from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.base import CallRef, RunRef, Subject, ToolContext, ToolSpec, Wait
 from app.modules.messaging.models import MessageKind
 from app.runtime.loop import Halt, ToolResult
@@ -158,7 +162,9 @@ async def _ask(
             args=canonical,
             subjects=[_subject(s) for s in subjects],
             fingerprint=fingerprint(spec.name, canonical, subjects),
-            summary=cards.summary(spec.name, canonical),
+            summary=external.summary(spec.remote)
+            if spec.remote
+            else cards.summary(spec.name, canonical),
             state=ApprovalState.PENDING,
             addressed_to=ctx.run.user_id,
             expires_at=cards.until(),

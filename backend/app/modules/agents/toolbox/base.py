@@ -132,8 +132,23 @@ ActionOf = Callable[[AsyncSession, Actor, dict[str, Any]], Awaitable[Action]]
 
 
 @dataclass(frozen=True, slots=True)
+class RemoteTool:
+    """An external MCP server's tool behind a spec (plan M8 decision 8; ids and names
+    only): the host calls it outside the step's transaction (`agents/external_step.py`)."""
+
+    server_id: uuid.UUID
+    tool_id: uuid.UUID
+    server_name: str
+    tool_name: str  # as the server names it
+    writes: bool  # classified `write` by an admin: level 4, always a person's release
+
+
+@dataclass(frozen=True, slots=True)
 class ToolSpec:
-    """`level`: the lowest autonomy level (1 to 3) whose default allows the tool."""
+    """`level`: the lowest autonomy level (1 to 4) whose default allows the tool.
+    `floor`: the loosest grant it can ever have (an external write tool: `confirm`).
+    `explicit`: offered only to an agent with an entry for it (external tools).
+    `remote`: an external tool (`run` is never called for it)."""
 
     name: str
     description: str
@@ -144,6 +159,9 @@ class ToolSpec:
     subjects: Subjects | None = None  # None: the call changes no object (release: args)
     action: Action | None = None  # what the releasing person must be able to do there
     action_of: ActionOf | None = None  # instead of `action`, where the call decides it
+    floor: Grant = Grant.ALLOW
+    explicit: bool = False
+    remote: RemoteTool | None = None
 
     async def needs(
         self, session: AsyncSession, actor: Actor, args: dict[str, Any]

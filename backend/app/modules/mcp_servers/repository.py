@@ -134,6 +134,25 @@ class ToolRepository:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         return await self.session.scalar(stmt)
 
+    async def of_org(self, *, usable_only: bool) -> list[tuple[McpServerTool, McpServer]]:
+        """The organisation's tools with their servers, by server and tool name. With
+        `usable_only`: only those a run may call now (approved, listed as approved,
+        still listed, on an enabled server)."""
+        stmt = (
+            select(McpServerTool, McpServer)
+            .join(McpServer, McpServer.id == McpServerTool.server_id)
+            .where(McpServerTool.org_id == self.org_id, McpServer.org_id == self.org_id)
+            .order_by(McpServer.name, McpServerTool.name)
+        )
+        if usable_only:
+            stmt = stmt.where(
+                McpServer.enabled.is_(True),
+                McpServerTool.state == ToolState.APPROVED,
+                McpServerTool.fingerprint == McpServerTool.approved_fingerprint,
+                McpServerTool.missing.is_(False),
+            )
+        return [(tool, server) for tool, server in (await self.session.execute(stmt)).all()]
+
     async def withdraw_approvals(self, server_id: uuid.UUID) -> None:
         """The server moved: what was approved there needs approval again, and no
         listing brings an old approval back."""

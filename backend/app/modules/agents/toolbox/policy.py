@@ -1,7 +1,11 @@
 """How an agent may use each tool (plan M6 decision 2, spec 8.1 and 8.2).
 
-- The agent's autonomy level (1 to 3 in M6; 4 comes with external tools, M8) sets the
-  default per tool: `allow` from the tool's level up, `block` below it.
+- The agent's autonomy level (1 to 4) sets the default per tool: `allow` from the
+  tool's level up, `block` below it. Level 4 (acting outside, plan M8 decision 8) adds
+  the external write tools, which are never looser than `confirm` (`ToolSpec.floor`).
+- External tools (`ToolSpec.explicit`) are offered only to an agent with an entry for
+  each: without one they are `block`; with one, the stricter of the entry and what
+  the level allows (an external read tool is level 2, a write tool level 4).
 - Entries per agent and tool (`agent_tool`) can only tighten: the effective grant is
   the stricter of the default and the entry. An entry can never open a tool the level
   blocks, nor a tool the catalog does not list (those are never offered at all).
@@ -39,15 +43,21 @@ FREE_LEVEL = 2  # up to this level anyone who may change the agent sets it
 UNWATCHED_LEVEL = 3  # from this level a tool writes directly (spec 8.2)
 
 
+def ceiling(level: int, spec: ToolSpec) -> Grant:
+    """The loosest grant the level allows for the tool."""
+    return spec.floor if level >= spec.level else Grant.BLOCK
+
+
 def default_grant(level: int, spec: ToolSpec) -> Grant:
-    return Grant.ALLOW if level >= spec.level else Grant.BLOCK
+    """The grant without an entry (an external tool: none)."""
+    return Grant.BLOCK if spec.explicit else ceiling(level, spec)
 
 
 def effective(level: int, spec: ToolSpec, entry: Grant | None) -> Grant:
-    grant = default_grant(level, spec)
-    if entry is not None and entry.strictness > grant.strictness:
-        return entry
-    return grant
+    if entry is None:
+        return default_grant(level, spec)
+    grant = ceiling(level, spec)
+    return entry if entry.strictness > grant.strictness else grant
 
 
 def watched(grant: Grant, spec: ToolSpec, *, event_rule: bool) -> Grant:

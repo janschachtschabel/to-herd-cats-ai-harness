@@ -80,7 +80,7 @@ def test_every_tool_has_a_level_and_an_effect() -> None:
         assert (CATALOG[name].level, CATALOG[name].effect) == (1, Effect.READ)
 
 
-async def test_a_new_agent_is_level_two_and_level_four_is_not_offered(bench: Bench) -> None:
+async def test_a_new_agent_is_level_two_and_level_five_is_not_offered(bench: Bench) -> None:
     body = {
         "name": "Bea",
         "connection_id": str(bench.connection.id),
@@ -91,10 +91,10 @@ async def test_a_new_agent_is_level_two_and_level_four_is_not_offered(bench: Ben
     assert created.status_code == 201 and created.json()["level"] == 2
     agent = created.json()
     url = f"{AGENTS}/{agent['id']}"
+    five = await bench.people.admin.patch(url, json={"level": 5, "version": 1})
+    assert five.status_code == 422
     four = await bench.people.admin.patch(url, json={"level": 4, "version": 1})
-    assert four.status_code == 422
-    three = await bench.people.admin.patch(url, json={"level": 3, "version": 1})
-    assert three.status_code == 200 and three.json()["level"] == 3
+    assert four.status_code == 200 and four.json()["level"] == 4
 
 
 async def test_the_tools_of_an_agent(bench: Bench) -> None:
@@ -112,6 +112,7 @@ async def test_the_tools_of_an_agent(bench: Bench) -> None:
         "default": "allow",
         "entry": None,
         "effective": "allow",
+        "external": None,
     }
     put = {"tools": [{"tool": "read_page", "policy": "block"}], "version": body["version"]}
     changed = await bench.people.admin.put(url, json=put)

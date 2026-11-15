@@ -10,7 +10,8 @@ that writes commits its effect together with its entry in the journal
 (`toolbox/base.py`). A tool that must wait for a person sets the run `waiting` in that
 transaction instead, and the host raises `Suspended` once it is committed. A tool the
 agent may use only with a person's release (`confirm`) passes `approvals/gate.py`
-first, in the same transaction.
+first, in the same transaction. An external MCP server's tool (`ToolSpec.remote`)
+runs in two transactions around the remote call instead (`external_step.py`).
 
 Bounds (module review M6, findings 3 and 14; review 2, finding 8):
 - Every step (the checks before a model call, the record after it, a tool's step,
@@ -43,6 +44,7 @@ from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
 from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.executor_repository import RunSteps
+from app.modules.agents.external_step import call_external
 from app.modules.agents.models import (
     STEP_LOCK_TIMEOUT_SECONDS,
     STEP_STATEMENT_TIMEOUT_SECONDS,
@@ -134,7 +136,7 @@ class RunHost:
             content = reply_content(step, reply)
             if usage.cost is not None:
                 content["cost"] = str(usage.cost)  # the run view shows it per step
-            await steps.event(self._seq(), EventKind.MODEL_CALL, content)
+            await steps.event(self.next_seq(), EventKind.MODEL_CALL, content)
             run.steps += 1
             claimed = self.run.claimed
             in_place = claimed.automation_id is None or await automation_runs.heard_in_place(
@@ -152,7 +154,11 @@ class RunHost:
             raise Halt("deadline")
         try:
             async with asyncio.timeout(left + CUT_GRACE_SECONDS):
-                result = await once_more(self.run, lambda: self._tool_step(step, call, args, spec))
+                result = await (
+                    call_external(self, step, call, args, spec)
+                    if spec.remote is not None
+                    else once_more(self.run, lambda: self._tool_step(step, call, args, spec))
+                )
         except (Lost, Halt):
             raise
         except TimeoutError as exc:  # anything but the database, past the deadline
@@ -178,7 +184,7 @@ class RunHost:
             location = await location_of(steps, self.run)
             reads = self.run.reads
             pages, tickets, drafts = set(reads.pages), set(reads.tickets), set(reads.drafts)
-            ctx = ToolContext(session, actor, location, reads, self._ref(), CallRef(step, call.id))
+            ctx = ToolContext(session, actor, location, reads, self.ref(), CallRef(step, call.id))
             started = time.perf_counter()
             with caused_by(run.id):  # what the tool emits names the run (plan M7)
                 held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
@@ -191,7 +197,7 @@ class RunHost:
             reads.drafts |= await repo.draft_spaces(reads.pages - pages)  # as read
             read = (reads.pages - pages, reads.tickets - tickets, reads.drafts - drafts)
             content = tool_content(step, call, args, result, duration_ms, read)
-            await steps.event(self._seq(), EventKind.TOOL_CALL, content)
+            await steps.event(self.next_seq(), EventKind.TOOL_CALL, content)
             steps.keep(run)
             return result
 
@@ -201,9 +207,9 @@ class RunHost:
         result = ToolResult(TIMED_OUT_SOURCE, TOOL_TIMED_OUT)
         async with self.unit() as session:
             steps, run, _ = await owned(session, self.run)
-            await settle_timed_out(session, self._ref(), CallRef(step, call.id))
+            await settle_timed_out(session, self.ref(), CallRef(step, call.id))
             content = tool_content(step, call, args, result, 0)
-            await steps.event(self._seq(), EventKind.TOOL_CALL, content)
+            await steps.event(self.next_seq(), EventKind.TOOL_CALL, content)
             steps.keep(run)
         return result
 
@@ -226,7 +232,7 @@ class RunHost:
             space_id=place.space_id,
         )
 
-    def _ref(self) -> RunRef:
+    def ref(self) -> RunRef:
         c = self.run.claimed
         return RunRef(
             c.id,
@@ -238,6 +244,6 @@ class RunHost:
             c.chain_depth,
         )
 
-    def _seq(self) -> int:
+    def next_seq(self) -> int:
         self.run.seq += 1
         return self.run.seq

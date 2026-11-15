@@ -319,11 +319,11 @@ Recht 404 `ai.not_found`.
   Umleitungen folgt der Client nur innerhalb derselben Herkunft (Schema, Host, Port);
   jede andere endet mit dem Zustand `redirect`.
 - **Felder**: Name (je Organisation eindeutig), `url`, `data_location`
-  (`local`/`eu`/`external`, wie bei einer Verbindung; die KI-Richtlinie nutzt es mit
-  Task 7), `connector_scope` (`none`, `shared` mit `connector_id` eines geteilten
-  Konnektors, `personal`: der Zugang der Person, in deren Auftrag aufgerufen wird,
-  optional mit `oauth_client_id`), `enabled`, `version` (409
-  `mcp_server.version_conflict`).
+  (`local`/`eu`/`external`, wie bei einer Verbindung; die KI-Richtlinie entscheidet
+  damit, ob ein Lauf das Werkzeug aufrufen darf), `connector_scope` (`none`, `shared`
+  mit `connector_id` eines geteilten Konnektors, `personal`: der Zugang der Person, in
+  deren Auftrag aufgerufen wird, optional mit `oauth_client_id`), `enabled`, `version`
+  (409 `mcp_server.version_conflict`).
 - **Werkzeugliste**: wird beim Anlegen und mit `POST …/{id}/refresh` eingelesen, ohne
   offene Transaktion, mit Zeitlimit (20 s) und Größenlimit (2 MiB); höchstens 500
   Werkzeuge, Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen
@@ -346,15 +346,38 @@ Recht 404 `ai.not_found`.
   nur lesend kennzeichnet (`readOnlyHint`), sonst `write`. Ein nicht so gekennzeichnetes
   Werkzeug auf `read` zu setzen, verlangt `confirm_loosen: true` (422
   `mcp_tool.loosen_unconfirmed`); das Audit vermerkt `loosened`.
-- **Aufruf** (für Läufe, Task 7: `ToolCaller.call_tool` in
-  `backend/app/modules/mcp_servers/calls.py`): nur ein freigegebenes, noch gelistetes
-  Werkzeug mit dem freigegebenen Fingerabdruck eines eingeschalteten Servers. Im selben
+- **Aufruf** (`backend/app/modules/mcp_servers/calls.py`): nur ein freigegebenes, noch
+  gelistetes Werkzeug mit dem freigegebenen Fingerabdruck eines eingeschalteten Servers. Im selben
   Gespräch mit dem Server wird zuerst die Werkzeugliste gelesen; nennt der Server das
   Werkzeug anders als freigegeben, unterbleibt der Aufruf, das Werkzeug wird `changed`
   (bzw. `missing`). Der Zugang wird serverseitig eingesetzt; fehlt bei `personal` der
   Konnektor der Person, ist das ein Fehler `mcp_tool.not_connected`. Zeitlimit 60 s,
   Antworten höchstens 512 KiB (`too_large`). Das Ergebnis ist nicht vertrauenswürdig
   und wird vom Aufrufer gerahmt.
+- **Im Lauf eines Agenten** (Plan M8, Entscheidung 8; Einzelheiten in
+  [`AGENTEN.md`](AGENTEN.md#externe-werkzeuge-seit-m8)): Ein Agent bekommt ein
+  externes Werkzeug nur mit einem Eintrag in seinen Werkzeugfreigaben
+  (`PUT /api/agents/{id}/tools`, Name `ext_…`), und nur, solange es brauchbar ist
+  (freigegeben, unverändert, gelistet, Server eingeschaltet). Lesende Werkzeuge sind
+  Stufe 2; schreibende Stufe 4 und immer mit Freigabe der fragenden Person
+  (Fingerabdruck über Werkzeug, Argumente und die Versionen von Server und Werkzeug:
+  ändert sich eins davon vor dem Ausführen, ist die Freigabe veraltet, und nichts wird
+  gesendet). In Läufen von Ereignisregeln gilt das ebenso. Vor jedem Aufruf entscheidet
+  die KI-Richtlinie aller bisher gelesenen Bereiche (und des Bereichs des Ortes) über
+  den `data_location` des Servers wie über den einer Verbindung; lässt sie ihn nicht
+  zu, wird nicht aufgerufen (`policy_blocked` als Ergebnis). Der Zugang ist der
+  geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Das Ergebnis
+  geht gerahmt als `<untrusted source="mcp" server=… tool=…>` und auf 8.000 Zeichen
+  gekürzt an das Modell (im Journal vollständig) und gibt nie ein Recht, eine Stufe
+  oder eine Freigabe. Es trägt keinen Bereich: Außer der fragenden Person sieht es in
+  der Laufansicht niemand. Fehler sind Ergebnisse mit festen Wörtern
+  (`external_tool_unavailable`, `external_tool_not_connected`,
+  `external_tool_credential_unavailable`, `external_tool_failed: … (<Zustand>)`,
+  `external_tool_error` für einen Fehler, den das Werkzeug selbst meldet); der Lauf
+  geht weiter. Vor dem Senden steht im Journal `external_outcome_unknown`; geht der
+  Worker verloren, wird der Aufruf nicht wiederholt, und das Modell erfährt, dass der
+  Ausgang unbekannt ist. Aufrufe werden nicht auditiert; das Journal (`run_event`)
+  hält sie mit Argumenten und Ergebnis, nie mit dem Zugang.
 - **Was nie ins Log oder Audit geht**: Argumente, Ergebnisse, Beschreibungen,
   Zugänge, Fehlertexte des Servers. Logzeilen `mcp.list_tools` und `mcp.tool_call`
   nennen nur IDs, Zustand, Dauer und Größe; die eigenen Logzeilen des MCP-SDK sind

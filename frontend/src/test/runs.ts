@@ -79,6 +79,7 @@ export function makeApproval(overrides: Partial<Approval> = {}): Approval {
     decided_at: null,
     reason: null,
     redacted: false,
+    external: null,
     expires_at: '2026-11-17T09:00:00Z',
     created_at: '2026-11-14T09:00:00Z',
     version: 1,

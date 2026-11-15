@@ -6,7 +6,7 @@ An agent talks to a chat connection of the organisation, with one of its models;
 connection is locked shared while an agent is written, so it cannot be deleted under
 it (the deletion checks agents too, 409 `ai.connection_in_use`). Its responsible
 person is an active person, no guest. Limits are capped (25 steps, 10 minutes). Its
-level (1 to 3, default 2) above 2 only from an admin or someone who manages every
+level (1 to 4, default 2) above 2 only from an admin or someone who manages every
 space of the agent (403 `agent.level_denied`, `toolbox/policy.py`). An
 agent that took part in a conversation or ran is not deleted (409 `agent.in_use`):
 it is paused, so its answers stay attributed. Every change is audited (without the

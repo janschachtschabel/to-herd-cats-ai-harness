@@ -4,16 +4,18 @@
 introduction for colleagues, instructions, the connection and model it talks to, the
 person responsible for it, a status (`draft`: not offered to anyone; `active`;
 `paused`: kept, but starts no runs) and its limits per run (steps, runtime), capped
-from above; its autonomy level (spec 8.2: 1 reads, 2 proposes, 3 writes inside; 4,
-acting outside, comes with M8), the default of its tool grants.
+from above; its autonomy level (spec 8.2: 1 reads, 2 proposes, 3 writes inside, 4
+acts outside through external tools, plan M8 decision 8), the default of its tool
+grants.
 
 A personal agent (`owner_user_id`, plan M6 decision 13) belongs to one person: it is
 a member only of that person's personal space, its responsible person is its owner,
 it has at most level 2 and uses the owner's connection and model (`personal.py`).
 
-`agent_tool`: an agent's entry for one tool of the catalog (`toolbox/catalog.py`):
-`allow`, `confirm` or `block`; it can only tighten what the level allows
-(`toolbox/policy.py`).
+`agent_tool`: an agent's entry for one tool of the catalog (`toolbox/catalog.py`) or
+one external tool (`toolbox/external.py`, by its name `ext_…`): `allow`, `confirm` or
+`block`; it can only tighten what the level allows (`toolbox/policy.py`), and an
+external tool is offered only with one.
 
 `run`: one answer to a direct message, to a mention of the agent in a channel or a
 thread (it answers in the mentioning message's thread), to a ticket assigned to it
@@ -77,7 +79,7 @@ STEP_STATEMENT_TIMEOUT_SECONDS = 20.0
 # row at most so long, then answers 409 `conflict.retry` (review M6 2, finding 4); less
 # than Postgres' `deadlock_timeout` (1 s), so it loses a deadlock before detection.
 REASSIGN_LOCK_TIMEOUT_SECONDS = 0.5
-MAX_LEVEL = 3  # level 4 (external tools) comes with M8
+MAX_LEVEL = 4  # 4: acting outside (external write tools, plan M8 decision 8)
 MAX_CHAIN_DEPTH = 3  # handovers from agent to agent that led to a run (plan M6 task 8)
 MAX_HANDOVERS_PER_RUN = 5  # tickets one run hands to agents (review M6 finding 16c)
 DEFAULT_LEVEL = 2

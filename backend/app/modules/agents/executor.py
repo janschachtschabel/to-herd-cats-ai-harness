@@ -20,9 +20,11 @@ works.
   unique and the transaction checks the attempt first, so a call is recorded once,
   whatever worker died when.
 - Every tool call: the rights again, the tool through the services with the run's
-  actor (`tools.py`), and its `run_event` with the full result. A step that cannot be
-  recorded, or a tool that fails, ends the run with `error` at once (the call's usage
-  is still recorded).
+  actor (`tools.py`), and its `run_event` with the full result. The tools offered:
+  the catalog's and the external tools the agent has an entry for, as its level and
+  grants allow (`toolbox/policy.py`); an external tool's call: `external_step.py`. A
+  step that cannot be recorded, or a tool that fails, ends the run with `error` at
+  once (the call's usage is still recorded).
 - The end, in one transaction: `closing.close`. A run whose question was deleted
   before it started (no person's message after the last answer, the mentioning
   message deleted, the ticket gone, the automation's term gone) ends `completed` at
@@ -55,6 +57,7 @@ from app.modules.agents.repository import AgentRepository
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
+from app.modules.agents.toolbox.external import offered_external
 from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.ai.budget_metrics import budget_stops
 from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
@@ -136,7 +139,10 @@ class Executor:
             deadline = self.clock() + agent.max_runtime_seconds
             entries = await AgentRepository(session, org).tool_entries(agent.id)
             grants = {name: Grant(policy) for name, policy in entries.items()}
-            tools = allowed(agent.level, offered(), grants) if target.supports_tools else []
+            tools = []
+            if target.supports_tools:  # the catalog's, then the external ones it is granted
+                specs = offered() + await offered_external(session, org)
+                tools = allowed(agent.level, specs, grants)
             run = Working(
                 claimed,
                 agent,

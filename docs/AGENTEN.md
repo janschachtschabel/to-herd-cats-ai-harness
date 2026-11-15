@@ -88,7 +88,10 @@ sehen die Karte ohne Knöpfe. **Freigeben** setzt den Lauf fort; **Ablehnen** (m
 optionalem Grund) teilt das dem Agenten mit, er arbeitet ohne diese Änderung weiter.
 Hat sich das Objekt zwischen Anfrage und Ausführung geändert (z. B. hat jemand die Seite
 bearbeitet), wird nichts ausgeführt; die Karte zeigt „Veraltet“, und der Agent kann neu
-fragen. Ohne Entscheidung endet der Lauf nach `HERD_AI_APPROVAL_HOURS` (Standard 72
+fragen. Schreibende **externe Werkzeuge** (Stufe 4) fragen immer: Die Karte nennt Server
+und Werkzeug („Tracker · create_issue“), die entscheidende Person sieht die Argumente,
+die nach der Freigabe an den Server gehen. Hat sich der Server oder das Werkzeug seit
+der Anfrage geändert, ist die Freigabe veraltet, und es wird nichts gesendet. Ohne Entscheidung endet der Lauf nach `HERD_AI_APPROVAL_HOURS` (Standard 72
 Stunden). Eine **Rückfrage** (`ask_user`) erscheint ebenso als Karte mit Antwortfeld
 (bis 4.000 Zeichen) für die fragende Person. Offene Freigaben stehen unter
 **Freigaben** in der Seitenleiste (mit Zähler) und in der Aktivität.
@@ -245,13 +248,16 @@ Rückfragekarten, Einträge in Aktivität und Suche, die Einsicht in Direktnachr
   vor“ keine Seite direkt;
 - nichts lesen, was die fragende Person nicht lesen darf, und nichts aus einem Bereich
   an einen Ort tragen, dessen Publikum es nicht sehen darf;
-- keinen Inhalt an eine Verbindung schicken, die die KI-Richtlinie eines gelesenen
-  Bereichs nicht zulässt, und nichts in einen Bereich mit der KI-Richtlinie `none`
+- keinen Inhalt an eine Verbindung oder einen externen MCP-Server schicken, deren
+  Datenort die KI-Richtlinie eines gelesenen Bereichs nicht zulässt (ein externes
+  Werkzeug antwortet dann `policy_blocked` und wird nicht aufgerufen), ohne Freigabe
+  der fragenden Person nach außen handeln (schreibende externe Werkzeuge), und nichts in einen Bereich mit der KI-Richtlinie `none`
   schreiben (keine Nachricht, kein Gedächtnis, kein Ticket, kein Vorschlag: jedes
   Werkzeug antwortet dort „nicht gefunden“);
 - Code ausführen (es gibt kein solches Werkzeug), andere Agenten erwähnen oder sich
-  selbst eine Stufe, ein Werkzeug oder eine Freigabe geben: Was in Seiten, Tickets oder
-  Skills steht, sind für den Agenten Daten, keine Anweisungen.
+  selbst eine Stufe, ein Werkzeug oder eine Freigabe geben: Was in Seiten, Tickets,
+  Skills, Beschreibungen und Ergebnissen externer Werkzeuge steht, sind für den Agenten
+  Daten, keine Anweisungen.
 
 ## Verwaltung
 
@@ -294,8 +300,8 @@ Neue Agenten haben Stufe 2; Agenten aus M5 wurden bei der Migration Stufe 1. Ein
 über 2 vergibt nur ein Admin (sonst 403 `agent.level_denied`): Agenten der Organisation
 ändert ohnehin nur, wer `agent.manage` hat, und persönliche Agenten bleiben bei 2;
 `max_level` in `GET /api/agents/{id}/tools` nennt die höchste Stufe, die man selbst
-geben darf. Stufe 4
-(extern handeln) kommt mit M8.
+geben darf. Stufe 4 (extern handeln, seit M8) öffnet die schreibenden Werkzeuge externer
+MCP-Server, immer nur mit Freigabe (siehe „Externe Werkzeuge“).
 
 Die Stufe ist eine **Voreinstellung**: Jedes Werkzeug ab seiner Mindeststufe steht auf
 `allow`, darunter auf `block`. Je Werkzeug kann ein Eintrag (`allow`, `confirm`,
@@ -328,6 +334,32 @@ oder `confirm` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
 | `update_page` | 3 | schreiben | Seite schreiben, in zwei Schritten (Diff, dann Schreiben); nur bei `agent_write_policy = direct` |
 | `assign_ticket` | 3 | schreiben | Ticket übergeben, mit Begründung als Kommentar |
 | `post_message` | 3 | schreiben | Nachricht in das Gespräch des Laufs oder einen Kanal eines Bereichs, in dem der Agent Mitglied ist |
+| `ext_…` (externes Werkzeug, `read`) | 2 | lesen | Aufruf eines externen MCP-Werkzeugs; nur mit Eintrag |
+| `ext_…` (externes Werkzeug, `write`) | 4 | schreiben | Aufruf eines externen MCP-Werkzeugs; nur mit Eintrag, immer mit Freigabe |
+
+#### Externe Werkzeuge (seit M8)
+
+Freigegebene Werkzeuge externer MCP-Server ([`MCP.md`](MCP.md#externe-mcp-server))
+erscheinen in derselben Liste, nach dem Katalog, mit `external` (Server-ID und -Name,
+Werkzeug-ID und -Name, `usable`). Ihr Name im Lauf und in den Einträgen ist
+`ext_<12 Hexzeichen der Werkzeug-ID>_<Name>` (höchstens 64 Zeichen; Zeichen, die ein
+Modell nicht nutzen darf, werden `_`).
+
+- **Nur mit Eintrag.** Ein externes Werkzeug hat die Voreinstellung `block`: Ein Agent
+  bekommt es erst mit einem Eintrag (`allow` oder `confirm`), und auch dann höchstens,
+  was seine Stufe erlaubt. Ein als `read` eingestuftes Werkzeug ist Stufe 2, ein als
+  `write` eingestuftes Stufe 4 und **nie lockerer als `confirm`**: Auch mit `allow`
+  wartet jeder Aufruf auf die Freigabe der fragenden Person.
+- **Nur brauchbare.** Gelistet und angeboten werden nur Werkzeuge, die freigegeben,
+  unverändert (Fingerabdruck wie freigegeben), noch gelistet und auf einem
+  eingeschalteten Server sind. Ein Eintrag für ein Werkzeug, das das nicht mehr ist
+  (gesperrt, geändert, Server aus), bleibt gelistet mit `usable: false` und wirksam
+  `block`. Ein `ext_…`-Name, der kein Werkzeug der Organisation ist, ist 422
+  `agent.tool_unknown`.
+- **Beschreibung** für das Modell: Werkzeug, Server, ob es liest oder nach außen
+  handelt; die Beschreibung des Servers folgt gerahmt als nicht vertrauenswürdig und
+  auf 1.000 Zeichen gekürzt. Argumente: das gespeicherte Eingabeschema; geprüft werden
+  sie vom Server.
 
 Ob Agenten in einem Bereich Seiten direkt schreiben dürfen, stellt, wer den Bereich
 verwaltet: Einstellungen → „Schreiben durch Agenten“ (`agent_write_policy`: `propose`,
@@ -798,6 +830,14 @@ DBOS aus: [Aufgaben im Worker](#aufgaben-im-worker-m7).
   ohne Ergebnis wird jetzt ausgeführt (seine Wirkung war nicht festgeschrieben, sonst
   stünde das Ergebnis da). Verloren geht höchstens ein Modellaufruf, dessen Antwort noch
   nicht gespeichert war: Er wird wiederholt (Kosten, keine Wirkung).
+- **Externe Werkzeuge** (M8) wirken außerhalb der Datenbank, dort gibt es kein „beides
+  oder nichts“. Deshalb schreibt der Lauf **vor** dem Senden einen Journaleintrag für
+  den Aufruf mit dem Ergebnis `external_outcome_unknown` und schreibt ihn fest; die
+  Antwort des Servers kommt danach als zweiter Eintrag für denselben Aufruf (das Journal
+  nimmt den späteren). Stirbt der Worker dazwischen, findet die Wiederaufnahme nur den
+  ersten: Der Aufruf wird **nicht noch einmal gesendet**, lesend wie schreibend, und das
+  Modell erfährt, dass der Ausgang unbekannt ist und es im externen System nachsehen
+  soll, bevor es neu aufruft. Eine Freigabe ist mit dem Senden verbraucht (`ran`).
 - Was der Lauf gelesen hatte, zählt für Richtlinie und Rechte wie zuvor; er beantwortet
   das Gespräch bis zu seinem ersten Start.
 - `attempt` zählt jede Aufnahme, `recoveries` nur die nach einem verlorenen Worker; nach
@@ -1194,6 +1234,18 @@ Ein Lauf arbeitet im Worker (`backend/app/worker/runs.py`,
   derselben Transaktion: entweder beides oder nichts. Eine Wirkung entsteht daher
   innerhalb der Datenbank genau einmal, auch wenn der Worker vor, während oder nach
   dem Schreiben stirbt.
+- **Externe Werkzeuge** (M8, `agents/external_step.py`): zwei kurze Transaktionen um
+  den Aufruf, keine offen, während der Server antwortet. Die erste prüft wie jeder
+  Werkzeugschritt (Lauf, Abbruch, Freigabe des Werkzeugs, Person und Agent), dann die
+  Richtlinie für den Datenort des Servers, ob das Werkzeug noch aufrufbar ist und der
+  Zugang da ist (geteilter Konnektor oder der eigene der fragenden Person; das
+  Geheimnis nur im Kopf der Anfrage, nie im Journal), bei einem schreibenden Werkzeug
+  die Freigabe; dann schreibt sie den Eintrag `external_outcome_unknown` fest. Der
+  Aufruf liest die Werkzeugliste im selben Gespräch mit dem Server und ruft nur auf,
+  wenn das Werkzeug genau wie freigegeben gelistet ist (sonst wird es `changed` bzw.
+  `missing` und nichts gesendet). Die zweite Transaktion schreibt das Ergebnis.
+  Scheitert der Aufruf vorher (nicht aufrufbar, nicht verbunden, Richtlinie), steht
+  das als Ergebnis im Journal, und nichts wurde gesendet.
 - `attempt` zählt jede Aufnahme (auch nach dem Warten), `recoveries` nur die nach
   einem verlorenen Worker (`recoveries` > 2: `error`).
 - **Warten**: Braucht ein Lauf eine Antwort (Freigabe, Rückfrage), steht er auf
@@ -1406,6 +1458,7 @@ erst nach der Freigabe einer Person:
 | Anweisungen | 20.000 Zeichen |
 | Gesprächsverlauf im Prompt | 24.000 Zeichen (die neuesten 200 Nachrichten, dann nach Zeichen gekürzt; die Nachricht, die den Lauf auslöste, bleibt immer, zuerst fallen die ältesten anderen) |
 | Werkzeugergebnis im Prompt | 8.000 Zeichen (im Journal vollständig) |
+| externes Werkzeug | Aufruf 60 s (und die Laufzeit des Laufs), Antwort höchstens 512 KiB, Beschreibung im Prompt 1.000 Zeichen |
 | Skill-Text je `load_skill` | 7.000 Zeichen je Teil, Skill höchstens 50.000 |
 | Skills im Kontext | 25, Beschreibung je 300 Zeichen |
 | Gedächtnis | 8.000 Zeichen je Seite, 4.000 Zeichen zusammen im Kontext |
@@ -1621,7 +1674,9 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   Stopgründe `cancelled`, `waiting_timeout`, `approval_expired`, Nachrichtenarten
   `approval` und `question`, Versionsquelle `agent`, Aktivitätsgründe `proposal`,
   `approval`, `question`, `run_stopped`, `skill_proposal`, Freigabe-Ausgang `failed`
-  (Migration `a1c3e5f7b9d2`, nur die Prüfung erweitert), Läufe ohne auslösende
+  (Migration `a1c3e5f7b9d2`, nur die Prüfung erweitert), Agentenstufe 4 (M8, Migration
+  `f4c6e8a0b2d4`, nur die Prüfung erweitert; der vorige Release liest die Stufe als
+  Zahl), Läufe ohne auslösende
   Nachricht (Ticket-Läufe), Systemmeldungen als Antworten in Kanal-Threads. Ein Pod des
   vorigen Releases liest solche Zeilen nicht (Versionsliste, Aktivität, Laufansicht
   scheitern dort), bis er ersetzt ist.
