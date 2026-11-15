@@ -25,7 +25,10 @@ works.
   grants allow (`toolbox/policy.py`); an external tool's call: `external_step.py`. A
   step that cannot be recorded, or a tool that fails, ends the run with `error` at
   once (the call's usage is still recorded).
-- The end, in one transaction: `closing.close`. A run whose question was deleted
+- The end, in one transaction: `closing.close`. A run that holds a result of the
+  person's own connector answers only where the person is alone with the agent
+  (`writing.into_own`); anywhere else it ends `policy_blocked` (`personal_connector`)
+  without its answer. A run whose question was deleted
   before it started (no person's message after the last answer, the mentioning
   message deleted, the ticket gone, the automation's term gone) ends `completed` at
   once, without a call, an answer or a notice.
@@ -46,7 +49,7 @@ from dataclasses import replace
 
 from app.core import secrets
 from app.modules.agents import briefing, place
-from app.modules.agents.actor import allowed_actor
+from app.modules.agents.actor import Reads, allowed_actor
 from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
@@ -59,6 +62,7 @@ from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.external import offered_external
 from app.modules.agents.toolbox.policy import Grant, allowed
+from app.modules.agents.toolbox.writing import into_own
 from app.modules.ai.budget_metrics import budget_stops
 from app.modules.ai.models import AiConnection, ConnectionKind, DataLocation, ParamFamily
 from app.modules.ai.provider import egress_proxy, rules_for
@@ -66,6 +70,7 @@ from app.modules.automations.models import AutomationKind
 from app.runtime import context, models
 from app.runtime.loop import Outcome, Recorded, run_loop
 
+PERSONAL_DETAIL = "personal_connector"  # an answer the person's own connector held back
 MAX_RECOVERIES = 2  # a run taken up again this often after its worker died: `error`
 
 ModelMaker = Callable[[models.ModelTarget, float], models.BuiltModel]
@@ -91,7 +96,7 @@ class Executor:
             if isinstance(prepared, Outcome):
                 return await self._finish(claimed, prepared)
             outcome = await self._loop(*prepared)
-            return await self._finish(claimed, outcome)
+            return await self._finish(claimed, outcome, prepared[0].reads)
         except (Lost, Suspended):
             return None
 
@@ -195,12 +200,18 @@ class Executor:
         finally:
             await built.close()
 
-    async def _finish(self, claimed: Claimed, outcome: Outcome) -> StopReason:
+    async def _finish(
+        self, claimed: Claimed, outcome: Outcome, reads: Reads | None = None
+    ) -> StopReason:
         async with self.unit() as session:
             steps = RunSteps(session, claimed)
             run = await steps.owned()
             if run is None:
                 raise Lost
+            if reads is not None and outcome.reason == "completed" and outcome.answer:
+                c = claimed
+                if await into_own(session, reads, c.org_id, c.conversation_id, c.user_id):
+                    outcome = Outcome("policy_blocked", detail=PERSONAL_DETAIL)
             reason = await close(
                 session, steps, run, StopReason(outcome.reason), outcome.answer, outcome.detail
             )

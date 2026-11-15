@@ -61,8 +61,18 @@ def tool_content(
     result: ToolResult,
     duration_ms: int,
     read: tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]] = (set(), set(), set()),
+    *,
+    personal: bool = False,
 ) -> dict[str, object]:
-    """`read`: the pages, tickets and drafts' spaces the call read (new to the run)."""
+    """`read`: the pages, tickets and drafts' spaces the call read (new to the run);
+    `personal`: its result came through the asking person's own connector."""
+    noted: dict[str, object] = {
+        "pages": sorted(str(p) for p in read[0]),
+        "tickets": sorted(str(t) for t in read[1]),
+        "drafts": sorted(str(d) for d in read[2]),
+    }
+    if personal:
+        noted["personal"] = True
     content: dict[str, object] = {
         "step": step,
         "call_id": call.id,
@@ -73,28 +83,26 @@ def tool_content(
         "text": result.text,
         "spaces": sorted(str(space_id) for space_id in result.spaces),
         "duration_ms": duration_ms,
-        "read": {
-            "pages": sorted(str(p) for p in read[0]),
-            "tickets": sorted(str(t) for t in read[1]),
-            "drafts": sorted(str(d) for d in read[2]),
-        },
+        "read": noted,
     }
     if result.final:
         content["final"] = True
     return content
 
 
-Snapshot = tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]
+Snapshot = tuple[tuple[set[uuid.UUID], ...], bool]
 
 
 def snapshot(reads: Reads) -> Snapshot:
-    return set(reads.spaces), set(reads.pages), set(reads.tickets), set(reads.drafts)
+    sets = (reads.spaces, reads.pages, reads.tickets, reads.drafts)
+    return tuple(set(s) for s in sets), reads.personal
 
 
 def restore(reads: Reads, saved: Snapshot) -> None:
     """What the run had read before a step that was rolled back (in place: the step's
     tool context shares the object)."""
     sets = (reads.spaces, reads.pages, reads.tickets, reads.drafts)
-    for now, then in zip(sets, saved, strict=True):
+    for now, then in zip(sets, saved[0], strict=True):
         now.clear()
         now.update(then)
+    reads.personal = saved[1]

@@ -6,8 +6,9 @@ level), or a channel of a space the agent is a member of. No other DM, whatever
 participants it has: its audience is not the run's. Posted through `MessageService`
 with the run's actor (`channel.post` in the channel's space, which the write scope
 limits to the run's space), written for the agent (`kind=agent`, its run in
-`run_id`), after the audience check (`writing.leaks_into`). An agent's message
-mentions nobody and starts no run (`MessageService.post`, `by`).
+`run_id`), after the audience check (`writing.leaks_into`; into its own conversation
+`writing.into_own_conversation`, for a result of the person's own connector). An
+agent's message mentions nobody and starts no run (`MessageService.post`, `by`).
 """
 
 import hashlib
@@ -22,6 +23,7 @@ from app.modules.agents.toolbox.writing import (
     by,
     closed_to_ai,
     effect,
+    into_own_conversation,
     key_for,
     leaks_into,
     refusal,
@@ -48,6 +50,8 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
     except NotFound:
         return refusal("conversation", NOT_FOUND, attrs)
     own = ctx.answers_in(conversation.id)
+    if own and (why := await into_own_conversation(ctx, conversation.id)):
+        return refusal("conversation", why, attrs)
     if not own and (
         conversation.kind != ConversationKind.CHANNEL
         or conversation.space_id is None

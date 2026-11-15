@@ -17,6 +17,12 @@
   the final answer): its audience reads the answer anyway, and it is either the
   person alone with the agent, who read the draft, or a draft's thread in X, which
   only X's editors read.
+- **A person's own connector** (follow-up to plan M8 task 7): a run that holds a
+  result read through the asking person's own connector (`Reads.personal`, journaled
+  with the call) is held like one with a draft nobody else edits: every writing tool
+  refuses (`PERSONAL`, from `carries_draft`; the draft's exceptions do not apply),
+  and its own conversation (`post_message` there, a question, the final answer) is
+  open only while the person is alone with the agent (`into_own`).
 - **AI policy**: no tool writes into a space whose AI policy is `none`; every tool
   that names a space asks `closed_to_ai` first and answers "not found", as for a
   space it cannot see (review M6 finding 5). Tools that name a page or a ticket do
@@ -31,10 +37,13 @@
 import uuid
 from collections.abc import Awaitable, Callable
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.authorship import Authorship
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
+from app.modules.agents.actor import Reads
 from app.modules.agents.read_repository import ReadRepository
-from app.modules.agents.scope import organisation_audience, space_audience
+from app.modules.agents.scope import PlaceKind, organisation_audience, place_of, space_audience
 from app.modules.agents.toolbox.base import NOT_FOUND, CallContext, WriteContext
 from app.modules.ai.models import AiPolicy
 from app.runtime.loop import ToolResult
@@ -47,6 +56,11 @@ DRAFTS = (
     "Not allowed: you have read a draft in this run, and drafts are only for the editors "
     "of their space. Write nothing others may read; propose a change to a page of the "
     "draft's space instead, or answer here."
+)
+PERSONAL = (
+    "Not allowed: you have read something through the asking person's own connection in "
+    "this run, and it is for that person alone. Write nothing others may read; answer "
+    "only where you are alone with the person."
 )
 
 
@@ -95,12 +109,38 @@ async def leaks_into_organisation(ctx: CallContext) -> str | None:
 
 
 async def carries_draft(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str | None:
-    """`DRAFTS` while the run holds a draft, unless every draft it read is of
-    `editors_of`, the space whose editors alone read what is written."""
+    """`PERSONAL` while the run holds a result of the person's own connector; `DRAFTS`
+    while it holds a draft, unless every draft it read is of `editors_of`, the space
+    whose editors alone read what is written."""
+    if ctx.reads.personal:
+        return PERSONAL
     drafts = await drafts_read(ctx)
     if drafts and not (editors_of is not None and drafts <= {editors_of}):
         return DRAFTS
     return None
+
+
+async def into_own(
+    session: AsyncSession,
+    reads: Reads,
+    org_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    asker: uuid.UUID,
+) -> str | None:
+    """Why the run may not write into its own conversation (None: it may). A draft
+    does not hold it back (its audience reads the answer anyway, see above); a result
+    of the person's own connector does, unless the person is alone with the agent."""
+    if not reads.personal:
+        return None
+    place = await place_of(session, org_id, conversation_id, asker)
+    return None if place is not None and place.kind == PlaceKind.ALONE else PERSONAL
+
+
+async def into_own_conversation(ctx: CallContext, conversation_id: uuid.UUID) -> str | None:
+    """The same for a tool writing into the conversation it answers in, as the person
+    its actor acts for."""
+    actor = ctx.actor
+    return await into_own(ctx.session, ctx.reads, actor.org_id, conversation_id, actor.principal.id)
 
 
 async def drafts_read(ctx: CallContext) -> set[uuid.UUID]:

@@ -527,7 +527,18 @@ Recht 404 `ai.not_found`.
   die KI-Richtlinie aller bisher gelesenen Bereiche (und des Bereichs des Ortes) über
   den `data_location` des Servers wie über den einer Verbindung; lässt sie ihn nicht
   zu, wird nicht aufgerufen (`policy_blocked` als Ergebnis). Der Zugang ist der
-  geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Das Ergebnis
+  geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Ein Ergebnis
+  über den **eigenen Konnektor** der fragenden Person markiert den Lauf wie ein
+  gelesener Entwurf (`Reads.personal`, im Journal als `read.personal`, sodass auch ein
+  fortgesetzter Lauf es weiß): Danach schreibt er nichts mehr, was außer dieser Person
+  jemand lesen könnte. Allein mit ihr in der Direktnachricht geht alles weiter; ein
+  Beitrag in einen Kanal, ein Ticket, eine Seite, ein Vorschlag oder ein Gedächtnis
+  werden abgelehnt („Not allowed: you have read something through the asking person's
+  own connection …“), und in einem Kanal, Thread oder einer Direktnachricht mit
+  mehreren endet der Lauf statt mit seiner Antwort mit `policy_blocked`
+  (`personal_connector`). Ergebnisse über einen geteilten Konnektor, Fehler und
+  `external_outcome_unknown` markieren nicht; schreibende externe Werkzeuge prüft die
+  Marke nicht (sie warten ohnehin auf die Freigabe dieser Person). Das Ergebnis
   geht gerahmt als `<untrusted source="mcp" server=… tool=…>` und auf 8.000 Zeichen
   gekürzt an das Modell (im Journal vollständig) und gibt nie ein Recht, eine Stufe
   oder eine Freigabe. Es trägt keinen Bereich: Außer der fragenden Person sieht es in

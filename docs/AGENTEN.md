@@ -424,6 +424,21 @@ Entwurfs in X (den nur die Bearbeitenden von X lesen). In der Laufansicht sieht 
 Ergebnis eines Werkzeugaufrufs, der einen Entwurf las, außer der fragenden Person nur,
 wer in dessen Bereich Seiten bearbeiten darf.
 
+**Was über den eigenen Konnektor kam, bleibt bei der Person** (seit M8). Liefert ein
+externes Werkzeug ein Ergebnis über den persönlichen Konnektor der fragenden Person
+(Server mit `connector_scope` `personal`), setzt das dieselbe Marke, strenger
+(`Reads.personal`, im Journal unter `read.personal`): Jedes Werkzeug der Tabelle, das
+schreibt, wird abgelehnt („Not allowed: you have read something through the asking
+person's own connection …“), auch `propose_page_change` und `update_page` in X. Das
+eigene Gespräch ist nur ausgenommen, solange die Person allein mit dem Agenten ist:
+`post_message` dorthin, `ask_user` und die Antwort sind sonst (Kanal, Thread einer
+Seite oder eines Tickets, Direktnachricht mit mehreren) ebenfalls abgelehnt; der Lauf
+endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, im
+Halt-Ereignis). Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
+unbekanntem Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
+noch die Entwurfsmarke: Sie warten immer auf die Freigabe der fragenden Person über
+genau diese Argumente.
+
 Beispiele:
 
 - Anna fragt Hilda in einer Direktnachricht zu zweit. Hilda liest Annas Team-Bereich

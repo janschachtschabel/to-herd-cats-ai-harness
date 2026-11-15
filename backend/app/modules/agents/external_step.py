@@ -16,7 +16,11 @@ it here). No transaction is open while the remote server answers.
    called only as approved; through the egress guard, with a deadline and a cap.
 3. A second transaction records the real result as a second `run_event` for the
    same call (the journal keeps the later one), or marks the tool `changed` or
-   `missing` when the server listed it otherwise.
+   `missing` when the server listed it otherwise. A result through the asking
+   person's own connector marks the run (`Reads.personal`, journaled with the result
+   as `read.personal`): from then on it writes nothing others may read
+   (`toolbox/writing.carries_draft`). A failure, the placeholder and a shared
+   connector's result carry no mark.
 
 A take-up after a lost worker replays the first entry: the model learns that the
 outcome is unknown, and the call is never sent again on its own, read or write (a
@@ -53,6 +57,7 @@ from app.modules.agents.working import Unit, Working, once_more
 from app.modules.ai.models import DataLocation
 from app.modules.mcp_servers.calls import PreparedCall, ToolCaller, UntrustedResult, execute
 from app.modules.mcp_servers.errors import ExternalToolError, ToolUnavailable
+from app.modules.mcp_servers.models import ConnectorUse
 from app.modules.mcp_servers.repository import ServerRepository
 from app.runtime.loop import ToolCall, ToolResult
 
@@ -75,6 +80,7 @@ class _Sending:
     prepared: PreparedCall
     arguments: dict[str, Any]
     placeholder: ToolResult
+    personal: bool  # through the asking person's own connector
 
 
 async def call_external(
@@ -138,7 +144,8 @@ async def _before(
             return await _record(host, steps, run, step, call, args, held)
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder)
-        return _Sending(prepared, args.model_dump(mode="json"), placeholder)
+        personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
+        return _Sending(prepared, args.model_dump(mode="json"), placeholder, personal)
 
 
 async def _after(
@@ -163,7 +170,12 @@ async def _after(
             result = external.failure_of(remote, outcome)
         else:
             result = external.result_of(remote, outcome)
-        return await _record(host, steps, run, step, call, args, result, duration_ms)
+        personal = first.personal and isinstance(outcome, UntrustedResult)
+        if personal:  # the run's memory as recorded (a retry restores it)
+            host.run.reads.personal = True
+        return await _record(
+            host, steps, run, step, call, args, result, duration_ms, personal=personal
+        )
 
 
 async def _record(
@@ -175,8 +187,10 @@ async def _record(
     args: BaseModel,
     result: ToolResult,
     duration_ms: int = 0,
+    *,
+    personal: bool = False,
 ) -> ToolResult:
-    content = tool_content(step, call, args, result, duration_ms)
+    content = tool_content(step, call, args, result, duration_ms, personal=personal)
     await steps.event(host.next_seq(), EventKind.TOOL_CALL, content)
     steps.keep(run)
     return result

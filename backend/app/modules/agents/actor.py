@@ -36,12 +36,16 @@ class Reads:
     looked up again for every check (a page moved since counts where it is now).
     `drafts`: the spaces of drafts it read, as they were then (journaled with the
     call that read them): only their editors may read what the run writes while it
-    holds one (`toolbox/writing.carries_draft`, review M6 2 finding 1)."""
+    holds one (`toolbox/writing.carries_draft`, review M6 2 finding 1).
+    `personal`: it holds a result read through the asking person's own connector
+    (journaled with that call): it writes nothing anyone but that person may read, the
+    same check as for a draft (`carries_draft`, follow-up to plan M8 task 7)."""
 
     spaces: set[uuid.UUID] = field(default_factory=set)
     pages: set[uuid.UUID] = field(default_factory=set)
     tickets: set[uuid.UUID] = field(default_factory=set)
     drafts: set[uuid.UUID] = field(default_factory=set)
+    personal: bool = False
 
 
 async def run_actor(
