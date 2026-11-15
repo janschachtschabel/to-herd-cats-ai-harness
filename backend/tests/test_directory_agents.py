@@ -28,7 +28,9 @@ async def test_a_space_offers_its_member_agents_beside_its_people(work: Work) ->
     outsider = await make_agent(bench.session, bench.people, bench.connection.id, name="Olga")
     found = await _found(bench.people.alice, space_id=str(work.space.id))
     agents = [e for e in found if e["type"] == "agent"]
-    assert agents == [{"type": "agent", "id": str(bench.agent.id), "name": "Ava"}]
+    assert agents == [
+        {"type": "agent", "id": str(bench.agent.id), "name": "Ava", "kind": "internal"}
+    ]
     assert str(bench.people.users["alice"].id) in {e["id"] for e in found if e["type"] == "user"}
     assert str(outsider.id) not in {e["id"] for e in found}
     only = await _found(bench.people.alice, space_id=str(work.space.id), type="agent")

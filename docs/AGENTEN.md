@@ -332,7 +332,11 @@ hat, wird nicht gelöscht, sondern pausiert (409 `agent.in_use`). Aufgaben lasse
 für externe Agenten nicht anlegen (403 `automation.not_allowed`). Seine Token:
 [`MCP.md`](MCP.md#externe-agenten). Werkzeugfreigaben (`agent_tool`) wirken auch für
 ihn, nur verschärfend: Was nicht `allow` ist, bietet `/mcp` ihm nicht an (Freigaben
-mit `confirm` gibt es dort nicht).
+mit `confirm` gibt es dort nicht). `GET /api/agents/{id}/tools` nennt dafür je Werkzeug
+`via_mcp` (das Werkzeug des Katalogs kann sein Token über `/mcp` erreichen: dort
+angeboten und höchstens Stufe 2; bei allen anderen Agenten `false`) und `max_level` 2.
+Das Verzeichnis (`GET /api/directory`) nennt bei Agenten `kind`, damit Auswahllisten
+(Erwähnung, Zuweisung) einen externen Agenten kennzeichnen.
 
 ### Stufen und Werkzeugfreigaben
 

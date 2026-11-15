@@ -97,6 +97,17 @@ _AGENT_BY_MODE: Mapping[TokenMode, tuple[Exposed, ...]] = {
 }
 
 
+_REACHABLE = frozenset(
+    tool.name for tool in READ_TOOLS + WRITE_TOOLS if tool.spec.level <= EXTERNAL_MAX_LEVEL
+)
+
+
+def reaches_external_agent(name: str) -> bool:
+    """Whether the catalog tool `name` can be offered to an external agent's token
+    (offered over `/mcp` at all, and within level 2): what its grants decide."""
+    return name in _REACHABLE
+
+
 def tools_for(token: TokenActor) -> tuple[Exposed, ...]:
     """The tools the token is offered: by its mode; an agent token's also the pick-up
     tools, and only those its agent's level allows (at most 2, decision 11) and its

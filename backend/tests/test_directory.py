@@ -1,5 +1,6 @@
 """The directory: people and groups a space admin can add, for everyone but guests.
-Only active people and groups of the caller's organisation; only type, id and name."""
+Only active people and groups of the caller's organisation; only type, id, name and
+(for agents) kind."""
 
 from httpx import AsyncClient
 
@@ -25,17 +26,19 @@ async def test_member_finds_people_and_groups_by_name(
     await make_user(name="Otto Other", email="otto@example.com")
 
     found = await _entries(member_client, q="LE")
-    assert {"type": "user", "id": str(lea.id), "name": "Lea Lange"} in found
-    assert {"type": "group", "id": str(team.id), "name": "Leitung"} in found
+    assert {"type": "user", "id": str(lea.id), "name": "Lea Lange", "kind": None} in found
+    assert {"type": "group", "id": str(team.id), "name": "Leitung", "kind": None} in found
     assert "Otto Other" not in {e["name"] for e in found}
 
 
-async def test_entries_have_type_id_and_name_only(member_client: AsyncClient, member) -> None:
+async def test_entries_have_type_id_name_and_kind_only(member_client: AsyncClient, member) -> None:
     response = await member_client.get(DIRECTORY, params={"q": "Max"})
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"items", "next_cursor"}
-    assert body["items"] == [{"type": "user", "id": str(member.id), "name": "Max Member"}]
+    assert body["items"] == [
+        {"type": "user", "id": str(member.id), "name": "Max Member", "kind": None}
+    ]
 
 
 async def test_email_does_not_match(member_client: AsyncClient, make_user) -> None:

@@ -5,7 +5,10 @@ entries at once, with the agent's `version` (409 `agent.version_conflict`); a na
 catalog does not list is refused (422 `agent.tool_unknown`). Holders of
 `agent.manage` only (404 `agent.not_found` else); every change is audited.
 `max_level`: the highest level the caller may give the agent (`may_grant_level`), so
-a level they may not give is never offered (a personal agent's: 2).
+a level they may not give is never offered (a personal agent's and an external
+agent's: 2). `via_mcp`: for an external agent, whether a catalog tool can reach its
+token over `/mcp` (plan M8 decision 11; `mcp_tools/exposed.py`), so its managers see
+which grants count for it.
 
 External tools (plan M8 decision 8, `toolbox/external.py`) follow the catalog: every
 usable one of the organisation (approved and unchanged, on an enabled server), and
@@ -22,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
 from app.core.errors import ValidationFailed
-from app.modules.agents.models import MAX_LEVEL, Agent
+from app.modules.agents.models import EXTERNAL_MAX_LEVEL, MAX_LEVEL, Agent
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.service import AgentService
 from app.modules.agents.toolbox.base import ToolSpec
@@ -36,6 +39,7 @@ from app.modules.agents.toolbox.policy import (
     may_grant_level,
 )
 from app.modules.audit.recorder import record
+from app.modules.mcp_tools.exposed import reaches_external_agent
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +60,7 @@ class ToolGrant:
     entry: Grant | None
     effective: Grant
     external: ExternalOf | None = None
+    via_mcp: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +107,8 @@ class GrantService:
     def max_level(self, actor: Actor, agent: Agent) -> int:
         if agent.owner_user_id is not None:  # personal agents stay at 2 (`personal.py`)
             return FREE_LEVEL
+        if agent.external:  # it proposes at most (plan M8 decision 11)
+            return EXTERNAL_MAX_LEVEL
         return MAX_LEVEL if may_grant_level(actor, MAX_LEVEL) else FREE_LEVEL
 
 
@@ -124,4 +131,5 @@ def _grant(agent: Agent, spec: ToolSpec, stored: dict[str, str], usable: bool | 
         entry,
         grant,
         of,
+        via_mcp=agent.external and remote is None and reaches_external_agent(spec.name),
     )

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access_repository import person_reads_space
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Agent, AgentStatus
+from app.modules.agents.models import Agent, AgentKind, AgentStatus
 from app.modules.groups.models import Group
 from app.modules.spaces.models import SpaceMember
 from app.modules.users.models import User
@@ -20,6 +20,7 @@ class DirectoryEntry(NamedTuple):
     id: uuid.UUID
     name: str
     key: str  # the sort key (lower-cased name), for the cursor
+    kind: AgentKind | None = None  # an agent's kind (plan M8); None for people and groups
 
 
 class DirectoryRepository:
@@ -48,6 +49,7 @@ class DirectoryRepository:
                 literal(PrincipalType.USER.value, String).label("type"),
                 User.id.label("id"),
                 User.name.label("name"),
+                literal(None, String).label("kind"),
             ).where(
                 User.org_id == org_id,
                 User.is_active.is_(True),
@@ -61,6 +63,7 @@ class DirectoryRepository:
                 literal(PrincipalType.AGENT.value, String).label("type"),
                 Agent.id.label("id"),
                 Agent.name.label("name"),
+                Agent.kind.label("kind"),
             ).where(
                 Agent.org_id == org_id,
                 Agent.status != AgentStatus.DRAFT,
@@ -81,14 +84,20 @@ class DirectoryRepository:
                     literal(PrincipalType.GROUP.value, String).label("type"),
                     Group.id.label("id"),
                     Group.name.label("name"),
+                    literal(None, String).label("kind"),
                 ).where(Group.org_id == org_id, Group.name.icontains(text, autoescape=True))
             )
         if not parts:
             return []
         both = union_all(*parts).subquery()
         key = func.lower(both.c.name)
-        stmt = select(both.c.type, both.c.id, both.c.name, key).order_by(key, both.c.id)
+        stmt = select(both.c.type, both.c.id, both.c.name, key, both.c.kind).order_by(
+            key, both.c.id
+        )
         if after is not None:
             stmt = stmt.where(tuple_(key, both.c.id) > tuple_(literal(after[0]), after[1]))
         rows = (await self.session.execute(stmt.limit(limit))).all()
-        return [DirectoryEntry(PrincipalType(t), i, n, k) for t, i, n, k in rows]
+        return [
+            DirectoryEntry(PrincipalType(t), i, n, k, AgentKind(kind) if kind else None)
+            for t, i, n, k, kind in rows
+        ]

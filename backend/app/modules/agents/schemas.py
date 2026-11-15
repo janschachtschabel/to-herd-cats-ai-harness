@@ -155,7 +155,9 @@ class AgentToolOut(BaseModel):
     `effect`; `default` (from the agent's level; an external tool's is `block`: it
     needs an entry), `entry` (the agent's, or null) and `effective` (what a run gets).
     `external`: set for an external MCP server's tool (name `ext_…`; a write tool is
-    level 4 and at most `confirm`), null for the catalog's."""
+    level 4 and at most `confirm`), null for the catalog's. `via_mcp`: only for an
+    external agent (plan M8): the catalog tool can reach its token over `/mcp` (offered
+    there, level 2 at most); false for every other agent and tool."""
 
     name: str
     level: int
@@ -164,6 +166,7 @@ class AgentToolOut(BaseModel):
     entry: Grant | None
     effective: Grant
     external: AgentExternalToolOut | None = None
+    via_mcp: bool = False
 
 
 class AgentToolsOut(BaseModel):
@@ -205,6 +208,7 @@ class AgentToolsOut(BaseModel):
                         if t.external
                         else None
                     ),
+                    via_mcp=t.via_mcp,
                 )
                 for t in shown.tools
             ],

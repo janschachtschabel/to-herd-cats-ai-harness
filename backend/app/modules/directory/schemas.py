@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.pagination import PageParams
 from app.core.principal import PrincipalType
+from app.modules.agents.models import AgentKind
 from app.modules.directory.repository import DirectoryEntry
 
 
@@ -24,12 +25,15 @@ class DirectoryQuery(PageParams):
 
 class DirectoryEntryOut(BaseModel):
     """Who can be added to a space or written to. Deliberately no email or role: any
-    member may read it."""
+    member may read it. `kind`: an agent's kind (`external`: it works from outside
+    through `/mcp` and answers nothing here by itself, plan M8); null for people and
+    groups."""
 
     type: Literal[PrincipalType.USER, PrincipalType.GROUP, PrincipalType.AGENT]
     id: uuid.UUID
     name: str
+    kind: AgentKind | None = None
 
     @classmethod
     def of(cls, entry: DirectoryEntry) -> "DirectoryEntryOut":
-        return cls(type=entry.type, id=entry.id, name=entry.name)
+        return cls(type=entry.type, id=entry.id, name=entry.name, kind=entry.kind)

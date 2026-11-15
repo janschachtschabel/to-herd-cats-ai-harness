@@ -113,6 +113,7 @@ async def test_the_tools_of_an_agent(bench: Bench) -> None:
         "entry": None,
         "effective": "allow",
         "external": None,
+        "via_mcp": False,
     }
     put = {"tools": [{"tool": "read_page", "policy": "block"}], "version": body["version"]}
     changed = await bench.people.admin.put(url, json=put)
