@@ -1,7 +1,7 @@
 """Login, logout and session resolution."""
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,8 +83,12 @@ class AuthService:
         if not user.is_active or user.password_hash != checked:
             await self.session.commit()
             raise Unauthorized(code="auth.invalid_credentials")
+        return user, await self.open_session(user, utcnow())
+
+    async def open_session(self, user: User, now: datetime) -> str:
+        """A new login session for an active person whose sign-in was checked (password
+        or OIDC); the token goes into the cookie and nowhere else."""
         token = new_session_token()
-        now = utcnow()
         # Housekeeping without a background task: every login removes a bounded batch
         # of expired sessions, anyone's (people who never return included).
         await self.sessions.delete_expired(
@@ -99,7 +103,7 @@ class AuthService:
             )
         )
         user.last_login_at = now
-        return user, token
+        return token
 
     async def logout(self, token: str) -> None:
         await self.sessions.end_by_hash(hash_token(token), utcnow())

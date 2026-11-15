@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Response
 
 from app.modules.auth.context import AuthContext
+from app.modules.auth.cookies import set_session_cookie
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
 from app.modules.auth.schemas import LoginRequest, MeOut
 from app.modules.auth.service import AuthService
@@ -21,16 +22,7 @@ async def login(
 ) -> MeOut:
     ip = request.client.host if request.client else None
     user, token = await AuthService(session, settings).login(body.email, body.password, ip)
-    response.set_cookie(
-        settings.session_cookie_name,
-        token,
-        max_age=settings.session_ttl_hours * 3600,
-        httponly=True,
-        # https as the client saw it (X-Forwarded-Proto from a trusted proxy counts).
-        secure=settings.cookie_secure or request.url.scheme == "https",
-        samesite="lax",
-        path="/",
-    )
+    set_session_cookie(response, request, settings, token)
     return await _me(AuthContext(user=user), session, settings)
 
 

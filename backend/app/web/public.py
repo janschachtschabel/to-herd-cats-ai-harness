@@ -40,6 +40,8 @@ from app.modules.messaging import router_live as messaging_live
 from app.modules.messaging import router_social as messaging_social
 from app.modules.messaging.live import LiveHub
 from app.modules.oauth import router as oauth
+from app.modules.oidc import admin_router as oidc_admin
+from app.modules.oidc.router import router as oidc_router
 from app.modules.proposals import router as proposals
 from app.modules.search.router import router as search_router
 from app.modules.skills import assignment_router as skill_assignments
@@ -69,7 +71,10 @@ def api_router() -> APIRouter:
     """Everything under /api; unsafe methods need the CSRF header."""
     api = APIRouter(prefix="/api", dependencies=[Depends(csrf_guard)])
     api.include_router(auth_router)
+    api.include_router(oidc_router)
+    api.include_router(oidc_admin.providers)
     api.include_router(users_router)
+    api.include_router(oidc_admin.user_identities)
     api.include_router(groups_router)
     api.include_router(spaces_router)
     api.include_router(wiki.space_pages)

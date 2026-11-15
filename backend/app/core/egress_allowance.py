@@ -66,32 +66,33 @@ def host_key(host: str) -> str:
     return host.rstrip(".").lower()
 
 
-def parse_allowance(raw: str) -> PrivateAllowance:
+def parse_allowance(raw: str, setting: str = "HERD_MCP_ALLOWED_HOSTS") -> PrivateAllowance:
     """The allowance from the setting's text; ValueError names the setting, never an
-    entry."""
+    entry. The same form serves `HERD_OIDC_ALLOWED_HOSTS` (an in-house identity
+    provider)."""
     hosts: set[str] = set()
     networks: list[IPNetwork] = []
     for entry in (part.strip() for part in raw.split(",")):
         if not entry:
             continue
-        network = _network(entry)
+        network = _network(entry, setting)
         if network is not None:
             networks.append(network)
             continue
         name = host_key(entry)
         if len(name) > 253 or _HOST.fullmatch(name) is None:
-            raise ValueError("HERD_MCP_ALLOWED_HOSTS: an entry is no host name or network")
+            raise ValueError(f"{setting}: an entry is no host name or network")
         hosts.add(name)
     return PrivateAllowance(frozenset(hosts), tuple(networks))
 
 
-def _network(entry: str) -> IPNetwork | None:
+def _network(entry: str, setting: str) -> IPNetwork | None:
     try:
         network = ipaddress.ip_network(entry, strict=False)
     except ValueError:
         if "/" in entry:
-            raise ValueError("HERD_MCP_ALLOWED_HOSTS: a network is not valid") from None
+            raise ValueError(f"{setting}: a network is not valid") from None
         return None
     if not any(network.version == r.version and network.subnet_of(r) for r in PRIVATE_RANGES):  # type: ignore[arg-type]
-        raise ValueError("HERD_MCP_ALLOWED_HOSTS: a network lies outside the private ranges")
+        raise ValueError(f"{setting}: a network lies outside the private ranges")
     return network

@@ -2,9 +2,12 @@
 never as plaintext.
 
 - `env:NAME`: read from the process environment when used. Only names starting with
-  `HERD_AI_`, so a connection cannot be pointed at the database password or the secret
-  key itself and send it to a URL of the admin's choosing; the app's own `HERD_AI_`
-  settings (`RESERVED_NAMES`, the egress proxy among them) are refused too.
+  `HERD_AI_` (AI connections, connectors, OAuth clients) or `HERD_OIDC_` (OIDC
+  providers, plan M9 decision 12), each area writing only its own prefix (`env_ref`),
+  so a connection cannot be pointed at the database password or the secret key itself
+  and send it to a URL of the admin's choosing; the app's own `HERD_AI_` and
+  `HERD_OIDC_` settings (`RESERVED_NAMES`, the egress proxy among them) are refused
+  too.
 - `enc:<token>`: a Fernet token under a key derived from `HERD_SECRET_KEY`; tokens of
   `HERD_SECRET_KEY_PREVIOUS` still decrypt during a rotation (`rotate`).
 
@@ -28,11 +31,14 @@ from app.core.errors import ValidationFailed
 
 ENV_PREFIX = "env:"
 ENC_PREFIX = "enc:"
-ENV_NAME = re.compile(r"HERD_AI_[A-Z0-9_]{1,100}")
-# The app's own settings with that prefix (`core/config.py`, every `ai_*` field): never
-# a connection's key (the egress proxy's URL may carry the proxy's credentials).
+AI_ENV_PREFIX = "HERD_AI_"
+OIDC_ENV_PREFIX = "HERD_OIDC_"
+ENV_NAME = re.compile(r"HERD_(?:AI|OIDC)_[A-Z0-9_]{1,100}")
+# The app's own settings with those prefixes (`core/config.py`, every `ai_*` and
+# `oidc_*` field): never a secret reference (the egress proxy's URL may carry the
+# proxy's credentials).
 RESERVED_NAMES = frozenset(
-    f"HERD_{name.upper()}" for name in Settings.model_fields if name.startswith("ai_")
+    f"HERD_{name.upper()}" for name in Settings.model_fields if name.startswith(("ai_", "oidc_"))
 )
 MAX_VALUE_CHARS = 4096
 # Visible ASCII only: the value goes into an HTTP header.
@@ -53,9 +59,9 @@ class SecretUnavailable(Exception):  # noqa: N818 (a state, not an error class n
         super().__init__("secret unavailable")
 
 
-def env_ref(name: str) -> str:
-    """`env:NAME` for an allowed variable name; 422 otherwise."""
-    if not _allowed_name(name):
+def env_ref(name: str, prefix: str = AI_ENV_PREFIX) -> str:
+    """`env:NAME` for an allowed variable name of the area's `prefix`; 422 otherwise."""
+    if not name.startswith(prefix) or not _allowed_name(name):
         raise ValidationFailed(code="secrets.env_name_invalid")
     return ENV_PREFIX + name
 

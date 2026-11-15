@@ -14,7 +14,12 @@ from app.modules.audit.recorder import record_system
 from app.modules.backups.repository import BackupRunRepository, clear_tables
 
 # `collab_grant` first: emptying `user_session` would only make its grants powerless.
-CLEARED_AFTER_RESTORE: tuple[str, ...] = ("collab_grant", "user_session", "oauth_flow")
+CLEARED_AFTER_RESTORE: tuple[str, ...] = (
+    "collab_grant",
+    "oidc_flow",
+    "user_session",
+    "oauth_flow",
+)
 
 
 async def finish_restore(

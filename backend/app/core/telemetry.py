@@ -77,9 +77,9 @@ def _tracer_provider(settings: Settings) -> TracerProvider:
     return _provider
 
 
-# Routes whose query carries one-time secrets (the OAuth callback's code and state):
-# no span, since a span records the URL with its query.
-UNTRACED_PATHS = ("/api/ai/oauth/callback",)
+# Routes whose query carries one-time secrets (the OAuth and OIDC callbacks' code and
+# state): no span, since a span records the URL with its query. Regular expressions.
+UNTRACED_PATHS = ("/api/ai/oauth/callback", "/api/auth/oidc/[^/]+/callback")
 
 
 def configure_tracing(app: FastAPI, settings: Settings) -> None:

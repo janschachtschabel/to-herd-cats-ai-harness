@@ -25,6 +25,8 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
     users, groups, inspect = "/api/admin/users", "/api/admin/groups", "/api/admin/dm-inspect"
     grant = {"conversation_id": str(uuid7()), "reason": "a reason of some length"}
     member_ref = {"member_type": "user", "member_id": str(user.id)}
+    providers = "/api/admin/oidc-providers"
+    new_provider = {"kind": "google", "client_id": "c", "client_secret": {"value": "s"}}
     return [
         ("GET", "/api/admin/audit", "/api/admin/audit", None),
         ("GET", users, users, None),
@@ -32,6 +34,29 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
         ("PATCH", f"{users}/{{user_id}}", f"{users}/{user.id}", {"name": "X", "version": 1}),
         ("POST", f"{users}/{{user_id}}/deactivate", f"{users}/{user.id}/deactivate", None),
         ("POST", f"{users}/{{user_id}}/reactivate", f"{users}/{user.id}/reactivate", None),
+        ("GET", f"{users}/{{user_id}}/identities", f"{users}/{user.id}/identities", None),
+        (
+            "DELETE",
+            f"{users}/{{user_id}}/identities/{{identity_id}}",
+            f"{users}/{user.id}/identities/{uuid7()}",
+            None,
+        ),
+        ("GET", providers, providers, None),
+        ("POST", providers, providers, new_provider),
+        ("GET", f"{providers}/{{provider_id}}", f"{providers}/{uuid7()}", None),
+        (
+            "PATCH",
+            f"{providers}/{{provider_id}}",
+            f"{providers}/{uuid7()}",
+            {"name": "X", "version": 1},
+        ),
+        (
+            "DELETE",
+            f"{providers}/{{provider_id}}",
+            f"{providers}/{uuid7()}?version=1",
+            None,
+        ),
+        ("POST", f"{providers}/{{provider_id}}/check", f"{providers}/{uuid7()}/check", None),
         ("GET", groups, groups, None),
         ("POST", groups, groups, {"name": "Neu"}),
         ("GET", f"{groups}/{{group_id}}", f"{groups}/{group.id}", None),

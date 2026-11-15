@@ -142,6 +142,7 @@ async def test_hostile_cursors_answer_422_everywhere(
         "{message_id}": message.json()["id"],
         "{skill_id}": skill.json()["id"],
         "{token_id}": token.json()["id"],
+        "{user_id}": str(member.id),
     }
     for template in _list_endpoints():
         if template in NEED_A_RUN:
