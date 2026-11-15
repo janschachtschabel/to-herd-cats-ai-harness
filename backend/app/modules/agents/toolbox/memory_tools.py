@@ -9,8 +9,11 @@ receive (`writing.leaks_into`), never on a page locked for AI, and at most
 `MAX_MEMORY_CHARS` (refused with a note to shorten it). From a DM of the person
 alone with the agent only into a space nobody but that person reads (what the model
 writes there may carry the DM's own words, which no check counts as read; review M6
-finding 16a). Through `writing.effect`: the page, its folders and the mapping commit
-with the call's journal entry.
+finding 16a). Under the personal mark only with the person's release of exactly that
+content, like any write, wherever it goes (her personal space included): memory
+carries no mark and reaches every later run of the agent (module review M8 4, K2).
+Through `writing.effect`: the page, its folders and the mapping commit with the
+call's journal entry.
 """
 
 import uuid

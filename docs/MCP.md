@@ -756,16 +756,18 @@ Recht 404 `ai.not_found`.
   geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Ein Ergebnis
   über den **eigenen Konnektor** der fragenden Person markiert den Lauf wie ein
   gelesener Entwurf (`Reads.personal`, im Journal als `read.personal`, sodass auch ein
-  fortgesetzter Lauf es weiß): Was er danach schreiben will, wo außer dieser Person
-  jemand lesen könnte (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein
-  Gedächtnis), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
+  fortgesetzter Lauf es weiß): Was er danach anderswo als allein mit ihr
+  schreiben will (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein Gedächtnis,
+  jeder Bereich), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
   freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte zeigt den
   Inhalt vollständig; was sich nicht vollständig zeigen lässt (ein Vergleich über
   `HERD_DIFF_MAX_LINES`), wird abgelehnt (`personal_release.too_large`), statt zur
-  Freigabe zu stehen (Review M8 3, Befund H5). Allein mit ihr in
-  der Direktnachricht und in Bereichen, die außer ihr niemand liest (ihr persönlicher
-  Bereich), geht alles ohne Freigabe weiter (Review M8 3, Befund H7). In einem Kanal, Thread oder
+  Freigabe zu stehen (Review M8 3, Befund H5). Ohne Freigabe schreibt er nur in sein
+  eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten; markiert).
+  Jeder andere Ort wartet, auch ihr persönlicher Bereich, ein Bereich, in dem sie heute
+  allein ist, und das Gedächtnis des Agenten: Was dort steht, trägt keine Marke
+  (Review M8 4, Befunde K1 und K2). In einem Kanal, Thread oder
   einer Direktnachricht mit mehreren bleiben seine Antwort und seine Rückfrage
   zurückgehalten: Er endet statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Die

@@ -154,7 +154,7 @@ async def set_ticket_status(ctx: WriteContext, args: SetTicketStatusArgs) -> Too
             else ("Only a person sets a status of category done or cancelled")
         )
         return refusal("ticket", f"{why}. You may set: {names}.", attrs)
-    if drafted := await carries_draft(ctx, into=(ticket.space_id,)):
+    if drafted := await carries_draft(ctx):
         return refusal("ticket", drafted, attrs)
 
     async def write() -> ToolResult:
@@ -210,7 +210,7 @@ async def link_ticket_page(ctx: WriteContext, args: LinkTicketPageArgs) -> ToolR
         page = None
     if ticket is None or page is None:
         return refusal("ticket", NOT_FOUND, attrs)
-    if why := await carries_draft(ctx, into=(ticket.space_id, page.space_id)):
+    if why := await carries_draft(ctx):
         return refusal("ticket", why, attrs)
 
     async def write() -> ToolResult:

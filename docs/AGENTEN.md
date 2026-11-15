@@ -513,21 +513,24 @@ wer in dessen Bereich Seiten bearbeiten darf.
 externes Werkzeug ein Ergebnis über den persönlichen Konnektor der fragenden Person
 (Server mit `connector_scope` `personal`), trägt der Lauf die persönliche Marke
 (`Reads.personal`, im Journal unter `read.personal`). Seit Review M8 2 (Befund G2) wird
-ein Schreiben, das andere als die Person lesen könnten, nicht mehr abgelehnt: Jedes
-schreibende Werkzeug der Tabelle (ein Kanal, ein Ticket, eine Seite, ein Vorschlag,
-eine Gedächtnisseite, ein Skill, auch `post_message` ins eigene Gespräch, wo andere
-mitlesen) wartet auf die **Freigabe der fragenden Person**, die genau den Inhalt zeigt,
+ein Schreiben unter der Marke nicht mehr abgelehnt: Jedes schreibende Werkzeug der
+Tabelle (ein Kanal, ein Ticket und seine Felder, eine Seite, ein Vorschlag, eine
+Gedächtnisseite, ein Skill oder Skill-Vorschlag, eine Übergabe, auch `post_message`
+ins eigene Gespräch, wo andere mitlesen) wartet auf die **Freigabe der fragenden
+Person**, die genau den Inhalt zeigt,
 der geschrieben würde (die Freigabekarte trägt `personal: true`, ihre Angaben stehen
 offen; im Lauf einer Automatisierung oder Ereignisregel gibt die Eigentümerin frei).
 Gibt sie frei, läuft genau dieser Aufruf, und was so geschrieben wird, ist nicht
 markiert: Sie hat entschieden, es zu veröffentlichen. Lehnt sie ab, sieht das Modell
-die Ablehnung. Ins eigene Gespräch allein mit dem Agenten braucht es keine Freigabe;
-was dort steht, ist markiert. Ebenso wenig in einen Bereich, den außer ihr niemand
-liest (ihr persönlicher Bereich oder ein Bereich, in dem sie allein Mitglied ist; ein
-Admin, der kraft Adminrecht hineinsieht, wird auditiert): Ein Gedächtnis, ein Ticket
-oder eine Seite dort schreibt der Lauf ohne Freigabe (Review M8 3, Befund H7). Wer
-später weitere Personen in einen solchen Bereich holt, entscheidet selbst darüber,
-was sie dort lesen. Zurückgehalten bleiben die eigene Antwort des Laufs und
+die Ablehnung. Der **einzige** Ort, an den ein markierter Lauf ohne Freigabe schreibt,
+ist sein eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten); was
+dort steht, ist markiert (`personal`). Jeder andere Ort wartet auf ihre Freigabe, auch
+ihr persönlicher Bereich und ein Teambereich, in dem sie heute allein Mitglied ist,
+und auch das Gedächtnis des Agenten (Review M8 4, Befunde K1 und K2; die Ausnahme aus
+Review M8 3, Befund H7, ist zurückgenommen): Was dort steht, trägt keine Marke, ein
+Teambereich kann später Mitglieder bekommen, und ein Gedächtnis liest jeder spätere
+Lauf des Agenten (auch der einer Automation oder einer nach „Neu beginnen“) ohne
+Marke. So steht nirgends ohne Marke, was sie nicht freigegeben hat. Zurückgehalten bleiben die eigene Antwort des Laufs und
 `ask_user`, wo andere mitlesen (Kanal, Thread einer Seite oder eines Tickets,
 Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
 `policy_blocked` (`personal_connector`, im Halt-Ereignis und im Hinweis des Gesprächs,
