@@ -16,6 +16,7 @@ from app.core.security import (
     dummy_password_hash,
     hash_password,
     hash_token,
+    needs_rehash,
     new_session_token,
     verify_password,
 )
@@ -327,3 +328,21 @@ async def test_bootstrap_takes_a_lock(session: AsyncSession) -> None:
         )
     )
     assert held == 1
+
+
+async def test_a_login_rehashes_a_password_stored_with_old_parameters(
+    client: AsyncClient, owner_user: User, session: AsyncSession
+) -> None:
+    """ASVS 5.0 V11.2.2: when the hashing parameters move on, each person's hash moves
+    with them at their next login (the old one still verifies until then)."""
+    from argon2 import PasswordHasher  # noqa: PLC0415
+
+    weak = PasswordHasher(time_cost=1, memory_cost=8 * 1024, parallelism=1).hash(PASSWORD)
+    owner_user.password_hash = weak
+    await session.flush()
+    body = {"email": owner_user.email, "password": PASSWORD}
+    assert (await client.post("/api/auth/login", json=body, headers=CSRF)).status_code == 200
+    await session.refresh(owner_user)
+    assert owner_user.password_hash != weak
+    assert not needs_rehash(owner_user.password_hash)
+    assert verify_password(owner_user.password_hash, PASSWORD)

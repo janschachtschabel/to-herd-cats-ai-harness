@@ -13,7 +13,9 @@ from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.retention import upkeep_after
 from app.core.security import (
+    hash_password_async,
     hash_token,
+    needs_rehash,
     new_session_token,
     password_work,
     verify_against_dummy,
@@ -85,12 +87,17 @@ class AuthService:
             await per_account.fail(attempt)
             raise Unauthorized(code="auth.invalid_credentials")
         await per_account.end(attempt)  # a success is not a failed attempt
+        # Today's hashing parameters, computed before the person's row is read again
+        # (no connection held while hashing).
+        rehashed = await hash_password_async(password) if needs_rehash(checked or "") else None
         # Read again: the person may have been deactivated or got a new password
         # while the password was being checked.
         await self.session.refresh(user)
         if not user.is_active or user.password_hash != checked:
             await self.session.commit()
             raise Unauthorized(code="auth.invalid_credentials")
+        if rehashed is not None:
+            user.password_hash = rehashed
         return user, await self.open_session(user, utcnow())
 
     async def open_session(self, user: User, now: datetime) -> str:
