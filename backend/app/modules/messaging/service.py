@@ -127,10 +127,12 @@ class MessageService:
         mentions: Iterable[uuid.UUID] = (),
         by: Authorship | None = None,
         card: MessageKind | None = None,
+        personal: bool = False,
     ) -> Posted:
         """`by`: written for an agent (`kind=agent`, or `card`: an approval or a
         question card of its run, plan M6 task 7), or the person's own through an
-        access token (`via_token`)."""
+        access token (`via_token`). `personal`: an agent's message that holds its
+        asker's personal content (`message.personal`, module review M8 2)."""
         conversation = await self.reader.readable(actor, conversation_id)
         await self.reader.require_post(actor, conversation)
         body_md = checked_body(body_md)
@@ -140,6 +142,8 @@ class MessageService:
             raise ValueError("an agent's message needs a client_id")
         if card is not None and not agent:
             raise ValueError("a card is an agent's")
+        if personal and not agent:
+            raise ValueError("only an agent's message is marked personal")
         author = by.principal if by else actor.principal
         repo = self.repo(actor)
         parent = await threads.lock_parent(repo, conversation, parent_id) if parent_id else None
@@ -154,6 +158,7 @@ class MessageService:
                 "client_id": client_id,
                 "run_id": by.run_id if by else None,
                 "via_token": by.via_token if by else None,
+                "personal": personal,
                 "created_at": utcnow(),
             }
         )

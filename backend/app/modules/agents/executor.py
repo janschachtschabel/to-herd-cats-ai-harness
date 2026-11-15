@@ -28,11 +28,12 @@ works.
 - The end, in one transaction: `closing.close`. A run that holds a result of the
   person's own connector answers only where the person is alone with the agent
   (`writing.into_own`); anywhere else it ends `policy_blocked` (`personal_connector`)
-  without its answer. A later run alone with the person where an earlier one read that
-  way starts with the mark (the history holds what was said). A run whose question was deleted
-  before it started (no person's message after the last answer, the mentioning
-  message deleted, the ticket gone, the automation's term gone) ends `completed` at
-  once, without a call, an answer or a notice.
+  without its answer. A run whose history window holds a message marked personal
+  starts marked, journaled at once as a `mark` event (`personal_mark.py`); its answer
+  is marked too. A run whose question was deleted before it started (no person's
+  message after the last answer, the mentioning message deleted, the ticket gone, the
+  automation's term gone) ends `completed` at once, without a call, an answer or a
+  notice.
 
 Taking a run up again (plan M6 decision 1): the run replays its journal (`journal.py`)
 and goes on after its last recorded step, with what it had read restored; the
@@ -48,10 +49,8 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core import secrets
-from app.modules.agents import briefing, place
+from app.modules.agents import briefing, personal_mark, place
 from app.modules.agents.actor import Reads, allowed_actor
 from app.modules.agents.closing import PERSONAL_DETAIL, close
 from app.modules.agents.control_repository import ControlRepository
@@ -59,8 +58,7 @@ from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import renamed, replay
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
-from app.modules.agents.run_models import StopReason
-from app.modules.agents.scope import PlaceKind, place_of
+from app.modules.agents.run_models import EventKind, StopReason
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
@@ -145,11 +143,15 @@ class Executor:
             # a draft's thread (or a draft memory page) is its editors' alone: the mark
             drafts = await ReadRepository(session, org).draft_spaces(journal.reads.pages)
             journal.reads.drafts |= drafts
-            if await _said_personal(session, claimed):
-                journal.reads.personal = True
             found = await place.asked(session, claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
+            seq = journal.seq
+            present = personal_mark.in_window(found.turns)  # the history it is given
+            if present and not journal.reads.personal:  # journaled before any model call
+                seq += 1
+                await steps.event(seq, EventKind.MARK, personal_mark.mark_event())
+                journal.reads.personal = True
             target = _target(connection, uses.model)
             deadline = self.clock() + agent.max_runtime_seconds
             entries = await AgentRepository(session, org).tool_entries(agent.id)
@@ -174,15 +176,16 @@ class Executor:
                 connection.secret_ref,
                 deadline,
                 reads=journal.reads,
-                seq=journal.seq,
+                seq=seq,
                 tools=tools,
                 reply_to=found.reply_to,
                 event_rule=found.automation_kind == AutomationKind.EVENT,
             )
+        sections = [*briefed.sections, personal_mark.PRESENT] if present else briefed.sections
         instructions = context.instructions(
             agent.name,
             agent.instructions,
-            briefed.sections,
+            sections,
             found.asker,
             found.automation_of,
             found.automation_kind,
@@ -230,23 +233,19 @@ class Executor:
                 c = claimed
                 if await into_own(session, reads, c.org_id, c.conversation_id, c.user_id):
                     outcome = Outcome("policy_blocked", detail=PERSONAL_DETAIL)
+            marked = reads is not None and reads.personal  # alone with the person (above)
             reason = await close(
-                session, steps, run, StopReason(outcome.reason), outcome.answer, outcome.detail
+                session,
+                steps,
+                run,
+                StopReason(outcome.reason),
+                outcome.answer,
+                outcome.detail,
+                personal=marked,
             )
         if reason == StopReason.BUDGET:  # committed; the detail is the budget's scope
             budget_stops().labels(scope=outcome.detail or "unknown").inc()
         return reason
-
-
-async def _said_personal(session: AsyncSession, claimed: Claimed) -> bool:
-    """Alone with the agent, an earlier run may have said there what its asker read
-    with her own connector; the history holds it, so a later run carries the mark on
-    (module review M8 1). Elsewhere no such run wrote anything into the conversation."""
-    org, conversation = claimed.org_id, claimed.conversation_id
-    spot = await place_of(session, org, conversation, claimed.user_id)
-    if spot is None or spot.kind != PlaceKind.ALONE:
-        return False
-    return await ReadRepository(session, org).personal_before(conversation, claimed.id)
 
 
 def _target(connection: AiConnection, model: str) -> models.ModelTarget:

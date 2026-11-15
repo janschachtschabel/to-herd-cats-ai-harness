@@ -67,6 +67,7 @@ class Turn:
     text: str
     name: str = ""  # `other`: who wrote it
     keep: bool = False  # the message that asked the run: never dropped
+    flagged: bool = False  # a message marked personal (`agents/personal_mark.py`)
 
 
 def instructions(

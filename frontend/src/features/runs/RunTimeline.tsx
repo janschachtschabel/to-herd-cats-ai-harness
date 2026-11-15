@@ -1,4 +1,4 @@
-import { Bot, CircleStop, EyeOff, Hourglass, Wrench } from 'lucide-react'
+import { Bot, CircleStop, EyeOff, Hourglass, UserLock, Wrench } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { budgetScopeText, stopText } from '@/features/agents/display'
@@ -154,6 +154,14 @@ export function RunTimeline({
             <ModelStep key={item.key} item={item} />
           ) : item.kind === 'tool' ? (
             <ToolStep key={item.key} item={item} />
+          ) : item.kind === 'mark' ? (
+            <Row
+              key={item.key}
+              icon={<UserLock className="size-3.5" />}
+              title={t('runs.timeline.mark.title')}
+            >
+              <p className="mt-1 text-sm">{t('runs.timeline.mark.text')}</p>
+            </Row>
           ) : item.kind === 'waiting' ? (
             <Row
               key={item.key}

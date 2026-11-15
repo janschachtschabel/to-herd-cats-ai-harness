@@ -111,7 +111,8 @@ class PastRunRepository:
         return [PastHit(r[0], r[1], r[2], EventKind(r[3]), r[4]) for r in rows]
 
     async def reads(self, run_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, RunReads]:
-        """What each of the runs read, from its tool calls' events."""
+        """What each of the runs read, from its tool calls' events, and whether it
+        carried the personal mark (also from a `mark` event)."""
         ids = sorted(set(run_ids))
         found: dict[uuid.UUID, RunReads] = {run_id: RunReads() for run_id in ids}
         if not ids:
@@ -119,7 +120,7 @@ class PastRunRepository:
         stmt = select(RunEvent.run_id, RunEvent.content).where(
             RunEvent.org_id == self.org_id,
             RunEvent.run_id.in_(ids),
-            RunEvent.kind == EventKind.TOOL_CALL,
+            RunEvent.kind.in_((EventKind.TOOL_CALL, EventKind.MARK)),
         )
         for run_id, content in await self.session.execute(stmt):
             into = found[run_id]

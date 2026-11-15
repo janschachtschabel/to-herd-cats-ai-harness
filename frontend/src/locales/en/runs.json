@@ -113,6 +113,10 @@
       "approval": {
         "rejected": "The release was rejected; the step did not run.",
         "stale": "The content changed after the release; the step did not run."
+      },
+      "mark": {
+        "title": "Personal content in the history",
+        "text": "The history this run was given holds messages with what the asking person read through her own connection. So the run carries her mark: what it writes from it stays with her."
       }
     },
     "cancel": {

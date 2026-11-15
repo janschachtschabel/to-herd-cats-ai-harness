@@ -7,8 +7,9 @@ participants it has: its audience is not the run's. Posted through `MessageServi
 with the run's actor (`channel.post` in the channel's space, which the write scope
 limits to the run's space), written for the agent (`kind=agent`, its run in
 `run_id`), after the audience check (`writing.leaks_into`; into its own conversation
-`writing.into_own_conversation`, for a result of the person's own connector). An
-agent's message mentions nobody and starts no run (`MessageService.post`, `by`).
+`writing.into_own_conversation`, for a result of the person's own connector; there,
+alone with the person, a marked run's message is marked personal too). An agent's
+message mentions nobody and starts no run (`MessageService.post`, `by`).
 """
 
 import hashlib
@@ -69,7 +70,13 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
         digest = hashlib.sha256(args.text.encode()).hexdigest()
         key = key_for(ctx, "post", conversation.id, args.reply_to, digest)
         posted = await MessageService(ctx.session).post(
-            ctx.actor, conversation.id, args.text, args.reply_to, client_id=key, by=by(ctx)
+            ctx.actor,
+            conversation.id,
+            args.text,
+            args.reply_to,
+            client_id=key,
+            by=by(ctx),
+            personal=own and ctx.reads.personal,  # only alone with the person (above)
         )
         return ToolResult("conversation", f"Posted message id={posted.message.id}.", attrs)
 

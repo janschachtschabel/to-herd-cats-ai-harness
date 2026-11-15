@@ -88,6 +88,7 @@ class EventKind(StrEnum):
     MODEL_CALL = "model_call"
     TOOL_CALL = "tool_call"
     STOP = "stop"
+    MARK = "mark"  # the history gave the run its asker's personal content (review M8 2)
 
 
 # Where "one open run" counts: a channel thread's root (`Run.lane_id`), else the

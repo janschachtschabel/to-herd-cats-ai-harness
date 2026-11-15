@@ -17,7 +17,7 @@ from app.modules.messaging.dm_schemas import (
     InspectionOut,
 )
 from app.modules.messaging.dms import DmService
-from app.modules.messaging.inspect import InspectService
+from app.modules.messaging.inspect import InspectService, withheld
 from app.modules.messaging.message_schemas import MessageOut
 from app.modules.messaging.router import message_page
 from app.modules.messaging.schemas import ConversationOut
@@ -86,4 +86,4 @@ async def inspected_messages(
     """The inspected DM's messages, replies included, newest first; 404 once the
     inspection has expired."""
     page = await InspectService(session).messages(actor, inspection_id, params)
-    return await message_page(session, actor, page)
+    return withheld(await message_page(session, actor, page))

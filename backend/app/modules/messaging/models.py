@@ -32,6 +32,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Computed,
     DateTime,
@@ -264,6 +265,12 @@ class Message(UuidPk, OrgScoped, Base):
     # A person's message through an access token at `/mcp`: the token's name (the AI
     # mark of what an external AI client wrote, plan M8 decision 3).
     via_token: Mapped[str | None] = mapped_column(String(VIA_TOKEN_CHARS))
+    # Written by a run that held what its asker read through her own connector, where
+    # she is alone with the agent (module review M8 2, G1): a run whose history window
+    # holds one carries that person's mark (`agents/personal_mark.py`).
+    personal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

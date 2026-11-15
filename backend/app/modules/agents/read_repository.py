@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import ColumnElement, exists, func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor, visible_space_ids
 from app.core.principal import PrincipalType
 from app.modules.agents.models import Agent
-from app.modules.agents.run_models import EventKind, Run, RunEvent
+from app.modules.agents.run_models import Run
 from app.modules.ai.policy import Policy
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.spaces.models import Space
@@ -40,13 +40,14 @@ class Whereabouts:
 @dataclass(frozen=True, slots=True)
 class Said:
     """A message as a run reads it: whether an agent wrote it, its author (id and name
-    as they are now; None once gone) and its text."""
+    as they are now; None once gone), its text, and whether it is marked personal."""
 
     by_agent: bool
     text: str
     author_id: uuid.UUID | None = None
     author_name: str | None = None
     message_id: uuid.UUID | None = None
+    personal: bool = False
 
 
 class ReadRepository:
@@ -72,6 +73,7 @@ class ReadRepository:
                 Message.author_id,
                 self._author_name(),
                 Message.id,
+                Message.personal,
                 at,
             )
             .where(
@@ -86,11 +88,10 @@ class ReadRepository:
             .limit(HISTORY_MESSAGES)
         )
         rows = list(reversed((await self.session.execute(stmt)).all()))
-        rows.sort(
-            key=lambda row: row[5] or until
-        )  # stable: messages of one moment keep their order
+        rows.sort(key=lambda row: row[6] or until)  # stable: one moment keeps its order
         return [
-            Said(k == MessageKind.AGENT, body, by, name, mid) for k, body, by, name, mid, _ in rows
+            Said(k == MessageKind.AGENT, body, by, name, mid, marked)
+            for k, body, by, name, mid, marked, _ in rows
         ]
 
     async def thread_root(self, trigger_id: uuid.UUID, *, lock: bool = False) -> Message | None:
@@ -117,7 +118,12 @@ class ReadRepository:
         in it written up to `until` (the run's start), oldest first."""
         stmt = (
             select(
-                Message.kind, Message.body_md, Message.author_id, self._author_name(), Message.id
+                Message.kind,
+                Message.body_md,
+                Message.author_id,
+                self._author_name(),
+                Message.id,
+                Message.personal,
             )
             .where(
                 Message.org_id == self.org_id,
@@ -131,7 +137,8 @@ class ReadRepository:
         )
         rows = reversed((await self.session.execute(stmt)).all())
         return [
-            Said(k == MessageKind.AGENT, body, by, name, mid) for k, body, by, name, mid in rows
+            Said(k == MessageKind.AGENT, body, by, name, mid, marked)
+            for k, body, by, name, mid, marked in rows
         ]
 
     async def person_name(self, user_id: uuid.UUID) -> str | None:
@@ -213,20 +220,3 @@ class ReadRepository:
         """Which of the spaces the actor (with its read scope) may read now."""
         stmt = visible_space_ids(actor).where(Space.id.in_(sorted(space_ids)))
         return set(await self.session.scalars(stmt))
-
-    async def personal_before(self, conversation_id: uuid.UUID, run_id: uuid.UUID) -> bool:
-        """Whether an earlier run in the conversation read through its asker's own
-        connector (a tool event with `read.personal`): what it said there is in the
-        conversation's history, which a later run reads."""
-        stmt = select(
-            exists().where(
-                Run.org_id == self.org_id,
-                Run.conversation_id == conversation_id,
-                Run.id != run_id,
-                RunEvent.org_id == self.org_id,
-                RunEvent.run_id == Run.id,
-                RunEvent.kind == EventKind.TOOL_CALL,
-                RunEvent.content["read"]["personal"].as_boolean().is_(True),
-            )
-        )
-        return bool(await self.session.scalar(stmt))

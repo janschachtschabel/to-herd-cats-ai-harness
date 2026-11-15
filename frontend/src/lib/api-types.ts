@@ -5331,7 +5331,7 @@ export interface components {
          * EventKind
          * @enum {string}
          */
-        EventKind: "model_call" | "tool_call" | "stop";
+        EventKind: "model_call" | "tool_call" | "stop" | "mark";
         /**
          * EventType
          * @description What an event rule listens to (decision 8).
@@ -5881,7 +5881,9 @@ export interface components {
          *     token's name (AI mark of an external AI client, plan M8).
          *     `mentions`: the people mentioned who may see the conversation; `reactions`: by
          *     emoji, the first reacted with first. `card`: set for a run's card (`kind`
-         *     `approval` or `question`).
+         *     `approval` or `question`). `personal`: an agent's message that holds what the
+         *     person read through her own connector (module review M8 2); only where she is
+         *     alone with the agent.
          */
         MessageOut: {
             author: components["schemas"]["MessageAuthorOut"] | null;
@@ -5916,6 +5918,11 @@ export interface components {
             mentions: string[];
             /** Parent Id */
             parent_id: string | null;
+            /**
+             * Personal
+             * @default false
+             */
+            personal?: boolean;
             /** Reactions */
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */
@@ -5983,6 +5990,11 @@ export interface components {
             not_notified: string[];
             /** Parent Id */
             parent_id: string | null;
+            /**
+             * Personal
+             * @default false
+             */
+            personal?: boolean;
             /** Reactions */
             reactions: components["schemas"]["ReactionOut"][];
             /** Reply Count */

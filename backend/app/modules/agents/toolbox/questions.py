@@ -8,7 +8,8 @@ answer`, only by that person) resumes the run; the same call then finds it and g
 it to the model as its result, framed as untrusted like every result. Nobody
 answering in time ends the run with `waiting_timeout`. A run that holds a result of
 the person's own connector asks only where the person is alone with the agent
-(`writing.into_own_conversation`): others would read the question too.
+(`writing.into_own_conversation`): others would read the question too; there, a
+marked run's question is marked personal (`message.personal`).
 """
 
 from typing import Annotated
@@ -58,7 +59,12 @@ async def ask_user(ctx: ToolContext, args: AskUserArgs) -> ToolResult | Wait:
             )
         )
         card = await cards.post(
-            ctx, MessageKind.QUESTION, question.id, args.question, question.addressed_to
+            ctx,
+            MessageKind.QUESTION,
+            question.id,
+            args.question,
+            question.addressed_to,
+            personal=ctx.reads.personal,  # only alone with the person (above)
         )
         question.message_id = card.id
         await ctx.session.flush()

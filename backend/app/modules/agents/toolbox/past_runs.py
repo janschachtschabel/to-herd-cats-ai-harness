@@ -17,10 +17,12 @@ the model's words are the conversation's content, which the run view shows nobod
 else, whatever spaces the other hits came from (review M6 finding 10).
 Outside a DM of the person alone with the agent, only runs of the same conversation:
 another conversation's audience is not this one's (plan M6 decision 5). A run whose
-conversation the person no longer sees is left out too. The words of a run that read
-through the person's own connector (its personal mark) are found only alone with the
-agent, and mark the run that finds them (module review M8 1: a later run in the same
-channel found them before and could post them there).
+conversation the person no longer sees is left out too. Anything of a run that
+carried the personal mark (its journal notes `read.personal`, from a connector's
+result, a tool or its history: `personal_mark.py`), its words and its results alike,
+is found only alone with the agent, and marks the run that finds it, journaled with
+this call's result (module review M8 1 and 2: a later run in the same channel found
+it before and could post it there; a run that found it kept the mark only in memory).
 """
 
 import uuid
@@ -37,6 +39,7 @@ from app.modules.agents.past_runs_repository import (
     RunReads,
     event_reads,
 )
+from app.modules.agents.personal_mark import PERSONAL_LINE
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.run_models import EventKind
 from app.modules.agents.runs import ASKER_ONLY, may_read_all, may_read_drafts
@@ -77,26 +80,27 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
         conversation_id=None if place.kind == PlaceKind.ALONE else run.conversation_id,
         limit=CANDIDATES,
     )
-    of_runs = await repo.reads(h.run_id for h in hits if _words(h))
+    of_runs = await repo.reads(h.run_id for h in hits)
     checker = _Checker(ctx)
     lines: list[str] = []
     spaces: set[uuid.UUID] = set()
     private = False
     for hit in hits:
         noted = of_runs[hit.run_id] if _words(hit) else event_reads(hit.content)
-        if noted.personal and place.kind != PlaceKind.ALONE:
+        personal = of_runs[hit.run_id].personal  # anything of a marked run
+        if personal and place.kind != PlaceKind.ALONE:
             continue  # what the person read with her own connector: hers alone
         now = await checker.readable(hit, noted)
         if now is None:
             continue
-        ctx.reads.personal |= noted.personal
+        ctx.reads.personal |= personal  # the host journals it with this result
         spaces |= now
         private |= _words(hit) or not now or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
         ctx.reads.spaces |= now
         ctx.reads.pages |= noted.pages
         ctx.reads.tickets |= noted.tickets
         ctx.reads.drafts |= noted.drafts
-        lines.append(_line(hit, args.query))
+        lines.append((PERSONAL_LINE if personal else "") + _line(hit, args.query))
         if len(lines) == HITS:
             break
     attrs = {ASKER_ONLY: "true"} if private else {}

@@ -159,7 +159,9 @@ class MessageOut(BaseModel):
     token's name (AI mark of an external AI client, plan M8).
     `mentions`: the people mentioned who may see the conversation; `reactions`: by
     emoji, the first reacted with first. `card`: set for a run's card (`kind`
-    `approval` or `question`)."""
+    `approval` or `question`). `personal`: an agent's message that holds what the
+    person read through her own connector (module review M8 2); only where she is
+    alone with the agent."""
 
     id: uuid.UUID
     conversation_id: uuid.UUID
@@ -179,6 +181,7 @@ class MessageOut(BaseModel):
     reactions: list[ReactionOut]
     system: SystemEntryOut | None
     card: CardOut | None = None
+    personal: bool = False
 
     @classmethod
     def of(cls, view: MessageView) -> "MessageOut":
@@ -207,6 +210,7 @@ class MessageOut(BaseModel):
             reactions=[ReactionOut.of(r) for r in view.reactions],
             system=SystemEntryOut.of(view.system) if view.system else None,
             card=_card(message),
+            personal=message.personal,
         )
 
 

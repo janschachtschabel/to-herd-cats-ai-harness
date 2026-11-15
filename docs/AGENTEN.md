@@ -508,13 +508,40 @@ eigene Gespräch ist nur ausgenommen, solange die Person allein mit dem Agenten 
 Seite oder eines Tickets, Direktnachricht mit mehreren) ebenfalls abgelehnt; der Lauf
 endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, im
 Halt-Ereignis und im Hinweis des Gesprächs, `system.stop_detail`: die Person liest dort,
-dass sie in einer Direktnachricht allein mit dem Agenten fragen kann). Die Marke reicht
-über den Lauf hinaus, so weit das Gesagte reicht (Review M8 1, Verdachtsprüfung): Ein
-späterer Lauf in der Direktnachricht allein mit dem Agenten, in der ein Lauf mit Marke
-lief, beginnt mit der Marke (ihr Verlauf hält, was dort gesagt wurde); `search_past_runs`
-findet die Worte eines Laufs mit Marke nur allein mit dem Agenten und markiert dann den
-suchenden Lauf, in einem Kanal oder Thread findet es sie nicht. Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
-unbekanntem Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
+dass sie in einer Direktnachricht allein mit dem Agenten fragen kann).
+
+Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Workers
+(Review M8 2, Befund G1; `agents/personal_mark.py`):
+
+- **Persönliche Inhalte** sind ein Ergebnis des eigenen Konnektors und jede Nachricht,
+  die ein markierter Lauf schreibt (Antwort, `post_message` ins eigene Gespräch,
+  Rückfrage): Sie trägt `message.personal` (in der API `personal: true`). Solche
+  Nachrichten gibt es nur in der Direktnachricht allein mit dem Agenten.
+- **Markiert wird ein Lauf**, sobald persönlicher Inhalt in seinen Kontext kommt, und
+  dieser Moment steht sofort im Journal: das Ergebnis des eigenen Konnektors
+  (`read.personal`), eine markierte Nachricht im Verlaufsfenster, das er zu Beginn
+  bekommt (ein eigenes Journalereignis `mark` vor dem ersten Modellaufruf; das Modell
+  erfährt in seinen Anweisungen, dass der Verlauf Persönliches enthält, das es in
+  diesem Lauf nicht selbst gelesen hat), ein Treffer von `search_past_runs` aus einem
+  markierten Lauf (Worte wie Werkzeugergebnisse; nur allein mit dem Agenten zu finden,
+  im Kanal oder Thread nie) und eine markierte Nachricht, die `read_conversation`
+  zurückgibt (beide mit `read.personal` am Aufruf, die Zeile beginnt mit
+  `(personal)`). Fortsetzung nach Verlust des Workers, nach einer Rückfrage oder einer
+  Freigabe liest die Marke aus dem Journal.
+- **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
+  Verlaufsfenster und Werkzeugergebnisse nichts Markiertes enthalten, beginnt und
+  bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,
+  hält sich die Marke in einer laufenden Direktnachricht, solange markierte Antworten
+  im Verlaufsfenster stehen (24.000 Zeichen, die neuesten zuerst).
+- **Wer markierte Nachrichten liest**: wer die Direktnachricht liest, also die Person.
+  Die Nachrichtensuche findet ohnehin nur Nachrichten von Personen, die Laufansicht
+  zeigt anderen weder die Worte des Modells noch Ergebnisse ohne Bereich, `/mcp` hat
+  kein Werkzeug, das Nachrichten oder Läufe liest, und die Einsicht eines Admins in
+  die Direktnachricht zeigt eine markierte Nachricht mit Platz, Verfasser und Marke,
+  aber ohne Text.
+
+Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit unbekanntem
+Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
 noch die Entwurfsmarke: Sie warten immer auf die Freigabe der fragenden Person über
 genau diese Argumente. Mit der Marke gilt das auch für jedes **lesende** externe
 Werkzeug eines Servers, den der Lauf nicht über den eigenen Konnektor dieser Person

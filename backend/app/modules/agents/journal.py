@@ -7,7 +7,8 @@ for its calls (by call id). The steps run from 1 without a gap; should one be mi
 the journal ends before it and the loop calls the model again from there.
 
 `renamed` gives recorded calls a tool's name as it is now (an external tool's journal
-of an earlier release: `toolbox/external.legacy_names`).
+of an earlier release: `toolbox/external.legacy_names`). A `mark` event restores the
+personal mark the run's history gave it (`personal_mark.py`).
 """
 
 import uuid
@@ -46,6 +47,8 @@ def replay(events: Iterable[RunEvent]) -> Replay:
             reads.tickets |= _ids(read.get("tickets"))
             reads.drafts |= _ids(read.get("drafts"))
             reads.personal |= read.get("personal") is True
+        elif event.kind == EventKind.MARK:  # the history gave it personal content
+            reads.personal |= (content.get("read") or {}).get("personal") is True
     steps: list[Recorded] = []
     while (answer := answers.get(len(steps) + 1)) is not None:
         calls = tuple(

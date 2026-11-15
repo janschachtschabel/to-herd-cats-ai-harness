@@ -10,7 +10,10 @@ them in. The only way to read one is this service, and each step needs `dm.inspe
   60 minutes, written to the audit log as `dm.admin_access` with the conversation
   and the reason, and shown to the participants on the conversation.
 - `messages`: the DM's messages through one's own inspection while it lasts;
-  afterwards, and for anyone else, 404 `dm_inspection.not_found`.
+  afterwards, and for anyone else, 404 `dm_inspection.not_found`. A message marked
+  personal (what the person read through her own connector, in her DM with an agent;
+  module review M8 2) comes withheld: its place, author and mark stay, its text is
+  empty (`withheld`). It is hers alone, as the run view keeps it.
 
 An inspection only reads: it gives no visibility anywhere else, so writing,
 reacting, marking as read, search and live events stay closed to it.
@@ -35,6 +38,7 @@ from app.core.pagination import (
 from app.modules.audit.recorder import record
 from app.modules.messaging.dm_repository import InspectionRepository
 from app.modules.messaging.dms import DmEntry, entry_page
+from app.modules.messaging.message_schemas import MessageOut
 from app.modules.messaging.models import DmInspection, Message
 from app.modules.messaging.visibility import conversation_not_found
 
@@ -97,3 +101,9 @@ class InspectService:
             raise NotFound(code="dm_inspection.not_found")
         rows = await repo.messages(inspection.conversation_id, before, params.limit + 1)
         return id_page(rows, params.limit, lambda m: m.id)
+
+
+def withheld(page: Page[MessageOut]) -> Page[MessageOut]:
+    """The inspected messages with the text of those marked personal left out."""
+    items = [m.model_copy(update={"body_md": ""}) if m.personal else m for m in page.items]
+    return Page[MessageOut](items=items, next_cursor=page.next_cursor)

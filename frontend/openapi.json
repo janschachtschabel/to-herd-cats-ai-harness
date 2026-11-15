@@ -4898,7 +4898,8 @@
         "enum": [
           "model_call",
           "tool_call",
-          "stop"
+          "stop",
+          "mark"
         ],
         "title": "EventKind",
         "type": "string"
@@ -6123,7 +6124,7 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`via_token`: a person's message written through an access token at `/mcp`, the\ntoken's name (AI mark of an external AI client, plan M8).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first. `card`: set for a run's card (`kind`\n`approval` or `question`).",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`via_token`: a person's message written through an access token at `/mcp`, the\ntoken's name (AI mark of an external AI client, plan M8).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first. `card`: set for a run's card (`kind`\n`approval` or `question`). `personal`: an agent's message that holds what the\nperson read through her own connector (module review M8 2); only where she is\nalone with the agent.",
         "properties": {
           "author": {
             "anyOf": [
@@ -6234,6 +6235,11 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "personal": {
+            "default": false,
+            "title": "Personal",
+            "type": "boolean"
           },
           "reactions": {
             "items": {
@@ -6465,6 +6471,11 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "personal": {
+            "default": false,
+            "title": "Personal",
+            "type": "boolean"
           },
           "reactions": {
             "items": {

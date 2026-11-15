@@ -220,6 +220,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Die persönliche Marke reicht so weit wie das Gesagte. Ein späterer Lauf in der Direktnachricht allein mit dem Agenten, in der ein markierter Lauf lief, beginnt mit der Marke; `search_past_runs` findet die Worte eines markierten Laufs nur allein mit dem Agenten und markiert dann den suchenden Lauf. Vorher konnte ein späterer Lauf sie in einen Kanal tragen. Review M8 1, Verdachtsprüfung.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Die persönliche Marke folgt dem Inhalt und ist gespeichert, statt geerbt zu werden. Jede Nachricht, die ein markierter Lauf schreibt (Antwort, Nachricht ins eigene Gespräch, Rückfrage), trägt die Marke (`message.personal`); es gibt sie nur in der Direktnachricht allein mit dem Agenten. Ein Lauf ist markiert, sobald markierter Inhalt in seinen Kontext kommt: über sein Verlaufsfenster zu Beginn, einen Treffer von `search_past_runs` aus einem markierten Lauf oder eine markierte Nachricht aus `read_conversation`. Dieser Moment steht sofort im Journal, sodass Wiederaufnahme nach Verlust des Workers, nach einer Rückfrage oder einer Freigabe die Marke behält. Ohne markierten Inhalt im Kontext beginnt ein Lauf ohne Marke. Die Einsicht eines Admins zeigt markierte Nachrichten ohne Text. Review M8 2, Befund G1.*
+
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]
 
 Die Schnittmenge in 5.4 schützt das **Lesen**. Ein Agent schreibt aber in Gespräche mit eigenem Publikum. Damit dort nichts durchsickert, wird der Lesebereich eines Laufs zusätzlich auf das **Publikum des Ausgabeorts** begrenzt:

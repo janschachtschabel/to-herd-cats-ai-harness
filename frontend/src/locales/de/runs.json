@@ -113,6 +113,10 @@
       "approval": {
         "rejected": "Die Freigabe wurde abgelehnt; der Schritt lief nicht.",
         "stale": "Der Inhalt hatte sich nach der Freigabe geändert; der Schritt lief nicht."
+      },
+      "mark": {
+        "title": "Persönliches im Verlauf",
+        "text": "Der Verlauf, den der Lauf bekam, enthält Nachrichten mit dem, was die fragende Person über ihren eigenen Zugang gelesen hat. Der Lauf trägt deshalb ihre Markierung: Was er daraus schreibt, bleibt bei ihr."
       }
     },
     "cancel": {

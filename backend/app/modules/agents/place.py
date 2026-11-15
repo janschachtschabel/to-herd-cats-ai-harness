@@ -126,9 +126,10 @@ async def _asked(reads: ReadRepository, claimed: Claimed) -> Asked | None:
 
 def _turn(said: Said, claimed: Claimed) -> Turn:
     if said.by_agent and said.author_id == claimed.agent_id:
-        return Turn("agent", said.text)
+        return Turn("agent", said.text, flagged=said.personal)
     if not said.by_agent and said.author_id == claimed.user_id:
         asked = said.message_id is not None and said.message_id == claimed.trigger_message_id
         return Turn("person", said.text, keep=asked)  # its question stays in the window
     name = said.author_name or "someone"
-    return Turn("other", said.text, f"{name} (agent)" if said.by_agent else name)
+    who = f"{name} (agent)" if said.by_agent else name
+    return Turn("other", said.text, who, flagged=said.personal)

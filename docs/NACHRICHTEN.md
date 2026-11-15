@@ -168,7 +168,9 @@ Direktnachrichten“ (Spezifikation 5.5, Plan M3 Entscheidung 6):
    einschließlich Thread-Antworten, neueste zuerst, **nur lesend** (keine Eingabe,
    keine Reaktion, kein Bearbeiten oder Löschen). Danach, oder für jemand anderes,
    antwortet die API 404 `dm_inspection.not_found`; eine neue Einsicht braucht eine neue
-   Begründung.
+   Begründung. Eine Nachricht eines Agenten mit persönlicher Marke (`personal`: was die
+   Person über ihren eigenen Konnektor las, siehe [`AGENTEN.md`](AGENTEN.md)) erscheint
+   mit Platz, Verfasser und Marke, aber ohne Text.
 4. Das Audit vermerkt `dm.admin_access` mit Begründung und Einsicht. Die Teilnehmenden
    sehen im Gespräch „Von der Verwaltung eingesehen am … (Name)“.
 

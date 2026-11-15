@@ -50,9 +50,12 @@ async def close(
     reason: StopReason,
     answer: str | None = None,
     detail: str | None = None,
+    *,
+    personal: bool = False,
 ) -> StopReason:
     """End the run (locked by the caller) with its answer or a notice, and queue the
-    run for a question it leaves unanswered."""
+    run for a question it leaves unanswered. `personal`: the run carries the personal
+    mark, so its answer is marked (`message.personal`)."""
     claimed = steps.run
     by = await ControlRepository(session, claimed.org_id).cancelled_by(run.id)
     if by is not None:
@@ -65,7 +68,7 @@ async def close(
     root = None if quiet else await _thread(session, claimed)
     if reason == StopReason.COMPLETED:
         if answer is not None and not quiet:
-            message = await steps.answer(answer[:MAX_BODY_CHARS], root)
+            message = await steps.answer(answer[:MAX_BODY_CHARS], root, personal=personal)
             if message is not None:
                 if root is not None:
                     threads.count_reply(root, message)

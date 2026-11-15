@@ -52,10 +52,17 @@ def summary(tool: str, args: dict[str, object]) -> str:
 
 
 async def post(
-    ctx: ToolContext, kind: MessageKind, card_id: uuid.UUID, text: str, to: uuid.UUID
+    ctx: ToolContext,
+    kind: MessageKind,
+    card_id: uuid.UUID,
+    text: str,
+    to: uuid.UUID,
+    *,
+    personal: bool = False,
 ) -> Message:
     """The card, and the activity entry of the person it asks. Where it answers: a
-    heartbeat's run opens its term's thread only now (`automations/runs.py`)."""
+    heartbeat's run opens its term's thread only now (`automations/runs.py`).
+    `personal`: a marked run's question (`message.personal`)."""
     thread = ctx.run.reply_to
     if thread is None:
         opened = await automation_runs.open_thread(ctx.session, ctx.run.org_id, ctx.run.id)
@@ -68,6 +75,7 @@ async def post(
         client_id=card_id,
         by=by(ctx),
         card=kind,
+        personal=personal,
     )
     reason = (
         NotificationReason.APPROVAL if kind == MessageKind.APPROVAL else NotificationReason.QUESTION

@@ -257,9 +257,12 @@ class RunSteps:
             return 0.0
         return max((start + RATE_WINDOW - now).total_seconds(), 0.05)
 
-    async def answer(self, text_md: str, parent: Message | None) -> Message | None:
+    async def answer(
+        self, text_md: str, parent: Message | None, *, personal: bool = False
+    ) -> Message | None:
         """The agent's answer, once per run (`client_id` = the run; None if written);
-        with `parent`: a reply in its thread (the caller counts it)."""
+        with `parent`: a reply in its thread (the caller counts it); `personal`: it
+        holds its asker's personal content (`message.personal`)."""
         stmt = (
             insert(Message)
             .values(
@@ -270,6 +273,7 @@ class RunSteps:
                 author_id=self.run.agent_id,
                 kind=MessageKind.AGENT,
                 body_md=text_md,
+                personal=personal,
                 client_id=self.run.id,
                 run_id=self.run.id,
                 created_at=utcnow(),

@@ -297,9 +297,12 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   - A result through the asker's own connector marks the run (`Reads.personal`, like
     the draft mark): it writes nothing others may read, and every call of an external
     server it does not use with the asker's own connector (read tools included) waits
-    for the asker's release of the exact arguments (automation runs: the owner). Later
-    runs inherit it where they read what was said: alone with the asker in that DM,
-    and through `search_past_runs` (which finds a marked run's words only there).
+    for the asker's release of the exact arguments (automation runs: the owner). The
+    mark follows the content and is persisted (`agents/personal_mark.py`): every
+    message a marked run writes is `message.personal` (only alone with the asker); a
+    run is marked, journaled at once, when such content enters its context (history
+    window: a `mark` event; `search_past_runs`, `read_conversation`: `read.personal`);
+    never by memory alone. No marked content in its context: no mark.
   - A connector's secret goes only to the origin (OAuth: the endpoints) it was given
     for: a server's new origin or a client's new endpoints disconnect its connectors
     (`connectors/moving.py`; a shared one stays only when the change says so).

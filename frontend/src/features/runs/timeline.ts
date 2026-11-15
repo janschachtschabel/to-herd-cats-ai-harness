@@ -36,6 +36,7 @@ export type TimelineItem =
   /** A call that has no result yet while the run waits: for a release or an answer. */
   | { kind: 'waiting'; key: string; step: number; call: AskedCall }
   | { kind: 'stop'; key: string; reason: string | null; detail: string | null; event: RunEvent }
+  | { kind: 'mark'; key: string; event: RunEvent }
 
 /** What an external call's result says (the host's fixed words, never the server's). */
 export type ExternalOutcome =
@@ -103,7 +104,8 @@ function calls(value: unknown): AskedCall[] {
  * it is one row, where it was sent, with its latest entry; an unknown outcome that is
  * the run's last entry while it still runs is "being sent". While the run waits, the
  * calls of its last step that have no result yet are shown as waiting (for a release
- * or an answer). A redacted event keeps only its step and name; its rows say so.
+ * or an answer). A redacted event keeps only its step and name; its rows say so. A
+ * `mark` event (the run's history held personal messages) is a row of its own.
  */
 export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineItem[] {
   const items: TimelineItem[] = []
@@ -149,6 +151,8 @@ export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineIt
       } else {
         items[at] = { ...item, key: items[at]!.key }
       }
+    } else if (event.kind === 'mark') {
+      items.push({ kind: 'mark', key: event.id, event })
     } else {
       items.push({
         kind: 'stop',
