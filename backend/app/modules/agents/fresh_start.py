@@ -14,9 +14,18 @@ she released. Earlier messages stay as they are, marked ones too.
   someone who cannot see the DM gets 404 `conversation.not_found`, anywhere else 403
   `conversation.not_alone_with_agent`; `version` as read (409
   `conversation.version_conflict`).
+- The DM's row is held first (`FOR NO KEY UPDATE`), and a person's new message there
+  holds it `FOR SHARE` (`MessageService.post`), so the two are serialised (module
+  review M8 4, K4): a message that came first, with the run it queued, is committed
+  and seen here; one that comes later waits and is written after the cut.
 - The runs of the DM still open (queued, running, waiting, but not an automation's)
-  are cancelled first (`control.cancel`, as in the run view), so no run that started
-  with the old history answers after the boundary.
+  are cancelled (`control.cancel`, as in the run view: a queued or waiting one ends
+  at once with its notice, a running one before its next step, with its notice), so
+  no run that started, or was asked, before the cut answers after it.
+- The cut is the database's clock (`clock_timestamp()`), and no earlier than any
+  message or run the DM holds, whatever node's clock wrote them; a message written
+  after it is dated after it (`MessageService.post`). So everything before the cut
+  is before it, and every run after it reads its own message.
 - Audited as `conversation.fresh_start` with the number of runs cancelled, never
   content.
 """
@@ -27,9 +36,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
 from app.core.errors import Forbidden
-from app.core.models_base import utcnow
 from app.core.principal import PrincipalType
 from app.modules.agents import control
+from app.modules.agents.fresh_start_repository import FreshStartRepository
 from app.modules.agents.run_repository import RunRepository
 from app.modules.audit.recorder import record
 from app.modules.messaging.dm_repository import participants_of
@@ -44,13 +53,14 @@ async def start_afresh(
     conversation = await reader.readable(actor, conversation_id)
     if not await _alone_with_agent(session, actor, conversation):
         raise Forbidden(code="conversation.not_alone_with_agent")
-    check_version(conversation, version)
+    repo = FreshStartRepository(session, actor.org_id)
+    locked = await repo.lock(conversation.id)  # a message sent meanwhile: before or after
+    assert locked is not None
+    check_version(locked, version)
     cancelled = 0
     for run_id in await RunRepository(session, actor.org_id).open_in(conversation.id):
         cancelled += await control.cancel(session, actor.org_id, run_id, actor.principal.id)
-    locked = await reader.readable(actor, conversation.id, lock=True)
-    check_version(locked, version)
-    locked.fresh_start_at = utcnow()  # after the cancels: nothing of theirs comes later
+    locked.fresh_start_at = await repo.cut(conversation.id)  # after all it holds
     locked.version += 1
     await session.flush()
     details = {"cancelled_runs": cancelled}

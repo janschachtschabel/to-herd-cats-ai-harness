@@ -601,11 +601,18 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   jedem Lauf, und unter der Marke wird nur Gedächtnis, was sie freigegeben hat (siehe
   oben). Ohne Markiertes im Kontext beginnen die Läufe ohne Marke. Offene Läufe
   des Gesprächs (wartend, laufend, auf Freigabe oder Antwort wartend; nicht die einer
-  Automation) werden vorher abgebrochen, damit keiner, der mit dem alten Verlauf
-  begonnen hat, nach dem Schnitt antwortet. Die Nachrichten davor bleiben, wie sie sind,
-  markierte auch, und sie sieht sie weiter; im Gespräch zeigt eine Linie „Neu begonnen am
-  …“, wo der Schnitt liegt. Das Abzeichen „Persönlich“ und die Freigabekarte unter der
-  Marke nennen diesen Weg; die Rückfrage sagt genau, was der Schnitt abschneidet und
+  Automation) werden abgebrochen, jeder mit seinem Hinweis im Gespräch, damit keiner,
+  der vor dem Schnitt begonnen hat oder gefragt wurde, nach ihm antwortet. Der Schnitt
+  kommt von der Uhr der Datenbank und liegt nie vor einer Nachricht oder einem Lauf,
+  die das Gespräch schon hat; „Neu beginnen“ und eine gleichzeitig gesendete Nachricht
+  der Person warten aufeinander an der Zeile des Gesprächs (`FOR NO KEY UPDATE` gegen
+  `FOR SHARE`). Kam die Nachricht zuerst, wird ihr Lauf mit Hinweis abgebrochen; kommt
+  sie danach, liegt sie hinter dem Schnitt (auch wenn die Uhr des API-Knotens
+  nachgeht), und ihr Lauf liest sie. Keiner endet stumm (Review M8 4, Befund K4).
+  Die Nachrichten davor bleiben, wie sie sind, markierte auch, und sie sieht sie
+  weiter; im Gespräch zeigt eine Linie „Neu begonnen am …“, wo der Schnitt liegt.
+  Das Abzeichen „Persönlich“ und die Freigabekarte unter der Marke nennen diesen
+  Weg; die Rückfrage sagt genau, was der Schnitt abschneidet und
   dass freigegebenes Gedächtnis bleibt. Frühere markierte Läufe bleiben markiert
   (anderswo, etwa in einem Kanal, findet `search_past_runs` sie ohnehin nie).
   API: `POST /api/conversations/{id}/fresh-start` mit `{"version": n}` (die gelesene

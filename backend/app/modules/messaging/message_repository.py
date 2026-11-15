@@ -6,6 +6,7 @@ Ids are UUIDv7, so ordering by id is ordering by creation time.
 """
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import ColumnElement, and_, select
@@ -35,6 +36,17 @@ class MessageRepository:
         )
         if lock:
             stmt = stmt.with_for_update()
+        return await self.session.scalar(stmt)
+
+    async def fresh_start_held(self, conversation_id: uuid.UUID) -> datetime | None:
+        """The conversation's fresh start as committed now, its row held `FOR SHARE`
+        until the transaction ends, so a fresh start (`agents/fresh_start.py`) cannot
+        come between this and the commit (module review M8 4, K4)."""
+        stmt = (
+            select(Conversation.fresh_start_at)
+            .where(Conversation.org_id == self.scope.org_id, Conversation.id == conversation_id)
+            .with_for_update(read=True)
+        )
         return await self.session.scalar(stmt)
 
     async def insert(self, values: dict[str, Any]) -> Message | None:

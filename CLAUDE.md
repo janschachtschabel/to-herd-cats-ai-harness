@@ -311,7 +311,8 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
     unmarks by heuristic, only the asker's "Neu beginnen" in her DM alone with the
     agent (`conversation.fresh_start_at`, `agents/fresh_start.py`): runs there after it
     reach nothing from before it (history window, `read_conversation`,
-    `search_past_runs`); memory she released stays. Every event
+    `search_past_runs`); memory she released stays. The cut is the database clock,
+    serialised with her messages on the DM's row (`messaging/dating.py`). Every event
     of a marked run is the asker's alone (the run view redacts the whole run for
     anyone else); a call the release gate finds to change nothing (a preview) runs
     `previewing`, never as released, and `writing.effect` never writes for it.
