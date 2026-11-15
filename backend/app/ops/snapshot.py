@@ -116,7 +116,16 @@ async def secret_figures(conn: AsyncConnection) -> tuple[dict[str, int], list[st
     """`enc:` values per "table.column" and the sorted names of `env:` references."""
     enc_values: dict[str, int] = {}
     env_names: set[str] = set()
+    rows = await conn.execute(
+        text(
+            "SELECT table_name, column_name FROM information_schema.columns"
+            " WHERE table_schema = current_schema()"
+        )
+    )
+    present = {(str(t), str(c)) for t, c in rows.all()}
     for table, column in secret_columns():
+        if (table, column) not in present:  # a database at an older revision
+            continue
         model = Base.metadata.tables[table]
         col = model.c[column]
         count = await conn.scalar(

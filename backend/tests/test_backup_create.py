@@ -5,6 +5,7 @@ in `backup_run`; pg_dump gets the password only in its environment."""
 import hashlib
 import os
 import re
+import shutil
 import stat
 import subprocess
 import tarfile
@@ -53,11 +54,14 @@ def _fake_tool(tmp_path: Path, name: str, body: str) -> Path:
     """A `name` on a directory put first on PATH; `--version` answers like the real one."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
-    real = subprocess.run([name, "--version"], capture_output=True, text=True, check=True)
+    path = shutil.which(name)
+    assert path is not None
+    real = subprocess.run([path, "--version"], capture_output=True, text=True, check=True)
     script = bin_dir / name
     script.write_text(
         "#!/bin/sh\n"
-        f'if [ "$1" = "--version" ]; then echo "{real.stdout.strip()}"; exit 0; fi\n' + body
+        f'if [ "$1" = "--version" ]; then echo "{real.stdout.strip()}"; exit 0; fi\n'
+        + body.replace("{real}", path)
     )
     script.chmod(0o755)
     return bin_dir
@@ -206,7 +210,7 @@ async def test_no_password_in_argv(
     bin_dir = _fake_tool(
         tmp_path,
         "pg_dump",
-        f'printf "%s\\n" "$@" > {seen}.argv\nenv > {seen}.env\nexec /usr/bin/pg_dump "$@"\n',
+        f'printf "%s\\n" "$@" > {seen}.argv\nenv > {seen}.env\nexec {{real}} "$@"\n',
     )
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("HERD_SECRET_KEY", KEY)

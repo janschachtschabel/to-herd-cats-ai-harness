@@ -42,6 +42,10 @@ class Storage(Protocol):
         """Remove the file under `key`; nothing there is fine."""
         ...
 
+    async def exists(self, key: str) -> bool:
+        """Whether a file is stored under `key`."""
+        ...
+
 
 class LocalStorage:
     def __init__(self, root: Path) -> None:
@@ -83,6 +87,9 @@ class LocalStorage:
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self.path_of(key).unlink, missing_ok=True)
+
+    async def exists(self, key: str) -> bool:
+        return await asyncio.to_thread(self.path_of(key).is_file)
 
 
 def _sync_close(handle: BinaryIO) -> None:

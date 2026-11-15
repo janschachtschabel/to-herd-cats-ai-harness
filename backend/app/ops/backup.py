@@ -126,6 +126,16 @@ async def _create(
     return BackupOutcome(run_id, path, BackupState.OK, None)
 
 
+async def write_archive(settings: Settings, path: Path, at: datetime) -> str:
+    """An archive of the settings' database at `path`, without a `backup_run` row
+    (`create_backup` records one); the archive's SHA-256."""
+    engine = make_engine(settings.database())
+    try:
+        return await _write(settings, engine, path, at)
+    finally:
+        await engine.dispose()
+
+
 async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: datetime) -> str:
     private_dir(path.parent)
     pg_dump_version = tool_version("pg_dump")

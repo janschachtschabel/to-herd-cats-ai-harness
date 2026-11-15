@@ -95,3 +95,30 @@ async def dump(settings: Settings, snapshot_id: str, out: Path) -> None:
     status = await process.wait()
     if status != 0:
         raise ToolFailed("backup.dump_failed", status)
+
+
+async def restore(settings: Settings, dump_file: Path) -> None:
+    """`pg_restore` of `dump_file` into the settings' database: all or nothing
+    (`--single-transaction --exit-on-error`), without owners and grants (managed
+    databases have other roles)."""
+    path = shutil.which("pg_restore")
+    if path is None:
+        raise ToolFailed("restore.tool_missing")
+    env = child_env(settings)
+    process = await asyncio.create_subprocess_exec(
+        path,
+        "--no-owner",
+        "--no-privileges",
+        "--single-transaction",
+        "--exit-on-error",
+        "--no-password",
+        f"--dbname={env.get('PGDATABASE', '')}",
+        str(dump_file),
+        env=env,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    status = await process.wait()
+    if status != 0:
+        raise ToolFailed("restore.pg_restore_failed", status)

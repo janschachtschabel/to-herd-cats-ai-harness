@@ -1,7 +1,8 @@
 # Sicherung und Wiederherstellung
 
-Stand: M9 Task 1 (Archiv und Sicherung über die Kommandozeile). Wiederherstellung,
-Zeitplan, Aufbewahrung und Offsite folgen in den nächsten Aufgaben von M9.
+Stand: M9 Tasks 1 und 2 (Archiv und Sicherung über die Kommandozeile, Wiederherstellung
+in eine leere Installation mit Probe). Zeitplan, Aufbewahrung und Offsite folgen in den
+nächsten Aufgaben von M9.
 
 ## Was gesichert wird
 
@@ -100,3 +101,69 @@ Manifest.
 
 **Werkzeuge:** Das Image bringt `postgresql-client-17` mit; unterstützt sind Server ab
 PostgreSQL 16. `pg_dump` muss mindestens die Hauptversion des Servers haben.
+
+## Wiederherstellen (in eine leere Installation)
+
+Eingespielt wird über die Kommandozeile, mit den `HERD_*`-Einstellungen der
+**Ziel**-Installation (Datenbank, `HERD_DATA_DIR`, `HERD_SECRET_KEY`):
+
+```bash
+python -m app.ops restore check ARCHIV                       # "ok" oder Problemcodes, dazu Warnungen
+python -m app.ops restore apply ARCHIV [--without-secrets]   # nur in eine leere Installation
+```
+
+**Leer** heißt: keine Tabelle im Schema `public` (eine frisch angelegte Datenbank, noch
+nicht migriert, kein App-Prozess hat sie gestartet) und in der Ablage kein Schlüssel des
+Archivs mit anderem Inhalt (gleicher Schlüssel = gleicher Inhalt, geprüft über SHA-256).
+Einspielen in eine laufende Installation folgt in M9b.
+
+Abgelehnt wird mit einem Code; am Ziel ändert sich dann nichts:
+
+| Code | Bedeutung |
+|---|---|
+| `archive.*` | das Archiv selbst passt nicht (siehe `verify` oben) |
+| `restore.archive_newer` | das Archiv hat eine Alembic-Revision, die dieser Code nicht kennt (neuere Version): erst die passende oder neuere App-Version einsetzen |
+| `restore.target_not_empty` | die Zieldatenbank hat schon Tabellen |
+| `restore.file_conflict` | ein Schlüssel des Archivs liegt in der Ablage mit anderem Inhalt |
+| `restore.server_too_old` | der Zielserver hat eine kleinere Hauptversion als der Quellserver |
+| `restore.tools_too_old` | `pg_restore` ist älter als das `pg_dump` des Archivs (oder fehlt) |
+| `restore.secret_key_mismatch` | das Archiv hat `enc:`-Werte, und weder `HERD_SECRET_KEY` noch `HERD_SECRET_KEY_PREVIOUS` hat die Kennung aus dem Manifest |
+| `restore.secret_key_missing` | dasselbe, ohne jeden Schlüssel am Ziel |
+
+Warnungen halten nicht auf: `restore.env_missing:<NAME>` (eine Umgebungsvariable zu
+einem `env:`-Verweis fehlt am Ziel) und, bei einem Schlüsselproblem,
+`restore.secrets_unreadable:<tabelle.spalte>=<Anzahl>`.
+
+**Ohne passenden Schlüssel** spielt `--without-secrets` trotzdem ein: Die `enc:`-Werte
+bleiben unlesbar. KI-Verbindungen, Konnektoren und OAuth-Clients melden dann „Geheimnis
+nicht verfügbar“, bis ein Admin den Wert neu einträgt.
+
+Der Ablauf, unter der Advisory-Sperre `herd.schema` (dieselbe nimmt jede Migration;
+ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migrieren):
+
+1. die Prüfungen oben;
+2. die Dateien des Archivs in die Ablage (je Datei beim Schreiben gegen das Manifest
+   geprüft; schon vorhandene mit gleichem Inhalt bleiben);
+3. die Datenbank mit `pg_restore --no-owner --no-privileges --single-transaction
+   --exit-on-error` (ganz oder gar nicht; scheitert es, werden die eben geschriebenen
+   Dateien wieder entfernt);
+4. `alembic upgrade head`, wenn das Archiv eine ältere bekannte Revision hat;
+5. in einer Transaktion: alle Sitzungen und offenen OAuth-Abläufe gelöscht (nach einer
+   Wiederherstellung ist jede Anmeldung ungültig), Sicherungsläufe im Zustand `running`
+   werden `interrupted`, ein Audit-Eintrag `backup.restored` (`system`, Archivname,
+   Revisionen).
+
+Danach die App normal starten. `restore apply` gibt Revisionen, Tabellen und Dateien
+aus; scheitert ein Schritt, endet es mit `failed <code>` (`restore.pg_restore_failed`,
+`restore.tool_missing`, `archive.member_checksum`).
+
+### Probe
+
+`deploy/scripts/restore-rehearsal.sh` spielt den ganzen Weg durch: Installation A mit
+Demodaten und Anhang, Sicherung während A läuft, Einspielen in eine leere Datenbank B,
+Vergleich aller Tabellen (`scripts/compare_databases.py`: Zeilen und Prüfsumme des
+Inhalts), Anmeldung an B, das alte Cookie von A gilt nicht, der Anhang hat dieselbe
+Prüfsumme, ein manipuliertes Archiv wird abgelehnt. Ohne Docker, gegen einen
+PostgreSQL-Server über `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` (Standard
+`localhost:5433`, `herd`); Ausgabe der letzten Probe in
+[`demo/m9.md`](demo/m9.md). In der CI läuft sie als Job `restore` gegen PostgreSQL 17.

@@ -17,6 +17,7 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.core.db import make_engine
 from app.core.logging import configure_logging
+from app.core.migrations import lock_schema
 from app.models_registry import Base
 
 if not logging.getLogger().handlers:  # the alembic CLI; the app has configured logging
@@ -40,6 +41,7 @@ def run_migrations_offline() -> None:
 def _run(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
     with context.begin_transaction():
+        lock_schema(connection)  # never while an archive is being restored (plan M9)
         context.run_migrations()
 
 

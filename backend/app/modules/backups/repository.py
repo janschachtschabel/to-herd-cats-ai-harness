@@ -2,9 +2,10 @@
 its row belongs to the installation's organisation (there is one, `orgs/models.py`)."""
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger
@@ -49,6 +50,14 @@ class BackupRunRepository:
             )
         )
 
+    async def interrupt_running(self, at: datetime) -> None:
+        """Runs still `running` (their process is gone: after a restore)."""
+        await self.session.execute(
+            update(BackupRun)
+            .where(BackupRun.state == BackupState.RUNNING)
+            .values(state=BackupState.INTERRUPTED, finished_at=at)
+        )
+
     async def latest(self, org_id: uuid.UUID, limit: int) -> list[BackupRun]:
         """Newest first."""
         stmt = (
@@ -58,3 +67,9 @@ class BackupRunRepository:
             .limit(limit)
         )
         return list((await self.session.scalars(stmt)).all())
+
+
+async def clear_tables(session: AsyncSession, names: Iterable[str]) -> None:
+    """Delete every row of the tables (fixed names from code, never input)."""
+    for name in names:
+        await session.execute(text(f'DELETE FROM "{name}"'))  # noqa: S608

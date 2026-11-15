@@ -111,6 +111,8 @@ Die in M8 offene dritte, schmale Prüfung der persönlichen Marke (G1 gespeicher
 **Abnahme:** Archiv einer Demo-Datenbank entsteht, `verify` leer, `backup_run` `ok`; Gates grün. **Hier:** alles. **Nur CI:** Image-Build mit `postgresql-client-17`.
 **Commits:** `ops: write and verify backup archives`, `wiki: delete unused files after a grace period`.
 
+Geändert in M9: Zwei Migrationen statt einer (`m9_storage_tombstone` mit dem Commit der Grabsteine, `m9_backup_run` mit dem der Archive; je Scheibe eine). Die Kommandozeile hat einen Verteiler `ops/cli.py` (`run(argv, settings, clock)`, testbar ohne Prozess); `backup list` liest `backup_run` und ist damit der Leser aller Felder. `modules/backups/metrics.py` (Gauges) und `HERD_BACKUP_DIR` in Compose und Chart kommen mit Task 3, wo Dienst, Volume und CronJob entstehen; Task 1 legt die Einstellung in `core/config_ops.py` an und dokumentiert sie in `docs/SICHERUNG.md`. Zusätzliche Codes: `archive.exists` (ein Archiv gleichen Namens wird nie überschrieben), ein Mitglied, das nicht im Manifest steht, zählt als `archive.member_checksum`. Die CLI-Sicherung steht im Audit als `backup.created` mit Akteur `system` (`actor_id` = Null-UUID) und `via` = Auslöser. Der CI-Job `backend` installiert `postgresql-client-17` (der Dienst ist PostgreSQL 17, das `pg_dump` 16 des Runners lehnte ihn ab).
+
 ### Task 2: Wiederherstellung über die Kommandozeile und Probe (M9a)
 
 **Ziel:** `python -m app.ops restore check <archiv>` und `restore apply <archiv> [--without-secrets]` nach Entscheidungen 5 und 6; Probe als Skript, lokal und als CI-Job.
@@ -135,6 +137,8 @@ Die in M8 offene dritte, schmale Prüfung der persönlichen Marke (G1 gespeicher
 
 **Abnahme:** Probe lokal grün, Ausgabe in `docs/demo/m9.md`. **Hier:** alles gegen PG16. **Nur CI:** Job `restore` gegen PG17 und Client 17 (`bash -n` und `yaml.safe_load` der Workflow-Datei hier).
 **Commits:** `ops: restore an archive into an empty installation`, `ci: rehearse a restore`.
+
+Geändert in M9: `finish_restore` bekommt zusätzlich `revision_from`/`revision_to` (für das Audit). Die Probe hält A nach der Sicherung an und vergleicht A und B, bevor B startet: Die Anmeldung an B ändert `app_user` und `rate_limit_hit`, und ein laufendes A könnte nach dem Snapshot noch schreiben; `compare_databases.py` vergleicht außer Zeilen auch eine Prüfsumme des Inhalts je Tabelle und lässt Sitzungen, Abläufe, Audit-Log und `backup_run` aus. Ein Speicherschlüssel im Archiv, den die Ablage nicht zulässt, ist `archive.format_unknown`. Die Sperre `herd.schema` nimmt alembics `env.py` je Migrationstransaktion (`core/migrations.lock_schema`), die Wiederherstellung auf Sitzungsebene für ihre ganze Dauer (`ops/schema_lock.py`).
 
 ### Task 3: Automatische Sicherung, Aufbewahrung, Offsite, Alarm (M9a)
 

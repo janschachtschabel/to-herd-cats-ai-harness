@@ -11,6 +11,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "alembic"
+# Migrating and restoring an archive (`app/ops/restore.py`) take this advisory lock, so
+# a process starting in role `all` never migrates a database that is being restored.
+SCHEMA_LOCK = "herd.schema"
 
 
 def alembic_config() -> Config:
@@ -26,6 +29,18 @@ def upgrade_head(connection: Connection | None = None) -> None:
     if connection is not None:
         config.attributes["connection"] = connection
     command.upgrade(config, "head")
+
+
+def lock_schema(connection: Connection) -> None:
+    """Hold SCHEMA_LOCK until the connection's transaction ends (alembic's env.py)."""
+    connection.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:name, 0))"), {"name": SCHEMA_LOCK}
+    )
+
+
+def known_revisions() -> tuple[frozenset[str], frozenset[str]]:
+    """The code's heads and every revision it knows."""
+    return _code_revisions()
 
 
 def stamp_head(connection: Connection) -> None:
