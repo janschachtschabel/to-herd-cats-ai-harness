@@ -762,7 +762,9 @@ Recht 404 `ai.not_found`.
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
   freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Die Karte sagt, dass
   er jetzt oder später von anderen gelesen werden kann, und zeigt den Inhalt
-  vollständig (Review M8 4, Befund K5); was sich nicht vollständig zeigen lässt (ein Vergleich über
+  vollständig (Review M8 4, Befund K5), auch beim Schreibwerkzeug eines Servers, den
+  sie mit ihrem eigenen Konnektor nutzt: Was es schreibt, verlässt das System
+  (Review M8 5, Befund L3); was sich nicht vollständig zeigen lässt (ein Vergleich über
   `HERD_DIFF_MAX_LINES`), wird abgelehnt (`personal_release.too_large`), statt zur
   Freigabe zu stehen (Review M8 3, Befund H5). Ohne Freigabe schreibt er nur in sein
   eigenes Gespräch allein mit ihr (ihre Direktnachricht mit dem Agenten; markiert).

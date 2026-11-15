@@ -35,10 +35,11 @@ the tool, never an argument (`toolbox/external.py`).
 
 Under the personal mark (`agents/personal_mark.py`) every write but into the run's
 DM alone with the person asks the same way, whatever the tool's grant
-(`personal_step.py`); such an approval is `personal`, and so is a `confirm` grant's
-only when the call owes that release (module review M8 4, K5). A personal card says
+(`personal_step.py`); such an approval is `personal`, and so is every `confirm`
+grant's but a message into that DM (module review M8 5, L2). A personal card says
 that what is released can be read by others now or later, and shows it in full; a
-call whose content cannot be shown in full is refused instead (`shown.py`).
+call whose content cannot be shown in full is refused instead (`shown.py`). An
+approved release that the call now owes as personal but was not asked so is stale.
 """
 
 import hashlib
@@ -118,7 +119,11 @@ async def gate(
     if found.state == ApprovalState.REJECTED:
         said = f" The person's reason: {found.reason}" if found.reason else ""
         return ToolResult("approval", REJECTED + said, {"tool": spec.name})
-    if subjects is None or fingerprint(spec.name, canonical, subjects) != found.fingerprint:
+    if (
+        subjects is None
+        or fingerprint(spec.name, canonical, subjects) != found.fingerprint
+        or (personal and not found.personal)  # the mark owes a release she was not shown
+    ):
         await _settle(ctx, found, ApprovalOutcome.STALE)
         return ToolResult("approval", STALE, {"tool": spec.name})
     if (action := await spec.needs(ctx.session, ctx.actor, canonical)) is not None:

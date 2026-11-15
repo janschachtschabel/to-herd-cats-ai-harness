@@ -584,12 +584,14 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   freigeben: Der Aufruf wird abgelehnt, bevor eine Karte entsteht (das Modell liest
   `Refused (personal_release.too_large)`, die Laufansicht sagt es ihr in Worten), und
   eine schon gestellte Freigabe, die inzwischen zu groß ist (die Grenze wurde
-  gesenkt), lässt sich nur noch ablehnen (409 `approval.not_shown_in_full`). Beides
-  gilt nur für eine Freigabe, die die Marke verlangt: Fragt ein Werkzeug auf
-  `confirm` in einem markierten Lauf, ist seine Karte nur dann persönlich, wenn der
-  Aufruf ihre Freigabe auch unter der Marke bräuchte; eine Nachricht in ihre
-  Direktnachricht allein mit dem Agenten bekommt die gewöhnliche Karte (Review M8 4,
-  Befund K5).
+  gesenkt), lässt sich nur noch ablehnen (409 `approval.not_shown_in_full`). Fragt
+  ein Werkzeug auf `confirm` in einem markierten Lauf, ist seine Karte immer
+  persönlich, auch wenn der Aufruf gerade abgelehnt würde (ein fehlendes Ticket, ein
+  fehlendes Recht): bis sie entscheidet, kann sich das ändern. Nur eine Nachricht in
+  ihre Direktnachricht allein mit dem Agenten bekommt die gewöhnliche Karte (Review
+  M8 5, Befund L2; ersetzt Review M8 4, Befund K5). Eine Freigabe, die die Marke
+  verlangt, aber nicht als persönliche gestellt wurde, gilt als veraltet
+  (`approval_stale`): Das Modell muss neu fragen.
 - **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
   Verlaufsfenster und Werkzeugergebnisse nichts Markiertes enthalten, beginnt und
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,

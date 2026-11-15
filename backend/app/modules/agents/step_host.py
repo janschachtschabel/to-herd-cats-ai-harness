@@ -192,9 +192,8 @@ class RunHost:
             started = time.perf_counter()
             with caused_by(run.id):  # what the tool emits names the run (plan M7)
                 held = None
-                if grant == Grant.CONFIRM:  # personal: only if the mark owes it (K5)
-                    personal = marked and await owes_release(ctx, spec, args)
-                    held = await gate(ctx, spec, args, personal=personal)
+                if grant == Grant.CONFIRM:  # under the mark: personal (L2)
+                    held = await gate(ctx, spec, args, personal=await owes_release(ctx, args))
                 if isinstance(held, ToolResult | Wait):
                     result: ToolResult | Wait = held
                 else:  # a release covers the mark too

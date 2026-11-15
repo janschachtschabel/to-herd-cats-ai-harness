@@ -166,9 +166,6 @@ class ToolContext(WriteContext):
     # preview): it runs without a release, yet never writes (`writing.effect`), and
     # its result is the asker's alone like every event of a marked run (`runs.py`).
     previewing: bool = False
-    # Asked only whether the call owes the person's release under the mark
-    # (`personal_step.owes_release`): its checks run, it never writes.
-    probing: bool = False
     owed: Owed = field(default_factory=Owed)  # this call's, fresh for each call
 
     @property

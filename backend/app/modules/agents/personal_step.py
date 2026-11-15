@@ -8,36 +8,30 @@
   is the asker's alone (module review M8 3, H1).
 - `owes_release`: for a tool on `confirm`, whether its release is the mark's too, so
   its card is personal (says that what is released can be read by others now or
-  later, shows it in full, refuses what cannot be shown: `approvals/shown.py`) only
-  then (module review M8 4, K5). The tool runs `probing` on a copy of what the run
-  read, in a savepoint that is always undone: its checks run, `writing.effect` raises
-  `ReleaseFirst` where the mark owes the release and never writes.
+  later, shows it in full, refuses what cannot be shown: `approvals/shown.py`). Under
+  the mark every one is, but a message into the run's own conversation alone with her
+  (marked itself): decided from the call, never from what the tool would meet now,
+  since a refusal when asked (a missing ticket, a right, a draft) can be gone by the
+  time she decides (module review M8 5, L2; it replaces M8 4, K5's probe).
 """
 
-import copy
 from dataclasses import replace
 from typing import Any
 
 from app.modules.agents.approvals.gate import Passed, gate
 from app.modules.agents.personal_mark import ReleaseFirst
-from app.modules.agents.toolbox.base import Owed, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.base import ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.message_tools import PostMessageArgs
+from app.modules.agents.toolbox.writing import into_own_conversation
 from app.runtime.loop import ToolResult
 
 
-class _Undo(Exception):
-    """Ends a probe's savepoint, whatever the tool did."""
-
-
-async def owes_release(ctx: ToolContext, spec: ToolSpec, args: Any) -> bool:
-    probe = replace(ctx, probing=True, reads=copy.deepcopy(ctx.reads), owed=Owed())
-    try:
-        async with ctx.session.begin_nested():
-            await spec.run(probe, args)
-            raise _Undo
-    except ReleaseFirst:
-        return True
-    except _Undo:
+async def owes_release(ctx: ToolContext, args: Any) -> bool:
+    if not ctx.reads.personal:
         return False
+    if isinstance(args, PostMessageArgs) and ctx.answers_in(args.conversation_id):
+        return await into_own_conversation(ctx, args.conversation_id) is not None
+    return True
 
 
 async def run_tool(
