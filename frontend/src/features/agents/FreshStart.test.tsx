@@ -54,7 +54,9 @@ describe('"Neu beginnen" in her DM alone with an agent (module review M8 3, H2)'
     const { user } = await renderApp(`/c/${dm.id}`)
     await user.click(await screen.findByRole('button', { name: 'Neu beginnen' }))
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent(/bekommt Hilda in diesem Gespräch nichts mehr von dem, was davor war/)
+    expect(dialog).toHaveTextContent(
+      /bekommt Hilda in diesem Gespräch nichts mehr von dem, was davor war/,
+    )
     expect(dialog).toHaveTextContent(/Suche in seinen früheren Läufen/)
     expect(dialog).toHaveTextContent(/zum Merken freigegeben hast, bleibt/)
     expect(dialog).toHaveTextContent(/Markierung „Persönlich“ endet/)
