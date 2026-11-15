@@ -33,7 +33,11 @@ function ServerItem({ server }: { server: Server }) {
         <p className="font-semibold break-words">{server.name}</p>
         <p className="text-xs break-all text-muted-foreground">{server.url}</p>
         <span className="mt-2 flex flex-wrap gap-1.5">
-          <Badge variant="outline">{t(`ai.locations.${server.data_location}`)}</Badge>
+          <Badge variant="outline">
+            {t('mcp.servers.dataLocationBadge', {
+              location: t(`ai.locations.${server.data_location}`),
+            })}
+          </Badge>
           <Badge variant="outline">{t(`mcp.access.${server.connector_scope}`)}</Badge>
           {server.catalog_id && <Badge variant="outline">{t('mcp.servers.fromCatalog')}</Badge>}
           <Badge variant={server.enabled ? 'secondary' : 'destructive'}>

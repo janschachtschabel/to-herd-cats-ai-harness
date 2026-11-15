@@ -30,6 +30,20 @@ describe('external MCP servers', () => {
     },
   )
 
+  test('each server in the list says where its data goes, its access and if it is on', async () => {
+    mockApi({
+      ...shell(AI_ADMIN),
+      'GET /api/ai/mcp-servers': page([
+        makeServer({ id: SRV, name: 'Wetter', enabled: false, connector_scope: 'none' }),
+      ]),
+    })
+    await renderApp('/admin/ai/mcp-servers')
+    const row = await screen.findByRole('link', { name: /Wetter/ })
+    expect(within(row).getByText('Datenort: Extern')).toBeInTheDocument()
+    expect(within(row).getByText('Ohne Zugang')).toBeInTheDocument()
+    expect(within(row).getByText('Ausgeschaltet')).toBeInTheDocument()
+  })
+
   test('no server yet: says so; added by its address it opens with its tools read', async () => {
     const shared = makeConnector({ id: CONN, name: 'GitHub-Token' })
     const created = makeServer({ id: SRV, name: 'GitHub', connector_id: CONN })
