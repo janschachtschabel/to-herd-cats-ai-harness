@@ -529,6 +529,12 @@ Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
 mit dem Agenten antwortet und ihr vorlegt, was er von dort anderswo schreiben will).
 Externe Aufrufe folgen der Regel unten (Freigabe je Aufruf, an einen anderen Server
 ebenso). Die Entwurfsmarke lehnt weiter ab, auch unter der persönlichen Marke.
+Gefragt wird erst, wenn nichts anderes den Aufruf ablehnt (Review M8 3, Befund H3):
+Entwurfsmarke, Leck in einen anderen Bereich, ein für KI geschlossener Bereich und die
+eigenen Ablehnungen des Werkzeugs (etwa ein unbekanntes Eltern-Ticket oder Gedächtnis
+aus der Direktnachricht in einen geteilten Bereich) kommen zuerst; die Freigabe wird
+unmittelbar vor dem Schreiben verlangt (`writing.effect`). So wird sie nie um etwas
+gebeten, das ohnehin abgelehnt würde.
 
 Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Workers
 (Review M8 2, Befund G1; `agents/personal_mark.py`):

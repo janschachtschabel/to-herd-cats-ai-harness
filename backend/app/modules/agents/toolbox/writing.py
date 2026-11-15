@@ -20,12 +20,15 @@
 - **A person's own content** (the personal mark, `agents/personal_mark.py`; module
   review M8 2, G2): a run that holds what the asking person read through her own
   connector (`Reads.personal`, journaled) writes nothing others may read without her
-  release: once every other check passed, `release_first` raises `ReleaseFirst` and
-  the host asks her to release exactly this call (`step_host.py`); after the
-  release the call runs (`ToolContext.released`) and what it writes is not marked.
-  A call the gate finds to change nothing (`update_page`'s preview) runs without a
-  release as `ToolContext.previewing`: past `release_first`, but `effect` never
-  writes for it (module review M8 3, H1).
+  release: the checks note it (`release_first`, `ToolContext.owed`), and once nothing
+  else refused the call (the draft mark, a leak, a space closed to AI, the tool's
+  own refusals: module review M8 3, H3) `effect` raises `ReleaseFirst` right before
+  the write and the host asks her to release exactly this call (`step_host.py`);
+  after the release the call runs (`ToolContext.released`) and what it writes is
+  not marked.
+  A call the gate finds to change nothing (`update_page`'s preview under a `confirm`
+  grant) runs without a release as `ToolContext.previewing`: `effect` never writes
+  for it (module review M8 3, H1).
   The draft's exceptions do not spare a release. Its own conversation is open
   without a release only while the person is alone with the agent (`into_own`):
   elsewhere `post_message` there asks for the release too, while a question and the
@@ -143,11 +146,16 @@ async def _drafted(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str
 
 def release_first(ctx: CallContext) -> None:
     """Under the personal mark, a write others could read needs the asking person's
-    release of this very call (`ReleaseFirst`, which the host turns into one); a
-    released call goes on. Outside a run (`/mcp`) there is no mark."""
-    if not ctx.reads.personal or isinstance(ctx, ToolContext) and (ctx.released or ctx.previewing):
-        return
-    raise ReleaseFirst
+    release of this very call: noted here, asked by `effect` right before it writes
+    (`ReleaseFirst`, which the host turns into a release). Outside a run (`/mcp`)
+    there is no mark."""
+    if ctx.reads.personal and isinstance(ctx, ToolContext):
+        ctx.owed.release = True
+
+
+def _ask_release(ctx: CallContext) -> None:
+    if isinstance(ctx, ToolContext) and ctx.owed.release and not ctx.released:
+        raise ReleaseFirst
 
 
 async def into_own(
@@ -201,10 +209,12 @@ async def effect(
     write: Callable[[], Awaitable[ToolResult]],
 ) -> ToolResult:
     """Run `write` in a savepoint; a service's refusal undoes it and is the result.
-    A call under the personal mark that runs without a release because the gate found
-    it to change nothing (`ToolContext.previewing`) never gets here to write."""
+    Under the personal mark, a call whose checks noted a write others read asks the
+    person's release first (`release_first`); one that runs unreleased because the
+    gate found it to change nothing (`ToolContext.previewing`) never writes."""
     if isinstance(ctx, ToolContext) and ctx.previewing:
         return refusal(source, RELEASE_NEEDED, attrs)
+    _ask_release(ctx)  # every other check passed: her release of exactly this
     try:
         async with ctx.session.begin_nested():
             return await write()

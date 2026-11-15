@@ -20,8 +20,9 @@ content and is persisted, never only in a worker's memory.
 - **What it holds back** (finding G2): a write that anyone but the person could read
   (a channel, a ticket, a page, a proposal, a memory page, a skill, her own
   conversation where others read along) is not refused: it waits for the asking
-  person's release of exactly what would be written (`ReleaseFirst`, raised by
-  `toolbox/writing.release_first`, turned into a release by `step_host.py`; in an
+  person's release of exactly what would be written (`ReleaseFirst`, noted by
+  `toolbox/writing.release_first` and raised by `writing.effect` once nothing else
+  refused the call, turned into a release by `step_host.py`; in an
   automation's or an event rule's run the owner releases). What is written after a
   release is not marked: she decided to publish it. Into her own conversation alone
   with the agent no release is needed, and what is written there is marked. The
