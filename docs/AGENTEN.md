@@ -1932,6 +1932,11 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   durchziehen (oder alte API-Pods vor dem Start der neuen beenden).
 - Ein Worker des vorigen Releases arbeitet keine Läufe ab, die er nicht kennt (wartende,
   Ticket-Läufe); er sollte nicht neben neuen Workern weiterlaufen.
+- M8, persönliche Marke (Migration `5b7d9f1a3c6e`): die Ereignisart `mark` (nur die
+  Prüfung erweitert). Die Wiedergabe des Journals eines Workers des vorigen Releases
+  übergeht sie; die Laufansicht eines API-Pods des vorigen Releases scheitert an einem
+  Lauf mit `mark` (500), bis er ersetzt ist. Ab diesem Release übergeht die Laufansicht
+  (API und Oberfläche) jede Ereignisart, die sie nicht kennt (Review M8 3, Befund H6).
 
 ### Woran man Probleme erkennt
 

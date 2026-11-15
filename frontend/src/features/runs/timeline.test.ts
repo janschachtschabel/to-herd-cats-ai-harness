@@ -78,3 +78,16 @@ describe('external calls in a run’s timeline', () => {
     expect(externalToolName('search')).toBeNull()
   })
 })
+
+describe('event kinds this version does not know', () => {
+  test('are passed over, never shown as a stop (module review M8 3, H6)', () => {
+    const later = makeEvent({
+      kind: 'from_the_future' as unknown as 'stop',
+      seq: 4,
+      content: { reason: 'completed' },
+    })
+    const stop = makeEvent({ kind: 'stop', seq: 5, content: { reason: 'completed' } })
+    const items = buildTimeline([model, answered, later, stop], makeRun({ state: 'done' }))
+    expect(items.map((item) => item.kind)).toEqual(['model', 'tool', 'stop'])
+  })
+})

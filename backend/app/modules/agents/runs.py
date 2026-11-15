@@ -16,6 +16,8 @@ their run in full. Anyone else reads
   the personal mark (`RunRepository.marked`: what its asker read through her own
   connector, or a hit or a history that held it), from its first event on, whatever
   spaces it noted: its words may repeat what she read (module review M8 3, H1);
+- an event of a kind this release does not know (a newer release wrote it during a
+  rolling upgrade): left out, for everyone (module review M8 3, H6);
 - never the model's own words, its text and its tool calls' arguments, nor a tool
   call's arguments: they are the conversation's content, which its person reads (an
   admin only through the audited inspection of the DM). Usage (tokens, cost,
@@ -45,6 +47,9 @@ MODEL_CALL_SHOWN = (
 )
 TOOL_CALL_SHOWN = ("step", "call_id", "name", "source", "duration_ms")
 ASKER_ONLY = "asker_only"  # a tool result's attr: only the asker reads its text
+# The kinds this release shows; another (a newer release's, during a rolling upgrade)
+# is passed over, never a 500 (module review M8 3, H6).
+KNOWN_KINDS = frozenset(kind.value for kind in EventKind)
 
 
 def run_not_found() -> NotFound:
@@ -85,11 +90,12 @@ class RunService:
         asker = actor.principal.id == run.user_id
         repo = RunRepository(self.session, actor.org_id)
         marked = not asker and await repo.marked(run.id)  # hers alone, the whole run
+        known = [e for e in page.items if e.kind in KNOWN_KINDS]  # a newer release's: passed
         shown = [
             ShownEvent(e, e.content, False)
             if asker
             else await self._for_other(actor, e, marked=marked)
-            for e in page.items
+            for e in known
         ]
         return Page[ShownEvent](items=shown, next_cursor=page.next_cursor)
 

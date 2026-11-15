@@ -105,7 +105,8 @@ function calls(value: unknown): AskedCall[] {
  * the run's last entry while it still runs is "being sent". While the run waits, the
  * calls of its last step that have no result yet are shown as waiting (for a release
  * or an answer). A redacted event keeps only its step and name; its rows say so. A
- * `mark` event (the run's history held personal messages) is a row of its own.
+ * `mark` event (the run's history held personal messages) is a row of its own. A kind
+ * this version does not know (a newer release's) is passed over.
  */
 export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineItem[] {
   const items: TimelineItem[] = []
@@ -153,7 +154,7 @@ export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineIt
       }
     } else if (event.kind === 'mark') {
       items.push({ kind: 'mark', key: event.id, event })
-    } else {
+    } else if (event.kind === 'stop') {
       items.push({
         kind: 'stop',
         key: event.id,
