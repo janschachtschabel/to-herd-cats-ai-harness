@@ -5,7 +5,7 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 7 (Automatisierung) ist gebaut, dazu M6 und aus M5 die
+**Stand: Meilenstein 8 (Öffnung: MCP) ist gebaut, dazu M7, M6 und aus M5 die
 KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5 Tasks 8 bis 11) fehlen
 noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
@@ -117,11 +117,26 @@ Aus M7 Automatisierung:
 - **Prüffrist** je Bereich: Seiten, die zu lange nicht geprüft wurden, tragen „Prüfung
   fällig“; die Verantwortlichen bekommen eine Erinnerung.
 
+Aus M8 die Öffnung über MCP:
+
+- **`/mcp` für externe KI-Clients** (Claude Code, Codex): persönliche Zugangstoken
+  (einmal angezeigt, nur gehasht gespeichert, mit Umfang und Ablauf), lesende und mit
+  `write` schreibende Werkzeuge, nie mehr als die Person darf, nie Entwürfe oder
+  KI-gesperrte Inhalte; was ein Token schreibt, trägt das KI-Kennzeichen.
+- **Externe Agenten** als Teammitglieder mit Agenten-Token: holen zugewiesene Tickets
+  ab und bringen sie bis „Zur Prüfung“.
+- **Externe MCP-Server** als Werkzeugquelle der eigenen Agenten: jedes Werkzeug einzeln
+  freigegeben (gesperrt, wenn der Server es ändert), schreibende nur mit Freigabe der
+  fragenden Person; **Konnektoren** (Token oder OAuth, geteilt oder persönlich) und ein
+  **Katalog** mit GitHub und GitLab, erweiterbar ohne Codeänderung.
+
 Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
 [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
 [`docs/TICKETS.md`](docs/TICKETS.md), der KI-Anbindung (Verbindungen, Schlüssel,
 Zuordnung, Verbrauch, Richtlinie): [`docs/KI.md`](docs/KI.md), der Agenten (Bedienung,
-Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN.md).
+Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN.md), von
+MCP (Token, `/mcp` mit Claude Code und Codex, externe Agenten, Server, Konnektoren,
+Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
@@ -239,8 +254,14 @@ bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter oder zum Proxy). Drei Al
 kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing`, mit M7 zwei
 weitere: `HerdAutomationsLagging` und `HerdAutomationsFailing` (alle Warnung).
 Seit M8 begrenzt `mcp.ratePerMinute` (`HERD_MCP_RATE_PER_MINUTE`, Standard 120) die
-Aufrufe je Zugangstoken und Minute, gezählt in PostgreSQL über alle API-Pods
-(`docs/MCP.md`).
+Aufrufe je Zugangstoken und Minute, gezählt in PostgreSQL über alle API-Pods;
+`mcp.maxCallsPerRun` (Worker, Standard 20) die Aufrufe externer Werkzeuge je Lauf,
+`mcp.allowedHosts` (API und Worker) die privaten Hosts externer MCP-Server und
+`mcp.catalogConfigMap` (API) eine ConfigMap eigener Katalog-Vorlagen. `/mcp` geht mit
+dem Standardpfad `/` des Ingress an die API und braucht keine Annotation (kurze
+JSON-Antworten). Vier Alarme kommen dazu: `HerdExternalToolsFailing`,
+`HerdOAuthRefreshFailing`, `HerdMcpAuthFailures` und `HerdMcpCatalogProblems` (alle
+Warnung; [`docs/MCP.md`](docs/MCP.md#betrieb)).
 Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
 
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
@@ -364,7 +385,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M7. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M8. Wer betreibt, sollte sie
 kennen.
 
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
@@ -414,6 +435,19 @@ kennen.
   des vorigen Releases lässt Herzschläge und Ereignisregeln fällig liegen. Einzelheiten:
   [`docs/AGENTEN.md`](docs/AGENTEN.md#aufgaben-im-worker-m7), [`docs/KI.md`](docs/KI.md),
   [`docs/WIKI.md`](docs/WIKI.md).
+- **MCP** (M8): `/mcp` ist zustandsloses Streamable HTTP (je `POST` eine JSON-Antwort,
+  keine Sitzungen, keine Streams) auf dem öffentlichen Port der API; jeder Knoten
+  bedient jede Anfrage. Der Proxy reicht `Authorization` durch und setzt kein `Origin`
+  (Anfragen mit `Origin` lehnt `/mcp` ab). Ohne den Schalter der Organisation (KI-Verwaltung,
+  Standard aus) hat niemand Token, `/mcp` antwortet 401. Je Token höchstens
+  `HERD_MCP_RATE_PER_MINUTE` Aufrufe je Minute; gemessen rund 25–45 ms je Aufruf allein
+  und 45–70 Aufrufe je Sekunde mit 10 Clients an einem Prozess
+  ([Steckbrief](docs/STECKBRIEF.md#mcp-m8)). Ausgehend rufen API (Werkzeuglisten,
+  OAuth-Erneuerung) und Worker (Läufe) externe MCP-Server nur über die SSRF-Sperre oder
+  `HERD_AI_EGRESS_PROXY` auf; private Hosts nur, wenn `HERD_MCP_ALLOWED_HOSTS` sie nennt.
+  OAuth braucht `HERD_PUBLIC_URL` und `HERD_SECRET_KEY`. Ein Lauf sendet höchstens
+  `HERD_MCP_MAX_CALLS_PER_RUN` externe Aufrufe; sie zählen zu keinem Budget.
+  Einzelheiten, Metriken und Alarme: [`docs/MCP.md`](docs/MCP.md#betrieb).
 - **Mitgeliefertes PostgreSQL im Chart** (`postgresql.enabled`, Standard `true`) ist
   zum Ausprobieren gedacht: ein Pod, keine Replikation, keine Sicherung. In Produktion
   `postgresql.enabled=false` und eine externe Datenbank setzen.

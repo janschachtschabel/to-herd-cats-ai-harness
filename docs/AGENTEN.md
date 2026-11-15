@@ -404,6 +404,12 @@ Modell nicht nutzen darf, werden `_`).
   handelt; die Beschreibung des Servers folgt gerahmt als nicht vertrauenswürdig und
   auf 1.000 Zeichen gekürzt. Argumente: das gespeicherte Eingabeschema; geprüft werden
   sie vom Server.
+- **Höchstens `HERD_MCP_MAX_CALLS_PER_RUN` Aufrufe je Lauf** (Standard 20, seit Task 13
+  von M8). Gezählt werden die gesendeten Aufrufe (ihr erster Eintrag im Journal); was
+  die Richtlinie, eine Freigabe oder ein fehlender Zugang zurückhielt, zählt nicht. Der
+  nächste Aufruf wird nicht gesendet, das Modell liest `external_tool_limit: …` und kann
+  ohne das Werkzeug weitermachen. Externe Aufrufe kosten keine Modell-Tokens; kein
+  Tagesbudget zählt sie, diese Grenze begrenzt sie.
 
 Ob Agenten in einem Bereich Seiten direkt schreiben dürfen, stellt, wer den Bereich
 verwaltet: Einstellungen → „Schreiben durch Agenten“ (`agent_write_policy`: `propose`,
@@ -1517,7 +1523,7 @@ erst nach der Freigabe einer Person:
 | Anweisungen | 20.000 Zeichen |
 | Gesprächsverlauf im Prompt | 24.000 Zeichen (die neuesten 200 Nachrichten, dann nach Zeichen gekürzt; die Nachricht, die den Lauf auslöste, bleibt immer, zuerst fallen die ältesten anderen) |
 | Werkzeugergebnis im Prompt | 8.000 Zeichen (im Journal vollständig) |
-| externes Werkzeug | Aufruf 60 s (und die Laufzeit des Laufs), Antwort höchstens 512 KiB, Beschreibung im Prompt 1.000 Zeichen |
+| externes Werkzeug | Aufruf 60 s (und die Laufzeit des Laufs), Antwort höchstens 512 KiB, Beschreibung im Prompt 1.000 Zeichen; höchstens `HERD_MCP_MAX_CALLS_PER_RUN` gesendete Aufrufe je Lauf (Standard 20, 1 bis 500) |
 | Skill-Text je `load_skill` | 7.000 Zeichen je Teil, Skill höchstens 50.000 |
 | Skills im Kontext | 25, Beschreibung je 300 Zeichen |
 | Gedächtnis | 8.000 Zeichen je Seite, 4.000 Zeichen zusammen im Kontext |
@@ -1541,6 +1547,8 @@ erst nach der Freigabe einer Person:
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | 20 | API | Zeitlimit für Verbindungstest und Modellliste |
 | `HERD_MCP_ALLOWED_HOSTS` | leer | API, Worker | private Hosts, auf denen externe MCP-Server laufen dürfen (Hostnamen oder private Netze, kommagetrennt; [`MCP.md`](MCP.md#externe-mcp-server)) |
 | `HERD_MCP_CATALOG_DIR` | leer | API | Verzeichnis mit eigenen Katalog-Vorlagen der Installation (`*.yaml`, zusätzlich zu GitHub und GitLab; Chart `mcp.catalogConfigMap`; [`MCP.md`](MCP.md#katalog)) |
+| `HERD_MCP_MAX_CALLS_PER_RUN` | 20 | Worker | gesendete Aufrufe externer Werkzeuge je Lauf (1 bis 500); der nächste wird nicht gesendet (Chart `mcp.maxCallsPerRun`) |
+| `HERD_MCP_RATE_PER_MINUTE` | 120 | API | Aufrufe je Zugangstoken und Minute an `/mcp` (Chart `mcp.ratePerMinute`; [`MCP.md`](MCP.md#betrieb)) |
 | `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
 
 **Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage
@@ -1548,7 +1556,8 @@ erst nach der Freigabe einer Person:
 **Helm:** `ai.existingSecret` (ein Secret, dessen Schlüssel diese Variablen sind; geht an
 API und Worker, nie an den Migrations-Job), `ai.checkTimeoutSeconds`,
 `ai.personalAgentsMax`, `ai.automationsMax` (API), `ai.approvalHours`, `ai.runConcurrency`,
-`ai.runLeaseSeconds` (Worker), `mcp.allowedHosts` (API und Worker). Mit `networkPolicy.enabled` erreichen API und Worker
+`ai.runLeaseSeconds`, `mcp.maxCallsPerRun` (Worker), `mcp.allowedHosts` (API und Worker),
+`mcp.ratePerMinute`, `mcp.catalogConfigMap` (API). Mit `networkPolicy.enabled` erreichen API und Worker
 **keinen Anbieter**, bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter, oder nur
 zum Proxy aus `HERD_AI_EGRESS_PROXY`); das Chart legt dafür eine eigene NetworkPolicy
 nur für API und Worker an. Ohne sie antworten Verbindungstests `timeout` oder
@@ -1575,6 +1584,10 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_budget_stops_total{scope}` | Zähler | Läufe, die dieser Worker an einem erreichten Tagesbudget beendet hat, je Geltung (`user`, `agent`, `organisation`); übersprungene Termine zählen als `skipped_budget` oben |
 | `herd_wiki_review_reminders_total` | Zähler | Seiten, deren Prüffrist der tägliche Durchlauf dieses Workers gemeldet hat ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)) |
 | `herd_wiki_review_spaces_unchecked` | Gauge | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat; tagsüber 0 |
+| `herd_external_tool_calls_total{outcome,effect}` | Zähler | Aufrufe externer MCP-Werkzeuge in Läufen dieses Workers (seit M8), gezählt nach dem Commit ihres Schritts, je Ergebnis (`ok`, `error`: das Werkzeug meldet selbst einen Fehler, `refused`: nicht gesendet wegen einer Regel, `limited`: Grenze des Laufs, `failed`, `timeout`, `unknown`: gesendet, Ergebnis nicht festgehalten) und Wirkung (`read`, `write`); nie Server, Werkzeug oder Argumente |
+
+Die Metriken von `/mcp`, der OAuth-Erneuerung und des Katalogs (auch von API-Pods)
+stehen in [`MCP.md`](MCP.md#metriken-und-alarme).
 
 Alarme in der PrometheusRule des Charts (mit promtool-Tests):
 
@@ -1598,6 +1611,11 @@ Alarme in der PrometheusRule des Charts (mit promtool-Tests):
   wegen dreier Fehlschläge in Folge angehalten. Meist eine gemeinsame Ursache (Anbieter,
   Schlüssel, Werkzeug; siehe `HerdRunsFailing`); danach setzen die Eigentümerinnen oder
   die Verwaltenden der Bereiche sie fort.
+- `HerdExternalToolsFailing` (seit M8): mehr als die Hälfte der gesendeten externen
+  Aufrufe der letzten 15 Minuten (mindestens 3) scheiterte oder lief in das Zeitlimit,
+  5 Minuten lang; zurückgehaltene (`refused`, `limited`) zählen nicht. Server in der
+  KI-Verwaltung testen, `mcp.tool_call` im Log des Workers lesen; die übrigen
+  MCP-Alarme in [`MCP.md`](MCP.md#metriken-und-alarme).
 - Dazu wie bisher `HerdWorkerAbsent` (deckt auch „kein Worker feuert Aufgaben“ ab: dann
   fehlen die Gauges), `HerdWorkerStalled`, `HerdNotReady`.
 

@@ -5,7 +5,9 @@ aus Modul-Review 1), M6 und M7 (Budgets). Hybride Suche und Embeddings (M5 Tasks
 8 bis 11) folgen.
 
 Agenten, Läufe, Werkzeuge, Freigaben, Skills, Gedächtnis und ihr Betrieb (Worker,
-Metriken, Alarme) stehen in [`AGENTEN.md`](AGENTEN.md).
+Metriken, Alarme) stehen in [`AGENTEN.md`](AGENTEN.md). Seit M8: Zugangstoken und der
+Endpunkt `/mcp` für externe KI-Clients, externe MCP-Server als Werkzeugquelle,
+Konnektoren (auch OAuth) und der Katalog in [`MCP.md`](MCP.md).
 
 ## Verbindungen (`/api/ai/connections`, Recht `ai.manage`)
 
@@ -215,6 +217,12 @@ ebenso an). Leser ohne KI sehen von beidem nichts.
   Richtlinien (`app/modules/ai/policy.py`); was KI lesen darf, filtern
   `ai_space_ids` und `ai_readable` (`app/modules/ai/policy_filters.py`) in SQL, in
   derselben Abfrage wie die Rechte.
+- Seit M8 gilt dieselbe Richtlinie für zwei weitere Ziele mit eigenem `data_location`
+  ([`MCP.md`](MCP.md)): einen **externen Client über `/mcp`** (wie eine Verbindung mit
+  dem Datenort der Organisation für `/mcp`, Standard `external`; Bereiche, die das
+  ausschließen, und alles mit KI-Sperre sind für das Token nicht vorhanden) und einen
+  **externen MCP-Server**, den ein Lauf aufrufen will (die strengste Richtlinie alles
+  Gelesenen entscheidet wie vor einem Modellaufruf; sonst wird nicht gesendet).
 
 ## Agenten
 

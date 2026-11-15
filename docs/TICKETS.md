@@ -136,7 +136,7 @@ Kategorie `cancelled` („Verworfen“). Zwischen Bereichen verschieben lässt e
 - Ein **externer Agent** (seit M8) bekommt keinen Lauf: Das Ticket **wartet auf
   Abholung** (`awaiting_pickup: true` in Liste und Ansicht, solange sein Status offen
   ist), ohne Hinweis im Thread. Der Agent übernimmt es über `/mcp` (`claim_ticket`:
-  zugewiesen und in den ersten Status „in Arbeit“, mit `version`; 409
+  zugewiesen und in den ersten Status „in Arbeit“, mit `version`; ein Werkzeugfehler
   `ticket.taken`, wenn es schon jemand anderem gehört) und bringt es höchstens bis
   „Zur Prüfung“ ([`MCP.md`](MCP.md#ticket-abholung)).
 - **„Übernehmen“** weist ein nicht zugewiesenes Ticket sich selbst zu, **„Abgeben“**
@@ -356,6 +356,17 @@ Beschreibung). Eine Eingabe wie `HC-42`, `hc-42` oder `42` stellt das sichtbare 
 mit dieser Nummer an den Anfang. Gesucht wird in Titel und Beschreibung (Deutsch und
 ohne Sprachregeln), nur in Bereichen, deren Tickets man lesen darf, im selben
 SQL-Ausdruck. Die Ticket-Liste hat dazu ihr eigenes Textfeld.
+
+### Über `/mcp` (seit M8)
+
+Externe KI-Clients (Claude Code, Codex) lesen Tickets mit einem Zugangstoken über
+`/mcp` (`read_ticket`, `search_tickets`, `search`) und legen mit einem `write`-Token an,
+kommentieren, verknüpfen Seiten und setzen den Status höchstens bis zur Kategorie
+„Prüfung“; „erledigt“ und „verworfen“ setzt immer ein Mensch. Es gelten die Rechte der
+Person, der Umfang des Tokens und die KI-Richtlinie; ein unsichtbares Ticket antwortet
+wie ein unbekanntes. Was ein Token schreibt, trägt seinen Namen (`via_token`) am Ticket
+und an den Systemeinträgen des Threads. Einrichten, Werkzeuge und Grenzen:
+[`MCP.md`](MCP.md#der-endpunkt-mcp).
 
 ### Grenzen
 

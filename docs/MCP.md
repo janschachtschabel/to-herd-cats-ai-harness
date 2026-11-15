@@ -1,11 +1,25 @@
 # MCP: das System als MCP-Server und als MCP-Client
 
-Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
-`mcp.use`** (Plan M8, Task 1), **der Endpunkt `/mcp`** mit lesenden und schreibenden
-Werkzeugen (Tasks 2 und 3), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
-**externe MCP-Server** mit Werkzeugfreigabe (Task 6), ihre Werkzeuge im Lauf (Task 7)
-und der **Katalog** mitgelieferter Vorlagen (Task 9), dazu **externe Agenten** mit
-Agenten-Token und Ticket-Abholung (Task 4).
+Seit M8 öffnet sich das System in beide Richtungen (Plan
+`docs/superpowers/plans/2026-11-15-m8-oeffnung.md`):
+
+- **Nach außen, als MCP-Server:** Externe KI-Clients wie Claude Code und Codex lesen und
+  arbeiten über den Endpunkt `/mcp` mit einem [Zugangstoken](#zugangstoken), nie mit
+  mehr Rechten als die Person und nur in den Bereichen des Tokens
+  ([Der Endpunkt `/mcp`](#der-endpunkt-mcp)). [Externe Agenten](#externe-agenten) sind
+  Teammitglieder, die von außen mit einem Agenten-Token Tickets abholen und bis „Zur
+  Prüfung“ bringen.
+- **Nach innen, als MCP-Client:** Die eigenen Agenten rufen Werkzeuge
+  [externer MCP-Server](#externe-mcp-server) auf, jedes einzeln freigegeben, mit
+  gespeicherten Zugängen ([Konnektoren](#konnektoren), auch
+  [OAuth](#oauth-konnektoren)) und Vorlagen aus dem [Katalog](#katalog) (GitHub,
+  GitLab, eigene).
+
+Betrieb (Reverse-Proxy, Einstellungen, Grenzen, Metriken und Alarme) steht unter
+[Betrieb](#betrieb), was ein externer Client sehen kann und was nicht unter
+[Sicherheit](#sicherheit-was-ein-externer-client-sieht). Bedienung der Agenten:
+[`AGENTEN.md`](AGENTEN.md), KI-Verbindungen und Richtlinie: [`KI.md`](KI.md), Tickets:
+[`TICKETS.md`](TICKETS.md).
 
 ## Zugangstoken
 
@@ -120,20 +134,10 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
   `HERD_MCP_RATE_PER_MINUTE` Aufrufe je Minute (Standard 120, 1 bis 10.000); darüber
   429 `mcp.rate_limited` mit `Retry-After`.
 
-### Einstellungen
-
-| Variable | Standard | Bedeutung |
-|---|---|---|
-| `HERD_MCP_RATE_PER_MINUTE` | `120` | Aufrufe je Token und Minute (API; Chart `mcp.ratePerMinute`) |
-| `HERD_MCP_ALLOWED_HOSTS` | leer | private Hosts externer MCP-Server: Hostnamen oder private Netze (CIDR), kommagetrennt (API und Worker; Chart `mcp.allowedHosts`; siehe „Externe MCP-Server“) |
-| `HERD_MCP_CATALOG_DIR` | leer | Verzeichnis mit eigenen Katalog-Vorlagen (API; Chart `mcp.catalogConfigMap`; siehe „Katalog“) |
-
-### Für die folgenden Tasks
-
-`backend/app/modules/tokens/resolve.py` stellt die Abhängigkeit `TokenActorDep` bereit
-(Akteur der Person mit Umfang, Modus, Token-Name und Datenort);
-`backend/app/modules/tokens/reach.py` sagt in SQL, was ein solcher Akteur lesen darf
-(`readable_space_ids`, `readable_spaces`, `readable_page_ids`).
+Die Einstellungen stehen unter [Betrieb](#einstellungen). Im Code:
+`backend/app/modules/tokens/resolve.py` löst ein Token bei jedem Aufruf zum Akteur der
+Person mit Umfang, Modus, Token-Name und Datenort auf; `backend/app/modules/tokens/reach.py`
+sagt in SQL, was ein solcher Akteur lesen darf.
 
 ## Der Endpunkt `/mcp`
 
@@ -149,19 +153,48 @@ dem Handshake (`initialize`, Protokoll 2025) und Clients des zustandslosen Proto
 
 ### Einen Client verbinden
 
-Zuerst unter den persönlichen Einstellungen ein Token anlegen (`read` zum Lesen,
-`write` zum Arbeiten; am besten nur mit den nötigen Bereichen) und den Klartext in eine
-Umgebungsvariable legen, etwa `HERD_TOKEN`. Das Token gehört nie in eine Datei, die
-eingecheckt wird, und nie in eine URL.
+Zuerst unter den persönlichen Einstellungen („Zugangstoken“) ein Token anlegen
+(`read` zum Lesen, `write` zum Arbeiten; am besten nur mit den nötigen Bereichen und
+kurzer Laufzeit) und den Klartext in eine Umgebungsvariable legen, etwa `HERD_TOKEN`.
+Das Token gehört nie in eine Datei, die eingecheckt wird, und nie in eine URL. Die
+Syntax unten ist geprüft am 15.11.2026 an der Dokumentation von Claude Code
+(code.claude.com/docs/en/mcp) und am Quelltext von Codex (`codex-rs`: `mcp_cmd.rs`,
+`config/src/mcp_types.rs`); ein Lauf der beiden Clients gegen eine Installation war
+von hier aus nicht möglich.
 
-Claude Code:
+**Claude Code**, als Befehl (Transport `http` ist Streamable HTTP):
 
 ```bash
 claude mcp add --transport http herd https://herd.example.com/mcp \
   --header "Authorization: Bearer $HERD_TOKEN"
 ```
 
-Codex (`~/.codex/config.toml`; das Token liest Codex aus der Umgebung):
+Die Shell setzt dabei den Klartext ein, und Claude Code speichert ihn in seiner
+Konfiguration (Geltung `local` oder `user`: in `~/.claude.json`). Wer das nicht will,
+trägt den Server in die `.mcp.json` des Projekts ein; Claude Code setzt
+`${HERD_TOKEN}` erst beim Verbinden aus der Umgebung ein, die Datei enthält das Token
+also nie:
+
+```json
+{
+  "mcpServers": {
+    "herd": {
+      "type": "http",
+      "url": "https://herd.example.com/mcp",
+      "headers": { "Authorization": "Bearer ${HERD_TOKEN}" }
+    }
+  }
+}
+```
+
+Ob die Verbindung steht, zeigt `/mcp` in Claude Code (ein ungültiges Token erscheint
+als fehlgeschlagene Verbindung mit 401). Der Name der Variable ist frei, nur nicht einer
+der Zugangsdaten, die Claude Code für entfernte Server bewusst leer lässt (etwa
+`ANTHROPIC_API_KEY`, `HTTPS_PROXY`, `NPM_TOKEN`).
+
+**Codex**, in `~/.codex/config.toml` (Codex liest das Token bei jeder Anfrage aus der
+Umgebung und sendet es als `Authorization: Bearer`; mit `bearer_token_env_var`
+versucht es keine OAuth-Anmeldung):
 
 ```toml
 [mcp_servers.herd]
@@ -169,10 +202,12 @@ url = "https://herd.example.com/mcp"
 bearer_token_env_var = "HERD_TOKEN"
 ```
 
-oder `codex mcp add herd --url https://herd.example.com/mcp --bearer-token-env-var HERD_TOKEN`.
+oder als Befehl `codex mcp add herd --url https://herd.example.com/mcp
+--bearer-token-env-var HERD_TOKEN`.
 
-Hinter einem Reverse-Proxy muss `/mcp` wie `/api` an die API gehen (Pfad unverändert,
-`Authorization` durchreichen, keine Pufferung nötig: die Antworten sind kurz).
+Andere Clients: Streamable HTTP, `POST` an `/mcp`, Kopf `Authorization: Bearer
+<token>`, kein `Origin`. Was zwischen Client und API steht, beschreibt
+[Reverse-Proxy und Ingress](#reverse-proxy-und-ingress).
 
 ### Werkzeuge
 
@@ -660,7 +695,9 @@ Recht 404 `ai.not_found`.
   mehreren endet der Lauf statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`). Ergebnisse über einen geteilten Konnektor, Fehler und
   `external_outcome_unknown` markieren nicht; schreibende externe Werkzeuge prüft die
-  Marke nicht (sie warten ohnehin auf die Freigabe dieser Person). Das Ergebnis
+  Marke nicht (sie warten ohnehin auf die Freigabe dieser Person). Ein Lauf sendet
+  höchstens `HERD_MCP_MAX_CALLS_PER_RUN` Aufrufe (Standard 20); der nächste wird nicht
+  gesendet (`external_tool_limit`), was zurückgehalten wurde, zählt nicht. Das Ergebnis
   geht gerahmt als `<untrusted source="mcp" server=… tool=…>` und auf 8.000 Zeichen
   gekürzt an das Modell (im Journal vollständig) und gibt nie ein Recht, eine Stufe
   oder eine Freigabe. Es trägt keinen Bereich: Außer der fragenden Person sieht es in
@@ -832,10 +869,181 @@ docs: ["https://tracker.example.com/docs/mcp"]
   Dateiname und Ort und Art des Fehlers, nie dem Inhalt). Eine eigene Vorlage kann
   keine mitgelieferte ersetzen (dieselbe ID: übersprungen, „id … already taken“).
   Versteckte Dateien und andere Endungen werden nicht gelesen, höchstens 100 Dateien
-  je Verzeichnis.
+  je Verzeichnis. Die Zahl der übersprungenen Dateien zeigt die Metrik
+  `herd_mcp_catalog_problems` (Alarm `HerdMcpCatalogProblems`).
+- Im Chart: die Dateien als ConfigMap anlegen und nennen, etwa
+  `kubectl create configmap herd-catalog --from-file=tracker.yaml` und
+  `--set mcp.catalogConfigMap=herd-catalog`. Eine geänderte ConfigMap kommt mit der
+  Verzögerung des Kubelets in den Pods an (ohne Einstellung bis gut eine Minute) und gilt dann
+  ohne Neustart.
 - Vorab prüfen: `cd backend && uv run python -m scripts.check_mcp_catalog <verzeichnis>`
   nennt jede Vorlage und jedes Problem und endet mit 1, wenn eines da ist. Die CI
   prüft so die mitgelieferten Vorlagen.
 - Die Adressen prüfen die Ausgangsregeln erst beim Anlegen (Server und OAuth-Client wie
   von Hand); eine Vorlage für ein internes Ziel braucht dessen Host in
   `HERD_MCP_ALLOWED_HOSTS`.
+
+## Betrieb
+
+### Reverse-Proxy und Ingress
+
+`/mcp` gehört wie `/api` zur API (öffentlicher Port 8080) und braucht keinen eigenen
+Dienst, Prozess oder Speicher: Jeder API-Knoten beantwortet jede Anfrage, nichts bleibt
+im Prozess (keine Sitzungen, keine Streams). Für den Weg dorthin gilt:
+
+- **Pfad:** `/mcp` unverändert an die API. Das Ingress des Charts leitet mit dem
+  Standardpfad `/` (`Prefix`) alles an die API, auch `/mcp`; wer in `ingress.hosts`
+  nur einzelne Pfade nennt, nimmt `/mcp` (`Exact` oder `Prefix`) dazu. Hinter einem
+  eigenen Proxy dasselbe wie für `/api`.
+- **Köpfe:** `Authorization` unverändert durchreichen; keinen `Origin`-Kopf hinzufügen
+  (eine Anfrage mit `Origin` lehnt `/mcp` ab, 403 `mcp.origin_refused`). Der Proxy
+  darf `Authorization` nicht protokollieren.
+- **Pufferung und Zeitlimits:** Jede Anfrage ist ein `POST` mit genau einer
+  JSON-Antwort (höchstens 1 MiB), kein Upgrade, kein Server-Stream (`GET` antwortet
+  405). Pufferung muss also nicht abgeschaltet werden und schadet nicht; die üblichen
+  Zeitlimits der Controller (ingress-nginx: 60 s) reichen weit (gemessen: unter 1 s
+  auch unter Last, siehe [Steckbrief](STECKBRIEF.md#mcp-m8)). Ein Größenlimit des
+  Proxys für Anfragen muss mindestens `HERD_MAX_BODY_BYTES` (1 MiB) erlauben.
+- **TLS:** Clients verbinden sich über https; das Token ist ein Bearer-Token und darf
+  nicht über unverschlüsseltes HTTP gehen.
+- **Ausgehend** (die eigenen Agenten als Client): API-Pods lesen Werkzeuglisten und
+  erneuern OAuth-Token, Worker rufen Werkzeuge in Läufen auf, beide über die
+  SSRF-Sperre bzw. `HERD_AI_EGRESS_PROXY`. Mit `networkPolicy.enabled` im Chart muss
+  `networkPolicy.aiEgress` die MCP-Server und Autorisierungsserver erlauben (oder den
+  Proxy); private Hosts zusätzlich in `HERD_MCP_ALLOWED_HOSTS`.
+- **OAuth:** `HERD_PUBLIC_URL` (Chart `publicUrl`, sonst aus dem ersten Ingress-Host)
+  muss die Adresse sein, unter der Browser die App öffnen; die Rückleitungsadresse
+  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` muss beim Anbieter genau so eingetragen
+  sein. Ihr Query enthält den Code: Er steht im Zugriffsprotokoll des Proxys, ist aber
+  nur einmal und nur mit Prüfwert einlösbar.
+
+### Einstellungen
+
+| Variable | Standard | wer liest sie | Bedeutung |
+|---|---|---|---|
+| `HERD_MCP_RATE_PER_MINUTE` | `120` | API | Aufrufe je Zugangstoken und Minute an `/mcp`, 1 bis 10.000, über alle API-Knoten in PostgreSQL gezählt; darüber 429 (Chart `mcp.ratePerMinute`) |
+| `HERD_MCP_ALLOWED_HOSTS` | leer | API, Worker | private Hosts externer MCP-Server und Autorisierungsserver: Hostnamen oder private Netze (CIDR), kommagetrennt; nur in der Umgebung, ein ungültiger Eintrag verhindert den Start (Chart `mcp.allowedHosts`; siehe [Externe MCP-Server](#externe-mcp-server)) |
+| `HERD_MCP_CATALOG_DIR` | leer | API | Verzeichnis mit eigenen Katalog-Vorlagen (Chart `mcp.catalogConfigMap`, eingebunden unter `/etc/herd/mcp-catalog`; siehe [Katalog](#eigene-vorlagen)) |
+| `HERD_MCP_MAX_CALLS_PER_RUN` | `20` | Worker | gesendete Aufrufe externer Werkzeuge je Lauf eines Agenten, 1 bis 500 (Chart `mcp.maxCallsPerRun`) |
+| `HERD_PUBLIC_URL` | leer | API | Adresse der App für die OAuth-Rückleitung; ohne sie kein OAuth (422 `connector.oauth_unconfigured`) |
+| `HERD_SECRET_KEY` (`_PREVIOUS`) | – | API, Worker | Schlüssel für Konnektor-Geheimnisse, OAuth-Token und Client-Geheimnisse (`enc:`; [`KI.md`](KI.md#schlüssel)) |
+| `HERD_AI_EGRESS_PROXY` | – | API, Worker | Proxy für ausgehende Aufrufe nach draußen; gelistete private Hosts gehen direkt |
+| `HERD_MAX_BODY_BYTES` | 1 MiB | API | größte Anfrage, auch an `/mcp` (413) |
+
+Ob Personen überhaupt Token haben dürfen und welcher Datenort für `/mcp` gilt, ist
+keine Variable, sondern die Einstellung der Organisation in der KI-Verwaltung
+(`PUT /api/ai/mcp`, Standard aus). Compose: alle Variablen in beiden Compose-Dateien
+(`deploy/compose/README.md`); Chart: Werte unter `mcp.*` mit Schema und Prüfregeln
+(`deploy/helm/scripts/check-chart-rules.sh`).
+
+### Grenzen
+
+| Grenze | Wert |
+|---|---|
+| Aufrufe je Token | `HERD_MCP_RATE_PER_MINUTE` je Minute (Standard 120), jede HTTP-Anfrage zählt |
+| Anfrage an `/mcp` | `HERD_MAX_BODY_BYTES` (1 MiB) |
+| Antwort von `/mcp` | 1 MiB (500 `mcp.response_too_large`); Text eines Werkzeugergebnisses 100.000 Zeichen |
+| Laufzeit eines Tokens | 1 bis 365 Tage, Pflicht |
+| Bereiche eines Tokens | 1 bis 50 oder „alle meine“ |
+| `list_my_tickets` | 50 Tickets |
+| externer Server: Werkzeugliste | 20 s, 2 MiB, 500 Werkzeuge, Beschreibung gespeichert bis 10.000 Zeichen |
+| externer Server: Aufruf | 60 s (und die Laufzeit des Laufs), Antwort 512 KiB, Ergebnis im Prompt 8.000 Zeichen, Beschreibung im Prompt 1.000 Zeichen |
+| externe Aufrufe je Lauf | `HERD_MCP_MAX_CALLS_PER_RUN` (Standard 20); externe Aufrufe kosten keine Modell-Tokens und zählen zu keinem Tagesbudget |
+| OAuth | Ablauf (`state`) 10 Minuten; Erneuerung 60 s vor Ablauf oder nach einem 401, Sperre der Zeile höchstens 30 s; Antworten des Anbieters 64 KiB |
+| Katalog | 100 Dateien je Verzeichnis, 256 KiB je Datei |
+
+### Metriken und Alarme
+
+Auf dem internen Port (`/metrics`, 9090). Labels sind nur Aufzählungswerte und Namen
+eingebauter Werkzeuge: nie Token, Token-Namen, Personen, Server-Adressen,
+Werkzeugnamen externer Server, Argumente oder Inhalte.
+
+| Metrik | Art | wer | Bedeutung |
+|---|---|---|---|
+| `herd_mcp_calls_total{tool,outcome}` | Zähler | API | Werkzeugaufrufe über `/mcp` je eingebautem Werkzeug und Ergebnis (`ok`, `refused`, `invalid`, `failed`); dieselben Aufrufe je Token in `mcp_call` |
+| `herd_http_requests_total{route="/mcp",status}` | Zähler | API | alle Anfragen an `/mcp`: 200, 401 (Token ungültig), 403 (`Origin`), 405, 413, 429 (Ratenbegrenzung) |
+| `herd_external_tool_calls_total{outcome,effect}` | Zähler | Worker | Aufrufe externer Werkzeuge in Läufen, nach dem Commit ihres Schritts: `ok`, `error` (das Werkzeug meldet einen Fehler), `refused` (nicht gesendet: Richtlinie, Freigabe abgelehnt oder veraltet, Werkzeug nicht brauchbar, Person nicht verbunden), `limited` (Grenze des Laufs), `failed` (gesendet und gescheitert, oder Zugang nicht nutzbar), `timeout`, `unknown` (gesendet, Ergebnis nicht festgehalten); `effect` `read` oder `write` |
+| `herd_oauth_refreshes_total{status}` | Zähler | API, Worker | Erneuerungen von OAuth-Token je Antwort des Anbieters: `ok`, `invalid_grant` (Konnektor getrennt), `rejected`, `blocked`, `timeout`, `unreachable`, `redirect`, `server_error`, `invalid_response` |
+| `herd_mcp_catalog_problems` | Gauge | API | übersprungene Katalog-Dateien beim letzten Lesen (bei jedem Scrape neu geprüft) |
+
+Alarme in der PrometheusRule des Charts (`metrics.prometheusRule.enabled`), je als
+Warnung, mit promtool-Tests (`deploy/helm/to-herd-cats-ai/tests/rules-test.yaml`):
+
+- `HerdExternalToolsFailing`: mehr als die Hälfte der gesendeten externen Aufrufe der
+  letzten 15 Minuten (mindestens 3) scheiterte oder lief in das Zeitlimit, 5 Minuten
+  lang. Abhilfe: Server in der KI-Verwaltung testen (Zustand `unreachable`,
+  `unauthorized`, `forbidden`, `server_error`, `timeout`, `blocked`), Logzeilen
+  `mcp.tool_call` des Workers, Netzfreigabe und `HERD_MCP_ALLOWED_HOSTS`;
+  `HerdOAuthRefreshFailing` mitlesen.
+- `HerdOAuthRefreshFailing`: mindestens 3 Erneuerungen in 30 Minuten scheiterten aus
+  einem anderen Grund als `invalid_grant`, 5 Minuten lang. Der Anbieter ist nicht
+  erreichbar oder lehnt den Client ab; Logzeilen `oauth.token_request` (Grant
+  `refresh_token`, Zustand). Die Token bleiben und werden wieder versucht.
+  `invalid_grant` allein alarmiert nicht: Dann ist ein einzelner Konnektor getrennt
+  (meist hat die Person den Zugang beim Anbieter widerrufen) und wird neu verbunden.
+- `HerdMcpAuthFailures`: mehr als 50 Antworten 401 an `/mcp` in 5 Minuten, 10 Minuten
+  lang. Jemand probiert Token, oder ein Client ruft mit einem widerrufenen oder
+  abgelaufenen Token immer wieder an. Das Zugriffsprotokoll des Proxys nennt die
+  Clients (die App protokolliert `http.request` mit Pfad und Status, nie das Token);
+  Token in der KI-Verwaltung widerrufen oder den Client am Proxy sperren.
+- `HerdMcpCatalogProblems`: Katalog-Dateien werden seit 15 Minuten übersprungen
+  (`GET /api/ai/mcp-catalog/problems`, Logzeilen `mcp.catalog_problem`); die Dateien
+  mit `uv run python -m scripts.check_mcp_catalog <dir>` prüfen und die ConfigMap
+  berichtigen.
+
+Ein eigener Alarm für die Ratenbegrenzung (429) fehlt bewusst: Sie schützt die
+Installation und trifft nur das Token, das zu oft fragt; wer sie beobachten will, liest
+`herd_http_requests_total{route="/mcp",status="429"}`.
+
+Logzeilen (nur IDs, Codes, Dauer und Größe): `mcp.tool_call` (API: Werkzeug über
+`/mcp`; Worker: externer Aufruf mit Zustand), `mcp.list_tools`, `oauth.token_request`,
+`mcp.catalog_problem`, `http.request`.
+
+### Rolling Update
+
+`/mcp` hält keine Verbindungen offen; ein Pod, der beendet wird, beantwortet laufende
+Anfragen und nimmt keine neuen an (wie `/api`). Ein Client, dessen Anfrage dabei
+abbricht, wiederholt sie; lesende Werkzeuge sind gefahrlos, ein schreibendes Werkzeug
+kann dann zweimal wirken (wie jeder abgebrochene `POST`). Die Migrationen von M8
+erweitern nur; ein Pod des vorigen Releases bedient `/mcp` nicht, bis er ersetzt ist.
+
+## Sicherheit: was ein externer Client sieht
+
+Ein externer Client (Claude Code, Codex, ein Skript mit Token) **sieht**:
+
+- über ein persönliches Token: was seine Person jetzt lesen darf, geschnitten mit dem
+  Umfang des Tokens und dem, was die KI-Richtlinie für den Datenort von `/mcp` erlaubt
+  (Standard `external`); über ein Agenten-Token zusätzlich nur die Bereiche des Agenten.
+  Bei jedem Aufruf neu geprüft: ein entzogener Bereich, ein widerrufenes Token, eine
+  inaktive Person, „keine KI“ oder der Schalter aus wirken sofort;
+- nur veröffentlichte Seiten, Tickets, Bereiche und den Seitenbaum, die Versionsliste
+  (ohne Inhalt) nur mit `write`-Token;
+- die eingebauten Werkzeuge seines Modus mit ihren Beschreibungen.
+
+Er **sieht nicht**:
+
+- **Entwürfe**, auch nicht die eigenen; Seiten und Bereiche mit KI-Sperre (`no_ai`);
+  Bereiche, deren Richtlinie den Datenort ausschließt. Alles davon antwortet wie eine
+  unbekannte ID („Nothing found (or not readable).“), auch in Suche und Listen;
+- Nachrichten, Kanäle, Direktnachrichten und Threads (es gibt kein lesendes Werkzeug
+  dafür), Läufe der Agenten, ihr Journal, Gedächtnis und Skills, Freigaben,
+  Rückfragen, Audit, Personen- und Gruppenverwaltung, Konnektoren, Geheimnisse und
+  externe MCP-Server: `/mcp` bietet nur die Werkzeuge oben;
+- Werkzeuge, die im System eine Freigabe verlangen, und `assign_ticket`;
+- interne Einzelheiten: Fehler kommen als feste Codes und Wörter, nie mit Stack,
+  SQL oder den Werten ungültiger Argumente.
+
+Was er **schreibt** (nur mit `write`-Token), trägt das KI-Kennzeichen mit dem Namen des
+Tokens (`via_token`), geht durch dieselben Dienste und Rechte wie bei der Person, schreibt
+Seiten direkt nur in Bereichen mit `agent_write_policy = direct` und setzt Tickets nie
+auf „erledigt“. Jeder Aufruf eines schreibenden Werkzeugs steht im Audit.
+
+Für die **eigenen Agenten als Client** gilt umgekehrt: Was ein externer Server liefert
+(Ergebnisse, Beschreibungen), ist nicht vertrauenswürdig, wird gerahmt
+(`<untrusted …>`) und gekürzt, gibt nie ein Recht, eine Stufe oder eine Freigabe; ein
+geändertes Werkzeug (anderer Fingerabdruck) ist gesperrt, bis die Verwaltung es neu
+freigibt; der Katalog schlägt nur vor und gibt nie frei; schreibende externe Werkzeuge
+laufen nur mit der Freigabe der fragenden Person für genau diese Argumente; was über
+den persönlichen Zugang einer Person gelesen wurde, schreibt der Lauf nirgends hin, wo
+andere es lesen könnten. Zugänge stehen nie im Prompt, in Argumenten, im Journal, im
+Log oder im Audit.
