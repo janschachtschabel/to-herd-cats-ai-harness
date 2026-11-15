@@ -1,7 +1,7 @@
 from httpx import AsyncClient
-from uuid_utils.compat import uuid7
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
 from app.core.principal import SystemRole
 from app.modules.audit.models import AuditLog
