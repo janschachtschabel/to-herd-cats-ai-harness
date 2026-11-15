@@ -23,6 +23,9 @@
   release: once every other check passed, `release_first` raises `ReleaseFirst` and
   the host asks her to release exactly this call (`step_host.py`); after the
   release the call runs (`ToolContext.released`) and what it writes is not marked.
+  A call the gate finds to change nothing (`update_page`'s preview) runs without a
+  release as `ToolContext.previewing`: past `release_first`, but `effect` never
+  writes for it (module review M8 3, H1).
   The draft's exceptions do not spare a release. Its own conversation is open
   without a release only while the person is alone with the agent (`into_own`):
   elsewhere `post_message` there asks for the release too, while a question and the
@@ -61,6 +64,11 @@ DRAFTS = (
     "Not allowed: you have read a draft in this run, and drafts are only for the editors "
     "of their space. Write nothing others may read; propose a change to a page of the "
     "draft's space instead, or answer here."
+)
+RELEASE_NEEDED = (
+    "Not without the person's release: you have read something through the asking "
+    "person's own connection in this run, and this call would write it where others "
+    "read. Call it again to ask her to release exactly this."
 )
 PERSONAL = (
     "Not allowed here: you have read something through the asking person's own "
@@ -137,8 +145,9 @@ def release_first(ctx: CallContext) -> None:
     """Under the personal mark, a write others could read needs the asking person's
     release of this very call (`ReleaseFirst`, which the host turns into one); a
     released call goes on. Outside a run (`/mcp`) there is no mark."""
-    if ctx.reads.personal and not (isinstance(ctx, ToolContext) and ctx.released):
-        raise ReleaseFirst
+    if not ctx.reads.personal or isinstance(ctx, ToolContext) and (ctx.released or ctx.previewing):
+        return
+    raise ReleaseFirst
 
 
 async def into_own(
@@ -191,7 +200,11 @@ async def effect(
     attrs: dict[str, str],
     write: Callable[[], Awaitable[ToolResult]],
 ) -> ToolResult:
-    """Run `write` in a savepoint; a service's refusal undoes it and is the result."""
+    """Run `write` in a savepoint; a service's refusal undoes it and is the result.
+    A call under the personal mark that runs without a release because the gate found
+    it to change nothing (`ToolContext.previewing`) never gets here to write."""
+    if isinstance(ctx, ToolContext) and ctx.previewing:
+        return refusal(source, RELEASE_NEEDED, attrs)
     try:
         async with ctx.session.begin_nested():
             return await write()

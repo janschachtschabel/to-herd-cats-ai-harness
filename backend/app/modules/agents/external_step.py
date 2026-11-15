@@ -57,7 +57,7 @@ from app.core.config import get_settings
 from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
 from app.mcp.client import Refused
-from app.modules.agents.approvals.gate import gate
+from app.modules.agents.approvals.gate import Passed, gate
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_metrics import CallOutcome, count, outcome_of
 from app.modules.agents.external_repository import SENT, sent_calls
@@ -189,14 +189,14 @@ async def _before(
         )
         personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
         marked = host.run.reads.personal and not personal  # leaves the person's hands
-        held: ToolResult | Wait | None = None
+        held: ToolResult | Wait | Passed | None = None
         if grant == Grant.CONFIRM or remote.writes or marked:  # a write tool: always
             with caused_by(run.id):
                 held = await gate(ctx, spec, args, personal=marked)
         if isinstance(held, Wait):
             await steps.wait(run, held.until)
             return held
-        if held is not None:  # the release was rejected or is stale
+        if isinstance(held, ToolResult):  # the release was rejected or is stale
             return _Ended(await _record(host, steps, run, step, call, args, held), refused)
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder, sent=True)

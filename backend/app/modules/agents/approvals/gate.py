@@ -4,7 +4,9 @@ A run offers a tool whose effective grant is `confirm` like any other. When the 
 calls it, the host asks the gate first, in the call's transaction (`step_host.py`):
 
 - No approval for the call yet: if the call changes nothing (`ToolSpec.subjects`
-  gives None, such as `update_page`'s preview) it runs at once. Otherwise an approval
+  gives None, such as `update_page`'s preview) it runs at once (`Passed.UNCHANGED`:
+  never as a released call; under the personal mark it runs `previewing`, module
+  review M8 3, H1). Otherwise an approval
   is made (the canonical arguments, what the call would change and the fingerprint),
   its card is posted (`cards.py`) and the run waits (`Wait`, until the approval
   expires: `HERD_AI_APPROVAL_HOURS`, 72 by default).
@@ -38,6 +40,7 @@ the same way, whatever the tool's grant (`step_host.py`); such an approval is
 
 import hashlib
 import json
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -62,6 +65,13 @@ STALE = (
 REJECTED = "approval_rejected: the person did not release this call; it did not run."
 
 
+class Passed(StrEnum):
+    """Why the gate lets a call run now."""
+
+    RELEASED = "released"  # the person released exactly this call
+    UNCHANGED = "unchanged"  # the call changes nothing (a preview): nobody released it
+
+
 def fingerprint(tool: str, args: dict[str, Any], subjects: list[Subject]) -> str:
     canonical = json.dumps(
         {
@@ -78,9 +88,10 @@ def fingerprint(tool: str, args: dict[str, Any], subjects: list[Subject]) -> str
 
 async def gate(
     ctx: ToolContext, spec: ToolSpec, args: BaseModel, *, personal: bool = False
-) -> ToolResult | Wait | None:
-    """None: the tool may run now; else what the call gets instead of running.
-    `personal`: asked because the run carries the personal mark (its card says so)."""
+) -> ToolResult | Wait | Passed:
+    """`Passed`: the tool may run now (and why); else what the call gets instead of
+    running. `personal`: asked because the run carries the personal mark (its card
+    says so)."""
     assert ctx.call is not None
     repo = WaitedRepository(ctx.session, ctx.run.org_id)
     found = await repo.for_call(Approval, ctx.run.id, ctx.call.step, ctx.call.id)
@@ -88,7 +99,7 @@ async def gate(
     canonical = args.model_dump(mode="json")
     if found is None:
         if subjects is None:
-            return None  # the call changes nothing (and finds what it may not, itself)
+            return Passed.UNCHANGED  # (and finds what it may not, itself)
         return Wait((await _ask(ctx, spec, canonical, subjects, personal)).expires_at)
     if found.state == ApprovalState.PENDING:
         if found.expires_at <= utcnow():
@@ -109,7 +120,7 @@ async def gate(
             ):
                 raise Halt("rights_revoked")
     await _settle(ctx, found, ApprovalOutcome.RAN)
-    return None
+    return Passed.RELEASED
 
 
 async def _settle(ctx: ToolContext, approval: Approval, outcome: ApprovalOutcome) -> None:

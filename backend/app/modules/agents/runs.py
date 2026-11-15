@@ -12,7 +12,10 @@ their run in full. Anyone else reads
   marks itself the asker's (`ASKER_ONLY` in its attrs: `search_past_runs` with any
   of the model's words or a hit from a run that read no space, review M6 finding 10),
   and one that read a draft (its `read.drafts`) unless they see drafts in that space
-  (`page.edit`, review M6 2 finding 2);
+  (`page.edit`, review M6 2 finding 2); and every tool result of a run that carries
+  the personal mark (`RunRepository.marked`: what its asker read through her own
+  connector, or a hit or a history that held it), from its first event on, whatever
+  spaces it noted: its words may repeat what she read (module review M8 3, H1);
 - never the model's own words, its text and its tool calls' arguments, nor a tool
   call's arguments: they are the conversation's content, which its person reads (an
   admin only through the audited inspection of the DM). Usage (tokens, cost,
@@ -80,13 +83,17 @@ class RunService:
         )
         page = id_page(rows, params.limit, lambda e: e.id)
         asker = actor.principal.id == run.user_id
+        repo = RunRepository(self.session, actor.org_id)
+        marked = not asker and await repo.marked(run.id)  # hers alone, the whole run
         shown = [
-            ShownEvent(e, e.content, False) if asker else await self._for_other(actor, e)
+            ShownEvent(e, e.content, False)
+            if asker
+            else await self._for_other(actor, e, marked=marked)
             for e in page.items
         ]
         return Page[ShownEvent](items=shown, next_cursor=page.next_cursor)
 
-    async def _for_other(self, actor: Actor, event: RunEvent) -> ShownEvent:
+    async def _for_other(self, actor: Actor, event: RunEvent, *, marked: bool) -> ShownEvent:
         content = event.content
         if event.kind == EventKind.MODEL_CALL:
             kept = _pick(content, MODEL_CALL_SHOWN)
@@ -96,7 +103,7 @@ class RunService:
         if event.kind == EventKind.TOOL_CALL:
             kept = _pick(content, TOOL_CALL_SHOWN)
             attrs = {k: v for k, v in (content.get("attrs") or {}).items() if k != "query"}
-            hidden = attrs.get(ASKER_ONLY) or not await self._may_read_all(actor, content)
+            hidden = marked or attrs.get(ASKER_ONLY) or not await self._may_read_all(actor, content)
             if hidden:
                 return ShownEvent(event, kept, True)
             return ShownEvent(event, {**kept, "attrs": attrs, "text": content.get("text")}, False)

@@ -563,6 +563,16 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,
   hält sich die Marke in einer laufenden Direktnachricht, solange markierte Antworten
   im Verlaufsfenster stehen (24.000 Zeichen, die neuesten zuerst).
+- **Ein markierter Lauf gehört der fragenden Person** (Review M8 3, Befund H1): In der
+  Laufansicht (`/api/runs/{id}/events`) sieht jede andere Person (die verantwortliche,
+  wer `agent.manage` hat, ein Admin) **jedes** Ereignis eines Laufs, der die Marke trägt,
+  geschwärzt, vom ersten an, nicht erst ab der Marke, gleich aus welchen Bereichen es
+  kam: Werkzeugname, Quelle und Dauer bleiben, Text und Angaben nicht. Ebenso ist ein
+  Ergebnis von `search_past_runs` mit einem Treffer aus einem markierten Lauf nur ihres
+  (`asker_only`), und der suchende Lauf ist dadurch selbst markiert. Eine Vorschau, die
+  nichts ändert (`update_page` ohne Token), läuft unter der Marke ohne Freigabe, aber nie
+  als freigegebener Aufruf: Sie schreibt nichts (ein Schreiben ohne Freigabe lehnt
+  `effect` mit „Not without the person's release“ ab), und ihre Ausgabe sieht nur sie.
 - **Wer markierte Nachrichten liest**: wer die Direktnachricht liest, also die Person.
   Die Nachrichtensuche findet ohnehin nur Nachrichten von Personen, die Laufansicht
   zeigt anderen weder die Worte des Modells noch Ergebnisse ohne Bereich, `/mcp` hat

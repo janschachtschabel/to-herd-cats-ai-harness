@@ -766,7 +766,8 @@ Recht 404 `ai.not_found`.
   zurückgehalten: Er endet statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Die
   Marke beginnt also mit dem ersten persönlichen Inhalt im Kontext und endet, wenn
-  keiner mehr darin ist. Sie folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
+  keiner mehr darin ist. Jedes Ereignis eines markierten Laufs zeigt die Laufansicht
+  nur ihr; alle anderen sehen es geschwärzt, den ganzen Lauf (Review M8 3, Befund H1). Sie folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
   (`personal`), und ein späterer Lauf ist markiert, sobald eine markierte Nachricht in
   sein Verlaufsfenster, ein Treffer eines markierten Laufs aus `search_past_runs` oder
   eine markierte Nachricht aus `read_conversation` in seinen Kontext kommt; das steht

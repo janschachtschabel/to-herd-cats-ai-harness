@@ -12,7 +12,8 @@ also notes an admin's read by admin right):
   pages and tickets where they are now (a page locked or trashed since: no hit), and
   the drafts it read (only for a run that sees drafts in their spaces now).
 The result is the asker's alone in the run view (`runs.ASKER_ONLY`) once a hit holds
-the model's words or comes from a run that noted no space (or from such a result):
+the model's words, comes from a run that carried the personal mark (module review M8
+3, H1), or from a run that noted no space (or from such a result):
 the model's words are the conversation's content, which the run view shows nobody
 else, whatever spaces the other hits came from (review M6 finding 10).
 Outside a DM of the person alone with the agent, only runs of the same conversation:
@@ -95,7 +96,12 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
             continue
         ctx.reads.personal |= personal  # the host journals it with this result
         spaces |= now
-        private |= _words(hit) or not now or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
+        private |= (
+            personal
+            or _words(hit)
+            or not now
+            or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
+        )
         ctx.reads.spaces |= now
         ctx.reads.pages |= noted.pages
         ctx.reads.tickets |= noted.tickets

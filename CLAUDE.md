@@ -304,7 +304,10 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
     message a marked run writes is `message.personal` (only alone with the asker); a
     run is marked, journaled at once, when such content enters its context (history
     window: a `mark` event; `search_past_runs`, `read_conversation`: `read.personal`);
-    never by memory alone. No marked content in its context: no mark.
+    never by memory alone. No marked content in its context: no mark. Every event
+    of a marked run is the asker's alone (the run view redacts the whole run for
+    anyone else); a call the release gate finds to change nothing (a preview) runs
+    `previewing`, never as released, and `writing.effect` never writes for it.
   - A connector's secret goes only to the origin (OAuth: the endpoints) it was given
     for: a server's new origin or a client's new endpoints disconnect its connectors
     (`connectors/moving.py`; a shared one stays only when the change says so).

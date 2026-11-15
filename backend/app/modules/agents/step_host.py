@@ -45,7 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db_errors import is_timeout
 from app.core.outbox import caused_by
-from app.modules.agents.approvals.gate import gate, settle_timed_out
+from app.modules.agents.approvals.gate import Passed, gate, settle_timed_out
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_step import call_external
 from app.modules.agents.personal_mark import ReleaseFirst
@@ -195,8 +195,10 @@ class RunHost:
                 held = None
                 if grant == Grant.CONFIRM:
                     held = await gate(ctx, spec, args, personal=marked)
-                released = grant == Grant.CONFIRM  # a release covers the mark too
-                result = held if held is not None else await _run(ctx, spec, args, released)
+                if isinstance(held, ToolResult | Wait):
+                    result: ToolResult | Wait = held
+                else:  # a release covers the mark too
+                    result = await _run(ctx, spec, args, held)
             duration_ms = round((time.perf_counter() - started) * 1000)
             if isinstance(result, Wait):
                 await steps.wait(run, result.until)
@@ -259,17 +261,24 @@ class RunHost:
         return self.run.seq
 
 
-async def _run(ctx: ToolContext, spec: ToolSpec, args: Any, released: bool) -> ToolResult | Wait:
+async def _run(
+    ctx: ToolContext, spec: ToolSpec, args: Any, passed: Passed | None
+) -> ToolResult | Wait:
     """The tool; under the personal mark a write others could read stops before its
     effect (`ReleaseFirst`, its savepoint undone) and asks the person's release of the
-    call first (`personal_mark.py`); released, it runs again and writes."""
-    if released or not ctx.reads.personal:
-        return await spec.run(replace(ctx, released=released), args)
-    try:
-        async with ctx.session.begin_nested():
-            return await spec.run(ctx, args)
-    except ReleaseFirst:
-        held = await gate(ctx, spec, args, personal=True)
-        if held is not None:
-            return held
-    return await spec.run(replace(ctx, released=True), args)
+    call first (`personal_mark.py`); released, it runs again and writes. A call the
+    gate finds to change nothing (a preview) runs unreleased, `previewing`: it never
+    writes, and its result is the asker's alone (module review M8 3, H1)."""
+    if passed == Passed.RELEASED or not ctx.reads.personal:
+        return await spec.run(replace(ctx, released=passed == Passed.RELEASED), args)
+    if passed is None:
+        try:
+            async with ctx.session.begin_nested():
+                return await spec.run(ctx, args)
+        except ReleaseFirst:
+            held = await gate(ctx, spec, args, personal=True)
+            if not isinstance(held, Passed):
+                return held
+            if held == Passed.RELEASED:
+                return await spec.run(replace(ctx, released=True), args)
+    return await spec.run(replace(ctx, previewing=True), args)
