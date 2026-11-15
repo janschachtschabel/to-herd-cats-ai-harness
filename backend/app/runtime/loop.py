@@ -109,6 +109,9 @@ class ToolResult:
     attrs: dict[str, str] = field(default_factory=dict)
     spaces: frozenset[uuid.UUID] = frozenset()
     final: bool = False
+    # A refusal (not allowed, not found, changed meanwhile): `/mcp` answers it as a tool
+    # error. Not journaled: a run's model reads the text either way.
+    failed: bool = False
 
 
 @dataclass(frozen=True, slots=True)

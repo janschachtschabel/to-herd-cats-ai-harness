@@ -38,9 +38,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.actor import Actor
+from app.core.authorship import Authorship
 from app.core.permissions import Action
+from app.core.principal import Principal
 from app.modules.agents.actor import Reads
+from app.modules.agents.repository import AgentRepository
 from app.modules.ai.models import DataLocation
+from app.modules.wiki.models import VersionSource
 from app.runtime.loop import ToolResult
 
 NOT_FOUND = "Nothing found (or not readable)."
@@ -102,9 +106,68 @@ class CallContext:
 
 
 @dataclass(frozen=True, slots=True)
-class ToolContext(CallContext):
+class WriteContext(CallContext):
+    """What a writing tool needs besides: for whom it writes, how it keys what it
+    writes, and where it may post. A run (`ToolContext`) writes for its agent, keyed by
+    the run (a run taken up again writes nothing twice); a person's token at `/mcp`
+    (`mcp_tools/context.py`) writes for the person with the token's name."""
+
+    @property
+    def by(self) -> Authorship:
+        raise NotImplementedError
+
+    @property
+    def source(self) -> VersionSource:
+        """The source of a page version the tool writes."""
+        raise NotImplementedError
+
+    def key(self, name: str, *parts: object) -> uuid.UUID:
+        """A key for what a call writes (a message's `client_id`)."""
+        raise NotImplementedError
+
+    def binding(self) -> uuid.UUID:
+        """What a preview's token is bound to (`update_page`): stable across the calls
+        of one writer."""
+        raise NotImplementedError
+
+    def answers_in(self, conversation_id: uuid.UUID) -> bool:
+        """Whether the conversation is the one the writer answers in."""
+        raise NotImplementedError
+
+    async def posts_in(self, space_id: uuid.UUID) -> bool:
+        """Whether the writer may post in a channel of the space at all (the rights and
+        the write scope are checked by the service besides)."""
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class ToolContext(WriteContext):
     run: RunRef
     call: CallRef | None = None  # None only outside a run (a tool called directly)
+
+    @property
+    def by(self) -> Authorship:
+        """What the tool writes is written for the agent, naming the run."""
+        return Authorship(Principal.agent(self.run.agent_id), self.run.id)
+
+    @property
+    def source(self) -> VersionSource:
+        return VersionSource.AGENT
+
+    def key(self, name: str, *parts: object) -> uuid.UUID:
+        """Stable within the run, from the call's arguments."""
+        return uuid.uuid5(self.run.id, ":".join([name, *map(str, parts)]))
+
+    def binding(self) -> uuid.UUID:
+        return self.run.id
+
+    def answers_in(self, conversation_id: uuid.UUID) -> bool:
+        return conversation_id == self.run.conversation_id
+
+    async def posts_in(self, space_id: uuid.UUID) -> bool:
+        """In a channel of a space the agent is a member of."""
+        repo = AgentRepository(self.session, self.run.org_id)
+        return space_id in await repo.member_space_ids(self.run.agent_id)
 
 
 @dataclass(frozen=True, slots=True)

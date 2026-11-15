@@ -25,6 +25,7 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, St
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.authorship import VIA_TOKEN_CHARS
 from app.core.models_base import Base, OrgScoped, UuidPk, utcnow
 from app.core.principal import PrincipalType
 from app.modules.wiki.models import MAX_SUMMARY_CHARS, MAX_TITLE_CHARS
@@ -90,6 +91,9 @@ class PageProposal(UuidPk, OrgScoped, Base):
     author_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     author_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    # A person's proposal through an access token at `/mcp`: the token's name (the AI
+    # mark, plan M8 decision 3).
+    via_token: Mapped[str | None] = mapped_column(String(VIA_TOKEN_CHARS))
     state: Mapped[ProposalState] = mapped_column(
         String(16), default=ProposalState.OPEN, nullable=False
     )

@@ -33,10 +33,9 @@ from collections.abc import Awaitable, Callable
 
 from app.core.authorship import Authorship
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
-from app.core.principal import Principal
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.scope import organisation_audience, space_audience
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, CallContext, WriteContext
 from app.modules.ai.models import AiPolicy
 from app.runtime.loop import ToolResult
 
@@ -51,25 +50,26 @@ DRAFTS = (
 )
 
 
-def by(ctx: ToolContext) -> Authorship:
-    """What the tool writes is written for the agent, naming the run."""
-    return Authorship(Principal.agent(ctx.run.agent_id), ctx.run.id)
+def by(ctx: WriteContext) -> Authorship:
+    """For whom the tool writes: the run's agent (naming the run), or the person of a
+    token at `/mcp` (with the token's name)."""
+    return ctx.by
 
 
-def key_for(ctx: ToolContext, name: str, *parts: object) -> uuid.UUID:
-    """A stable key for what a tool call writes (a message's `client_id`), from the
-    run and the call's arguments."""
-    return uuid.uuid5(ctx.run.id, ":".join([name, *map(str, parts)]))
+def key_for(ctx: WriteContext, name: str, *parts: object) -> uuid.UUID:
+    """A key for what a tool call writes (a message's `client_id`): in a run stable,
+    from the run and the call's arguments; at `/mcp` one per call."""
+    return ctx.key(name, *parts)
 
 
-async def closed_to_ai(ctx: ToolContext, space_id: uuid.UUID) -> bool:
+async def closed_to_ai(ctx: CallContext, space_id: uuid.UUID) -> bool:
     """Whether the space's AI policy is `none` (no tool writes there)."""
-    policies = await ReadRepository(ctx.session, ctx.run.org_id).policies({space_id})
+    policies = await ReadRepository(ctx.session, ctx.actor.org_id).policies({space_id})
     return any(p.kind == AiPolicy.NONE for p in policies)
 
 
 async def leaks_into(
-    ctx: ToolContext, space_id: uuid.UUID, *, editors_only: bool = False
+    ctx: CallContext, space_id: uuid.UUID, *, editors_only: bool = False
 ) -> str | None:
     """Why writing into the space would show its audience what it may not see (None:
     it would not): a draft read (`carries_draft`; `editors_only`: what is written
@@ -78,23 +78,23 @@ async def leaks_into(
     if why := await carries_draft(ctx, space_id if editors_only else None):
         return why
     read = await _read(ctx)
-    if read and not read <= await space_audience(ctx.session, ctx.run.org_id, space_id):
+    if read and not read <= await space_audience(ctx.session, ctx.actor.org_id, space_id):
         return LEAKS
     return None
 
 
-async def leaks_into_organisation(ctx: ToolContext) -> str | None:
+async def leaks_into_organisation(ctx: CallContext) -> str | None:
     """The same for what everyone of the organisation reads (an organisation-wide
     skill): a draft, or anything read outside the open spaces."""
     if why := await carries_draft(ctx):
         return why
     read = await _read(ctx)
-    if read and not read <= await organisation_audience(ctx.session, ctx.run.org_id):
+    if read and not read <= await organisation_audience(ctx.session, ctx.actor.org_id):
         return LEAKS
     return None
 
 
-async def carries_draft(ctx: ToolContext, editors_of: uuid.UUID | None = None) -> str | None:
+async def carries_draft(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str | None:
     """`DRAFTS` while the run holds a draft, unless every draft it read is of
     `editors_of`, the space whose editors alone read what is written."""
     drafts = await drafts_read(ctx)
@@ -103,24 +103,29 @@ async def carries_draft(ctx: ToolContext, editors_of: uuid.UUID | None = None) -
     return None
 
 
-async def drafts_read(ctx: ToolContext) -> set[uuid.UUID]:
+async def drafts_read(ctx: CallContext) -> set[uuid.UUID]:
     """The spaces of drafts the run read: noted when read, and pages it read that
     are drafts now."""
-    now = await ReadRepository(ctx.session, ctx.run.org_id).draft_spaces(ctx.reads.pages)
+    now = await ReadRepository(ctx.session, ctx.actor.org_id).draft_spaces(ctx.reads.pages)
     return ctx.reads.drafts | now
 
 
-async def _read(ctx: ToolContext) -> set[uuid.UUID]:
-    now = await ReadRepository(ctx.session, ctx.run.org_id).now(ctx.reads)
+async def _read(ctx: CallContext) -> set[uuid.UUID]:
+    now = await ReadRepository(ctx.session, ctx.actor.org_id).now(ctx.reads)
     return ctx.reads.spaces | now.spaces
 
 
 def refused(source: str, code: str, attrs: dict[str, str] | None = None) -> ToolResult:
-    return ToolResult(source, f"Refused ({code}).", attrs or {})
+    return ToolResult(source, f"Refused ({code}).", attrs or {}, failed=True)
+
+
+def refusal(source: str, text: str, attrs: dict[str, str] | None = None) -> ToolResult:
+    """A tool's answer that it did not write (not found, not allowed, a leak)."""
+    return ToolResult(source, text, attrs or {}, failed=True)
 
 
 async def effect(
-    ctx: ToolContext,
+    ctx: CallContext,
     source: str,
     attrs: dict[str, str],
     write: Callable[[], Awaitable[ToolResult]],
@@ -130,10 +135,10 @@ async def effect(
         async with ctx.session.begin_nested():
             return await write()
     except NotFound:
-        return ToolResult(source, NOT_FOUND, attrs)
+        return refusal(source, NOT_FOUND, attrs)
     except Forbidden as exc:
-        return ToolResult(source, f"Not allowed ({exc.code}).", attrs)
+        return refusal(source, f"Not allowed ({exc.code}).", attrs)
     except Conflict as exc:
-        return ToolResult(source, f"Changed meanwhile ({exc.code}): read it again.", attrs)
+        return refusal(source, f"Changed meanwhile ({exc.code}): read it again.", attrs)
     except ValidationFailed as exc:
         return refused(source, exc.code, attrs)

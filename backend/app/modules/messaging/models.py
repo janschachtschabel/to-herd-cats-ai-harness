@@ -48,6 +48,7 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.authorship import VIA_TOKEN_CHARS
 from app.core.models_base import Base, OrgScoped, UuidPk, utcnow
 from app.core.principal import PrincipalType
 
@@ -260,6 +261,9 @@ class Message(UuidPk, OrgScoped, Base):
     client_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     # The agent's run that wrote it (an answer, or a tool's message: plan M6 task 6).
     run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    # A person's message through an access token at `/mcp`: the token's name (the AI
+    # mark of what an external AI client wrote, plan M8 decision 3).
+    via_token: Mapped[str | None] = mapped_column(String(VIA_TOKEN_CHARS))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

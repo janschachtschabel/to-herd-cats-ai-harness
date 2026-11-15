@@ -33,7 +33,13 @@ from app.core.access import Action, Actor, can
 from app.core.errors import NotFound, ValidationFailed
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents.toolbox import handover
-from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
+from app.modules.agents.toolbox.base import (
+    NOT_FOUND,
+    CallContext,
+    Subject,
+    ToolContext,
+    WriteContext,
+)
 from app.modules.agents.toolbox.reading import ticket_scope
 from app.modules.agents.toolbox.writing import (
     by,
@@ -42,6 +48,7 @@ from app.modules.agents.toolbox.writing import (
     effect,
     key_for,
     leaks_into,
+    refusal,
 )
 from app.modules.messaging.models import MAX_BODY_CHARS
 from app.modules.messaging.service import MessageService
@@ -115,13 +122,13 @@ class AssignTicketArgs(BaseModel):
     reason: Reason
 
 
-async def comment_ticket(ctx: ToolContext, args: CommentTicketArgs) -> ToolResult:
+async def comment_ticket(ctx: WriteContext, args: CommentTicketArgs) -> ToolResult:
     attrs = {"key": args.key}
     ticket = await _ticket(ctx, args.key)
     if ticket is None:
-        return ToolResult("ticket", NOT_FOUND, attrs)
+        return refusal("ticket", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, ticket.space_id):
-        return ToolResult("ticket", why, attrs)
+        return refusal("ticket", why, attrs)
 
     async def write() -> ToolResult:
         await _comment(ctx, ticket, args.text, "comment")
@@ -130,11 +137,11 @@ async def comment_ticket(ctx: ToolContext, args: CommentTicketArgs) -> ToolResul
     return await effect(ctx, "ticket", attrs, write)
 
 
-async def set_ticket_status(ctx: ToolContext, args: SetTicketStatusArgs) -> ToolResult:
+async def set_ticket_status(ctx: WriteContext, args: SetTicketStatusArgs) -> ToolResult:
     attrs = {"key": args.key}
     ticket = await _ticket(ctx, args.key)
     if ticket is None:
-        return ToolResult("ticket", NOT_FOUND, attrs)
+        return refusal("ticket", NOT_FOUND, attrs)
     statuses = await status_repository(ctx.session, ctx.actor).in_space(ticket.space_id)
     wanted = args.status.casefold()
     status = next((s for s in statuses if s.name.casefold() == wanted or str(s.id) == wanted), None)
@@ -146,9 +153,9 @@ async def set_ticket_status(ctx: ToolContext, args: SetTicketStatusArgs) -> Tool
             if status is None
             else ("Only a person sets a status of category done or cancelled")
         )
-        return ToolResult("ticket", f"{why}. You may set: {names}.", attrs)
+        return refusal("ticket", f"{why}. You may set: {names}.", attrs)
     if drafted := await carries_draft(ctx):
-        return ToolResult("ticket", drafted, attrs)
+        return refusal("ticket", drafted, attrs)
 
     async def write() -> ToolResult:
         view = await TicketService(ctx.session).update(
@@ -163,19 +170,19 @@ async def set_ticket_status(ctx: ToolContext, args: SetTicketStatusArgs) -> Tool
     return await effect(ctx, "ticket", attrs, write)
 
 
-async def create_ticket(ctx: ToolContext, args: CreateTicketArgs) -> ToolResult:
+async def create_ticket(ctx: WriteContext, args: CreateTicketArgs) -> ToolResult:
     attrs = {"space": str(args.space_id)}
     if not await can(ctx.session, ctx.actor, Action.TICKET_READ, args.space_id) or (
         await closed_to_ai(ctx, args.space_id)
     ):
-        return ToolResult("ticket", NOT_FOUND, attrs)
+        return refusal("ticket", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, args.space_id):
-        return ToolResult("ticket", why, attrs)
+        return refusal("ticket", why, attrs)
     parent_id = None
     if args.parent_key is not None:
         parent = await _ticket(ctx, args.parent_key)
         if parent is None:
-            return ToolResult("ticket", NOT_FOUND, {"key": args.parent_key})
+            return refusal("ticket", NOT_FOUND, {"key": args.parent_key})
         parent_id = parent.id
 
     async def write() -> ToolResult:
@@ -194,7 +201,7 @@ async def create_ticket(ctx: ToolContext, args: CreateTicketArgs) -> ToolResult:
     return await effect(ctx, "ticket", attrs, write)
 
 
-async def link_ticket_page(ctx: ToolContext, args: LinkTicketPageArgs) -> ToolResult:
+async def link_ticket_page(ctx: WriteContext, args: LinkTicketPageArgs) -> ToolResult:
     attrs = {"key": args.key, "page": str(args.page_id)}
     ticket = await _ticket(ctx, args.key)
     try:
@@ -202,9 +209,9 @@ async def link_ticket_page(ctx: ToolContext, args: LinkTicketPageArgs) -> ToolRe
     except NotFound:
         page = None
     if ticket is None or page is None:
-        return ToolResult("ticket", NOT_FOUND, attrs)
+        return refusal("ticket", NOT_FOUND, attrs)
     if why := await carries_draft(ctx):
-        return ToolResult("ticket", why, attrs)
+        return refusal("ticket", why, attrs)
 
     async def write() -> ToolResult:
         linked = await TicketLinks(ctx.session).link(ctx.actor, ticket.number, page.id, by(ctx))
@@ -220,13 +227,13 @@ async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
     attrs = {"key": args.key}
     ticket = await _ticket(ctx, args.key)
     if ticket is None:
-        return ToolResult("ticket", NOT_FOUND, attrs)
+        return refusal("ticket", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, ticket.space_id):
-        return ToolResult("ticket", why, attrs)
+        return refusal("ticket", why, attrs)
     assignee = Principal(PrincipalType(args.assignee_type), args.assignee_id)
     to_agent = assignee.type == PrincipalType.AGENT
-    if to_agent and (refusal := await handover.refusal(ctx, ticket, assignee.id)):
-        return refusal
+    if to_agent and (stopped := await handover.refusal(ctx, ticket, assignee.id)):
+        return stopped
 
     async def write() -> ToolResult:
         await TicketService(ctx.session).update(
@@ -279,7 +286,7 @@ def _subject(ticket: WorkItem) -> Subject:
     return Subject("ticket", ticket.id, ticket.version, ticket.space_id)
 
 
-async def _ticket(ctx: ToolContext, key: str) -> WorkItem | None:
+async def _ticket(ctx: CallContext, key: str) -> WorkItem | None:
     number = key_number(key)
     if number is None:
         return None
@@ -291,8 +298,9 @@ async def _ticket(ctx: ToolContext, key: str) -> WorkItem | None:
         return None
 
 
-async def _comment(ctx: ToolContext, ticket: WorkItem, text: str, kind: str) -> None:
-    """The agent's message in the ticket's thread (one per run, ticket and text)."""
+async def _comment(ctx: WriteContext, ticket: WorkItem, text: str, kind: str) -> None:
+    """The writer's message in the ticket's thread (in a run one per run, ticket and
+    text)."""
     thread = await TicketService(ctx.session).thread(ctx.actor, ticket)
     digest = hashlib.sha256(text.encode()).hexdigest()
     key = key_for(ctx, kind, ticket.id, digest)

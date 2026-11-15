@@ -87,6 +87,7 @@ class VersionService:
                 change_summary=change_summary,
                 session_key=session_key,
                 run_id=by.run_id if by else None,
+                via_token=by.via_token if by else None,
             )
         )
 

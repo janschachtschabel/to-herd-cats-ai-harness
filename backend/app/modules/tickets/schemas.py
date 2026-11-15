@@ -123,7 +123,9 @@ class ChildCounts(BaseModel):
 class TicketSummaryOut(BaseModel):
     """A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
     number. `version` guards writes (send it back; stale → 409). `tags` by name.
-    `status_changed_at`: when its status last changed (or it was made)."""
+    `status_changed_at`: when its status last changed (or it was made). `via_token`:
+    made by its reporter's AI client through an access token at `/mcp` (the token's
+    name, the AI mark; plan M8)."""
 
     id: uuid.UUID
     number: int
@@ -143,6 +145,7 @@ class TicketSummaryOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     status_changed_at: datetime
+    via_token: str | None = None
 
     @classmethod
     def fields_of(cls, view: TicketView) -> dict[str, object]:
@@ -177,6 +180,7 @@ class TicketSummaryOut(BaseModel):
             "created_at": t.created_at,
             "updated_at": t.updated_at,
             "status_changed_at": t.status_changed_at,
+            "via_token": t.via_token,
         }
 
     @classmethod

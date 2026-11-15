@@ -26,10 +26,11 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.authorship import VIA_TOKEN_CHARS
 from app.core.models_base import Base, OrgScoped, UuidPk, utcnow
 from app.modules.ai.models import DataLocation
 
-MAX_NAME_CHARS = 80
+MAX_NAME_CHARS = VIA_TOKEN_CHARS  # what it writes carries its name (`core/authorship.py`)
 MAX_SCOPE_SPACES = 50
 MAX_DAYS = 365
 DIGEST_BYTES = 32

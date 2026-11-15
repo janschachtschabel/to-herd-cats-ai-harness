@@ -151,6 +151,8 @@ class MessageOut(BaseModel):
     deleted message keeps its place with `deleted_at` set and an empty `body_md`.
     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
     `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
+    `via_token`: a person's message written through an access token at `/mcp`, the
+    token's name (AI mark of an external AI client, plan M8).
     `mentions`: the people mentioned who may see the conversation; `reactions`: by
     emoji, the first reacted with first. `card`: set for a run's card (`kind`
     `approval` or `question`)."""
@@ -163,6 +165,7 @@ class MessageOut(BaseModel):
     body_md: str
     client_id: uuid.UUID | None
     run_id: uuid.UUID | None = None
+    via_token: str | None = None
     created_at: datetime
     edited_at: datetime | None
     deleted_at: datetime | None
@@ -190,6 +193,7 @@ class MessageOut(BaseModel):
             body_md="" if message.kind == MessageKind.SYSTEM else message.body_md,
             client_id=message.client_id,
             run_id=message.run_id,
+            via_token=message.via_token,
             created_at=message.created_at,
             edited_at=message.edited_at,
             deleted_at=message.deleted_at,

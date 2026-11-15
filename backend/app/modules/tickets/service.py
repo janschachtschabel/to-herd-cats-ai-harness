@@ -76,7 +76,8 @@ class TicketService:
         assignee: Principal | None = None,
         by: Authorship | None = None,
     ) -> TicketView:
-        """`by`: written for an agent (its run): the reporter and the event's actor."""
+        """`by`: written for an agent (its run): the reporter and the event's actor; or
+        the person's own through an access token (`via_token`, plan M8)."""
         await require(self.session, actor, Action.TICKET_CREATE, space_id)
         repo = ticket_repository(self.session, actor)
         status = await self._status(actor, space_id, status_id)
@@ -102,6 +103,7 @@ class TicketService:
                 assignee_id=assignee.id if assignee else None,
                 reporter_type=(by.principal if by else actor.principal).type,
                 reporter_id=(by.principal if by else actor.principal).id,
+                via_token=by.via_token if by else None,
                 due_on=due_on,
             )
         )

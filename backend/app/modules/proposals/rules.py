@@ -54,7 +54,11 @@ def check_author(actor: Actor, author: Principal) -> None:
 
 
 def common(
-    content_md: str, reason: str, author: Principal, run_id: uuid.UUID | None
+    content_md: str,
+    reason: str,
+    author: Principal,
+    run_id: uuid.UUID | None,
+    via_token: str | None = None,
 ) -> dict[str, object]:
     return {
         "content_md": content_md,
@@ -62,6 +66,7 @@ def common(
         "author_type": author.type,
         "author_id": author.id,
         "run_id": run_id,
+        "via_token": via_token,
         "state": ProposalState.OPEN,
     }
 

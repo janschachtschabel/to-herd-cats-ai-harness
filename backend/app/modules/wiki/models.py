@@ -30,6 +30,7 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.authorship import VIA_TOKEN_CHARS
 from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
 from app.core.principal import PrincipalType
 
@@ -131,6 +132,7 @@ class VersionSource(StrEnum):
     RESTORE = "restore"  # an older state brought back as a new version
     COLLAB = "collab"  # saved from a live-editing session
     AGENT = "agent"  # written for an agent (its run, or a proposal of it accepted)
+    MCP = "mcp"  # a person's AI client through an access token (plan M8 decision 3)
 
 
 class PageVersion(UuidPk, OrgScoped, Base):
@@ -141,7 +143,7 @@ class PageVersion(UuidPk, OrgScoped, Base):
     __table_args__ = (
         UniqueConstraint("page_id", "number"),
         CheckConstraint(
-            "source IN ('human', 'import', 'restore', 'collab', 'agent')", name="source"
+            "source IN ('human', 'import', 'restore', 'collab', 'agent', 'mcp')", name="source"
         ),
     )
 
@@ -161,6 +163,9 @@ class PageVersion(UuidPk, OrgScoped, Base):
     # The agent's run that wrote it (no foreign key: a version outlives its run, like
     # `usage_record.run_id`); the AI mark is an agent as author (`version_schemas`).
     run_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    # Through an access token at `/mcp` (source `mcp`): the token's name, the AI mark of
+    # a person's version (plan M8 decision 3).
+    via_token: Mapped[str | None] = mapped_column(String(VIA_TOKEN_CHARS))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

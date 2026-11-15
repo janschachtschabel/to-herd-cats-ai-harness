@@ -6,6 +6,12 @@ the organisation's MCP data location receive (`tokens/resolve.py`). So nothing h
 restates a permission rule; whatever the token may not see answers like an unknown
 id, as the tool answers it.
 
+A writing tool writes for the person with the token's name (`context.py`), only with
+a `write` token (`exposed.py`) and only inside its write scope (its actor's). A tool's
+refusal (not found, not allowed, changed meanwhile: `ToolResult.failed`) is a tool
+error. Every call of a writing tool is audited (`mcp.write_call`: the token, the tool
+and the outcome).
+
 Each call runs in a savepoint of the request's transaction: a call that fails undoes
 what it wrote, and the client gets a tool error without any internal detail. The
 arguments are checked against the tool's model first; an invalid call names the
@@ -17,15 +23,18 @@ the tool's name, the outcome and the time taken, never arguments or results.
 
 import logging
 import time
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid_utils.compat import uuid7
 
 from app.modules.agents.actor import Reads
-from app.modules.agents.toolbox.base import CallContext
+from app.modules.audit.recorder import record
+from app.modules.mcp_tools.context import TokenContext
 from app.modules.mcp_tools.exposed import Exposed, tool_for, tools_for
 from app.modules.mcp_tools.metrics import MCP_CALLS
 from app.modules.mcp_tools.models import McpCall, Outcome
@@ -37,6 +46,7 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_CHARS = 100_000
 CUT = "\n[cut: the result was longer than {limit} characters]"
 FAILED = "The call failed. Try again later."
+TARGET = "access_token"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,10 +74,12 @@ class McpToolService:
         if tool is None:
             raise UnknownTool
         started = time.perf_counter()
-        answer = await self._answer(token, tool, arguments or {})
+        call_id = uuid7()
+        answer = await self._answer(token, tool, arguments or {}, call_id)
         millis = round((time.perf_counter() - started) * 1000)
         await McpCallRepository(self.session, token.actor.org_id).add(
             McpCall(
+                id=call_id,
                 org_id=token.actor.org_id,
                 token_id=token.token_id,
                 tool=tool.name,
@@ -75,6 +87,11 @@ class McpToolService:
                 duration_ms=millis,
             )
         )
+        if not tool.read_only:
+            details = {"tool": tool.name, "outcome": answer.outcome.value}
+            await record(
+                self.session, token.actor, "mcp.write_call", TARGET, token.token_id, details
+            )
         MCP_CALLS.labels(tool=tool.name, outcome=answer.outcome.value).inc()
         logger.info(
             "mcp.tool_call",
@@ -83,19 +100,23 @@ class McpToolService:
         return answer
 
     async def _answer(
-        self, token: TokenActor, tool: Exposed, arguments: Mapping[str, Any]
+        self, token: TokenActor, tool: Exposed, arguments: Mapping[str, Any], call_id: uuid.UUID
     ) -> Answer:
         try:
             args = tool.spec.args.model_validate(dict(arguments))
         except ValidationError as exc:
             return Answer(_invalid(exc), True, Outcome.INVALID)
-        ctx = CallContext(self.session, token.actor, token.location, Reads())
+        ctx = TokenContext(
+            self.session, token.actor, token.location, Reads(), token.token_id, token.name, call_id
+        )
         try:
             async with self.session.begin_nested():
                 result = await tool.run(ctx, args)
         except Exception as exc:
             logger.error("mcp.tool_failed", extra={"tool": tool.name, "error": type(exc).__name__})
             return Answer(FAILED, True, Outcome.FAILED)
+        if result.failed:
+            return Answer(_cut(result.text), True, Outcome.REFUSED)
         return Answer(_cut(result.text), False, Outcome.OK)
 
 

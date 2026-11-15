@@ -17,14 +17,14 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.core.errors import NotFound
-from app.modules.agents.repository import AgentRepository
-from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext, WriteContext
 from app.modules.agents.toolbox.writing import (
     by,
     closed_to_ai,
     effect,
     key_for,
     leaks_into,
+    refusal,
 )
 from app.modules.messaging.models import MAX_BODY_CHARS, ConversationKind
 from app.modules.messaging.service import ConversationService, MessageService
@@ -41,25 +41,25 @@ class PostMessageArgs(BaseModel):
     reply_to: uuid.UUID | None = None
 
 
-async def post_message(ctx: ToolContext, args: PostMessageArgs) -> ToolResult:
+async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
     attrs = {"conversation": str(args.conversation_id)}
     try:
         conversation = await ConversationService(ctx.session).get(ctx.actor, args.conversation_id)
     except NotFound:
-        return ToolResult("conversation", NOT_FOUND, attrs)
-    own = conversation.id == ctx.run.conversation_id
-    if not own:
-        spaces = await AgentRepository(ctx.session, ctx.run.org_id).member_space_ids(
-            ctx.run.agent_id
-        )
-        if conversation.kind != ConversationKind.CHANNEL or conversation.space_id not in spaces:
-            return ToolResult("conversation", NOT_FOUND, attrs)
+        return refusal("conversation", NOT_FOUND, attrs)
+    own = ctx.answers_in(conversation.id)
+    if not own and (
+        conversation.kind != ConversationKind.CHANNEL
+        or conversation.space_id is None
+        or not await ctx.posts_in(conversation.space_id)
+    ):
+        return refusal("conversation", NOT_FOUND, attrs)
     if conversation.space_id is not None:
         if await closed_to_ai(ctx, conversation.space_id):
-            return ToolResult("conversation", NOT_FOUND, attrs)
+            return refusal("conversation", NOT_FOUND, attrs)
         # Its own conversation reads the run's answer anyway (`writing`, drafts).
         if why := await leaks_into(ctx, conversation.space_id, editors_only=own):
-            return ToolResult("conversation", why, attrs)
+            return refusal("conversation", why, attrs)
 
     async def write() -> ToolResult:
         digest = hashlib.sha256(args.text.encode()).hexdigest()

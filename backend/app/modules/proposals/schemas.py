@@ -33,10 +33,12 @@ class ProposalOut(BaseModel):
     """A proposal without its content. `kind`: `change` of `page_id`, based on its
     version `base_version`; or `new`, a page `title` under `parent_id` (null: the top
     level), whose `page_id` is the page it became once accepted. `ai`: made by an agent
-    (`run_id`: its run). `decided_by`/`decided_at`: who accepted, rejected or (its
-    author's person) withdrew it, and when; `decision_reason`: a rejection's reason;
-    `result_version`: the page version an acceptance wrote (null if the page held
-    that content already). `version`: name it when deciding (stale → 409)."""
+    (`run_id`: its run) or by a person's AI client through an access token
+    (`via_token`: the token's name, plan M8). `decided_by`/`decided_at`: who
+    accepted, rejected or (its author's person) withdrew it, and when;
+    `decision_reason`: a rejection's reason; `result_version`: the page version an
+    acceptance wrote (null if the page held that content already). `version`: name
+    it when deciding (stale → 409)."""
 
     id: uuid.UUID
     space_id: uuid.UUID
@@ -50,6 +52,7 @@ class ProposalOut(BaseModel):
     author: ProposalAuthorOut
     ai: bool
     run_id: uuid.UUID | None
+    via_token: str | None = None
     decided_by: ProposalDeciderOut | None
     decided_at: datetime | None
     decision_reason: str | None
@@ -79,8 +82,9 @@ class ProposalOut(BaseModel):
             author=ProposalAuthorOut(
                 type=p.author_type, id=p.author_id, name=author_names.get(p.author_id)
             ),
-            ai=p.author_type == PrincipalType.AGENT,
+            ai=p.author_type == PrincipalType.AGENT or p.via_token is not None,
             run_id=p.run_id,
+            via_token=p.via_token,
             decided_by=decided_by,
             decided_at=p.decided_at,
             decision_reason=p.decision_reason,

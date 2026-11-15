@@ -112,7 +112,7 @@ class ProposalDecisions:
         if page is None:
             raise Conflict(code="proposal.page_trashed")
         author = author_of(proposal)
-        if author.type == PrincipalType.AGENT and page.no_ai:
+        if (author.type == PrincipalType.AGENT or proposal.via_token) and page.no_ai:
             raise Conflict(code="proposal.page_no_ai")
         if merged_content is None:
             if page.content_md != proposal.base_content_md:
@@ -130,8 +130,8 @@ class ProposalDecisions:
             content_md=content,
             version=page.version,
             change_summary=proposal.reason,
-            source=VersionSource.HUMAN if merged else _source(author),
-            by=None if merged else Authorship(author, proposal.run_id),
+            source=VersionSource.HUMAN if merged else _source(proposal),
+            by=None if merged else _by(proposal),
         )
         if page.version == before:  # the page holds this content already
             return None
@@ -139,7 +139,6 @@ class ProposalDecisions:
 
     async def _create_page(self, actor: Actor, proposal: PageProposal) -> PageVersion | None:
         assert proposal.title is not None
-        author = author_of(proposal)
         try:
             page = await self.pages.create(
                 actor,
@@ -147,8 +146,8 @@ class ProposalDecisions:
                 proposal.parent_id,
                 proposal.title,
                 proposal.content_md,
-                source=_source(author),
-                by=Authorship(author, proposal.run_id),
+                source=_source(proposal),
+                by=_by(proposal),
             )
         except ValidationFailed as exc:
             if exc.code == "page.parent_not_found":
@@ -157,8 +156,15 @@ class ProposalDecisions:
         return await self.proposals.facts(actor).latest_version(page.id)
 
 
-def _source(author: Principal) -> VersionSource:
-    return VersionSource.AGENT if author.type == PrincipalType.AGENT else VersionSource.HUMAN
+def _source(proposal: PageProposal) -> VersionSource:
+    if proposal.author_type == PrincipalType.AGENT:
+        return VersionSource.AGENT
+    return VersionSource.MCP if proposal.via_token else VersionSource.HUMAN
+
+
+def _by(proposal: PageProposal) -> Authorship:
+    """The accepted version is its author's, with the run or the token it came by."""
+    return Authorship(author_of(proposal), proposal.run_id, proposal.via_token)
 
 
 async def _outdated(proposal: PageProposal, page: Page) -> Conflict:

@@ -182,10 +182,11 @@ async def test_update_page_writes_once_when_its_run_is_taken_up_again(
     work.space.agent_write_policy = AgentWritePolicy.DIRECT
     page_id = await work.page()
     posted = await work.bench.say("Bitte ändern")
-    run = SimpleNamespace(run=SimpleNamespace(id=uuid.UUID(posted["agent_run"]["id"])))
+    run_id = uuid.UUID(posted["agent_run"]["id"])
+    writer = SimpleNamespace(binding=lambda: run_id)  # a run's preview is bound to the run
     page = await work.bench.session.get(Page, uuid.UUID(page_id))
     assert page is not None
-    token = wiki_tools._token(run, page, "neu\n")  # type: ignore[arg-type]
+    token = wiki_tools._token(writer, page, "neu\n")  # type: ignore[arg-type]
     args = {"page_id": page_id, "content_md": "neu\n", "reason": "r", "token": token}
     work.bench.stub.state.replies.extend([call("update_page", **args), {"content": "Done."}])
     die_after(monkeypatch, "call_tool")

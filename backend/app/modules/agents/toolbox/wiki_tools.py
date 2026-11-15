@@ -31,8 +31,21 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import Action, can
 from app.core.errors import NotFound
 from app.modules.agents.memory_repository import MemoryRepository
-from app.modules.agents.toolbox.base import NOT_FOUND, Subject, ToolContext
-from app.modules.agents.toolbox.writing import by, closed_to_ai, effect, leaks_into, refused
+from app.modules.agents.toolbox.base import (
+    NOT_FOUND,
+    CallContext,
+    Subject,
+    ToolContext,
+    WriteContext,
+)
+from app.modules.agents.toolbox.writing import (
+    by,
+    closed_to_ai,
+    effect,
+    leaks_into,
+    refusal,
+    refused,
+)
 from app.modules.proposals.models import MAX_REASON_CHARS
 from app.modules.proposals.service import ProposalService
 from app.modules.wiki import diffing
@@ -41,7 +54,6 @@ from app.modules.wiki.models import (
     MAX_TITLE_CHARS,
     Page,
     PageStatus,
-    VersionSource,
 )
 from app.modules.wiki.service import PageService
 from app.modules.wiki.visibility import PageReader
@@ -85,13 +97,13 @@ class UpdatePageArgs(BaseModel):
     token: Annotated[str, StringConstraints(max_length=64)] | None = None
 
 
-async def propose_page_change(ctx: ToolContext, args: ProposePageChangeArgs) -> ToolResult:
+async def propose_page_change(ctx: WriteContext, args: ProposePageChangeArgs) -> ToolResult:
     attrs = {"page": str(args.page_id)}
     page = await _page(ctx, args.page_id)
     if page is None or not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, page.space_id):
-        return ToolResult("wiki", NOT_FOUND if page is None else "Not allowed here.", attrs)
+        return refusal("wiki", NOT_FOUND if page is None else "Not allowed here.", attrs)
     if why := await leaks_into(ctx, page.space_id, editors_only=True):  # page.edit sees it
-        return ToolResult("wiki", why, attrs)
+        return refusal("wiki", why, attrs)
 
     async def write() -> ToolResult:
         proposal = await ProposalService(ctx.session).propose_change(
@@ -100,7 +112,8 @@ async def propose_page_change(ctx: ToolContext, args: ProposePageChangeArgs) -> 
             args.content_md,
             args.reason,
             author=by(ctx).principal,
-            run_id=ctx.run.id,
+            run_id=by(ctx).run_id,
+            via_token=by(ctx).via_token,
         )
         text = f"Proposal id={proposal.id} made for page id={page.id}; a moderator decides."
         return ToolResult("wiki", text, attrs)
@@ -108,14 +121,14 @@ async def propose_page_change(ctx: ToolContext, args: ProposePageChangeArgs) -> 
     return await effect(ctx, "wiki", attrs, write)
 
 
-async def propose_new_page(ctx: ToolContext, args: ProposeNewPageArgs) -> ToolResult:
+async def propose_new_page(ctx: WriteContext, args: ProposeNewPageArgs) -> ToolResult:
     attrs = {"space": str(args.space_id)}
     if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, args.space_id) or (
         await closed_to_ai(ctx, args.space_id)
     ):
-        return ToolResult("wiki", NOT_FOUND, attrs)
+        return refusal("wiki", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, args.space_id):
-        return ToolResult("wiki", why, attrs)
+        return refusal("wiki", why, attrs)
 
     async def write() -> ToolResult:
         proposal = await ProposalService(ctx.session).propose_new(
@@ -126,27 +139,28 @@ async def propose_new_page(ctx: ToolContext, args: ProposeNewPageArgs) -> ToolRe
             args.content_md,
             args.reason,
             author=by(ctx).principal,
-            run_id=ctx.run.id,
+            run_id=by(ctx).run_id,
+            via_token=by(ctx).via_token,
         )
         return ToolResult("wiki", f"Proposal id={proposal.id} made; a moderator decides.", attrs)
 
     return await effect(ctx, "wiki", attrs, write)
 
 
-async def update_page(ctx: ToolContext, args: UpdatePageArgs) -> ToolResult:
+async def update_page(ctx: WriteContext, args: UpdatePageArgs) -> ToolResult:
     attrs = {"page": str(args.page_id)}
     page = await _page(ctx, args.page_id)
     if page is None:
-        return ToolResult("wiki", NOT_FOUND, attrs)
-    if await MemoryRepository(ctx.session, ctx.run.org_id).is_memory(page.id):
-        return ToolResult("wiki", USE_UPDATE_MEMORY, attrs)  # its rules: `memory_tools`
+        return refusal("wiki", NOT_FOUND, attrs)
+    if await MemoryRepository(ctx.session, ctx.actor.org_id).is_memory(page.id):
+        return refusal("wiki", USE_UPDATE_MEMORY, attrs)  # its rules: `memory_tools`
     if not await ProposalService(ctx.session).agent_writes_directly(ctx.actor, page.space_id):
-        return ToolResult("wiki", PROPOSE_INSTEAD, attrs)
+        return refusal("wiki", PROPOSE_INSTEAD, attrs)
     if not await can(ctx.session, ctx.actor, Action.PAGE_EDIT, page.space_id):
-        return ToolResult("wiki", "Not allowed here.", attrs)
+        return refusal("wiki", "Not allowed here.", attrs)
     draft = page.status == PageStatus.DRAFT  # only the space's editors read it
     if why := await leaks_into(ctx, page.space_id, editors_only=draft):
-        return ToolResult("wiki", why, attrs)
+        return refusal("wiki", why, attrs)
     ctx.reads.spaces.add(page.space_id)  # the diff shows the page
     ctx.reads.pages.add(page.id)
     spaces = frozenset({page.space_id})
@@ -168,7 +182,7 @@ async def update_page(ctx: ToolContext, args: UpdatePageArgs) -> ToolResult:
             content_md=args.content_md,
             version=locked.version,
             change_summary=args.reason,
-            source=VersionSource.AGENT,
+            source=ctx.source,
             by=by(ctx),
         )
         return ToolResult("wiki", f"Page id={written.id} saved (version {written.version}).", attrs)
@@ -208,18 +222,19 @@ def _subject(page: Page) -> Subject:
     return Subject("page", page.id, page.version, page.space_id)
 
 
-async def _page(ctx: ToolContext, page_id: uuid.UUID) -> Page | None:
+async def _page(ctx: CallContext, page_id: uuid.UUID) -> Page | None:
     try:
         return await PageReader(ctx.session).for_ai(ctx.actor, page_id)
     except NotFound:
         return None
 
 
-def _token(ctx: ToolContext, page: Page, content_md: str) -> str:
-    """Binds a preview to the run, the page as it is (version and content) and the new
-    content: a write with it changes exactly what the diff showed."""
+def _token(ctx: WriteContext, page: Page, content_md: str) -> str:
+    """Binds a preview to the writer (the run, or the token at `/mcp`), the page as it
+    is (version and content) and the new content: a write with it changes exactly what
+    the diff showed."""
     parts = (
-        str(ctx.run.id),
+        str(ctx.binding()),
         str(page.id),
         str(page.version),
         hashlib.sha256(page.content_md.encode()).hexdigest(),

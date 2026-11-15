@@ -42,6 +42,7 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.authorship import VIA_TOKEN_CHARS
 from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk, utcnow
 from app.core.principal import PrincipalType
 
@@ -206,6 +207,9 @@ class WorkItem(UuidPk, OrgScoped, Timestamps, Base):
     reporter_type: Mapped[PrincipalType] = mapped_column(String(16), nullable=False)
     reporter_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     # A day without time or zone (plan M4 decision 7).
+    # Made by a person's AI client through an access token at `/mcp`: the token's name
+    # (the AI mark, plan M8 decision 3).
+    via_token: Mapped[str | None] = mapped_column(String(VIA_TOKEN_CHARS))
     due_on: Mapped[date | None] = mapped_column(Date)
     # When the status last changed (or the ticket was made): set by the database
     # (trigger `work_item_status_changed_at`, migration m4b), whatever code writes.

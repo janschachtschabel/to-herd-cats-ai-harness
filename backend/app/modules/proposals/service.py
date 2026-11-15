@@ -159,6 +159,7 @@ class ProposalService:
         *,
         author: Principal,
         run_id: uuid.UUID | None = None,
+        via_token: str | None = None,
     ) -> PageProposal:
         """A change of the page's content, based on its content now."""
         rules.check_author(actor, author)
@@ -177,7 +178,7 @@ class ProposalService:
             page_id=locked.id,
             base_version=latest.number,
             base_content_md=locked.content_md,
-            **rules.common(content_md, reason, author, run_id),
+            **rules.common(content_md, reason, author, run_id, via_token),
         )
         return await self._made(actor, proposal)
 
@@ -192,6 +193,7 @@ class ProposalService:
         *,
         author: Principal,
         run_id: uuid.UUID | None = None,
+        via_token: str | None = None,
     ) -> PageProposal:
         """A new page under `parent_id` (None: the top level) of the space."""
         rules.check_author(actor, author)
@@ -211,7 +213,7 @@ class ProposalService:
             kind=ProposalKind.NEW,
             parent_id=parent_id,
             title=title,
-            **rules.common(content_md, reason, author, run_id),
+            **rules.common(content_md, reason, author, run_id, via_token),
         )
         return await self._made(actor, proposal)
 
