@@ -16,11 +16,15 @@ registers at the provider; there is no dynamic client registration here).
 
 Every request goes through the egress guard (https, public addresses), each answer
 capped at 64 KiB; every address found must pass the same rules as a written one.
+Each request is dialled directly or through `HERD_AI_EGRESS_PROXY` by its own host
+(`egress_for`): the server, its resource metadata and its authorization server may be
+different hosts, one in-house and listed, another outside (module review M8 1, F12).
 """
 
 import json
 import re
-from dataclasses import dataclass
+from contextlib import AsyncExitStack
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 from urllib.parse import urlsplit
@@ -74,12 +78,28 @@ class _Stop(Exception):  # noqa: N818
         self.status = status
 
 
+@dataclass
+class _Clients:
+    """A guarded client per egress decision (direct, or through the proxy), opened
+    when a host first needs it, all closed with the discovery."""
+
+    stack: AsyncExitStack
+    opened: dict[str | None, httpx.AsyncClient] = field(default_factory=dict)
+
+    async def send(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        rules, proxy = egress_for(url)
+        http = self.opened.get(proxy)
+        if http is None:
+            made = egress.client(rules, timeout=TIMEOUT_SECONDS, proxy=proxy)
+            http = self.opened[proxy] = await self.stack.enter_async_context(made)
+        return await http.send(http.build_request(method, url, **kwargs), stream=True)
+
+
 async def discover(url: str) -> Discovery:
     """`url` has passed `egress.check_base_url(url, RULES)`."""
     try:
-        rules, proxy = egress_for(url)
-        async with egress.client(rules, timeout=TIMEOUT_SECONDS, proxy=proxy) as http:
-            return await _discover(http, url)
+        async with AsyncExitStack() as stack:
+            return await _discover(_Clients(stack), url)
     except _Stop as stop:
         return Discovery(stop.status)
     except EgressBlocked:
@@ -90,7 +110,7 @@ async def discover(url: str) -> Discovery:
         return Discovery(DiscoveryStatus.UNREACHABLE)
 
 
-async def _discover(http: httpx.AsyncClient, url: str) -> Discovery:
+async def _discover(http: _Clients, url: str) -> Discovery:
     pointed, challenged_scope = await _challenge(http, url)
     candidates = [pointed] if pointed else _resource_candidates(url)
     metadata = await _first(http, candidates, lambda m: isinstance(m.get("resource"), str))
@@ -139,11 +159,10 @@ async def _discover(http: httpx.AsyncClient, url: str) -> Discovery:
     )
 
 
-async def _challenge(http: httpx.AsyncClient, url: str) -> tuple[str | None, str | None]:
+async def _challenge(http: _Clients, url: str) -> tuple[str | None, str | None]:
     """The resource metadata URL and scope a 401 names, if the server sends one."""
     headers = {"Accept": "application/json, text/event-stream"}
-    request = http.build_request("POST", url, json=_PROBE, headers=headers)
-    response = await http.send(request, stream=True)
+    response = await http.send("POST", url, json=_PROBE, headers=headers)
     await response.aclose()  # the body is not read
     if response.status_code != 401:
         return None, None
@@ -178,11 +197,10 @@ def _server_candidates(issuer: str) -> list[str]:
     ]
 
 
-async def _first(http: httpx.AsyncClient, urls: list[str], fits: Any) -> dict[str, Any] | None:
+async def _first(http: _Clients, urls: list[str], fits: Any) -> dict[str, Any] | None:
     for url in urls:
         _allowed(url)
-        request = http.build_request("GET", url, headers={"Accept": "application/json"})
-        response = await http.send(request, stream=True)
+        response = await http.send("GET", url, headers={"Accept": "application/json"})
         try:
             if response.status_code != 200:
                 continue

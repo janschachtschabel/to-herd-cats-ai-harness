@@ -4,8 +4,15 @@ else from the well-known URIs; then the authorization server's metadata (RFC 841
 OpenID discovery). Every request through the egress guard; the answer is a proposal
 for an OAuth client, nothing is stored."""
 
+from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlsplit
 
+import httpx
+import pytest
+
+from app.modules.oauth import discovery
+from app.modules.oauth.protocol import RULES
 from tests.factories_dms import People
 from tests.factories_oauth import CLIENTS
 from tests.support.oauth_stub import OAuthStub
@@ -68,3 +75,46 @@ async def test_nothing_to_find_and_the_guard(oauth_ready: OAuthStub, ai_people: 
     assert refused.json()["error"]["code"] == "oauth_client.url_not_allowed"
     hidden = await ai_people.alice.post(DISCOVER, json={"url": f"{oauth_ready.url}/mcp"})
     assert hidden.json()["error"]["code"] == "ai.not_found"
+
+
+async def test_each_host_is_asked_directly_or_through_the_proxy_on_its_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Module review M8 1, finding 12: an in-house server (dialled directly) with a
+    public authorization server; the authorization server is asked through the proxy."""
+    server, issuer = "https://mcp.in.example/mcp", "https://login.example"
+    asked: list[tuple[str, str | None]] = []
+
+    def answer(proxy: str | None) -> Callable[[httpx.Request], httpx.Response]:
+        def handle(request: httpx.Request) -> httpx.Response:
+            asked.append((request.url.host, proxy))
+            path = request.url.path
+            if path == "/.well-known/oauth-protected-resource/mcp":
+                return httpx.Response(
+                    200, json={"resource": server, "authorization_servers": [issuer]}
+                )
+            if path == "/.well-known/oauth-authorization-server":
+                return httpx.Response(
+                    200,
+                    json={
+                        "issuer": issuer,
+                        "authorization_endpoint": f"{issuer}/authorize",
+                        "token_endpoint": f"{issuer}/token",
+                    },
+                )
+            return httpx.Response(404)
+
+        return handle
+
+    def client(rules: Any, *, timeout: float, proxy: str | None = None) -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=httpx.MockTransport(answer(proxy)))
+
+    def egress_for(url: str) -> tuple[Any, str | None]:
+        return RULES, None if urlsplit(url).hostname == "mcp.in.example" else "http://proxy:3128"
+
+    monkeypatch.setattr(discovery.egress, "client", client)
+    monkeypatch.setattr(discovery, "egress_for", egress_for)
+    found = await discovery.discover(server)
+    assert found.status == "ok" and found.token_endpoint == f"{issuer}/token"
+    assert {proxy for host, proxy in asked if host == "mcp.in.example"} == {None}
+    assert {proxy for host, proxy in asked if host == "login.example"} == {"http://proxy:3128"}

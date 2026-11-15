@@ -782,7 +782,10 @@ Recht 404 `ai.not_found`.
   nicht gelisteter Name, der auf eine private Adresse auflöst, bleibt gesperrt. Ein
   gelistetes Netz erlaubt jede Adresse darin, gleich über welchen Namen; deshalb sind
   exakte Hostnamen die engere Wahl. Es bleibt bei https. Ein gelisteter Host wird direkt
-  gewählt, nicht über `HERD_AI_EGRESS_PROXY` (der Proxy ist für draußen gedacht); mit
+  gewählt, nicht über `HERD_AI_EGRESS_PROXY` (der Proxy ist für draußen gedacht). Das
+  entscheidet jede Anfrage nach ihrem eigenen Host, auch beim Erkennen eines
+  Autorisierungsservers: ein gelisteter interner Server mit einem öffentlichen
+  Autorisierungsserver wird direkt gefragt, der Autorisierungsserver über den Proxy; mit
   `networkPolicy.enabled` im Chart muss `networkPolicy.aiEgress` den Weg zu ihm
   zusätzlich öffnen. Gelesen wird die Einstellung von der API (Werkzeuglisten, Test)
   und vom Worker (Aufrufe in Läufen); Compose `HERD_MCP_ALLOWED_HOSTS`, Chart
