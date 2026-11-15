@@ -17,7 +17,10 @@ it here). No transaction is open while the remote server answers.
    use with the asking person's own connector (a shared connector, or none): what it
    sends may carry what only that person may read, so that person releases the exact
    arguments (in an automation's or an event rule's run: its owner, `run.user_id`;
-   module review M8 1, finding 3). A run that has sent
+   module review M8 1, finding 3). Under the mark that release is personal (its card
+   says that what is released can be read by others now or later), and so is a write
+   tool's through her own connector: what it writes leaves the system (module review
+   M8 5, L3). A run that has sent
    `HERD_MCP_MAX_CALLS_PER_RUN` calls sends no more (`CALL_LIMIT` as the result).
    Then, before anything is sent, the call's `run_event` with `OUTCOME_UNKNOWN` as its
    result, committed.
@@ -187,12 +190,14 @@ async def _before(
         ctx = ToolContext(
             session, actor, location, host.run.reads, host.ref(), CallRef(step, call.id)
         )
-        personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
-        marked = host.run.reads.personal and not personal  # leaves the person's hands
+        hers = server is not None and server.connector_scope == ConnectorUse.PERSONAL
+        reads = host.run.reads
+        marked = reads.personal and not hers  # what it sends leaves the person's hands
+        owed = reads.personal and (remote.writes or not hers)  # a write: always (L3)
         held: ToolResult | Wait | Passed | None = None
         if grant == Grant.CONFIRM or remote.writes or marked:  # a write tool: always
             with caused_by(run.id):
-                held = await gate(ctx, spec, args, personal=marked)
+                held = await gate(ctx, spec, args, personal=owed)
         if isinstance(held, Wait):
             await steps.wait(run, held.until)
             return held
@@ -200,7 +205,7 @@ async def _before(
             return _Ended(await _record(host, steps, run, step, call, args, held), refused)
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder, sent=True)
-        return _Sending(prepared, args.model_dump(mode="json"), placeholder, personal)
+        return _Sending(prepared, args.model_dump(mode="json"), placeholder, hers)
 
 
 async def _as_now(
