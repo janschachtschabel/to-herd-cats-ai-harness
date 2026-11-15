@@ -36,6 +36,7 @@ spec:
           env:
             {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
             {{- include "herd.aiApiEnv" . | nindent 12 }}
+            {{- include "herd.mcpApiEnv" . | nindent 12 }}
             {{- if include "herd.publicUrl" . }}
             {{- include "herd.publicUrlEnv" . | nindent 12 }}
             {{- end }}

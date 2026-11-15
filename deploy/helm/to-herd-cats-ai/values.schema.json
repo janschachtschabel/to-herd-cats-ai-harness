@@ -126,6 +126,15 @@
       "required": ["existingSecret", "checkTimeoutSeconds", "personalAgentsMax", "automationsMax", "approvalHours", "runConcurrency", "runLeaseSeconds"],
       "description": "AI connections and agent runs"
     },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ratePerMinute": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "HERD_MCP_RATE_PER_MINUTE (API)"}
+      },
+      "required": ["ratePerMinute"],
+      "description": "The MCP endpoint and its access tokens"
+    },
     "collab": {
       "type": "object",
       "additionalProperties": false,
@@ -360,5 +369,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

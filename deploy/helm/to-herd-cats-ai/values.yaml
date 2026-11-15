@@ -68,6 +68,12 @@ ai:
   runConcurrency: 4
   runLeaseSeconds: 30
 
+## @section MCP (M8; docs/MCP.md)
+
+## @param mcp.ratePerMinute Calls one access token may make to /mcp per minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_MCP_RATE_PER_MINUTE; API). Whether people may have tokens at all is the organisation's switch in the AI administration
+mcp:
+  ratePerMinute: 120
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 

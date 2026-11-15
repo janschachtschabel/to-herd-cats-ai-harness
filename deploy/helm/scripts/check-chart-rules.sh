@@ -207,6 +207,17 @@ grep -q "policyTypes: \[Egress\]" <<<"$policy" || fail "the AI egress policy res
 grep -q "203.0.113.0/24" <<<"$(doc NetworkPolicy t-to-herd-cats-ai "$out")$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")" \
   && fail "networkPolicy.aiEgress leaks into the general policies (the migration job)"
 
+# MCP (M8): the access tokens' rate limit reaches the API pods (they serve /mcp) only.
+out=$(render)
+grep -A1 -- "- name: HERD_MCP_RATE_PER_MINUTE" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q 'value: "120"' || fail "the API has no HERD_MCP_RATE_PER_MINUTE"
+out=$(render --set mcp.ratePerMinute=30)
+grep -A1 -- "- name: HERD_MCP_RATE_PER_MINUTE" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q 'value: "30"' || fail "mcp.ratePerMinute does not reach the API"
+grep -q "HERD_MCP_RATE_PER_MINUTE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker gets the API's MCP settings"
+if render --set mcp.ratePerMinute=0 >/dev/null; then fail "mcp.ratePerMinute=0 rendered"; fi
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.

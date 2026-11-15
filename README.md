@@ -238,6 +238,9 @@ für den Worker). Mit `networkPolicy.enabled` erreichen API und Worker keinen An
 bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter oder zum Proxy). Drei Alarme
 kommen dazu: `HerdRunsStuck`, `HerdRunsQueued` und `HerdRunsFailing`, mit M7 zwei
 weitere: `HerdAutomationsLagging` und `HerdAutomationsFailing` (alle Warnung).
+Seit M8 begrenzt `mcp.ratePerMinute` (`HERD_MCP_RATE_PER_MINUTE`, Standard 120) die
+Aufrufe je Zugangstoken und Minute, gezählt in PostgreSQL über alle API-Pods
+(`docs/MCP.md`).
 Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
 
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:

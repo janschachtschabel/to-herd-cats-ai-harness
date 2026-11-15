@@ -178,6 +178,12 @@ seccompProfile:
   value: {{ .Values.ai.automationsMax | quote }}
 {{- end -}}
 
+{{/* MCP settings of the API pods (they serve /mcp). */}}
+{{- define "herd.mcpApiEnv" -}}
+- name: HERD_MCP_RATE_PER_MINUTE
+  value: {{ .Values.mcp.ratePerMinute | quote }}
+{{- end -}}
+
 {{/* AI settings of the worker pods (agent runs). */}}
 {{- define "herd.aiWorkerEnv" -}}
 - name: HERD_AI_APPROVAL_HOURS
