@@ -83,6 +83,27 @@ describe('profile', () => {
     expect(within(form).getByLabelText('Neues Passwort')).toHaveValue('')
   })
 
+  test('a guessable new password is refused with the reason', async () => {
+    mockApi({
+      'GET /api/auth/me': makeMe(['space.create']),
+      'GET /api/spaces': page([]),
+      'POST /api/auth/me/password': (call: Call) =>
+        (call.body as { new_password: string }).new_password === 'basketball'
+          ? apiError(422, 'auth.password_common')
+          : apiError(422, 'auth.password_context'),
+    })
+    const { user } = await renderApp('/profile')
+    const form = await screen.findByRole('form', { name: 'Passwort ändern' })
+    await user.type(within(form).getByLabelText('Aktuelles Passwort'), 'altes-passwort-1')
+    await user.type(within(form).getByLabelText('Neues Passwort'), 'basketball')
+    await user.click(within(form).getByRole('button', { name: 'Passwort ändern' }))
+    expect(await within(form).findByText(/leicht zu erraten/)).toBeInTheDocument()
+    await user.clear(within(form).getByLabelText('Neues Passwort'))
+    await user.type(within(form).getByLabelText('Neues Passwort'), 'mia-muster-2026')
+    await user.click(within(form).getByRole('button', { name: 'Passwort ändern' }))
+    expect(await within(form).findByText(/naheliegenden Begriff/)).toBeInTheDocument()
+  })
+
   test('after a password change the language is stored with the new version', async () => {
     let current = makeMe(['space.create'])
     const bump = () =>

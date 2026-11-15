@@ -47,7 +47,9 @@
       "required": "Please log in.",
       "session_invalid": "Your session has expired. Please log in again.",
       "csrf": "The request was refused for security reasons.",
-      "wrong_password": "The current password is not correct."
+      "wrong_password": "The current password is not correct.",
+      "password_common": "This password is known from data breaches and easy to guess. Please choose another one.",
+      "password_context": "The password contains an obvious word (a name, the email address, the organisation or the product). Please choose another one."
     },
     "server": {
       "busy": "The server is busy right now. Please try again in a moment."
@@ -116,7 +118,7 @@
       "title": "Change password",
       "current": "Current password",
       "new": "New password",
-      "hint": "At least 10 characters. Other signed-in devices are signed out.",
+      "hint": "At least 10 characters, not known from data breaches and without your name. Other signed-in devices are signed out.",
       "submit": "Change password",
       "changed": "Password changed. Other sessions are signed out."
     }

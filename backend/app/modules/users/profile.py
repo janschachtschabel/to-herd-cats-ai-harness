@@ -3,7 +3,8 @@
 No right is needed beyond acting at all (a deactivated person does not act). The
 person's row is locked like an administrator's change of it, so the version check
 holds against both. A password change needs the current password (failed attempts
-are limited like logins) and ends every other session of the person; its hashing
+are limited like logins), may not be easy to guess (`core/password_check.py`) and
+ends every other session of the person; its hashing
 runs with no connection and no lock held (checked again under the lock afterwards).
 """
 
@@ -13,10 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor
 from app.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
+from app.core.password_check import context_words, refuse_guessable
 from app.core.ratelimit import RateLimiter
 from app.core.security import hash_password_async, verify_password_async
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
+from app.modules.orgs.repository import OrganizationRepository
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import ProfileUpdate
@@ -60,6 +63,9 @@ class ProfileService:
         await self.session.commit()
         if checked is None or not await verify_password_async(checked, current):
             raise ValidationFailed(code="auth.wrong_password")
+        org = await OrganizationRepository(self.session).get(actor.org_id)
+        words = context_words(org_name=org.name, email=user.email, name=user.name)
+        await refuse_guessable(new, words)
         new_hash = await hash_password_async(new)
         user = await self._me(actor)
         if user.password_hash != checked:  # changed meanwhile (another tab, an admin)

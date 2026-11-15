@@ -25,7 +25,7 @@ from app.modules.wiki.events import PAGE_EVENTS
 from scripts.demo_seed import DemoExists, DemoFailed, main, seed
 from tests.factories import PASSWORD, login
 
-DEMO_PASSWORD = "demo-password-123"
+DEMO_PASSWORD = "seed-people-pw-123"  # no context word ("demo" of demo.example)
 
 
 async def _handle(session: AsyncSession, *, tickets: bool = True) -> None:

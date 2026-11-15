@@ -2,8 +2,9 @@
 
 Every change is audited in the transaction that makes it. Writes for one organisation
 are serialised (`lock_admin_writes`), so the version check, the email check and the
-last-owner rule hold under concurrent requests. A new password is hashed before that
-lock, with no database connection held (`_hash`). Only an owner grants or revokes the
+last-owner rule hold under concurrent requests. A new password is refused when it is
+easy to guess (`core/password_check.py`) and hashed before that lock, with no database
+connection held (`_hash`). Only an owner grants or revokes the
 owner role, and only an owner changes an owner's password or (de)activates an owner.
 """
 
@@ -16,10 +17,12 @@ from app.core.access import Action, Actor, require
 from app.core.access_events import access_changed
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
+from app.core.password_check import context_words, refuse_guessable
 from app.core.principal import SystemRole
 from app.core.security import hash_password_async
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
+from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
@@ -40,7 +43,9 @@ class UserService:
         await require(self.session, actor, Action.USER_MANAGE)
         if _is_owner(data.system_role):
             _owner_only(actor)
-        password_hash = await self._hash(data.password)
+        password_hash = await self._checked_hash(
+            actor, data.password, email=data.email, name=data.name
+        )
         await self.users.lock_admin_writes(actor.org_id)
         if await self.users.get_by_email(actor.org_id, data.email):
             raise Conflict(code="users.email_taken")
@@ -69,7 +74,15 @@ class UserService:
         """A new password ends the person's sessions; someone changing their own keeps
         `current_session`, the one they are making the change with."""
         await require(self.session, actor, Action.USER_MANAGE)
-        password_hash = await self._hash(data.password)
+        password_hash = None
+        if data.password is not None:
+            target = await self.users.get_current(actor.org_id, user_id)
+            if target is None:
+                raise NotFound(code="users.not_found")
+            name = data.name or target.name
+            password_hash = await self._checked_hash(
+                actor, data.password, email=target.email, name=name
+            )
         user = await self._current(actor, user_id)
         role_changes = data.system_role is not None and data.system_role != user.system_role
         if role_changes and (_is_owner(data.system_role) or _is_owner(user.system_role)):
@@ -126,6 +139,16 @@ class UserService:
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.users.page(actor.org_id, after, params.limit + 1)
         return id_page(rows, params.limit, lambda u: u.id)
+
+    async def _checked_hash(
+        self, actor: Actor, password: str | None, *, email: str, name: str
+    ) -> str | None:
+        """The hash of a new password that is not easy to guess (422 otherwise)."""
+        if password is None:
+            return None
+        org = await OrganizationRepository(self.session).get(actor.org_id)
+        await refuse_guessable(password, context_words(org_name=org.name, email=email, name=name))
+        return await self._hash(password)
 
     async def _hash(self, password: str | None) -> str | None:
         """Hash before any lock is taken, with no connection held: the transaction so
