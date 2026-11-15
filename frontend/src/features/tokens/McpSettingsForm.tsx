@@ -63,19 +63,20 @@ export function McpSettingsForm({ settings }: { settings: McpSettings }) {
         <label htmlFor={`${id}-location`} className="text-sm font-medium">
           {t('tokens.admin.settings.location')}
         </label>
-        <NativeSelect
-          id={`${id}-location`}
-          className="max-w-xs"
-          aria-describedby={`${id}-location-hint`}
-          value={location}
-          onChange={(event) => setLocation(event.target.value as Schemas['DataLocation'])}
-        >
-          {LOCATIONS.map((value) => (
-            <option key={value} value={value}>
-              {t(`ai.locations.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
+        <div className="max-w-xs">
+          <NativeSelect
+            id={`${id}-location`}
+            aria-describedby={`${id}-location-hint`}
+            value={location}
+            onChange={(event) => setLocation(event.target.value as Schemas['DataLocation'])}
+          >
+            {LOCATIONS.map((value) => (
+              <option key={value} value={value}>
+                {t(`ai.locations.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
         <p id={`${id}-location-hint`} className="text-xs text-muted-foreground">
           {t('tokens.admin.settings.locationHint')}
         </p>

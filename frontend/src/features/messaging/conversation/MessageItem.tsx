@@ -121,9 +121,11 @@ function HumanMessage({ message }: { message: Message }) {
               <TicketCards markdown={message.body_md} />
             </>
           )}
-          {message.kind === 'agent' && (message.run_id ?? message.client_id) && (
-            <AnswerSources runId={(message.run_id ?? message.client_id) as string} />
-          )}
+          {message.kind === 'agent' &&
+            !message.via_token &&
+            (message.run_id ?? message.client_id) && (
+              <AnswerSources runId={(message.run_id ?? message.client_id) as string} />
+            )}
         </>
       )}
       <Reactions message={message} canReact={can.react} toggle={toggle} />

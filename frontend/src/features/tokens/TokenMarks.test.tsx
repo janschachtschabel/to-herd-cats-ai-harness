@@ -22,9 +22,13 @@ const space = makeSpace({ id: 'space-1', name: 'Werkstatt', my_role: 'editor' })
 const codi = { type: 'agent' as const, id: '00000000-0000-7000-8000-0000000000e1', name: 'Codi' }
 const thread = makeConversation({ kind: 'thread_ticket', name: null, space_id: space.id })
 
-function ticketApi(messages: ReturnType<typeof makeMessage>[], ticket = makeTicket()) {
+function ticketApi(
+  messages: ReturnType<typeof makeMessage>[],
+  ticket = makeTicket(),
+  permissions = ['directory.read'],
+) {
   return mockApi({
-    ...shellRoutes(makeMe(['directory.read']), [space]),
+    ...shellRoutes(makeMe(permissions), [space]),
     'GET /api/spaces/:id': space,
     'GET /api/tickets/:number': ticket,
     'GET /api/spaces/:id/ticket-statuses': page(STATUSES),
@@ -93,6 +97,22 @@ describe('what a token wrote, and tickets waiting for an external agent', () => 
     expect(within(line).getAllByText('Von einer KI geschrieben')).toHaveLength(1)
     const crumbs = screen.getByRole('navigation', { name: 'Wo das Ticket steht' })
     expect(within(crumbs).getByText('über Token „Claude Code Laptop“')).toBeInTheDocument()
+  })
+
+  test("an external agent's comment through its token offers no run sources", async () => {
+    const comment = makeMessage({
+      conversation_id: thread.id,
+      kind: 'agent',
+      author: codi,
+      body_md: 'Übernommen.',
+      client_id: '00000000-0000-7000-8000-0000000000c1',
+      via_token: 'Pipeline',
+    })
+    ticketApi([comment], makeTicket(), ['directory.read', 'ai.use'])
+    await renderApp('/tickets/42')
+    const article = await screen.findByRole('article', { name: 'Nachricht von Codi' })
+    expect(within(article).getByText('über Token „Pipeline“')).toBeInTheDocument()
+    expect(within(article).queryByText('Quellen anzeigen')).not.toBeInTheDocument()
   })
 
   test('proposals and page versions written through a token say so; source mcp has a label', async () => {
