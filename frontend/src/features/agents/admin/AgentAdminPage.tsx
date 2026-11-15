@@ -64,6 +64,7 @@ export function AgentAdminPage({ agentId }: { agentId: string }) {
             version={tools.data.version}
             onReload={reload}
             withheldNote={external ? t('agents.external.levelNote') : undefined}
+            explainKey={external ? 'agents.external.levels' : undefined}
           />
           {external ? (
             <ExternalAgentTools shown={tools.data} onReload={reload} />

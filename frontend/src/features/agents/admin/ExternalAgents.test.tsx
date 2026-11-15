@@ -104,6 +104,8 @@ describe('external agents', () => {
       expect.stringContaining('Stufe 2'),
     ])
     expect(screen.getByText(/höchstens Stufe 2/)).toBeInTheDocument()
+    expect(screen.getByText(/sieht die eigenen Tickets\. Ändert nichts/)).toBeInTheDocument()
+    expect(screen.queryByText(/das Gespräch und antwortet/)).not.toBeInTheDocument()
     const table = screen.getByRole('table', { name: 'Werkzeuge über MCP' })
     expect(within(table).getByText('Suchen')).toBeInTheDocument()
     expect(within(table).getByText('Ticket kommentieren')).toBeInTheDocument()

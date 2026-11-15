@@ -15,6 +15,7 @@ export function AgentLevelForm({
   version,
   onReload,
   withheldNote,
+  explainKey = 'agents.level.explain',
 }: {
   agentId: string
   level: number
@@ -23,6 +24,8 @@ export function AgentLevelForm({
   onReload: () => void
   /** Why higher levels are not offered (default: who may give level 3). */
   withheldNote?: string
+  /** Where each level's plain words are (an external agent's differ). */
+  explainKey?: 'agents.level.explain' | 'agents.external.levels'
 }) {
   const { t } = useTranslation()
   const save = useSetAgentLevel(agentId)
@@ -53,7 +56,7 @@ export function AgentLevelForm({
               <span>
                 <span className="font-medium">{t(`agents.level.names.${value}`)}</span>
                 <span className="block text-xs text-muted-foreground">
-                  {t(`agents.level.explain.${value}`)}
+                  {t(`${explainKey}.${value}`)}
                 </span>
               </span>
             </label>
