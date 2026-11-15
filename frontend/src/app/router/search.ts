@@ -10,33 +10,31 @@ function id(value: unknown): string | undefined {
 
 export interface MessageSearch {
   /** The thread to open beside the conversation. */
-  thread?: string
+  thread?: string | undefined
   /** The message to scroll to and mark. */
-  message?: string
+  message?: string | undefined
 }
 
+/* Every validator below returns each of its keys, as undefined when refused: TanStack
+ * Router lays the result over the raw search, so a key left out would keep its raw,
+ * unchecked value (search.test.ts). */
+
 export function messageSearch(search: Record<string, unknown>): MessageSearch {
-  const thread = id(search.thread)
-  const message = id(search.message)
-  return { ...(thread ? { thread } : {}), ...(message ? { message } : {}) }
+  return { thread: id(search.thread), message: id(search.message) }
 }
 
 const PAGE_MODES: readonly PageMode[] = ['edit', 'live', 'versions']
 
 export interface PageSearch extends MessageSearch {
-  view?: PageMode
+  view?: PageMode | undefined
   /** Open the page's discussion. */
-  discussion?: boolean
+  discussion?: boolean | undefined
 }
 
 export function pageSearch(search: Record<string, unknown>): PageSearch {
   const view = PAGE_MODES.includes(search.view as PageMode) ? (search.view as PageMode) : undefined
   const discussion = search.discussion === true || search.discussion === 'true'
-  return {
-    ...(view ? { view } : {}),
-    ...(discussion ? { discussion } : {}),
-    ...messageSearch(search),
-  }
+  return { view, discussion: discussion || undefined, ...messageSearch(search) }
 }
 
 /** Where to go after logging in: only paths inside this app. */
@@ -74,11 +72,11 @@ export function profileSearch(search: Record<string, unknown>): ProfileSearch {
 
 export interface SkillsSearch {
   /** The proposals beside the skills (for those who decide them). */
-  view?: 'proposals'
+  view?: 'proposals' | undefined
 }
 
 export function skillsSearch(search: Record<string, unknown>): SkillsSearch {
-  return search.view === 'proposals' ? { view: 'proposals' } : {}
+  return { view: search.view === 'proposals' ? 'proposals' : undefined }
 }
 
 const REMOTE_STATUSES: readonly RemoteStatus[] = [
@@ -99,12 +97,11 @@ const REMOTE_STATUSES: readonly RemoteStatus[] = [
 
 export interface ServerSearch {
   /** How reading the tools went right after the server was added. */
-  read?: RemoteStatus
+  read?: RemoteStatus | undefined
 }
 
 export function serverSearch(search: Record<string, unknown>): ServerSearch {
-  const read = REMOTE_STATUSES.find((status) => status === search.read)
-  return read ? { read } : {}
+  return { read: REMOTE_STATUSES.find((status) => status === search.read) }
 }
 
 const OAUTH_STATUSES: readonly OAuthStatus[] = ['connected', 'denied', 'failed', 'invalid']
