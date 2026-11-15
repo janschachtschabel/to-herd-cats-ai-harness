@@ -104,7 +104,7 @@
       "trustEmail": "Trust this provider's email addresses",
       "trustEmailHint": "Only switch it on if the provider is authoritative for every verified address; the first sign-in then links an existing account with the same address.",
       "allowSignup": "Allow self-registration",
-      "allowSignupHint": "New people from the allowed domains get an account as members, without AI until the administration grants it.",
+      "allowSignupHint": "New people from the allowed domains can register. Their account waits for approval under People → Awaiting approval; only then can they sign in, as members without AI.",
       "domains": "Allowed domains",
       "domainsHint": "One domain per line, exactly (no subdomains).",
       "domainsRequired": "Self-registration needs at least one domain.",

@@ -104,7 +104,7 @@
       "trustEmail": "E-Mail-Adressen dieses Anbieters vertrauen",
       "trustEmailHint": "Nur einschalten, wenn der Anbieter für jede bestätigte Adresse maßgeblich ist; dann verknüpft die erste Anmeldung ein bestehendes Konto mit derselben Adresse.",
       "allowSignup": "Selbstregistrierung erlauben",
-      "allowSignupHint": "Neue Personen aus den erlaubten Domains bekommen ein Konto als Mitglied, zunächst ohne KI, bis die Verwaltung sie freigibt.",
+      "allowSignupHint": "Neue Personen aus den erlaubten Domains können sich registrieren. Ihr Konto wartet auf Freigabe unter Personen → Wartet auf Freigabe; erst danach können sie sich anmelden, als Mitglied ohne KI.",
       "domains": "Erlaubte Domains",
       "domainsHint": "Eine Domain je Zeile, genau so (keine Subdomains).",
       "domainsRequired": "Mit Selbstregistrierung ist mindestens eine Domain nötig.",

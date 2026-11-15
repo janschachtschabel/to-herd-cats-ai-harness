@@ -81,25 +81,59 @@ derselben Adresse.
 ## Wie eine Anmeldung entschieden wird
 
 1. Ist das Konto beim Anbieter (`sub`) schon verknüpft, meldet es seine Person an
-   (deaktiviert: `oidc.account_inactive`).
+   (wartet noch auf Freigabe: `oidc.account_pending`; deaktiviert oder abgelehnt:
+   `oidc.account_inactive`).
 2. Sonst muss die E-Mail vorhanden und bestätigt sein (`email_verified`), sonst
    `oidc.email_unverified`.
 3. Gibt es ein aktives Konto mit dieser E-Mail, wird es nur verknüpft, wenn der
    Anbieter für die Adresse maßgeblich ist (Google wie oben, ein allgemeiner nur mit
    „E-Mail vertrauen“). Sonst `oidc.link_refused`: erst mit Passwort anmelden und im
-   Profil unter **Verknüpfte Konten** verknüpfen.
+   Profil unter **Verknüpfte Konten** verknüpfen. Ein Konto, das auf Freigabe wartet
+   oder deaktiviert ist, wird nicht verknüpft (Codes wie in 1).
 4. Ohne Konto: Selbstregistrierung, wenn der Anbieter sie erlaubt **und** Domains
    nennt (`oidc.signup_closed` sonst). Die Domain der bestätigten E-Mail muss genau
    gelistet sein (klein geschrieben, ohne Subdomains, ohne Punkt am Ende); bei Google
    muss außerdem `hd` gleich dieser Domain sein (für `gmail.com` nur, wenn
    ausdrücklich gelistet). Sonst `oidc.domain_not_allowed`.
 
-Ein selbst registriertes Konto ist `member`, aktiv, ohne Passwort, Sprache Deutsch,
-hat seinen persönlichen Bereich und sieht die offenen Bereiche. Es bekommt eine eigene
-KI-Zuordnung **„keine KI“** (Frage J2: Kosten und Datenabfluss erst nach Entscheidung
-eines Admins; zu ändern an einer Stelle, `SIGNUP_GETS_NO_AI` in
-`backend/app/modules/oidc/admission.py`). Ein Admin gibt KI in der KI-Verwaltung frei
-(Zuordnung der Person entfernen oder setzen). Audit: `user.self_registered`.
+## Selbstregistrierung und Freigabe
+
+Ohne Freigabe kommt niemand ins System (Entscheidung J2, Plan M9 Task 5b). Ein selbst
+registriertes Konto ist `member`, ohne Passwort, Sprache Deutsch, hat seinen
+persönlichen Bereich und eine eigene KI-Zuordnung **„keine KI“** (Kosten und
+Datenabfluss erst nach Entscheidung eines Admins; zu ändern an einer Stelle,
+`SIGNUP_GETS_NO_AI` in `backend/app/modules/oidc/admission.py`). Es entsteht aber
+**deaktiviert und wartet auf Freigabe** (`awaiting_approval_since`): Es wird keine
+Sitzung geöffnet, die Person landet auf der Seite „Dein Konto wartet auf Freigabe“
+(`/login?error=oidc.account_pending`), und jede weitere Anmeldung endet dort, bis
+entschieden ist. Wie jedes deaktivierte Konto erscheint es nicht im Verzeichnis, in
+Erwähnungen oder Auswahllisten. Audit: `user.self_registered` (durch die neue Person).
+
+- **Benachrichtigung:** Jede aktive Person mit `user.manage` (Owner, Admin) bekommt in
+  **Aktivität** einen Eintrag „… hat sich registriert und wartet auf Freigabe“, der zur
+  Liste führt. In der Navigation zeigt **Verwaltung → Personen** die Zahl der
+  wartenden Konten. Ereignisse tragen nur IDs (`user.signup_pending`), nie Adresse
+  oder Name.
+- **Verwaltung → Personen → Wartet auf Freigabe** (`/admin/users?filter=pending`,
+  API `GET /api/admin/users?pending=true`, Zahl `GET /api/admin/users/pending/count`):
+  - **Freigeben** (`POST /api/admin/users/{id}/approve`, Body `{"version": n}`): das
+    Konto wird aktiv, als `member`, weiterhin ohne KI; die Person meldet sich wieder
+    über den Anbieter an. Offene Bereiche sieht sie ohne Mitgliedschaft. Audit
+    `user.signup_approved`.
+  - **Ablehnen** (`POST /api/admin/users/{id}/reject`, gleicher Body): das Konto bleibt
+    deaktiviert (`oidc.account_inactive` bei der nächsten Anmeldung). Später lässt es
+    sich wie jede deaktivierte Person reaktivieren. Audit `user.signup_rejected`.
+  - Beides nennt die gelesene Version; hat jemand anderes inzwischen entschieden oder
+    geändert, antwortet die API 409 (`users.version_conflict`, `users.not_pending`).
+  - Ein wartendes Konto wird freigegeben, nicht reaktiviert
+    (`…/reactivate` antwortet 409 `users.awaiting_approval`), damit jeder Weg hinein
+    einen Freigabe-Eintrag im Protokoll hat.
+- Die Rolle ändert sich durch Freigabe nicht; KI gibt ein Admin in der KI-Verwaltung
+  frei (Zuordnung der Person entfernen oder setzen).
+- Andere Wege zu einem Konto sind schon Handlungen von Admins bzw. Betrieb und brauchen
+  keine Freigabe: **Person anlegen** (Admin), der erste Owner aus `HERD_BOOTSTRAP_*`
+  (nur solange es niemanden gibt), eine Wiederherstellung. Verknüpfen (Profil oder
+  „E-Mail vertrauen“) legt kein Konto an, sondern hängt es an ein bestehendes.
 
 ## Verknüpfen und lösen
 
@@ -146,7 +180,8 @@ Auf der Anmeldeseite (`/login?error=<code>`) bzw. im Profil (`/profile?link_erro
 | `oidc.signup_closed` | Kein Konto, Selbstregistrierung aus. |
 | `oidc.domain_not_allowed` | Die Domain ist nicht freigegeben (bei Google: oder `hd` passt nicht). |
 | `oidc.email_unverified` | Der Anbieter meldet keine bestätigte E-Mail. |
-| `oidc.account_inactive` | Das Konto ist deaktiviert. |
+| `oidc.account_pending` | Das Konto (selbst registriert) wartet auf Freigabe durch einen Admin. |
+| `oidc.account_inactive` | Das Konto ist deaktiviert oder die Registrierung wurde abgelehnt. |
 | `oidc.identity_taken` | Das Konto beim Anbieter gehört schon einer anderen Person. |
 | `oidc.flow_invalid` | Abgelaufen, schon benutzt, aus einem anderen Browser oder für einen anderen Anbieter. |
 | `oidc.denied` | Beim Anbieter abgebrochen. |
@@ -159,7 +194,8 @@ Auf der Anmeldeseite (`/login?error=<code>`) bzw. im Profil (`/profile?link_erro
 ## Überwachung
 
 Metrik `herd_oidc_logins_total{outcome}` (API): je Rückruf und je gescheitertem Start ein fester Ausgang (`login`,
-`link`, `signup`, `profile_link` oder der Code ohne `oidc.`). Alarm `HerdOidcFailing`:
+`link`, `signup` (neues Konto, wartet auf Freigabe), `profile_link` oder der Code
+ohne `oidc.`, etwa `account_pending`). Alarm `HerdOidcFailing`:
 mehr als die Hälfte der Rückrufe in 15 Minuten scheiterte am Anbieter
 (`provider_unreachable`, `provider_error`, `issuer_mismatch`, `id_token_invalid`),
 mindestens drei, für 5 Minuten. Anmeldung mit Passwort funktioniert weiter.
