@@ -123,11 +123,13 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
   the frontend.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
-  messaging, tickets and agents in the real app (role all, worker included) on a
-  throwaway database, with the OpenAI stub (`backend/tests/support/openai_stub.py`)
+  messaging, tickets, agents, automations and MCP in the real app (role all, worker
+  included) on a throwaway database, with the OpenAI stub
+  (`backend/tests/support/openai_stub.py`) and the MCP and OAuth stubs (over https)
   started by `global-setup.mjs`; a CI job of its own. Helpers per area
-  (`tests/helpers.mjs`, `messaging-helpers.mjs`, `tickets-helpers.mjs`,
-  `ai-helpers.mjs`); wait on concrete elements or
+  (`tests/helpers.mjs`, `messaging-helpers.mjs`, `live-typing-helpers.mjs`,
+  `tickets-helpers.mjs`, `ai-helpers.mjs`, `agents-helpers.mjs`,
+  `automations-helpers.mjs`, `mcp-helpers.mjs`); wait on concrete elements or
   responses (`openLive()` waits for the page's `/api/stream`), never fixed sleeps.
 - Dependencies (runtime): only MIT, MIT-0, BSD-2-Clause, BSD-3-Clause, 0BSD, Apache-2.0,
   ISC, PostgreSQL, PSF-2.0, Python-2.0, MPL-2.0 (unmodified use), Unlicense, CC0-1.0,
@@ -253,7 +255,8 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   A ticket's sprint belongs to its space (foreign key `(sprint_id, space_id)`); lock
   sprints before tickets.
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
-  `demo_ai.py`, `demo_ai_model.py`, shared API helpers in `demo_api.py`) goes through the public API only;
+  `demo_messaging.py`, `demo_ai.py`, `demo_ai_model.py`, `demo_automations.py`,
+  `demo_mcp.py`, shared API helpers in `demo_api.py`) goes through the public API only;
   extend it and its test with each milestone.
 - AI and agents:
   - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
