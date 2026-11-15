@@ -103,7 +103,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run); needs persistence.enabled"},
+        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run --scheduled); needs persistence.enabled"},
         "schedule": {"type": "string", "pattern": "^\\S+( \\S+){4}$", "description": "Cron schedule of the CronJob, five fields, Etc/UTC"},
         "keepDaily": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_DAILY"},
         "keepWeekly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_WEEKLY"},
