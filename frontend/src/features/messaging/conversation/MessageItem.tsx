@@ -13,6 +13,7 @@ import { useMe } from '@/features/auth/queries'
 import { MessageCard } from '@/features/approvals/MessageCard'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { TicketCards } from '@/features/tickets/TicketCard'
+import { ViaToken } from '@/features/tokens/ViaToken'
 import type { Message } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { messageAbilities } from '../abilities'
@@ -42,7 +43,8 @@ function SystemRow({ message }: { message: Message }) {
     >
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
       <span>{text}</span>
-      {message.system.actor?.type === 'agent' && <AgentBadge />}
+      {(message.system.actor?.type === 'agent' || message.via_token) && <AgentBadge />}
+      {message.via_token && <ViaToken name={message.via_token} />}
       <MessageTime iso={message.created_at} />
       {message.system.automation_id && usesAi(me) && (
         <Link
@@ -98,7 +100,8 @@ function HumanMessage({ message }: { message: Message }) {
     >
       <header className="flex items-baseline gap-2">
         <span className="text-sm font-semibold">{author}</span>
-        {byAgent(message) && <AgentBadge />}
+        {(byAgent(message) || message.via_token) && <AgentBadge />}
+        {message.via_token && <ViaToken name={message.via_token} />}
         <MessageTime iso={message.created_at} />
         {message.edited_at && !message.deleted_at && (
           <span className="text-xs text-muted-foreground">{t('messaging.message.edited')}</span>

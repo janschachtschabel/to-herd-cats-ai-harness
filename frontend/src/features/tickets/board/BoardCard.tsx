@@ -15,6 +15,7 @@ import {
 import type { Schemas, TicketSummary } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { AssigneeLabel, DueLabel, KindLabel, PriorityLabel } from '../parts'
+import { PickupBadge } from '../PickupBadge'
 import type { CardData, CardFocus, MoveCard } from './dnd'
 
 /** A ticket on the board: key, title, kind, priority, assignee, due day. With
@@ -118,6 +119,7 @@ export function BoardCard({
         <DueLabel due={ticket.due_on} />
       </div>
       <AssigneeLabel assignee={ticket.assignee} />
+      {ticket.awaiting_pickup && <PickupBadge />}
     </article>
   )
 }

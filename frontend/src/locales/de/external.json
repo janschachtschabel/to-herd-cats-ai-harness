@@ -35,5 +35,11 @@
     "noRun": {
       "agent_external": "Der Agent arbeitet von außen über MCP und antwortet hier nicht von selbst. Deine Nachricht ist gespeichert; weise ihm für eine Aufgabe ein Ticket zu."
     }
+  },
+  "tickets": {
+    "pickup": {
+      "badge": "Wartet auf Abholung",
+      "title": "Einem externen Agenten zugewiesen: Er holt das Ticket über MCP ab; im System läuft dafür nichts."
+    }
   }
 }

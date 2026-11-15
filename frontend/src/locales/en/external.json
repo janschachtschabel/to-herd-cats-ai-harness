@@ -35,5 +35,11 @@
     "noRun": {
       "agent_external": "The agent works from outside via MCP and does not answer here by itself. Your message is saved; assign it a ticket for a task."
     }
+  },
+  "tickets": {
+    "pickup": {
+      "badge": "Awaiting pick-up",
+      "title": "Assigned to an external agent: it picks the ticket up via MCP; nothing runs in the system for it."
+    }
   }
 }

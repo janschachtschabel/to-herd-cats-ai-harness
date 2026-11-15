@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
+import { ViaToken } from '@/features/tokens/ViaToken'
 import { VisibleRunLink } from '@/features/runs/RunBits'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
@@ -92,6 +93,7 @@ export function VersionsPanel({ page }: { page: WikiPage }) {
                       {v.label && <Badge variant="secondary">{v.label}</Badge>}
                       <Badge variant="outline">{t(`wiki.versions.source.${v.source}`)}</Badge>
                       {v.ai && <AgentBadge />}
+                      {v.via_token && <ViaToken name={v.via_token} />}
                     </div>
                     {v.ai && v.run_id && <VisibleRunLink runId={v.run_id} />}
                     {v.change_summary && (

@@ -6,6 +6,7 @@ import type { Ticket } from '@/lib/api'
 import { canRelease, canTake, type TicketAbilities } from './abilities'
 import { AssigneeLabel } from './parts'
 import { FieldRow } from './FieldRow'
+import { PickupBadge } from './PickupBadge'
 import type { useTicketSave } from './useTicketSave'
 
 const NONE = new Set<string>()
@@ -46,8 +47,13 @@ export function AssigneeField({
               }}
             />
           ) : (
-            <span id={id} aria-labelledby={`${id}-label`}>
+            <span id={id} aria-labelledby={`${id}-label`} className="flex flex-col gap-1">
               <AssigneeLabel assignee={ticket.assignee} />
+              {ticket.awaiting_pickup && (
+                <span>
+                  <PickupBadge />
+                </span>
+              )}
             </span>
           )}
           <div className="flex flex-wrap gap-1.5">

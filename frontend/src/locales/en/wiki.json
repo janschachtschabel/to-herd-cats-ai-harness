@@ -136,7 +136,8 @@
         "import": "Imported",
         "restore": "Restored",
         "collab": "Live",
-        "agent": "By an agent"
+        "agent": "By an agent",
+        "mcp": "Via MCP"
       },
       "kind": {
         "insert": "added:",

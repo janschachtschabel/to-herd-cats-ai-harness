@@ -136,7 +136,8 @@
         "import": "Importiert",
         "restore": "Wiederhergestellt",
         "collab": "Live",
-        "agent": "Von einem Agenten"
+        "agent": "Von einem Agenten",
+        "mcp": "Über MCP"
       },
       "kind": {
         "insert": "hinzugefügt:",

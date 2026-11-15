@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { TicketSummary } from '@/lib/api'
 import { AssigneeLabel, DueLabel, KindLabel, PriorityLabel, StatusBadge } from './parts'
+import { PickupBadge } from './PickupBadge'
 
 /** Tickets as rows: key and title lead to the ticket; status, kind, priority, who and
  *  when below. `spaceNames` adds the space where the list spans several; `lead` a
@@ -41,6 +42,7 @@ export function TicketRows({
                 <KindLabel kind={ticket.kind} />
                 <PriorityLabel priority={ticket.priority} />
                 <AssigneeLabel assignee={ticket.assignee} />
+                {ticket.awaiting_pickup && <PickupBadge />}
                 <DueLabel due={ticket.due_on} />
                 {spaceNames?.get(ticket.space_id) && (
                   <span className="truncate text-xs text-muted-foreground">

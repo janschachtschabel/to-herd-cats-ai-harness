@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { AgentBadge } from '@/features/agents/AgentBadge'
 import { useMe } from '@/features/auth/queries'
 import { DiscussionPanel } from '@/features/messaging/discussion/DiscussionPanel'
 import { useSpace } from '@/features/spaces/queries'
+import { ViaToken } from '@/features/tokens/ViaToken'
 import type { Ticket } from '@/lib/api'
 import { ticketAbilities } from './abilities'
 import { KindLabel } from './parts'
@@ -55,6 +57,12 @@ export function TicketView({
           )}
           <span className="font-mono">{ticket.key}</span>
           <KindLabel kind={ticket.kind} />
+          {ticket.via_token && (
+            <>
+              <AgentBadge />
+              <ViaToken name={ticket.via_token} />
+            </>
+          )}
         </nav>
         <TicketTitle ticket={ticket} editable={abilities.edit} />
       </div>
