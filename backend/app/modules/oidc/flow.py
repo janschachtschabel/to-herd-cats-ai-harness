@@ -39,6 +39,7 @@ from app.core.errors import NotFound, RateLimited, ValidationFailed
 from app.core.ratelimit import RateLimiter, limit_key
 from app.modules.auth.context import AuthContext
 from app.modules.auth.service import AuthService
+from app.modules.auth.sign_in_log import log_sign_in
 from app.modules.oidc import protocol
 from app.modules.oidc.accounts import Accounts, Admitted
 from app.modules.oidc.admission import Refuse
@@ -89,7 +90,9 @@ class Started:
 @dataclass(frozen=True, slots=True)
 class Finished:
     location: str
+    outcome: str  # the metric's and the log's word
     session_token: str | None = None
+    user_id: uuid.UUID | None = None
 
 
 class FlowService:
@@ -162,6 +165,20 @@ class FlowService:
         code: str | None,
         error: str | None,
     ) -> Finished:
+        finished = await self._finish(key, ip, binding=binding, state=state, code=code, error=error)
+        log_sign_in("oidc", finished.outcome, client=ip, user_id=finished.user_id, provider=key)
+        return finished
+
+    async def _finish(
+        self,
+        key: str,
+        ip: str | None,
+        *,
+        binding: str | None,
+        state: str | None,
+        code: str | None,
+        error: str | None,
+    ) -> Finished:
         if not await self._limit(ip):
             return _refused("oidc.rate_limited", None)
         try:
@@ -216,7 +233,7 @@ class FlowService:
     async def _signed_in(self, admitted: Admitted, now: datetime) -> Finished:
         token = await AuthService(self.session, self.settings).open_session(admitted.user, now)
         count_outcome(admitted.outcome)
-        return Finished("/", token)
+        return Finished("/", admitted.outcome, token, admitted.user.id)
 
     async def _link(self, provider: OidcProvider, session_id: uuid.UUID, subject: str) -> Finished:
         auth = await AuthService(self.session, self.settings).resolve_session(session_id)
@@ -232,10 +249,11 @@ class FlowService:
                 provider, auth.user, subject, now, via="profile"
             )
         count_outcome("profile_link")
-        return Finished(f"{PROFILE_PAGE}?{urlencode({'linked': provider.key})}")
+        location = f"{PROFILE_PAGE}?{urlencode({'linked': provider.key})}"
+        return Finished(location, "profile_link", user_id=auth.user.id)
 
 
 def _refused(code: str, linking: uuid.UUID | None) -> Finished:
     count_outcome(code.removeprefix("oidc."))
     page, name = (PROFILE_PAGE, "link_error") if linking is not None else (LOGIN_PAGE, "error")
-    return Finished(f"{page}?{urlencode({name: code})}")
+    return Finished(f"{page}?{urlencode({name: code})}", code.removeprefix("oidc."))

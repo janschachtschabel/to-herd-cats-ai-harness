@@ -31,13 +31,16 @@ class SessionRepository:
         """Active or ended (until it is cleared away)."""
         return await self.session.scalar(select(UserSession).where(UserSession.id == session_id))
 
-    async def end_by_hash(self, token_hash: str, now: datetime) -> None:
-        """The session ends now; the row stays until `delete_expired` clears it."""
-        await self.session.execute(
+    async def end_by_hash(self, token_hash: str, now: datetime) -> uuid.UUID | None:
+        """The session ends now; the row stays until `delete_expired` clears it. The
+        person whose session it was, None if no running session had this hash."""
+        ended: uuid.UUID | None = await self.session.scalar(
             update(UserSession)
             .where(UserSession.token_hash == token_hash, UserSession.expires_at > now)
             .values(expires_at=now)
+            .returning(UserSession.user_id)
         )
+        return ended
 
     async def delete_expired(self, org_id: uuid.UUID, before: datetime, limit: int) -> None:
         """Up to `limit` sessions of the organisation that ended before `before`,

@@ -23,6 +23,7 @@ from app.modules.ai.effective import effective_assignment
 from app.modules.auth.context import AuthContext
 from app.modules.auth.models import UserSession
 from app.modules.auth.repository import SessionRepository
+from app.modules.auth.sign_in_log import log_sign_in, log_sign_out
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.users.models import User
@@ -43,8 +44,14 @@ class AuthService:
         self.settings = settings
 
     async def login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
-        async with password_work():  # refused at once, before any query, when full
-            return await self._login(email, password, ip)
+        try:
+            async with password_work():  # refused at once, before any query, when full
+                user, token = await self._login(email, password, ip)
+        except (Unauthorized, RateLimited) as refused:
+            log_sign_in("password", refused.code.removeprefix("auth."), client=ip)
+            raise
+        log_sign_in("password", "ok", client=ip, user_id=user.id)
+        return user, token
 
     async def _login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
         """A new session for the person; the token goes into the cookie and nowhere else.
@@ -107,7 +114,9 @@ class AuthService:
         return token
 
     async def logout(self, token: str) -> None:
-        await self.sessions.end_by_hash(hash_token(token), utcnow())
+        ended = await self.sessions.end_by_hash(hash_token(token), utcnow())
+        if ended is not None:
+            log_sign_out(ended)
 
     async def resolve(self, token: str) -> AuthContext | None:
         user_session = await self.sessions.get_active(hash_token(token), utcnow())
