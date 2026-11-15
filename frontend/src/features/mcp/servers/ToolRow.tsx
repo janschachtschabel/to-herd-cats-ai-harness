@@ -71,10 +71,10 @@ export function ToolRow({ serverId, tool }: { serverId: string; tool: Tool }) {
           </NativeSelect>
         </label>
         <div className="flex flex-wrap gap-2">
-          {view !== 'approved' && (
+          {view !== 'approved' && view !== 'missing' && (
             <Button
               size="sm"
-              disabled={change.isPending || view === 'missing'}
+              disabled={change.isPending}
               onClick={() => change.mutate({ action: 'approve', version: tool.version })}
               aria-label={t('mcp.tools.approveNamed', { name: tool.name })}
             >

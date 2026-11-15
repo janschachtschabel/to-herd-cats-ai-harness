@@ -112,7 +112,7 @@ describe('a server’s tools', () => {
     await renderApp(`/admin/ai/mcp-servers/${SRV}`)
     const gone = await screen.findByRole('article', { name: 'old_tool' })
     expect(within(gone).getByText(/bietet dieses Werkzeug nicht mehr an/)).toBeInTheDocument()
-    expect(within(gone).getByRole('button', { name: 'old_tool freigeben' })).toBeDisabled()
+    expect(within(gone).queryByRole('button', { name: 'old_tool freigeben' })).toBeNull()
     const off = article('delete_project')
     expect(within(off).queryByRole('button', { name: 'delete_project sperren' })).toBeNull()
     expect(within(off).getByRole('button', { name: 'delete_project freigeben' })).toBeEnabled()

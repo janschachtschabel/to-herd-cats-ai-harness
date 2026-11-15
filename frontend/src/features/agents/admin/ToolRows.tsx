@@ -79,7 +79,7 @@ export function ExternalToolRow({ tool, level, choice, onChoose }: RowProps) {
   return (
     <tr className="align-top">
       <th scope="row" className="py-2 pr-3 text-left font-normal">
-        <span className="font-mono text-sm font-medium break-all">{name}</span>
+        <span className="font-mono text-sm font-medium break-words">{name}</span>
         <span className="mt-0.5 flex flex-wrap gap-1">
           <Badge variant="outline">{t(`agents.tools.effects.${tool.effect}`)}</Badge>
           <Badge variant="outline">{t('agents.tools.fromLevel', { level: tool.level })}</Badge>
