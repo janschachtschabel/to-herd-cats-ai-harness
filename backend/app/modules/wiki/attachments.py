@@ -8,8 +8,9 @@ An upload is read once into a spool (`core/uploads.py`), up to
 a key built from the organisation and the SHA-256 (never from the file name); a file
 leaves the storage with the last attachment that uses it. Writing, counting and
 deleting one content's file are serialised (`lock_blob`), so an upload and a delete
-of the same content cannot lose the file. Files are removed only after the deleting
-transaction has committed (`core.db.after_commit`).
+of the same content cannot lose the file. A deleted attachment's file stays for a
+grace period (a tombstone, `core/storage_tombstones.py`, plan M9 decision 4) and is
+removed by the worker's due loop if no attachment uses it by then.
 """
 
 import asyncio
@@ -24,11 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import pagination
 from app.core.access import Action, Actor
 from app.core.config import get_settings
-from app.core.db import after_commit
 from app.core.errors import NotFound, ValidationFailed
 from app.core.outbox import emit
 from app.core.pagination import PageParams, decode_id_cursor, id_page
 from app.core.storage import Storage, StoredFileMissing, get_storage
+from app.core.storage_tombstones import bury
 from app.core.uploads import spool
 from app.modules.audit.recorder import record
 from app.modules.wiki import filetypes
@@ -161,24 +162,11 @@ class AttachmentService:
         await self._drop_unused(actor, gone)
 
     async def _drop_unused(self, actor: Actor, gone: builtins.list[Attachment]) -> None:
-        """Files leave only after the rows' deletion has committed: a failed commit must
-        not leave a row without its file (a file without a row is harmless). The check
-        is made again then, under the lock, since an upload of the same content may
-        have committed in between."""
-        shas = sorted({a.sha256 for a in gone})  # one order: no deadlock
-        if not shas:
-            return
-        scope = self.reader.scope(actor)
-        storage = self.storage
-
-        async def remove_unused(session: AsyncSession) -> None:
-            attachments = AttachmentRepository(session, scope)
-            for sha256 in shas:
-                await attachments.lock_blob(sha256)
-                if not await attachments.uses_blob(sha256):
-                    await storage.delete(storage_key(scope.org_id, sha256))
-
-        after_commit(self.session, remove_unused)
+        """The files of deleted rows get a tombstone in this transaction; the due loop
+        removes each after the grace period if no attachment uses it then
+        (`core/storage_tombstones.py`, `attachment_files.blob_in_use`), so a backup's
+        snapshot finds every file of its rows."""
+        await bury(self.session, actor.org_id, (storage_key(actor.org_id, a.sha256) for a in gone))
 
     async def _audit(
         self, actor: Actor, action: str, attachment: Attachment, details: dict[str, Any]

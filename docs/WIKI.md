@@ -94,7 +94,12 @@ zählt sie nicht mit.
   PDF, TXT, Markdown, CSV, JSON, DOCX, XLSX, PPTX, ZIP (als Download). SVG und HTML
   werden abgelehnt, auch umbenannt. Ein Upload sendet das Ereignis
   `attachment.uploaded` (nur IDs; seit M7, für Ereignis-Regeln von Agenten,
-  [`AGENTEN.md`](AGENTEN.md)); ein Import sendet keines.
+  [`AGENTEN.md`](AGENTEN.md)); ein Import sendet keines. Gleiche Inhalte liegen nur
+  einmal in der Ablage. Wird der letzte Anhang eines Inhalts gelöscht (auch mit dem
+  endgültigen Löschen einer Seite), bleibt die Datei noch 48 Stunden liegen (ein
+  Grabstein, `storage_tombstone`); danach entfernt sie der Worker, wenn sie nicht
+  wieder benutzt wird. So findet eine laufende Sicherung jede Datei ihres
+  Datenbank-Stands (M9).
 - **Suche:** Strg+K (oder „Suche“ in der Seitenleiste) durchsucht Titel und Inhalt
   aller Seiten, die man lesen darf, optional nur im aktuellen Bereich. Entwürfe findet
   nur, wer sie sehen darf.

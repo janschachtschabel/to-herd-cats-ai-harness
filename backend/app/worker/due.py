@@ -25,7 +25,9 @@ events a term took, EVENT_RETENTION after that term, and terms older than
 FIRING_RETENTION with their events; never a term whose run is still open, never an
 event still waiting for an active rule's quiet time to end. Events waiting with a
 deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago. The
-same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION.
+same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION,
+and the files of storage tombstones older than their grace that nothing uses again
+(`core/storage_tombstones.py`, plan M9 decision 4).
 
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
@@ -46,10 +48,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
+from app.core.storage import get_storage
+from app.core.storage_tombstones import remove_buried
 from app.modules.automations.firing import Fired, fire_next, set_aside
 from app.modules.automations.metrics import automation_metrics
 from app.modules.automations.upkeep_repository import UpkeepRepository
 from app.modules.mcp_tools.repository import delete_calls_before
+from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.review_pass import Step, review_next
 from app.modules.wiki.review_repository import ReviewRepository
 
@@ -194,7 +199,9 @@ class DueLoop:
         if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_EVERY_SECONDS:
             return None
         self._last_cleanup = now
-        return await self.cleanup()
+        removed = await self.cleanup()
+        await self.remove_buried_files()
+        return removed
 
     async def cleanup(self) -> tuple[int, int, int]:
         """Remove what the log no longer needs, batch by batch (one transaction each):
@@ -217,6 +224,18 @@ class DueLoop:
             lambda s: delete_calls_before(s, now - MCP_CALL_RETENTION, limit)
         )
         return terms, events, calls
+
+    async def remove_buried_files(self) -> int:
+        """Remove the files of tombstones older than their grace that no attachment
+        uses again, batch by batch (one transaction each); how many files."""
+        storage, now, limit = get_storage(), self.clock.now(), self.cleanup_batch
+        files = 0
+        while True:
+            async with self.database.session_factory() as session, session.begin():
+                taken, removed = await remove_buried(session, storage, now, blob_in_use, limit)
+            files += removed
+            if taken < limit:
+                return files
 
     async def _batches(self, step: Callable[[AsyncSession], Awaitable[int]]) -> int:
         removed = 0

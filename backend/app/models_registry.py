@@ -3,6 +3,7 @@
 from app.core.models_base import Base
 from app.core.outbox import EventDelivery, EventOutbox
 from app.core.ratelimit import RateLimitHit
+from app.core.storage_tombstone_repository import StorageTombstone
 from app.modules.agents.approvals.models import Approval, RunQuestion
 from app.modules.agents.memory_models import AgentMemory
 from app.modules.agents.models import Agent, AgentTool
@@ -52,6 +53,7 @@ from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
+    "StorageTombstone",
     "AccessToken",
     "McpSetting",
     "Agent",

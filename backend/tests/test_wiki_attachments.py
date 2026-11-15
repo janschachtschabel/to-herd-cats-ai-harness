@@ -4,6 +4,7 @@ delete, and what happens with the page (plan M2 task 6)."""
 import io
 import json
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
 from app.core.config import Settings, get_settings
+from app.core.models_base import utcnow
+from app.core.storage import get_storage
+from app.core.storage_tombstones import GRACE, remove_buried
 from app.modules.audit.models import AuditLog
+from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.models import Attachment
 from tests.factories_wiki import Wiki, new_page, publish
 
@@ -51,6 +56,13 @@ async def _uploaded(client: AsyncClient, page: dict[str, Any], name: str, data: 
 def _error(r: Any, status: int, code: str) -> None:
     assert r.status_code == status, r.text
     assert r.json()["error"]["code"] == code
+
+
+async def _after_the_grace(session: AsyncSession) -> int:
+    """What the due loop does once the tombstones' grace has passed: files removed."""
+    later = utcnow() + GRACE + timedelta(minutes=1)
+    _, removed = await remove_buried(session, get_storage(), later, blob_in_use, 100)
+    return removed
 
 
 def _stored_files(data_dir: Path) -> list[Path]:
@@ -217,17 +229,23 @@ async def test_upload_over_the_limit_is_413(wiki: Wiki, monkeypatch) -> None:
     assert (await _uploaded(wiki.editor, page, "x.txt", b"a" * 1024))["size"] == 1024
 
 
-async def test_same_content_is_stored_once(wiki: Wiki, data_dir: Path) -> None:
+async def test_same_content_is_stored_once(
+    wiki: Wiki, session: AsyncSession, data_dir: Path
+) -> None:
     page = await new_page(wiki.editor, wiki.space_id, "Bilder")
     first = await _uploaded(wiki.editor, page, "a.png", PNG)
     second = await _uploaded(wiki.editor, page, "b.png", PNG)
     assert first["id"] != second["id"] and first["sha256"] == second["sha256"]
     assert len(_stored_files(data_dir)) == 1
-    # The file stays while another attachment uses it, and goes with the last one.
+    # The file stays while another attachment uses it, and goes with the last one
+    # (after the grace period, plan M9 decision 4).
     assert (await wiki.editor.delete(first["url"])).status_code == 204
+    assert await _after_the_grace(session) == 0
     assert len(_stored_files(data_dir)) == 1
     assert (await wiki.editor.get(second["url"])).content == PNG
     assert (await wiki.editor.delete(second["url"])).status_code == 204
+    assert len(_stored_files(data_dir)) == 1
+    assert await _after_the_grace(session) == 1
     assert _stored_files(data_dir) == []
     _error(await wiki.editor.get(second["url"]), 404, "attachment.not_found")
 
@@ -295,6 +313,8 @@ async def test_purge_deletes_attachments_and_unused_files(
     assert r.status_code == 204
     assert (await wiki.admin.delete(f"/api/pages/{page['id']}")).status_code == 204
     assert await session.scalar(select(func.count()).select_from(Attachment)) == 1
+    assert len(_stored_files(data_dir)) == 2  # until the grace has passed
+    assert await _after_the_grace(session) == 1
     names = sorted(p.name for p in _stored_files(data_dir))
     assert len(names) == 1  # the PDF is gone, the shared PNG stays for "Bleibt"
 
