@@ -1,0 +1,343 @@
+{
+  "nav": {
+    "tickets": "Tickets",
+    "myBoard": "My board"
+  },
+  "activity": {
+    "reasons": {
+      "assignment": "assigned {{where}} to you",
+      "ticket_comment": "commented on {{where}}"
+    }
+  },
+  "tickets": {
+    "title": "Tickets",
+    "kinds": {
+      "epic": "Epic",
+      "story": "Story",
+      "task": "Task",
+      "bug": "Bug"
+    },
+    "priorities": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal",
+      "low": "Low"
+    },
+    "categories": {
+      "open": "Open",
+      "active": "In progress",
+      "review": "In review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "sorts": {
+      "updated": "Last changed",
+      "due": "Due date",
+      "priority": "Priority",
+      "number": "Newest first"
+    },
+    "sidebar": {
+      "count_one": "{{count}} open ticket for you",
+      "count_other": "{{count}} open tickets for you"
+    },
+    "fields": {
+      "space": "Space",
+      "title": "Title",
+      "description": "Description",
+      "markdownHint": "Markdown: **bold**, _italic_, lists, links, code.",
+      "status": "Status",
+      "assignee": "Assigned to",
+      "unassigned": "Nobody",
+      "unknownPerson": "Unknown",
+      "priority": "Priority",
+      "kind": "Kind",
+      "due": "Due on",
+      "dueOn": "Due {{date}}",
+      "noDue": "No date",
+      "parent": "Parent",
+      "noParent": "None",
+      "chooseParent": "Change",
+      "tags": "Tags",
+      "sprint": "Sprint",
+      "noSprint": "No sprint (backlog)"
+    },
+    "filters": {
+      "label": "Filter tickets",
+      "text": "Search title or description",
+      "state": "Status",
+      "unfinished": "Not done",
+      "allStates": "All",
+      "space": "Space",
+      "allSpaces": "All spaces",
+      "any": "All",
+      "sort": "Sort by"
+    },
+    "list": {
+      "views": "View",
+      "mine": "My tickets",
+      "all": "All tickets",
+      "mineDescription": "What is assigned to you and not done yet.",
+      "allDescription": "The tickets of every space you may see.",
+      "emptyMine": "Nothing open is assigned to you right now.",
+      "empty": "No tickets for these filters."
+    },
+    "create": {
+      "open": "New ticket",
+      "title": "New ticket",
+      "description": "A title is enough; everything else can be added later.",
+      "submit": "Create"
+    },
+    "view": {
+      "gone": "This ticket does not exist, or you may not see it.",
+      "toList": "To the tickets",
+      "breadcrumbs": "Where the ticket is",
+      "fields": "Ticket fields",
+      "editTitle": "Change title",
+      "editDescription": "Edit",
+      "noDescription": "No description yet.",
+      "children_one": "{{count}} child ticket",
+      "children_other": "{{count}} child tickets"
+    },
+    "progress": {
+      "label_one": "{{done}} of {{count}} done",
+      "label_other": "{{done}} of {{count}} done"
+    },
+    "assign": {
+      "take": "Take",
+      "release": "Let go",
+      "clear": "Unassign",
+      "choose": "Assign to someone"
+    },
+    "tags": {
+      "edit": "Change tags",
+      "description": "Tags of this space and system-wide tags, at most 20.",
+      "none": "None",
+      "noneAvailable": "This space has no tags yet."
+    },
+    "links": {
+      "pages": "Linked pages",
+      "addPage": "Link a page",
+      "noPages": "None",
+      "removePage": "Unlink “{{title}}”",
+      "tickets": "Linked tickets",
+      "addTicket": "Link a ticket",
+      "noTickets": "No tickets linked to this page yet.",
+      "unlinkTicket": "Unlink {{key}}"
+    },
+    "pick": {
+      "page": "Find a page by its title or content.",
+      "ticket": "Find a ticket by key (HC-42) or title.",
+      "input": "Search",
+      "results": "Results",
+      "empty": "Nothing found."
+    },
+    "discussion": {
+      "title": "Comments",
+      "empty": "No comments on this ticket yet.",
+      "composer": "Write a comment"
+    },
+    "timeline": {
+      "created": "{{actor}} created the ticket.",
+      "status_changed": "{{actor}} changed the status from {{from}} to {{to}}.",
+      "assigned": "{{actor}} assigned the ticket to {{to}}.",
+      "unassigned": "{{actor}} removed {{from}} from the ticket.",
+      "priority_changed": "{{actor}} changed the priority from {{from}} to {{to}}.",
+      "kind_changed": "{{actor}} changed the kind from {{from}} to {{to}}.",
+      "parent_set": "{{actor}} put the ticket under {{to}}.",
+      "parent_removed": "{{actor}} took the ticket out of {{from}}.",
+      "due_set": "{{actor}} set the due date to {{to}}.",
+      "due_removed": "{{actor}} removed the due date.",
+      "title_changed": "{{actor}} changed the title.",
+      "description_changed": "{{actor}} changed the description.",
+      "page_linked": "{{actor}} linked the page “{{title}}”.",
+      "page_linked_hidden": "{{actor}} linked a page.",
+      "page_unlinked": "{{actor}} unlinked “{{title}}”.",
+      "page_unlinked_hidden": "{{actor}} unlinked a page.",
+      "unknown": "{{actor}} changed the ticket.",
+      "goneStatus": "a deleted status",
+      "sprint_set": "{{actor}} put the ticket into {{to}}.",
+      "sprint_moved": "{{actor}} moved the ticket from {{from}} to {{to}}.",
+      "sprint_removed": "{{actor}} moved the ticket from {{from}} to the backlog.",
+      "someSprint": "a sprint",
+      "someSprintInto": "a sprint",
+      "handed": "{{actor}} handed the ticket over to {{to}}."
+    },
+    "space": {
+      "views": "Views of the space",
+      "wiki": "Wiki",
+      "board": "Board",
+      "epics": "Epics",
+      "sprints": "Sprints",
+      "backlog": "Backlog"
+    },
+    "board": {
+      "title": "Board",
+      "columns": "Board columns",
+      "filters": "Filter the board",
+      "onlyMine": "Only mine",
+      "epic": "Epic",
+      "count_one": "{{count}} ticket",
+      "count_other": "{{count}} tickets",
+      "emptyColumn": "No tickets",
+      "moveCard": "Move {{key}}",
+      "changeStatus": "Change status of {{key}}",
+      "statusMenu": "Change status",
+      "conflict": "The ticket was changed in the meantime and is back in its place. The board is reloaded; please try again.",
+      "dnd": {
+        "instructions": "Space or Enter picks the card up. Arrow left or right chooses the column, Space or Enter drops it, Escape cancels.",
+        "start": "Picked up {{key}}.",
+        "over": "{{key}} over {{status}}.",
+        "outside": "{{key}} over no column.",
+        "end": "Dropped {{key}} in {{status}}.",
+        "cancel": "{{key}} not moved."
+      }
+    },
+    "epics": {
+      "title": "Epics",
+      "create": "New epic",
+      "empty": "No epics in this space yet.",
+      "toggle": "Show the child tickets of {{key}}",
+      "noChildren": "No child tickets yet."
+    },
+    "statuses": {
+      "title": "Ticket statuses",
+      "description": "The board's columns, in this order. The category decides what counts as open, in progress or done.",
+      "name": "Name",
+      "newName": "New status",
+      "category": "Category",
+      "new": "Add a status",
+      "add": "Add",
+      "nameOf": "Name of {{name}}",
+      "categoryOf": "Category of {{name}}",
+      "up": "Move {{name}} up",
+      "down": "Move {{name}} down",
+      "delete": "Delete {{name}}",
+      "deleteTitle": "Delete status “{{name}}”",
+      "deleteText": "Tickets in this status move to the chosen status.",
+      "replaceWith": "Move tickets to",
+      "tooMany": "A space can have at most {{count}} statuses."
+    },
+    "card": {
+      "label": "Ticket {{key}}: {{title}}"
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "A sprint gathers tickets of this space for a span of time. At most one runs at a time.",
+      "create": "New sprint",
+      "empty": "No sprints in this space yet.",
+      "states": {
+        "active": "Active",
+        "planned": "Planned",
+        "closed": "Closed"
+      },
+      "option": {
+        "active": "{{name}} (running)",
+        "closed": "{{name}} (closed)"
+      },
+      "dates": "{{from}} – {{to}}",
+      "start": "Start {{name}}",
+      "startShort": "Start",
+      "close": "Close {{name}}",
+      "closeShort": "Close",
+      "startBlocked": "Can start once {{name}} is closed.",
+      "tallyLabel": "Tally:",
+      "tally": "{{planned}} planned · {{done}} done · {{carried}} carried over",
+      "toggle": "Show the tickets of {{name}}",
+      "noTickets": "No tickets in this sprint.",
+      "closedNote": "Finished and cancelled tickets stay in the closed sprint. A ticket reopened afterwards goes back to the backlog.",
+      "removeTicket": "Move {{key}} to the backlog",
+      "removeStale": "The ticket was changed in the meantime and stayed in the sprint; the list has been reloaded.",
+      "form": {
+        "title": "New sprint",
+        "description": "Name and dates; the goal in one sentence. The sprint starts out planned.",
+        "name": "Name",
+        "goal": "Goal",
+        "starts": "Start",
+        "ends": "End",
+        "submit": "Create"
+      },
+      "closeDialog": {
+        "title": "Close {{name}}",
+        "text": "Done and cancelled tickets stay in the sprint; the tally is recorded.",
+        "legend": "Where do the unfinished tickets go?",
+        "next": "Into the next sprint: {{name}}",
+        "nextMissing": "Into the next sprint (none planned)",
+        "backlog": "Back to the backlog",
+        "submit": "Close sprint"
+      }
+    },
+    "backlog": {
+      "title": "Backlog",
+      "description": "Unfinished tickets in no sprint, by priority.",
+      "empty": "The backlog is empty.",
+      "selection": "Selection for the sprint",
+      "select": "Select {{key}}",
+      "selectAll": "Select all",
+      "target": "Target sprint",
+      "put": "Put into sprint ({{n}})",
+      "noSprint": "There is no running or planned sprint. Create one first:",
+      "done_one": "{{count}} ticket put into {{name}}.",
+      "done_other": "{{count}} tickets put into {{name}}.",
+      "stale_one": "{{count}} ticket was changed in the meantime and stayed in the backlog; the backlog has been reloaded.",
+      "stale_other": "{{count}} tickets were changed in the meantime and stayed in the backlog; the backlog has been reloaded."
+    },
+    "myBoard": {
+      "title": "My board",
+      "description": "What is assigned to you, from every space, by category. Done shows the last 14 days.",
+      "columns": "Columns of my board",
+      "empty": "Nothing is assigned to you right now.",
+      "changeColumn": "Change the column of {{key}}",
+      "columnMenu": "Choose a column",
+      "categoryEmpty": "{{space}} has no status of the category {{category}}. The ticket stays where it was."
+    },
+    "daily": {
+      "group": "Group by person",
+      "sprint": "Sprint",
+      "allSprints": "All tickets",
+      "backlog": "Backlog (no sprint)",
+      "since": "Highlighted is what changed status, or is new, since {{day}} (midnight UTC).",
+      "unassigned": "Unassigned",
+      "summary_one": "{{count}} ticket, {{changed}} changed since the last working day",
+      "summary_other": "{{count}} tickets, {{changed}} changed since the last working day",
+      "focus": "Show only {{name}}",
+      "focusUnassigned": "Show only unassigned tickets",
+      "focused": "Filtered to {{name}}.",
+      "showAll": "Show everyone",
+      "changed": "Changed",
+      "cell": "{{person}}: {{status}}",
+      "cellChanged_one": "{{count}} changed",
+      "cellChanged_other": "{{count}} changed",
+      "truncated": "More than 100 people have tickets here; the first 100 by name are shown. Narrow it down by sprint, kind or tag to see the others.",
+      "empty": "No tickets for this selection."
+    }
+  },
+  "errors": {
+    "ticket": {
+      "not_found": "This ticket does not exist, or you may not see it.",
+      "version_conflict": "Someone has changed the ticket in the meantime.",
+      "assignee_invalid": "This person cannot be given tickets here.",
+      "status_invalid": "This status does not exist in this space.",
+      "parent_invalid": "This ticket cannot be the parent here.",
+      "kind_invalid": "This kind does not fit the parent or child tickets.",
+      "too_many_pages": "No more than 50 pages can be linked.",
+      "sprint_invalid": "Tickets cannot be put into this sprint.",
+      "category_empty": "The ticket's space has no status of this category."
+    },
+    "ticket_status": {
+      "not_found": "This status does not exist (any more).",
+      "name_taken": "A status with this name already exists.",
+      "category_required": "There must always be an open and a done status.",
+      "in_use": "The status still has tickets. Choose where they move.",
+      "replacement_invalid": "This replacement status does not work.",
+      "version_conflict": "Someone has changed this status in the meantime."
+    },
+    "sprint": {
+      "not_found": "This sprint does not exist, or you may not see it.",
+      "version_conflict": "Someone changed the sprint in the meantime.",
+      "active_exists": "A sprint is already running in this space. Close it first.",
+      "state_invalid": "This is not possible (any more) in the sprint's state.",
+      "next_missing": "There is no planned sprint for the tickets to go into.",
+      "dates_invalid": "The end lies before the start, or a date lies outside the years 2000 to 2100."
+    }
+  }
+}

@@ -1,0 +1,216 @@
+# Values of the to-herd-cats-ai chart. Every value is described by values.schema.json.
+# Secrets are never values: the chart only takes the names of existing Secrets.
+
+## @section Image
+
+## @param image.repository Image repository (one image for every role: api, migrate, collab)
+## @param image.tag Image tag; empty means the chart's appVersion
+## @param image.digest Image digest (sha256:...); when set it pins the image, the tag stays for readability
+## @param image.pullPolicy Image pull policy
+image:
+  repository: ghcr.io/janschachtschabel/to-herd-cats-ai
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+## @param imagePullSecrets Names of Secrets for pulling the image, e.g. [{name: regcred}]
+imagePullSecrets: []
+
+## @section API (HERD_ROLE=api)
+
+## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops)
+## @param api.resources Resource requests and limits of the API container
+## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
+## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
+## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL
+api:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  cookieSecure: true
+  forwardedAllowIps: ""
+  env: {}
+
+## @section Worker (HERD_ROLE=worker)
+
+## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these
+## @param worker.resources Resource requests and limits of the worker container
+## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here)
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+  env: {}
+
+## @section AI and agents (M5, M6; docs/KI.md, docs/AGENTEN.md)
+
+## @param ai.existingSecret Name of an existing Secret whose keys are environment variables of the API and the worker (both call AI providers: the API to test connections and list models, the worker for agent runs): HERD_SECRET_KEY (at least 32 characters, `openssl rand -hex 32`; needed for keys stored encrypted as `enc:`), HERD_SECRET_KEY_PREVIOUS (only during a key rotation), HERD_AI_EGRESS_PROXY (optional, `http://[user:password@]host:port`: the proxy provider calls go through; the URL may carry credentials, so it is a secret) and the provider keys that connections reference as `env:HERD_AI_<NAME>`. Empty: none; connections then cannot store keys encrypted, and `env:` keys must come from api.env/worker.env (plaintext in the Deployment: avoid)
+## @param ai.checkTimeoutSeconds Longest wait for a provider when an admin tests a connection or lists its models (HERD_AI_CHECK_TIMEOUT_SECONDS; API)
+## @param ai.personalAgentsMax Personal agents one person may have at most, 0 to 100 (HERD_AI_PERSONAL_AGENTS_MAX; API); the organisation switch in the AI administration turns them off altogether
+## @param ai.automationsMax Automations one person may own at most, not counting done or deleted ones, 0 to 1000 (HERD_AI_AUTOMATIONS_MAX; API)
+## @param ai.approvalHours How long a run waits for a release or an answer before it ends with approval_expired or waiting_timeout, in hours, at most 720 (HERD_AI_APPROVAL_HOURS; worker)
+## @param ai.runConcurrency Agent runs one worker pod works on at once, 1 to 64 (HERD_RUN_CONCURRENCY; worker). Each run uses one database connection only during its short step transactions, never during a provider call; a worker needs up to runConcurrency + 3 connections for runs, besides those of the outbox. The connection's own max_concurrency still caps runs across all workers
+## @param ai.runLeaseSeconds Lease a running run holds, renewed every third of it (HERD_RUN_LEASE_SECONDS, at least 3; worker). When a worker dies, another one takes its runs up after the lease ran out and goes on from their journal
+ai:
+  existingSecret: ""
+  checkTimeoutSeconds: 20
+  personalAgentsMax: 5
+  automationsMax: 20
+  approvalHours: 72
+  runConcurrency: 4
+  runLeaseSeconds: 30
+
+## @section MCP (M8; docs/MCP.md)
+
+## @param mcp.ratePerMinute Calls one access token may make to /mcp per minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_MCP_RATE_PER_MINUTE; API). Whether people may have tokens at all is the organisation's switch in the AI administration
+## @param mcp.allowedHosts Private hosts external MCP servers may run on (an in-house GitLab): exact host names or private networks in CIDR form (HERD_MCP_ALLOWED_HOSTS; API and worker). Empty: public addresses only. Link-local and metadata addresses stay refused; a listed host is dialled directly, past HERD_AI_EGRESS_PROXY. With networkPolicy.enabled, networkPolicy.aiEgress must also let the pods reach it
+## @param mcp.catalogConfigMap Name of an existing ConfigMap whose keys are catalogue entries (*.yaml; docs/MCP.md, "Katalog"), added to the shipped GitHub and GitLab entries: mounted read-only into the API pods at /etc/herd/mcp-catalog (HERD_MCP_CATALOG_DIR; API). A broken file is reported to the admin and skipped. Empty: the shipped entries only
+## @param mcp.maxCallsPerRun Calls one agent run may send to tools of external MCP servers, 1 to 500 (HERD_MCP_MAX_CALLS_PER_RUN; worker). The next is refused as the tool's result and nothing is sent; external calls cost no model tokens, so no budget counts them
+mcp:
+  ratePerMinute: 120
+  allowedHosts: []
+  catalogConfigMap: ""
+  maxCallsPerRun: 20
+
+## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
+publicUrl: ""
+
+## @section Files (HERD_DATA_DIR=/data)
+
+## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only)
+## @param persistence.existingClaim Name of an existing PersistentVolumeClaim to use; empty: the chart creates one (kept on uninstall)
+## @param persistence.size Size of the claim the chart creates
+## @param persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
+## @param persistence.accessModes Access modes of the claim the chart creates; more than one API replica needs ReadWriteMany (every replica reads and writes the files), with one replica ReadWriteOnce is enough
+persistence:
+  enabled: true
+  existingClaim: ""
+  size: 10Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteMany
+
+## @section Live editing (HERD_ROLE=collab)
+
+## @param collab.enabled Run the collab process (Hocuspocus, live editing) as its own Deployment; the API relays /collab/ WebSockets to it. Off: the live editor reports that live editing is off
+## @param collab.resources Resource requests and limits of the collab container. Sizing rule (docs/WIKI.md): memory limit ≥ (130 MiB + 250 MiB × HERD_COLLAB_CHECK_WORKERS + HERD_COLLAB_MEMORY_BUDGET_MB) / 0.8; the defaults (1 worker, budget 400) need 975 MiB. A larger budget (collab.env) needs a larger limit
+## @param collab.env Extra environment variables of the collab process (name: value)
+## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
+collab:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 1Gi
+  env: {}
+  internalToken:
+    existingSecret: ""
+
+## @section Secrets
+
+## @param secrets.existingSecret Name of an existing Secret whose keys are environment variables (HERD_BOOTSTRAP_ADMIN_EMAIL, HERD_BOOTSTRAP_ADMIN_PASSWORD); empty: none
+secrets:
+  existingSecret: ""
+
+## @section Database
+
+## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
+## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL; set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
+database:
+  url: ""
+  existingSecret: ""
+
+## @section Bundled PostgreSQL (for test and staging only)
+
+## @param postgresql.enabled Run a minimal single-pod pgvector StatefulSet; switch it off and set database.url for production
+## @param postgresql.image PostgreSQL image (pgvector), pinned by digest
+## @param postgresql.storage.size Size of the data volume
+## @param postgresql.storage.storageClass Storage class of the data volume; empty: the cluster default
+## @param postgresql.resources Resource requests and limits of the PostgreSQL container
+postgresql:
+  enabled: true
+  image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+  storage:
+    size: 8Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+## @section Ingress (public port 8080)
+
+## @param ingress.enabled Create an Ingress for the public port
+## @param ingress.className IngressClass name; empty: the cluster default
+## @param ingress.annotations Annotations of the Ingress. Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the controller must not buffer them and must allow a read timeout of at least 1 h. The app sends `X-Accel-Buffering: no` (ingress-nginx then passes the stream through unbuffered) and a comment line every 15 s; a proxy that ignores that header needs response buffering switched off for /api/stream. ingress-nginx: see the example below and ci/production-values.yaml
+## @param ingress.hosts Hosts and paths, e.g. [{host: herd.example.com, paths: [{path: /, pathType: Prefix}]}]
+## @param ingress.tls TLS entries, e.g. [{secretName: herd-tls, hosts: [herd.example.com]}]
+ingress:
+  enabled: false
+  className: ""
+  # ingress-nginx, for live updates (Server-Sent Events, /api/stream) and live editing
+  # (WebSockets, /collab/); uploads and imports need the body size:
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  #   nginx.ingress.kubernetes.io/proxy-body-size: 100m
+  annotations: {}
+  hosts:
+    - host: herd.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+## @section NetworkPolicy
+
+## @param networkPolicy.enabled Restrict traffic of the app pods (and of the collab process and the bundled PostgreSQL to the app)
+## @param networkPolicy.publicFrom Peers allowed on the public port 8080 (NetworkPolicyPeer list, e.g. the ingress controller's namespace); empty: everyone
+## @param networkPolicy.internalFrom Peers allowed on the internal port 9090 and on the collab process's port 1234 for its /metrics (probes are kubelet traffic; list e.g. the Prometheus namespace); empty: no one
+## @param networkPolicy.egress Extra egress rules (NetworkPolicyEgressRule list), e.g. to an external database or OTLP collector; DNS and the bundled PostgreSQL are always allowed
+## @param networkPolicy.aiEgress Egress rules (NetworkPolicyEgressRule list) for the API and worker pods only, to the AI providers of your connections or to the proxy in HERD_AI_EGRESS_PROXY (then only the proxy). Empty: with networkPolicy.enabled no provider is reachable (connection tests answer `timeout` or `unreachable`, runs stop with `error`); see the example below
+networkPolicy:
+  enabled: false
+  publicFrom: []
+  internalFrom: []
+  egress: []
+  # AI providers, e.g. through a proxy in the cluster:
+  #   - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: egress-proxy}}}]
+  #     ports: [{port: 3128, protocol: TCP}]
+  # or directly (NetworkPolicy knows no host names: the provider's address ranges):
+  #   - to: [{ipBlock: {cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]}}]
+  #     ports: [{port: 443, protocol: TCP}]
+  aiEgress: []
+
+## @section Metrics (internal port 9090, /metrics)
+
+## @param metrics.serviceMonitor.enabled Create a ServiceMonitor (Prometheus Operator)
+## @param metrics.serviceMonitor.interval Scrape interval
+## @param metrics.serviceMonitor.labels Extra labels, e.g. the selector of your Prometheus
+## @param metrics.prometheusRule.enabled Create a PrometheusRule with HerdNotReady (needs kube-state-metrics), HerdHigh5xx, HerdOutboxBacklog, HerdOutboxFailed, HerdWorkerStalled and HerdWorkerAbsent (the last four need the API and worker pods scraped with the chart's Service names as jobs: metrics.serviceMonitor or an equivalent scrape), for agent runs HerdRunsStuck, HerdRunsQueued and HerdRunsFailing, for automations HerdAutomationsLagging and HerdAutomationsFailing (all from the worker's metrics), and for MCP HerdExternalToolsFailing (worker), HerdOAuthRefreshFailing (API and worker), HerdMcpAuthFailures and HerdMcpCatalogProblems (API pods)
+## @param metrics.prometheusRule.labels Extra labels, e.g. the rule selector of your Prometheus
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+  prometheusRule:
+    enabled: false
+    labels: {}
+
+## @section Tracing
+
+## @param tracing.otlpEndpoint OTLP/HTTP endpoint for traces (OTEL_EXPORTER_OTLP_ENDPOINT); empty: no export
+tracing:
+  otlpEndpoint: ""

@@ -1,0 +1,95 @@
+import type { Me, Permission } from '@/lib/api'
+
+/** The milestone this build is at; sections of later milestones stay hidden. */
+export const CURRENT_MILESTONE = 6
+
+export type SectionId =
+  'activity' | 'search' | 'channels' | 'direct' | 'spaces' | 'work' | 'agents' | 'admin'
+
+export interface NavSection {
+  id: SectionId
+  /** The milestone that brings the section (spec section 14). */
+  milestone: number
+  /** Shown only to people holding at least one of these rights. */
+  anyOf?: Permission[]
+}
+
+/** The sidebar of spec 6.2, top to bottom, plus the administration for admins. */
+export const NAV_SECTIONS: readonly NavSection[] = [
+  { id: 'activity', milestone: 3 },
+  { id: 'search', milestone: 2 },
+  { id: 'channels', milestone: 3 },
+  { id: 'direct', milestone: 3 },
+  { id: 'spaces', milestone: 1 },
+  { id: 'work', milestone: 4 },
+  // Working with agents (plan M6): releases, runs, one's own agents.
+  { id: 'agents', milestone: 6, anyOf: ['ai.use', 'agent.manage'] },
+  {
+    id: 'admin',
+    milestone: 1,
+    anyOf: [
+      'user.manage',
+      'group.manage',
+      'tag.manage',
+      'audit.read',
+      'dm.inspect',
+      'ai.manage',
+      'agent.manage',
+      'skill.manage',
+    ],
+  },
+]
+
+export interface AdminLink {
+  to:
+    | '/admin/users'
+    | '/admin/groups'
+    | '/admin/tags'
+    | '/admin/audit'
+    | '/admin/dm-inspect'
+    | '/admin/ai'
+    | '/admin/agents'
+    | '/admin/skills'
+  labelKey:
+    | 'nav.users'
+    | 'nav.groups'
+    | 'nav.tags'
+    | 'nav.audit'
+    | 'nav.dmInspect'
+    | 'nav.ai'
+    | 'nav.agents'
+    | 'nav.skills'
+  permission: Permission
+}
+
+export const ADMIN_LINKS: readonly AdminLink[] = [
+  { to: '/admin/users', labelKey: 'nav.users', permission: 'user.manage' },
+  { to: '/admin/groups', labelKey: 'nav.groups', permission: 'group.manage' },
+  { to: '/admin/tags', labelKey: 'nav.tags', permission: 'tag.manage' },
+  { to: '/admin/audit', labelKey: 'nav.audit', permission: 'audit.read' },
+  { to: '/admin/dm-inspect', labelKey: 'nav.dmInspect', permission: 'dm.inspect' },
+  { to: '/admin/ai', labelKey: 'nav.ai', permission: 'ai.manage' },
+  { to: '/admin/agents', labelKey: 'nav.agents', permission: 'agent.manage' },
+  { to: '/admin/skills', labelKey: 'nav.skills', permission: 'skill.manage' },
+]
+
+function holds(me: Me | null, permission: Permission): boolean {
+  return me?.permissions.includes(permission) ?? false
+}
+
+/** The sections `me` sees at `milestone`. */
+export function visibleSections(
+  me: Me | null,
+  milestone: number = CURRENT_MILESTONE,
+): NavSection[] {
+  return NAV_SECTIONS.filter(
+    (section) =>
+      section.milestone <= milestone &&
+      (!section.anyOf || section.anyOf.some((permission) => holds(me, permission))),
+  )
+}
+
+/** The administration pages `me` may open. */
+export function adminLinks(me: Me | null): AdminLink[] {
+  return ADMIN_LINKS.filter((link) => holds(me, link.permission))
+}

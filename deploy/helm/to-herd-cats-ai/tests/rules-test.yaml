@@ -1,0 +1,665 @@
+# promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
+# One firing and at least one non-firing case per alert. The rule file is the one the
+# PrometheusRule template embeds, so what is tested is what is deployed.
+rule_files:
+  - ../files/prometheus-rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # HerdNotReady: one of our pods is not ready for longer than 5 minutes.
+  - name: HerdNotReady fires after 5 minutes, only for our pods
+    interval: 1m
+    input_series:
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-api-a", condition="true"}'
+        values: "0x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-api-a", container="to-herd-cats-ai"}'
+        values: "1x15"
+      # The worker's container has the same name: a worker that is not ready alerts too.
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-worker-a", condition="true"}'
+        values: "0x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-worker-a", container="to-herd-cats-ai"}'
+        values: "1x15"
+      # Ready: never alerts.
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-api-b", condition="true"}'
+        values: "1x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-api-b", container="to-herd-cats-ai"}'
+        values: "1x15"
+      # Not ready, but not ours (and the finished migration job's pod is not ours either).
+      - series: 'kube_pod_status_ready{namespace="herd", pod="other-x", condition="true"}'
+        values: "0x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="other-x", container="nginx"}'
+        values: "1x15"
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-migrate-x", condition="true"}'
+        values: "0x15"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-migrate-x", container="migrate"}'
+        values: "1x15"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HerdNotReady
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: HerdNotReady
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              pod: herd-api-a
+            exp_annotations:
+              summary: "to-herd-cats-ai pod herd/herd-api-a has not been ready for 5 minutes"
+              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              pod: herd-worker-a
+            exp_annotations:
+              summary: "to-herd-cats-ai pod herd/herd-worker-a has not been ready for 5 minutes"
+              description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
+
+  - name: HerdNotReady stays quiet when a pod recovers within 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'kube_pod_status_ready{namespace="herd", pod="herd-api-a", condition="true"}'
+        values: "0 0 0 1 1 1 1 1 1 1 1 1 1 1 1"
+      - series: 'kube_pod_container_info{namespace="herd", pod="herd-api-a", container="to-herd-cats-ai"}'
+        values: "1x15"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdNotReady
+        exp_alerts: []
+
+  # HerdHigh5xx: more than 5 % of the requests end in 5xx, for 10 minutes.
+  - name: HerdHigh5xx fires at 10 % errors after 10 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", method="GET", route="/api/spaces", status="200"}'
+        values: "0+90x30"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", method="GET", route="/api/spaces", status="500"}'
+        values: "0+10x30"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: HerdHigh5xx
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdHigh5xx
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "More than 5 % of the requests to herd/herd-internal failed with 5xx for 10 minutes"
+              description: "Look at the error logs of to-herd-cats-ai (level ERROR, with trace_id) for the cause."
+
+  - name: HerdHigh5xx stays quiet at 2 % errors and ignores 4xx
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", method="GET", route="/api/spaces", status="200"}'
+        values: "0+68x30"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", method="GET", route="/api/spaces", status="404"}'
+        values: "0+30x30"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", method="GET", route="/api/spaces", status="503"}'
+        values: "0+2x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: HerdHigh5xx
+        exp_alerts: []
+
+  # HerdOutboxBacklog: the oldest pending outbox event is older than 5 minutes. Every
+  # worker reports the same age (read from the database); API pods do not report it.
+  - name: HerdOutboxBacklog fires once per job when the oldest event passes 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 60 120 180 240 300 360 420 480"
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 60 120 180 240 300 360 420 480"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: HerdOutboxBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "The oldest outbox event of herd/herd-worker has waited more than 5 minutes"
+              description: "The workers cannot keep up, or a handler keeps failing or timing out (it is retried for up to about 14 minutes; log entries outbox.handler_failed, outbox.handler_timeout). Notifications, page timelines and live updates are late."
+
+  - name: HerdOutboxBacklog stays quiet when the backlog drains within 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_oldest_pending_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 60 120 180 240 0 0 60 120 0 0 0"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: HerdOutboxBacklog
+        exp_alerts: []
+
+  # HerdOutboxFailed: the number of given-up events in the table (herd_outbox_failed,
+  # read from the database by every worker) rose within 15 minutes, or first appears
+  # above 0. A restart or a new pod with the same count stays quiet.
+  - name: HerdOutboxFailed fires once per job when the count rises, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "2x19 3x20"
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "2x19 3x20"
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 22m
+        alertname: HerdOutboxFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Outbox events gave up in herd/herd-worker (3 in all)"
+              description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+
+  - name: HerdOutboxFailed fires when failures first show
+    interval: 1m
+    input_series:
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "_x20 1x20"
+    alert_rule_test:
+      - eval_time: 19m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 22m
+        alertname: HerdOutboxFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Outbox events gave up in herd/herd-worker (1 in all)"
+              description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+
+  - name: HerdOutboxFailed stays quiet for a new worker pod with the same count, and at 0
+    interval: 1m
+    input_series:
+      # (Prometheus first sees the 4 at 0m and alerts until 15m: covered above.)
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "4x27"
+      - series: 'herd_outbox_failed{namespace="herd", job="herd-worker", pod="herd-worker-c"}'
+        values: "_x25 4x20"
+      - series: 'herd_outbox_failed{namespace="other", job="other-worker", pod="other-worker-a"}'
+        values: "0x45"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 26m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: HerdOutboxFailed
+        exp_alerts: []
+
+  # HerdWorkerStalled: a worker's last finished batch is more than 3 minutes old, for 2
+  # minutes. A worker that keeps passing (every few seconds) stays quiet.
+  - name: HerdWorkerStalled fires for the worker that stopped making progress
+    interval: 1m
+    input_series:
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0+60x5 300x20"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0+60x25"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdWorkerStalled
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: HerdWorkerStalled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+              pod: herd-worker-a
+            exp_annotations:
+              summary: "Worker herd/herd-worker-a has made no progress for 5 minutes"
+              description: "Its dispatcher has not finished a batch; notifications, page timelines and live updates wait. Look for outbox.handler_timeout and outbox.pass_failed in its log and for locks held in the database."
+
+  # HerdWorkerAbsent: API pods (herd_sse_connections without a worker gauge on the same
+  # pod) run and no worker of their release reports, for 5 minutes.
+  - name: HerdWorkerAbsent fires for the release whose worker is missing
+    interval: 1m
+    input_series:
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "3x20"
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-b"}'
+        values: "1x20"
+      # The other release in the namespace has its worker (which exports both gauges).
+      - series: 'herd_sse_connections{namespace="herd", job="other-internal", pod="other-api-a"}'
+        values: "0x20"
+      - series: 'herd_sse_connections{namespace="herd", job="other-worker", pod="other-worker-a"}'
+        values: "0x20"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="other-worker", pod="other-worker-a"}'
+        values: "0+60x20"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdWorkerAbsent
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: HerdWorkerAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "No worker reports for herd/herd-internal while its API runs"
+              description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+
+  - name: HerdWorkerAbsent fires when the last worker goes, and not for role all
+    interval: 1m
+    input_series:
+      - series: 'herd_sse_connections{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "2x40"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0+60x10 _x30"
+      - series: 'herd_sse_connections{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x10 _x30"
+      # A single process in role all (API and worker in one pod) never alerts.
+      - series: 'herd_sse_connections{namespace="solo", job="solo-internal", pod="solo-a"}'
+        values: "1x40"
+      - series: 'herd_worker_last_pass_timestamp_seconds{namespace="solo", job="solo-internal", pod="solo-a"}'
+        values: "0+60x40"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: HerdWorkerAbsent
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HerdWorkerAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "No worker reports for herd/herd-internal while its API runs"
+              description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+
+  # HerdRunsStuck: a run has been stuck (lease not renewed, or past any run's time) for
+  # 5 minutes. Every worker reports the same count, read from the database.
+  - name: HerdRunsStuck fires once per job after 5 minutes, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 1x10 0x5"
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 1x10 0x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: HerdRunsStuck
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "1 agent runs of herd/herd-worker are stuck"
+              description: "Runs hold a lease no worker renews, or run longer than any run may; people wait for an answer. Look for runs.failed, runs.renew_failed and runs.claim_failed in the workers' logs."
+      - eval_time: 15m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+
+  - name: HerdRunsStuck stays quiet when a dead worker's run is taken over
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_stuck{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 1 1 0 0 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdRunsStuck
+        exp_alerts: []
+
+  # HerdRunsQueued: the oldest waiting run is older than 5 minutes.
+  - name: HerdRunsQueued fires once per job when a run waits more than 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 0 60 120 180 240 300 360 420"
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0 0 60 120 180 240 300 360 420"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HerdRunsQueued
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: HerdRunsQueued
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "An agent run of herd/herd-worker has waited more than 5 minutes for a worker"
+              description: "The workers are busy with other runs (HERD_RUN_CONCURRENCY, the connection's max_concurrency, its requests_per_minute) or claim nothing (runs.claim_failed in their logs). People wait for an answer."
+
+  - name: HerdRunsQueued stays quiet while runs are taken within 5 minutes
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_oldest_queued_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 30 90 150 0 20 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: HerdRunsQueued
+        exp_alerts: []
+
+  # HerdRunsFailing: more than half of the runs finished in 15 minutes failed (at least
+  # 3), for 5 minutes. Two workers count their own runs; the alert sums them per job.
+  - name: HerdRunsFailing fires when most runs are refused by the provider, then clears
+    interval: 1m
+    input_series:
+      # worker a: 1 refused run a minute from minute 1 to 20, worker b: 1 completed a minute
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="provider_refused"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-b", reason="provider_refused"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-b", reason="completed"}'
+        values: "0+1x50"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HerdRunsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Most agent runs of herd/herd-worker fail (66.67% in 15 minutes)"
+              description: "Runs stop with provider_refused or error. Test the agents' connections in the AI administration (unauthorized, payment_required, rate_limited, timeout, unreachable, blocked); look at the stop reasons in the run view and for runs.failed in the workers' logs. With networkPolicy.enabled the provider must be allowed in networkPolicy.aiEgress."
+      - eval_time: 45m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+
+  - name: HerdRunsFailing stays quiet for a few failures among many runs and for cancels
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="error"}'
+        values: "0+1x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="completed"}'
+        values: "0+2x30"
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="cancelled"}'
+        values: "0+5x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+
+  - name: HerdRunsFailing stays quiet for fewer than 3 failed runs
+    interval: 1m
+    input_series:
+      - series: 'herd_runs_total{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="error"}'
+        values: "0 0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HerdRunsFailing
+        exp_alerts: []
+
+  # HerdAutomationsLagging: the oldest due term waited more than 3 minutes, for 5 minutes.
+  # Two workers report the same value from the database; the alert takes the maximum.
+  - name: HerdAutomationsLagging fires when the oldest due term waits too long, then clears
+    interval: 1m
+    input_series:
+      # the term waits from minute 0 on (60 s more each minute) until minute 12, then fired
+      - series: 'herd_automations_oldest_due_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0+60x12 0x10"
+      - series: 'herd_automations_oldest_due_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "0+60x12 0x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HerdAutomationsLagging
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: HerdAutomationsLagging
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "A due automation of herd/herd-worker has waited more than 3 minutes to be fired"
+              description: "The workers' due loop does not keep up or keeps failing on a term (automations.pass_failed in the workers' logs; a worker of an older release cannot fire heartbeats and event rules). Scheduled agent work starts late."
+      - eval_time: 15m
+        alertname: HerdAutomationsLagging
+        exp_alerts: []
+
+  - name: HerdAutomationsLagging stays quiet for a burst the due loop works off in minutes
+    interval: 1m
+    input_series:
+      # 1,000 terms due at once: the oldest waits up to 4 minutes, then the backlog is gone
+      - series: 'herd_automations_oldest_due_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0 60 120 180 240 0x15"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdAutomationsLagging
+        exp_alerts: []
+
+  # HerdAutomationsFailing: at least 5 more automations paused for failing runs within an
+  # hour.
+  - name: HerdAutomationsFailing fires when many automations pause for failures in an hour
+    interval: 5m
+    input_series:
+      - series: 'herd_automations_paused{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="failing"}'
+        values: "1x12 2 4 6 7 7x24"
+      - series: 'herd_automations_paused{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="manual"}'
+        values: "20x40"
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: HerdAutomationsFailing
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: HerdAutomationsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "6 more automations of herd/herd-worker paused for failing runs within an hour"
+              description: "Their last three runs did not complete; their owners got an activity entry. Look at the stop reasons of their runs in the run view (and HerdRunsFailing); once the cause is fixed, the owners or the space managers resume them."
+      - eval_time: 150m
+        alertname: HerdAutomationsFailing
+        exp_alerts: []
+
+  - name: HerdAutomationsFailing stays quiet for single failures and manual pauses
+    interval: 5m
+    input_series:
+      - series: 'herd_automations_paused{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="failing"}'
+        values: "0 1 1 2 2 3 3 3 4 4 4 4 5 5 5 5 5 6 6 6 7"
+      - series: 'herd_automations_paused{namespace="herd", job="herd-worker", pod="herd-worker-a", reason="manual"}'
+        values: "0+3x20"
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: HerdAutomationsFailing
+        exp_alerts: []
+
+  # HerdExternalToolsFailing: most external calls sent in 15 minutes failed or timed out,
+  # at least 3, for 5 minutes. Calls kept back on purpose (refused, limited) do not count.
+  - name: HerdExternalToolsFailing fires when most calls sent fail, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-b", outcome="timeout", effect="write"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="ok", effect="read"}'
+        values: "0+1x50"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HerdExternalToolsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Most external tool calls of herd/herd-worker fail"
+              description: "Calls to tools of external MCP servers fail or time out. Test the servers in the AI administration (MCP servers, Test: unreachable, unauthorized, forbidden, server_error, timeout, blocked); look for mcp.tool_call with its status in the workers' logs and for HerdOAuthRefreshFailing. A private server must be named in mcp.allowedHosts; with networkPolicy.enabled the way out must be allowed in networkPolicy.aiEgress."
+      - eval_time: 45m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  - name: HerdExternalToolsFailing stays quiet for calls kept back on purpose and rare failures
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="refused", effect="read"}'
+        values: "0+5x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="limited", effect="read"}'
+        values: "0+5x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0+1x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="ok", effect="read"}'
+        values: "0+3x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  - name: HerdExternalToolsFailing stays quiet for fewer than 3 failed calls
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0 0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  # HerdOAuthRefreshFailing: at least 3 renewals in 30 minutes failed for another reason
+  # than invalid_grant, for 5 minutes.
+  - name: HerdOAuthRefreshFailing fires when renewals keep failing, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-worker", pod="herd-worker-a", status="server_error"}'
+        values: "0+1x20 20x50"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-worker", pod="herd-worker-a", status="ok"}'
+        values: "0+2x70"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "OAuth renewals of herd/herd-worker keep failing"
+              description: "The authorization server does not renew access tokens (status rejected, blocked, timeout, unreachable, redirect, server_error or invalid_response; log entries oauth.token_request with grant refresh_token). The tokens are kept and tried again, but external tools of the affected servers fail until then. Check the OAuth client in the AI administration (client id and secret, token endpoint) and the way out (mcp.allowedHosts, networkPolicy.aiEgress, HERD_AI_EGRESS_PROXY)."
+      - eval_time: 65m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+
+  - name: HerdOAuthRefreshFailing stays quiet for refused refresh tokens and a single failure
+    interval: 1m
+    input_series:
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="invalid_grant"}'
+        values: "0+1x60"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="timeout"}'
+        values: "0 0 1x58"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="ok"}'
+        values: "0+5x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+
+  # HerdMcpAuthFailures: more than 50 requests to /mcp answered 401 in 5 minutes, for 10
+  # minutes (the API's request counter, route /mcp).
+  - name: HerdMcpAuthFailures fires on a stream of 401 at /mcp, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="401"}'
+        values: "0+20x30 600x30"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="200"}'
+        values: "0+100x60"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HerdMcpAuthFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "Many requests to /mcp of herd/herd-internal carry no valid token"
+              description: "Over 50 requests to /mcp in 5 minutes were answered 401 (token.invalid: unknown, revoked, expired, its person inactive or without mcp.use, or the organisation's MCP switch off). The reverse proxy's access log names the clients; the app logs http.request lines with path /mcp and status 401, never the token. Revoke tokens in the AI administration, or block the clients at the proxy."
+      - eval_time: 50m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+
+  - name: HerdMcpAuthFailures stays quiet for a few 401 at /mcp and for 401 elsewhere
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="401"}'
+        values: "0+5x40"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="429"}'
+        values: "0+50x40"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="GET", route="/api/auth/me", status="401"}'
+        values: "0+100x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+
+  # HerdMcpCatalogProblems: the API skips catalogue files, for 15 minutes.
+  - name: HerdMcpCatalogProblems fires while catalogue files are skipped, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_mcp_catalog_problems{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "0x5 2x30 0x10"
+      - series: 'herd_mcp_catalog_problems{namespace="herd", job="herd-internal", pod="herd-api-b"}'
+        values: "0x5 2x30 0x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "2 catalogue files of herd/herd-internal are skipped"
+              description: "The AI administration lists them under Catalogue, problems (GET /api/ai/mcp-catalog/problems); the log entries mcp.catalog_problem name the file and what is wrong, never its content. Check the files with uv run python -m scripts.check_mcp_catalog <dir> and fix the ConfigMap (mcp.catalogConfigMap)."
+      - eval_time: 40m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts: []

@@ -1,0 +1,392 @@
+{
+  "app": {
+    "name": "Herd"
+  },
+  "common": {
+    "actions": "Aktionen"
+  },
+  "actions": {
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "loadMore": "Mehr laden",
+    "remove": "Entfernen",
+    "retry": "Erneut versuchen",
+    "save": "Speichern"
+  },
+  "states": {
+    "loading": "Wird geladen …",
+    "loadingMore": "Lädt …",
+    "traceId": "Trace-ID {{traceId}}"
+  },
+  "forms": {
+    "conflict": "Jemand hat diesen Eintrag inzwischen geändert. Lade die aktuelle Fassung und speichere dann erneut – deine Eingaben bleiben erhalten.",
+    "reload": "Aktuelle Fassung laden"
+  },
+  "validation": {
+    "required": "Bitte ausfüllen.",
+    "email": "Bitte eine gültige E-Mail-Adresse eingeben.",
+    "invalid": "Dieser Wert ist ungültig.",
+    "tooShort_one": "Mindestens {{count}} Zeichen.",
+    "tooShort_other": "Mindestens {{count}} Zeichen.",
+    "tooLong_one": "Höchstens {{count}} Zeichen.",
+    "tooLong_other": "Höchstens {{count}} Zeichen."
+  },
+  "errors": {
+    "generic": "Das hat nicht geklappt.",
+    "network": "Der Server ist nicht erreichbar. Bitte prüfe die Verbindung.",
+    "forbidden": "Dafür fehlt dir die Berechtigung.",
+    "notFound": "Das gibt es nicht (mehr).",
+    "internal": "Auf dem Server ist ein Fehler aufgetreten.",
+    "validation_failed": "Die Eingaben sind unvollständig oder ungültig.",
+    "auth": {
+      "invalid_credentials": "E-Mail-Adresse oder Passwort ist falsch.",
+      "too_many_attempts": "Zu viele Versuche. Bitte warte eine Minute.",
+      "permission_denied": "Dafür fehlt dir die Berechtigung.",
+      "required": "Bitte melde dich an.",
+      "session_invalid": "Deine Sitzung ist abgelaufen. Bitte melde dich neu an.",
+      "csrf": "Die Anfrage wurde aus Sicherheitsgründen abgelehnt.",
+      "wrong_password": "Das aktuelle Passwort stimmt nicht."
+    },
+    "server": {
+      "busy": "Der Server ist gerade ausgelastet. Bitte versuche es gleich noch einmal."
+    },
+    "users": {
+      "email_taken": "Diese E-Mail-Adresse ist schon vergeben.",
+      "owner_only": "Das darf nur ein Eigentümer.",
+      "last_owner": "Es muss mindestens einen aktiven Eigentümer geben.",
+      "not_found": "Diese Person gibt es nicht.",
+      "version_conflict": "Jemand hat diese Person inzwischen geändert."
+    },
+    "groups": {
+      "name_taken": "Eine Gruppe mit diesem Namen gibt es schon.",
+      "not_found": "Diese Gruppe gibt es nicht.",
+      "member_not_found": "Diese Person ist nicht in der Gruppe.",
+      "version_conflict": "Jemand hat diese Gruppe inzwischen geändert."
+    },
+    "space": {
+      "not_found": "Diesen Bereich gibt es nicht."
+    },
+    "spaces": {
+      "kind_not_allowed": "Diese Art von Bereich lässt sich nicht anlegen.",
+      "personal_members_fixed": "Die Mitglieder eines persönlichen Bereichs lassen sich nicht ändern.",
+      "member_not_found": "Dieses Mitglied gibt es nicht.",
+      "version_conflict": "Jemand hat diesen Bereich inzwischen geändert."
+    }
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "text": "Diese Seite gibt es nicht, oder du kannst sie nicht sehen.",
+    "back": "Zu den Bereichen"
+  },
+  "auth": {
+    "title": "Anmelden",
+    "hint": "Melde dich mit deiner E-Mail-Adresse und deinem Passwort an.",
+    "email": "E-Mail-Adresse",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Wird angemeldet …",
+    "logout": "Abmelden"
+  },
+  "nav": {
+    "label": "Hauptnavigation",
+    "skipToContent": "Zum Inhalt springen",
+    "toggleSidebar": "Seitenleiste ein- oder ausblenden",
+    "activity": "Aktivität",
+    "search": "Suche",
+    "channels": "Kanäle",
+    "direct": "Direkt",
+    "spaces": "Bereiche",
+    "spacesFailed": "Bereiche konnten nicht geladen werden.",
+    "moreSpaces": "Weitere Bereiche",
+    "work": "Arbeit",
+    "admin": "Verwaltung",
+    "users": "Personen",
+    "groups": "Gruppen",
+    "tags": "Tags",
+    "audit": "Protokoll"
+  },
+  "profile": {
+    "title": "Profil",
+    "description": "Deine Einstellungen für diese Anwendung.",
+    "language": "Sprache",
+    "localeNotSaved": "Die Sprache wurde nicht gespeichert.",
+    "password": {
+      "title": "Passwort ändern",
+      "current": "Aktuelles Passwort",
+      "new": "Neues Passwort",
+      "hint": "Mindestens 10 Zeichen. Andere angemeldete Geräte werden abgemeldet.",
+      "submit": "Passwort ändern",
+      "changed": "Passwort geändert. Andere Sitzungen sind abgemeldet."
+    }
+  },
+  "userMenu": {
+    "profile": "Profil und Einstellungen",
+    "open": "Menü von {{name}}",
+    "language": "Sprache",
+    "locales": {
+      "de": "Deutsch",
+      "en": "English"
+    },
+    "theme": "Darstellung",
+    "themes": {
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "Wie das System"
+    }
+  },
+  "roles": {
+    "viewer": "Leser",
+    "editor": "Autor",
+    "moderator": "Moderator",
+    "admin": "Verwalter"
+  },
+  "systemRoles": {
+    "owner": "Eigentümer",
+    "admin": "Administrator",
+    "member": "Mitglied",
+    "guest": "Gast"
+  },
+  "principals": {
+    "user": "Person",
+    "group": "Gruppe",
+    "agent": "Agent"
+  },
+  "spaces": {
+    "title": "Bereiche",
+    "description": "Alle Bereiche, die du sehen kannst.",
+    "empty": "Noch keine Bereiche.",
+    "mine": "Mein Bereich",
+    "myRole": "Deine Rolle: {{role}}",
+    "kinds": {
+      "open": {
+        "label": "Offen",
+        "plural": "Offene Bereiche",
+        "hint": "Für alle Mitglieder der Organisation lesbar."
+      },
+      "team": {
+        "label": "Team",
+        "plural": "Team-Bereiche",
+        "hint": "Nur für die Mitglieder des Bereichs sichtbar."
+      },
+      "personal": {
+        "label": "Persönlich",
+        "plural": "Persönliche Bereiche",
+        "hint": "Gehören genau einer Person."
+      }
+    },
+    "fields": {
+      "kind": "Art",
+      "name": "Name",
+      "icon": "Symbol",
+      "description": "Beschreibung"
+    },
+    "create": {
+      "open": "Bereich anlegen",
+      "title": "Bereich anlegen",
+      "description": "Du wirst Verwalter des neuen Bereichs.",
+      "submit": "Anlegen"
+    },
+    "settings": {
+      "open": "Einstellungen",
+      "title": "Einstellungen des Bereichs",
+      "page": "Mitglieder und Einstellungen"
+    },
+    "members": {
+      "title": "Mitglieder",
+      "empty": "Dieser Bereich hat noch keine Mitglieder.",
+      "name": "Name",
+      "role": "Rolle",
+      "roleOf": "Rolle von {{name}}",
+      "removeNamed": "{{name}} entfernen",
+      "personalFixed": "Ein persönlicher Bereich gehört genau einer Person; seine Mitglieder lassen sich nicht ändern.",
+      "add": "Mitglied hinzufügen",
+      "who": "Person oder Gruppe",
+      "addSubmit": "Hinzufügen",
+      "noDirectory": "Gäste können keine Personen oder Gruppen suchen und deshalb keine Mitglieder hinzufügen.",
+      "pickRequired": "Bitte eine Person oder Gruppe auswählen."
+    },
+    "review": {
+      "title": "Prüffrist für Seiten",
+      "hint": "Veröffentlichte Seiten, die so lange nicht geprüft wurden, gelten als „Prüfung fällig“; die Moderierenden bekommen einmal je Frist eine Aktivität.",
+      "on": "Seiten regelmäßig prüfen",
+      "days": "Prüfen alle … Tage",
+      "range": "Eine ganze Zahl von 7 bis 730 Tagen."
+    }
+  },
+  "users": {
+    "title": "Personen",
+    "description": "Wer sich anmelden kann, mit welcher Rolle.",
+    "empty": "Noch keine Personen.",
+    "neverLoggedIn": "Noch nie",
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Deaktiviert"
+    },
+    "fields": {
+      "name": "Name",
+      "email": "E-Mail-Adresse",
+      "password": "Passwort",
+      "newPassword": "Neues Passwort",
+      "role": "Rolle",
+      "locale": "Sprache",
+      "status": "Status",
+      "lastLogin": "Letzte Anmeldung"
+    },
+    "create": {
+      "open": "Person anlegen",
+      "title": "Person anlegen",
+      "passwordHint": "Mindestens 10 Zeichen. Ohne Passwort kann sich die Person noch nicht anmelden.",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "title": "{{name}} bearbeiten",
+      "openNamed": "{{name}} bearbeiten",
+      "passwordHint": "Leer lassen, um das Passwort zu behalten. Ein neues Passwort meldet die Person überall ab."
+    },
+    "deactivate": {
+      "action": "Deaktivieren",
+      "openNamed": "{{name}} deaktivieren",
+      "title": "Person deaktivieren?",
+      "text": "{{name}} wird sofort abgemeldet und kann sich nicht mehr anmelden. Mitgliedschaften bleiben erhalten."
+    },
+    "reactivate": {
+      "action": "Reaktivieren",
+      "openNamed": "{{name}} reaktivieren",
+      "title": "Person reaktivieren?",
+      "text": "{{name}} kann sich danach wieder anmelden."
+    }
+  },
+  "groups": {
+    "title": "Gruppen",
+    "description": "Gruppen fassen Personen zusammen; sie können Mitglied von Bereichen sein.",
+    "empty": "Noch keine Gruppen.",
+    "back": "Alle Gruppen",
+    "fields": {
+      "name": "Name",
+      "description": "Beschreibung"
+    },
+    "create": {
+      "open": "Gruppe anlegen",
+      "title": "Gruppe anlegen",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "title": "Gruppe bearbeiten"
+    },
+    "delete": {
+      "title": "Gruppe löschen?",
+      "text": "Die Gruppe „{{name}}“ und ihre Mitgliedschaften in Bereichen werden gelöscht."
+    },
+    "members": {
+      "title": "Mitglieder",
+      "empty": "Diese Gruppe hat noch keine Mitglieder.",
+      "name": "Name",
+      "removeNamed": "{{name}} entfernen",
+      "add": "Person hinzufügen",
+      "choose": "Bitte wählen …",
+      "addSubmit": "Hinzufügen",
+      "morePeople": "Weitere Personen laden"
+    }
+  },
+  "tags": {
+    "title": "Tags",
+    "description": "Systemweite Tags lassen sich in allen Bereichen verwenden. Bereichs-Tags verwalten die Moderatoren eines Bereichs in seinen Einstellungen.",
+    "empty": "Noch keine systemweiten Tags.",
+    "create": {
+      "open": "Neuer Tag",
+      "title": "Neuer Tag",
+      "submit": "Anlegen"
+    },
+    "edit": {
+      "open": "Tag „{{name}}“ bearbeiten",
+      "title": "Tag bearbeiten"
+    },
+    "delete": {
+      "open": "Tag „{{name}}“ löschen",
+      "title": "Tag löschen?",
+      "text": "„{{name}}“ wird von allen Seiten entfernt, die ihn tragen. Das lässt sich nicht rückgängig machen."
+    },
+    "fields": {
+      "name": "Name",
+      "color": "Farbe",
+      "colorHint": "Als #rrggbb, z. B. #2563eb.",
+      "colorPicker": "Farbe auswählen"
+    },
+    "space": {
+      "title": "Tags dieses Bereichs",
+      "description": "Nur in diesem Bereich verwendbar. Systemweite Tags verwaltet die Administration.",
+      "empty": "Dieser Bereich hat noch keine eigenen Tags."
+    }
+  },
+  "audit": {
+    "title": "Protokoll",
+    "description": "Wer wann was geändert hat, neueste zuerst.",
+    "empty": "Keine Einträge.",
+    "filter": {
+      "actor": "Person",
+      "anyone": "Alle Personen",
+      "action": "Aktion",
+      "anything": "Alle Aktionen"
+    },
+    "fields": {
+      "when": "Zeitpunkt",
+      "actor": "Person",
+      "action": "Aktion",
+      "target": "Betrifft",
+      "details": "Einzelheiten",
+      "ip": "IP-Adresse"
+    },
+    "targets": {
+      "user": "Person",
+      "group": "Gruppe",
+      "space": "Bereich"
+    },
+    "actions": {
+      "user": {
+        "created": "Person angelegt",
+        "updated": "Person geändert",
+        "password_changed": "Passwort geändert",
+        "deactivated": "Person deaktiviert",
+        "reactivated": "Person reaktiviert"
+      },
+      "group": {
+        "created": "Gruppe angelegt",
+        "updated": "Gruppe geändert",
+        "deleted": "Gruppe gelöscht",
+        "member_added": "Gruppenmitglied hinzugefügt",
+        "member_removed": "Gruppenmitglied entfernt"
+      },
+      "space": {
+        "created": "Bereich angelegt",
+        "updated": "Bereich geändert",
+        "member_set": "Bereichsmitglied gesetzt",
+        "member_removed": "Bereichsmitglied entfernt",
+        "admin_access": "Bereich als Administrator geöffnet"
+      }
+    },
+    "detailKeys": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "icon": "Symbol",
+      "role": "Rolle",
+      "system_role": "Rolle",
+      "member_type": "Art",
+      "kind": "Art",
+      "locale": "Sprache"
+    },
+    "kinds": {
+      "open": "offen",
+      "team": "Team",
+      "personal": "persönlich"
+    }
+  },
+  "directory": {
+    "placeholder": "Name eingeben …",
+    "hint": "Sucht in den Namen von Personen und Gruppen.",
+    "searching": "Suche …",
+    "empty": "Niemand gefunden.",
+    "loadMore": "Weitere laden"
+  }
+}

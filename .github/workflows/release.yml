@@ -1,0 +1,92 @@
+# Release on a tag vX.Y.Z: the tag must equal the pyproject and chart versions, all
+# CI checks must pass, then the image (ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z and
+# :X.Y) and the chart (oci://ghcr.io/<owner>/charts/to-herd-cats-ai) are published
+# with the default GITHUB_TOKEN. Finally both are pulled without credentials; new
+# GHCR packages are private until made public, so a failure there only warns.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      minor: ${{ steps.version.outputs.minor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag = pyproject version = chart version = appVersion
+        run: bash deploy/helm/scripts/check-chart-version.sh "$GITHUB_REF_NAME"
+      - id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [version, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      MINOR: ${{ needs.version.outputs.minor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.19.0
+      - name: Names (GHCR needs a lower-case owner)
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/$owner/to-herd-cats-ai" >> "$GITHUB_ENV"
+          echo "CHARTS=oci://ghcr.io/$owner/charts" >> "$GITHUB_ENV"
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push the image
+        run: |
+          docker build --build-arg "VERSION=$VERSION" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "$IMAGE:$VERSION" -t "$IMAGE:$MINOR" .
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:$MINOR"
+      - name: Package and push the chart
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          mkdir -p "$RUNNER_TEMP/charts"
+          helm package deploy/helm/to-herd-cats-ai --destination "$RUNNER_TEMP/charts"
+          helm push "$RUNNER_TEMP/charts/to-herd-cats-ai-$VERSION.tgz" "$CHARTS"
+      - name: Pull both without credentials (warn only)
+        run: |
+          docker logout ghcr.io
+          helm registry logout ghcr.io || true
+          docker image rm "$IMAGE:$VERSION" "$IMAGE:$MINOR" >/dev/null
+          mkdir -p "$RUNNER_TEMP/pulled"
+          if docker pull "$IMAGE:$VERSION" >/dev/null 2>&1; then
+            echo "Image $IMAGE:$VERSION is publicly pullable."
+          else
+            echo "::warning::$IMAGE:$VERSION cannot be pulled anonymously; make the GHCR package public."
+          fi
+          if helm pull "$CHARTS/to-herd-cats-ai" --version "$VERSION" --destination "$RUNNER_TEMP/pulled" >/dev/null 2>&1; then
+            echo "Chart $CHARTS/to-herd-cats-ai:$VERSION is publicly pullable."
+          else
+            echo "::warning::$CHARTS/to-herd-cats-ai:$VERSION cannot be pulled anonymously; make the GHCR package public."
+          fi

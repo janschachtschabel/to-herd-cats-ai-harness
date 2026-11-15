@@ -1,0 +1,34 @@
+to-herd-cats-ai {{ .Chart.AppVersion }} is installed as {{ include "herd.fullname" . }}.
+
+Public port 8080: service {{ include "herd.fullname" . }}{{ if .Values.ingress.enabled }} (Ingress: {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}){{ end }}.
+Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal (API pods) and {{ include "herd.fullname" . }}-worker (worker pods).
+Worker (outbox: notifications, page timelines, live updates): {{ .Values.worker.replicas }} replica(s){{ if eq (int .Values.worker.replicas) 0 }}; with none, nothing of this is delivered{{ end }}.
+{{- if .Values.ingress.enabled }}
+Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the Ingress must not buffer them and must allow a long read timeout (see ingress.annotations in values.yaml).
+{{- end }}
+{{- if .Values.collab.enabled }}
+Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab (one replica, by design).
+{{- with include "herd.publicUrl" . }} Browsers must open the app at {{ . }}.{{ else }} No publicUrl: WebSocket Origins must match the host the request came to.{{ end }}
+{{- end }}
+Files (attachments): {{ if .Values.persistence.enabled }}{{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }} on /data (kept on uninstall){{ else }}an emptyDir per API pod: files are lost with the pod (persistence.enabled=false){{ end }}.
+{{- if .Values.postgresql.enabled }}
+
+The bundled PostgreSQL is for test and staging only (no replication, no backups).
+For production set postgresql.enabled=false, database.url and database.existingSecret.
+{{- end }}
+{{- if not .Values.secrets.existingSecret }}
+
+secrets.existingSecret is empty: no first owner is created. Create a Secret with
+HERD_BOOTSTRAP_ADMIN_EMAIL and HERD_BOOTSTRAP_ADMIN_PASSWORD and set
+secrets.existingSecret to its name.
+{{- end }}
+{{- if not .Values.ai.existingSecret }}
+
+ai.existingSecret is empty: connections cannot store AI keys encrypted (HERD_SECRET_KEY),
+and provider keys (env:HERD_AI_<NAME>) have no Secret to come from. See docs/KI.md.
+{{- end }}
+{{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.aiEgress) }}
+
+networkPolicy.aiEgress is empty: the API and worker pods reach no AI provider (connection
+tests answer "timeout" or "unreachable", agent runs stop with "error"). See docs/AGENTEN.md.
+{{- end }}

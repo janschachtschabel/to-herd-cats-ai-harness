@@ -1,0 +1,164 @@
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Query
+
+from app.core.pagination import Page, PageParams
+from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.tags.models import SubjectType
+from app.modules.tags.schemas import TagsSet
+from app.modules.tags.service import TagService
+from app.modules.wiki.ai_lock import AiLockService
+from app.modules.wiki.present import page_out, tree_out
+from app.modules.wiki.review import ReviewService
+from app.modules.wiki.schemas import (
+    AiLockIn,
+    ExpectedVersion,
+    PageCreate,
+    PageMove,
+    PageOut,
+    PageUpdate,
+    TrashedPageOut,
+    TreeNodeOut,
+)
+from app.modules.wiki.service import PageService
+
+space_pages = APIRouter(prefix="/spaces/{space_id}/pages", tags=["wiki"])
+space_trash = APIRouter(prefix="/spaces/{space_id}/trash", tags=["wiki"])
+pages = APIRouter(prefix="/pages", tags=["wiki"])
+
+PathQuery = Annotated[str, Query(min_length=1, max_length=2000, description="e.g. `it/zugaenge`")]
+
+
+@space_pages.get("/tree", response_model=Page[TreeNodeOut])
+async def page_tree(
+    space_id: uuid.UUID,
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+    tag: Annotated[uuid.UUID | None, Query(description="only pages with this tag")] = None,
+    review_due: Annotated[
+        bool, Query(description="only pages whose review is due (plan M7 decision 11)")
+    ] = False,
+) -> Page[TreeNodeOut]:
+    among = ReviewService(session).due_filter(actor, space_id) if review_due else None
+    page = await PageService(session).tree(actor, space_id, params, tag_id=tag, among=among)
+    return await tree_out(session, actor, page)
+
+
+@space_pages.post("", response_model=PageOut, status_code=201)
+async def create_page(
+    space_id: uuid.UUID, body: PageCreate, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    page = await PageService(session).create(
+        actor, space_id, body.parent_id, body.title, body.content_md
+    )
+    return await page_out(session, actor, page)
+
+
+@space_pages.get("/by-path", response_model=PageOut)
+async def page_by_path(
+    space_id: uuid.UUID, path: PathQuery, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    return await page_out(
+        session, actor, await PageService(session).get_by_path(actor, space_id, path)
+    )
+
+
+@pages.get("/{page_id}", response_model=PageOut)
+async def get_page(page_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> PageOut:
+    return await page_out(session, actor, await PageService(session).get(actor, page_id))
+
+
+@pages.patch("/{page_id}", response_model=PageOut)
+async def update_page(
+    page_id: uuid.UUID, body: PageUpdate, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    page = await PageService(session).update(
+        actor,
+        page_id,
+        title=body.title,
+        content_md=body.content_md,
+        version=body.version,
+        change_summary=body.change_summary,
+    )
+    return await page_out(session, actor, page)
+
+
+@pages.post("/{page_id}/publish", response_model=PageOut)
+async def publish_page(
+    page_id: uuid.UUID, body: ExpectedVersion, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    return await page_out(
+        session, actor, await PageService(session).publish(actor, page_id, body.version)
+    )
+
+
+@pages.post("/{page_id}/reviewed", response_model=PageOut)
+async def mark_page_reviewed(page_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> PageOut:
+    """Mark a published page as reviewed now (`page.edit`); takes and bumps no version."""
+    page = await ReviewService(session).mark_reviewed(actor, page_id)
+    return await page_out(session, actor, page)
+
+
+@pages.put("/{page_id}/ai-lock", response_model=PageOut)
+async def set_page_ai_lock(
+    page_id: uuid.UUID, body: AiLockIn, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    """`page.moderate` in its space; the page's `version` (stale → 409)."""
+    page = await AiLockService(session).set_page(actor, page_id, body.no_ai, body.version)
+    return await page_out(session, actor, page)
+
+
+@pages.post("/{page_id}/move", response_model=PageOut)
+async def move_page(
+    page_id: uuid.UUID, body: PageMove, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    page = await PageService(session).move(
+        actor, page_id, new_parent_id=body.parent_id, position=body.position, version=body.version
+    )
+    return await page_out(session, actor, page)
+
+
+@pages.put("/{page_id}/tags", response_model=PageOut)
+async def set_page_tags(
+    page_id: uuid.UUID, body: TagsSet, actor: ActorDep, session: SessionDep
+) -> PageOut:
+    """Replace the page's tags (`page.edit`); bumps the page version."""
+    await TagService(session).set_for(
+        actor, SubjectType.PAGE, page_id, body.tag_ids, version=body.version
+    )
+    return await page_out(session, actor, await PageService(session).get(actor, page_id))
+
+
+@pages.post("/{page_id}/trash", status_code=204)
+async def trash_page(
+    page_id: uuid.UUID, body: ExpectedVersion, actor: ActorDep, session: SessionDep
+) -> None:
+    await PageService(session).trash(actor, page_id, body.version)
+
+
+@pages.post("/{page_id}/restore", response_model=PageOut)
+async def restore_page(page_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> PageOut:
+    return await page_out(
+        session, actor, await PageService(session).restore_from_trash(actor, page_id)
+    )
+
+
+@pages.delete("/{page_id}", status_code=204)
+async def purge_page(page_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
+    """Delete a page in the trash for good, with everything below it (system admins)."""
+    await PageService(session).purge(actor, page_id)
+
+
+@space_trash.get("", response_model=Page[TrashedPageOut])
+async def list_trash(
+    space_id: uuid.UUID,
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+) -> Page[TrashedPageOut]:
+    page = await PageService(session).list_trash(actor, space_id, params)
+    return Page[TrashedPageOut](
+        items=[TrashedPageOut.of(p) for p in page.items], next_cursor=page.next_cursor
+    )

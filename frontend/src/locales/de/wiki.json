@@ -1,0 +1,348 @@
+{
+  "activity": {
+    "proposalWhere": "einem Bereich (neue Seite)",
+    "reasons": {
+      "proposal": "hat einen Vorschlag zu einer Seite eingereicht oder entschieden ({{where}})"
+    }
+  },
+  "search": {
+    "title": "Suche",
+    "description": "Durchsucht alle Seiten und Nachrichten, die du lesen darfst. Pfeiltasten wählen, Eingabe öffnet.",
+    "input": "Suchbegriff",
+    "placeholder": "Seiten und Nachrichten durchsuchen …",
+    "hint": "Gib einen Begriff ein, um Seiten, Nachrichten und Tickets zu finden.",
+    "empty": "Keine Treffer.",
+    "results": "Treffer",
+    "onlyHere": "Nur in diesem Bereich",
+    "shortcut": "Strg K"
+  },
+  "wiki": {
+    "space": {
+      "settings": "Mitglieder"
+    },
+    "tree": {
+      "title": "Seiten",
+      "empty": "Noch keine Seiten.",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen"
+    },
+    "home": {
+      "title": "Seiten in diesem Bereich",
+      "empty": "In diesem Bereich gibt es noch keine Seiten.",
+      "emptyCreate": "In diesem Bereich gibt es noch keine Seiten. Lege die erste an.",
+      "createFirst": "Erste Seite anlegen",
+      "children_one": "{{count}} Unterseite",
+      "children_other": "{{count}} Unterseiten"
+    },
+    "fields": {
+      "title": "Titel",
+      "parent": "Übergeordnete Seite"
+    },
+    "parent": {
+      "top": "Keine (oberste Ebene)"
+    },
+    "create": {
+      "open": "Neue Seite",
+      "title": "Neue Seite",
+      "description": "Die Seite beginnt als Entwurf; veröffentlicht sehen sie alle Leser des Bereichs.",
+      "submit": "Anlegen"
+    },
+    "page": {
+      "draft": "Entwurf",
+      "empty": "Diese Seite hat noch keinen Inhalt.",
+      "notFound": "Diese Seite gibt es nicht (mehr).",
+      "breadcrumbs": "Seitenpfad",
+      "toc": "Inhalt",
+      "updated": "Zuletzt geändert {{when}}"
+    },
+    "links": {
+      "missing": "Diese Seite gibt es noch nicht.",
+      "create": "anlegen",
+      "createNamed": "Seite „{{title}}“ anlegen"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "live": "Gemeinsam bearbeiten",
+      "publish": "Veröffentlichen",
+      "more": "Weitere Aktionen",
+      "versions": "Versionen",
+      "exportPage": "Als Markdown herunterladen",
+      "createChild": "Unterseite anlegen",
+      "rename": "Umbenennen",
+      "move": "Verschieben",
+      "trash": "In den Papierkorb"
+    },
+    "conflict": {
+      "reloaded": "Jemand hat die Seite inzwischen geändert. Die aktuelle Fassung ist geladen – prüfe sie und versuche es erneut."
+    },
+    "rename": {
+      "title": "Seite umbenennen"
+    },
+    "move": {
+      "title": "Seite verschieben",
+      "description": "Wohin soll „{{title}}“? Unterseiten wandern mit.",
+      "position": "Stelle",
+      "first": "An den Anfang",
+      "after": "Nach „{{title}}“",
+      "submit": "Verschieben"
+    },
+    "tags": {
+      "title": "Tags der Seite",
+      "description": "Tags gelten für die ganze Organisation oder nur für diesen Bereich.",
+      "none": "Es gibt noch keine Tags.",
+      "new": "Neuer Tag",
+      "newName": "Name des neuen Tags",
+      "add": "Hinzufügen",
+      "edit": "Tags bearbeiten",
+      "list": "Tags"
+    },
+    "tagFilter": {
+      "label": "Nach Tag filtern",
+      "all": "Alle Seiten",
+      "clear": "Filter aufheben",
+      "empty": "Keine Seite trägt diesen Tag.",
+      "treeLabel": "Seiten mit dem Tag „{{name}}“",
+      "treeLabelAny": "Seiten mit dem gewählten Tag",
+      "showTagged": "Seiten mit dem Tag „{{name}}“"
+    },
+    "editor": {
+      "title": "Seite bearbeiten",
+      "markdown": "Markdown",
+      "hint": "Speichern mit Strg+S. Links auf andere Seiten: [[Titel]].",
+      "preview": "Vorschau",
+      "summary": "Was hast du geändert? (optional)",
+      "leaveConfirm": "Deine Änderungen sind nicht gespeichert. Trotzdem verlassen?",
+      "conflictTitle": "Die Seite wurde inzwischen geändert",
+      "conflictText": "Jemand hat die Seite gespeichert, während du sie bearbeitet hast. Behältst du deine Fassung, wird sie auf den aktuellen Stand gesetzt und du kannst erneut speichern; verwirfst du sie, siehst du die aktuelle Fassung.",
+      "keepMine": "Meine Fassung behalten",
+      "discardMine": "Meine Änderungen verwerfen",
+      "rebased": "Die aktuelle Fassung ist geladen; dein Text ist erhalten. Speichern überschreibt die Änderung der anderen Person."
+    },
+    "versions": {
+      "title": "Versionen von „{{title}}“",
+      "caption": "Versionen der Seite, neueste zuerst",
+      "back": "Zur Seite",
+      "from": "Von",
+      "to": "Bis",
+      "fromNamed": "Version {{number}} als Ausgangsstand",
+      "toNamed": "Version {{number}} als Vergleichsstand",
+      "version": "Version",
+      "who": "Von wem, wann",
+      "actions": "Aktionen",
+      "number": "Version {{number}}",
+      "unknownAuthor": "Unbekannt",
+      "source": {
+        "human": "Bearbeitet",
+        "import": "Importiert",
+        "restore": "Wiederhergestellt",
+        "collab": "Live",
+        "agent": "Von einem Agenten",
+        "mcp": "Über MCP"
+      },
+      "kind": {
+        "insert": "hinzugefügt:",
+        "delete": "entfernt:",
+        "equal": ""
+      },
+      "pickTwo": "Wähle zwei verschiedene Versionen, um sie zu vergleichen.",
+      "diffLabel": "Unterschiede von Version {{from}} zu Version {{to}}",
+      "titleChanged": "Titel: „{{from}}“ → „{{to}}“",
+      "noChanges": "Kein Unterschied im Inhalt.",
+      "restore": "Wiederherstellen",
+      "restoreNamed": "Version {{number}} wiederherstellen",
+      "restoreTitle": "Version wiederherstellen?",
+      "restoreText": "Der Inhalt von Version {{number}} wird als neue Version gespeichert. Eine laufende Live-Bearbeitung endet dabei.",
+      "label": "Name",
+      "labelHint": "Leer lassen, um den Namen zu entfernen.",
+      "labelNamed": "Version {{number}} benennen",
+      "labelTitle": "Version {{number}} benennen"
+    },
+    "trash": {
+      "open": "Papierkorb",
+      "title": "Papierkorb",
+      "description": "Seiten im Papierkorb sind für niemanden sichtbar, bis sie wiederhergestellt werden.",
+      "empty": "Der Papierkorb ist leer.",
+      "trashedAt": "gelöscht {{when}}",
+      "restore": "Wiederherstellen",
+      "restoreNamed": "„{{title}}“ wiederherstellen",
+      "purge": "Endgültig löschen",
+      "purgeNamed": "„{{title}}“ endgültig löschen",
+      "purgeTitle": "Endgültig löschen?",
+      "purgeText": "„{{title}}“ wird mit allen Unterseiten, Versionen und Anhängen gelöscht. Das lässt sich nicht rückgängig machen.",
+      "confirmTitle": "In den Papierkorb legen?",
+      "confirmText": "„{{title}}“ und alle Unterseiten kommen in den Papierkorb. Moderatoren können sie wiederherstellen."
+    },
+    "attachments": {
+      "title": "Anhänge",
+      "empty": "Keine Anhänge.",
+      "upload": "Datei hochladen",
+      "uploading": "Lädt hoch …",
+      "copyNamed": "Markdown für {{name}} kopieren",
+      "copied": "Kopiert",
+      "deleteNamed": "{{name}} löschen",
+      "deleteTitle": "Anhang löschen?",
+      "deleteText": "„{{name}}“ wird gelöscht. Links darauf funktionieren dann nicht mehr."
+    },
+    "transfer": {
+      "menu": "Import/Export",
+      "export": "Bereich exportieren (ZIP)",
+      "import": "Markdown importieren …",
+      "importTitle": "Markdown importieren",
+      "importDescription": "Ein ZIP mit Markdown-Dateien (Ordner werden zu Unterseiten, Anhänge unter _attachments/). Vorhandene Seiten bleiben unverändert.",
+      "file": "ZIP-Datei",
+      "importSubmit": "Importieren",
+      "importing": "Importiert …",
+      "created_one": "{{count}} Seite angelegt.",
+      "created_other": "{{count}} Seiten angelegt.",
+      "attachments_one": "{{count}} Anhang übernommen.",
+      "attachments_other": "{{count}} Anhänge übernommen.",
+      "skipped_one": "{{count}} Eintrag übersprungen:",
+      "skipped_other": "{{count}} Einträge übersprungen:",
+      "reasons": {
+        "unsafe_path": "unsicherer Pfad",
+        "not_markdown": "keine Markdown-Datei",
+        "exists": "Seite gibt es schon",
+        "duplicate": "doppelt im Archiv",
+        "too_deep": "zu tief verschachtelt",
+        "too_large": "zu groß",
+        "invalid_text": "kein gültiger UTF-8-Text",
+        "unreadable": "nicht lesbar",
+        "no_page": "keine passende Seite",
+        "type_not_allowed": "Dateityp nicht erlaubt",
+        "type_mismatch": "Endung passt nicht zum Inhalt",
+        "filename_invalid": "ungültiger Dateiname",
+        "invalid_manifest": "Verzeichnis der Anhänge ungültig"
+      }
+    },
+    "live": {
+      "toolbar": "Formatierung",
+      "label": "Inhalt von „{{title}}“",
+      "present": "Ebenfalls in der Seite",
+      "alone": "Niemand sonst ist gerade hier.",
+      "done": "Fertig",
+      "hint": "Änderungen werden automatisch gespeichert (spätestens nach 10 Sekunden) und erscheinen bei allen, die die Seite gerade bearbeiten.",
+      "notSaved": "Die letzten Änderungen sind noch nicht gespeichert. Bitte versuche es gleich noch einmal.",
+      "unsaveable": {
+        "markdown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: er würde als Markdown anders gelesen, als er hier aussieht.",
+        "example": {
+          "tableCode": "Ursache ist Code mit einem Backslash in einer Tabellenzelle: ein Backslash direkt vor | lässt sich dort nicht als Markdown schreiben.",
+          "address": "Ursache ist eine Adresse oder E-Mail-Adresse, die die Seite anders verlinken würde, als sie hier steht (etwa zwei mit + verbundene E-Mail-Adressen).",
+          "list": "Ursache ist eine Liste, die Markdown als etwas anderes lesen würde (etwa leere verschachtelte Punkte, die als Trennlinie gelesen würden)."
+        },
+        "reopen": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: das Markdown ließe sich im Live-Editor nicht unverändert wieder öffnen.",
+        "structure": "Der aktuelle Stand lässt sich so nicht als Markdown speichern: sein Aufbau ist für den Editor ungültig.",
+        "unknown": "Der aktuelle Stand lässt sich so nicht als Markdown speichern.",
+        "timeout": "Der aktuelle Stand wurde nicht gespeichert: seine Prüfung hat zu lange gedauert. Die Seite ist zu aufwendig für die Live-Bearbeitung; bearbeitet sie im Markdown-Editor.",
+        "tooLarge": "Der aktuelle Stand ist zu groß für die Live-Bearbeitung: die Tabellen der Seite haben zusammen mehr als {{cells}} Tabellenzellen. Nehmt Zeilen heraus, oder bearbeitet die Seite im Markdown-Editor.",
+        "where": "Betroffen ist Block {{number}} („{{start}}“).",
+        "whereEmpty": "Betroffen ist Block {{number}}.",
+        "wherePair": "Betroffen sind die Blöcke {{number}} und {{next}}, die nur zusammen nicht gespeichert werden können („{{start}}“ …).",
+        "wherePairEmpty": "Betroffen sind die Blöcke {{number}} und {{next}}, die nur zusammen nicht gespeichert werden können.",
+        "rest": "Die letzten Änderungen bleiben ungespeichert, bis ihr ihn ändert; die Sitzung läuft weiter."
+      },
+      "leaveConfirm": {
+        "unconfirmed": "Der Server hat das Speichern deiner letzten Änderungen noch nicht bestätigt. Trotzdem verlassen? Sie können dann verloren sein.",
+        "unsent": "Deine letzten Änderungen sind noch nicht beim Server angekommen (die Verbindung ist unterbrochen). Trotzdem verlassen? Sie gehen dann verloren.",
+        "unsaveable": "Der aktuelle Stand lässt sich nicht speichern (siehe Hinweis). Trotzdem verlassen? Die Änderungen seit der letzten Speicherung gehen dann verloren.",
+        "lost": "Dein Text ist nicht gespeichert. Kopiere ihn vorher als Markdown. Trotzdem verlassen?"
+      },
+      "regenerated": "Die Seite wurde außerhalb der Live-Sitzung geändert (gespeichert, wiederhergestellt oder verschoben). Der aktuelle Stand ist geladen.",
+      "copy": "Meinen Text als Markdown kopieren",
+      "copied": "Kopiert",
+      "reload": "Neu laden",
+      "markdownEditor": "Im Markdown-Editor bearbeiten",
+      "status": {
+        "connecting": "Verbindet …",
+        "synced": "Synchronisiert",
+        "saving": "Speichert …",
+        "offline": "Getrennt – neuer Versuch …",
+        "stopped": "Beendet"
+      },
+      "stop": {
+        "unauthorized": "Deine Sitzung ist abgelaufen. Bitte melde dich neu an.",
+        "forbidden": "Dir fehlt das Schreibrecht für diese Seite. Der Text ist schreibgeschützt.",
+        "not_found": "Diese Seite ist nicht mehr sichtbar (verschoben, gelöscht oder Rechte geändert).",
+        "too_large": "Die Seite ist zu groß oder zu aufwendig für die Live-Bearbeitung (höchstens {{cells}} Tabellenzellen und 200.000 Zeichen, und ihre Prüfung darf nicht zu lange dauern). Bearbeite sie im Markdown-Editor.",
+        "off": "Die Live-Bearbeitung ist auf diesem Server ausgeschaltet.",
+        "invalid": "Die Live-Sitzung wurde beendet.",
+        "connection_limit": "Du hast zu viele Live-Verbindungen offen (höchstens 3 je Seite und 10 insgesamt je Anmeldung). Schließe andere Fenster mit dieser Seite und lade neu.",
+        "not_roundtrip_safe": "Diese Seite enthält Markdown, die der Live-Editor nicht unverändert bearbeiten kann. Damit nichts an ihrer Bedeutung verloren geht, bearbeite sie im Markdown-Editor.",
+        "invalid_content": "Der Live-Editor kann den gemeinsamen Stand dieser Seite nicht darstellen. Damit nichts verloren geht, wurde die Sitzung beendet, ohne etwas zu speichern. Bearbeite die Seite im Markdown-Editor.",
+        "server_error": "Die Live-Verbindung zu dieser Seite bricht beim Laden immer wieder mit einem Serverfehler ab. Bearbeite die Seite im Markdown-Editor oder versuche es später neu.",
+        "busy": "Der Live-Editor ist gerade ausgelastet: Es sind schon viele große Seiten live geöffnet. Versuche es gleich noch einmal (Neu laden), oder bearbeite die Seite im Markdown-Editor."
+      },
+      "tools": {
+        "bold": "Fett",
+        "italic": "Kursiv",
+        "strike": "Durchgestrichen",
+        "code": "Code",
+        "h1": "Überschrift 1",
+        "h2": "Überschrift 2",
+        "h3": "Überschrift 3",
+        "bulletList": "Aufzählung",
+        "orderedList": "Nummerierte Liste",
+        "taskList": "Aufgabenliste",
+        "quote": "Zitat",
+        "codeBlock": "Codeblock",
+        "rule": "Trennlinie",
+        "unlink": "Link entfernen"
+      }
+    },
+    "memory": {
+      "mark": "Von Agenten geführt",
+      "note": "Ein Agent führt diese Seite als sein Gedächtnis für diesen Bereich und liest sie zu Beginn jedes Laufs. Du kannst sie korrigieren wie jede andere Seite."
+    },
+    "review": {
+      "due": "Prüfung fällig",
+      "last": "Zuletzt geprüft am {{date}}.",
+      "never": "Noch nie geprüft.",
+      "interval_one": "Der Bereich verlangt eine Prüfung jeden Tag.",
+      "interval_other": "Der Bereich verlangt eine Prüfung alle {{count}} Tage.",
+      "mark": "Als geprüft markieren",
+      "filter": "Nur Seiten mit fälliger Prüfung",
+      "empty": "Keine Seite ist zur Prüfung fällig.",
+      "emptyTagged": "Keine Seite mit diesem Tag ist zur Prüfung fällig.",
+      "treeLabel": "Seiten mit fälliger Prüfung",
+      "treeLabelTagged": "Seiten mit dem Tag „{{name}}“ und fälliger Prüfung"
+    }
+  },
+  "errors": {
+    "tooLarge": "Das ist zu groß.",
+    "unsupportedType": "Diese Art von Datei wird nicht angenommen.",
+    "request": {
+      "too_large": "Das ist zu groß für eine Anfrage."
+    },
+    "page": {
+      "not_found": "Diese Seite gibt es nicht (mehr).",
+      "version_conflict": "Jemand hat die Seite inzwischen geändert.",
+      "already_published": "Die Seite ist schon veröffentlicht.",
+      "parent_draft": "Die übergeordnete Seite ist noch ein Entwurf. Veröffentliche zuerst sie.",
+      "parent_not_found": "Die übergeordnete Seite gibt es nicht (mehr).",
+      "too_deep": "So tief lassen sich Seiten nicht verschachteln.",
+      "move_other_space": "Seiten lassen sich nicht in einen anderen Bereich verschieben.",
+      "move_cycle": "Eine Seite lässt sich nicht unter sich selbst oder ihre Unterseiten verschieben.",
+      "path_taken": "Dort gibt es schon eine Seite mit diesem Namen.",
+      "not_trashed": "Die Seite ist nicht im Papierkorb.",
+      "version_not_found": "Diese Version gibt es nicht.",
+      "diff_too_large": "Die Versionen sind zu lang für einen Vergleich.",
+      "not_published": "Nur veröffentlichte Seiten werden geprüft."
+    },
+    "tags": {
+      "not_found": "Diesen Tag gibt es nicht.",
+      "name_taken": "Einen Tag mit diesem Namen gibt es schon.",
+      "version_conflict": "Jemand hat diesen Tag inzwischen geändert.",
+      "wrong_space": "Dieser Tag gehört zu einem anderen Bereich."
+    },
+    "attachment": {
+      "not_found": "Diesen Anhang gibt es nicht (mehr).",
+      "too_large": "Die Datei ist zu groß.",
+      "type_not_allowed": "Diese Art von Datei ist als Anhang nicht erlaubt.",
+      "type_mismatch": "Die Dateiendung passt nicht zum Inhalt der Datei.",
+      "filename_invalid": "Der Dateiname ist ungültig."
+    },
+    "import": {
+      "too_large": "Das Archiv ist zu groß oder enthält zu viele Dateien.",
+      "invalid_zip": "Das ist keine gültige ZIP-Datei."
+    }
+  }
+}

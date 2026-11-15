@@ -1,0 +1,21 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+# Scrapes /metrics on the internal service; the scrape job is that service's name.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "herd.fullname" . }}
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/endpoint: internal
+  endpoints:
+    - port: internal
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}

@@ -1,0 +1,46 @@
+{
+  "agents": {
+    "external": {
+      "create": "Create external agent",
+      "badge": "External via MCP",
+      "badgeTitle": "Works from outside via MCP and does not answer here by itself",
+      "explain": "An external agent, such as Claude Code or Codex on its own machine or in a pipeline, works from outside via MCP with an agent token: it picks up tickets assigned to it, comments and takes them up to “In review”. It has no model, no runs and no automations here and does not answer messages by itself.",
+      "responsibleHint": "The agent may never do more than this person. If they are no longer active or may not hold access tokens, it rests.",
+      "levels": {
+        "1": "Reads pages and tickets and sees its own tickets. Changes nothing.",
+        "2": "Also picks up and comments on tickets, status up to “In review” and page proposals."
+      },
+      "levelNote": "An external agent has level 2 at most: it proposes, a person sets done.",
+      "tools": {
+        "title": "Tools via MCP",
+        "hint": "Only these tools can reach a token of the agent (besides seeing and picking up its own tickets). Only “Allowed” counts: what is blocked, MCP does not offer it; releases by a person do not exist there.",
+        "tableLabel": "Tools via MCP",
+        "grant": "Grant",
+        "choices": {
+          "allow": "Allowed",
+          "confirm": "After release (blocked via MCP)",
+          "block": "Blocked"
+        }
+      },
+      "tokens": {
+        "title": "Tokens of the agent",
+        "hint": "The agent works from outside with these. A token's calls show what it did via MCP.",
+        "empty": "{{name}} has no token yet."
+      },
+      "mark": "external",
+      "markTitle": "External agent, does not answer by itself",
+      "noDm": "{{name}} works from outside via MCP and does not answer here by itself. Assign it a ticket instead.",
+      "header": "An external agent: it works from outside via MCP and does not answer here by itself.",
+      "open": "Level, tools, tokens"
+    },
+    "noRun": {
+      "agent_external": "The agent works from outside via MCP and does not answer here by itself. Your message is saved; assign it a ticket for a task."
+    }
+  },
+  "tickets": {
+    "pickup": {
+      "badge": "Awaiting pick-up",
+      "title": "Assigned to an external agent: it picks the ticket up via MCP; nothing runs in the system for it."
+    }
+  }
+}

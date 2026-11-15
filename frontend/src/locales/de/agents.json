@@ -1,0 +1,143 @@
+{
+  "agents": {
+    "admin": {
+      "open": "Stufe, Werkzeuge, Skills",
+      "back": "Alle Agenten"
+    },
+    "level": {
+      "title": "Autonomiestufe",
+      "badge": "Stufe {{level}}",
+      "hint": "Die Stufe legt fest, welche Werkzeuge der Agent von sich aus nutzen darf. Einzelne Werkzeuge lassen sich darunter weiter einschränken, nie erweitern.",
+      "names": {
+        "1": "Stufe 1: nur lesen",
+        "2": "Stufe 2: vorschlagen",
+        "3": "Stufe 3: intern schreiben",
+        "4": "Stufe 4: nach außen handeln"
+      },
+      "explain": {
+        "1": "Liest Seiten, Tickets und das Gespräch und antwortet. Ändert nichts.",
+        "2": "Liest wie Stufe 1, schlägt Änderungen an Seiten vor, kommentiert und legt Tickets an. Vorschläge nimmt ein Mensch an.",
+        "3": "Wie Stufe 2, schreibt Seiten direkt (nur in Bereichen, die das erlauben), übergibt Tickets und schreibt Nachrichten in Gespräche, in denen er Mitglied ist.",
+        "4": "Wie Stufe 3, darf zusätzlich schreibende Werkzeuge externer Server nutzen. Jeder solche Aufruf wartet auf die Freigabe der fragenden Person über genau diese Argumente."
+      },
+      "withheld": "Höhere Stufen vergibt nur ein Admin.",
+      "save": "Stufe speichern"
+    },
+    "tools": {
+      "title": "Werkzeuge",
+      "hint": "Jedes Werkzeug ist ab einer Stufe erlaubt. Hier lässt es sich nur verschärfen: nur nach Freigabe durch einen Menschen, oder ganz gesperrt.",
+      "tableLabel": "Werkzeuge des Agenten",
+      "tool": "Werkzeug",
+      "effective": "Wirksam",
+      "entry": "Einschränkung",
+      "entryFor": "Freigabe für {{name}}",
+      "fromLevel": "ab Stufe {{level}}",
+      "unavailable": "Nicht verfügbar: braucht Stufe {{level}}",
+      "effects": {
+        "read": "liest",
+        "propose": "schlägt vor",
+        "write": "schreibt"
+      },
+      "grants": {
+        "allow": "Erlaubt",
+        "confirm": "Nach Freigabe",
+        "block": "Gesperrt"
+      },
+      "choices": {
+        "default": "Wie die Stufe (erlaubt)",
+        "confirm": "Nur nach Freigabe",
+        "block": "Gesperrt"
+      },
+      "save": "Freigaben speichern",
+      "names": {
+        "search": "Suchen",
+        "read_page": "Seite lesen",
+        "read_ticket": "Ticket lesen",
+        "list_tree": "Seitenbaum ansehen",
+        "list_versions": "Versionen ansehen",
+        "search_tickets": "Tickets suchen",
+        "read_conversation": "Gespräch lesen",
+        "search_past_runs": "Frühere Läufe durchsuchen",
+        "submit_result": "Ergebnis abgeben",
+        "load_skill": "Skill laden",
+        "ask_user": "Rückfrage stellen",
+        "propose_page_change": "Änderung an einer Seite vorschlagen",
+        "propose_new_page": "Neue Seite vorschlagen",
+        "comment_ticket": "Ticket kommentieren",
+        "set_ticket_status": "Ticketstatus setzen (bis „Zur Prüfung“)",
+        "create_ticket": "Ticket anlegen",
+        "link_ticket_page": "Ticket mit Seite verknüpfen",
+        "update_memory": "Gedächtnis pflegen",
+        "propose_skill": "Skill vorschlagen",
+        "update_page": "Seite direkt ändern",
+        "assign_ticket": "Ticket übergeben",
+        "post_message": "Nachricht schreiben"
+      },
+      "external": {
+        "group": "Externe Werkzeuge · {{server}}",
+        "groupHint": "Nur zugeteilte Werkzeuge bekommt der Agent; jeder Aufruf schickt Daten an diesen Server.",
+        "unusable": "Nicht nutzbar: nicht (mehr) freigegeben oder Server aus",
+        "leftOut": "Nicht im Modellaufruf",
+        "leftOutHint": "Die Beschreibungen aller externen Werkzeuge dieses Agenten zusammen sind länger, als ein Modellaufruf mitnimmt (100.000 Zeichen). Dieses Werkzeug bekommt er deshalb nicht; die zuerst gelisteten haben Vorrang. Nimm ihm andere externe Werkzeuge weg, damit es passt.",
+        "alwaysReleased": "Handelt nach außen: jeder Aufruf nach Freigabe",
+        "needsLevel": "Wirkt erst ab Stufe {{level}}",
+        "choices": {
+          "off": "Nicht zugeteilt",
+          "allow": "Erlaubt",
+          "confirm": "Nur nach Freigabe"
+        }
+      }
+    },
+    "spaces": {
+      "title": "Bereiche",
+      "hint": "Hier arbeitet der Agent mit der genannten Rolle. Mitglieder fügt man in den Einstellungen eines Bereichs hinzu.",
+      "listLabel": "Bereiche des Agenten",
+      "empty": "Noch in keinem Bereich. Offene Bereiche liest er trotzdem."
+    },
+    "skills": {
+      "title": "Skills",
+      "hint": "Im Lauf kennt der Agent Name und Beschreibung und lädt den Text, wenn er ihn braucht.",
+      "listLabel": "Skills des Agenten",
+      "empty": "Noch keine Skills.",
+      "assign": "Skills zuweisen",
+      "assignTitle": "Skills zuweisen",
+      "assignHint": "Angeboten werden die aktiven Skills, die du siehst.",
+      "search": "Skills nach Name suchen",
+      "noneOffered": "Keine passenden Skills.",
+      "removeNamed": "Skill {{name}} entfernen",
+      "unavailable": {
+        "archived": "Nicht verfügbar: Der Skill ist archiviert.",
+        "unreachable": "Nicht verfügbar: Der Agent liest den Bereich dieses Skills nicht."
+      }
+    },
+    "personal": {
+      "title": "Meine Agenten",
+      "description": "Deine eigenen Agenten: Sie arbeiten nur in deinem persönlichen Bereich, höchstens auf Stufe 2, mit deinem Modell und auf dein Konto.",
+      "create": "Agent anlegen",
+      "createTitle": "Eigenen Agenten anlegen",
+      "createHint": "Er nutzt dein Modell, du bist verantwortlich, und er ist Mitglied deines persönlichen Bereichs.",
+      "instructionsHint": "Was er tun soll und wie er antwortet; auch seine Persönlichkeit gehört hierher.",
+      "disabled": "Persönliche Agenten sind in dieser Organisation ausgeschaltet (oder du nutzt keine KI). Du kannst keine neuen anlegen, und vorhandene antworten nicht.",
+      "empty": "Du hast noch keine eigenen Agenten.",
+      "listLabel": "Meine Agenten",
+      "talk": "Gespräch öffnen",
+      "settings": "Stufe und Werkzeuge",
+      "back": "Zu meinen Agenten",
+      "levelCap": "Persönliche Agenten arbeiten höchstens auf Stufe 2.",
+      "owned": "Persönlich: {{name}}",
+      "unknownOwner": "unbekannt"
+    }
+  },
+  "errors": {
+    "agent": {
+      "level_denied": "Stufe 3 und 4 vergibt nur ein Admin.",
+      "tool_unknown": "Dieses Werkzeug gibt es nicht (mehr). Bitte neu laden.",
+      "skill_not_assignable": "Mindestens ein Skill lässt sich diesem Agenten nicht zuweisen (unbekannt oder außerhalb seiner Bereiche).",
+      "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben.",
+      "personal_disabled": "Persönliche Agenten sind in dieser Organisation ausgeschaltet.",
+      "personal_limit": "Du hast schon so viele eigene Agenten, wie erlaubt sind. Lösche einen, um einen neuen anzulegen.",
+      "personal_space_only": "Ein persönlicher Agent arbeitet nur im persönlichen Bereich seiner Person.",
+      "connection_unavailable": "Die KI-Verbindung des Agenten ist ausgeschaltet oder bietet das Modell nicht mehr an. Speichere den Agenten erneut, damit er die aktuelle Zuordnung übernimmt."
+    }
+  }
+}

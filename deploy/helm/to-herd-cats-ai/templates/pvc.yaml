@@ -1,0 +1,24 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+{{- if and (gt (int .Values.api.replicas) 1) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+{{- fail "api.replicas > 1 needs persistence.accessModes [ReadWriteMany]: every API pod reads and writes the files on /data (or set api.replicas=1)" }}
+{{- end }}
+# The files (attachments) on /data, shared by every API pod. Kept on uninstall.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "herd.fullname" . }}-data
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

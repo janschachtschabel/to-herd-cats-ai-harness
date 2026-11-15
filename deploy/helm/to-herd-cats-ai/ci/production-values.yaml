@@ -1,0 +1,94 @@
+# A production-like configuration for CI (helm lint/template, kubeconform): external
+# database, secrets by reference, Ingress with TLS and the timeouts live updates need,
+# AI keys by reference and provider egress through a proxy, two workers, NetworkPolicy, ServiceMonitor, PrometheusRule, tracing and a
+# digest-pinned image.
+image:
+  tag: "0.1.0"
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+imagePullSecrets:
+  - name: regcred
+api:
+  replicas: 3
+  forwardedAllowIps: 10.0.0.0/8
+  env:
+    HERD_LOG_LEVEL: INFO
+worker:
+  replicas: 2
+  env:
+    HERD_LOG_LEVEL: INFO
+secrets:
+  existingSecret: herd-app
+ai:
+  existingSecret: herd-ai
+  checkTimeoutSeconds: 20
+  personalAgentsMax: 3
+  automationsMax: 30
+  approvalHours: 48
+  runConcurrency: 8
+  runLeaseSeconds: 30
+database:
+  url: postgresql+asyncpg://herd@db.example.internal:5432/herd
+  existingSecret: herd-db
+postgresql:
+  enabled: false
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m  # imports up to HERD_IMPORT_MAX_BYTES (100 MiB), attachments 25 MiB
+    # Live updates (/api/stream, Server-Sent Events) stay open for hours; the app turns
+    # buffering off per response (X-Accel-Buffering: no) and sends a heartbeat every 15 s.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: herd.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: herd-tls
+      hosts: [herd.example.com]
+networkPolicy:
+  enabled: true
+  publicFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  internalFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.20.0.0/16
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 4318
+          protocol: TCP
+  # AI providers only through the egress proxy in HERD_AI_EGRESS_PROXY (ai.existingSecret).
+  aiEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: egress-proxy
+      ports:
+        - port: 3128
+          protocol: TCP
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+tracing:
+  otlpEndpoint: http://otel-collector.monitoring:4318

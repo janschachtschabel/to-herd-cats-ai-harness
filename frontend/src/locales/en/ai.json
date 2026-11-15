@@ -1,0 +1,416 @@
+{
+  "nav": {
+    "ai": "AI",
+    "agents": "Agents"
+  },
+  "ai": {
+    "title": "AI",
+    "tabs": {
+      "label": "AI administration",
+      "connections": "Connections",
+      "assignments": "Assignments",
+      "usage": "Usage",
+      "budgets": "Budgets"
+    },
+    "kinds": {
+      "openai": "OpenAI",
+      "openai_compatible": "OpenAI-compatible",
+      "b_api": "b-api",
+      "local": "Local"
+    },
+    "locations": {
+      "local": "Local",
+      "eu": "EU",
+      "external": "External"
+    },
+    "purposes": {
+      "chat": "Chat",
+      "embedding": "Embedding",
+      "both": "Chat and embedding"
+    },
+    "connections": {
+      "description": "Providers that speak the OpenAI protocol. Keys are only written, never shown.",
+      "empty": "No connection set up yet. Without a connection nobody has AI.",
+      "listLabel": "Connections",
+      "secretNote": "A key you enter is stored encrypted and never shown again.",
+      "kindHint": "Cannot be changed later. “Local” may use http and internal addresses.",
+      "kindFixed": "A connection's kind is fixed.",
+      "baseUrlHint": "For example https://api.openai.com/v1. Empty: the kind's address.",
+      "secretStored": "A key is stored. It is not shown.",
+      "secretMissing": "No key stored.",
+      "secretEnvHint": "Name of a server environment variable with the prefix HERD_AI_.",
+      "secretEnvPlaceholder": "HERD_AI_…",
+      "modelsHint": "One model per line; the first is the standard model. Empty: the kind's models.",
+      "dataLocationHint": "Decides, with a space's AI policy, whether content may go here.",
+      "paramFamilyAuto": "Automatic",
+      "on": "Enabled",
+      "off": "Disabled",
+      "noModels": "No models",
+      "test": "Test",
+      "testing": "Testing …",
+      "enable": "Enable",
+      "disable": "Disable",
+      "fetchModels": "Fetch models",
+      "deleteNamed": "Delete connection {{name}}",
+      "deleteTitle": "Delete connection?",
+      "deleteText": "“{{name}}” will be deleted. This fails while an assignment or an agent still uses it.",
+      "create": {
+        "open": "Set up connection",
+        "title": "Set up connection",
+        "submit": "Set up"
+      },
+      "edit": {
+        "title": "Edit connection"
+      },
+      "fields": {
+        "name": "Name",
+        "kind": "Kind",
+        "baseUrl": "Address (base URL)",
+        "secret": "Key",
+        "secretValue": "Key (stored encrypted)",
+        "secretEnv": "Environment variable",
+        "models": "Models",
+        "dataLocation": "Data location",
+        "purpose": "Purpose",
+        "paramFamily": "Token parameter",
+        "maxConcurrency": "Concurrent runs",
+        "requestsPerMinute": "Requests per minute",
+        "enabled": "Enabled"
+      },
+      "secretModes": {
+        "keep": "Keep",
+        "value": "Enter key",
+        "env": "Environment variable",
+        "none": "No key"
+      },
+      "secretKinds": {
+        "env": "From an environment variable",
+        "enc": "Stored encrypted"
+      }
+    },
+    "check": {
+      "ok": "The connection works ({{model}}, {{ms}} ms).",
+      "unauthorized": "The provider refuses: invalid key (401).",
+      "payment_required": "The provider refuses: payment or credit needed (402).",
+      "forbidden": "The provider refuses: no access to this model (403).",
+      "not_found": "Model or address not found at the provider (404).",
+      "rate_limited": "The provider refuses: rate limit reached (429).",
+      "provider_error": "Error at the provider.",
+      "redirect": "The provider redirects; redirects are blocked.",
+      "timeout": "No answer in time.",
+      "unreachable": "Provider unreachable.",
+      "blocked": "Address blocked (private or internal address).",
+      "invalid_response": "The provider's answer could not be read.",
+      "secret_unavailable": "Key unavailable (environment variable or server key missing).",
+      "no_model": "No model entered."
+    },
+    "assignments": {
+      "description": "Who uses which model: the person before their group before the standard. No assignment, no AI.",
+      "connection": "Connection",
+      "model": "Model",
+      "disabledConnection": "{{name}} (disabled)",
+      "defaultTitle": "Organisation standard",
+      "defaultHint": "Applies to everyone without an own or group assignment. Empty: only those assigned have AI.",
+      "noDefault": "No standard (no AI)",
+      "saved": "Saved.",
+      "groupsTitle": "Groups",
+      "groupsHint": "Someone in several groups gets the first group's assignment.",
+      "groupsEmpty": "No group assignments.",
+      "moveUp": "Move {{name}} up",
+      "moveDown": "Move {{name}} down",
+      "removeGroup": "Remove {{name}}",
+      "addGroup": "Add group",
+      "saveGroups": "Save order",
+      "usersTitle": "Single people",
+      "usersHint": "A model of their own or explicitly no AI; this comes before group and standard.",
+      "usersEmpty": "No person assignments.",
+      "noAi": "No AI",
+      "targetText": "{{connection}} · {{model}}",
+      "removePerson": "Remove {{name}}'s assignment",
+      "person": "Person",
+      "addPerson": "Assign",
+      "personal": {
+        "title": "Personal agents",
+        "hint": "Whoever uses AI may make their own agents: only in their personal space, at most level 2, on their own account. Switched off, nobody makes new ones and the existing ones no longer answer (they are kept).",
+        "label": "Allow personal agents",
+        "on": "Allowed.",
+        "off": "Switched off: personal agents do not answer."
+      }
+    },
+    "usage": {
+      "description": "Usage per day (UTC). Costs only where a price is stored.",
+      "groupBy": "Split by",
+      "groups": {
+        "day": "Day only",
+        "user": "Person",
+        "agent": "Agent",
+        "space": "Space",
+        "connection": "Connection"
+      },
+      "from": "From",
+      "to": "To",
+      "empty": "No usage in this period.",
+      "day": "Day",
+      "calls": "Calls",
+      "tokensIn": "Tokens in",
+      "tokensOut": "Tokens out",
+      "cost": "Cost",
+      "unknown": "(unknown)",
+      "noPrice": "no price"
+    },
+    "mine": {
+      "title": "My AI",
+      "model": "Your model: {{model}}",
+      "period": "Period {{from}} to {{to}} (UTC)."
+    },
+    "policy": {
+      "title": "AI policy",
+      "hint": "What AI connections may receive from this space.",
+      "values": {
+        "any": "Any connection",
+        "restricted": "Only certain data locations",
+        "none": "No AI"
+      },
+      "explain": {
+        "any": "Content may go to any connection set up.",
+        "restricted": "Content goes only to connections at one of the chosen locations; otherwise the run stops.",
+        "none": "AI does not see this space: no hits, no reading."
+      },
+      "locations": "Allowed data locations",
+      "locationsRequired": "Please choose at least one data location."
+    },
+    "lock": {
+      "locked": "Locked for AI",
+      "lockPage": "Lock for AI",
+      "unlockPage": "Lift the AI lock",
+      "lockFile": "Lock {{name}} for AI",
+      "unlockFile": "Lift the AI lock of {{name}}"
+    },
+    "budgets": {
+      "description": "Daily limits on AI usage per organisation, person or agent. The day is the UTC day. Once a limit is reached, a run ends before its next model call; a call in flight is never cut, so a limit can be passed by one call.",
+      "currencyNote": "A currency limit counts only calls with a stored price, and stops only those. Calls without a price count toward the token limit alone. Where several budgets apply, the tightest wins.",
+      "listLabel": "Budgets",
+      "empty": "No budget set yet. Without a budget, usage is not limited.",
+      "scopes": {
+        "organisation": "Organisation"
+      },
+      "subject": {
+        "user": "Person: {{name}}",
+        "agent": "Agent: {{name}}"
+      },
+      "gone": "(deleted)",
+      "exhausted": "Limit reached",
+      "todayTokens": "Tokens today",
+      "todayCost": "Cost today",
+      "unpriced": "Without a price",
+      "ofLimitTokens": "{{used}} of {{limit}} tokens",
+      "noTokenLimit": "{{used}} tokens (no token limit)",
+      "ofLimit": "{{used}} of {{limit}}",
+      "noCostLimit": "{{used}} (no currency limit)",
+      "unpricedCalls_one": "{{count}} call without a price (counts toward tokens only)",
+      "unpricedCalls_other": "{{count}} calls without a price (count toward tokens only)",
+      "edit": "Change budget {{subject}}",
+      "editTitle": "Change budget: {{subject}}",
+      "remove": "Remove budget {{subject}}",
+      "removeTitle": "Remove the budget?",
+      "removeText": "The daily limit for {{subject}} goes away. Other budgets still apply.",
+      "new": "Set a budget",
+      "scope": "Applies to",
+      "scopeOptions": {
+        "organisation": "The whole organisation",
+        "user": "A person",
+        "agent": "An agent"
+      },
+      "person": "Person",
+      "agent": "Agent",
+      "pickAgent": "Pick an agent",
+      "agentsNeedRight": "Agents can be picked by those who manage agents. Existing agent budgets can still be changed and removed in the list.",
+      "tokens": "Tokens per day",
+      "tokensHint": "Input and output together. Empty: no token limit.",
+      "cost": "Euros per day",
+      "costHint": "Counts only calls with a stored price. Empty: no currency limit.",
+      "errors": {
+        "tokens": "A whole number above 0.",
+        "cost": "An amount in euros, for example 5 or 2.50.",
+        "limitMissing": "Please give a token or a currency limit."
+      }
+    }
+  },
+  "agents": {
+    "title": "Agents",
+    "description": "AI colleagues: they answer in direct messages and work as far as their level and tools allow.",
+    "noConnection": "Set up an AI connection first: an agent needs a model.",
+    "empty": "No agents yet.",
+    "listLabel": "Agents",
+    "pause": "Pause",
+    "activate": "Activate",
+    "deleteNamed": "Delete agent {{name}}",
+    "deleteTitle": "Delete agent?",
+    "deleteText": "“{{name}}” will be deleted. An agent that has talked is kept: pause it instead.",
+    "create": {
+      "open": "Create agent",
+      "title": "Create agent",
+      "submit": "Create"
+    },
+    "edit": {
+      "title": "Edit {{name}}"
+    },
+    "card": {
+      "model": "Model {{model}} via {{connection}}",
+      "limits": "at most {{steps}} steps, {{seconds}} s"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "fields": {
+      "name": "Name",
+      "intro": "Introduction",
+      "introHint": "Everyone with AI sees it in the profile and the direct message.",
+      "instructions": "Instructions",
+      "instructionsHint": "{{count}} of {{max}} characters. Only administrators see them.",
+      "model": "Model",
+      "modelRequired": "Please choose a connection and a model.",
+      "responsible": "Responsible person",
+      "responsibleHint": "If deactivated, the agent does not answer.",
+      "responsibleRequired": "Please choose a person.",
+      "currentResponsible": "(current person)",
+      "status": "Status",
+      "statusHint": "Only active agents answer.",
+      "maxSteps": "Maximum steps",
+      "maxRuntime": "Maximum seconds"
+    },
+    "badge": {
+      "short": "AI",
+      "title": "Written by an AI",
+      "agent": "An AI agent"
+    },
+    "stop": {
+      "title": "No answer:",
+      "completed": "The run is complete.",
+      "max_steps": "The agent reached its maximum number of steps.",
+      "deadline": "The time for this run ran out.",
+      "no_progress": "The agent made no progress (it repeated the same request).",
+      "rights_revoked": "Rights changed or the agent was paused; the run was ended.",
+      "policy_blocked": "Stopped by a space's AI policy: what was read may not go to this connection.",
+      "provider_refused": "The provider refuses (access, credit or rate limit).",
+      "error": "Something went wrong. Please try again later.",
+      "approval_expired": "Nobody gave the release in time; the run was ended.",
+      "cancelled": "The run was cancelled.",
+      "waiting_timeout": "Nobody answered in time; the run was ended.",
+      "budget": "The daily AI budget is used up; the run stopped before its next model call.",
+      "budgetReached": "Reached: {{scope}}.",
+      "budgetScope": {
+        "user": "the daily limit of the person who asked",
+        "agent": "this agent's daily limit",
+        "organisation": "the organisation's daily limit"
+      },
+      "unknown": "The run was ended.",
+      "titleNamed": "{{name}} stopped without an answer:",
+      "someAgent": "An agent"
+    },
+    "noRun": {
+      "ai_unavailable": "You have no AI assignment (any more); the agent does not answer.",
+      "agent_draft": "This agent is a draft and does not answer.",
+      "agent_paused": "This agent is paused and does not answer now. Your message is saved.",
+      "agent_responsible_inactive": "The agent's responsible person is deactivated; it does not answer.",
+      "agent_connection_unavailable": "No connection available: the agent's AI connection is disabled or no longer offers the model.",
+      "run_thread_reply": "The agent does not answer thread replies; write in the conversation.",
+      "run_waiting": "The agent is already working on something here or waiting for an answer. It answers once that is done.",
+      "run_handover_limit": "The chain of handovers is too long (at most 3); the agent hands over no further.",
+      "agent_not_found": "This agent does not exist (any more), or you may not ask it.",
+      "agent_personal_disabled": "Personal agents are switched off in this organisation; the agent does not answer.",
+      "unknown": "The agent does not answer this message."
+    },
+    "progress": {
+      "queued": "{{name}} is about to start …",
+      "working_one": "{{name}} is working … (step {{count}})",
+      "working_other": "{{name}} is working … (step {{count}})",
+      "label": "{{name}} is working",
+      "queuedThread": "{{name}} is about to start in the message's thread …",
+      "workingThread_one": "{{name}} is working in the message's thread … (step {{count}})",
+      "workingThread_other": "{{name}} is working in the message's thread … (step {{count}})",
+      "waiting": "{{name}} is waiting for a release or an answer.",
+      "openThread": "Open thread"
+    },
+    "header": {
+      "paused": "This agent is paused and does not answer now."
+    },
+    "dm": {
+      "title": "Talk to an agent",
+      "agent": "Agent",
+      "hint": "A conversation between you and the agent alone.",
+      "open": "Open conversation"
+    },
+    "sources": {
+      "show": "Show sources",
+      "none": "No sources read.",
+      "title": "Read:",
+      "page": "Page",
+      "hidden_one": "{{count}} source is not visible to you.",
+      "hidden_other": "{{count}} sources are not visible to you."
+    },
+    "refused": {
+      "start": "{{name}} could not start: {{reason}}",
+      "handover": "{{name}} could not hand over: {{reason}}"
+    },
+    "personalMark": {
+      "short": "Personal",
+      "title": "Personal: for you alone",
+      "text": "This message holds what you read through your own access, or it came about in a conversation that held it. It stays with you: while such a message is in the history the agent is given, it puts anything it wants to write elsewhere to you for release first."
+    }
+  },
+  "errors": {
+    "ai": {
+      "not_found": "Not found.",
+      "connection_name_taken": "A connection with this name already exists.",
+      "connection_in_use": "The connection is still assigned or used by an agent.",
+      "connection_not_found": "This connection no longer exists.",
+      "base_url_not_allowed": "This address is not allowed (https only; internal addresses only for “Local”).",
+      "connection_not_chat": "This connection cannot chat.",
+      "model_unknown": "This connection does not offer the model.",
+      "group_twice": "A group is in the list twice.",
+      "group_not_found": "This group no longer exists.",
+      "guest_not_assignable": "Guests get no AI.",
+      "usage_period_invalid": "The period is invalid (at most 365 days).",
+      "provider_failed": "The provider did not return the model list.",
+      "budget_version_conflict": "Someone changed this budget meanwhile.",
+      "budget_limit_missing": "Please give a token or a currency limit.",
+      "budget_not_found": "This budget no longer exists."
+    },
+    "agent": {
+      "not_found": "This agent does not exist (any more).",
+      "in_use": "This agent has already talked and is kept. Pause it instead.",
+      "responsible_invalid": "The responsible person must be active and not a guest.",
+      "connection_and_model": "Connection and model go together."
+    },
+    "secrets": {
+      "key_missing": "The server has no key (HERD_SECRET_KEY): only environment variables are possible.",
+      "env_name_invalid": "Only environment variables with the prefix HERD_AI_ are allowed.",
+      "value_invalid": "This key is invalid."
+    },
+    "dm": {
+      "agent_pair_only": "One talks to an agent only as a pair."
+    }
+  },
+  "activity": {
+    "reasons": {
+      "approval": "asks you for a release in {{where}}",
+      "question": "asked you a question in {{where}}",
+      "run_stopped": "reports in {{where}} that a run did not finish",
+      "skill_proposal": "proposed a skill or decided a skill proposal ({{where}})"
+    },
+    "skillProposalWhere": {
+      "org": "organisation-wide",
+      "space": "a space"
+    },
+    "automation": {
+      "owner": "An automation with {{agent}} is paused: its owner may no longer run it. Whoever may create it can take it over.",
+      "failing": "An automation with {{agent}} is paused: three runs in a row did not finish.",
+      "manual": "An automation with {{agent}} was paused by hand.",
+      "paused": "An automation with {{agent}} is paused.",
+      "resumed": "An automation with {{agent}} was paused and runs again."
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "app": {
+    "titleWithCount": "({{count}}) {{name}}"
+  },
+  "nav": {
+    "dmInspect": "Einsicht in Direktnachrichten"
+  },
+  "live": {
+    "retrying": "Live-Aktualisierung unterbrochen – neuer Versuch …",
+    "limited": "Zu viele offene Fenster: Live-Aktualisierung pausiert"
+  },
+  "messaging": {
+    "sidebar": {
+      "failed": "Konnte nicht geladen werden.",
+      "noChannels": "Noch keine Kanäle.",
+      "noDms": "Noch keine Direktnachrichten.",
+      "moreChannels": "Weitere Kanäle",
+      "moreDms": "Weitere Direktnachrichten"
+    },
+    "unread": {
+      "messages_one": "{{count}} ungelesene Nachricht",
+      "messages_other": "{{count}} ungelesene Nachrichten",
+      "mentions_one": "{{count}} Erwähnung von dir",
+      "mentions_other": "{{count}} Erwähnungen von dir"
+    },
+    "channel": {
+      "create": "Kanal anlegen",
+      "createTitle": "Kanal anlegen",
+      "createDescription": "Ein Kanal gehört zu einem Bereich; alle, die den Bereich sehen, lesen mit.",
+      "createSubmit": "Anlegen",
+      "space": "Bereich",
+      "name": "Name",
+      "topic": "Thema",
+      "topicHint": "Optional: worum es in diesem Kanal geht.",
+      "archived": "Archiviert",
+      "inSpace": "im Bereich {{space}}"
+    },
+    "dm": {
+      "short": "Direktnachricht",
+      "onlyMe": "Nur ich",
+      "inactive": "{{name}} (deaktiviert)",
+      "open": "Direktnachricht beginnen",
+      "openTitle": "Direktnachricht",
+      "openDescription": "Wähle bis zu {{count}} Personen. Gibt es das Gespräch schon, geht es dort weiter.",
+      "people": "Personen",
+      "chosen": "Ausgewählte Personen",
+      "removePerson": "{{name}} entfernen",
+      "full": "Mehr als {{count}} weitere Personen gehen nicht.",
+      "openSubmit": "Öffnen",
+      "inspectionsLabel": "Einsichten der Verwaltung",
+      "inspected": "Von der Verwaltung eingesehen am {{when}} ({{admin}})"
+    },
+    "conversation": {
+      "gone": "Dieses Gespräch gibt es nicht (mehr), oder du hast keinen Zugang mehr.",
+      "toActivity": "Zur Aktivität"
+    },
+    "list": {
+      "label": "Nachrichtenverlauf",
+      "section": "Gespräch",
+      "older": "Ältere Nachrichten laden",
+      "empty": "Noch keine Nachrichten. Schreib die erste!",
+      "new": "Neu",
+      "arrived": "Neue Nachricht von {{author}}"
+    },
+    "days": {
+      "today": "Heute",
+      "yesterday": "Gestern"
+    },
+    "message": {
+      "label": "Nachricht von {{author}}",
+      "unknownAuthor": "Unbekannt",
+      "edited": "(bearbeitet)",
+      "deleted": "Diese Nachricht wurde gelöscht.",
+      "edit": "Nachricht bearbeiten",
+      "editLabel": "Nachricht bearbeiten",
+      "delete": "Nachricht löschen",
+      "deleteTitle": "Nachricht löschen?",
+      "deleteText": "Der Text verschwindet für alle. Antworten im Thread bleiben."
+    },
+    "pending": {
+      "sending": "Wird gesendet …",
+      "failed": "Nicht gesendet: {{reason}}",
+      "retry": "Erneut senden",
+      "discard": "Verwerfen"
+    },
+    "composer": {
+      "label": "Nachricht an {{name}}",
+      "send": "Senden",
+      "hint": "Eingabe sendet, Umschalt+Eingabe beginnt eine neue Zeile, @ erwähnt jemanden. Markdown geht.",
+      "tooLong_one": "Höchstens {{count}} Zeichen.",
+      "tooLong_other": "Höchstens {{count}} Zeichen.",
+      "notNotified_one": "Nicht benachrichtigt: {{names}} – kann dieses Gespräch nicht sehen.",
+      "notNotified_other": "Nicht benachrichtigt: {{names}} – können dieses Gespräch nicht sehen.",
+      "archived": "Dieser Kanal ist archiviert. Hier kann niemand mehr schreiben.",
+      "readOnly": "Du kannst hier nur mitlesen."
+    },
+    "mention": {
+      "label": "Person erwähnen"
+    },
+    "reactions": {
+      "add": "Reaktion hinzufügen",
+      "with": "Mit {{emoji}} reagieren",
+      "chip_one": "{{emoji}}: {{count}} Reaktion",
+      "chip_other": "{{emoji}}: {{count}} Reaktionen",
+      "chipMine_one": "{{emoji}}: {{count}} Reaktion, auch von dir",
+      "chipMine_other": "{{emoji}}: {{count}} Reaktionen, auch von dir"
+    },
+    "thread": {
+      "title": "Thread",
+      "reply": "Im Thread antworten",
+      "replies_one": "{{count}} Antwort",
+      "replies_other": "{{count}} Antworten",
+      "openWithCount_one": "Thread von {{author}} öffnen, {{count}} Antwort",
+      "openWithCount_other": "Thread von {{author}} öffnen, {{count}} Antworten",
+      "composer": "Im Thread antworten",
+      "openSystem_one": "Thread „{{text}}“ öffnen, {{count}} Antwort",
+      "openSystem_other": "Thread „{{text}}“ öffnen, {{count}} Antworten"
+    },
+    "discussion": {
+      "title": "Diskussion",
+      "open": "Diskussion",
+      "close": "Diskussion schließen",
+      "hideSystem": "Systemmeldungen ausblenden",
+      "empty": "Noch keine Beiträge zu dieser Seite.",
+      "composer": "Zur Seite schreiben"
+    },
+    "system": {
+      "someone": "Jemand",
+      "page_created": "{{actor}} hat die Seite angelegt.",
+      "page_published": "{{actor}} hat die Seite veröffentlicht.",
+      "page_moved": "{{actor}} hat die Seite verschoben.",
+      "page_trashed": "{{actor}} hat die Seite in den Papierkorb gelegt.",
+      "page_restored": "{{actor}} hat die Seite aus dem Papierkorb geholt.",
+      "page_version_restored": "{{actor}} hat Version {{number}} wiederhergestellt.",
+      "page_review_due": "Die Prüffrist der Seite ist abgelaufen.",
+      "automation_started": "Aufgabe von {{actor}} gestartet.",
+      "unknown": "{{actor}} hat die Seite geändert."
+    }
+  },
+  "activity": {
+    "title": "Aktivität",
+    "description": "Was dich betrifft: Erwähnungen, Antworten, Zuweisungen und Kommentare an deinen Tickets, neueste zuerst.",
+    "tabs": "Ansichten",
+    "forMe": "Für mich",
+    "showDone": "Erledigte zeigen",
+    "readAll": "Alle als gelesen markieren",
+    "empty": "Nichts Neues für dich.",
+    "unread": "Ungelesen:",
+    "open": "Öffnen",
+    "doneAction": "Erledigt",
+    "markDone": "Eintrag von {{author}} als erledigt markieren",
+    "markDoneEntry": "Eintrag als erledigt markieren",
+    "done": "Erledigt",
+    "unreadCount_one": "{{count}} ungelesener Eintrag",
+    "unreadCount_other": "{{count}} ungelesene Einträge",
+    "reasons": {
+      "mention": "hat dich in {{where}} erwähnt",
+      "reply": "hat in {{where}} auf einen Thread geantwortet"
+    },
+    "reviewDue": {
+      "named": "Die Prüffrist der Seite „{{title}}“ ist abgelaufen. Bitte prüfen.",
+      "page": "Die Prüffrist einer Seite ist abgelaufen. Bitte prüfen."
+    }
+  },
+  "dmInspect": {
+    "title": "Einsicht in Direktnachrichten",
+    "description": "Nur lesend, mit Begründung, für 60 Minuten.",
+    "rules": "Jede Einsicht wird mit Begründung im Protokoll vermerkt, und die Teilnehmenden sehen im Gespräch, dass und wann die Verwaltung eingesehen hat.",
+    "person": "Person",
+    "dms": "Direktnachrichten dieser Person",
+    "none": "Diese Person hat keine Direktnachrichten.",
+    "lastMessage": "Zuletzt geschrieben am {{when}}",
+    "noMessages": "Noch keine Nachricht",
+    "request": "Einsicht beantragen",
+    "chosen": "Gespräch: {{people}}",
+    "reason": "Begründung",
+    "reasonHint": "10 bis 500 Zeichen. Wird protokolliert.",
+    "start": "Einsicht beginnen",
+    "viewTitle": "Einsicht: {{people}}",
+    "viewReason": "Begründung: {{reason}}",
+    "until_one": "Einsicht bis {{when}} (noch {{count}} Minute).",
+    "until_other": "Einsicht bis {{when}} (noch {{count}} Minuten).",
+    "expired": "Die Einsicht ist abgelaufen. Für eine weitere braucht es eine neue Begründung.",
+    "end": "Einsicht beenden",
+    "messages": "Nachrichten, neueste zuerst",
+    "empty": "In diesem Gespräch steht nichts.",
+    "inThread": "Antwort im Thread",
+    "withheld": "Persönlich: Diese Nachricht des Agenten enthält, was die Person über ihren eigenen Zugang gelesen hat. Ihr Inhalt wird in der Einsicht nicht gezeigt."
+  },
+  "audit": {
+    "targets": {
+      "conversation": "Gespräch",
+      "message": "Nachricht"
+    },
+    "actions": {
+      "dm": {
+        "admin_lookup": "Direktnachrichten einer Person aufgelistet",
+        "admin_access": "Direktnachricht eingesehen"
+      },
+      "message": {
+        "moderated": "Fremde Nachricht gelöscht"
+      }
+    },
+    "detailKeys": {
+      "reason": "Begründung",
+      "inspection_id": "Einsicht"
+    }
+  },
+  "search": {
+    "messageBy": "von {{author}}"
+  },
+  "errors": {
+    "conversation": {
+      "not_found": "Dieses Gespräch gibt es nicht (mehr), oder du hast keinen Zugang mehr.",
+      "archived": "Dieser Kanal ist archiviert. Hier kann niemand mehr schreiben.",
+      "version_conflict": "Jemand hat diesen Kanal inzwischen geändert."
+    },
+    "channel": {
+      "name_taken": "In diesem Bereich gibt es schon einen Kanal mit diesem Namen.",
+      "not_allowed": "In persönlichen Bereichen gibt es keine Kanäle."
+    },
+    "message": {
+      "not_found": "Diese Nachricht gibt es nicht (mehr).",
+      "not_author": "Nur wer die Nachricht geschrieben hat, kann sie ändern.",
+      "deleted": "Diese Nachricht wurde gelöscht.",
+      "system": "Systemmeldungen lassen sich nicht löschen.",
+      "bad_parent": "Auf diese Nachricht kann man nicht im Thread antworten.",
+      "body_invalid": "Die Nachricht ist leer oder zu lang.",
+      "client_id_conflict": "Diese Nachricht wurde schon anderswo gesendet."
+    },
+    "reaction": {
+      "invalid_emoji": "Das ist kein Emoji."
+    },
+    "dm": {
+      "guest_cannot_open": "Gäste können keine Direktnachrichten beginnen.",
+      "participants_invalid": "Mindestens eine der Personen gibt es nicht oder sie ist deaktiviert."
+    },
+    "dm_inspection": {
+      "not_found": "Die Einsicht ist abgelaufen oder gehört jemand anderem."
+    },
+    "notification": {
+      "not_found": "Diesen Eintrag gibt es nicht mehr."
+    },
+    "live": {
+      "too_many_streams": "Zu viele offene Fenster: Live-Aktualisierung pausiert."
+    }
+  }
+}

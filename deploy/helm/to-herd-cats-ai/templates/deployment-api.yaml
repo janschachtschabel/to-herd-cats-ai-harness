@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "herd.fullname" . }}-api
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "herd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "herd.podSecurityContext" . | nindent 8 }}
+      # preStop waits 5 s while the endpoints are removed (no refused connections
+      # during a rollout); then SIGTERM goes through tini to the launcher, which drains
+      # both servers. 35 s = the 5 s wait + 30 s to drain.
+      terminationGracePeriodSeconds: 35
+      containers:
+        # The container name is what the HerdNotReady alert selects on.
+        - name: to-herd-cats-ai
+          image: {{ include "herd.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
+            {{- include "herd.aiApiEnv" . | nindent 12 }}
+            {{- include "herd.mcpApiEnv" . | nindent 12 }}
+            {{- if include "herd.publicUrl" . }}
+            {{- include "herd.publicUrlEnv" . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.collab.enabled }}
+            # Live editing: /collab/ WebSockets are checked here and relayed to the
+            # collab process, which calls back on the internal port with the token.
+            {{- include "herd.internalTokenEnv" . | nindent 12 }}
+            - name: HERD_COLLAB_URL
+              value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
+            {{- end }}
+          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret }}
+          envFrom:
+            {{- with .Values.secrets.existingSecret }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- with .Values.ai.existingSecret }}
+            # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: internal
+              containerPort: 9090
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: internal
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext:
+            {{- include "herd.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            {{- include "herd.volumeMounts" . | nindent 12 }}
+            - name: data
+              mountPath: /data
+            {{- if .Values.mcp.catalogConfigMap }}
+            # The operator's catalogue entries (HERD_MCP_CATALOG_DIR).
+            - name: mcp-catalog
+              mountPath: {{ include "herd.mcpCatalogDir" . }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- include "herd.volumes" . | nindent 8 }}
+        # The files (attachments); fsGroup 10001 makes the volume writable.
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- with .Values.mcp.catalogConfigMap }}
+        - name: mcp-catalog
+          configMap:
+            name: {{ . }}
+        {{- end }}

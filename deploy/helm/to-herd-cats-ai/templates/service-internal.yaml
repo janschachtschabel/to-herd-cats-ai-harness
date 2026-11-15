@@ -1,0 +1,19 @@
+# The internal port 9090: /health, /ready, /metrics. Never behind the Ingress.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}-internal
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    app.kubernetes.io/endpoint: internal
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  ports:
+    - name: internal
+      port: 9090
+      targetPort: internal
+      protocol: TCP

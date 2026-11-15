@@ -1,0 +1,53 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.api.forwardedAllowIps }}
+{{- fail "api.forwardedAllowIps is required with ingress.enabled: set it to the address range of the ingress controller's pods (e.g. 10.0.0.0/8), otherwise every client appears with the ingress pod's address and the scheme stays http" }}
+{{- end }}
+# Only the public service; the internal port 9090 is never exposed. Live editing is a
+# WebSocket on /collab/<page> of the same service (the API checks it and relays it to
+# the collab process): the controller must pass the Upgrade (ingress-nginx and
+# Traefik do by default). The connection stays open while someone edits; the API
+# pings it every 20 s, within the usual read timeouts of 60 s.
+# Live updates are Server-Sent Events on GET /api/stream: one response per browser tab
+# that stays open for hours. The app sends `X-Accel-Buffering: no` (nginx does not
+# buffer it) and a comment line every 15 s; set the controller's read timeout to at
+# least 1 h (ingress-nginx: proxy-read-timeout and proxy-send-timeout "3600", see
+# ingress.annotations), so streams are not cut and reopened every minute.
+# MCP clients (Claude Code, Codex) call POST /mcp with a bearer token: stateless JSON
+# request and response (at most 1 MiB, no upgrade, no stream), so it needs no annotation;
+# keep Authorization as it is and add no Origin header (/mcp refuses requests with one).
+# The default path / covers it; with narrower paths add /mcp (docs/MCP.md, "Betrieb").
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "herd.fullname" . }}
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "herd.fullname" $ }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}

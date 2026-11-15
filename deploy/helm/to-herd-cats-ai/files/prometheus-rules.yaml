@@ -1,0 +1,237 @@
+# Alerts of to-herd-cats-ai in the plain Prometheus rule-file format. The
+# PrometheusRule template embeds this file unchanged, and
+# `promtool test rules tests/rules-test.yaml` tests it as it is.
+groups:
+  - name: to-herd-cats-ai
+    rules:
+      # The readiness probe (/ready: database reachable, schema at this release's head or newer;
+      # on worker pods also the outbox loop running) has failed for 5 minutes. Needs
+      # kube-state-metrics. Our pods are those with a container named to-herd-cats-ai (the
+      # API and worker Deployments; the migration job's is "migrate", collab's "collab").
+      - alert: HerdNotReady
+        expr: |
+          (max by (namespace, pod) (kube_pod_status_ready{condition="true"}) == 0)
+          and on (namespace, pod)
+          max by (namespace, pod) (kube_pod_container_info{container="to-herd-cats-ai"})
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "to-herd-cats-ai pod {{ $labels.namespace }}/{{ $labels.pod }} has not been ready for 5 minutes"
+          description: "Its readiness probe (/ready on port 9090) fails: the database is unreachable, its schema is older than this release, or (worker pods) the outbox loop does not run."
+      # More than 5 % of the public requests answered 5xx, sustained for 10 minutes
+      # (share over a 5-minute window). Per namespace and scrape job, so several
+      # releases in one cluster alert separately. No traffic, no alert.
+      - alert: HerdHigh5xx
+        expr: |
+          sum by (namespace, job) (rate(herd_http_requests_total{status=~"5.."}[5m]))
+            / sum by (namespace, job) (rate(herd_http_requests_total[5m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5 % of the requests to {{ $labels.namespace }}/{{ $labels.job }} failed with 5xx for 10 minutes"
+          description: "Look at the error logs of to-herd-cats-ai (level ERROR, with trace_id) for the cause."
+      # The oldest outbox event (spec 4.3) has waited more than 5 minutes. Every worker
+      # reads the age from the database every 10 s (herd_outbox_oldest_pending_seconds),
+      # also while a pass hangs, so the maximum per job is the backlog. API pods do not
+      # export it (with no worker at all, HerdWorkerAbsent fires instead). Events waiting
+      # for a retry count as pending.
+      - alert: HerdOutboxBacklog
+        expr: |
+          max by (namespace, job) (herd_outbox_oldest_pending_seconds) > 300
+        labels:
+          severity: critical
+        annotations:
+          summary: "The oldest outbox event of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes"
+          description: "The workers cannot keep up, or a handler keeps failing or timing out (it is retried for up to about 14 minutes; log entries outbox.handler_failed, outbox.handler_timeout). Notifications, page timelines and live updates are late."
+      # Outbox events gave up on a handler after their last attempt. herd_outbox_failed is
+      # the number of such events in the table, read from the database by every worker, so
+      # it survives restarts and new pods: the alert fires when it rose within the last
+      # 15 minutes, or when it first appears above 0 (a fresh Prometheus or release).
+      - alert: HerdOutboxFailed
+        expr: |
+          (
+            max by (namespace, job) (herd_outbox_failed)
+              > max by (namespace, job) (herd_outbox_failed offset 15m)
+          )
+          or
+          (
+            max by (namespace, job) (herd_outbox_failed) > 0
+              unless max by (namespace, job) (herd_outbox_failed offset 15m)
+          )
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox events gave up in {{ $labels.namespace }}/{{ $labels.job }} ({{ $value }} in all)"
+          description: "An event failed in a handler on every attempt and is not retried any more; its effect (notification, system message or live update) is missing. The log entries outbox.failed name the events and handlers."
+      # A worker has not finished a batch (or found nothing due) for 3 minutes, sustained
+      # for 2 more: a handler or the database hangs beyond the handler time limit
+      # (HERD_WORKER_HANDLER_TIMEOUT_SECONDS, 30 s; its /ready turns not ready after four
+      # times that). Per pod; a worker that is gone shows as HerdWorkerAbsent or
+      # HerdNotReady instead.
+      - alert: HerdWorkerStalled
+        expr: |
+          time() - max by (namespace, job, pod) (herd_worker_last_pass_timestamp_seconds) > 180
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker {{ $labels.namespace }}/{{ $labels.pod }} has made no progress for 5 minutes"
+          description: "Its dispatcher has not finished a batch; notifications, page timelines and live updates wait. Look for outbox.handler_timeout and outbox.pass_failed in its log and for locks held in the database."
+      # API pods run while no worker reports at all (worker.replicas 0, every worker pod
+      # gone or not scraped): nothing works off the outbox, and the backlog gauges, which
+      # only workers export, are absent. API pods are those that export
+      # herd_sse_connections without herd_worker_last_pass_timestamp_seconds (role all
+      # exports both); a release's worker job is its API job with "-worker" for
+      # "-internal" (the chart's Service names), so releases sharing a namespace are told
+      # apart.
+      - alert: HerdWorkerAbsent
+        expr: |
+          count by (namespace, job) (
+            herd_sse_connections
+              unless on (namespace, pod) herd_worker_last_pass_timestamp_seconds
+          )
+          unless on (namespace, job)
+          count by (namespace, job) (
+            label_replace(herd_worker_last_pass_timestamp_seconds, "job", "$1-internal", "job", "(.+)-worker")
+          )
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No worker reports for {{ $labels.namespace }}/{{ $labels.job }} while its API runs"
+          description: "Nothing dispatches the outbox: notifications, page timelines and live updates stop. Check worker.replicas, the worker pods and their scrape (metrics.serviceMonitor)."
+      # Agent runs (plan M5 task 6). Every worker reads from the database how many runs are
+      # stuck (running with a lease no worker renews, or for longer than any run may: its
+      # 10 minutes and one more) and how long the oldest run has waited for a worker. A
+      # lease that just ran out (a worker died) is taken over within seconds; 5 minutes
+      # of it means no worker takes runs.
+      - alert: HerdRunsStuck
+        expr: |
+          max by (namespace, job) (herd_runs_stuck) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} agent runs of {{ $labels.namespace }}/{{ $labels.job }} are stuck"
+          description: "Runs hold a lease no worker renews, or run longer than any run may; people wait for an answer. Look for runs.failed, runs.renew_failed and runs.claim_failed in the workers' logs."
+      - alert: HerdRunsQueued
+        expr: |
+          max by (namespace, job) (herd_runs_oldest_queued_seconds) > 300
+        labels:
+          severity: warning
+        annotations:
+          summary: "An agent run of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 5 minutes for a worker"
+          description: "The workers are busy with other runs (HERD_RUN_CONCURRENCY, the connection's max_concurrency, its requests_per_minute) or claim nothing (runs.claim_failed in their logs). People wait for an answer."
+      # Most agent runs end in failure: in 15 minutes more than half of the runs the
+      # workers finished stopped with `provider_refused` (the provider answered 401, 402,
+      # 403 or 429: a wrong or revoked key, an exhausted quota or rate limit) or `error`
+      # (the provider failed or timed out, a tool failed, a step could not be stored),
+      # and at least 3 of them, sustained for 5 minutes. herd_runs_total counts per
+      # worker and stop reason; a person's cancel, a missing answer or a stop by the
+      # space's AI policy are not failures of the installation and do not count.
+      - alert: HerdRunsFailing
+        expr: |
+          (
+            sum by (namespace, job) (increase(herd_runs_total{reason=~"provider_refused|error"}[15m]))
+              / sum by (namespace, job) (increase(herd_runs_total[15m]))
+          ) > 0.5
+          and
+          sum by (namespace, job) (increase(herd_runs_total{reason=~"provider_refused|error"}[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Most agent runs of {{ $labels.namespace }}/{{ $labels.job }} fail ({{ $value | humanizePercentage }} in 15 minutes)"
+          description: "Runs stop with provider_refused or error. Test the agents' connections in the AI administration (unauthorized, payment_required, rate_limited, timeout, unreachable, blocked); look at the stop reasons in the run view and for runs.failed in the workers' logs. With networkPolicy.enabled the provider must be allowed in networkPolicy.aiEgress."
+      # Automations (plan M7). Every worker reads from the database how long the oldest due
+      # term has waited to be fired (herd_automations_oldest_due_seconds). The due loop
+      # looks every 5 seconds and fires up to 50 terms a pass, one transaction each, so a
+      # term normally waits seconds. 3 minutes of it for 5 minutes means the due loop is
+      # not keeping up, or a term fails to fire again and again (automations.pass_failed
+      # in the workers' logs; it stays due and is tried again). With no worker at all the
+      # gauge is absent and HerdWorkerAbsent fires instead.
+      - alert: HerdAutomationsLagging
+        expr: |
+          max by (namespace, job) (herd_automations_oldest_due_seconds) > 180
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A due automation of {{ $labels.namespace }}/{{ $labels.job }} has waited more than 3 minutes to be fired"
+          description: "The workers' due loop does not keep up or keeps failing on a term (automations.pass_failed in the workers' logs; a worker of an older release cannot fire heartbeats and event rules). Scheduled agent work starts late."
+      # Automations pause themselves after three runs in a row that did not complete
+      # (paused_reason failing). herd_automations_paused counts the paused ones by reason
+      # from the database; 5 more pausing for failures within an hour points at a cause
+      # common to them (a provider, a key, a tool) rather than at single automations.
+      - alert: HerdAutomationsFailing
+        expr: |
+          max by (namespace, job) (herd_automations_paused{reason="failing"})
+            - max by (namespace, job) (herd_automations_paused{reason="failing"} offset 1h)
+            >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} more automations of {{ $labels.namespace }}/{{ $labels.job }} paused for failing runs within an hour"
+          description: "Their last three runs did not complete; their owners got an activity entry. Look at the stop reasons of their runs in the run view (and HerdRunsFailing); once the cause is fixed, the owners or the space managers resume them."
+      # MCP (plan M8). Agent runs call tools of external MCP servers; every call counts in
+      # herd_external_tool_calls_total by outcome once its step committed (workers only).
+      # Most calls sent in 15 minutes failed or timed out (and at least 3 of them), for 5
+      # minutes: the server is down, slow, refuses the access, or the way out is closed.
+      # Calls the system kept back on purpose (refused: policy, release, unapproved or
+      # changed tool, a person not connected; limited: a run's cap) do not count.
+      - alert: HerdExternalToolsFailing
+        expr: |
+          (
+            sum by (namespace, job) (increase(herd_external_tool_calls_total{outcome=~"failed|timeout"}[15m]))
+              / sum by (namespace, job) (increase(herd_external_tool_calls_total{outcome=~"ok|error|failed|timeout|unknown"}[15m]))
+          ) > 0.5
+          and
+          sum by (namespace, job) (increase(herd_external_tool_calls_total{outcome=~"failed|timeout"}[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Most external tool calls of {{ $labels.namespace }}/{{ $labels.job }} fail"
+          description: "Calls to tools of external MCP servers fail or time out. Test the servers in the AI administration (MCP servers, Test: unreachable, unauthorized, forbidden, server_error, timeout, blocked); look for mcp.tool_call with its status in the workers' logs and for HerdOAuthRefreshFailing. A private server must be named in mcp.allowedHosts; with networkPolicy.enabled the way out must be allowed in networkPolicy.aiEgress."
+      # OAuth connectors renew their access tokens shortly before they expire or after a
+      # 401 (API pods while reading tool lists, workers in runs). At least 3 renewals in 30
+      # minutes failed for another reason than a refresh token the provider no longer takes
+      # (invalid_grant: that connector is disconnected and its owner connects it again),
+      # for 5 minutes: the provider is down, refuses the client, or cannot be reached.
+      - alert: HerdOAuthRefreshFailing
+        expr: |
+          sum by (namespace, job) (increase(herd_oauth_refreshes_total{status!~"ok|invalid_grant"}[30m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OAuth renewals of {{ $labels.namespace }}/{{ $labels.job }} keep failing"
+          description: "The authorization server does not renew access tokens (status rejected, blocked, timeout, unreachable, redirect, server_error or invalid_response; log entries oauth.token_request with grant refresh_token). The tokens are kept and tried again, but external tools of the affected servers fail until then. Check the OAuth client in the AI administration (client id and secret, token endpoint) and the way out (mcp.allowedHosts, networkPolicy.aiEgress, HERD_AI_EGRESS_PROXY)."
+      # More than 50 requests to /mcp answered 401 within 5 minutes, for 10 minutes: someone
+      # tries tokens, or a client keeps calling with a revoked or expired token. The API
+      # counts every request by route and status (herd_http_requests_total); the token
+      # itself is never logged or labelled.
+      - alert: HerdMcpAuthFailures
+        expr: |
+          sum by (namespace, job) (increase(herd_http_requests_total{route="/mcp", status="401"}[5m])) > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Many requests to /mcp of {{ $labels.namespace }}/{{ $labels.job }} carry no valid token"
+          description: "Over 50 requests to /mcp in 5 minutes were answered 401 (token.invalid: unknown, revoked, expired, its person inactive or without mcp.use, or the organisation's MCP switch off). The reverse proxy's access log names the clients; the app logs http.request lines with path /mcp and status 401, never the token. Revoke tokens in the AI administration, or block the clients at the proxy."
+      # Catalogue files the API skipped (herd_mcp_catalog_problems, read again on every
+      # scrape): an entry of mcp.catalogConfigMap that does not parse or validate, or that
+      # takes the id of a shipped one, for 15 minutes.
+      - alert: HerdMcpCatalogProblems
+        expr: |
+          max by (namespace, job) (herd_mcp_catalog_problems) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} catalogue files of {{ $labels.namespace }}/{{ $labels.job }} are skipped"
+          description: "The AI administration lists them under Catalogue, problems (GET /api/ai/mcp-catalog/problems); the log entries mcp.catalog_problem name the file and what is wrong, never its content. Check the files with uv run python -m scripts.check_mcp_catalog <dir> and fix the ConfigMap (mcp.catalogConfigMap)."

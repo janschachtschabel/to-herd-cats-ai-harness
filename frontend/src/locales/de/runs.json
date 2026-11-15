@@ -1,0 +1,152 @@
+{
+  "nav": {
+    "agentWork": "Mit Agenten",
+    "myRuns": "Meine Läufe",
+    "myAgents": "Meine Agenten"
+  },
+  "runs": {
+    "link": "Lauf ansehen",
+    "states": {
+      "queued": "Wartet auf Start",
+      "running": "Läuft",
+      "waiting": "Wartet auf Antwort",
+      "done": "Beendet",
+      "completed": "Abgeschlossen",
+      "stopped": "Abgebrochen"
+    },
+    "stopReasons": {
+      "completed": "Abgeschlossen",
+      "max_steps": "Höchstzahl an Schritten",
+      "deadline": "Zeit abgelaufen",
+      "no_progress": "Kam nicht weiter",
+      "rights_revoked": "Rechte entzogen",
+      "policy_blocked": "KI-Richtlinie",
+      "provider_refused": "Anbieter lehnt ab",
+      "error": "Fehler",
+      "cancelled": "Abgebrochen",
+      "waiting_timeout": "Keine Antwort rechtzeitig",
+      "approval_expired": "Freigabe abgelaufen",
+      "budget": "Tagesbudget"
+    },
+    "places": {
+      "dm": "Direktnachricht",
+      "channel": "Kanal",
+      "thread_page": "Seiten-Thread",
+      "thread_ticket": "Ticket-Thread"
+    },
+    "duration": {
+      "ms_one": "{{count}} ms",
+      "ms_other": "{{count}} ms",
+      "s_one": "{{count}} s",
+      "s_other": "{{count}} s",
+      "min": "{{minutes}} min {{seconds}} s",
+      "h": "{{hours}} h {{minutes}} min"
+    },
+    "filters": {
+      "state": "Zustand",
+      "stopReason": "Stopgrund",
+      "all": "Alle"
+    },
+    "list": {
+      "label": "Läufe",
+      "title": "{{agent}} · {{place}}",
+      "titleNoAgent": "{{place}} · gefragt von {{asker}}",
+      "steps_one": "{{count}} Schritt",
+      "steps_other": "{{count}} Schritte",
+      "cost": "Kosten {{cost}}"
+    },
+    "mine": {
+      "title": "Meine Läufe",
+      "description": "Was Agenten für dich getan haben oder gerade tun: aus Direktnachrichten, Erwähnungen und Tickets, die du ihnen gegeben hast.",
+      "empty": "Noch keine Läufe."
+    },
+    "agent": {
+      "title": "Läufe von {{name}}",
+      "titleUnnamed": "Läufe des Agenten",
+      "description": "Alle Läufe dieses Agenten, neueste zuerst.",
+      "empty": "Dieser Agent hatte noch keine Läufe.",
+      "open": "Läufe"
+    },
+    "page": {
+      "title": "Lauf von {{name}}",
+      "back": "Meine Läufe"
+    },
+    "header": {
+      "agent": "Agent",
+      "asker": "Gefragt von",
+      "place": "Ort",
+      "state": "Zustand",
+      "stopReason": "Stopgrund",
+      "waitUntil": "Wartet bis",
+      "started": "Begonnen",
+      "duration": "Dauer",
+      "attempts": "Versuche",
+      "attemptsValue": "{{attempts}}, {{recoveries}}",
+      "attemptsCount_one": "{{count}} Versuch",
+      "attemptsCount_other": "{{count}} Versuche",
+      "recoveriesCount_one": "{{count}} Wiederaufnahme",
+      "recoveriesCount_other": "{{count}} Wiederaufnahmen",
+      "steps": "Modellschritte",
+      "tokens": "Token",
+      "tokensValue": "{{tokensIn}} ein ({{cached}} aus dem Zwischenspeicher), {{tokensOut}} aus",
+      "cost": "Kosten",
+      "noPrice": "kein Preis hinterlegt",
+      "chain": "Übergaben",
+      "chainNone": "Keine: eine Person hat gefragt",
+      "chainDepth_one": "{{count}} Übergabe von Agent zu Agent",
+      "chainDepth_other": "{{count}} Übergaben von Agent zu Agent"
+    },
+    "timeline": {
+      "title": "Schritte",
+      "label": "Schritte des Laufs",
+      "empty": "Noch keine Schritte.",
+      "model": "Modellschritt {{step}}",
+      "tokens": "{{tokensIn}} Token ein, {{tokensOut}} aus",
+      "calls": "Ruft auf: {{tools}}",
+      "args": "Argumente",
+      "result": "Ergebnis",
+      "hidden": "Nicht für dich sichtbar.",
+      "final": "Hat das Ergebnis abgegeben.",
+      "stop": "Ende",
+      "waitingApproval": "Wartet auf eine Freigabe: {{tool}}",
+      "waitingAnswer": "Wartet auf eine Antwort auf seine Frage",
+      "approval": {
+        "rejected": "Die Freigabe wurde abgelehnt; der Schritt lief nicht.",
+        "stale": "Der Inhalt hatte sich nach der Freigabe geändert; der Schritt lief nicht."
+      },
+      "mark": {
+        "title": "Persönliches im Verlauf",
+        "text": "Der Verlauf, den der Lauf bekam, enthält Nachrichten mit dem, was die fragende Person über ihren eigenen Zugang gelesen hat. Der Lauf trägt deshalb ihre Markierung: Was er daraus schreibt, bleibt bei ihr."
+      }
+    },
+    "cancel": {
+      "open": "Lauf abbrechen",
+      "title": "Lauf abbrechen?",
+      "text": "Der Agent hört vor seinem nächsten Schritt auf. Was er schon geschrieben hat, bleibt; eine Antwort schreibt er nicht mehr.",
+      "confirm": "Ja, Lauf abbrechen",
+      "requested": "Abbruch angefordert: Der Lauf endet vor seinem nächsten Schritt."
+    },
+    "external": {
+      "title": "{{server}} · {{tool}}",
+      "badge": "Externes Werkzeug",
+      "named": "{{name}} (extern)",
+      "outcomes": {
+        "sending": "Wird an den externen Server gesendet …",
+        "unknown": "Ausgang unbekannt: Der Aufruf ging an den Server, seine Antwort wurde aber nie festgehalten (die Arbeit wurde unterbrochen). Er wurde nicht noch einmal gesendet; ob er gewirkt hat, zeigt das externe System.",
+        "not_connected": "Nicht aufgerufen: Die fragende Person hat ihren Zugang zu diesem Server nicht verbunden (unter „Meine Verbindungen“).",
+        "unavailable": "Nicht aufgerufen: Das Werkzeug ist gerade nicht freigegeben, oder sein Server ist aus.",
+        "credential_unavailable": "Nicht aufgerufen: Der Zugang des Servers lässt sich gerade nicht verwenden.",
+        "failed": "Der Server hat nicht wie erwartet geantwortet.",
+        "error": "Das Werkzeug hat einen Fehler gemeldet.",
+        "policy": "Nicht aufgerufen: Was der Lauf gelesen hat, darf laut KI-Richtlinie nicht an diesen Server gehen."
+      },
+      "personalConnector": "Der Lauf hat mit dem persönlichen Zugang der fragenden Person zu einem externen Server gelesen. Was er dabei erfahren hat, ist nur für sie: Seine Antwort steht deshalb nicht hier, wo andere mitlesen. In ihrer Direktnachricht allein mit dem Agenten antwortet er ihr; was er von dort anderswo schreiben will, legt er ihr vorher zur Freigabe vor."
+    }
+  },
+  "errors": {
+    "run": {
+      "not_found": "Diesen Lauf gibt es nicht, oder du darfst ihn nicht sehen.",
+      "finished": "Der Lauf ist schon zu Ende gegangen."
+    }
+  }
+}

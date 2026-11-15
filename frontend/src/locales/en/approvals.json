@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "approvals": "Releases",
+    "approvalsCount_one": "{{count}} release waiting",
+    "approvalsCount_other": "{{count}} releases waiting"
+  },
+  "approvals": {
+    "card": {
+      "label": "Release",
+      "title": "Release requested: {{tool}}",
+      "titleUnknown": "Release requested",
+      "openPage": "Open the affected page",
+      "openTicket": "Open ticket {{key}}",
+      "showDiff": "Show the change",
+      "hideDiff": "Hide the change",
+      "diffTooLarge": "The texts are too large to compare.",
+      "args": "The call's details",
+      "personal": "Personal: this run read what only you see through your own access, or it is in your conversation. If you release it, exactly the content below is written, and others can read it. It is no longer marked personal after that.",
+      "youDecide": "You decide.",
+      "decides": "{{name}} decides.",
+      "askerDecides": "The person who asked the agent decides.",
+      "until": "Open until {{when}}.",
+      "reason": "Reason: {{reason}}",
+      "reasonRedacted": "Only the person who was asked sees a reason.",
+      "notYours": "Only the person who asked the agent decides. Whoever may see the run sees the details.",
+      "titleExternal": "Release asked: external tool {{tool}}",
+      "externalArgs": "These arguments go to the external server exactly as shown:",
+      "externalArgsLabel": "Arguments for the external server",
+      "externalArgsHidden": "Only the person asked sees the arguments."
+    },
+    "state": {
+      "pending": "Waiting for a decision",
+      "approved": "Released",
+      "done": "Released and carried out",
+      "stale": "Stale",
+      "failed": "Not carried out",
+      "rejected": "Rejected",
+      "expired": "Expired"
+    },
+    "outcome": {
+      "approved": "Released on {{when}}. The agent carries it out shortly.",
+      "done": "Released on {{when}} and carried out.",
+      "stale": "Released on {{when}}, but not carried out: the content changed since the request. The agent may ask again.",
+      "failed": "Released on {{when}}, but not carried out: the step took too long (other work held the data) and was undone. The agent may try again.",
+      "rejected": "Rejected on {{when}}. Nothing was carried out.",
+      "expired": "Expired: nobody decided in time. Nothing was carried out."
+    },
+    "decide": {
+      "approve": "Release",
+      "reject": "Reject",
+      "reason": "Reason (optional, goes to the agent)",
+      "reasonTooLong_one": "At most {{count}} character.",
+      "reasonTooLong_other": "At most {{count}} characters.",
+      "rejectConfirm": "Reject"
+    },
+    "question": {
+      "label": "Question",
+      "title": "The agent asks",
+      "answerLabel": "Your answer",
+      "tooLong_one": "At most {{count}} character.",
+      "tooLong_other": "At most {{count}} characters.",
+      "send": "Answer",
+      "askerAnswers": "The person who asked the agent answers.",
+      "redacted": "Only the person who asked the agent sees the question.",
+      "answeredAt": "Answered on {{when}}.",
+      "yourAnswer": "Your answer: {{answer}}",
+      "expired": "Expired: nobody answered in time.",
+      "state": {
+        "pending": "Waiting for an answer",
+        "answered": "Answered",
+        "expired": "Expired"
+      }
+    },
+    "page": {
+      "title": "Releases",
+      "description": "What agents want to do on your behalf and do only once you release it.",
+      "filter": "State",
+      "pending": "Open",
+      "all": "All",
+      "empty": "No open releases.",
+      "emptyAll": "No releases yet.",
+      "list": "Releases",
+      "where": "Where:"
+    },
+    "waiting": {
+      "question": "{{name}} answers, on the card in the conversation.",
+      "approval": "Waiting for {{name}} to decide."
+    }
+  },
+  "errors": {
+    "approval": {
+      "not_found": "This release does not exist (any more), or you may not see it.",
+      "not_addressed": "Only the person who asked the agent decides.",
+      "not_permitted": "You may not (any more) do yourself what the agent wants to do, so you cannot release it either.",
+      "decided": "This release has been decided already.",
+      "expired": "This release has expired; the agent stopped waiting.",
+      "run_ended": "The run no longer waits for it (it finished or was cancelled).",
+      "version_conflict": "The release has changed meanwhile. It was reloaded."
+    },
+    "question": {
+      "not_found": "This question does not exist (any more), or you may not see it.",
+      "not_addressed": "Only the person who asked the agent answers.",
+      "answered": "This question has been answered already.",
+      "expired": "This question has expired; the agent stopped waiting.",
+      "run_ended": "The run no longer waits for the answer (it finished or was cancelled).",
+      "version_conflict": "The question has changed meanwhile. It was reloaded."
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "agents": {
+    "admin": {
+      "open": "Level, tools, skills",
+      "back": "All agents"
+    },
+    "level": {
+      "title": "Autonomy level",
+      "badge": "Level {{level}}",
+      "hint": "The level decides which tools the agent may use on its own. Below, single tools can be restricted further, never widened.",
+      "names": {
+        "1": "Level 1: read only",
+        "2": "Level 2: propose",
+        "3": "Level 3: write internally",
+        "4": "Level 4: act outside"
+      },
+      "explain": {
+        "1": "Reads pages, tickets and the conversation, and answers. Changes nothing.",
+        "2": "Reads like level 1, proposes changes to pages, comments and creates tickets. A person accepts proposals.",
+        "3": "Like level 2, writes pages directly (only in spaces that allow it), hands tickets on and writes messages in conversations it is a member of.",
+        "4": "Like level 3, and may also use writing tools of external servers. Every such call waits for the asking person to release exactly these arguments."
+      },
+      "withheld": "Only an admin gives higher levels.",
+      "save": "Save level"
+    },
+    "tools": {
+      "title": "Tools",
+      "hint": "Each tool is allowed from a level up. Here it can only be tightened: only after a person approves, or blocked altogether.",
+      "tableLabel": "Tools of the agent",
+      "tool": "Tool",
+      "effective": "In effect",
+      "entry": "Restriction",
+      "entryFor": "Grant for {{name}}",
+      "fromLevel": "from level {{level}}",
+      "unavailable": "Not available: needs level {{level}}",
+      "effects": {
+        "read": "reads",
+        "propose": "proposes",
+        "write": "writes"
+      },
+      "grants": {
+        "allow": "Allowed",
+        "confirm": "After approval",
+        "block": "Blocked"
+      },
+      "choices": {
+        "default": "As the level (allowed)",
+        "confirm": "Only after approval",
+        "block": "Blocked"
+      },
+      "save": "Save grants",
+      "names": {
+        "search": "Search",
+        "read_page": "Read a page",
+        "read_ticket": "Read a ticket",
+        "list_tree": "Look at the page tree",
+        "list_versions": "Look at versions",
+        "search_tickets": "Search tickets",
+        "read_conversation": "Read the conversation",
+        "search_past_runs": "Search earlier runs",
+        "submit_result": "Hand in a result",
+        "load_skill": "Load a skill",
+        "ask_user": "Ask a question",
+        "propose_page_change": "Propose a change to a page",
+        "propose_new_page": "Propose a new page",
+        "comment_ticket": "Comment on a ticket",
+        "set_ticket_status": "Set a ticket's status (up to “In review”)",
+        "create_ticket": "Create a ticket",
+        "link_ticket_page": "Link a ticket to a page",
+        "update_memory": "Keep its memory",
+        "propose_skill": "Propose a skill",
+        "update_page": "Change a page directly",
+        "assign_ticket": "Hand a ticket on",
+        "post_message": "Write a message"
+      },
+      "external": {
+        "group": "External tools · {{server}}",
+        "groupHint": "The agent gets granted tools only; every call sends data to this server.",
+        "unusable": "Not usable: not (or no longer) approved, or server off",
+        "leftOut": "Not in the model call",
+        "leftOutHint": "The descriptions of all of this agent's external tools together are longer than one model call takes (100,000 characters), so it does not get this tool; those listed first come first. Take other external tools away from it to make room.",
+        "alwaysReleased": "Acts outside: every call after release",
+        "needsLevel": "Takes effect from level {{level}}",
+        "choices": {
+          "off": "Not granted",
+          "allow": "Allowed",
+          "confirm": "Only after release"
+        }
+      }
+    },
+    "spaces": {
+      "title": "Spaces",
+      "hint": "The agent works here with the role shown. Members are added in a space's settings.",
+      "listLabel": "Spaces of the agent",
+      "empty": "In no space yet. It still reads open spaces."
+    },
+    "skills": {
+      "title": "Skills",
+      "hint": "In a run the agent knows each skill's name and description and loads the text when it needs it.",
+      "listLabel": "Skills of the agent",
+      "empty": "No skills yet.",
+      "assign": "Assign skills",
+      "assignTitle": "Assign skills",
+      "assignHint": "Offered are the active skills you can see.",
+      "search": "Search skills by name",
+      "noneOffered": "No matching skills.",
+      "removeNamed": "Remove skill {{name}}",
+      "unavailable": {
+        "archived": "Not available: the skill is archived.",
+        "unreachable": "Not available: the agent does not read this skill's space."
+      }
+    },
+    "personal": {
+      "title": "My agents",
+      "description": "Your own agents: they work only in your personal space, at most at level 2, with your model and on your account.",
+      "create": "New agent",
+      "createTitle": "New personal agent",
+      "createHint": "It uses your model, you are responsible, and it is a member of your personal space.",
+      "instructionsHint": "What it should do and how it answers; its personality belongs here too.",
+      "disabled": "Personal agents are switched off in this organisation (or you do not use AI). You cannot make new ones, and existing ones do not answer.",
+      "empty": "You have no agents of your own yet.",
+      "listLabel": "My agents",
+      "talk": "Open conversation",
+      "settings": "Level and tools",
+      "back": "Back to my agents",
+      "levelCap": "Personal agents work at most at level 2.",
+      "owned": "Personal: {{name}}",
+      "unknownOwner": "unknown"
+    }
+  },
+  "errors": {
+    "agent": {
+      "level_denied": "Only an admin gives levels 3 and 4.",
+      "tool_unknown": "This tool does not exist (any more). Please reload.",
+      "skill_not_assignable": "At least one skill cannot be given to this agent (unknown, or outside its spaces).",
+      "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them.",
+      "personal_disabled": "Personal agents are switched off in this organisation.",
+      "personal_limit": "You already have as many agents of your own as allowed. Delete one to make a new one.",
+      "personal_space_only": "A personal agent works only in its person's personal space.",
+      "connection_unavailable": "The agent's AI connection is off or no longer offers the model. Save the agent again so it takes the current assignment."
+    }
+  }
+}

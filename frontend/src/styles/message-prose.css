@@ -1,0 +1,28 @@
+/* A message's Markdown: the wiki's typography (`.wiki-prose`), tighter, so a chat
+   reads as lines rather than pages. Mentions stand out; one of me stands out more. */
+@layer components {
+  .message-prose {
+    line-height: 1.55;
+  }
+  .message-prose :is(p, ul, ol, blockquote, pre, table) {
+    margin: 0.25em 0;
+  }
+  .message-prose > :last-child {
+    margin-bottom: 0;
+  }
+  .message-prose :is(h1, h2, h3, h4) {
+    font-size: 1em;
+    margin: 0.4em 0 0.2em;
+  }
+  .message-prose .mention {
+    border-radius: 4px;
+    padding: 0 0.2em;
+    font-weight: 500;
+    color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 10%, transparent);
+  }
+  .message-prose .mention-me {
+    color: var(--foreground);
+    background: color-mix(in oklch, oklch(0.85 0.15 85) 55%, transparent);
+  }
+}

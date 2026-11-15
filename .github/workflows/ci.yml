@@ -1,0 +1,280 @@
+# Checks for pull requests and for pushes to main: backend, frontend, collab, the
+# browser tests (e2e), chart, image and licenses. A tag runs them once, called by the
+# release workflow before anything is published (no push trigger for tags here, so
+# nothing runs twice). A pull request's own pushes run as `pull_request` only (no branch
+# push trigger besides main). Actions are pinned by commit; Renovate keeps the pins
+# current. Only the default GITHUB_TOKEN (read) is used.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.11.32"
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      HERD_TEST_DATABASE_URL: postgresql+asyncpg://herd:herd@localhost:5433/herd_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app scripts
+      - run: uv run pytest -q
+      - name: Catalogue entries (app/mcp/catalog)
+        run: uv run python -m scripts.check_mcp_catalog
+      - name: pip-audit (runtime dependencies, hashed from uv.lock)
+        run: |
+          uv export --frozen --no-dev --no-emit-project > "$RUNNER_TEMP/runtime.txt"
+          uvx --from pip-audit==2.10.1 pip-audit --strict --disable-pip -r "$RUNNER_TEMP/runtime.txt"
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # check:api dumps the OpenAPI document from the backend app.
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: node scripts/check-i18n.mjs
+      - run: npm run check:api
+      - run: npm audit --audit-level=high
+
+  # The live-editing process (collab/): lint, its tests against a fake internal API,
+  # and the end-to-end test: the real API (role all, which starts this process) on a
+  # scratch database, two Yjs clients through the WebSocket relay.
+  collab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: collab
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: collab/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:integration
+        env:
+          HERD_IT_ADMIN_URL: postgresql://herd:herd@localhost:5433/herd_test
+      - run: npm audit --audit-level=high
+
+  # The browser tests of live editing (e2e/, Playwright): the built SPA and the real app
+  # (role all: API and collab process) on a scratch database, two browser contexts.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            collab/package-lock.json
+            e2e/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: npm ci
+        working-directory: collab
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: npx playwright test
+        working-directory: e2e
+        env:
+          HERD_E2E_ADMIN_URL: postgresql://herd:herd@localhost:5433/herd_test
+      - run: npm audit --audit-level=high
+        working-directory: e2e
+
+  chart:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CHART: deploy/helm/to-herd-cats-ai
+      KUBECONFORM_VERSION: v0.7.0
+      KUBECONFORM_SHA256: c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3
+      PROMETHEUS_VERSION: "3.16.0"
+      PROMETHEUS_SHA256: 68727009472a2c02e1ff7f062fd5b3e637285bffc8fc2d340c76fb449d6e0f34
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.19.0
+      - name: Install kubeconform and promtool (checksums from their releases)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSLo kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tgz" | sha256sum -c -
+          tar -xzf kubeconform.tgz -C bin kubeconform
+          prom="prometheus-${PROMETHEUS_VERSION}.linux-amd64"
+          curl -fsSLo prometheus.tgz "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${prom}.tar.gz"
+          echo "${PROMETHEUS_SHA256}  prometheus.tgz" | sha256sum -c -
+          tar -xzf prometheus.tgz --strip-components=1 -C bin "${prom}/promtool"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: bash deploy/helm/scripts/check-chart-version.sh
+      - run: bash deploy/helm/scripts/check-chart-rules.sh
+      - name: helm lint --strict (defaults and every ci/*-values.yaml)
+        run: |
+          helm lint --strict "$CHART"
+          for values in "$CHART"/ci/*-values.yaml; do helm lint --strict "$CHART" -f "$values"; done
+      - name: helm template | kubeconform (CRDs from the datree catalog)
+        run: |
+          schemas=(-schema-location default
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json')
+          helm template t "$CHART" | kubeconform -strict -summary "${schemas[@]}"
+          for values in "$CHART"/ci/*-values.yaml; do
+            helm template t "$CHART" -f "$values" | kubeconform -strict -summary "${schemas[@]}"
+          done
+      - run: promtool test rules "$CHART/tests/rules-test.yaml"
+
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -t to-herd-cats-ai:local .
+      # The unmodified smoke test: compose build (from the cache above), start, log
+      # in, probes, user id, published ports, a message over the live stream, tear down.
+      - run: bash deploy/compose/smoke.sh
+      # Two API nodes, a worker and collab (compose.nodes.yml) from the same image: a
+      # message posted on node A arrives on a live stream of node B.
+      - run: bash deploy/compose/smoke.sh
+        env:
+          SMOKE_NODES: "1"
+          SMOKE_SKIP_BUILD: "1"
+      - name: Trivy (HIGH and CRITICAL with a fix available fail the job)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: to-herd-cats-ai:local
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  licenses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - name: Backend runtime dependencies (uv.lock without dev)
+        run: |
+          uv export --frozen --no-dev --no-hashes --no-emit-project > "$RUNNER_TEMP/runtime.txt"
+          uv run python scripts/check_licenses.py python "$RUNNER_TEMP/runtime.txt"
+      - name: Frontend runtime dependencies (package-lock.json without dev)
+        run: uv run python scripts/check_licenses.py npm ../frontend/package-lock.json
+      - name: Collab runtime dependencies (package-lock.json without dev)
+        run: uv run python scripts/check_licenses.py npm ../collab/package-lock.json
+      - name: Browser test dependencies (e2e/package-lock.json)
+        run: uv run python scripts/check_licenses.py npm ../e2e/package-lock.json

@@ -1,0 +1,122 @@
+{
+  "messaging": {
+    "system": {
+      "proposal_created": "{{actor}} submitted a proposal.",
+      "proposal_accepted": "{{actor}} accepted a proposal.",
+      "proposal_rejected": "{{actor}} rejected a proposal.",
+      "proposal_withdrawn": "{{actor}} withdrew a proposal."
+    }
+  },
+  "spaces": {
+    "agentWrite": {
+      "title": "How agents change pages",
+      "hint": "Applies to agents whose level allows writing (level 3). Level 2 agents only ever propose.",
+      "values": {
+        "propose": "Propose",
+        "direct": "Write directly"
+      },
+      "explain": {
+        "propose": "Agents propose changes; a moderator accepts or rejects them.",
+        "direct": "Level 3 agents write pages directly. A version is always kept first; pages locked for AI stay untouched."
+      }
+    }
+  },
+  "proposals": {
+    "tab": "Proposals",
+    "tabCount_one": "{{count}} open proposal",
+    "tabCount_other": "{{count}} open proposals",
+    "title": "Proposals",
+    "hintModerator": "Changes to pages that agents proposed. You accept or reject them.",
+    "hintEditor": "Changes to pages that agents proposed. Moderators accept or reject them.",
+    "noAccess": "Proposals are seen by people who edit this space's pages.",
+    "filter": "State",
+    "states": {
+      "open": "Open",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "empty": {
+      "open": "No open proposals.",
+      "accepted": "No accepted proposals yet.",
+      "rejected": "No rejected proposals yet.",
+      "withdrawn": "No withdrawn proposals."
+    },
+    "change": "Change to “{{title}}”",
+    "newPage": "New page “{{title}}”",
+    "newPageUnder": "New page “{{title}}” under “{{parent}}”",
+    "somePage": "a page",
+    "by": "by {{name}}",
+    "unknownAuthor": "Unknown",
+    "back": "All proposals",
+    "reason": "Reason",
+    "run_one": "Made in a run ({{state}}, {{count}} step).",
+    "run_other": "Made in a run ({{state}}, {{count}} steps).",
+    "runStates": {
+      "queued": "waiting to start",
+      "running": "running",
+      "waiting": "waiting",
+      "done": "finished"
+    },
+    "outdated": "The page has changed since the proposal. Accepting shows a merge of both.",
+    "diffLabel": "Changes of the proposal",
+    "tooLarge": "The texts are too long to compare.",
+    "noChange": "The proposal does not change the content.",
+    "accept": "Accept",
+    "pageHint_one": "{{count}} open proposal for this page",
+    "pageHint_other": "{{count}} open proposals for this page",
+    "outcome": {
+      "accepted": "Accepted by {{name}} on {{when}}",
+      "rejected": "Rejected by {{name}} on {{when}}",
+      "withdrawn": "Withdrawn",
+      "reason": "Reason: {{reason}}",
+      "openPage": "Open “{{title}}”",
+      "openVersion": "Open “{{title}}” (version {{number}})"
+    },
+    "reject": {
+      "open": "Reject",
+      "title": "Reject proposal",
+      "hint": "The page stays as it is. Whoever made the proposal sees the reason.",
+      "reason": "Reason (optional)",
+      "reasonHint": "{{count}} of {{max}} characters",
+      "submit": "Reject"
+    },
+    "merge": {
+      "title": "The page has changed",
+      "hint": "The page was edited after the proposal. Check what comes together and accept the merged text.",
+      "again": "The page has changed once more. The merge was worked out again.",
+      "meanwhile": "What changed on the page since",
+      "sameVersion": "The changes are in the newest version (live editing); the merge below shows them.",
+      "tooLarge": "The texts are too long to merge here. Reject the proposal, or carry the change into the page yourself.",
+      "clean": "Proposal and page merge without a conflict.",
+      "conflicts_one": "{{count}} place was changed on both sides. Choose what holds for each.",
+      "conflicts_other": "{{count}} places were changed on both sides. Choose what holds for each.",
+      "region": "Conflict {{number}}",
+      "sides": {
+        "base": "Original",
+        "proposed": "Proposal",
+        "current": "Page now"
+      },
+      "nothing": "(nothing)",
+      "choices": {
+        "current": "Keep the page",
+        "proposed": "Take the proposal",
+        "both": "Both"
+      },
+      "text": "Merged text",
+      "textHint": "Written into the page like this. Another choice above puts the text together again.",
+      "submit": "Accept merged"
+    }
+  },
+  "errors": {
+    "proposal": {
+      "not_found": "This proposal does not exist (any more).",
+      "not_open": "This proposal has been decided already.",
+      "version_conflict": "The proposal has changed meanwhile; it was reloaded.",
+      "base_outdated": "The page has changed since the proposal.",
+      "page_trashed": "The page is in the trash now; the proposal cannot be accepted.",
+      "page_no_ai": "The page is locked for AI now; an agent's proposal cannot be accepted.",
+      "parent_gone": "The parent page is gone or in the trash."
+    }
+  }
+}

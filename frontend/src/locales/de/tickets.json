@@ -1,0 +1,343 @@
+{
+  "nav": {
+    "tickets": "Tickets",
+    "myBoard": "Mein Board"
+  },
+  "activity": {
+    "reasons": {
+      "assignment": "hat dir {{where}} zugewiesen",
+      "ticket_comment": "hat {{where}} kommentiert"
+    }
+  },
+  "tickets": {
+    "title": "Tickets",
+    "kinds": {
+      "epic": "Epic",
+      "story": "Story",
+      "task": "Aufgabe",
+      "bug": "Fehler"
+    },
+    "priorities": {
+      "urgent": "Dringend",
+      "high": "Hoch",
+      "normal": "Normal",
+      "low": "Niedrig"
+    },
+    "categories": {
+      "open": "Offen",
+      "active": "In Arbeit",
+      "review": "Zur Prüfung",
+      "done": "Erledigt",
+      "cancelled": "Verworfen"
+    },
+    "sorts": {
+      "updated": "Zuletzt geändert",
+      "due": "Fälligkeit",
+      "priority": "Priorität",
+      "number": "Neueste zuerst"
+    },
+    "sidebar": {
+      "count_one": "{{count}} offenes Ticket für dich",
+      "count_other": "{{count}} offene Tickets für dich"
+    },
+    "fields": {
+      "space": "Bereich",
+      "title": "Titel",
+      "description": "Beschreibung",
+      "markdownHint": "Markdown: **fett**, _kursiv_, Listen, Links, Code.",
+      "status": "Status",
+      "assignee": "Zugewiesen an",
+      "unassigned": "Niemand",
+      "unknownPerson": "Unbekannt",
+      "priority": "Priorität",
+      "kind": "Art",
+      "due": "Fällig am",
+      "dueOn": "Fällig {{date}}",
+      "noDue": "Kein Datum",
+      "parent": "Übergeordnet",
+      "noParent": "Keins",
+      "chooseParent": "Ändern",
+      "tags": "Tags",
+      "sprint": "Sprint",
+      "noSprint": "Kein Sprint (Vorrat)"
+    },
+    "filters": {
+      "label": "Tickets filtern",
+      "text": "Titel oder Beschreibung durchsuchen",
+      "state": "Status",
+      "unfinished": "Nicht erledigt",
+      "allStates": "Alle",
+      "space": "Bereich",
+      "allSpaces": "Alle Bereiche",
+      "any": "Alle",
+      "sort": "Sortierung"
+    },
+    "list": {
+      "views": "Ansicht",
+      "mine": "Meine Tickets",
+      "all": "Alle Tickets",
+      "mineDescription": "Was dir zugewiesen und noch nicht erledigt ist.",
+      "allDescription": "Die Tickets aller Bereiche, die du sehen darfst.",
+      "emptyMine": "Dir ist gerade nichts Offenes zugewiesen.",
+      "empty": "Keine Tickets für diese Filter."
+    },
+    "create": {
+      "open": "Neues Ticket",
+      "title": "Neues Ticket",
+      "description": "Titel genügt; alles andere lässt sich später ergänzen.",
+      "submit": "Anlegen"
+    },
+    "view": {
+      "gone": "Dieses Ticket gibt es nicht, oder du darfst es nicht sehen.",
+      "toList": "Zu den Tickets",
+      "breadcrumbs": "Wo das Ticket steht",
+      "fields": "Felder des Tickets",
+      "editTitle": "Titel ändern",
+      "editDescription": "Bearbeiten",
+      "noDescription": "Noch keine Beschreibung.",
+      "children_one": "{{count}} untergeordnetes Ticket",
+      "children_other": "{{count}} untergeordnete Tickets"
+    },
+    "progress": {
+      "label_one": "{{done}} von {{count}} erledigt",
+      "label_other": "{{done}} von {{count}} erledigt"
+    },
+    "assign": {
+      "take": "Übernehmen",
+      "release": "Abgeben",
+      "clear": "Zuweisung lösen",
+      "choose": "Jemandem zuweisen"
+    },
+    "tags": {
+      "edit": "Tags ändern",
+      "description": "Tags dieses Bereichs und systemweite Tags, höchstens 20.",
+      "none": "Keine",
+      "noneAvailable": "In diesem Bereich gibt es noch keine Tags."
+    },
+    "links": {
+      "pages": "Verknüpfte Seiten",
+      "addPage": "Seite verknüpfen",
+      "noPages": "Keine",
+      "removePage": "Verknüpfung mit „{{title}}“ lösen",
+      "tickets": "Verknüpfte Tickets",
+      "addTicket": "Ticket verknüpfen",
+      "noTickets": "Noch keine Tickets mit dieser Seite verknüpft.",
+      "unlinkTicket": "Verknüpfung mit {{key}} lösen"
+    },
+    "pick": {
+      "page": "Suche eine Seite nach ihrem Titel oder Inhalt.",
+      "ticket": "Suche ein Ticket nach Schlüssel (HC-42) oder Titel.",
+      "input": "Suchen",
+      "results": "Treffer",
+      "empty": "Nichts gefunden."
+    },
+    "discussion": {
+      "title": "Kommentare",
+      "empty": "Noch keine Kommentare zu diesem Ticket.",
+      "composer": "Kommentar schreiben"
+    },
+    "timeline": {
+      "created": "{{actor}} hat das Ticket angelegt.",
+      "status_changed": "{{actor}} hat den Status von {{from}} auf {{to}} gesetzt.",
+      "assigned": "{{actor}} hat das Ticket {{to}} zugewiesen.",
+      "unassigned": "{{actor}} hat die Zuweisung an {{from}} gelöst.",
+      "priority_changed": "{{actor}} hat die Priorität von {{from}} auf {{to}} geändert.",
+      "kind_changed": "{{actor}} hat die Art von {{from}} auf {{to}} geändert.",
+      "parent_set": "{{actor}} hat das Ticket unter {{to}} eingeordnet.",
+      "parent_removed": "{{actor}} hat das Ticket aus {{from}} herausgenommen.",
+      "due_set": "{{actor}} hat die Fälligkeit auf {{to}} gesetzt.",
+      "due_removed": "{{actor}} hat die Fälligkeit entfernt.",
+      "title_changed": "{{actor}} hat den Titel geändert.",
+      "description_changed": "{{actor}} hat die Beschreibung geändert.",
+      "page_linked": "{{actor}} hat die Seite „{{title}}“ verknüpft.",
+      "page_linked_hidden": "{{actor}} hat eine Seite verknüpft.",
+      "page_unlinked": "{{actor}} hat die Verknüpfung mit „{{title}}“ gelöst.",
+      "page_unlinked_hidden": "{{actor}} hat die Verknüpfung mit einer Seite gelöst.",
+      "unknown": "{{actor}} hat das Ticket geändert.",
+      "goneStatus": "einem gelöschten Status",
+      "sprint_set": "{{actor}} hat das Ticket in {{to}} gelegt.",
+      "sprint_moved": "{{actor}} hat das Ticket von {{from}} nach {{to}} verschoben.",
+      "sprint_removed": "{{actor}} hat das Ticket aus {{from}} in den Vorrat gelegt.",
+      "someSprint": "einem Sprint",
+      "someSprintInto": "einen Sprint",
+      "handed": "{{actor}} hat das Ticket an {{to}} übergeben."
+    },
+    "space": {
+      "views": "Ansichten des Bereichs",
+      "wiki": "Wiki",
+      "board": "Board",
+      "epics": "Epics",
+      "sprints": "Sprints",
+      "backlog": "Vorrat"
+    },
+    "board": {
+      "title": "Board",
+      "columns": "Spalten des Boards",
+      "filters": "Board filtern",
+      "onlyMine": "Nur meine",
+      "epic": "Epic",
+      "count_one": "{{count}} Ticket",
+      "count_other": "{{count}} Tickets",
+      "emptyColumn": "Keine Tickets",
+      "moveCard": "{{key}} verschieben",
+      "changeStatus": "Status von {{key}} ändern",
+      "statusMenu": "Status ändern",
+      "conflict": "Das Ticket wurde inzwischen geändert und ist wieder an seinem Platz. Das Board ist neu geladen; versuche es noch einmal.",
+      "dnd": {
+        "instructions": "Leertaste oder Enter hebt die Karte an. Pfeil links oder rechts wählt die Spalte, Leertaste oder Enter legt sie ab, Escape bricht ab.",
+        "start": "{{key}} angehoben.",
+        "over": "{{key}} über {{status}}.",
+        "outside": "{{key}} über keiner Spalte.",
+        "end": "{{key}} in {{status}} abgelegt.",
+        "cancel": "{{key}} nicht verschoben."
+      }
+    },
+    "epics": {
+      "title": "Epics",
+      "create": "Neues Epic",
+      "empty": "Noch keine Epics in diesem Bereich.",
+      "toggle": "Untergeordnete Tickets von {{key}} zeigen",
+      "noChildren": "Noch keine untergeordneten Tickets."
+    },
+    "statuses": {
+      "title": "Ticket-Status",
+      "description": "Die Spalten des Boards, in dieser Reihenfolge. Die Kategorie bestimmt, was als offen, in Arbeit oder erledigt zählt.",
+      "name": "Name",
+      "newName": "Neuer Status",
+      "category": "Kategorie",
+      "new": "Status hinzufügen",
+      "add": "Hinzufügen",
+      "nameOf": "Name von {{name}}",
+      "categoryOf": "Kategorie von {{name}}",
+      "up": "{{name}} nach oben",
+      "down": "{{name}} nach unten",
+      "delete": "{{name}} löschen",
+      "deleteTitle": "Status „{{name}}“ löschen",
+      "deleteText": "Tickets in diesem Status wechseln in den gewählten Status.",
+      "replaceWith": "Tickets wechseln nach",
+      "tooMany": "Mehr als {{count}} Status sind je Bereich nicht möglich."
+    },
+    "card": {
+      "label": "Ticket {{key}}: {{title}}"
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "Ein Sprint bündelt Tickets dieses Bereichs für einen Zeitraum. Es läuft höchstens einer zur Zeit.",
+      "create": "Neuer Sprint",
+      "empty": "Noch keine Sprints in diesem Bereich.",
+      "states": {
+        "active": "Aktiv",
+        "planned": "Geplant",
+        "closed": "Abgeschlossen"
+      },
+      "option": {
+        "active": "{{name}} (läuft)",
+        "closed": "{{name}} (abgeschlossen)"
+      },
+      "dates": "{{from}} – {{to}}",
+      "start": "{{name}} starten",
+      "startShort": "Starten",
+      "close": "{{name}} abschließen",
+      "closeShort": "Abschließen",
+      "startBlocked": "Starten geht, sobald {{name}} abgeschlossen ist.",
+      "tallyLabel": "Bilanz:",
+      "tally": "{{planned}} geplant · {{done}} erledigt · {{carried}} übertragen",
+      "toggle": "Tickets von {{name}} zeigen",
+      "noTickets": "Keine Tickets in diesem Sprint.",
+      "closedNote": "Erledigtes und Verworfenes bleibt im abgeschlossenen Sprint. Wird ein Ticket danach wieder geöffnet, geht es zurück in den Vorrat.",
+      "removeTicket": "{{key}} in den Vorrat legen",
+      "removeStale": "Das Ticket wurde inzwischen geändert und blieb im Sprint; die Liste ist neu geladen.",
+      "form": {
+        "title": "Neuer Sprint",
+        "description": "Name und Zeitraum; das Ziel in einem Satz. Der Sprint beginnt als geplant.",
+        "name": "Name",
+        "goal": "Ziel",
+        "starts": "Beginn",
+        "ends": "Ende",
+        "submit": "Anlegen"
+      },
+      "closeDialog": {
+        "title": "{{name}} abschließen",
+        "text": "Erledigte und verworfene Tickets bleiben im Sprint; die Bilanz wird festgehalten.",
+        "legend": "Wohin gehen die unerledigten Tickets?",
+        "next": "In den nächsten Sprint: {{name}}",
+        "nextMissing": "In den nächsten Sprint (keiner geplant)",
+        "backlog": "Zurück in den Vorrat",
+        "submit": "Abschließen"
+      }
+    },
+    "backlog": {
+      "title": "Vorrat",
+      "description": "Unerledigte Tickets ohne Sprint, nach Priorität.",
+      "empty": "Der Vorrat ist leer.",
+      "selection": "Auswahl für den Sprint",
+      "select": "{{key}} auswählen",
+      "selectAll": "Alle auswählen",
+      "target": "Ziel-Sprint",
+      "put": "In Sprint legen ({{n}})",
+      "noSprint": "Es gibt keinen laufenden oder geplanten Sprint. Lege zuerst einen an:",
+      "done_one": "{{count}} Ticket in {{name}} gelegt.",
+      "done_other": "{{count}} Tickets in {{name}} gelegt.",
+      "stale_one": "{{count}} Ticket wurde inzwischen geändert und blieb im Vorrat; der Vorrat ist neu geladen.",
+      "stale_other": "{{count}} Tickets wurden inzwischen geändert und blieben im Vorrat; der Vorrat ist neu geladen."
+    },
+    "myBoard": {
+      "title": "Mein Board",
+      "description": "Was dir zugewiesen ist, aus allen Bereichen, nach Kategorie. Erledigt zeigt die letzten 14 Tage.",
+      "columns": "Spalten von Mein Board",
+      "empty": "Dir ist gerade nichts zugewiesen.",
+      "changeColumn": "Spalte von {{key}} ändern",
+      "columnMenu": "Spalte wählen",
+      "categoryEmpty": "{{space}} hat keinen Status der Kategorie {{category}}. Das Ticket bleibt, wo es war."
+    },
+    "daily": {
+      "group": "Nach Person gruppieren",
+      "sprint": "Sprint",
+      "allSprints": "Alle Tickets",
+      "backlog": "Vorrat (ohne Sprint)",
+      "since": "Hervorgehoben ist, was seit {{day}} (0 Uhr UTC) den Status gewechselt hat oder neu ist.",
+      "unassigned": "Nicht zugewiesen",
+      "summary_one": "{{count}} Ticket, {{changed}} seit dem letzten Arbeitstag geändert",
+      "summary_other": "{{count}} Tickets, {{changed}} seit dem letzten Arbeitstag geändert",
+      "focus": "Nur {{name}} zeigen",
+      "focusUnassigned": "Nur nicht zugewiesene Tickets zeigen",
+      "focused": "Gefiltert auf {{name}}.",
+      "showAll": "Alle Personen zeigen",
+      "changed": "Geändert",
+      "cell": "{{person}}: {{status}}",
+      "cellChanged_one": "{{count}} geändert",
+      "cellChanged_other": "{{count}} geändert",
+      "truncated": "Mehr als 100 Personen haben hier Tickets; gezeigt werden die ersten 100 nach Namen. Grenze mit Sprint, Art oder Tag ein, um die übrigen zu sehen.",
+      "empty": "Keine Tickets für diese Auswahl."
+    }
+  },
+  "errors": {
+    "ticket": {
+      "not_found": "Dieses Ticket gibt es nicht, oder du darfst es nicht sehen.",
+      "version_conflict": "Jemand hat das Ticket inzwischen geändert.",
+      "assignee_invalid": "Diese Person kann hier keine Tickets bekommen.",
+      "status_invalid": "Diesen Status gibt es in diesem Bereich nicht.",
+      "parent_invalid": "Dieses Ticket kann hier nicht übergeordnet sein.",
+      "kind_invalid": "Diese Art passt nicht zu den über- oder untergeordneten Tickets.",
+      "too_many_pages": "Mehr als 50 Seiten lassen sich nicht verknüpfen.",
+      "sprint_invalid": "In diesen Sprint lassen sich keine Tickets legen.",
+      "category_empty": "Im Bereich dieses Tickets gibt es keinen Status dieser Kategorie."
+    },
+    "ticket_status": {
+      "not_found": "Diesen Status gibt es nicht (mehr).",
+      "name_taken": "Einen Status mit diesem Namen gibt es schon.",
+      "category_required": "Es muss immer einen offenen und einen erledigten Status geben.",
+      "in_use": "Der Status hat noch Tickets. Wähle, wohin sie wechseln.",
+      "replacement_invalid": "Dieser Ersatzstatus geht nicht.",
+      "version_conflict": "Jemand hat diesen Status inzwischen geändert."
+    },
+    "sprint": {
+      "not_found": "Diesen Sprint gibt es nicht, oder du darfst ihn nicht sehen.",
+      "version_conflict": "Jemand hat den Sprint inzwischen geändert.",
+      "active_exists": "In diesem Bereich läuft schon ein Sprint. Schließe ihn zuerst ab.",
+      "state_invalid": "In diesem Zustand des Sprints geht das nicht (mehr).",
+      "next_missing": "Es gibt keinen geplanten Sprint, in den die Tickets gehen könnten.",
+      "dates_invalid": "Das Ende liegt vor dem Beginn, oder ein Datum liegt außerhalb der Jahre 2000 bis 2100."
+    }
+  }
+}

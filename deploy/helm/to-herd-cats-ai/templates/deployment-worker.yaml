@@ -1,0 +1,115 @@
+# The worker (HERD_ROLE=worker): the outbox dispatcher (spec 4.3) and the agent runs
+# (M5, M6). It hands the events that the API writes with its changes to their handlers
+# (notifications, page timelines, live updates over NOTIFY to every API pod), and works
+# on queued agent runs, calling the AI providers of their connections (the only traffic
+# that leaves the cluster; networkPolicy.aiEgress). It serves only the internal port
+# (/health, /ready, /metrics). Several replicas are safe: they claim disjoint batches
+# and runs (FOR NO KEY UPDATE SKIP LOCKED), every handler is idempotent, and a run's
+# effects are committed with its journal. On SIGTERM the batch in progress finishes and
+# runs in progress are dropped; another worker takes them up after their lease and
+# goes on from their journal.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "herd.fullname" . }}-worker
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "herd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "herd.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        # The API's container name: the HerdNotReady alert covers the worker too.
+        - name: to-herd-cats-ai
+          image: {{ include "herd.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "herd.databaseEnv" (dict "root" . "role" "worker") | nindent 12 }}
+            {{- with .Values.tracing.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- include "herd.aiWorkerEnv" . | nindent 12 }}
+            {{- include "herd.mcpWorkerEnv" . | nindent 12 }}
+            {{- range $name, $value := .Values.worker.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.ai.existingSecret }}
+          # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          ports:
+            - name: internal
+              containerPort: 9090
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: internal
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Ready: the database answers, its schema is this release's or newer, and the
+          # dispatcher's last pass reached it.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: internal
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- include "herd.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            {{- include "herd.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "herd.volumes" . | nindent 8 }}
+---
+# The worker's internal port, for the metrics scrape only (headless: nothing else
+# connects to it). The ServiceMonitor selects it by app.kubernetes.io/endpoint.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "herd.fullname" . }}-worker
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/endpoint: internal
+spec:
+  clusterIP: None
+  selector:
+    {{- include "herd.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  ports:
+    - name: internal
+      port: 9090
+      targetPort: internal
+      protocol: TCP

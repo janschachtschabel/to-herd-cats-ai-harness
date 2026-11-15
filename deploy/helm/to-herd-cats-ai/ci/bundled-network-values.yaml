@@ -1,0 +1,8 @@
+# The bundled PostgreSQL together with NetworkPolicy and the monitoring resources.
+networkPolicy:
+  enabled: true
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true

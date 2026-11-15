@@ -1,0 +1,263 @@
+{
+  "nav": {
+    "myAutomations": "Meine Aufgaben"
+  },
+  "automations": {
+    "mine": {
+      "title": "Meine Aufgaben",
+      "description": "Was Agenten zu einer Zeit, regelmäßig oder auf Ereignisse hin für dich erledigen. Jede Aufgabe läuft mit deinen Rechten.",
+      "empty": "Du hast noch keine Aufgabe angelegt."
+    },
+    "agent": {
+      "title": "Aufgaben",
+      "description": "Die Aufgaben, die dieser Agent für Menschen der Organisation erledigt.",
+      "empty": "Dieser Agent hat keine Aufgaben."
+    },
+    "space": {
+      "tab": "Aufgaben",
+      "title": "Aufgaben in diesem Bereich",
+      "description": "Aufgaben und Ereignis-Regeln an Kanälen und Tickets des Bereichs, soweit du sie siehst.",
+      "empty": "Hier gibt es keine Aufgabe, die du siehst."
+    },
+    "create": "Neue Aufgabe",
+    "list": {
+      "label": "Aufgaben",
+      "next": "Nächster Termin",
+      "noNext": "kein weiterer Termin",
+      "onEvent": "bei jedem passenden Ereignis",
+      "afterResume": "nach dem Fortsetzen; fällig {{term}}",
+      "lastRun": "Letzter Lauf",
+      "noRun": "noch keiner",
+      "openRun": "Lauf ansehen",
+      "owner": "Gehört {{name}}",
+      "unknownAgent": "ein entfernter Agent",
+      "unknownOwner": "eine frühere Person"
+    },
+    "kinds": {
+      "once": "Einmalig",
+      "recurring": "Wiederkehrend",
+      "heartbeat": "Heartbeat",
+      "event": "Ereignis-Regel"
+    },
+    "kindHints": {
+      "once": "Einmal zu einem Zeitpunkt.",
+      "recurring": "Nach einem Zeitplan, etwa jeden Werktag um 9 Uhr.",
+      "heartbeat": "In festen Abständen innerhalb aktiver Stunden eine Checkliste durchgehen.",
+      "event": "Wenn im Bereich etwas geschieht, etwa ein Ticket angelegt wird."
+    },
+    "states": {
+      "active": "Aktiv",
+      "done": "Erledigt",
+      "paused": "Angehalten"
+    },
+    "paused": {
+      "manual": "Von Hand angehalten",
+      "owner": "Angehalten: Wer sie besitzt, darf sie nicht mehr ausführen",
+      "failing": "Angehalten: Drei Läufe in Folge kamen nicht zu Ende"
+    },
+    "place": {
+      "dm": "Direktnachricht mit {{agent}}",
+      "channel": "Kanal #{{name}}",
+      "ticket": "Ticket {{key}}",
+      "unnamed": "ein Kanal"
+    },
+    "redacted": {
+      "title": "Aufgabe für {{agent}}",
+      "instruction": "Den Auftrag und den Namen des Ortes sehen nur, wem die Aufgabe gehört, und wer den Ort lesen darf.",
+      "channel": "ein Kanal, den du nicht siehst",
+      "ticket": "ein Ticket, das du nicht siehst"
+    },
+    "schedule": {
+      "once": "Einmal am {{at}}",
+      "hourly": "Stündlich zur Minute {{minute}}",
+      "daily": "Täglich um {{time}}",
+      "weekdays": "Werktags um {{time}}",
+      "weekly": "Jeden {{day}} um {{time}}",
+      "monthly": "Monatlich am {{day}}. um {{time}}",
+      "custom": "Cron „{{cron}}“",
+      "heartbeat_one": "Jede Minute, {{days}}, {{from}}–{{until}}",
+      "heartbeat_other": "Alle {{count}} Minuten, {{days}}, {{from}}–{{until}}",
+      "event": "Bei: {{event}}",
+      "zone": "Zeitzone {{zone}}"
+    },
+    "term": {
+      "there": "dort {{time}}, {{zone}}",
+      "zone": "{{zone}}"
+    },
+    "weekdays": {
+      "1": "Montag",
+      "2": "Dienstag",
+      "3": "Mittwoch",
+      "4": "Donnerstag",
+      "5": "Freitag",
+      "6": "Samstag",
+      "7": "Sonntag"
+    },
+    "weekdaysShort": {
+      "1": "Mo",
+      "2": "Di",
+      "3": "Mi",
+      "4": "Do",
+      "5": "Fr",
+      "6": "Sa",
+      "7": "So"
+    },
+    "events": {
+      "page_published": "Seite veröffentlicht",
+      "ticket_created": "Ticket angelegt",
+      "attachment_uploaded": "Anhang hochgeladen",
+      "page_review_due": "Prüffrist einer Seite abgelaufen"
+    },
+    "outcomes": {
+      "started": "Gestartet",
+      "heartbeatOk": "Nichts zu melden (HEARTBEAT_OK, still)",
+      "skipped_busy": "Übersprungen: Der vorige Lauf arbeitete noch",
+      "skipped_paused_agent": "Übersprungen: Der Agent war angehalten oder nicht verfügbar",
+      "skipped_budget": "Übersprungen: Ein Tagesbudget war erreicht",
+      "skipped_policy": "Übersprungen: Der Ort war archiviert oder für diese KI gesperrt",
+      "skipped_off_hours": "Übersprungen: außerhalb der aktiven Stunden",
+      "skipped_depth": "Übersprungen: Die Kette war zu tief (Tiefe 3)"
+    },
+    "detail": {
+      "back": "Meine Aufgaben",
+      "instruction": "Auftrag",
+      "checklist": "Checkliste",
+      "agent": "Agent",
+      "owner": "Gehört",
+      "place": "Ort",
+      "schedule": "Zeitplan",
+      "state": "Zustand",
+      "next": "Nächster Termin",
+      "upcoming": "Die nächsten Termine",
+      "lastRun": "Letzter Lauf",
+      "quiet_one": "Ruhezeit: {{count}} Minute",
+      "quiet_other": "Ruhezeit: {{count}} Minuten",
+      "filterTag": "Nur mit Schlagwort",
+      "filterKind": "Nur Tickets der Art {{kind}}",
+      "log": "Protokoll",
+      "logLabel": "Protokoll der Termine",
+      "logEmpty": "Noch kein Termin.",
+      "due": "Termin",
+      "notFound": "Diese Aufgabe gibt es nicht, oder du darfst sie nicht sehen.",
+      "termErrors_one": "Der letzte Termin ließ sich nicht auslösen; das System versucht es später erneut.",
+      "termErrors_other": "Die letzten {{count}} Termine ließen sich nicht auslösen; das System versucht es später erneut."
+    },
+    "actions": {
+      "label": "Aktionen",
+      "edit": "Bearbeiten",
+      "pause": "Anhalten",
+      "resume": "Fortsetzen",
+      "run": "Jetzt ausführen",
+      "delete": "Löschen",
+      "takeOver": "Übernehmen",
+      "ran": "Termin ausgelöst: {{outcome}}",
+      "open": "Aufgabe ansehen"
+    },
+    "delete": {
+      "title": "Aufgabe löschen?",
+      "text": "Sie läuft dann nicht mehr. Ihre bisherigen Läufe bleiben als Verlauf erhalten; ein Lauf, der gerade arbeitet, endet wie sonst auch."
+    },
+    "takeOver": {
+      "title": "Aufgabe übernehmen?",
+      "text": "Sie gehört dann dir: Sie läuft mit deinen Rechten und in deinem Namen, ihre Läufe verbrauchen dein Budget, und Freigaben und Rückfragen gehen an dich. Eine angehaltene Aufgabe läuft wieder.",
+      "confirm": "Übernehmen",
+      "ownerUnable": "Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen; fortsetzen geht deshalb nicht. Wer sie selbst anlegen dürfte, kann sie übernehmen."
+    },
+    "form": {
+      "createTitle": "Neue Aufgabe",
+      "editTitle": "Aufgabe bearbeiten",
+      "description": "Ein Agent erledigt sie ohne Anstoß im Gespräch, mit deinen Rechten am gewählten Ort.",
+      "agent": "Agent",
+      "agentHint": "Ein Agent, den du erreichst.",
+      "place": "Ort",
+      "placeHint": "Wohin das Ergebnis geht.",
+      "places": {
+        "dm": "Meine Direktnachricht mit dem Agenten",
+        "channel": "Ein Kanal",
+        "ticket": "Ein Ticket"
+      },
+      "channel": "Kanal",
+      "channelNone": "Kanal wählen …",
+      "channelHint": "Jeder Termin eröffnet dort einen eigenen Thread. Der Agent muss Mitglied des Bereichs sein.",
+      "channelOption": "#{{name}} ({{space}})",
+      "ticket": "Ticket",
+      "ticketHint": "Etwa HC-12. Der Thread des Tickets entsteht beim Speichern, falls es ihn noch nicht gibt.",
+      "instruction": "Auftrag",
+      "instructionHint": "Was der Agent tun soll. Steht im Thread nicht im Wortlaut, sondern als „Aufgabe gestartet“.",
+      "checklist": "Checkliste",
+      "checklistHint": "Was der Agent bei jedem Termin prüft.",
+      "kind": "Art",
+      "kindFixed": "Die Art lässt sich nach dem Anlegen nicht mehr ändern.",
+      "date": "Datum",
+      "time": "Uhrzeit",
+      "preset": "Zeitplan",
+      "presets": {
+        "hourly": "Stündlich",
+        "daily": "Täglich",
+        "weekdays": "Werktags (Montag bis Freitag)",
+        "weekly": "Wöchentlich",
+        "monthly": "Monatlich",
+        "custom": "Eigener Cron-Ausdruck (Expertenfeld)"
+      },
+      "minute": "Minute",
+      "weekday": "Wochentag",
+      "monthDay": "Tag des Monats",
+      "monthDayHint": "1 bis 28, damit es den Tag in jedem Monat gibt.",
+      "cron": "Cron-Ausdruck",
+      "cronHint": "Fünf Felder: Minute, Stunde, Tag, Monat, Wochentag – in der Zeitzone der Aufgabe. Höchstens alle 15 Minuten.",
+      "zone": "Zeitzone",
+      "interval": "Abstand in Minuten",
+      "intervalHint": "15 bis 1440 Minuten.",
+      "days": "Aktive Wochentage",
+      "from": "Aktiv von",
+      "until": "Aktiv bis",
+      "hoursHint": "Liegt „bis“ vor „von“, reichen die aktiven Stunden über Mitternacht; sind beide gleich, ist der ganze Tag aktiv.",
+      "heartbeatOk": "Antwortet der Agent genau mit HEARTBEAT_OK, bleibt es still: Nichts wird zugestellt, nur das Protokoll vermerkt es.",
+      "event": "Ereignis",
+      "tag": "Nur Tickets mit Schlagwort",
+      "anyTag": "Jedes Schlagwort",
+      "ticketKind": "Nur Tickets der Art",
+      "anyKind": "Jede Art",
+      "quiet": "Ruhezeit in Minuten",
+      "quietHint": "Innerhalb der Ruhezeit startet höchstens ein Lauf; weitere Ereignisse werden gezählt und dem nächsten Lauf als Anzahl mitgegeben.",
+      "eventRights": "Der Lauf handelt mit deinen Rechten am Ort der Regel und schreibt nur in diesen Bereich.",
+      "eventSight": "Er liest nur, was ein Betrachter des Bereichs sieht. Wer das Ereignis auslöst, gewinnt dadurch keine Rechte.",
+      "preview": "Die nächsten Termine",
+      "previewHint": "In deiner Ortszeit; abweichend die Zeit in der Zeitzone der Aufgabe.",
+      "previewWaiting": "Erscheint, sobald der Zeitplan vollständig ist.",
+      "previewNone": "Kein Termin.",
+      "create": "Anlegen",
+      "errors": {
+        "agent": "Bitte einen Agenten wählen.",
+        "channel": "Bitte einen Kanal wählen.",
+        "ticket": "Bitte eine Ticketnummer angeben, etwa HC-12.",
+        "once": "Bitte Datum und Uhrzeit angeben.",
+        "interval": "Zwischen {{min}} und {{max}} Minuten.",
+        "days": "Mindestens einen Wochentag wählen.",
+        "quiet": "Zwischen {{min}} und {{max}} Minuten."
+      }
+    }
+  },
+  "errors": {
+    "automation": {
+      "not_found": "Diese Aufgabe gibt es nicht, oder du darfst sie nicht sehen.",
+      "version_conflict": "Jemand hat diese Aufgabe inzwischen geändert.",
+      "not_allowed": "Das darfst du bei dieser Aufgabe nicht.",
+      "not_active": "Die Aufgabe ist nicht aktiv.",
+      "not_paused": "Die Aufgabe ist nicht angehalten.",
+      "owner_unable": "Wer diese Aufgabe besitzt, darf sie nicht mehr ausführen. Wer sie selbst anlegen dürfte, kann sie übernehmen.",
+      "not_runnable": "Eine Ereignis-Regel läuft nur auf ein Ereignis hin.",
+      "limit": "Du hast schon so viele Aufgaben, wie erlaubt sind. Lösche eine, bevor du eine neue anlegst.",
+      "kind_immutable": "Die Art einer Aufgabe lässt sich nicht ändern.",
+      "invalid_place": "An diesem Ort geht das nicht: Ereignis-Regeln brauchen einen Kanal oder ein Ticket eines Bereichs.",
+      "agent_not_member": "Der Agent ist kein Mitglied des Bereichs dieses Orts.",
+      "invalid_filter": "Dieser Filter passt nicht: Schlagwort und Art gibt es nur bei „Ticket angelegt“, und das Schlagwort muss zum Bereich gehören.",
+      "in_the_past": "Dieser Zeitpunkt liegt in der Vergangenheit.",
+      "too_frequent": "Zu häufig: Zwischen zwei Terminen müssen mindestens 15 Minuten liegen.",
+      "invalid_cron": "Diesen Cron-Ausdruck verstehen wir nicht. Er braucht fünf Felder.",
+      "invalid_time_zone": "Diese Zeitzone ist unbekannt.",
+      "invalid_interval": "Der Abstand muss zwischen 15 und 1440 Minuten liegen.",
+      "invalid_hours": "Diese aktiven Stunden passen nicht."
+    }
+  }
+}

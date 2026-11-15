@@ -1,0 +1,146 @@
+# GitLab's MCP server (plan M8 task 9), on GitLab.com and on self-managed/Dedicated
+# instances (`base_url`). Checked on 2026-11-15 against:
+# - https://docs.gitlab.com/user/model_context_protocol/mcp_server/ (endpoint
+#   <instance>/api/v4/mcp, HTTP transport, OAuth 2.0 with the `mcp` scope, dynamic
+#   client registration or a pre-registered non-confidential application, fine-grained
+#   personal access tokens; legacy, project and group access tokens are refused with
+#   403 insufficient_scope; toolsets through the X-Gitlab-Enabled-Mcp-Server-Toolsets
+#   header; generally available since GitLab 19.5)
+# - https://docs.gitlab.com/user/model_context_protocol/mcp_server_tools/ (tool names)
+# - live, gitlab.com: POST /api/v4/mcp answers 401 with
+#   `WWW-Authenticate: Bearer realm="GitLab", scope="mcp", resource_metadata=...`;
+#   /.well-known/oauth-protected-resource/api/v4/mcp names resource
+#   https://gitlab.com/api/v4/mcp and authorization server https://gitlab.com;
+#   /.well-known/oauth-authorization-server names /oauth/authorize, /oauth/token,
+#   /oauth/revoke, PKCE plain and S256, client_secret_basic and client_secret_post.
+# NOT verified from here:
+# - the header form a fine-grained personal access token takes at /api/v4/mcp (GitLab's
+#   REST API takes `Authorization: Bearer` and `PRIVATE-TOKEN`; bearer is offered);
+# - a self-managed instance below a path (https://host/gitlab) is assumed to serve the
+#   same paths below that base URL;
+# - tools whose description the docs leave out (marked * there) are classified by name.
+# A self-managed instance on a private network needs its host in HERD_MCP_ALLOWED_HOSTS.
+id: gitlab
+name: GitLab
+description:
+  de: >-
+    Der MCP-Server von GitLab (GitLab.com oder eine eigene Instanz): Projekte, Issues und
+    Work Items, Merge Requests, Repository und CI. Anmeldung mit OAuth (Scope `mcp`) oder
+    einem fein granularen persönlichen Zugriffstoken.
+  en: >-
+    GitLab's MCP server (GitLab.com or your own instance): projects, issues and work
+    items, merge requests, repository and CI. Sign in with OAuth (scope `mcp`) or a
+    fine-grained personal access token.
+base_url:
+  default: https://gitlab.com
+  note:
+    de: >-
+      Für eine eigene Instanz deren Adresse, etwa https://gitlab.example.com. Liegt sie
+      im Firmennetz, muss der Betrieb den Host in HERD_MCP_ALLOWED_HOSTS freigeben.
+    en: >-
+      For your own instance its address, e.g. https://gitlab.example.com. On a company
+      network, the operator must list the host in HERD_MCP_ALLOWED_HOSTS.
+url: "{base_url}/api/v4/mcp"
+data_location: external
+connector_scopes: [personal, shared]
+auth:
+  - kind: oauth
+    oauth:
+      authorization_endpoint: "{base_url}/oauth/authorize"
+      token_endpoint: "{base_url}/oauth/token"
+      revocation_endpoint: "{base_url}/oauth/revoke"
+      scopes: mcp
+      resource: true
+      token_auth: client_secret_post
+    note:
+      de: >-
+        In GitLab eine Anwendung mit dem Scope `mcp` anlegen, „Confidential“ abwählen
+        (dann ohne Client-Geheimnis, nur PKCE); Callback-URL ist
+        <HERD_PUBLIC_URL>/api/ai/oauth/callback.
+      en: >-
+        Create an application in GitLab with the `mcp` scope and clear "Confidential"
+        (then without a client secret, PKCE only); the callback URL is
+        <HERD_PUBLIC_URL>/api/ai/oauth/callback.
+  - kind: bearer
+    note:
+      de: >-
+        Fein granulares persönliches Zugriffstoken mit der Ressource „MCP tool“ und dem
+        Recht „Execute“; klassische Token lehnt der Server ab.
+      en: >-
+        A fine-grained personal access token with the "MCP tool" resource and the
+        "Execute" permission; legacy tokens are refused by the server.
+tools:
+  # meta
+  get_mcp_server_version: read
+  # core
+  get_project: read
+  save_project: write
+  get_user: read
+  list_groups: read
+  list_projects: read
+  list_project_members: read
+  list_todos: read
+  list_user_events: read
+  save_note: write
+  search: read
+  search_labels: read
+  semantic_search: read
+  get_pages_content: read
+  # merge requests
+  save_merge_request: write
+  get_merge_request: read
+  list_merge_requests: read
+  get_merge_request_commits: read
+  get_merge_request_diffs: read
+  get_merge_request_pipelines: read
+  get_merge_request_conflicts: read
+  get_merge_request_notes: read
+  save_merge_request_review: write
+  accept_merge_request: write
+  # work items
+  get_work_item: read
+  get_workitem_notes: read
+  get_work_item_types: read
+  link_work_items: write
+  get_saved_view_work_items: read
+  list_work_item_saved_views: read
+  save_work_item: write
+  list_work_items: read
+  create_issue: write
+  get_issue: read
+  # repository
+  add_branch: write
+  fork_repository: write
+  list_branches: read
+  get_repository_file: read
+  list_repository_tree: read
+  get_commit: read
+  list_commits: read
+  list_releases: read
+  list_tags: read
+  add_commit: write
+  # ci
+  get_pipeline: read
+  get_pipeline_jobs: read
+  get_job: read
+  get_artifact_file: read
+  list_pipelines: read
+  list_pipeline_schedules: read
+  save_pipeline: write
+  manage_pipeline: write
+  # duo agent platform
+  list_duo_agents_and_flows: read
+  start_duo_session: write
+  list_duo_sessions: read
+  get_duo_session: read
+  send_duo_session_input: write
+  # wikis
+  list_wiki_pages: read
+  # code security
+  list_vulnerabilities: read
+  get_vulnerability: read
+  save_vulnerability: write
+  attach_scan_profile: write
+docs:
+  - https://docs.gitlab.com/user/model_context_protocol/mcp_server/
+  - https://docs.gitlab.com/user/model_context_protocol/mcp_server_tools/

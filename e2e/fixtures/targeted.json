@@ -1,0 +1,170 @@
+[
+  {
+    "name": "first: \"# README.md\"",
+    "md": "# README.md\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# Deployment auf example.com\"",
+    "md": "# Deployment auf example.com\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Kontakt: firma.de\"",
+    "md": "Kontakt: firma.de\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# app.py\"",
+    "md": "# app.py\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Siehe config.yaml\"",
+    "md": "Siehe config.yaml\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# Notizen zu main.rs\"",
+    "md": "# Notizen zu main.rs\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Lies zuerst INSTALL.txt\"",
+    "md": "Lies zuerst INSTALL.txt\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# setup.sh\"",
+    "md": "# setup.sh\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Mail an anna@example.org\"",
+    "md": "Mail an anna@example.org\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# index.html\"",
+    "md": "# index.html\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# v1.2.3\"",
+    "md": "# v1.2.3\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Stand: 12.11.2026\"",
+    "md": "Stand: 12.11.2026\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# docs/WIKI.md\"",
+    "md": "# docs/WIKI.md\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# to-herd-cats.ai\"",
+    "md": "# to-herd-cats.ai\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Unser Shop: shop.example.org/produkte\"",
+    "md": "Unser Shop: shop.example.org/produkte\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# Node.js\"",
+    "md": "# Node.js\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# ASP.NET\"",
+    "md": "# ASP.NET\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Mehr auf (example.com)\"",
+    "md": "Mehr auf (example.com)\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# Readme.MD\"",
+    "md": "# Readme.MD\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"- punkt.de\\n- zwei\"",
+    "md": "- punkt.de\n- zwei\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"> zitat.com\"",
+    "md": "> zitat.com\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"`code.com`\"",
+    "md": "`code.com`\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"**fett.com**\"",
+    "md": "**fett.com**\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"[link.com](http://x.y)\"",
+    "md": "[link.com](http://x.y)\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Ende mit Punkt example.com.\"",
+    "md": "Ende mit Punkt example.com.\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"Zwei Zeilen\\nzweite.com\"",
+    "md": "Zwei Zeilen\nzweite.com\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# Titel\\n\\nZweiter Block endet mit example.com\"",
+    "md": "# Titel\n\nZweiter Block endet mit example.com\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "table: \"| a | b |\\n|---|---|\\n| `x|y` | 2 |\"",
+    "md": "Text\n\n| a | b |\n|---|---|\n| `x|y` | 2 |\n"
+  },
+  {
+    "name": "table: \"| Befehl | Bedeutung |\\n|---|---|\\n| `a || b` | oder |\"",
+    "md": "Text\n\n| Befehl | Bedeutung |\n|---|---|\n| `a || b` | oder |\n"
+  },
+  {
+    "name": "table: \"| a | b |\\n|---|---|\\n| 1 |\"",
+    "md": "Text\n\n| a | b |\n|---|---|\n| 1 |\n"
+  },
+  {
+    "name": "table: \"| a | b |\\n|---|---|\\n| 1 | 2 | 3 |\"",
+    "md": "Text\n\n| a | b |\n|---|---|\n| 1 | 2 | 3 |\n"
+  },
+  {
+    "name": "table: \"| a | b |\\n|---|---|\\n| 1 | 2 |\\nText direkt danach\"",
+    "md": "Text\n\n| a | b |\n|---|---|\n| 1 | 2 |\nText direkt danach\n"
+  },
+  {
+    "name": "table: \"| a | b |\\n|---|---|\\n| 1 | 2 |\\n\\nmit Leerzeile\"",
+    "md": "Text\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nmit Leerzeile\n"
+  },
+  {
+    "name": "table: \"a | b\\n--|--\\n1 | 2\"",
+    "md": "Text\n\na | b\n--|--\n1 | 2\n"
+  },
+  {
+    "name": "table: \"| Regex | Was |\\n|---|---|\\n| a\\\\|b | ok |\"",
+    "md": "Text\n\n| Regex | Was |\n|---|---|\n| a\\|b | ok |\n"
+  },
+  {
+    "name": "table: \"|a|\\n|-|\\n|1|2|\\n|3|\"",
+    "md": "Text\n\n|a|\n|-|\n|1|2|\n|3|\n"
+  },
+  {
+    "name": "data image",
+    "md": "Bild ![x](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==) im Text\n"
+  },
+  {
+    "name": "brief: rulings on module-review-2.md",
+    "md": "# M2 fix wave 2 — rulings on module-review-2.md\n\nFix S1–S12 from `.superpowers/sdd/m2/module-review-2.md` (read it fully).\n"
+  },
+  {
+    "name": "first: \"# docker-compose.md\"",
+    "md": "# docker-compose.md\n\nZweiter Absatz.\n"
+  },
+  {
+    "name": "first: \"# config.py\"",
+    "md": "# config.py\n\n| a | b |\n|---|---|\n| 1 |\n"
+  },
+  {
+    "name": "table: aligned columns, short and long rows",
+    "md": "| Name | Wert | Einheit |\n| :-- | --: | :-: |\n| a | 1 |\n| b | 2 | kg | extra |\n"
+  },
+  {
+    "name": "table: header only",
+    "md": "| a | b |\n|---|---|\n"
+  }
+]

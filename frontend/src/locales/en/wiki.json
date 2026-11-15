@@ -1,0 +1,348 @@
+{
+  "activity": {
+    "proposalWhere": "a space (a new page)",
+    "reasons": {
+      "proposal": "submitted or decided a proposal for a page ({{where}})"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "description": "Searches every page and message you may read. Arrow keys choose, Enter opens.",
+    "input": "Search term",
+    "placeholder": "Search pages and messages …",
+    "hint": "Type a term to find pages, messages and tickets.",
+    "empty": "No results.",
+    "results": "Results",
+    "onlyHere": "Only in this space",
+    "shortcut": "Ctrl K"
+  },
+  "wiki": {
+    "space": {
+      "settings": "Members"
+    },
+    "tree": {
+      "title": "Pages",
+      "empty": "No pages yet.",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    },
+    "home": {
+      "title": "Pages in this space",
+      "empty": "This space has no pages yet.",
+      "emptyCreate": "This space has no pages yet. Create the first one.",
+      "createFirst": "Create the first page",
+      "children_one": "{{count}} subpage",
+      "children_other": "{{count}} subpages"
+    },
+    "fields": {
+      "title": "Title",
+      "parent": "Parent page"
+    },
+    "parent": {
+      "top": "None (top level)"
+    },
+    "create": {
+      "open": "New page",
+      "title": "New page",
+      "description": "The page starts as a draft; once published, every reader of the space sees it.",
+      "submit": "Create"
+    },
+    "page": {
+      "draft": "Draft",
+      "empty": "This page has no content yet.",
+      "notFound": "This page does not exist (any more).",
+      "breadcrumbs": "Page path",
+      "toc": "Contents",
+      "updated": "Last changed {{when}}"
+    },
+    "links": {
+      "missing": "This page does not exist yet.",
+      "create": "create",
+      "createNamed": "Create page “{{title}}”"
+    },
+    "actions": {
+      "edit": "Edit",
+      "live": "Edit together",
+      "publish": "Publish",
+      "more": "More actions",
+      "versions": "Versions",
+      "exportPage": "Download as Markdown",
+      "createChild": "Create subpage",
+      "rename": "Rename",
+      "move": "Move",
+      "trash": "Move to trash"
+    },
+    "conflict": {
+      "reloaded": "Someone changed the page in the meantime. The current version is loaded – check it and try again."
+    },
+    "rename": {
+      "title": "Rename page"
+    },
+    "move": {
+      "title": "Move page",
+      "description": "Where should “{{title}}” go? Subpages move along.",
+      "position": "Position",
+      "first": "At the start",
+      "after": "After “{{title}}”",
+      "submit": "Move"
+    },
+    "tags": {
+      "title": "Page tags",
+      "description": "Tags apply to the whole organisation or only to this space.",
+      "none": "There are no tags yet.",
+      "new": "New tag",
+      "newName": "Name of the new tag",
+      "add": "Add",
+      "edit": "Edit tags",
+      "list": "Tags"
+    },
+    "tagFilter": {
+      "label": "Filter by tag",
+      "all": "All pages",
+      "clear": "Clear filter",
+      "empty": "No page carries this tag.",
+      "treeLabel": "Pages tagged “{{name}}”",
+      "treeLabelAny": "Pages with the chosen tag",
+      "showTagged": "Pages tagged “{{name}}”"
+    },
+    "editor": {
+      "title": "Edit page",
+      "markdown": "Markdown",
+      "hint": "Save with Ctrl+S. Links to other pages: [[Title]].",
+      "preview": "Preview",
+      "summary": "What did you change? (optional)",
+      "leaveConfirm": "Your changes are not saved. Leave anyway?",
+      "conflictTitle": "The page was changed in the meantime",
+      "conflictText": "Someone saved the page while you were editing it. Keep your version to put it on top of the current one and save again; discard it to see the current version.",
+      "keepMine": "Keep my version",
+      "discardMine": "Discard my changes",
+      "rebased": "The current version is loaded; your text is kept. Saving overwrites the other person's change."
+    },
+    "versions": {
+      "title": "Versions of “{{title}}”",
+      "caption": "Versions of the page, newest first",
+      "back": "Back to the page",
+      "from": "From",
+      "to": "To",
+      "fromNamed": "Version {{number}} as the base",
+      "toNamed": "Version {{number}} to compare",
+      "version": "Version",
+      "who": "By whom, when",
+      "actions": "Actions",
+      "number": "Version {{number}}",
+      "unknownAuthor": "Unknown",
+      "source": {
+        "human": "Edited",
+        "import": "Imported",
+        "restore": "Restored",
+        "collab": "Live",
+        "agent": "By an agent",
+        "mcp": "Via MCP"
+      },
+      "kind": {
+        "insert": "added:",
+        "delete": "removed:",
+        "equal": ""
+      },
+      "pickTwo": "Choose two different versions to compare them.",
+      "diffLabel": "Differences from version {{from}} to version {{to}}",
+      "titleChanged": "Title: “{{from}}” → “{{to}}”",
+      "noChanges": "No difference in the content.",
+      "restore": "Restore",
+      "restoreNamed": "Restore version {{number}}",
+      "restoreTitle": "Restore this version?",
+      "restoreText": "The content of version {{number}} is saved as a new version. A live editing session on the page ends.",
+      "label": "Name",
+      "labelHint": "Leave empty to remove the name.",
+      "labelNamed": "Name version {{number}}",
+      "labelTitle": "Name version {{number}}"
+    },
+    "trash": {
+      "open": "Trash",
+      "title": "Trash",
+      "description": "Pages in the trash are hidden from everyone until they are restored.",
+      "empty": "The trash is empty.",
+      "trashedAt": "deleted {{when}}",
+      "restore": "Restore",
+      "restoreNamed": "Restore “{{title}}”",
+      "purge": "Delete for good",
+      "purgeNamed": "Delete “{{title}}” for good",
+      "purgeTitle": "Delete for good?",
+      "purgeText": "“{{title}}” is deleted with all subpages, versions and attachments. This cannot be undone.",
+      "confirmTitle": "Move to the trash?",
+      "confirmText": "“{{title}}” and all its subpages go to the trash. Moderators can restore them."
+    },
+    "attachments": {
+      "title": "Attachments",
+      "empty": "No attachments.",
+      "upload": "Upload file",
+      "uploading": "Uploading …",
+      "copyNamed": "Copy Markdown for {{name}}",
+      "copied": "Copied",
+      "deleteNamed": "Delete {{name}}",
+      "deleteTitle": "Delete the attachment?",
+      "deleteText": "“{{name}}” is deleted. Links to it stop working."
+    },
+    "transfer": {
+      "menu": "Import/Export",
+      "export": "Export space (ZIP)",
+      "import": "Import Markdown …",
+      "importTitle": "Import Markdown",
+      "importDescription": "A ZIP of Markdown files (folders become subpages, attachments under _attachments/). Existing pages stay unchanged.",
+      "file": "ZIP file",
+      "importSubmit": "Import",
+      "importing": "Importing …",
+      "created_one": "{{count}} page created.",
+      "created_other": "{{count}} pages created.",
+      "attachments_one": "{{count}} attachment taken over.",
+      "attachments_other": "{{count}} attachments taken over.",
+      "skipped_one": "{{count}} entry skipped:",
+      "skipped_other": "{{count}} entries skipped:",
+      "reasons": {
+        "unsafe_path": "unsafe path",
+        "not_markdown": "not a Markdown file",
+        "exists": "page exists already",
+        "duplicate": "twice in the archive",
+        "too_deep": "nested too deeply",
+        "too_large": "too large",
+        "invalid_text": "not valid UTF-8 text",
+        "unreadable": "unreadable",
+        "no_page": "no matching page",
+        "type_not_allowed": "file type not allowed",
+        "type_mismatch": "extension does not match the content",
+        "filename_invalid": "invalid file name",
+        "invalid_manifest": "invalid attachment list"
+      }
+    },
+    "live": {
+      "toolbar": "Formatting",
+      "label": "Content of “{{title}}”",
+      "present": "Also on the page",
+      "alone": "Nobody else is here right now.",
+      "done": "Done",
+      "hint": "Changes are saved automatically (within 10 seconds at most) and appear for everyone editing the page right now.",
+      "notSaved": "Your latest changes are not saved yet. Please try again in a moment.",
+      "unsaveable": {
+        "markdown": "The current state cannot be saved as Markdown like this: as Markdown it would read differently from what is shown here.",
+        "example": {
+          "tableCode": "The cause is code with a backslash in a table cell: a backslash right before | cannot be written as Markdown there.",
+          "address": "The cause is an address or e-mail address the page would link differently from how it stands here (for example two e-mail addresses joined by +).",
+          "list": "The cause is a list Markdown would read as something else (for example empty nested items read as a rule)."
+        },
+        "reopen": "The current state cannot be saved as Markdown like this: the live editor could not open the Markdown again unchanged.",
+        "structure": "The current state cannot be saved as Markdown like this: its structure is not valid for the editor.",
+        "unknown": "The current state cannot be saved as Markdown like this.",
+        "timeout": "The current state was not saved: checking it took too long. The page is too heavy for live editing; edit it in the Markdown editor.",
+        "tooLarge": "The current state is too large for live editing: the page's tables hold more than {{cells}} table cells in all. Take rows out, or edit the page in the Markdown editor.",
+        "where": "It concerns block {{number}} (“{{start}}”).",
+        "whereEmpty": "It concerns block {{number}}.",
+        "wherePair": "It concerns blocks {{number}} and {{next}}, which cannot be saved together (“{{start}}” …).",
+        "wherePairEmpty": "It concerns blocks {{number}} and {{next}}, which cannot be saved together.",
+        "rest": "The latest changes stay unsaved until it is changed; the session goes on."
+      },
+      "leaveConfirm": {
+        "unconfirmed": "The server has not yet confirmed that your latest changes are saved. Leave anyway? They may be lost.",
+        "unsent": "Your latest changes have not reached the server yet (the connection is interrupted). Leave anyway? They will be lost.",
+        "unsaveable": "The current state cannot be saved (see the notice). Leave anyway? The changes since the last save will be lost.",
+        "lost": "Your text is not saved. Copy it as Markdown first. Leave anyway?"
+      },
+      "regenerated": "The page was changed outside the live session (saved, restored or moved). The current version is loaded.",
+      "copy": "Copy my text as Markdown",
+      "copied": "Copied",
+      "reload": "Reload",
+      "markdownEditor": "Edit in the Markdown editor",
+      "status": {
+        "connecting": "Connecting …",
+        "synced": "Synchronised",
+        "saving": "Saving …",
+        "offline": "Disconnected – retrying …",
+        "stopped": "Ended"
+      },
+      "stop": {
+        "unauthorized": "Your session has expired. Please log in again.",
+        "forbidden": "You may not edit this page. The text is read-only.",
+        "not_found": "This page is no longer visible (moved, deleted or rights changed).",
+        "too_large": "The page is too large or too heavy for live editing (at most {{cells}} table cells and 200,000 characters, and checking it must not take too long). Edit it in the Markdown editor.",
+        "off": "Live editing is turned off on this server.",
+        "invalid": "The live session has ended.",
+        "connection_limit": "You have too many live connections open (at most 3 per page and 10 in all per sign-in). Close other windows with this page and reload.",
+        "not_roundtrip_safe": "This page contains Markdown that the live editor cannot edit without changing it. To keep its meaning intact, edit it in the Markdown editor.",
+        "invalid_content": "The live editor cannot show the shared state of this page. So that nothing is lost, the session was ended without saving anything. Edit the page in the Markdown editor.",
+        "server_error": "The live connection to this page keeps failing with a server error while loading. Edit the page in the Markdown editor or try again later.",
+        "busy": "The live editor is busy right now: many large pages are open live already. Try again shortly (Reload), or edit the page in the Markdown editor."
+      },
+      "tools": {
+        "bold": "Bold",
+        "italic": "Italic",
+        "strike": "Strikethrough",
+        "code": "Code",
+        "h1": "Heading 1",
+        "h2": "Heading 2",
+        "h3": "Heading 3",
+        "bulletList": "Bullet list",
+        "orderedList": "Numbered list",
+        "taskList": "Task list",
+        "quote": "Quote",
+        "codeBlock": "Code block",
+        "rule": "Divider",
+        "unlink": "Remove link"
+      }
+    },
+    "memory": {
+      "mark": "Kept by agents",
+      "note": "An agent keeps this page as its memory for this space and reads it at the start of every run. You can correct it like any other page."
+    },
+    "review": {
+      "due": "Review due",
+      "last": "Last reviewed on {{date}}.",
+      "never": "Never reviewed.",
+      "interval_one": "The space asks for a review every day.",
+      "interval_other": "The space asks for a review every {{count}} days.",
+      "mark": "Mark as reviewed",
+      "filter": "Only pages whose review is due",
+      "empty": "No page is due for review.",
+      "emptyTagged": "No page with this tag is due for review.",
+      "treeLabel": "Pages whose review is due",
+      "treeLabelTagged": "Pages tagged “{{name}}” whose review is due"
+    }
+  },
+  "errors": {
+    "tooLarge": "That is too large.",
+    "unsupportedType": "This kind of file is not accepted.",
+    "request": {
+      "too_large": "That is too large for one request."
+    },
+    "page": {
+      "not_found": "This page does not exist (any more).",
+      "version_conflict": "Someone changed the page in the meantime.",
+      "already_published": "The page is already published.",
+      "parent_draft": "The parent page is still a draft. Publish it first.",
+      "parent_not_found": "The parent page does not exist (any more).",
+      "too_deep": "Pages cannot be nested this deeply.",
+      "move_other_space": "Pages cannot move to another space.",
+      "move_cycle": "A page cannot move below itself or its subpages.",
+      "path_taken": "There already is a page of this name there.",
+      "not_trashed": "The page is not in the trash.",
+      "version_not_found": "This version does not exist.",
+      "diff_too_large": "The versions are too long to compare.",
+      "not_published": "Only published pages are reviewed."
+    },
+    "tags": {
+      "not_found": "This tag does not exist.",
+      "name_taken": "A tag of this name exists already.",
+      "version_conflict": "Someone changed this tag in the meantime.",
+      "wrong_space": "This tag belongs to another space."
+    },
+    "attachment": {
+      "not_found": "This attachment does not exist (any more).",
+      "too_large": "The file is too large.",
+      "type_not_allowed": "This kind of file is not allowed as an attachment.",
+      "type_mismatch": "The file extension does not match the file's content.",
+      "filename_invalid": "The file name is invalid."
+    },
+    "import": {
+      "too_large": "The archive is too large or holds too many files.",
+      "invalid_zip": "This is not a valid ZIP file."
+    }
+  }
+}

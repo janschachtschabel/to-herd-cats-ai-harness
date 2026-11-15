@@ -1,0 +1,92 @@
+# Reference deployment: PostgreSQL and the app in one container (HERD_ROLE=all:
+# migrate, then serve, with the worker (outbox: notifications, page timelines, live
+# updates) in the same process and the live-editing process as a child on 127.0.0.1;
+# that child keeps its live documents under HERD_COLLAB_MEMORY_BUDGET_MB, 400 by
+# default, and needs up to about 800 MB with it, docs/WIKI.md. If the child dies, the
+# app exits and `restart: unless-stopped` starts it again).
+# compose.nodes.yml runs the roles in separate containers instead (two API nodes).
+# Secrets come from .env next to this file (see .env.example), the AI keys from the
+# optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
+# 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
+# the collab port stay inside. Attachments live on the volume app-data (/data).
+name: to-herd-cats-ai
+
+services:
+  db:
+    image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+    environment:
+      POSTGRES_USER: herd
+      POSTGRES_DB: herd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U herd -d herd"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HERD_ROLE: all
+      # The password is kept out of the URL; the app merges it in (escaped).
+      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
+      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      # Shared by the API and the collab process (live editing); at least 32 characters.
+      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+      # The address browsers use, e.g. https://wiki.example; WebSocket Origins must
+      # match it. Empty: they must match the host the request came to.
+      HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+      HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
+      HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+      # AI and agents (docs/AGENTEN.md): test call timeout, personal agents and
+      # automations per person, hours a run waits for a release or an answer, runs at
+      # once, a run's lease.
+      HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
+      HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
+      HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}
+      HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
+      HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
+      HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
+      # MCP (docs/MCP.md): calls per access token and minute; private hosts (names or
+      # CIDR, comma separated) external MCP servers may run on (empty: none); the
+      # directory, inside the container, of the operator's own catalogue entries
+      # (mount it read-only, e.g. in compose.override.yml; empty: the shipped ones);
+      # calls one agent run may send to external MCP servers.
+      HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
+      HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
+      HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
+      HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
+    # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
+    # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
+    # default would hide them.
+    env_file:
+      - path: ai.env
+        required: false
+    ports:
+      - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - app-data:/data
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  app-data:
