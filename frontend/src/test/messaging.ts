@@ -20,6 +20,7 @@ export function makeConversation(overrides: Partial<Conversation> = {}): Convers
     can_post: true,
     participants: [],
     inspections: [],
+    fresh_start_at: null,
     ...overrides,
   }
 }

@@ -585,6 +585,28 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,
   hält sich die Marke in einer laufenden Direktnachricht, solange markierte Antworten
   im Verlaufsfenster stehen (24.000 Zeichen, die neuesten zuerst).
+  Das ist so gewollt: Nichts nimmt die Marke von selbst wieder ab (keine Heuristik).
+  Der Ausweg ist ihre ausdrückliche Entscheidung (Review M8 3, Befund H2).
+- **„Neu beginnen“**: In ihrer Direktnachricht allein mit dem Agenten (eine Person, ein
+  Agent) steht oben im Gespräch „Neu beginnen“. Nach einer Rückfrage, die sagt, was es
+  bewirkt, setzt es einen Schnitt (`conversation.fresh_start_at`): Läufe danach bekommen
+  keinen Verlauf von vor dem Schnitt, weder im Verlaufsfenster noch über
+  `read_conversation`; ohne Markiertes im Kontext beginnen sie ohne Marke. Offene Läufe
+  des Gesprächs (wartend, laufend, auf Freigabe oder Antwort wartend; nicht die einer
+  Automation) werden vorher abgebrochen, damit keiner, der mit dem alten Verlauf
+  begonnen hat, nach dem Schnitt antwortet. Die Nachrichten davor bleiben, wie sie sind,
+  markierte auch, und sie sieht sie weiter; im Gespräch zeigt eine Linie „Neu begonnen am
+  …“, wo der Schnitt liegt. Das Abzeichen „Persönlich“ und die Freigabekarte unter der
+  Marke nennen diesen Weg. Frühere markierte Läufe bleiben markiert: Ein Treffer von
+  `search_past_runs` aus einem von ihnen markiert auch nach dem Schnitt.
+  API: `POST /api/conversations/{id}/fresh-start` mit `{"version": n}` (die gelesene
+  Version des Gesprächs) → das Gespräch mit `fresh_start_at` und neuer Version. Wer das
+  Gespräch nicht sieht, bekommt 404 `conversation.not_found`; in jedem anderen Gespräch
+  (Kanal, Thread, Direktnachricht mit mehreren oder mit einer Person) 403
+  `conversation.not_alone_with_agent`; eine veraltete Version 409
+  `conversation.version_conflict`. Audit `conversation.fresh_start` mit der Zahl der
+  abgebrochenen Läufe (`cancelled_runs`), nie Inhalt. Ein Live-Ereignis gibt es dafür
+  nicht: Andere Tabs derselben Person zeigen die Linie nach dem nächsten Laden.
 - **Ein markierter Lauf gehört der fragenden Person** (Review M8 3, Befund H1): In der
   Laufansicht (`/api/runs/{id}/events`) sieht jede andere Person (die verantwortliche,
   wer `agent.manage` hat, ein Admin) **jedes** Ereignis eines Laufs, der die Marke trägt,
@@ -1944,6 +1966,10 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   übergeht sie; die Laufansicht eines API-Pods des vorigen Releases scheitert an einem
   Lauf mit `mark` (500), bis er ersetzt ist. Ab diesem Release übergeht die Laufansicht
   (API und Oberfläche) jede Ereignisart, die sie nicht kennt (Review M8 3, Befund H6).
+- M8, „Neu beginnen“ (Migration `f3a7c9e1b5d8`): die Spalte `conversation.fresh_start_at`
+  (nullbar, ohne Umschreiben). Ein Worker des vorigen Releases liest sie nicht und gibt
+  Läufen weiter den ganzen Verlauf (die Marke hält dann wie zuvor), bis er ersetzt ist;
+  den Schnitt setzt nur ein API-Pod dieses Releases.
 
 ### Woran man Probleme erkennt
 

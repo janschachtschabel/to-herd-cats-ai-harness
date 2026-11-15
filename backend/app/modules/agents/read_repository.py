@@ -57,9 +57,15 @@ class ReadRepository:
 
     async def said(self, conversation_id: uuid.UUID, until: datetime) -> list[Said]:
         """The conversation as a run answers it: the person's and the agent's top-level
-        messages written up to `until` (the run's start), oldest first. An answer counts
+        messages written up to `until` (the run's start), oldest first, and after the
+        conversation's fresh start if it has one (`fresh_start.py`). An answer counts
         from the start of the run that wrote it, so a message the person sent while
         that run worked comes after it. Timeline notices (a run's stop) are left out."""
+        fresh = (
+            select(Conversation.fresh_start_at)
+            .where(Conversation.org_id == self.org_id, Conversation.id == conversation_id)
+            .scalar_subquery()
+        )
         answered = (
             select(Run.started_at)
             .where(Run.org_id == self.org_id, Run.id == Message.client_id)
@@ -83,6 +89,7 @@ class ReadRepository:
                 Message.deleted_at.is_(None),
                 Message.kind.in_((MessageKind.HUMAN, MessageKind.AGENT)),
                 Message.created_at <= until,
+                or_(fresh.is_(None), Message.created_at > fresh),
             )
             .order_by(Message.created_at.desc(), Message.id.desc())
             .limit(HISTORY_MESSAGES)

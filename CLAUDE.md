@@ -304,7 +304,10 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
     message a marked run writes is `message.personal` (only alone with the asker); a
     run is marked, journaled at once, when such content enters its context (history
     window: a `mark` event; `search_past_runs`, `read_conversation`: `read.personal`);
-    never by memory alone. No marked content in its context: no mark. Every event
+    never by memory alone. No marked content in its context: no mark; nothing
+    unmarks by heuristic, only the asker's "Neu beginnen" in her DM alone with the
+    agent (`conversation.fresh_start_at`, `agents/fresh_start.py`): runs after it get
+    no history from before it. Every event
     of a marked run is the asker's alone (the run view redacts the whole run for
     anyone else); a call the release gate finds to change nothing (a preview) runs
     `previewing`, never as released, and `writing.effect` never writes for it.

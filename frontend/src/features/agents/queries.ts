@@ -94,6 +94,26 @@ export function useOpenAgentDm() {
   })
 }
 
+/** "Neu beginnen" in her DM alone with an agent (module review M8 3, H2): runs after it
+ *  read nothing from before; open runs are cancelled. Sends the version it read. */
+export function useStartAfresh(conversationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (version: number) =>
+      unwrap(
+        await api.POST('/api/conversations/{conversation_id}/fresh-start', {
+          params: { path: { conversation_id: conversationId } },
+          body: { version },
+        }),
+      ),
+    onSuccess: (conversation) => {
+      queryClient.setQueryData(messagingKeys.conversation(conversationId), conversation)
+      void queryClient.invalidateQueries({ queryKey: messagingKeys.messages(conversationId) })
+      void queryClient.invalidateQueries({ queryKey: agentKeys.all })
+    },
+  })
+}
+
 /** A run, for whom it concerns (the person who asked, the responsible person, agent
  *  admins); refreshed by `run.progress` and new messages, never polled. */
 export function useRun(runId: string | null) {

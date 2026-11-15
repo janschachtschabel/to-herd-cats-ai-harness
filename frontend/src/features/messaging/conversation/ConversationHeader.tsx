@@ -3,7 +3,8 @@ import { Bot, Eye, Hash, UsersRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { AgentHeaderNote } from '@/features/agents/AgentHeaderNote'
-import { agentOf } from '@/features/agents/display'
+import { agentOf, aloneWithAgent } from '@/features/agents/display'
+import { FreshStartButton } from '@/features/agents/FreshStart'
 import { useMe } from '@/features/auth/queries'
 import type { Conversation, Space } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -40,6 +41,9 @@ export function ConversationHeader({
           >
             {t('messaging.channel.inSpace', { space: space.name })}
           </Link>
+        )}
+        {agent && aloneWithAgent(conversation, me?.user.id) && (
+          <FreshStartButton conversation={conversation} agentName={agent.name} />
         )}
       </div>
       {agent && <AgentHeaderNote agentId={agent.id} />}

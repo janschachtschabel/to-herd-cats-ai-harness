@@ -16,8 +16,8 @@ from app.core.request_log import RequestLogMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.telemetry import configure_tracing
 from app.mcp.endpoint import router as mcp_endpoint
+from app.modules.agents import fresh_start_router, run_router
 from app.modules.agents import router as agents_router
-from app.modules.agents import run_router
 from app.modules.agents import spaces_router as agent_spaces
 from app.modules.agents.approvals import router as approvals_router
 from app.modules.ai import assignment_router as ai_assignments
@@ -128,6 +128,7 @@ def api_router() -> APIRouter:
     api.include_router(agents_router.agents)
     api.include_router(run_router.agent_runs)
     api.include_router(run_router.runs)
+    api.include_router(fresh_start_router.fresh_start)
     api.include_router(agent_spaces.agent_spaces)
     api.include_router(approvals_router.approvals)
     api.include_router(approvals_router.questions)

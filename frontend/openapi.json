@@ -3910,7 +3910,7 @@
         "type": "string"
       },
       "ConversationOut": {
-        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds. `page_id`: a page thread's\npage (null for other kinds).",
+        "description": "`can_post`: whether the caller may write here now (the right in the space, and\nthe channel not archived). `created_by` is null for what the system set up.\n`version` guards writes (send it back; stale \u2192 409). A direct message lists its\n`participants` and, on its own (`GET /conversations/{id}`), every admin\n`inspections` of it; both are empty for other kinds. `page_id`: a page thread's\npage (null for other kinds). `fresh_start_at`: where the person started her DM\nalone with an agent afresh (its agent sees nothing from before; null: never).",
         "properties": {
           "archived_at": {
             "anyOf": [
@@ -3942,6 +3942,18 @@
                 "type": "null"
               }
             ]
+          },
+          "fresh_start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fresh Start At"
           },
           "id": {
             "format": "uuid",
@@ -4577,6 +4589,18 @@
                 "type": "null"
               }
             ]
+          },
+          "fresh_start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fresh Start At"
           },
           "id": {
             "format": "uuid",
@@ -21602,6 +21626,60 @@
         "summary": "Archive Channel",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/conversations/{conversation_id}/fresh-start": {
+      "post": {
+        "description": "Start her DM alone with an agent afresh: its runs read nothing from before now\n(the personal mark of what came before ends for them); open runs are cancelled.\n403 `conversation.not_alone_with_agent` anywhere else.",
+        "operationId": "start_conversation_afresh_api_conversations__conversation_id__fresh_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__modules__messaging__schemas__ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Conversation Afresh",
+        "tags": [
+          "agents"
         ]
       }
     },

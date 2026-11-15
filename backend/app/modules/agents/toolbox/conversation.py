@@ -9,7 +9,7 @@
   space as the source (policy and rights checks of the run cover it); a DM counts as
   the person's own content, as the history does. A message marked personal is shown
   as such and marks the run (`personal_mark.py`; the host journals it with the
-  result).
+  result). Nothing from before the conversation's fresh start (`fresh_start.py`).
 - `submit_result`: the run's result. It ends the run (`completed`) with its text as
   the answer; no call after it runs. Recorded like any tool call, so a run taken up
   again after it answers with it once, without a model call.
@@ -76,7 +76,13 @@ async def read_conversation(ctx: ToolContext, args: ReadConversationArgs) -> Too
             rows = list(reversed(page.items))
     except NotFound:
         return ToolResult("conversation", NOT_FOUND)
-    shown = [m for m in rows if m.kind in (MessageKind.HUMAN, MessageKind.AGENT)]
+    fresh = conversation.fresh_start_at  # nothing from before a fresh start (H2)
+    shown = [
+        m
+        for m in rows
+        if m.kind in (MessageKind.HUMAN, MessageKind.AGENT)
+        and (fresh is None or m.created_at > fresh)
+    ]
     views = await message_views(ctx.session, ctx.actor, shown)
     lines = [_line(v.message, v.author_name) for v in views]
     if any(v.message.personal for v in views):

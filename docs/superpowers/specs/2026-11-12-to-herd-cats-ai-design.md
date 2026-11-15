@@ -234,6 +234,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Eine Freigabekarte unter der persönlichen Marke zeigt den Inhalt vollständig und aufgeklappt (alle Angaben, bei einer Seitenänderung den ganzen Vergleich). Was sich nicht vollständig zeigen lässt (ein Vergleich über `HERD_DIFF_MAX_LINES`), kann nicht freigegeben werden: Der Aufruf wird mit `personal_release.too_large` abgelehnt, und eine schon gestellte Freigabe lässt sich dann nur ablehnen. Review M8 3, Befund H5.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Die persönliche Marke hält, solange markierte Nachrichten im Verlaufsfenster stehen; nichts nimmt sie heuristisch ab. Der Ausweg ist „Neu beginnen“: Nur die Person in ihrer Direktnachricht allein mit dem Agenten kann einen Schnitt setzen (gespeichert, auditiert ohne Inhalt); Läufe danach bekommen keinen Verlauf von davor, offene Läufe des Gesprächs werden vorher abgebrochen. Das Abzeichen, die Freigabekarte und die Dokumentation erklären es. Review M8 3, Befund H2.*
+
 *Geändert nach Review M8 [Claude, 15.11.2026]: Was die externen Werkzeuge eines Agenten zu jedem Modellaufruf beitragen (Name, Beschreibung, Argumentschema), ist zusammen auf 100.000 Zeichen begrenzt. Die Werkzeuge werden in der Reihenfolge genommen, in der sie zuerst gelistet wurden, jedes, solange die Summe passt; die Auswahl ist bei jedem Schritt, jeder Fortsetzung und beim Wiederholen dieselbe. Die Werkzeugliste des Agenten zeigt, was wegbleibt, und eine Metrik zählt es ohne Namen. Review M8 2, Befund G5.*
 
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]

@@ -1844,6 +1844,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/fresh-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Conversation Afresh
+         * @description Start her DM alone with an agent afresh: its runs read nothing from before now
+         *     (the personal mark of what came before ends for them); open runs are cancelled.
+         *     403 `conversation.not_alone_with_agent` anywhere else.
+         */
+        post: operations["start_conversation_afresh_api_conversations__conversation_id__fresh_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/messages": {
         parameters: {
             query?: never;
@@ -4982,7 +5004,8 @@ export interface components {
          *     `version` guards writes (send it back; stale → 409). A direct message lists its
          *     `participants` and, on its own (`GET /conversations/{id}`), every admin
          *     `inspections` of it; both are empty for other kinds. `page_id`: a page thread's
-         *     page (null for other kinds).
+         *     page (null for other kinds). `fresh_start_at`: where the person started her DM
+         *     alone with an agent afresh (its agent sees nothing from before; null: never).
          */
         ConversationOut: {
             /** Archived At */
@@ -4995,6 +5018,8 @@ export interface components {
              */
             created_at: string;
             created_by: components["schemas"]["PrincipalRef"] | null;
+            /** Fresh Start At */
+            fresh_start_at?: string | null;
             /**
              * Id
              * Format: uuid
@@ -5228,6 +5253,8 @@ export interface components {
              */
             created_at: string;
             created_by: components["schemas"]["PrincipalRef"] | null;
+            /** Fresh Start At */
+            fresh_start_at?: string | null;
             /**
              * Id
              * Format: uuid
@@ -13270,6 +13297,41 @@ export interface operations {
         };
     };
     archive_channel_api_conversations__conversation_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__modules__messaging__schemas__ExpectedVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_conversation_afresh_api_conversations__conversation_id__fresh_start_post: {
         parameters: {
             query?: never;
             header?: never;

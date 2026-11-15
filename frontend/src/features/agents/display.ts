@@ -88,6 +88,15 @@ export function agentOf(conversation: Conversation): { id: string; name: string 
   return agent ? { id: agent.id, name: agent.name } : null
 }
 
+/** Whether the conversation is the reader's DM alone with one agent: the only place
+ *  "Neu beginnen" is offered (the server checks again). */
+export function aloneWithAgent(conversation: Conversation, meId: string | undefined): boolean {
+  if (conversation.kind !== 'dm' || !meId) return false
+  const people = (conversation.participants ?? []).filter((p) => p.type !== 'agent')
+  const agents = (conversation.participants ?? []).filter((p) => p.type === 'agent')
+  return agents.length === 1 && people.length === 1 && people[0]!.id === meId
+}
+
 /** What a tool answers when it found nothing it may show (the backend's NOT_FOUND). */
 const NOT_FOUND = 'Nothing found (or not readable).'
 

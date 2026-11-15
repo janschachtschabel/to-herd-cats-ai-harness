@@ -167,6 +167,21 @@ class RunRepository:
         row = (await self.session.execute(stmt)).one_or_none()
         return (row[0], row[1]) if row is not None else None
 
+    async def open_in(self, conversation_id: uuid.UUID) -> list[uuid.UUID]:
+        """The runs of the conversation asked by its messages (not an automation's) that
+        have not ended: queued, running or waiting."""
+        stmt = (
+            select(Run.id)
+            .where(
+                Run.org_id == self.org_id,
+                Run.conversation_id == conversation_id,
+                Run.automation_id.is_(None),
+                Run.state != RunState.DONE,
+            )
+            .order_by(Run.id)
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def marked(self, run_id: uuid.UUID) -> bool:
         """Whether the run carries the personal mark: a `mark` event, or a tool call's
         event noting `read.personal` (`agents/personal_mark.py`)."""

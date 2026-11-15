@@ -44,4 +44,19 @@ describe('timeline', () => {
       'pending-k2',
     ])
   })
+
+  test('a fresh start sits before the first message after it, or at the end', () => {
+    const newest = [
+      makeMessage({ id: 'c', created_at: '2026-11-13T12:10:00Z' }),
+      makeMessage({ id: 'b', created_at: '2026-11-13T12:05:00Z' }),
+      makeMessage({ id: 'a', created_at: '2026-11-13T12:00:00Z' }),
+    ]
+    const keys = (fresh: string | null) =>
+      buildTimeline(newest, [], null, fresh)
+        .filter((r) => r.kind !== 'day')
+        .map((r) => r.key)
+    expect(keys('2026-11-13T12:03:00Z')).toEqual(['a', 'fresh', 'b', 'c'])
+    expect(keys('2026-11-13T12:30:00Z')).toEqual(['a', 'b', 'c', 'fresh'])
+    expect(keys(null)).toEqual(['a', 'b', 'c'])
+  })
 })
