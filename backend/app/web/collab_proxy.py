@@ -1,19 +1,22 @@
 """The WebSocket relay `/collab/{page_id}?generation=N` on the public port (spec E13,
-plan M2 task 9): browsers reach the collab process through the API, which runs the
-same checks as the REST API before a single frame passes.
+plan M2 task 9, plan M9 decision 16): browsers reach the collab process through the
+API, which runs the same checks as the REST API before a single frame passes.
 
 1. Origin: equal to HERD_PUBLIC_URL's origin, or without one, to the host the
    request came to; otherwise the handshake is refused (HTTP 403). This replaces the
    CSRF header, which a browser cannot add to a WebSocket handshake.
 2. Session cookie (4401), the page visible (4404) and `page.edit` (4403), and the
    browser's document of the current generation (4409), through
-   `CollabService.authenticate`, in a database session of its own that is closed
-   before relaying (a live connection holds no database connection).
+   `CollabService.admit`, in a database session of its own that is committed and
+   closed before relaying (a live connection holds no database connection). It
+   issues a grant for this connection, page and generation (`collab_grants.py`).
 3. Then the collab process is dialled at `<collab_url>/collab/<page_id>?generation=N`
-   with only the session cookie, the Origin and the original host
-   (`X-Forwarded-Host`); the page comes from the path the check ran on, and the
-   collab process binds the connection to it. Frames pass both ways unchanged; a
-   close code (4409, 4403, ...) is passed on.
+   with only the grant (`Authorization: Bearer herd_cg_...`), the Origin and the
+   original host (`X-Forwarded-Host`). The session cookie never leaves the API: a
+   compromised collab process reaches only the pages open in it and no login session.
+   The page comes from the path the check ran on, and the collab process binds the
+   connection to it. Frames pass both ways unchanged; a close code (4409, 4403, ...)
+   is passed on.
 
 Without HERD_INTERNAL_TOKEN live editing is off (4503); a collab process that cannot
 be reached is 4502. A refusal after the Origin check accepts the socket and closes it
@@ -80,17 +83,16 @@ async def _deny(websocket: WebSocket, status: int, code: str) -> None:
     await websocket.close(code=4000 + status, reason=code)
 
 
-async def _authorize(token: str, page_id: uuid.UUID, generation: int) -> AppError | None:
+async def _authorize(token: str, page_id: uuid.UUID, generation: int) -> str | AppError:
+    """A grant for this connection, or why there is none."""
     async with get_database().session_factory() as session:
         try:
-            grant = await CollabService(session).authenticate(token, page_id)
+            grant = await CollabService(session).admit(token, page_id, generation)
         except AppError as error:
-            return error
-        finally:
             await session.rollback()
-    if grant.generation != generation:
-        return AppError(code="collab.generation_ended")
-    return None
+            return error
+        await session.commit()
+    return grant
 
 
 @router.websocket("/collab/{page_id}")
@@ -110,11 +112,10 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
     generation = int(raw_generation)
     try:
         async with asyncio.timeout(HANDSHAKE_TIMEOUT_SECONDS):
-            refused = await _authorize(token, page_id, generation)
-            if refused is not None:
-                status = 409 if refused.code == "collab.generation_ended" else refused.status_code
-                return await _deny(websocket, status, refused.code)
-            upstream = await _dial(websocket, settings, token, host, page_id, generation)
+            grant = await _authorize(token, page_id, generation)
+            if isinstance(grant, AppError):
+                return await _deny(websocket, grant.status_code, grant.code)
+            upstream = await _dial(websocket, settings, grant, host, page_id, generation)
     except TimeoutError:
         logger.warning("collab handshake timed out")
         return await _deny(websocket, 504, "collab.timeout")
@@ -137,7 +138,7 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
 async def _dial(
     websocket: WebSocket,
     settings: Settings,
-    token: str,
+    grant: str,
     host: str | None,
     page_id: uuid.UUID,
     generation: int,
@@ -146,7 +147,7 @@ async def _dial(
     try:
         return await connect(
             f"{settings.collab_url}/collab/{page_id}?generation={generation}",
-            additional_headers=_upstream_headers(websocket, settings, token, host),
+            additional_headers=_upstream_headers(websocket, grant, host),
             max_size=MAX_MESSAGE_BYTES,
             open_timeout=OPEN_TIMEOUT_SECONDS,
             compression=None,
@@ -156,13 +157,9 @@ async def _dial(
         return None
 
 
-def _upstream_headers(
-    websocket: WebSocket, settings: Settings, token: str, host: str | None
-) -> dict[str, str]:
-    headers = {
-        "Cookie": f"{settings.session_cookie_name}={token}",
-        "Origin": websocket.headers["origin"],
-    }
+def _upstream_headers(websocket: WebSocket, grant: str, host: str | None) -> dict[str, str]:
+    """The grant, the Origin and the host only: no cookie, nothing else of the browser's."""
+    headers = {"Authorization": f"Bearer {grant}", "Origin": websocket.headers["origin"]}
     if host:
         headers["X-Forwarded-Host"] = host
     return headers

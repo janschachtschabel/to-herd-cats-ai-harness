@@ -1,9 +1,11 @@
 """The internal collab API under test: the internal app on the test session (with and
-without the internal token) and helpers for its calls."""
+without the internal token) and helpers for its calls. `grant_of` issues a grant the
+way the relay does (`CollabService.admit`)."""
 
 import base64
 from collections.abc import AsyncIterator
 from typing import Any
+from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -12,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.modules.wiki.collab_service import CollabService
 from app.web.internal import create_internal_app
 from tests.app_session import session_override
 
@@ -47,17 +50,39 @@ def token_of(client: AsyncClient) -> str:
     return token
 
 
-async def collab_auth(collab: AsyncClient, client: AsyncClient, page: dict[str, Any]) -> Any:
-    return await collab.post(
-        "/internal/collab/auth", json={"session_token": token_of(client), "page_id": page["id"]}
+async def grant_of(
+    session: AsyncSession, client: AsyncClient, page: dict[str, Any], generation: int = 0
+) -> str:
+    """A grant for the client's login session on this page and generation, issued as
+    the relay issues it after its checks."""
+    return await CollabService(session).admit(token_of(client), UUID(page["id"]), generation)
+
+
+async def collab_auth(
+    collab: AsyncClient, grant: str, page: dict[str, Any], generation: int = 0
+) -> Any:
+    body = {"grant": grant, "page_id": page["id"], "generation": generation}
+    return await collab.post("/internal/collab/auth", json=body)
+
+
+async def load(collab: AsyncClient, grant: str, page: dict[str, Any], generation: int = 0) -> Any:
+    return await collab.get(
+        f"/internal/collab/pages/{page['id']}",
+        params={"generation": generation},
+        headers={"X-Herd-Grant": grant},
     )
 
 
-async def session_id_of(collab: AsyncClient, client: AsyncClient, page: dict[str, Any]) -> str:
-    r = await collab_auth(collab, client, page)
-    assert r.status_code == 200, r.text
-    session_id: str = r.json()["session_id"]
-    return session_id
+async def check(
+    collab: AsyncClient,
+    page: dict[str, Any],
+    grants: list[str],
+    *,
+    unsaved: list[str] | None = None,
+    generation: int = 0,
+) -> Any:
+    body = {"grants": grants, "unsaved_grants": unsaved or [], "generation": generation}
+    return await collab.post(f"/internal/collab/pages/{page['id']}/check", json=body)
 
 
 def ydoc(data: bytes = b"\x01\x02state") -> str:
@@ -67,7 +92,7 @@ def ydoc(data: bytes = b"\x01\x02state") -> str:
 async def put_live(
     collab: AsyncClient,
     page: dict[str, Any],
-    sessions: list[str],
+    grants: list[str],
     *,
     generation: int = 0,
     content_md: str = "live",
@@ -80,7 +105,7 @@ async def put_live(
             "generation": generation,
             "ydoc_b64": ydoc_b64 or ydoc(),
             "content_md": content_md,
-            "editor_session_ids": sessions,
+            "editor_grants": grants,
             "session_key": session_key,
         },
     )

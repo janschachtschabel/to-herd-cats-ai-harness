@@ -5,12 +5,14 @@ generation (409); it never writes its older document over the newer Markdown."""
 
 import asyncio
 import base64
+from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 
 from app.core.config import get_settings
+from app.modules.wiki.collab_service import CollabService
 from app.web.internal import create_internal_app
 from tests.factories import login
 from tests.real_db import MakeRealClient, RealDb
@@ -31,15 +33,14 @@ async def test_live_save_never_overwrites_a_markdown_save(
         transport=transport, base_url="http://internal", headers={"X-Herd-Internal-Token": TOKEN}
     ) as internal:
         token = owner.cookies.get(get_settings().session_cookie_name)
+        assert token
         outcomes = set()
         for round_ in range(ROUNDS):
             r = await owner.post(f"/api/spaces/{space['id']}/pages", json={"title": f"S{round_}"})
             page = r.json()
-            auth = await internal.post(
-                "/internal/collab/auth", json={"session_token": token, "page_id": page["id"]}
-            )
-            assert auth.status_code == 200, auth.text
-            sid = auth.json()["session_id"]
+            async with real_db.database.session_factory() as db:
+                grant = await CollabService(db).admit(token, UUID(page["id"]), 0)
+                await db.commit()
             patch, put = await asyncio.gather(
                 owner.patch(
                     f"/api/pages/{page['id']}",
@@ -51,7 +52,7 @@ async def test_live_save_never_overwrites_a_markdown_save(
                         "generation": 0,
                         "ydoc_b64": base64.b64encode(b"old").decode(),
                         "content_md": "live",
-                        "editor_session_ids": [sid],
+                        "editor_grants": [grant],
                         "session_key": f"doc-{round_}",
                     },
                 ),

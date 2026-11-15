@@ -411,12 +411,51 @@ Markdown-Editor speichert genau, was dasteht. Im Live-Editor gilt:
   Person gespeichert. Sie hatte das Recht dazu (sonst wäre es ein Rechteentzug und
   würde verworfen); das ist so entschieden (Prüfung M2, S9).
 
+## Berechtigungen des Collab-Prozesses
+
+Das Sitzungs-Cookie verlässt die API nicht (seit M9, R14). Nach ihren Prüfungen stellt
+die API für jede Live-Verbindung eine eigene, kurzlebige Berechtigung aus
+(`herd_cg_…`, 256 Bit Zufall) und reicht nur sie dem Collab-Prozess weiter
+(`Authorization: Bearer`). Sie gilt für genau eine Seite und eine Generation:
+
+- **Was sie erlaubt:** Laden, Speichern und Prüfen dieser Seite in dieser Generation
+  über die interne API, als die Person, deren Anmeldung sie ausgestellt bekam, und nur,
+  solange diese die Seite bearbeiten darf. Für eine andere Seite oder eine andere
+  Generation wird sie nicht gefunden. Ein kompromittierter Collab-Prozess erreicht so
+  nur die Seiten, die gerade offen sind, und keine Anmeldung; mit einer erfundenen oder
+  fremden Berechtigung beendet er auch keine Generation.
+- **Ablauf:** zehn Minuten; jede Prüfung des offenen Dokuments (alle 5 s) verlängert
+  sie. Läuft sie ab (etwa weil die API länger als zehn Minuten nicht erreichbar war),
+  wird die Verbindung mit 4403 getrennt und der Editor verbindet sich nicht von selbst
+  neu („Neu laden“).
+- **Abmelden** ist weiterhin kein Rechteentzug: Neue Verbindungen nimmt die
+  Berechtigung nicht mehr an, aber was die Person getippt hat, wird unter ihrem Namen
+  gespeichert (bis die beendete Anmeldung nach einer Stunde aufgeräumt ist).
+- **Mit der Anmeldung:** Wird eine Anmeldung gelöscht (Abmeldung durch einen
+  Administrator, Deaktivierung, Passwortänderung, eine Stunde nach Abmeldung oder
+  Ablauf), verliert jede ihrer Berechtigungen sofort jede Wirkung. Die Zeile bleibt
+  noch bis eine Stunde nach dem Ablauf stehen, nur damit die Prüfung erkennt, dass
+  ungespeicherte Änderungen über sie kamen, und die Generation beendet. Abgelaufene
+  Berechtigungen räumt die API beim Ausstellen neuer in Stapeln auf.
+- **Nach einer Wiederherstellung** gilt keine Berechtigung mehr (der Schritt nach dem
+  Einspielen löscht sie mit den Sitzungen).
+- Gespeichert wird nur der SHA-256 (`collab_grant`). Die Berechtigung steht in keinem
+  Log, keiner URL, keinem Audit-Eintrag und keiner Fehlermeldung; die interne API
+  nimmt sie beim Laden im Kopf `X-Herd-Grant`, sonst im Rumpf.
+- Die Grenzen je Anmeldung (3 Verbindungen je Seite, 10 insgesamt) zählt der
+  Collab-Prozess über eine undurchsichtige Kennung der Anmeldung (`session_ref`), die
+  ihm die API zur Berechtigung nennt; mit ihr kann er nichts tun.
+- Es gibt keine Übergangsschicht für ältere Collab-Prozesse: API und Collab-Prozess
+  kommen aus demselben Image und werden zusammen ausgerollt; ein Collab-Prozess, der
+  noch Cookies erwartet, lehnt jede Verbindung mit 4401 ab, bis er ersetzt ist.
+
 ## Betrieb hinter einem Reverse Proxy
 
 Die Live-Bearbeitung ist ein WebSocket auf `/collab/<seiten-id>?generation=<n>` am
 öffentlichen Port (8080) der API, also am selben Host und Service wie alles andere. Die
 API prüft Origin, Sitzungs-Cookie, Rechte und Generation und reicht erst dann an den
-Collab-Prozess weiter. Daraus folgt für Proxy und Ingress:
+Collab-Prozess weiter (siehe „Berechtigungen des Collab-Prozesses“). Daraus folgt für
+Proxy und Ingress:
 
 1. **Upgrade durchreichen** (`Upgrade`- und `Connection`-Header, HTTP/1.1 zum
    Backend). Ein eigener Pfad für `/collab` ist nicht nötig.
@@ -507,7 +546,7 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
 - Im Browser HTTP 403 beim WebSocket: Origin passt nicht zu `HERD_PUBLIC_URL` bzw. zum
   Host.
 - Close-Codes (in den Entwicklerwerkzeugen des Browsers): 4401 Sitzung ungültig, 4403
-  kein Schreibrecht, 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
+  kein Schreibrecht (oder die Berechtigung der Verbindung ist abgelaufen), 4404 Seite nicht sichtbar, 4409 Generation beendet, 4413 Zustand
   zu groß, 4422 Seite nicht verlustfrei live bearbeitbar, 4429 zu viele Verbindungen
   (je Anmeldung 3 je Seite und 10 insgesamt, je Person 20 über alle Anmeldungen, nie
   mehr als ein Viertel aller), 4507 Live-Editor ausgelastet (Speicherbudget des

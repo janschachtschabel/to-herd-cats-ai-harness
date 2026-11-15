@@ -21,8 +21,8 @@ for (const [status, code] of [
 ]) {
   test(`a save answered ${status} closes everyone with ${code}`, async () => {
     live = await liveFixture({ createCollabServer });
-    const anna = live.open({ cookie: "herd_session=token-a" });
-    const ben = live.open({ cookie: "herd_session=token-b" });
+    const anna = live.open({ grant: "herd_cg_a" });
+    const ben = live.open({ grant: "herd_cg_b" });
     await Promise.all([synced(anna), synced(ben)]);
     await until(() => live.api.saves.length === 1);
     live.api.saveAnswer = () => [status, { error: { code: "x" } }];

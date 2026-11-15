@@ -1,10 +1,14 @@
 // The API's internal collab interface (`/internal/collab/*` on the internal port,
 // header X-Herd-Internal-Token). The collab process stores nothing itself: it
-// authenticates, loads and saves only through these calls.
+// authenticates, loads and saves only through these calls, each with the grants the
+// API's relay handed it for exactly one page and generation (`Authorization: Bearer
+// herd_cg_...` on the connection; plan M9 decision 16). A grant goes into a body or a
+// header, never into a URL or a log line.
 
 export class ApiUnavailable extends Error {}
 
 const TOKEN_HEADER = "X-Herd-Internal-Token";
+const GRANT_HEADER = "X-Herd-Grant";
 
 export class InternalApi {
   /** @param {{ baseUrl: string, token: string, timeoutMs?: number }} options */
@@ -15,12 +19,12 @@ export class InternalApi {
   }
 
   /** `{status, body}`; `ApiUnavailable` when the API cannot be reached or fails (5xx). */
-  async call(method, path, body) {
+  async call(method, path, body, headers = {}) {
     let response;
     try {
       response = await fetch(`${this.baseUrl}/internal/collab${path}`, {
         method,
-        headers: { [TOKEN_HEADER]: this.token, "Content-Type": "application/json" },
+        headers: { ...headers, [TOKEN_HEADER]: this.token, "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
@@ -40,21 +44,22 @@ export class InternalApi {
     return { status: response.status, body: parsed };
   }
 
-  auth(sessionToken, pageId) {
-    return this.call("POST", "/auth", { session_token: sessionToken, page_id: pageId });
+  /** Who the connection's grant edits as: `{user, session_ref, generation}`. */
+  auth(grant, pageId, generation) {
+    return this.call("POST", "/auth", { grant, page_id: pageId, generation });
   }
 
-  load(pageId, sessionId, generation) {
-    const query = new URLSearchParams({ session_id: sessionId, generation: String(generation) });
-    return this.call("GET", `/pages/${pageId}?${query}`);
+  load(pageId, grant, generation) {
+    const query = new URLSearchParams({ generation: String(generation) });
+    return this.call("GET", `/pages/${pageId}?${query}`, undefined, { [GRANT_HEADER]: grant });
   }
 
-  save(pageId, { generation, ydoc, contentMd, editorSessionIds, sessionKey }) {
+  save(pageId, { generation, ydoc, contentMd, editorGrants, sessionKey }) {
     return this.call("PUT", `/pages/${pageId}`, {
       generation,
       ydoc_b64: Buffer.from(ydoc).toString("base64"),
       content_md: contentMd,
-      editor_session_ids: editorSessionIds,
+      editor_grants: editorGrants,
       session_key: sessionKey,
     });
   }
@@ -69,10 +74,11 @@ export class InternalApi {
     return this.call("POST", `/pages/${pageId}/load-mutation`);
   }
 
-  check(pageId, sessionIds, generation, unsavedSessionIds = []) {
+  /** Whether the generation and the grants still hold (each one named is extended). */
+  check(pageId, grants, generation, unsavedGrants = []) {
     return this.call("POST", `/pages/${pageId}/check`, {
-      session_ids: sessionIds,
-      unsaved_session_ids: unsavedSessionIds,
+      grants,
+      unsaved_grants: unsavedGrants,
       generation,
     });
   }

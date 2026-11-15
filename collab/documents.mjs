@@ -23,12 +23,10 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     log("live document dropped", { page_id: state.pageId, reason: close[1] });
   }
 
-  function revoke(document, sessionIds, userIds) {
+  function revoke(document, grants) {
     for (const connection of document.getConnections()) {
       const { context } = connection;
-      if (sessionIds.has(context.sessionId) || userIds.has(context.user?.id)) {
-        closeSocket(context, CLOSE.revoked);
-      }
+      if (grants.has(context.grant)) closeSocket(context, CLOSE.revoked);
     }
   }
 
@@ -37,31 +35,31 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
   }
 
   /** Ask the API whether the generation and the people still hold; true when the
-   * document was dropped. The unsaved sessions go along: one of them revoked ends the
-   * generation. Throws `ApiUnavailable`. */
+   * document was dropped. Every connection is known by its grant; the unsaved grants go
+   * along: one of them revoked ends the generation. The check also keeps the grants
+   * alive (they expire ten minutes after the last check). Throws `ApiUnavailable`. */
   async function checkDocument(document, documentName, state) {
-    const connected = document.getConnections().map((c) => c.context.sessionId);
-    // Sessions that left are checked too (the API takes the organisation from the page).
-    const sessionIds = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
+    const connected = document.getConnections().map((c) => c.context.grant);
+    // Grants of connections that left are checked too: their unsaved edits count.
+    const grants = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
     const unsaved = [...state.dirty.keys()];
-    if (sessionIds.length === 0 && unsaved.length === 0) return false;
-    const answer = await api.check(state.pageId, sessionIds, state.generation, unsaved);
+    if (grants.length === 0 && unsaved.length === 0) return false;
+    const answer = await api.check(state.pageId, grants, state.generation, unsaved);
     if (answer.status !== 200) return false;
-    const { revoked_session_ids: sessions, revoked_user_ids: users } = answer.body;
-    revoke(document, new Set(sessions), new Set(users));
+    revoke(document, new Set(answer.body.revoked_grants ?? []));
     if (!answer.body.generation_ok) {
       discard(document, state, CLOSE.generationEnded);
       return true;
     }
-    const ended = new Set(answer.body.ended_session_ids ?? []);
+    const ended = new Set(answer.body.ended_grants ?? []);
     if (ended.size > 0) await endSessions(document, documentName, state, ended);
     return false;
   }
 
-  /** Sessions that ended (logout, expiry) of people who may still edit: their edits
-   * are saved first, then their connections close with 4401. */
+  /** Grants whose login sessions ended (logout, expiry) while their people may still
+   * edit: their edits are saved first, then their connections close with 4401. */
   async function endSessions(document, documentName, state, ended) {
-    const unsaved = [...ended].some((sessionId) => state.dirty.has(sessionId));
+    const unsaved = [...ended].some((grant) => state.dirty.has(grant));
     if (unsaved && !state.holding && !state.discarded) {
       try {
         await document.saveMutex.runExclusive(() => store(document, documentName, state));
@@ -70,7 +68,7 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
       }
     }
     for (const connection of document.getConnections()) {
-      if (ended.has(connection.context.sessionId)) {
+      if (ended.has(connection.context.grant)) {
         closeSocket(connection.context, CLOSE.unauthorized);
       }
     }
@@ -126,13 +124,13 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
       const problem = `${tables.cells} table cells`;
       return unrepresentable(document, state, { problem, kind: "tooLarge", block: tables.block });
     }
-    for (const sessionId of editors) state.dirty.delete(sessionId);
+    for (const grant of editors) state.dirty.delete(grant);
     let written;
     try {
       written = await checks.readBack(json, state.size?.chars ?? 0);
     } catch (error) {
       if (!(error instanceof CheckFailed)) {
-        for (const sessionId of editors) state.dirty.set(sessionId, true);
+        for (const grant of editors) state.dirty.set(grant, true);
         throw error;
       }
       // Too heavy to check (the worker ran out of memory, or the check ran past its time
@@ -141,7 +139,7 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
       written = { ok: false, problem: error.message, kind, block: null };
     }
     if (!written.ok) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true);
+      for (const grant of editors) state.dirty.set(grant, true);
       return unrepresentable(document, state, written);
     }
     // Unchanged from what was loaded (an edit undone, or a browser tidying the
@@ -153,11 +151,11 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
         generation: state.generation,
         ydoc,
         contentMd,
-        editorSessionIds: editors,
+        editorGrants: editors,
         sessionKey: state.sessionKey,
       });
     } catch (error) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true);
+      for (const grant of editors) state.dirty.set(grant, true);
       throw error;
     }
     if (answer.status === 200) {
@@ -168,7 +166,7 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     }
     if (answer.status === 409) return discard(document, state, CLOSE.generationEnded);
     if (answer.status === 403) {
-      for (const sessionId of editors) state.dirty.set(sessionId, true); // still unsaved
+      for (const grant of editors) state.dirty.set(grant, true); // still unsaved
       return endGeneration(document, documentName, state);
     }
     if (answer.status === 413) return discard(document, state, CLOSE.tooLarge);

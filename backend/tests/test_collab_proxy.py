@@ -1,12 +1,14 @@
 """The WebSocket relay `/collab/{page_id}` (plan M2 task 9): the public app checks
 Origin, session and `page.edit` like the REST API, then passes frames both ways to
-the collab process. Runs the real app on a real port (uvicorn) against a stand-in
+the collab process, which gets a grant for the page and generation instead of the
+session cookie (plan M9 task 6). Runs the real app on a real port (uvicorn) against a stand-in
 collab process (a local WebSocket server) and committed data (tests/real_db.py)."""
 
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 import uvicorn
@@ -16,6 +18,9 @@ from websockets.asyncio.server import ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
 from app.core.config import get_settings
+from app.core.models_base import utcnow
+from app.modules.wiki import collab_grants
+from app.modules.wiki.collab_grants import PREFIX
 from app.web.public import create_public_app
 from tests.factories import login
 from tests.real_db import MakeRealClient, RealDb
@@ -217,21 +222,54 @@ def test_the_relay_passes_what_the_collab_process_allows() -> None:
     assert MAX_MESSAGE_BYTES == MAX_YDOC_BYTES + MESSAGE_ENVELOPE_BYTES
 
 
-async def test_forwards_cookie_header(public_url: str, setup: Setup, upstream: Upstream) -> None:
+async def test_the_relay_sends_no_cookie_upstream(
+    public_url: str, setup: Setup, upstream: Upstream, real_db: RealDb
+) -> None:
+    """Plan M9 decision 16 (R14): the collab process gets a grant for exactly this
+    page and generation, never the session cookie or anything else of the browser's."""
     headers = {
         "Origin": "http://wiki.example",
         "Cookie": f"other=secret; {setup.cookie}",
         "Authorization": "Bearer nope",
     }
-    async with connect(_url(public_url, setup.page, 0), additional_headers=headers) as ws:
-        await ws.send("ping")
-        await ws.recv()
-    ((path, forwarded),) = upstream.requests
-    assert path == f"/collab/{setup.page['id']}?generation=0"
-    assert forwarded["Cookie"] == setup.cookie  # only the session cookie
-    assert forwarded["Origin"] == "http://wiki.example"
-    assert forwarded["X-Forwarded-Host"].startswith("127.0.0.1:")
-    assert "Authorization" not in forwarded
+    for _ in range(2):  # a grant per connection
+        async with connect(_url(public_url, setup.page, 0), additional_headers=headers) as ws:
+            await ws.send("ping")
+            await ws.recv()
+    grants = []
+    for path, forwarded in upstream.requests:
+        assert path == f"/collab/{setup.page['id']}?generation=0"
+        assert set(forwarded) == {
+            "Host",
+            "Upgrade",
+            "Connection",
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Version",
+            "User-Agent",
+            "Authorization",
+            "Origin",
+            "X-Forwarded-Host",
+        }
+        assert forwarded["Origin"] == "http://wiki.example"
+        assert forwarded["X-Forwarded-Host"].startswith("127.0.0.1:")
+        scheme, grant = forwarded["Authorization"].split(" ")
+        assert scheme == "Bearer" and grant.startswith(PREFIX)
+        cookie_value = setup.cookie.split("=", 1)[1]
+        assert cookie_value not in str(forwarded)
+        grants.append(grant)
+    assert len(set(grants)) == 2
+    page_id = UUID(setup.page["id"])
+    async with real_db.database.session_factory() as session:
+        for grant in grants:
+            ref = await collab_grants.resolve(
+                session, grant, page_id=page_id, generation=0, now=utcnow()
+            )
+            assert ref is not None and ref.session_id is not None
+            for other_page, generation in ((page_id, 1), (uuid4(), 0)):
+                found = await collab_grants.resolve(
+                    session, grant, page_id=other_page, generation=generation, now=utcnow()
+                )
+                assert found is None
 
 
 async def test_live_editing_off_without_internal_token(

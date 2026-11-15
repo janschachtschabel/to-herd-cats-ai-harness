@@ -542,7 +542,7 @@ kennen.
   Browser beim Wiederverbinden erneut ein; ist er geschlossen, sind sie verloren. Mehrere Collab-Replikas (mit Redis/Valkey) sind für M9
   geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
   er erbt von ihrer Umgebung nur `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`, `NODE_*` und
-  `HERD_COLLAB_*` und bekommt dazu Token, öffentliche URL und Cookie-Namen, nie die
+  `HERD_COLLAB_*` und bekommt dazu Token und öffentliche URL, nie die
   Datenbank-Zugangsdaten oder andere Geheimnisse der API. Endet dieser Kindprozess (etwa
   weil der Kernel ihn wegen Speichermangels beendet), beendet sich die ganze App mit
   Code 3, und der Orchestrator (`restart: unless-stopped`, Kubernetes) startet sie neu;

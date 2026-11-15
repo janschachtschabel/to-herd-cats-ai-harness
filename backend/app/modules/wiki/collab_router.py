@@ -1,15 +1,18 @@
 """The internal collab API on the internal port (`/internal/collab/*`, behind the
-internal token, see `web/internal.py`). Only the collab process calls it."""
+internal token, see `web/internal.py`). Only the collab process calls it, and only
+with the grants the relay handed it (plan M9 decision 16): a load names its grant in
+the header `X-Herd-Grant` (never in the URL)."""
 
 import base64
 import binascii
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Header, Query, Response
 
 from app.core.errors import ValidationFailed
 from app.modules.auth.deps import SessionDep
+from app.modules.wiki.collab_grants import MAX_GRANT_CHARS
 from app.modules.wiki.collab_schemas import (
     AuthIn,
     AuthOut,
@@ -27,11 +30,11 @@ router = APIRouter(prefix="/collab", tags=["internal"])
 
 @router.post("/auth", response_model=AuthOut)
 async def authenticate(body: AuthIn, session: SessionDep) -> AuthOut:
-    grant = await CollabService(session).authenticate(body.session_token, body.page_id)
+    joined = await CollabService(session).join(body.grant, body.page_id, body.generation)
     return AuthOut(
-        user=CollabUserOut(id=grant.user.id, name=grant.user.name),
-        session_id=grant.session_id,
-        generation=grant.generation,
+        user=CollabUserOut(id=joined.user.id, name=joined.user.name),
+        session_ref=joined.session_ref,
+        generation=joined.generation,
         can_edit=True,
     )
 
@@ -39,11 +42,11 @@ async def authenticate(body: AuthIn, session: SessionDep) -> AuthOut:
 @router.get("/pages/{page_id}", response_model=LiveDocumentOut)
 async def load(
     page_id: uuid.UUID,
-    session_id: uuid.UUID,
     session: SessionDep,
-    generation: Annotated[int | None, Query(ge=0)] = None,
+    generation: Annotated[int, Query(ge=0)],
+    grant: Annotated[str, Header(alias="X-Herd-Grant", max_length=MAX_GRANT_CHARS)],
 ) -> LiveDocumentOut:
-    doc = await CollabService(session).load(page_id, session_id, generation)
+    doc = await CollabService(session).load(page_id, grant, generation)
     ydoc_b64 = base64.b64encode(doc.ydoc).decode("ascii") if doc.ydoc is not None else None
     return LiveDocumentOut(
         generation=doc.generation, ydoc_b64=ydoc_b64, content_md=doc.content_md, title=doc.title
@@ -61,7 +64,7 @@ async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut
         generation=body.generation,
         ydoc=ydoc,
         content_md=body.content_md,
-        session_ids=body.editor_session_ids,
+        grants=body.editor_grants,
         session_key=body.session_key,
     )
     return SaveOut(generation=page.collab_generation, version=page.version)
@@ -70,14 +73,13 @@ async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut
 @router.post("/pages/{page_id}/check", response_model=CheckOut)
 async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> CheckOut:
     result = await CollabService(session).check(
-        page_id, body.session_ids, body.generation, unsaved=body.unsaved_session_ids
+        page_id, body.grants, body.generation, unsaved=body.unsaved_grants
     )
     return CheckOut(
         generation_ok=result.generation_ok,
         generation=result.generation,
-        revoked_session_ids=result.revoked.session_ids,
-        revoked_user_ids=result.revoked.user_ids,
-        ended_session_ids=result.ended_session_ids,
+        revoked_grants=result.revoked_grants,
+        ended_grants=result.ended_grants,
     )
 
 

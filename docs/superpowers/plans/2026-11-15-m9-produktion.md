@@ -218,6 +218,12 @@ Geändert in M9: `keep_set(archives, rule)` ohne `now` (die Stufen zählen vom n
 **Abnahme:** Gates; `collab npm test` und `npm run test:integration`; e2e `live-*`. **Hier:** alles.
 **Commit:** `wiki: hand the collab process page-bound grants instead of the session cookie`.
 
+*Geändert in M9 (Task 6) [Claude, 15.11.2026]:*
+- `collab_grant` speichert keine Person: Sie folgt aus der Sitzung, eine eigene Spalte hätte keinen Leser (Regel 5). `mint(session, *, org_id, session_id, page_id, generation, now)`; `renew(session, grants, *, now)` nimmt die gefundenen `GrantRef`s; dazu `bound(...)` (gefunden für genau Seite und Generation). Der Schritt nach dem Einspielen (Task 2) leert `collab_grant` über `CLEARED_AFTER_RESTORE` in `ops/restore_after.py` (vor `user_session`); eine eigene Funktion dafür braucht es nicht.
+- Eine Berechtigung wird **nicht mit ihrer Sitzung gelöscht**, sondern verliert mit ihr jede Wirkung (`session_id` → NULL, `ON DELETE SET NULL`) und wird eine Stunde nach ihrem Ablauf beim Ausstellen neuer Berechtigungen aufgeräumt. Grund: Würde sie mitgelöscht, wäre die Berechtigung einer widerrufenen Sitzung unbekannt; eine unbekannte darf keine Generation beenden, und ungespeicherte Änderungen der widerrufenen Person blieben dann im Dokument, ohne dass jemand sie speichern oder verwerfen könnte. So beendet nur eine Berechtigung, die für genau diese Seite und Generation ausgestellt wurde, eine Generation.
+- `POST /internal/collab/auth` nimmt außer `grant` auch `page_id` und `generation` (die Bindung wird schon bei der Aufnahme geprüft). Prüfen antwortet `revoked_grants` und `ended_grants`, keine `revoked_user_ids` mehr (jede Verbindung hat ihre eigene Berechtigung); Fehler nennen keine Berechtigungen (403 `collab.editors_revoked` ohne Details), ungültige Berechtigungen sind 401 `collab.grant_invalid`.
+- Die Grenzen je Anmeldung zählt der Collab-Prozess erst nach der Aufnahme über `session_ref` (vorher beim Upgrade über den Hash des Cookies). `HERD_SESSION_COOKIE_NAME` geht nicht mehr an den Collab-Prozess.
+
 ### Task 7: Volles Helm-Chart (M9a)
 
 **Ziel:** Entscheidung 19 und alle neuen Einstellungen der Tasks 1 bis 6 im Chart; Compose vollständig.

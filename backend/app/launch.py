@@ -225,7 +225,6 @@ def collab_env(settings: Settings, *, host: str) -> dict[str, str]:
         HERD_COLLAB_HOST=host,
         HERD_COLLAB_PORT=str(settings.collab_port),
         HERD_COLLAB_API_URL=settings.collab_api_url or f"http://127.0.0.1:{settings.internal_port}",
-        HERD_SESSION_COOKIE_NAME=settings.session_cookie_name,
     )
     if settings.internal_token is not None:
         env["HERD_INTERNAL_TOKEN"] = settings.internal_token.get_secret_value()

@@ -24,6 +24,9 @@ let backend;
 let dataDir;
 let base;
 let wsBase;
+let collabBase;
+let internalBase;
+const INTERNAL_TOKEN = "it-".padEnd(48, "x");
 const clients = [];
 
 function freePort() {
@@ -92,6 +95,8 @@ before(async () => {
   const url = new URL(ADMIN_URL);
   base = `http://127.0.0.1:${publicPort}`;
   wsBase = `ws://127.0.0.1:${publicPort}`;
+  collabBase = `127.0.0.1:${collabPort}`;
+  internalBase = `http://127.0.0.1:${internalPort}`;
   backend = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
     cwd: BACKEND,
     stdio: process.env.HERD_IT_VERBOSE ? "inherit" : "ignore",
@@ -104,7 +109,7 @@ before(async () => {
       HERD_INTERNAL_PORT: String(internalPort),
       HERD_COLLAB_PORT: String(collabPort),
       HERD_COLLAB_URL: `ws://127.0.0.1:${collabPort}`,
-      HERD_INTERNAL_TOKEN: "it-".padEnd(48, "x"),
+      HERD_INTERNAL_TOKEN: INTERNAL_TOKEN,
       HERD_BOOTSTRAP_ADMIN_EMAIL: "owner@it.example",
       HERD_BOOTSTRAP_ADMIN_PASSWORD: PASSWORD,
       HERD_DATA_DIR: dataDir,
@@ -261,5 +266,28 @@ test(
     const after = await content(second.cookie, page.id);
     assert.equal(after.collab_generation, page.collab_generation);
     assert.deepEqual(other.closes, []);
+
+    // The session cookie never reaches the collab process and opens nothing there
+    // (plan M9 decision 16, R14): a valid login straight at its port is refused, and
+    // the internal API takes the cookie's token for no grant.
+    const direct = client(
+      `ws://${collabBase}/collab/${page.id}?generation=${page.collab_generation}`,
+      { cookie: second.cookie, origin: `http://${collabBase}`, name: `page:${page.id}` },
+    );
+    clients.push(direct);
+    await until(() => direct.closes.includes(4401), 15_000);
+    assert.ok(!direct.provider.synced);
+    direct.destroy();
+    const auth = await fetch(`${internalBase}/internal/collab/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Herd-Internal-Token": INTERNAL_TOKEN },
+      body: JSON.stringify({
+        grant: second.cookie.split("=")[1],
+        page_id: page.id,
+        generation: page.collab_generation,
+      }),
+    });
+    assert.equal(auth.status, 401);
+    assert.equal((await auth.json()).error.code, "collab.grant_invalid");
   },
 );

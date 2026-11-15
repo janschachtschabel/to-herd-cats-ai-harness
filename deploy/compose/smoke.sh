@@ -124,8 +124,9 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -X POST -H 'X-Requested-
 [[ $code == 201 ]] || fail "uploading an attachment answered $code"
 
 # Live editing: the WebSocket through the API's relay to the collab process. With the
-# owner's cookie the collab process authenticates the Hocuspocus client (answer:
-# Auth/Authenticated); without a cookie the relay closes with 4401.
+# owner's cookie the relay hands the collab process a grant for the page, which
+# authenticates the Hocuspocus client (answer: Auth/Authenticated); without a cookie
+# the relay closes with 4401.
 cookie="$(awk '$6 == "herd_session" {print $6 "=" $7}' "$jar")"
 origin="$(value HERD_PUBLIC_URL || true)"
 "${compose[@]}" exec -T -e COOKIE="$cookie" -e PAGE="$page_id" -e GENERATION="$generation" \

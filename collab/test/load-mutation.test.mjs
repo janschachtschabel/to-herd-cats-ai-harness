@@ -18,7 +18,7 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("a load mutation is counted once per connection, nothing is stored", async () => {
   live = await liveFixture({ markdown: "Text", createCollabServer });
-  const c = live.open({ cookie: "herd_session=token-a" });
+  const c = live.open({ grant: "herd_cg_a" });
   await synced(c);
   const saves = live.api.saves.length;
   c.provider.sendStateless(LOAD_MUTATION);

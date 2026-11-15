@@ -1,6 +1,8 @@
 // One person cannot occupy live editing for everyone (review M2 R7, S6): connections
 // are limited per login session (10), per page per session (3) and per person across
-// all their logins (20, never more than a quarter of all), closed with 4429; a socket
+// all their logins (20, never more than a quarter of all), closed with 4429. The login
+// session is known only by the opaque `session_ref` the API answers for a grant (the
+// relay issues a grant per connection, plan M9 decision 16); a socket
 // that has not completed the handshake within the timeout is closed (4408), and so is
 // one that sends nothing for 15 minutes.
 import { afterEach, test } from "node:test";
@@ -18,7 +20,7 @@ afterEach(async () => {
 });
 
 const pageId = (n) => `${PAGE.slice(0, -2)}${String(n).padStart(2, "0")}`;
-const anna = { cookie: "herd_session=token-a" };
+const anna = { grant: "herd_cg_a" };
 const onPage = (n) => [{ ...anna, name: `page:${pageId(n)}` }, { page: pageId(n) }];
 
 test("a login session holds at most 3 connections per page and 10 in all", async () => {
@@ -40,7 +42,7 @@ test("a login session holds at most 3 connections per page and 10 in all", async
   const eleventh = live.open(...onPage(4));
   await until(() => eleventh.closes.includes(4429));
   // Someone else is not affected; a closed connection frees its place.
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await synced(ben);
   for (const c of [first[0], fourth, eleventh]) c.destroy(); // the refused ones retry
   await until(() => live.server.connections() === 10);
@@ -49,10 +51,36 @@ test("a login session holds at most 3 connections per page and 10 in all", async
   assert.deepEqual(first[1].closes, []);
 });
 
+test("the limits per login session hold across its grants (session_ref)", async () => {
+  live = await liveFixture({ createCollabServer });
+  // Grants the relay issued for more connections of Anna's one login session.
+  for (let i = 0; i < 4; i++) live.api.users[`herd_cg_a_${i}`] = ["session-a", "user-a", "Anna"];
+  const own = (i) => ({ grant: `herd_cg_a_${i}` });
+  const three = [0, 1, 2].map((i) => live.open(own(i)));
+  await Promise.all(three.map(synced));
+  const fourth = live.open(own(3));
+  await until(() => fourth.closes.includes(4429));
+  // Anna's second login has slots of its own on the page.
+  const second = live.open({ grant: "herd_cg_a2" });
+  await synced(second);
+  assert.deepEqual(
+    three.flatMap((c) => c.closes),
+    [],
+  );
+  // A connection that leaves gives its login session's slot back.
+  three[0].destroy();
+  fourth.destroy();
+  await until(() => live.server.connections() === 3);
+  const again = live.open(own(3));
+  await synced(again);
+});
+
 test("a socket that never completes the handshake is closed (4408)", async () => {
   live = await liveFixture({ createCollabServer, handshakeTimeoutMs: 200 });
   const url = `${live.base}/collab/${PAGE}?generation=0`;
-  const idle = new WebSocket(url, { headers: { origin: ORIGIN, ...anna } });
+  const idle = new WebSocket(url, {
+    headers: { origin: ORIGIN, authorization: "Bearer herd_cg_a" },
+  });
   const closed = new Promise((resolve) => idle.on("close", (code) => resolve(code)));
   await new Promise((resolve) => idle.on("open", resolve));
   assert.equal(live.server.connections(), 1);
@@ -84,21 +112,21 @@ test("a socket whose page is still being opened is not closed as idle (M4-1 P13)
 test("one person holds a limited number of connections across their logins", async () => {
   live = await liveFixture({ createCollabServer, maxPerPerson: 4 });
   const first = [0, 1, 2].map(() => live.open(anna));
-  const second = live.open({ cookie: "herd_session=token-a2" });
+  const second = live.open({ grant: "herd_cg_a2" });
   await Promise.all([...first, second].map(synced));
   const fifth = live.open(
-    { cookie: "herd_session=token-a2", name: `page:${pageId(1)}` },
+    { grant: "herd_cg_a2", name: `page:${pageId(1)}` },
     {
       page: pageId(1),
     },
   );
   await until(() => fifth.closes.includes(4429));
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await synced(ben);
   fifth.destroy();
   first[0].destroy();
   await until(() => live.server.connections() === 4);
-  const again = live.open({ cookie: "herd_session=token-a2" });
+  const again = live.open({ grant: "herd_cg_a2" });
   await synced(again);
 });
 
@@ -133,7 +161,7 @@ test("one person never holds more than a quarter of all connections", async () =
 test("a connection that sends nothing for the idle timeout is closed", async () => {
   live = await liveFixture({ createCollabServer, idleTimeoutMs: 400, checkIntervalMs: 50 });
   const quiet = live.open(anna);
-  const busy = live.open({ cookie: "herd_session=token-b" });
+  const busy = live.open({ grant: "herd_cg_b" });
   await Promise.all([quiet, busy].map(synced));
   const typing = setInterval(() => type(busy.doc, "x"), 100);
   try {

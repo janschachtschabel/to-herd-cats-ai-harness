@@ -34,8 +34,8 @@ function listen(c) {
 
 test("a state that cannot be written as Markdown is not stored, and everyone is told", async () => {
   live = await liveFixture({ markdown: TABLE, createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await Promise.all([synced(anna), synced(ben)]);
   const annaHears = listen(anna);
   const benHears = listen(ben);
@@ -63,13 +63,13 @@ test("a state that cannot be written as Markdown is not stored, and everyone is 
 
 test("someone joining a document that cannot be saved is told at once", async () => {
   live = await liveFixture({ markdown: TABLE, createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   const text = cellText(anna.doc);
   const [{ attributes }] = text.toDelta();
   Y.transact(anna.doc, () => text.insert(text.length, "\\|", attributes));
   await until(() => live.api.unrepresentable >= 1);
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const ben = live.open({ grant: "herd_cg_b" });
   const benHears = listen(ben);
   await until(() => benHears.includes(NOTICE));
 });
@@ -84,8 +84,8 @@ function holds(payload, doc, deleted) {
 
 test("every stored state is acknowledged to everyone; a refused one is not (T5)", async () => {
   live = await liveFixture({ markdown: TABLE, createCollabServer });
-  const anna = live.open({ cookie: "herd_session=token-a" });
-  const ben = live.open({ cookie: "herd_session=token-b" });
+  const anna = live.open({ grant: "herd_cg_a" });
+  const ben = live.open({ grant: "herd_cg_b" });
   await Promise.all([synced(anna), synced(ben)]);
   const annaHears = listen(anna);
   const benHears = listen(ben);

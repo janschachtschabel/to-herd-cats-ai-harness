@@ -21,7 +21,7 @@ export function openRules({ api, log, checks, size, live, memory }) {
   /** Load the page into `document`; its state goes into `live` under `documentName`.
    * Throws (and closes the connection) when it must not be opened. */
   async function load(document, documentName, context) {
-    const answer = await api.load(context.pageId, context.sessionId, context.generation);
+    const answer = await api.load(context.pageId, context.grant, context.generation);
     if (answer.status === 409) throw deny(context, CLOSE.generationEnded);
     if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
     const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
@@ -85,7 +85,7 @@ export function openRules({ api, log, checks, size, live, memory }) {
         generation,
         ydoc: Y.encodeStateAsUpdate(document),
         contentMd,
-        editorSessionIds: [context.sessionId],
+        editorGrants: [context.grant],
         sessionKey: state.sessionKey,
       });
       if (saved.status === 409) throw deny(context, CLOSE.generationEnded);

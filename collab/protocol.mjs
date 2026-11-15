@@ -1,5 +1,5 @@
 // The wire protocol of the live connection: close codes, stateless messages,
-// presence colours and the cookie (shared by live.mjs and server.mjs).
+// presence colours and the connection's grant (shared by live.mjs and server.mjs).
 
 export const CLOSE = {
   generationEnded: [4409, "generation_ended"],
@@ -72,10 +72,8 @@ export function deny(context, close) {
   return Object.assign(new Error(close[1]), { reason: close[1] });
 }
 
-export function readCookie(header, name) {
-  for (const part of (header ?? "").split(";")) {
-    const index = part.indexOf("=");
-    if (index > 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
-  }
-  return null;
+/** The grant the API's relay sent (`Authorization: Bearer herd_cg_...`), or null. */
+export function readGrant(header) {
+  const match = /^Bearer (herd_cg_[A-Za-z0-9_-]{1,92})$/.exec(header ?? "");
+  return match ? match[1] : null;
 }

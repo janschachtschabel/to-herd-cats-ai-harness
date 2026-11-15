@@ -2,8 +2,11 @@
 //
 // One WebSocket edits one page: the page id and the generation the browser's
 // document belongs to come from the connection URL (`/collab/<page id>?generation=N`),
-// and the document name must be `page:<that id>`. Every connection authenticates
-// with the person's session cookie at the API (`/internal/collab/auth`).
+// and the document name must be `page:<that id>`. Every connection carries the grant
+// the API's relay issued for exactly that page and generation (`server.mjs`; never the
+// session cookie, plan M9 decision 16) and is admitted with it at the API
+// (`/internal/collab/auth`); loads, saves and checks name the grants of the
+// connections. The checks keep the grants alive.
 //
 // A page is opened only if the editor can show it without changing what it means
 // (`liveDocument` in markdown.mjs); otherwise 4422 `collab.not_roundtrip_safe`. The
@@ -14,8 +17,9 @@
 // Markdown equals what was loaded keeps the stored Markdown as it was written.
 //
 // Saves (debounced 2 s, at the latest after 10 s) send the Markdown and the Yjs
-// state together with the sessions that edited since the last save. Every 5 s each
-// open document asks the API whether its generation and its people still hold.
+// state together with the grants of the connections that edited since the last save.
+// Every 5 s each open document asks the API whether its generation and its people
+// still hold.
 // - Generation ended (a change outside the live session): every connection is closed
 //   with 4409 `generation_ended`, the document is dropped unsaved.
 // - A person's login session ended (logout, expiry) while they may still edit: what
@@ -45,16 +49,15 @@ import {
   UNSAVED,
   closeSocket,
   deny,
-  readCookie,
 } from "./protocol.mjs";
 
-export { CLOSE, colorFor, readCookie } from "./protocol.mjs";
+export { CLOSE, colorFor, readGrant } from "./protocol.mjs";
 
-/** `person(context, userId)`: false when the person holds too many connections.
- * `checks`: where the heavy checks run (`checks.mjs`). */
+/** `person(context, {userId, sessionRef})`: false when the person or their login
+ * session holds too many connections. `checks`: where the heavy checks run
+ * (`checks.mjs`). */
 export function liveExtension({
   api,
-  cookieName,
   retryMs = 5000,
   log = () => {},
   person = () => true,
@@ -92,22 +95,23 @@ export function liveExtension({
     loading,
     memory,
 
-    async onAuthenticate({ documentName, requestHeaders, context }) {
+    async onAuthenticate({ documentName, context }) {
       if (documentName !== `page:${context.pageId}`) throw deny(context, CLOSE.forbidden);
       if (ending.has(documentName)) throw deny(context, CLOSE.retry);
-      const token = readCookie(requestHeaders.get("cookie"), cookieName);
-      if (!token) throw deny(context, CLOSE.unauthorized);
+      if (!context.grant) throw deny(context, CLOSE.unauthorized);
       let answer;
       try {
-        answer = await api.auth(token, context.pageId);
+        answer = await api.auth(context.grant, context.pageId, context.generation);
       } catch (error) {
         if (error instanceof ApiUnavailable) throw deny(context, CLOSE.retry);
         throw error;
       }
+      if (answer.status === 409) throw deny(context, CLOSE.generationEnded);
       if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
       if (answer.body.generation !== context.generation) throw deny(context, CLOSE.generationEnded);
-      if (!person(context, answer.body.user.id)) throw deny(context, CLOSE.tooMany);
-      return { user: answer.body.user, sessionId: answer.body.session_id };
+      const { user, session_ref: sessionRef } = answer.body;
+      if (!person(context, { userId: user.id, sessionRef })) throw deny(context, CLOSE.tooMany);
+      return { user };
     },
 
     async onLoadDocument({ document, documentName, context }) {
@@ -125,7 +129,7 @@ export function liveExtension({
     async connected({ connection, documentName, context, instance }) {
       const state = live.get(documentName);
       if (!state || state.discarded || state.holding) return closeSocket(context, CLOSE.retry);
-      state.seen.add(context.sessionId);
+      state.seen.add(context.grant);
       if (state.unrepresentable) connection.sendStateless(state.unrepresentable);
       if (context.generation < state.generation) return closeSocket(context, CLOSE.generationEnded);
       if (context.generation > state.generation) {
@@ -181,7 +185,7 @@ export function liveExtension({
     async onDisconnect({ context, document, documentName, instance, socketId }) {
       presence.forget(socketId);
       const state = live.get(documentName);
-      if (!state || state.discarded || state.holding || !state.dirty.has(context?.sessionId)) {
+      if (!state || state.discarded || state.holding || !state.dirty.has(context?.grant)) {
         return;
       }
       instance.storeDocumentHooks(document, { document, documentName, instance }, true);
@@ -189,7 +193,7 @@ export function liveExtension({
 
     async onChange({ connection, context, documentName }) {
       const state = live.get(documentName);
-      if (connection && state && context?.sessionId) state.dirty.set(context.sessionId, true);
+      if (connection && state && context?.grant) state.dirty.set(context.grant, true);
     },
 
     async beforeHandleAwareness(payload) {

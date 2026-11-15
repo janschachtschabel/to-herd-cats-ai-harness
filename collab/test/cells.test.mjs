@@ -60,7 +60,7 @@ test("a page over the cap is refused at once, without a check", async () => {
     };
   }
   live = await liveFixture({ markdown, createCollabServer, checks });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await until(() => anna.closes.includes(4413));
   assert.equal(asked, 0, "no check worker was asked");
   assert.equal(live.api.saves.length, 0);
@@ -70,7 +70,7 @@ test("a page at the cap opens", async () => {
   const markdown = table(10, MAX_TABLE_CELLS / 10 - 1);
   assert.equal(markdownTableCells(markdown), MAX_TABLE_CELLS);
   live = await liveFixture({ markdown, createCollabServer, checkWorkers: 0 });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   assert.deepEqual(anna.closes, []);
 });
@@ -78,7 +78,7 @@ test("a page at the cap opens", async () => {
 test("a state over the cap is not stored, and everyone is told it is too large", async () => {
   const markdown = `Text\n\n${table(10, MAX_TABLE_CELLS / 10 - 1)}\n`;
   live = await liveFixture({ markdown, createCollabServer, checkWorkers: 0 });
-  const anna = live.open({ cookie: "herd_session=token-a" });
+  const anna = live.open({ grant: "herd_cg_a" });
   await synced(anna);
   const heard = [];
   anna.provider.on("stateless", ({ payload }) => heard.push(payload));

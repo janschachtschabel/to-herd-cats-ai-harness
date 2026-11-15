@@ -1,15 +1,24 @@
-"""Bodies of the internal collab API (`collab_router.py`)."""
+"""Bodies of the internal collab API (`collab_router.py`). A grant is the text the relay
+handed the collab process (`collab_grants.py`); any other text is simply not found."""
 
 import uuid
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
+from app.modules.wiki.collab_grants import MAX_GRANT_CHARS
+
 MAX_EDITORS = 200
+
+GrantText = Annotated[str, Field(min_length=1, max_length=MAX_GRANT_CHARS)]
 
 
 class AuthIn(BaseModel):
-    session_token: str = Field(min_length=1, max_length=200)
+    """The connection's grant, and the page and generation of its URL."""
+
+    grant: GrantText
     page_id: uuid.UUID
+    generation: int = Field(ge=0)
 
 
 class CollabUserOut(BaseModel):
@@ -18,10 +27,11 @@ class CollabUserOut(BaseModel):
 
 
 class AuthOut(BaseModel):
-    """`session_id` names the connection's login session in later saves and checks."""
+    """`session_ref` names the connection's login session opaquely, for the collab
+    process's limits per session; `generation` is the page's."""
 
     user: CollabUserOut
-    session_id: uuid.UUID
+    session_ref: str
     generation: int
     can_edit: bool
 
@@ -41,7 +51,7 @@ class SaveIn(BaseModel):
     generation: int = Field(ge=0)
     ydoc_b64: str
     content_md: str
-    editor_session_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_EDITORS)
+    editor_grants: list[GrantText] = Field(min_length=1, max_length=MAX_EDITORS)
     session_key: str = Field(min_length=1, max_length=100)
 
 
@@ -51,21 +61,22 @@ class SaveOut(BaseModel):
 
 
 class CheckIn(BaseModel):
-    """`session_ids`: the document's connections; `unsaved_session_ids`: the sessions
-    whose edits are in the document but not saved yet (one of them revoked ends the
-    generation)."""
+    """`grants`: the document's connections; `unsaved_grants`: the grants whose edits
+    are in the document but not saved yet (one of them revoked ends the generation,
+    if it was issued for this page and generation)."""
 
-    session_ids: list[uuid.UUID] = Field(max_length=MAX_EDITORS)
-    unsaved_session_ids: list[uuid.UUID] = Field(default=[], max_length=MAX_EDITORS)
+    grants: list[GrantText] = Field(max_length=MAX_EDITORS)
+    unsaved_grants: list[GrantText] = Field(default=[], max_length=MAX_EDITORS)
     generation: int = Field(ge=0)
 
 
 class CheckOut(BaseModel):
-    """`ended_session_ids`: sessions that ended (logout, expiry) of people who may still
-    edit: their edits may be saved, then their connections close (4401)."""
+    """`revoked_grants`: connections to close (no right any more, or no grant of this
+    page and generation); `ended_grants`: login sessions that ended (logout, expiry) of
+    people who may still edit: their edits may be saved, then their connections close
+    (4401)."""
 
     generation_ok: bool
     generation: int
-    revoked_session_ids: list[uuid.UUID]
-    revoked_user_ids: list[uuid.UUID]
-    ended_session_ids: list[uuid.UUID]
+    revoked_grants: list[str]
+    ended_grants: list[str]

@@ -239,7 +239,6 @@ def test_the_collab_process_gets_only_what_it_needs(monkeypatch):
         "HERD_COLLAB_HOST",
         "HERD_COLLAB_PORT",
         "HERD_COLLAB_API_URL",
-        "HERD_SESSION_COOKIE_NAME",
         "HERD_INTERNAL_TOKEN",
         "HERD_PUBLIC_URL",
     }

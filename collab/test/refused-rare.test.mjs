@@ -60,7 +60,7 @@ for (const [name, [json, detail]] of Object.entries(RARE)) {
     assert.equal(answer.block, 0);
 
     live = await liveFixture({ markdown: "Start", createCollabServer, checkWorkers: 0 });
-    const anna = live.open({ cookie: "herd_session=token-a" });
+    const anna = live.open({ grant: "herd_cg_a" });
     await synced(anna);
     const heard = [];
     anna.provider.on("stateless", ({ payload }) => heard.push(payload));
