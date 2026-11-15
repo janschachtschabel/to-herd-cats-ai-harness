@@ -81,7 +81,12 @@ function CreateForm({
       noValidate
       className="flex flex-col gap-4"
       onSubmit={form.handleSubmit((values) =>
-        create.mutate(tokenBody(values), { onSuccess: onCreated }),
+        create.mutate(tokenBody(values), {
+          onSuccess: (token) => {
+            onCreated(token)
+            create.reset() // the clear text stays only where `onCreated` shows it
+          },
+        }),
       )}
     >
       <Field

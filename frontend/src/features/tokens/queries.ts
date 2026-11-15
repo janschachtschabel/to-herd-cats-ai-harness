@@ -91,10 +91,13 @@ export function useTokenCalls(owner: CallsOwner, tokenId: string) {
 }
 
 /** Creates a token: mine, or an external agent's. The answer carries the clear text
- *  once (`secret`); it is handed on and kept nowhere in the cache. */
+ *  once (`secret`); it is handed on and kept nowhere in the cache: the finished
+ *  mutation is forgotten as soon as its form is gone (`gcTime: 0`, module review M8 2,
+ *  finding G3), and the form resets it once it has handed the token on. */
 export function useCreateToken(agentId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
+    gcTime: 0,
     mutationFn: async (body: Schemas['TokenIn']) =>
       agentId
         ? unwrap(
