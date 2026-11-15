@@ -1,6 +1,7 @@
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo } from 'react'
 import type { Conversation, Page } from '@/lib/api'
+import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationEventKeys, automationKeys } from '@/features/automations/queries'
@@ -81,8 +82,9 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
     case 'dm.inspected':
       return conversation ? [messagingKeys.conversation(conversation)] : []
     case 'notification.created':
-      // A new release card comes with an activity entry for the person asked.
-      return [activityKeys.all, approvalKeys.mine]
+      // A new release card comes with an activity entry for the person asked; an
+      // account awaiting approval with one for each user administrator.
+      return [activityKeys.all, approvalKeys.mine, userKeys.all]
     case 'activity.changed':
       return [activityKeys.all]
     case 'ticket.created':

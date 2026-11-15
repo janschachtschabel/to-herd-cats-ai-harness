@@ -73,6 +73,26 @@
         "title": "Action",
         "type": "string"
       },
+      "ActivityAccount": {
+        "description": "The self-registered account a `signup` notification is about (plan M9 task 5b;\nits address: the user administration's waiting accounts); the account is also the\nentry's `author`. `awaiting`: whether it still waits for approval.",
+        "properties": {
+          "awaiting": {
+            "title": "Awaiting",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "awaiting"
+        ],
+        "title": "ActivityAccount",
+        "type": "object"
+      },
       "ActivityAuthor": {
         "properties": {
           "id": {
@@ -212,8 +232,18 @@
         "type": "object"
       },
       "ActivityOut": {
-        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7); `author` may be an agent (`type`).",
+        "description": "A notification: why, where, from whom, and the first 140 characters of the\nmessage's Markdown. `parent_id`: the thread the message is in (null: top level).\n`read_at`/`done_at`: null until marked. An `assignment` points at a timeline entry:\n`author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top\nlevel has no conversation and no message, but `proposal` (plan M6); a\n`skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`\nthe automation (plan M7), a `signup` the waiting account (plan M9); `author` may be\nan agent (`type`).",
         "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityAccount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "author": {
             "anyOf": [
               {
@@ -7001,7 +7031,8 @@
           "run_stopped",
           "skill_proposal",
           "automation",
-          "review_due"
+          "review_due",
+          "signup"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -8999,6 +9030,20 @@
         ],
         "title": "PausedReason",
         "type": "string"
+      },
+      "PendingCountOut": {
+        "description": "How many self-registered accounts wait for approval.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "PendingCountOut",
+        "type": "object"
       },
       "PersonNameOut": {
         "description": "Who caused a timeline entry: a person, or (plan M6) an agent (`type`).",
@@ -11443,6 +11488,21 @@
           "version"
         ],
         "title": "ServerUpdate",
+        "type": "object"
+      },
+      "SignupDecisionIn": {
+        "additionalProperties": false,
+        "description": "Approve or reject a waiting account: the version the client read (409).",
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "SignupDecisionIn",
         "type": "object"
       },
       "SkillAuthorOut": {
@@ -14979,6 +15039,18 @@
       },
       "UserOut": {
         "properties": {
+          "awaiting_approval_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awaiting Approval Since"
+          },
           "email": {
             "title": "Email",
             "type": "string"
@@ -15028,6 +15100,7 @@
           "is_active",
           "locale",
           "last_login_at",
+          "awaiting_approval_since",
           "version"
         ],
         "title": "UserOut",
@@ -16602,6 +16675,18 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "description": "true: only accounts awaiting approval",
+            "in": "query",
+            "name": "pending",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "true: only accounts awaiting approval",
+              "title": "Pending",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -16671,6 +16756,28 @@
         ]
       }
     },
+    "/api/admin/users/pending/count": {
+      "get": {
+        "description": "How many self-registered accounts wait for approval (the admin navigation's badge).",
+        "operationId": "count_pending_api_admin_users_pending_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Count Pending",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/admin/users/{user_id}": {
       "patch": {
         "operationId": "update_user_api_admin_users__user_id__patch",
@@ -16719,6 +16826,60 @@
           }
         },
         "summary": "Update User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/approve": {
+      "post": {
+        "description": "Let a self-registered account in (409 `users.not_pending` once decided).",
+        "operationId": "approve_signup_api_admin_users__user_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Signup",
         "tags": [
           "users"
         ]
@@ -16908,6 +17069,60 @@
           }
         },
         "summary": "Reactivate User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/reject": {
+      "post": {
+        "description": "Refuse a self-registered account: it stays deactivated.",
+        "operationId": "reject_signup_api_admin_users__user_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Signup",
         "tags": [
           "users"
         ]

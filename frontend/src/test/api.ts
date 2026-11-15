@@ -131,6 +131,7 @@ export function makeUser(overrides: Partial<User> = {}): User {
     is_active: true,
     locale: 'de',
     last_login_at: null,
+    awaiting_approval_since: null,
     version: 1,
     ...overrides,
   }

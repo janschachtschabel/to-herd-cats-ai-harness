@@ -14,8 +14,10 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { usePendingCount } from '@/features/admin/users/queries'
 import { useMe } from '@/features/auth/queries'
 import { useOpenSearch } from '@/features/search/SearchContext'
+import { badgeCount } from '@/lib/format'
 import { navLinkActive, navLinkClass } from './navStyles'
 import { adminLinks, visibleSections, type AdminLink, type SectionId } from './nav'
 import { SectionHeading } from './SectionHeading'
@@ -34,6 +36,20 @@ const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/ai': Sparkles,
   '/admin/agents': Bot,
   '/admin/skills': ScrollText,
+}
+
+/** The number of self-registered accounts awaiting approval, beside "Personen" (the
+ *  link shows only with `user.manage`, so only such people ask). */
+function PendingBadge() {
+  const { t } = useTranslation()
+  const count = usePendingCount(true)
+  if (count === 0) return null
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular-nums">
+      <span aria-hidden>{badgeCount(count)}</span>
+      <span className="sr-only">{t('users.pending.navCount', { count })}</span>
+    </span>
+  )
 }
 
 function AdminSection() {
@@ -55,6 +71,7 @@ function AdminSection() {
               <Link to={link.to} className={navLinkClass} activeProps={navLinkActive}>
                 <Icon className="size-4 shrink-0" aria-hidden />
                 {t(link.labelKey)}
+                {link.to === '/admin/users' && <PendingBadge />}
               </Link>
             </li>
           )

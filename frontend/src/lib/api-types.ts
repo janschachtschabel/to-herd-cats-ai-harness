@@ -297,6 +297,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users/pending/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Pending
+         * @description How many self-registered accounts wait for approval (the admin navigation's badge).
+         */
+        get: operations["count_pending_api_admin_users_pending_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users/{user_id}": {
         parameters: {
             query?: never;
@@ -312,6 +332,26 @@ export interface paths {
         head?: never;
         /** Update User */
         patch: operations["update_user_api_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Signup
+         * @description Let a self-registered account in (409 `users.not_pending` once decided).
+         */
+        post: operations["approve_signup_api_admin_users__user_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/admin/users/{user_id}/deactivate": {
@@ -376,6 +416,26 @@ export interface paths {
         put?: never;
         /** Reactivate User */
         post: operations["reactivate_user_api_admin_users__user_id__reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Signup
+         * @description Refuse a self-registered account: it stays deactivated.
+         */
+        post: operations["reject_signup_api_admin_users__user_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3796,6 +3856,21 @@ export interface components {
          * @enum {string}
          */
         Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
+        /**
+         * ActivityAccount
+         * @description The self-registered account a `signup` notification is about (plan M9 task 5b;
+         *     its address: the user administration's waiting accounts); the account is also the
+         *     entry's `author`. `awaiting`: whether it still waits for approval.
+         */
+        ActivityAccount: {
+            /** Awaiting */
+            awaiting: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** ActivityAuthor */
         ActivityAuthor: {
             /**
@@ -3862,9 +3937,11 @@ export interface components {
          *     `author` is who assigned, `snippet` is empty. A `proposal` for a new page at the top
          *     level has no conversation and no message, but `proposal` (plan M6); a
          *     `skill_proposal` has `skill_proposal` instead (plan M6 task 9), an `automation`
-         *     the automation (plan M7); `author` may be an agent (`type`).
+         *     the automation (plan M7), a `signup` the waiting account (plan M9); `author` may be
+         *     an agent (`type`).
          */
         ActivityOut: {
+            account?: components["schemas"]["ActivityAccount"] | null;
             author: components["schemas"]["ActivityAuthor"] | null;
             automation?: components["schemas"]["ActivityAutomation"] | null;
             conversation: components["schemas"]["ActivityConversation"] | null;
@@ -6457,7 +6534,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup";
         /** OAuthSpec */
         OAuthSpec: {
             /** Authorization Endpoint */
@@ -7077,6 +7154,14 @@ export interface components {
          * @enum {string}
          */
         PausedReason: "manual" | "owner" | "failing";
+        /**
+         * PendingCountOut
+         * @description How many self-registered accounts wait for approval.
+         */
+        PendingCountOut: {
+            /** Count */
+            count: number;
+        };
         /**
          * PersonNameOut
          * @description Who caused a timeline entry: a person, or (plan M6) an agent (`type`).
@@ -7955,6 +8040,14 @@ export interface components {
             oauth_client_id?: string | null;
             /** Url */
             url?: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * SignupDecisionIn
+         * @description Approve or reject a waiting account: the version the client read (409).
+         */
+        SignupDecisionIn: {
             /** Version */
             version: number;
         };
@@ -9352,6 +9445,8 @@ export interface components {
         };
         /** UserOut */
         UserOut: {
+            /** Awaiting Approval Since */
+            awaiting_approval_since: string | null;
             /** Email */
             email: string;
             /**
@@ -10230,6 +10325,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+                /** @description true: only accounts awaiting approval */
+                pending?: boolean;
             };
             header?: never;
             path?: never;
@@ -10290,6 +10387,26 @@ export interface operations {
             };
         };
     };
+    count_pending_api_admin_users_pending_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingCountOut"];
+                };
+            };
+        };
+    };
     update_user_api_admin_users__user_id__patch: {
         parameters: {
             query?: never;
@@ -10302,6 +10419,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_signup_api_admin_users__user_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupDecisionIn"];
             };
         };
         responses: {
@@ -10435,6 +10587,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_signup_api_admin_users__user_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
             };
             /** @description Validation Error */
             422: {

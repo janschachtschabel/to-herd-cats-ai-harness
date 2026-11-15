@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { LiveEvent } from '@/lib/live'
+import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationKeys } from '@/features/automations/queries'
@@ -58,6 +59,8 @@ const KEYS = {
   firingsA: automationKeys.firings('au-a'),
   automationB: automationKeys.detail('au-b'),
   preview: automationKeys.preview(null),
+  pendingUsers: [...userKeys.all, 'pending'],
+  pendingCount: userKeys.pendingCount,
 }
 
 /** What the ticket queries hold where the invalidation reads it (the ticket's id). */
@@ -164,11 +167,14 @@ describe('live invalidation', () => {
       'question',
       'myApprovals',
     ])
-    // A new card's activity entry refreshes my list of releases (and its count).
+    // A new card's activity entry refreshes my list of releases (and its count); an
+    // account awaiting approval the people administration's lists and its count.
     expect(staleAfter({ type: 'notification.created' })).toEqual([
       'activity',
       'activityCount',
       'myApprovals',
+      'pendingUsers',
+      'pendingCount',
     ])
   })
 
@@ -246,6 +252,8 @@ describe('live invalidation', () => {
       'activity',
       'activityCount',
       'myApprovals',
+      'pendingUsers',
+      'pendingCount',
     ])
     expect(staleAfter({ type: 'activity.changed' })).toEqual(['activity', 'activityCount'])
   })

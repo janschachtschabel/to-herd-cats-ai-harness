@@ -70,6 +70,15 @@ export function profileSearch(search: Record<string, unknown>): ProfileSearch {
   return { linked, link_error: signInError(search.link_error) }
 }
 
+export interface UsersSearch {
+  /** Only the self-registered accounts awaiting approval (plan M9 task 5b). */
+  filter?: 'pending' | undefined
+}
+
+export function usersSearch(search: Record<string, unknown>): UsersSearch {
+  return { filter: search.filter === 'pending' ? 'pending' : undefined }
+}
+
 export interface SkillsSearch {
   /** The proposals beside the skills (for those who decide them). */
   view?: 'proposals' | undefined

@@ -20,9 +20,16 @@
       "provider_error": "The provider answered unexpectedly. Please try again later.",
       "issuer_mismatch": "The provider answered unexpectedly. Please try again later.",
       "id_token_invalid": "The provider's answer could not be verified. Please try again later.",
-      "public_url_missing": "Signing in through providers is not set up."
+      "public_url_missing": "Signing in through providers is not set up.",
+      "account_pending": "Your account is waiting for approval by an administrator."
     },
-    "hintWithProviders": "Sign in with your organisation's account or with your email address and password."
+    "hintWithProviders": "Sign in with your organisation's account or with your email address and password.",
+    "pending": {
+      "title": "Your account is waiting for approval",
+      "text": "Your account is waiting for approval by an administrator.",
+      "next": "The administrators have been notified. Once your account is approved, sign in through the provider again as you just did.",
+      "back": "Back to sign-in"
+    }
   },
   "profile": {
     "identities": {
@@ -150,6 +157,47 @@
       "provider_unreachable": "The provider cannot be reached.",
       "provider_error": "The provider answered unexpectedly.",
       "issuer_mismatch": "The discovery document names another issuer."
+    },
+    "users": {
+      "not_pending": "This account has already been decided on.",
+      "awaiting_approval": "This account is awaiting approval. Approve it instead of reactivating it."
+    }
+  },
+  "users": {
+    "views": "People views",
+    "allTab": "All people",
+    "status": {
+      "pending": "Awaiting approval"
+    },
+    "pending": {
+      "tab": "Awaiting approval",
+      "count_one": "{{count}} account awaiting approval",
+      "count_other": "{{count}} accounts awaiting approval",
+      "navCount_one": "{{count}} account awaiting approval",
+      "navCount_other": "{{count}} accounts awaiting approval",
+      "hint": "These people registered themselves through a sign-in provider. They cannot sign in until you approve them; until then they have no access. Approved accounts start as members without AI.",
+      "empty": "Nobody is awaiting approval.",
+      "approve": {
+        "action": "Approve",
+        "openNamed": "Approve {{name}}",
+        "title": "Approve account?",
+        "text": "{{name}} can then sign in as a member (without AI until you assign otherwise under AI)."
+      },
+      "reject": {
+        "action": "Reject",
+        "openNamed": "Reject {{name}}",
+        "title": "Reject account?",
+        "text": "The account of {{name}} stays deactivated; signing in is not possible. You can reactivate it later like any deactivated person."
+      }
+    }
+  },
+  "activity": {
+    "reasons": {
+      "signup": "registered"
+    },
+    "signup": {
+      "waiting": "{{name}} registered and is awaiting approval.",
+      "decided": "{{name}} registered; the approval has been decided."
     }
   }
 }

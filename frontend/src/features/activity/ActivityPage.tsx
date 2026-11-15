@@ -12,6 +12,7 @@ import {
   ScrollText,
   ShieldCheck,
   UserCheck,
+  UserPlus,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
@@ -22,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
 import { useMe } from '@/features/auth/queries'
 import { AutomationSentence, ReviewDueSentence } from './Sentences'
+import { signupText } from './wording'
 import { conversationLabel } from '@/features/messaging/display'
 import { plainMentions } from '@/features/messaging/mentions'
 import { messageTarget, useOpenMessage } from '@/features/messaging/targets'
@@ -123,6 +125,7 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   skill_proposal: ScrollText,
   automation: CalendarClock,
   review_due: ClipboardCheck,
+  signup: UserPlus,
 }
 
 /** Where an entry happened, for its sentence: its conversation, or where a proposal
@@ -163,7 +166,8 @@ function ActivityItem({
     (entry.conversation && entry.message_id) ||
     entry.skill_proposal ||
     entry.proposal ||
-    entry.automation,
+    entry.automation ||
+    entry.account,
   )
 
   const go = () => {
@@ -173,6 +177,8 @@ function ActivityItem({
     } else if (entry.skill_proposal) {
       const proposalId = entry.skill_proposal.id
       void navigate({ to: '/skill-proposals/$proposalId', params: { proposalId } })
+    } else if (entry.account) {
+      void navigate({ to: '/admin/users', search: { filter: 'pending' } })
     } else if (entry.automation) {
       const automationId = entry.automation.id
       void navigate({ to: '/automations/$automationId', params: { automationId } })
@@ -201,6 +207,8 @@ function ActivityItem({
             <AutomationSentence entry={entry} />
           ) : entry.reason === 'review_due' ? (
             <ReviewDueSentence entry={entry} />
+          ) : entry.reason === 'signup' ? (
+            signupText(t, entry)
           ) : (
             <>
               <span className="font-medium">{author ?? t('messaging.message.unknownAuthor')}</span>{' '}

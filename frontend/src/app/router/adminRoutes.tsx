@@ -3,7 +3,7 @@ import { adminLinks } from '@/app/shell/nav'
 import { hasPermission } from '@/features/auth/queries'
 import type { Me, Permission } from '@/lib/api'
 import { appRoute } from './base'
-import { serverSearch, skillsSearch } from './search'
+import { serverSearch, skillsSearch, usersSearch } from './search'
 
 const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
 const GroupsPage = lazyRouteComponent(
@@ -89,11 +89,17 @@ const adminIndexRoute = createRoute({
   },
 })
 
+/** People (`user.manage`); `?filter=pending`: the self-registered accounts awaiting
+ *  approval. */
 const usersRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/users',
+  validateSearch: usersSearch,
   loader: ({ context }) => requirePermission(context.me, 'user.manage'),
-  component: UsersPage,
+  component: function UsersRoute() {
+    const { filter } = usersRoute.useSearch()
+    return <UsersPage filter={filter ?? 'all'} />
+  },
 })
 
 /** Sign-in providers (plan M9): Google and other OIDC providers, self-registration. */

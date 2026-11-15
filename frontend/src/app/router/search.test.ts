@@ -8,6 +8,7 @@ import {
   profileSearch,
   serverSearch,
   skillsSearch,
+  usersSearch,
 } from './search'
 
 /** TanStack Router lays `validateSearch`'s result over the raw search: a key the
@@ -26,6 +27,7 @@ describe('validateSearch keeps no unchecked value', () => {
     ['messages', messageSearch, ['thread', 'message']],
     ['pages', pageSearch, ['thread', 'message', 'view', 'discussion']],
     ['skills', skillsSearch, ['view']],
+    ['users', usersSearch, ['filter']],
     ['servers', serverSearch, ['read']],
     ['runs', runSearch, ['state', 'stop_reason']],
     ['profile', profileSearch, ['linked', 'link_error']],
