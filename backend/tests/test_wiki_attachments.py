@@ -90,6 +90,7 @@ async def test_upload_and_download_roundtrip(wiki: Wiki, data_dir: Path) -> None
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["content-disposition"].startswith("attachment;")
     assert "sandbox" in r.headers["content-security-policy"]
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
     inline = await wiki.editor.get(body["url"], params={"inline": 1})
     assert inline.headers["content-disposition"].startswith("inline;")
     stored = _stored_files(data_dir)

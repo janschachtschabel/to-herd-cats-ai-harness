@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from app.core.downloads import content_disposition
 from app.core.pagination import Page, PageParams
+from app.core.security_headers import API_POLICY
 from app.modules.auth.deps import ActorDep, SessionDep
 from app.modules.wiki import filetypes
 from app.modules.wiki.ai_lock import AiLockService
@@ -40,7 +41,7 @@ def download_headers(attachment: Attachment, inline: bool) -> dict[str, str]:
         ),
         "X-Content-Type-Options": "nosniff",
         # Opened directly, nothing in it runs or loads anything.
-        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "Content-Security-Policy": f"{API_POLICY}; sandbox",
         "Cache-Control": "private, no-cache",
     }
 

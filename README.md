@@ -609,6 +609,14 @@ kennen.
   `<style>` mit Laufzeitwerten einfügt. Skripte bleiben auf `'self'` beschränkt. Die
   WebSocket-Verbindung der Live-Bearbeitung geht an denselben Host und fällt unter
   `default-src 'self'` (in Chromium ohne Verletzung geprüft); die CSP bleibt unverändert.
+  Jede andere Antwort (API, Fehler, Downloads) trägt eine eigene, strengere CSP
+  (`default-src 'none'`, `frame-ancestors 'none'`, Anhänge zusätzlich `sandbox`); nur
+  Swagger UI außerhalb der Produktion hat keine ([`SICHERHEIT.md`](docs/SICHERHEIT.md)).
+- **HSTS** (`max-age=31536000; includeSubDomains`) kommt nur auf Antworten über https
+  (direkt oder über `X-Forwarded-Proto` eines vertrauten Proxys) und gilt auch für
+  Subdomains des Hosts, unter dem die App läuft. Läuft sie direkt unter einer Domain,
+  deren Subdomains noch http brauchen, gehört sie auf eine eigene Subdomain
+  (`wiki.example.com`).
 - **Anmeldelast**: Die Passwortprüfung (argon2id, 64 MiB, 4 Lanes) läuft in
   Worker-Threads, höchstens `HERD_PASSWORD_HASH_CONCURRENCY` (Standard 2) gleichzeitig
   je Prozess; jede braucht 64 MiB. Höchstens `HERD_PASSWORD_HASH_QUEUE` (Standard 16)

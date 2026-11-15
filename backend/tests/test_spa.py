@@ -120,7 +120,8 @@ def test_csp_starts_from_self_and_forbids_framing() -> None:
     )
     assert directives["default-src"] == "'self'"
     assert directives["frame-ancestors"] == "'none'"
-    assert directives["base-uri"] == "'self'"
+    assert directives["base-uri"] == "'none'"
+    assert directives["object-src"] == "'none'"
     assert directives["form-action"] == "'self'"
     assert "script-src" not in directives  # scripts: 'self' only, never inline
     assert "*" not in CONTENT_SECURITY_POLICY

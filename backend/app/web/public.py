@@ -188,7 +188,9 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, routes=body_limits(settings)
     )
     app.add_middleware(UnhandledErrorMiddleware)
-    app.add_middleware(SecurityHeadersMiddleware)
+    # Swagger UI (outside production only) loads its scripts from a CDN: no API policy.
+    docs = () if app.docs_url is None else (app.docs_url,)
+    app.add_middleware(SecurityHeadersMiddleware, exempt=docs)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RequestLogMiddleware)
     install_error_handlers(app)
