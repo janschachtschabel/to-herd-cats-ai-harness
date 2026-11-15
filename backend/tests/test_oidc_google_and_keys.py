@@ -72,10 +72,10 @@ async def test_google_preset_sends_hd_only_with_exactly_one_domain_and_accepts_b
     done = await sign_in(
         await make_client(), oidc_stub, "google", email="a@example.com", hd="example.com", sub="g1"
     )
-    assert done.headers["location"] == "/", done.headers
+    assert error_of(done) == "oidc.account_pending", done.headers  # admitted, awaits approval
     oidc_stub.state.issuer_claim = "https://accounts.google.com"
     done = await sign_in(await make_client(), oidc_stub, "google", sub="g1")
-    assert done.headers["location"] == "/"
+    assert error_of(done) == "oidc.account_pending"  # the token passed: the subject is known
     oidc_stub.state.issuer_claim = oidc_stub.url  # not Google's
     done = await sign_in(await make_client(), oidc_stub, "google", sub="g1")
     assert error_of(done) == "oidc.id_token_invalid"
@@ -183,11 +183,11 @@ async def test_no_email_or_claims_in_logs(
         email=secret_bits[0], name=secret_bits[1], sub=secret_bits[2]
     )
     done = await browser.get("/api/auth/oidc/stub/callback", params=query)
-    assert done.headers["location"] == "/"
+    assert error_of(done) == "oidc.account_pending"
     oidc_stub.state.token_claims = {"aud": "wrong"}
     await sign_in(await make_client(), oidc_stub, email=secret_bits[0])
     ours = [r for r in caplog.records if not r.name.startswith("uvicorn")]
     text = "\n".join(f"{r.getMessage()} {r.__dict__}" for r in ours) + capsys.readouterr().out
-    for bit in (*secret_bits, query["code"], query["state"], browser.cookies["herd_session"]):
+    for bit in (*secret_bits, query["code"], query["state"]):
         assert bit not in text, bit
     assert "oidc id token refused" in text  # the refusal is logged, by its reason only

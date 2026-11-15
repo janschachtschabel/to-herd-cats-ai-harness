@@ -13,7 +13,9 @@ the automation, `automation_id`, and no conversation: for the agent's responsibl
 person and the managers of the place's space when its owner lost a right, for the
 owner when it kept failing); `review_due` (a page's review is due: plan M7 decision
 11; the message is the entry in the page's thread, for the space's moderators,
-`wiki/review_handlers.py`).
+`wiki/review_handlers.py`); `signup` (someone registered through OIDC and waits for
+approval: plan M9 task 5b; it names the account, `account_id`, and no conversation:
+for everyone who holds `user.manage`, `users/handlers.py`).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -51,9 +53,10 @@ class NotificationReason(StrEnum):
     SKILL_PROPOSAL = "skill_proposal"  # a skill proposal to decide, or mine decided
     AUTOMATION = "automation"  # an automation was paused (its owner's rights, failures)
     REVIEW_DUE = "review_due"  # a page I moderate is due for review (plan M7 task 6)
+    SIGNUP = "signup"  # a self-registered account waits for approval (plan M9 task 5b)
 
 
-TARGET = (
+_TARGET_BEFORE_ACCOUNTS = (
     "(message_id IS NOT NULL AND conversation_id IS NOT NULL AND proposal_id IS NULL"
     " AND skill_proposal_id IS NULL AND space_id IS NULL AND automation_id IS NULL)"
     " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NOT NULL"
@@ -62,6 +65,12 @@ TARGET = (
     " AND skill_proposal_id IS NOT NULL AND automation_id IS NULL)"
     " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NULL"
     " AND skill_proposal_id IS NULL AND space_id IS NULL AND automation_id IS NOT NULL)"
+)
+TARGET = (
+    f"(account_id IS NULL AND ({_TARGET_BEFORE_ACCOUNTS}))"
+    " OR (account_id IS NOT NULL AND message_id IS NULL AND conversation_id IS NULL"
+    " AND proposal_id IS NULL AND skill_proposal_id IS NULL AND space_id IS NULL"
+    " AND automation_id IS NULL)"
 )
 
 
@@ -72,7 +81,7 @@ class Notification(UuidPk, OrgScoped, Base):
         CheckConstraint(
             "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
             " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation',"
-            " 'review_due')",
+            " 'review_due', 'signup')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),
@@ -100,6 +109,15 @@ class Notification(UuidPk, OrgScoped, Base):
         ),
         Index("ix_notification_skill_proposal_id", "skill_proposal_id"),
         Index("ix_notification_automation_id", "automation_id"),
+        Index(
+            "uq_notification_account",
+            "user_id",
+            "account_id",
+            "reason",
+            unique=True,
+            postgresql_where=text("account_id IS NOT NULL"),
+        ),
+        Index("ix_notification_account_id", "account_id"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -128,6 +146,11 @@ class Notification(UuidPk, OrgScoped, Base):
     # An automation that was paused (plan M7); who sees it: `activity_repository`.
     automation_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("automation.id", ondelete="CASCADE")
+    )
+    # An account awaiting approval (plan M9 task 5b); who sees it: whoever holds
+    # `user.manage` now (`activity_repository`).
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

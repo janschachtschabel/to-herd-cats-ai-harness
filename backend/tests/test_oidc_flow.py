@@ -76,13 +76,27 @@ async def test_signup_creates_a_member_without_password_and_without_ai(
     ai_people: People, make_client: MakeClient, oidc_stub: OidcStub, session: AsyncSession
 ) -> None:
     """The organisation's standard assignment would give `ai.use`; the new person has
-    an own "no AI" assignment instead (J2)."""
+    an own "no AI" assignment instead (J2), and once approved signs in without it."""
     assert "ai.use" in (await _me(ai_people.alice))["permissions"]  # type: ignore[operator]
     await make_provider(
         ai_people.admin, oidc_stub, allow_signup=True, allowed_domains=["Neu.Example"]
     )
+    identity = {"email": "nina@neu.example", "name": "Nina Neu", "sub": "n1"}
+    done = await sign_in(await make_client(), oidc_stub, **identity)
+    assert error_of(done) == "oidc.account_pending"  # waits for approval (J2)
+    user = await session.scalar(select(User).where(User.email == "nina@neu.example"))
+    assert user is not None and user.password_hash is None and not user.is_active
+    assignment = await session.get(UserAssignment, user.id)
+    assert assignment is not None and assignment.no_ai
+    audit = await session.scalar(select(AuditLog).where(AuditLog.action == "user.self_registered"))
+    assert audit is not None and audit.actor_id == user.id
+    assert audit.details == {"provider": "stub", "system_role": "member"}
+    approved = await ai_people.admin.post(
+        f"/api/admin/users/{user.id}/approve", json={"version": user.version}
+    )
+    assert approved.status_code == 200, approved.text
     browser = await make_client()
-    done = await sign_in(browser, oidc_stub, email="nina@neu.example", name="Nina Neu", sub="n1")
+    done = await sign_in(browser, oidc_stub, **identity)
     assert done.headers["location"] == "/"
     me = await _me(browser)
     assert me["user"]["system_role"] == "member"  # type: ignore[index]
@@ -90,13 +104,6 @@ async def test_signup_creates_a_member_without_password_and_without_ai(
     assert me["user"]["locale"] == "de"  # type: ignore[index]
     assert "ai.use" not in me["permissions"]  # type: ignore[operator]
     assert me["ai_model"] is None
-    user = await session.scalar(select(User).where(User.email == "nina@neu.example"))
-    assert user is not None and user.password_hash is None and user.is_active
-    assignment = await session.get(UserAssignment, user.id)
-    assert assignment is not None and assignment.no_ai
-    audit = await session.scalar(select(AuditLog).where(AuditLog.action == "user.self_registered"))
-    assert audit is not None and audit.actor_id == user.id
-    assert audit.details == {"provider": "stub", "system_role": "member"}
 
 
 async def test_signup_outside_the_domains_is_refused(

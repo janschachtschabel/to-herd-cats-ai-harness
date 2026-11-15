@@ -19,7 +19,23 @@ class UserOut(BaseModel):
     is_active: bool
     locale: str
     last_login_at: datetime | None
+    # Self-registered and waiting for an admin to approve or reject (then null).
+    awaiting_approval_since: datetime | None
     version: int
+
+
+class SignupDecisionIn(BaseModel):
+    """Approve or reject a waiting account: the version the client read (409)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+
+
+class PendingCountOut(BaseModel):
+    """How many self-registered accounts wait for approval."""
+
+    count: int
 
 
 class UserCreate(BaseModel):

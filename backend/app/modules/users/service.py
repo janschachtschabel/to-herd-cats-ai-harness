@@ -1,4 +1,8 @@
-"""People administration: create, change, deactivate, reactivate, list.
+"""People administration: create, change, deactivate, reactivate, list, and the
+decision on a self-registered account awaiting approval (plan M9 task 5b: approve lets
+the person in as the member they registered as, reject leaves a deactivated account;
+either needs the version read, 409 otherwise). A waiting account is approved, never
+reactivated (`users.awaiting_approval`), so every way in leaves its audit entry.
 
 Every change is audited in the transaction that makes it. Writes for one organisation
 are serialised (`lock_admin_writes`), so the version check, the email check and the
@@ -138,17 +142,43 @@ class UserService:
     async def reactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """The person can log in again; idempotent."""
         user = await self._activity_target(actor, user_id)
+        if user.awaiting_approval_since is not None:
+            raise Conflict(code="users.awaiting_approval")
         if not user.is_active:
             user.is_active = True
             user.version += 1
             await self.session.flush()
             await self._audit(actor, "user.reactivated", user)
 
-    async def list(self, actor: Actor, params: PageParams) -> Page[User]:
+    async def decide_signup(
+        self, actor: Actor, user_id: uuid.UUID, version: int, *, approve: bool
+    ) -> User:
+        """Approve (active from now on) or reject (stays deactivated; reactivating it
+        later is the same as for anyone deactivated) a self-registered account. The
+        role stays what signing up gave (member)."""
+        await require(self.session, actor, Action.USER_MANAGE)
+        user = await self._current(actor, user_id)
+        if user.version != version:
+            raise Conflict(code="users.version_conflict")
+        if user.awaiting_approval_since is None:
+            raise Conflict(code="users.not_pending")
+        user.awaiting_approval_since = None
+        user.is_active = approve
+        user.version += 1
+        await self.session.flush()
+        action = "user.signup_approved" if approve else "user.signup_rejected"
+        await self._audit(actor, action, user)
+        return user
+
+    async def list(self, actor: Actor, params: PageParams, *, pending: bool = False) -> Page[User]:
         await require(self.session, actor, Action.USER_MANAGE)
         after = decode_id_cursor(params.cursor) if params.cursor else None
-        rows = await self.users.page(actor.org_id, after, params.limit + 1)
+        rows = await self.users.page(actor.org_id, after, params.limit + 1, pending=pending)
         return id_page(rows, params.limit, lambda u: u.id)
+
+    async def count_pending(self, actor: Actor) -> int:
+        await require(self.session, actor, Action.USER_MANAGE)
+        return await self.users.count_pending(actor.org_id)
 
     async def _checked_hash(
         self, actor: Actor, password: str | None, *, email: str, name: str

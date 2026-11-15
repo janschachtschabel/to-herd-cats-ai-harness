@@ -16,7 +16,8 @@ PKCE (S256), `state` and `nonce`, bound to the browser.
   used once. Then the code is exchanged, the ID token checked (`id_token.py`; an
   unknown `kid` fetches the JWKS again, at most once a minute across every node) and
   the admission carried out (`accounts.py`). The answer is a page of the app with a
-  fixed code, never the provider's words.
+  fixed code, never the provider's words. A self-registration opens no session: the
+  account awaits an admin's approval (`/login?error=oidc.account_pending`).
 
 Start and callback count per client address (`HERD_OIDC_RATE_PER_MINUTE`). Nothing of
 the claims, the code or the tokens is logged; the metric counts outcomes by code.
@@ -55,6 +56,7 @@ BINDING_COOKIE = "herd_oidc"
 COOKIE_PATH = "/api/auth/oidc"
 LOGIN_PAGE = "/login"
 PROFILE_PAGE = "/profile"
+PENDING = "oidc.account_pending"
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
@@ -231,6 +233,10 @@ class FlowService:
         return await self._signed_in(admitted, now)
 
     async def _signed_in(self, admitted: Admitted, now: datetime) -> Finished:
+        if admitted.outcome == "signup":  # waits for approval (plan M9 task 5b)
+            count_outcome(admitted.outcome)
+            location = f"{LOGIN_PAGE}?{urlencode({'error': PENDING})}"
+            return Finished(location, admitted.outcome, user_id=admitted.user.id)
         token = await AuthService(self.session, self.settings).open_session(admitted.user, now)
         count_outcome(admitted.outcome)
         return Finished("/", admitted.outcome, token, admitted.user.id)

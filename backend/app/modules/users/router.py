@@ -5,7 +5,13 @@ from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep
-from app.modules.users.schemas import UserCreate, UserOut, UserUpdateIn
+from app.modules.users.schemas import (
+    PendingCountOut,
+    SignupDecisionIn,
+    UserCreate,
+    UserOut,
+    UserUpdateIn,
+)
 from app.modules.users.service import UserService
 
 router = APIRouter(prefix="/admin/users", tags=["users"])
@@ -13,12 +19,21 @@ router = APIRouter(prefix="/admin/users", tags=["users"])
 
 @router.get("", response_model=Page[UserOut])
 async def list_users(
-    params: Annotated[PageParams, Query()], actor: ActorDep, session: SessionDep
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+    pending: Annotated[bool, Query(description="true: only accounts awaiting approval")] = False,
 ) -> Page[UserOut]:
-    page = await UserService(session).list(actor, params)
+    page = await UserService(session).list(actor, params, pending=pending)
     return Page[UserOut](
         items=[UserOut.model_validate(u) for u in page.items], next_cursor=page.next_cursor
     )
+
+
+@router.get("/pending/count", response_model=PendingCountOut)
+async def count_pending(actor: ActorDep, session: SessionDep) -> PendingCountOut:
+    """How many self-registered accounts wait for approval (the admin navigation's badge)."""
+    return PendingCountOut(count=await UserService(session).count_pending(actor))
 
 
 @router.post("", response_model=UserOut, status_code=201)
@@ -52,3 +67,23 @@ async def deactivate_user(user_id: uuid.UUID, actor: ActorDep, session: SessionD
 @router.post("/{user_id}/reactivate", status_code=204)
 async def reactivate_user(user_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
     await UserService(session).reactivate(actor, user_id)
+
+
+@router.post("/{user_id}/approve", response_model=UserOut)
+async def approve_signup(
+    user_id: uuid.UUID, body: SignupDecisionIn, actor: ActorDep, session: SessionDep
+) -> UserOut:
+    """Let a self-registered account in (409 `users.not_pending` once decided)."""
+    service = UserService(session)
+    user = await service.decide_signup(actor, user_id, body.version, approve=True)
+    return UserOut.model_validate(user)
+
+
+@router.post("/{user_id}/reject", response_model=UserOut)
+async def reject_signup(
+    user_id: uuid.UUID, body: SignupDecisionIn, actor: ActorDep, session: SessionDep
+) -> UserOut:
+    """Refuse a self-registered account: it stays deactivated."""
+    service = UserService(session)
+    user = await service.decide_signup(actor, user_id, body.version, approve=False)
+    return UserOut.model_validate(user)
