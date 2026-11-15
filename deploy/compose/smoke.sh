@@ -4,7 +4,8 @@
 # WebSocket with and without the session cookie, receive a posted message over the
 # live stream (/api/stream: outbox, worker, NOTIFY, SSE), create a ticket and change its
 # status and find the worker's two system entries in its thread, let a one-off automation
-# come due (15 s) and find exactly one term, tear down. Runs as its own
+# come due (15 s) and find exactly one term, read the page through /mcp with an access
+# token (tools listed on node A, read_page called on node B), tear down. Runs as its own
 # compose project on its own ports, with throwaway volumes, so a running installation
 # next to it is not touched. Ends with "SMOKE OK".
 #
@@ -222,6 +223,35 @@ done
   || fail "ticket $number's thread holds \"$(timeline)\", not its two system entries"
 in_channel="$(json 'len(d["items"])' "$(api "$base/api/conversations/$channel_id/messages")")"
 [[ $in_channel == 1 ]] || fail "#allgemein holds $in_channel messages after the ticket changes"
+
+# MCP: the organisation's switch on, a read token through the API (its clear text shown
+# once), then stateless JSON-RPC over POST /mcp: the tools listed on node A, the wiki's
+# page (published: a token never reads drafts) read with read_page on node B. Without a
+# token: 401 in the MCP form.
+shown="$(api "$base/api/pages/$page_id")"
+published="$(api -X POST "$base/api/pages/$page_id/publish" --data "{\"version\": $(json 'd["version"]' "$shown")}")"
+[[ "$(json 'd["status"]' "$published" 2>/dev/null)" == published ]] || fail "publishing the page answered $published"
+settings="$(api "$base/api/ai/mcp")"
+switched="$(api -X PUT "$base/api/ai/mcp" --data \
+  "{\"enabled\": true, \"data_location\": \"external\", \"version\": $(json 'd["version"]' "$settings")}")"
+[[ "$(json 'd["enabled"]' "$switched")" == True ]] || fail "switching MCP on answered $switched"
+token="$(api -X POST "$base/api/tokens" --data '{"name": "Smoke", "mode": "read", "expires_in_days": 1}')"
+secret="$(json 'd["secret"]' "$token")" || fail "creating an access token answered $token"
+mcp() {
+  curl -s -X POST "$1/mcp" -H "Authorization: Bearer $secret" -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' -H 'MCP-Protocol-Version: 2025-06-18' --data "$2"
+}
+listed="$(mcp "$base" '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}')"
+[[ "$(json '" ".join(sorted(t["name"] for t in d["result"]["tools"]))' "$listed" 2>/dev/null)" \
+  == "list_tree list_versions read_page read_ticket search search_tickets" ]] \
+  || fail "/mcp on $base listed $listed"
+read_call="{\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"tools/call\", \"params\": {\"name\": \"read_page\", \"arguments\": {\"page_id\": \"$page_id\"}}}"
+called="$(mcp "$base_b" "$read_call")"
+[[ "$(json 'd["result"]["isError"] is False and "# Smoke" in d["result"]["content"][0]["text"]' "$called" 2>/dev/null)" == True ]] \
+  || fail "read_page through /mcp on $base_b answered $called"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base_b/mcp" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' --data '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}')
+[[ $code == 401 ]] || fail "/mcp without a token answered $code"
 
 # Automations: a one-off automation due in 15 s fires exactly once, from the worker's due
 # loop (with SMOKE_NODES the worker service alone), read on node B. The agent's connection
