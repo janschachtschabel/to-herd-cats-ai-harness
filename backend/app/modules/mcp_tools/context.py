@@ -31,6 +31,10 @@ class TokenContext(WriteContext):
     agent_id: uuid.UUID | None = None  # an agent token's external agent
 
     @property
+    def agent_self(self) -> uuid.UUID | None:
+        return self.agent_id
+
+    @property
     def by(self) -> Authorship:
         author = Principal.agent(self.agent_id) if self.agent_id else self.actor.principal
         return Authorship(author, via_token=self.token_name)

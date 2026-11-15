@@ -104,6 +104,12 @@ class CallContext:
     location: DataLocation
     reads: Reads
 
+    @property
+    def agent_self(self) -> uuid.UUID | None:
+        """The agent a caller acts as, where "me" means an agent rather than the
+        actor (an agent token at `/mcp`); a run's "me" is its asker."""
+        return None
+
 
 @dataclass(frozen=True, slots=True)
 class WriteContext(CallContext):

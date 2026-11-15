@@ -144,10 +144,12 @@ async def list_versions(ctx: CallContext, args: ListVersionsArgs) -> ToolResult:
 
 async def search_tickets(ctx: CallContext, args: SearchTicketsArgs) -> ToolResult:
     """Tickets by text and filters, last changed first."""
+    me = ctx.agent_self
     filters = Filters(
         space_id=args.space_id,
         status_categories=tuple(args.status),
-        assignee_id=ctx.actor.principal.id if args.assigned_to_me else None,
+        assignee_id=ctx.actor.principal.id if args.assigned_to_me and me is None else None,
+        agent_assignee_id=me if args.assigned_to_me else None,
         unassigned=args.unassigned,
         kind=args.kind,
         priority=args.priority,

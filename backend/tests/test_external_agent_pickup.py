@@ -207,3 +207,23 @@ async def test_list_my_tickets_shows_only_its_unfinished_ones(work: Work, connec
     assert "list_my_tickets" in offered and "claim_ticket" not in offered
     assert open_one["key"] in listed
     assert done_one["key"] not in listed and others["key"] not in listed
+
+
+async def test_assigned_to_me_means_the_agent_for_its_token(work: Work, connect: Connect) -> None:
+    """Module review M8 1, finding 10: over an agent token, `search_tickets` with
+    `assigned_to_me` meant the responsible person; it means the agent, as its
+    description says (and as `list_my_tickets` does)."""
+    await mcp_on(work.admin)
+    agent = await make_external(work)
+    its = await _assign(work, await work.ticket("Für den Agenten"), agent)
+    alice = work.bench.people.users["alice"]
+    hers = await work.ticket("Für Alice")
+    r = await work.admin.patch(
+        f"/api/tickets/{hers['number']}",
+        json={"version": hers["version"], "assignee": {"type": "user", "id": str(alice.id)}},
+    )
+    assert r.status_code == 200, r.text
+    token = await agent_token(work.admin, agent, mode="read")
+    async with connect(token["secret"]) as client:
+        listed = text_of(await client.call_tool("search_tickets", {"assigned_to_me": True}))
+    assert its["key"] in listed and r.json()["key"] not in listed
