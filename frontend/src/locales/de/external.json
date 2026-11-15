@@ -1,0 +1,32 @@
+{
+  "agents": {
+    "external": {
+      "create": "Externen Agenten anlegen",
+      "badge": "Extern über MCP",
+      "badgeTitle": "Arbeitet von außen über MCP und antwortet hier nicht von selbst",
+      "explain": "Ein externer Agent, etwa Claude Code oder Codex auf einem eigenen Rechner oder in einer Pipeline, arbeitet von außen über MCP mit einem Agenten-Token: Er holt sich zugewiesene Tickets ab, kommentiert und bringt sie bis „Zur Prüfung“. Er hat kein Modell, keine Läufe und keine Aufgaben hier und antwortet nicht von selbst auf Nachrichten.",
+      "responsibleHint": "Der Agent darf nie mehr als diese Person. Ist sie nicht mehr aktiv oder darf sie keine Zugangstoken haben, ruht er.",
+      "levels": {
+        "1": "Liest Seiten und Tickets und sieht die eigenen Tickets. Ändert nichts.",
+        "2": "Dazu Tickets abholen und kommentieren, Status bis „Zur Prüfung“ und Seitenvorschläge."
+      },
+      "levelNote": "Ein externer Agent hat höchstens Stufe 2: Er schlägt vor, erledigt setzt ein Mensch.",
+      "tools": {
+        "title": "Werkzeuge über MCP",
+        "hint": "Nur diese Werkzeuge kann ein Token des Agenten bekommen (dazu die eigenen Tickets sehen und abholen). Nur „Erlaubt“ zählt: Was gesperrt ist, bietet MCP ihm nicht an; Freigaben durch einen Menschen gibt es dort nicht.",
+        "tableLabel": "Werkzeuge über MCP",
+        "grant": "Freigabe",
+        "choices": {
+          "allow": "Erlaubt",
+          "confirm": "Nach Freigabe (über MCP gesperrt)",
+          "block": "Gesperrt"
+        }
+      },
+      "tokens": {
+        "title": "Token des Agenten",
+        "hint": "Damit arbeitet der Agent von außen. Die Aufrufe eines Tokens zeigen, was er über MCP getan hat.",
+        "empty": "{{name}} hat noch kein Token."
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Globe, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
 } from '@/features/shared/states'
 import { AgentCard } from './AgentCard'
 import { AgentDialog } from './AgentDialog'
+import { ExternalAgentDialog } from './external/ExternalAgentDialog'
 import { useAgents, type Agent } from './queries'
 
 /** The agents (`agent.manage`): create, change, pause. A connection to answer with
@@ -23,7 +24,9 @@ export function AgentsPage() {
   const agents = useAgents()
   const connections = useConnections(hasPermission(me, 'ai.manage'))
   const [creating, setCreating] = useState(false)
+  const [creatingExternal, setCreatingExternal] = useState(false)
   const [editing, setEditing] = useState<Agent | null>(null)
+  const external = editing?.kind === 'external'
   const noConnection = !connections.isPending && connections.items.length === 0
   const names = new Map(connections.items.map((c) => [c.id, c.name]))
 
@@ -33,10 +36,16 @@ export function AgentsPage() {
         title={t('agents.title')}
         description={t('agents.description')}
         actions={
-          <Button onClick={() => setCreating(true)} disabled={noConnection}>
-            <Plus aria-hidden />
-            {t('agents.create.open')}
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setCreatingExternal(true)}>
+              <Globe aria-hidden />
+              {t('agents.external.create')}
+            </Button>
+            <Button onClick={() => setCreating(true)} disabled={noConnection}>
+              <Plus aria-hidden />
+              {t('agents.create.open')}
+            </Button>
+          </>
         }
       />
       {noConnection && (
@@ -67,10 +76,17 @@ export function AgentsPage() {
       )}
       <LoadMore hasMore={agents.hasMore} loading={agents.loadingMore} onLoad={agents.loadMore} />
       <AgentDialog open={creating} connections={connections.items} onOpenChange={setCreating} />
+      <ExternalAgentDialog open={creatingExternal} onOpenChange={setCreatingExternal} />
+      <ExternalAgentDialog
+        key={`external-${editing?.id ?? 'none'}`}
+        open={editing !== null && external}
+        agent={external ? editing : undefined}
+        onOpenChange={(open) => !open && setEditing(null)}
+      />
       <AgentDialog
         key={editing?.id ?? 'none'}
-        open={editing !== null}
-        agent={editing ?? undefined}
+        open={editing !== null && !external}
+        agent={editing && !external ? editing : undefined}
         connections={connections.items}
         onOpenChange={(open) => !open && setEditing(null)}
       />

@@ -58,7 +58,12 @@ export function ScopeFields({
 }) {
   const { t } = useTranslation()
   const scope = form.watch('scope')
+  const chosen = form.watch('space_ids')
   const error = form.formState.errors.space_ids
+  const toggle = (id: string, on: boolean) =>
+    form.setValue('space_ids', on ? [...chosen, id] : chosen.filter((c) => c !== id), {
+      shouldValidate: form.formState.isSubmitted,
+    })
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-1 text-sm font-medium">{t('tokens.fields.scope')}</legend>
@@ -83,9 +88,9 @@ export function ScopeFields({
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      value={space.id}
                       className="size-4 accent-primary"
-                      {...form.register('space_ids')}
+                      checked={chosen.includes(space.id)}
+                      onChange={(event) => toggle(space.id, event.target.checked)}
                     />
                     {space.name}
                   </label>

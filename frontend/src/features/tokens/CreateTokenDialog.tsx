@@ -17,7 +17,10 @@ import { EMPTY_TOKEN, tokenBody, type TokenValues } from './form'
 import { useCreateToken, type CreatedToken } from './queries'
 import { ModeFields, ScopeFields, type SpaceChoices } from './TokenFields'
 
-const resolver = bodyResolver<TokenValues>(bodySchema('TokenIn'), tokenBody)
+// An issue anywhere in the spaces' list is the list's (one message under it).
+const resolver = bodyResolver<TokenValues>(bodySchema('TokenIn'), tokenBody, (path) =>
+  path.startsWith('space_ids') ? 'space_ids' : path,
+)
 
 /** Create a token (mine, or an external agent's with `agentId`): name, read or write,
  *  all spaces or chosen ones, days until it expires. The clear text of the answer goes

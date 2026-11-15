@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { SaveError } from '@/features/shared/forms'
+import { ExternalBadge } from './external/ExternalBadge'
 import { useDeleteAgent, useOpenAgentDm, useUpdateAgent, type Agent } from './queries'
 
 const STATUS_VARIANT = { active: 'secondary', paused: 'destructive', draft: 'outline' } as const
@@ -61,6 +62,7 @@ export function AgentCard({
   const remove = useDeleteAgent()
   const [confirming, setConfirming] = useState(false)
   const next = agent.status === 'active' ? 'paused' : 'active'
+  const external = agent.kind === 'external'
 
   return (
     <article aria-label={agent.name} className="flex h-full flex-col gap-2 rounded-lg border p-4">
@@ -77,12 +79,13 @@ export function AgentCard({
               })}
             </Badge>
           )}
+          {external && <ExternalBadge />}
           <Badge variant="outline">{t('agents.level.badge', { level: agent.level })}</Badge>
           <Badge variant={STATUS_VARIANT[agent.status]}>{t(`agents.status.${agent.status}`)}</Badge>
         </span>
       </div>
       {agent.intro && <p className="text-sm text-muted-foreground">{agent.intro}</p>}
-      {!mine && (
+      {!mine && !external && (
         <p className="text-xs text-muted-foreground">
           {t('agents.card.model', { model: agent.model, connection: connectionName ?? '–' })}
           {' · '}
@@ -108,12 +111,14 @@ export function AgentCard({
             </Link>
           )}
         </Button>
-        <Button size="sm" variant="outline" asChild>
-          <Link to="/agents/$agentId/runs" params={{ agentId: agent.id }}>
-            <Activity aria-hidden />
-            {t('runs.agent.open')}
-          </Link>
-        </Button>
+        {!external && (
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/agents/$agentId/runs" params={{ agentId: agent.id }}>
+              <Activity aria-hidden />
+              {t('runs.agent.open')}
+            </Link>
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"

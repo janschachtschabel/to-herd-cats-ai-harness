@@ -12,9 +12,14 @@ import { AgentLevelForm } from './AgentLevelForm'
 import { AgentSkillsPanel } from './AgentSkillsPanel'
 import { AgentSpacesList } from './AgentSpacesList'
 import { AgentToolsForm } from './AgentToolsForm'
+import { AgentTokensPanel } from '../external/AgentTokensPanel'
+import { ExternalAgentTools } from '../external/ExternalAgentTools'
+import { ExternalBadge } from '../external/ExternalBadge'
 
 /** One agent for its managers (`agent.manage`): its autonomy level, the grant of each
- *  tool, the spaces it works in, its skills and its automations. */
+ *  tool, the spaces it works in, its skills and its automations. An external agent
+ *  (plan M8) has no skills, runs or automations here: its page shows the tools its
+ *  tokens can reach, its tokens and its spaces. */
 export function AgentAdminPage({ agentId }: { agentId: string }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -24,6 +29,7 @@ export function AgentAdminPage({ agentId }: { agentId: string }) {
 
   if (agent.isPending) return <LoadingState />
   if (agent.isError) return <ErrorState error={agent.error} onRetry={() => void agent.refetch()} />
+  const external = agent.data.kind === 'external'
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,6 +46,7 @@ export function AgentAdminPage({ agentId }: { agentId: string }) {
         }
       >
         <div className="mt-2 flex flex-wrap gap-2">
+          {external && <ExternalBadge />}
           <Badge variant="secondary">{t(`agents.status.${agent.data.status}`)}</Badge>
           <Badge variant="outline">{t('agents.level.badge', { level: agent.data.level })}</Badge>
         </div>
@@ -56,15 +63,29 @@ export function AgentAdminPage({ agentId }: { agentId: string }) {
             maxLevel={tools.data.max_level}
             version={tools.data.version}
             onReload={reload}
+            withheldNote={external ? t('agents.external.levelNote') : undefined}
           />
-          <AgentToolsForm shown={tools.data} onReload={reload} />
+          {external ? (
+            <ExternalAgentTools shown={tools.data} onReload={reload} />
+          ) : (
+            <AgentToolsForm shown={tools.data} onReload={reload} />
+          )}
         </>
       )}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <AgentSpacesList agentId={agentId} />
-        <AgentSkillsPanel agentId={agentId} onReload={reload} />
-      </div>
-      <AgentAutomationsPanel agentId={agentId} />
+      {external ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AgentTokensPanel agentId={agentId} name={agent.data.name} />
+          <AgentSpacesList agentId={agentId} />
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <AgentSpacesList agentId={agentId} />
+            <AgentSkillsPanel agentId={agentId} onReload={reload} />
+          </div>
+          <AgentAutomationsPanel agentId={agentId} />
+        </>
+      )}
     </div>
   )
 }
