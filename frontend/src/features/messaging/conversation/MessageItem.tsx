@@ -41,8 +41,13 @@ function SystemRow({ message }: { message: Message }) {
       className="flex flex-wrap items-center gap-x-2 py-1 pl-2 text-xs text-muted-foreground"
       data-kind="system"
     >
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-      <span>{text}</span>
+      <span className="min-w-0">
+        <span
+          aria-hidden
+          className="mr-2 inline-block size-1.5 rounded-full bg-muted-foreground/60 align-middle"
+        />
+        {text}
+      </span>
       {(message.system.actor?.type === 'agent' || message.via_token) && <AgentBadge />}
       {message.via_token && <ViaToken name={message.via_token} />}
       <MessageTime iso={message.created_at} />

@@ -30,7 +30,8 @@
       "mark": "extern",
       "markTitle": "Externer Agent, antwortet nicht von selbst",
       "noDm": "{{name}} arbeitet von außen über MCP und antwortet hier nicht von selbst. Weise ihm stattdessen ein Ticket zu.",
-      "header": "Ein externer Agent: Er arbeitet von außen über MCP und antwortet hier nicht von selbst."
+      "header": "Ein externer Agent: Er arbeitet von außen über MCP und antwortet hier nicht von selbst.",
+      "open": "Stufe, Werkzeuge, Token"
     },
     "noRun": {
       "agent_external": "Der Agent arbeitet von außen über MCP und antwortet hier nicht von selbst. Deine Nachricht ist gespeichert; weise ihm für eine Aufgabe ein Ticket zu."

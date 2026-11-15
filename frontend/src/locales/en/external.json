@@ -30,7 +30,8 @@
       "mark": "external",
       "markTitle": "External agent, does not answer by itself",
       "noDm": "{{name}} works from outside via MCP and does not answer here by itself. Assign it a ticket instead.",
-      "header": "An external agent: it works from outside via MCP and does not answer here by itself."
+      "header": "An external agent: it works from outside via MCP and does not answer here by itself.",
+      "open": "Level, tools, tokens"
     },
     "noRun": {
       "agent_external": "The agent works from outside via MCP and does not answer here by itself. Your message is saved; assign it a ticket for a task."

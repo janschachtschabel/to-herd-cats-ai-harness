@@ -107,7 +107,7 @@ export function AgentCard({
           ) : (
             <Link to="/admin/agents/$agentId" params={{ agentId: agent.id }}>
               <SlidersHorizontal aria-hidden />
-              {t('agents.admin.open')}
+              {external ? t('agents.external.open') : t('agents.admin.open')}
             </Link>
           )}
         </Button>

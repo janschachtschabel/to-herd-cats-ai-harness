@@ -67,6 +67,7 @@ describe('external agents', () => {
     expect(within(card).getByText('Extern über MCP')).toBeInTheDocument()
     expect(within(card).queryByText(/Modell/)).not.toBeInTheDocument()
     expect(within(card).queryByRole('link', { name: 'Läufe' })).not.toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Stufe, Werkzeuge, Token' })).toBeInTheDocument()
   })
 
   test('an external agent is changed without model fields, at its version', async () => {
