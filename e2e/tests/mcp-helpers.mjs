@@ -59,13 +59,13 @@ export const amendMcp = (script) => control(MCP_STUB, "/_stub/script", script);
 /** Every request the MCP stub received (method, path, headers, body). */
 export const mcpStubLog = () => control(MCP_STUB, "/_stub/log");
 
-/** The bodies of the `tools/call` requests the MCP stub received, parsed. */
+/** The `tools/call` requests the MCP stub received: tool name and arguments. */
 export async function stubToolCalls() {
   const log = await mcpStubLog();
   return log
     .map((r) => (r.body ? JSON.parse(r.body) : null))
     .filter((body) => body?.method === "tools/call")
-    .map((body) => body.params);
+    .map(({ params }) => ({ name: params.name, arguments: params.arguments }));
 }
 
 /** Resets the OAuth stub to its defaults (client `herd-client`, secret by post). */
@@ -193,4 +193,14 @@ export async function externalToolName(admin, agentId, serverName, toolName) {
   );
   expect(found, `${serverName} · ${toolName}`).toBeTruthy();
   return found.name;
+}
+
+/** Sets the agent's tool grants to exactly these (`{tool: policy}`; a PUT replaces all
+ *  entries, so tools left out fall back to their defaults: an external one is blocked). */
+export async function setGrants(admin, agentId, grants) {
+  const agent = await call(admin, "GET", `/api/agents/${agentId}`);
+  return call(admin, "PUT", `/api/agents/${agentId}/tools`, {
+    tools: Object.entries(grants).map(([tool, policy]) => ({ tool, policy })),
+    version: agent.version,
+  });
 }
