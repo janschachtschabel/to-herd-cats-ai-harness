@@ -23,7 +23,7 @@ import type { User } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { CreateUserDialog } from './CreateUserDialog'
 import { EditUserDialog } from './EditUserDialog'
-import { useSetUserActive, useUsers } from './queries'
+import { useSetUserActive, useSignUserOut, useUsers } from './queries'
 
 export function UsersPage() {
   const { t, i18n } = useTranslation()
@@ -32,6 +32,8 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [toggling, setToggling] = useState<User | null>(null)
+  const signOut = useSignUserOut()
+  const [signingOut, setSigningOut] = useState<User | null>(null)
 
   const confirmToggle = () => {
     if (!toggling) return
@@ -100,6 +102,19 @@ export function UsersPage() {
                     >
                       {t('actions.edit')}
                     </Button>
+                    {user.is_active && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t('users.signOut.openNamed', { name: user.name })}
+                        onClick={() => {
+                          signOut.reset()
+                          setSigningOut(user)
+                        }}
+                      >
+                        {t('users.signOut.action')}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -140,6 +155,19 @@ export function UsersPage() {
         error={setActive.error}
         onConfirm={confirmToggle}
         onOpenChange={(open) => !open && setToggling(null)}
+      />
+      <ConfirmDialog
+        open={signingOut !== null}
+        title={t('users.signOut.title')}
+        text={t('users.signOut.text', { name: signingOut?.name ?? '' })}
+        confirmLabel={t('users.signOut.action')}
+        destructive
+        pending={signOut.isPending}
+        error={signOut.error}
+        onConfirm={() =>
+          signingOut && signOut.mutate(signingOut.id, { onSuccess: () => setSigningOut(null) })
+        }
+        onOpenChange={(open) => !open && setSigningOut(null)}
       />
     </div>
   )

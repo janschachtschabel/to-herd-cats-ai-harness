@@ -3,6 +3,7 @@ export const AUDIT_ACTIONS = [
   'user.created',
   'user.updated',
   'user.password_changed',
+  'user.signed_out',
   'user.deactivated',
   'user.reactivated',
   'group.created',

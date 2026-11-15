@@ -114,6 +114,16 @@ class UserService:
             await self._audit(actor, "user.password_changed", user)
         return user
 
+    async def sign_out(
+        self, actor: Actor, user_id: uuid.UUID, *, current_session: uuid.UUID | None
+    ) -> None:
+        """Every session of the person ends (ASVS 5.0 V7.4.5); an administrator signing
+        out themselves keeps `current_session`, the one they act with."""
+        user = await self._activity_target(actor, user_id)
+        keep = current_session if actor.principal.id == user.id else None
+        await self.sessions.delete_for_user(actor.org_id, user.id, keep=keep)
+        await self._audit(actor, "user.signed_out", user)
+
     async def deactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """Deactivated people are logged out at once: all their sessions are deleted."""
         user = await self._activity_target(actor, user_id)

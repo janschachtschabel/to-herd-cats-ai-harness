@@ -36,6 +36,14 @@ async def update_user(
     return UserOut.model_validate(user)
 
 
+@router.post("/{user_id}/sign-out", status_code=204)
+async def sign_out_user(
+    user_id: uuid.UUID, actor: ActorDep, ctx: AuthDep, session: SessionDep
+) -> None:
+    """Ends every session of the person; they stay active and may sign in again."""
+    await UserService(session).sign_out(actor, user_id, current_session=ctx.session_id)
+
+
 @router.post("/{user_id}/deactivate", status_code=204)
 async def deactivate_user(user_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
     await UserService(session).deactivate(actor, user_id)

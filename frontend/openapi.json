@@ -16913,6 +16913,43 @@
         ]
       }
     },
+    "/api/admin/users/{user_id}/sign-out": {
+      "post": {
+        "description": "Ends every session of the person; they stay active and may sign in again.",
+        "operationId": "sign_out_user_api_admin_users__user_id__sign_out_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sign Out User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/agents": {
       "get": {
         "operationId": "list_agents_api_agents_get",

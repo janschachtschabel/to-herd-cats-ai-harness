@@ -47,6 +47,20 @@ export function useUpdateUser(userId: string) {
   })
 }
 
+/** Ends every session of the person (they stay active). */
+export function useSignUserOut() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: async (userId: string) =>
+      unwrap(
+        await api.POST('/api/admin/users/{user_id}/sign-out', {
+          params: { path: { user_id: userId } },
+        }),
+      ),
+    onSuccess: () => invalidate(),
+  })
+}
+
 export function useSetUserActive() {
   const invalidate = useInvalidateUsers()
   return useMutation({

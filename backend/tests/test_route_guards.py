@@ -34,6 +34,7 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
         ("PATCH", f"{users}/{{user_id}}", f"{users}/{user.id}", {"name": "X", "version": 1}),
         ("POST", f"{users}/{{user_id}}/deactivate", f"{users}/{user.id}/deactivate", None),
         ("POST", f"{users}/{{user_id}}/reactivate", f"{users}/{user.id}/reactivate", None),
+        ("POST", f"{users}/{{user_id}}/sign-out", f"{users}/{user.id}/sign-out", None),
         ("GET", f"{users}/{{user_id}}/identities", f"{users}/{user.id}/identities", None),
         (
             "DELETE",

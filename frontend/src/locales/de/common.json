@@ -258,6 +258,12 @@
       "openNamed": "{{name}} reaktivieren",
       "title": "Person reaktivieren?",
       "text": "{{name}} kann sich danach wieder anmelden."
+    },
+    "signOut": {
+      "action": "Abmelden",
+      "openNamed": "{{name}} überall abmelden",
+      "title": "Überall abmelden?",
+      "text": "Alle Sitzungen von {{name}} enden sofort auf jedem Gerät. {{name}} kann sich gleich wieder anmelden."
     }
   },
   "groups": {
@@ -350,6 +356,7 @@
         "created": "Person angelegt",
         "updated": "Person geändert",
         "password_changed": "Passwort geändert",
+        "signed_out": "Überall abgemeldet",
         "deactivated": "Person deaktiviert",
         "reactivated": "Person reaktiviert"
       },

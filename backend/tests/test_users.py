@@ -1,8 +1,10 @@
 from httpx import AsyncClient
+from uuid_utils.compat import uuid7
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.principal import SystemRole
+from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
 from app.modules.orgs.models import Organization
 from app.modules.users.models import User
@@ -221,3 +223,36 @@ async def test_create_validates_input(owner: AsyncClient) -> None:
         {**NEW_USER, "system_role": "superuser"},
     ):
         assert (await owner.post("/api/admin/users", json=bad)).status_code == 422
+
+
+async def test_an_administrator_signs_a_person_out_everywhere(
+    make_client, make_user, owner, owner_user: User, member: User, session: AsyncSession
+) -> None:
+    """ASVS 5.0 V7.4.5: every session of the person ends, audited; the person stays
+    active and may sign in again. An owner is signed out only by an owner, and an
+    administrator signing out themselves keeps the session they act with."""
+    first, second = await make_client(), await make_client()
+    await login(first, member.email)
+    await login(second, member.email)
+    assert (await owner.post(f"/api/admin/users/{member.id}/sign-out")).status_code == 204
+    assert (await first.get("/api/auth/me")).status_code == 401
+    assert (await second.get("/api/auth/me")).status_code == 401
+    await login(first, member.email)
+    assert (await first.get("/api/auth/me")).status_code == 200
+    audit = await session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "user.signed_out", AuditLog.target_id == member.id
+        )
+    )
+    assert audit is not None and audit.details is None
+
+    admin = await make_user(SystemRole.ADMIN, email="admin@example.com")
+    admin_client = await make_client(csrf=True)
+    await login(admin_client, admin.email)
+    refused = await admin_client.post(f"/api/admin/users/{owner_user.id}/sign-out")
+    assert refused.status_code == 403
+    assert (await owner.get("/api/auth/me")).status_code == 200
+    assert (await admin_client.post(f"/api/admin/users/{admin.id}/sign-out")).status_code == 204
+    assert (await admin_client.get("/api/auth/me")).status_code == 200
+    unknown = await owner.post(f"/api/admin/users/{uuid7()}/sign-out")
+    assert unknown.status_code == 404

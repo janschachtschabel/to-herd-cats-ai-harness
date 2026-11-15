@@ -258,6 +258,12 @@
       "openNamed": "Reactivate {{name}}",
       "title": "Reactivate person?",
       "text": "{{name}} can log in again afterwards."
+    },
+    "signOut": {
+      "action": "Sign out",
+      "openNamed": "Sign {{name}} out everywhere",
+      "title": "Sign out everywhere?",
+      "text": "Every session of {{name}} ends on every device at once. {{name}} can sign in again right away."
     }
   },
   "groups": {
@@ -350,6 +356,7 @@
         "created": "Person added",
         "updated": "Person changed",
         "password_changed": "Password changed",
+        "signed_out": "Signed out everywhere",
         "deactivated": "Person deactivated",
         "reactivated": "Person reactivated"
       },

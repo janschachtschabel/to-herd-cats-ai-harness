@@ -169,6 +169,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/admin/users", "admin"),
     ("PATCH", "/api/admin/users/{user_id}", "admin"),
     ("POST", "/api/admin/users/{user_id}/deactivate", "admin"),
+    ("POST", "/api/admin/users/{user_id}/sign-out", "admin"),
     ("POST", "/api/admin/users/{user_id}/reactivate", "admin"),
     ("GET", "/api/admin/users/{user_id}/identities", "admin"),
     ("DELETE", "/api/admin/users/{user_id}/identities/{identity_id}", "admin"),
