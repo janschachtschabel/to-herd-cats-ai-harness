@@ -11,7 +11,7 @@ import pytest
 from app.core.access import Action, can
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.toolbox import listing, reading, wiki_tools
 from app.modules.agents.toolbox.base import NOT_FOUND
 from app.modules.spaces.repository import SpaceRepository

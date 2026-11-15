@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.modules.agents.actor import Reads
-from app.modules.agents.models import EventKind, RunEvent
+from app.modules.agents.run_models import EventKind, RunEvent
 from app.runtime.loop import Recorded, ToolCall, ToolResult
 
 

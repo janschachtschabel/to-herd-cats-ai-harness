@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy import select
 
 from app.core.outbox import caused_by
-from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import Automation, FiringOutcome
 from app.modules.wiki.events import PAGE_PUBLISHED, page_event

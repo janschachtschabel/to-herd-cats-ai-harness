@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.tickets.models import WorkItem
 from tests.factories_tools import call

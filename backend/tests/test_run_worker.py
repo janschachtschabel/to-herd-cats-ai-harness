@@ -13,7 +13,8 @@ import app.modules.agents.router  # noqa: F401 -- registers the agent hooks
 import app.worker.runs as worker_runs
 from app.core.config import get_settings
 from app.core.db import Database
-from app.modules.agents.models import Agent, Run, RunState
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run, RunState
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.messaging.models import Message, MessageKind

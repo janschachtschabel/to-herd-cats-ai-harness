@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.core.models_base import utcnow
 from app.modules.agents.executor_repository import RunSteps, claim
-from app.modules.agents.models import EventKind, Run, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, StopReason
 from app.modules.agents.step_host import RunHost
 from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.ai.models import AiPolicy

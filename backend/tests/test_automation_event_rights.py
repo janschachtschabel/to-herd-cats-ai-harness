@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import AiPolicy
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import FiringOutcome

@@ -8,7 +8,7 @@ import uuid
 from datetime import timedelta
 
 from app.core.models_base import utcnow
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import AiPolicy, BudgetScope
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import AutomationState, FiringOutcome, PausedReason

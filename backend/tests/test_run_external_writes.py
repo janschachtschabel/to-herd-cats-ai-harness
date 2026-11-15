@@ -6,7 +6,7 @@ rejection sends nothing."""
 
 from typing import Any
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from tests.factories_external import Ext, call
 from tests.factories_mcp import SERVERS
 

@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import Run, StopReason
+from app.modules.agents.run_models import Run, StopReason
 from app.modules.audit.models import AuditLog
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import Automation

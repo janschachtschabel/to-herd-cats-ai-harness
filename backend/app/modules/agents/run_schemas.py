@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import AwareDatetime, BaseModel
 
 from app.core.pagination import PageParams
-from app.modules.agents.models import EventKind, RunState, StopReason
+from app.modules.agents.run_models import EventKind, RunState, StopReason
 from app.modules.agents.runs import ShownEvent
 from app.modules.messaging.models import ConversationKind
 

@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import EventKind, RunEvent
+from app.modules.agents.run_models import EventKind, RunEvent
 from app.modules.agents.toolbox.external import OUTCOME_UNKNOWN
 
 

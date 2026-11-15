@@ -10,7 +10,7 @@ from sqlalchemy import Text, cast, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import Run
+from app.modules.agents.run_models import Run
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import (
     Automation,

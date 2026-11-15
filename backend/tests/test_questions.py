@@ -12,7 +12,7 @@ from sqlalchemy import update
 from app.core.models_base import utcnow
 from app.modules.agents import control
 from app.modules.agents.approvals.models import MAX_ANSWER_CHARS
-from app.modules.agents.models import Run, StopReason
+from app.modules.agents.run_models import Run, StopReason
 from tests.factories_agents import Bench
 from tests.factories_tools import call
 

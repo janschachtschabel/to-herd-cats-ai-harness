@@ -15,7 +15,8 @@ from app.core.authorship import Authorship
 from app.core.errors import Conflict
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import Agent, Run
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run
 from app.modules.spaces.models import SpaceKind
 from app.modules.tickets.claiming import TicketClaims
 from tests.factories_external_agents import agent_token, make_external

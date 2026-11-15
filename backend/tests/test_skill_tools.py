@@ -12,7 +12,8 @@ from typing import Any
 from sqlalchemy import func, select
 
 from app.modules.agents.approvals.models import Approval
-from app.modules.agents.models import Agent, RunEvent, StopReason
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import RunEvent, StopReason
 from app.modules.agents.toolbox import skill_tools
 from app.modules.agents.toolbox.base import NOT_FOUND
 from app.modules.agents.toolbox.catalog import CATALOG

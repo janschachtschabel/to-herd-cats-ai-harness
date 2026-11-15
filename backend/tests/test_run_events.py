@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import RunEvent, StopReason
+from app.modules.agents.run_models import RunEvent, StopReason
 from app.modules.audit.models import ADMIN_ACCESS, AuditLog
 from app.modules.spaces.models import Space, SpaceKind
 from tests.factories_agents import Bench

@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from app.modules.agents.models import Run
+from app.modules.agents.run_models import Run
 from app.modules.agents.standing import Refusal, agent_refusal
 from app.modules.audit.models import AuditLog
 from tests.factories_external_agents import make_external

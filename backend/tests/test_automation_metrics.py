@@ -10,7 +10,7 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.core.metrics import REGISTRY
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import BudgetScope
 from app.modules.automations.models import Automation, AutomationState, PausedReason
 from app.worker.dispatcher import Dispatcher

@@ -54,9 +54,9 @@ from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import replay
-from app.modules.agents.models import StopReason
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered

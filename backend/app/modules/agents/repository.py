@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import OPEN_SPACE_FLOOR, SpaceRole
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Agent, AgentKind, AgentStatus, AgentTool, Run
+from app.modules.agents.models import Agent, AgentKind, AgentStatus, AgentTool
+from app.modules.agents.run_models import Run
 from app.modules.ai.models import AiConnection
 from app.modules.messaging.models import ConversationParticipant
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember

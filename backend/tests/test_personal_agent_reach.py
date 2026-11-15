@@ -12,7 +12,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import Agent, StopReason
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import Refusal, agent_refusal, refusal
 from app.modules.ai.models import UsageRecord

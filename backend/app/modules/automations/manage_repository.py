@@ -16,7 +16,8 @@ from sqlalchemy.orm import aliased
 
 from app.core.permissions import ADMIN_ROLES
 from app.core.repository import advisory_xact_lock
-from app.modules.agents.models import Agent, Run
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run
 from app.modules.automations.models import Automation, AutomationFiring, AutomationState
 from app.modules.automations.sight import AutomationSight, seen
 from app.modules.messaging.models import Conversation

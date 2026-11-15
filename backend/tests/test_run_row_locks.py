@@ -27,8 +27,9 @@ from app.modules.agents import step_checks, step_host
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import Claimed, RunSteps, claim
 from app.modules.agents.gauge_repository import open_runs
-from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS, Agent, Run
+from app.modules.agents.models import Agent
 from app.modules.agents.run_control_models import RunCancelRequest
+from app.modules.agents.run_models import REASSIGN_LOCK_TIMEOUT_SECONDS, Run
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.agents.step_host import RunHost, units_of

@@ -8,7 +8,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
-from app.modules.agents.models import MAX_RUNTIME_SECONDS, Run, RunState
+from app.modules.agents.models import MAX_RUNTIME_SECONDS
+from app.modules.agents.run_models import Run, RunState
 
 STUCK_GRACE_SECONDS = 60
 

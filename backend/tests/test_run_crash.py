@@ -19,7 +19,7 @@ import app.modules.agents.router  # noqa: F401 -- registers the agent hooks
 from app.core.config import get_settings
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import EventKind, Run, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, StopReason
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.agents.step_host import units_of

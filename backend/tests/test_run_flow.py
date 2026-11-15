@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 
 from app.core.outbox import Event, EventOutbox
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.live_events import decode, of_event
 from app.modules.messaging.models import Message

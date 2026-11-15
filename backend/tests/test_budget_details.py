@@ -5,7 +5,7 @@ run's `budget` stop notice names."""
 
 import pytest
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import BudgetScope
 from tests.factories_agents import Bench, make_agent
 from tests.test_ai_budget_check import budget

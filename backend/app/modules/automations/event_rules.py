@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
 from app.core.outbox import Event
-from app.modules.agents.models import MAX_CHAIN_DEPTH
+from app.modules.agents.run_models import MAX_CHAIN_DEPTH
 from app.modules.automations import event_sight, live
 from app.modules.automations.event_models import MAX_OBJECTS, EventNote
 from app.modules.automations.event_repository import Cause, EventRuleRepository

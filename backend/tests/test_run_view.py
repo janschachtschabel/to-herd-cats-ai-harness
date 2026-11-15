@@ -15,7 +15,7 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
-from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.messaging.models import Message
 from tests.factories_agents import Bench

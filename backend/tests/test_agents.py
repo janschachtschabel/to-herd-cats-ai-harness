@@ -9,7 +9,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.audit.models import AuditLog
 from tests.factories_agents import Bench, assign_default, make_connection
 

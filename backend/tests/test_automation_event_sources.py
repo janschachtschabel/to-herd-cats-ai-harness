@@ -6,7 +6,7 @@ the step's tool emits, never by the services themselves); an upload emits
 import uuid
 
 from app.core.outbox import Event
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from tests.factories_tools import call
 from tests.factories_writing import Work, events
 from tests.test_wiki_attachments import PNG, _uploaded

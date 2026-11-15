@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from app.core.models_base import utcnow
 from app.modules.agents.executor import MAX_RECOVERIES, Executor
 from app.modules.agents.executor_repository import Claimed, RunSteps, claim
-from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.models import Message, MessageKind
 from app.runtime.models import BuiltModel, ModelTarget, wrap_model

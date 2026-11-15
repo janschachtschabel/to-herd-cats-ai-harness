@@ -1421,7 +1421,7 @@ Direktnachricht starten Läufe so:
   übergebenden Lauf im selben Thread. Ein Lauf auf Stufe 3 übergibt nicht mehr: das
   Werkzeug lehnt ab (`run.handover_limit`), der Thread vermerkt es (`run.refused`).
   Ein Lauf übergibt höchstens 5 Tickets an Agenten (`MAX_HANDOVERS_PER_RUN`, neben der
-  Tiefengrenze in `agents/models.py`; gezählt im Journal des Laufs); darüber hinaus
+  Tiefengrenze in `agents/run_models.py`; gezählt im Journal des Laufs); darüber hinaus
   lehnt das Werkzeug ab (`run.handovers`), nur als Fehler für das Modell.
 - **Zuweisung zurückgenommen**: Wird ein Ticket einem Agenten weggenommen (jemand
   anderem zugewiesen oder niemandem), bittet dieselbe Transaktion dessen offene Läufe

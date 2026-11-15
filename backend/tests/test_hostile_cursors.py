@@ -10,7 +10,7 @@ import json
 import pytest
 from httpx import AsyncClient
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.groups.models import Group
 from app.modules.users.models import User
 from app.web.public import create_public_app

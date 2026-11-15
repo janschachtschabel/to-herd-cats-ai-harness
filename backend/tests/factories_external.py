@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core import egress
-from app.modules.agents.models import EventKind, RunEvent
+from app.modules.agents.run_models import EventKind, RunEvent
 from tests.factories_agents import Bench
 from tests.factories_mcp import SERVERS, approve, make_server, mcp_network, tools_of
 from tests.support.mcp_stub import McpStub

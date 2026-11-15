@@ -12,7 +12,7 @@ from app.modules.agents.approvals.models import (
     QuestionState,
     RunQuestion,
 )
-from app.modules.agents.models import Run
+from app.modules.agents.run_models import Run
 
 W = TypeVar("W", Approval, RunQuestion)
 

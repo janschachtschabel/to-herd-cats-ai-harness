@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
 from app.core.models_base import utcnow
-from app.modules.agents.models import LANE, Agent, Run, RunEvent, RunState
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import LANE, Run, RunEvent, RunState
 
 QUEUED = text("state = 'queued'")
 

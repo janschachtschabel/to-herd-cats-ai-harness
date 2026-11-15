@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.step_records import TOOL_TIMED_OUT
 from app.modules.proposals.service import ProposalService
 from tests.factories_writing import Work, events

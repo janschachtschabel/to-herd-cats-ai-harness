@@ -8,7 +8,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.agents.models import AgentStatus, RunState
+from app.modules.agents.models import AgentStatus
+from app.modules.agents.run_models import RunState
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import Automation, AutomationState, FiringOutcome
 from app.modules.automations.repository import AutomationRepository

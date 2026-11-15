@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.automations.firing import Fired, fire_next
 from app.modules.automations.models import (
     Automation,

@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from app.core.authorship import Authorship
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import AgentStatus, Run, StopReason
+from app.modules.agents.models import AgentStatus
+from app.modules.agents.run_models import Run, StopReason
 from app.modules.ai.models import AiPolicy
 from app.modules.messaging.service import MessageService
 from app.modules.spaces.repository import SpaceRepository

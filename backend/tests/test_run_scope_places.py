@@ -16,7 +16,7 @@ from app.core.errors import Forbidden, NotFound
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
 from app.modules.agents.actor import Reads, run_actor
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.toolbox.base import RunRef, ToolContext
 from app.modules.agents.toolbox.reading import SearchArgs, search

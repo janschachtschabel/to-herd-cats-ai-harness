@@ -40,7 +40,7 @@ from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository, due_waiting
 from app.modules.agents.executor_repository import Claimed, RunSteps
-from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS, RunState, StopReason
+from app.modules.agents.run_models import REASSIGN_LOCK_TIMEOUT_SECONDS, RunState, StopReason
 
 SWEEP_BATCH = 50
 

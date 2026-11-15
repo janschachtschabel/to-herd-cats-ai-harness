@@ -6,7 +6,7 @@ location. Failures are results with fixed words; the run goes on."""
 
 import json
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.toolbox.external import OUTCOME_UNKNOWN, POLICY_REFUSED
 from app.modules.ai.models import AiPolicy
 from tests.factories_external import Ext, call

@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor, visible_space_ids
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Agent, Run
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run
 from app.modules.ai.policy import Policy
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.spaces.models import Space

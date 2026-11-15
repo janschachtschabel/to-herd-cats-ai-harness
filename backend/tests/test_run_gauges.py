@@ -10,7 +10,8 @@ from sqlalchemy import update
 from app.core.models_base import utcnow
 from app.modules.agents.executor_repository import claim
 from app.modules.agents.gauge_repository import STUCK_GRACE_SECONDS, open_runs
-from app.modules.agents.models import MAX_RUNTIME_SECONDS, Run
+from app.modules.agents.models import MAX_RUNTIME_SECONDS
+from app.modules.agents.run_models import Run
 from tests.factories_agents import LEASE, Bench
 
 

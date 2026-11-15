@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.core.config import Settings, get_settings
 from app.core.metrics import REGISTRY
 from app.modules.agents import external_step
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.toolbox.external import CALL_LIMIT, OUTCOME_UNKNOWN, POLICY_REFUSED
 from app.modules.mcp_servers import calls
 from tests.factories_external import Ext, call

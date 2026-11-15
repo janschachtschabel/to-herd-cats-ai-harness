@@ -15,7 +15,7 @@ from sqlalchemy import delete, select
 from uuid_utils.compat import uuid7
 
 from app.core.outbox import Event
-from app.modules.agents.models import RunState, StopReason
+from app.modules.agents.run_models import RunState, StopReason
 from app.modules.automations import runs as automation_runs
 from app.modules.automations.event_models import MAX_OBJECTS, AutomationEvent
 from app.modules.automations.event_rules import on_event

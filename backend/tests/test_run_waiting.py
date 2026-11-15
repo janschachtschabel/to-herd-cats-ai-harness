@@ -14,7 +14,7 @@ from app.core.models_base import utcnow
 from app.modules.agents import control
 from app.modules.agents.executor_repository import claim
 from app.modules.agents.gauge_repository import open_runs
-from app.modules.agents.models import EventKind, Run, RunEvent, RunState, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.agents.step_host import RunHost
 from app.worker.runs import run_metrics
 from tests.factories_agents import LEASE, Bench, open_agent_dm

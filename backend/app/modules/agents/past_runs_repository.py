@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.agents.models import EventKind, Run, RunEvent
+from app.modules.agents.run_models import EventKind, Run, RunEvent
 from app.modules.spaces.models import Space
 
 

@@ -9,7 +9,8 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.outbox import EventOutbox
-from app.modules.agents.models import AgentStatus, Run
+from app.modules.agents.models import AgentStatus
+from app.modules.agents.run_models import Run
 from app.modules.ai.models import AiConnection
 from app.modules.groups.models import Group, GroupMember
 from app.modules.users.models import User

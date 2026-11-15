@@ -45,12 +45,12 @@ from app.core.outbox import caused_by
 from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_step import call_external
-from app.modules.agents.models import (
+from app.modules.agents.read_repository import ReadRepository
+from app.modules.agents.run_models import (
     STEP_LOCK_TIMEOUT_SECONDS,
     STEP_STATEMENT_TIMEOUT_SECONDS,
     EventKind,
 )
-from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.step_checks import (
     check_policy,
     exhausted,

@@ -4,7 +4,7 @@ first call and only add another notice."""
 
 from sqlalchemy import select
 
-from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.ai.models import BudgetScope
 from tests.factories_tools import call
 from tests.factories_writing import Work

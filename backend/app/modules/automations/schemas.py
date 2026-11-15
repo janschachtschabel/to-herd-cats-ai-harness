@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from app.modules.agents.models import RunState, StopReason
+from app.modules.agents.run_models import RunState, StopReason
 from app.modules.automations.models import (
     DEFAULT_QUIET_SECONDS,
     MAX_INSTRUCTION_CHARS,

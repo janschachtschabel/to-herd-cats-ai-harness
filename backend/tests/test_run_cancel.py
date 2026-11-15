@@ -11,9 +11,9 @@ import pytest
 from sqlalchemy import func, select
 
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import EventKind, Run, RunEvent, RunState
-from app.modules.agents.models import StopReason as Stop
 from app.modules.agents.run_control_models import RunCancelRequest
+from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState
+from app.modules.agents.run_models import StopReason as Stop
 from tests.factories_agents import LEASE, Bench
 from tests.support import probe_tools
 from tests.support.probe_tools import ANSWERED

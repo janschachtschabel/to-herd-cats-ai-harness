@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.core.outbox import EventOutbox
 from app.modules.agents import external_step
-from app.modules.agents.models import RunEvent, StopReason
+from app.modules.agents.run_models import RunEvent, StopReason
 from app.modules.agents.toolbox.external import OUTCOME_UNKNOWN
 from tests.factories_connectors import make_connector
 from tests.factories_external import Ext, call

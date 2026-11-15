@@ -11,8 +11,8 @@ from sqlalchemy import select
 
 from app.core.models_base import utcnow
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import Run, StopReason
 from app.modules.agents.past_runs_repository import PastRunRepository
+from app.modules.agents.run_models import Run, StopReason
 from app.modules.agents.toolbox import past_runs
 from app.modules.agents.toolbox.base import NOT_FOUND
 from app.modules.ai.models import AiPolicy

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from app.core.permissions import SpaceRole
 from app.modules.agents import memory
 from app.modules.agents.memory_models import AgentMemory
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.ai.models import AiPolicy, DataLocation
 from app.modules.spaces.models import SpaceKind
 from tests.factories_spaces import MakeSpace

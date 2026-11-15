@@ -22,7 +22,8 @@ from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.modules.agents.executor import Executor, ModelMaker
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import Agent, Run, StopReason
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run, StopReason
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.ai.models import AiConnection

@@ -49,7 +49,7 @@ from app.modules.agents.approvals.gate import gate
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_metrics import CallOutcome, count, outcome_of
 from app.modules.agents.external_repository import sent_calls
-from app.modules.agents.models import STEP_STATEMENT_TIMEOUT_SECONDS, EventKind, Run
+from app.modules.agents.run_models import STEP_STATEMENT_TIMEOUT_SECONDS, EventKind, Run
 from app.modules.agents.step_checks import (
     granted,
     location_of,

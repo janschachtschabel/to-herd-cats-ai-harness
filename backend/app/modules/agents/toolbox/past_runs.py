@@ -28,7 +28,6 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 from app.core.access import visible_space_ids
 from app.core.errors import NotFound
 from app.modules.agents.actor import Reads
-from app.modules.agents.models import EventKind
 from app.modules.agents.past_runs_repository import (
     PastHit,
     PastRunRepository,
@@ -36,6 +35,7 @@ from app.modules.agents.past_runs_repository import (
     event_reads,
 )
 from app.modules.agents.read_repository import ReadRepository
+from app.modules.agents.run_models import EventKind
 from app.modules.agents.runs import ASKER_ONLY, may_read_all, may_read_drafts
 from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext

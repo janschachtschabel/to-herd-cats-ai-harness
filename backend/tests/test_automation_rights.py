@@ -14,8 +14,8 @@ from sqlalchemy import select
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import RunState, StopReason
 from app.modules.agents.run_control_models import RunCancelRequest
+from app.modules.agents.run_models import RunState, StopReason
 from app.modules.automations.firing import fire_next
 from app.modules.automations.models import AutomationState, PausedReason
 from app.modules.automations.takeover import take_over

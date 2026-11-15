@@ -10,7 +10,7 @@ from typing import Any
 from app.core.authorship import Authorship
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.messaging.service import MessageService
 from app.modules.spaces.repository import SpaceRepository
 from app.runtime import context

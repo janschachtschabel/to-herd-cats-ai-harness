@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.agents.toolbox.writing import PERSONAL
 from app.modules.messaging.models import Message
 from tests.factories_connectors import PERSONAL as MY_CONNECTORS

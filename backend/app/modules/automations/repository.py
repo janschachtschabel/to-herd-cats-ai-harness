@@ -15,7 +15,7 @@ from uuid_utils.compat import uuid7
 from app.core.access_repository import person_holds_role
 from app.core.permissions import SpaceRole
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Run, RunState
+from app.modules.agents.run_models import Run, RunState
 from app.modules.automations.event_models import EventNote
 from app.modules.automations.models import (
     Automation,

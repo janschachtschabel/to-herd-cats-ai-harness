@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Action, Actor, can, require, sees_drafts
 from app.core.errors import NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
-from app.modules.agents.models import EventKind, Run, RunEvent
+from app.modules.agents.run_models import EventKind, Run, RunEvent
 from app.modules.agents.run_repository import RunRepository
 
 MODEL_CALL_SHOWN = (

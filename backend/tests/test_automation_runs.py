@@ -16,7 +16,7 @@ import pytest
 from sqlalchemy import select
 
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import Run, RunState, StopReason
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.messaging.models import MessageKind
 from app.modules.tickets.models import WorkItem
 from app.modules.tickets.thread_repository import TicketThreadRepository

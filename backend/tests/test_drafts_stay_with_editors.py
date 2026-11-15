@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.modules.agents.journal import replay
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.agents.step_records import tool_content
 from app.modules.agents.toolbox import listing, past_runs, reading, ticket_tools
 from app.modules.agents.toolbox.writing import DRAFTS

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, PrincipalType
 from app.modules.agents import memory
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.ai.models import DataLocation
 from app.modules.messaging.models import Message, MessageKind

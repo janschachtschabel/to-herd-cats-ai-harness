@@ -24,7 +24,7 @@ from app.core.models_base import utcnow
 from app.modules.agents import step_checks, step_host
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import RunSteps, claim, renew
-from app.modules.agents.models import EventKind, Run, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, Run, RunEvent, StopReason
 from app.modules.agents.step_host import RunHost, units_of
 from app.runtime.models import BuiltModel, ModelTarget
 from tests.factories_agents import LEASE, Bench

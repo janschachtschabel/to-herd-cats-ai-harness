@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.automations import entries, heartbeats, pausing
 from app.modules.automations.event_models import EventNote
 from app.modules.automations.models import AutomationKind, AutomationState, PausedReason

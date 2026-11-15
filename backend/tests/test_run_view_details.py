@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from app.core.models_base import utcnow
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.messaging.models import Conversation, Message, MessageKind
 from app.modules.spaces.models import SpaceKind

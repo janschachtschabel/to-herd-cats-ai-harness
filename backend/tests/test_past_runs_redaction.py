@@ -6,7 +6,7 @@ hits came from. A result of tool results only keeps the usual rule."""
 
 from typing import Any
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.spaces.models import Space
 from tests.factories_agents import Bench
 from tests.factories_tools import call

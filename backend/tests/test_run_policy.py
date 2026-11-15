@@ -13,7 +13,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import func, select, update
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.ai.models import AiPolicy
 from app.modules.spaces.models import Space, SpaceKind
 from app.modules.tickets.models import WorkItem

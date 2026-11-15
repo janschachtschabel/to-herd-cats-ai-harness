@@ -18,7 +18,7 @@ from sqlalchemy import event, select
 
 from app.core.clock import SystemClock
 from app.core.models_base import utcnow
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.ai.models import BudgetScope, UsageRecord
 from app.runtime.models import wrap_model
 from tests.factories_agents import Bench

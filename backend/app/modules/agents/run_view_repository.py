@@ -15,8 +15,9 @@ from decimal import Decimal
 from sqlalchemy import Select, case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import Agent, Run, RunState, StopReason
+from app.modules.agents.models import Agent
 from app.modules.agents.run_control_models import RunCancelRequest
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.models import Conversation, ConversationKind
 from app.modules.tickets.models import WorkItem

@@ -11,8 +11,8 @@ M6 finding 16c).
 
 import uuid
 
-from app.modules.agents.models import MAX_CHAIN_DEPTH, MAX_HANDOVERS_PER_RUN
 from app.modules.agents.notices import notice
+from app.modules.agents.run_models import MAX_CHAIN_DEPTH, MAX_HANDOVERS_PER_RUN
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import Refusal
 from app.modules.agents.toolbox.base import ToolContext

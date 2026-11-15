@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import Run, RunState
+from app.modules.agents.run_models import Run, RunState
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import (
     Automation,

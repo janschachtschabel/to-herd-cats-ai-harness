@@ -10,8 +10,8 @@ import time
 from sqlalchemy import select
 
 from app.modules.agents.executor_repository import RunSteps
-from app.modules.agents.models import REASSIGN_LOCK_TIMEOUT_SECONDS
 from app.modules.agents.run_control_models import RunCancelRequest
+from app.modules.agents.run_models import REASSIGN_LOCK_TIMEOUT_SECONDS
 from tests.real_db import MakeRealClient, RealDb
 from tests.support.openai_stub import OpenAIStub
 from tests.test_run_row_locks import _ticket_run

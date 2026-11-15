@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.modules.agents.executor_repository import RunSteps
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.ai.models import UsageRecord
 from tests.factories_agents import Bench

@@ -24,9 +24,9 @@ from app.modules.agents.actor import run_actor
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
-from app.modules.agents.models import EventKind, Run, StopReason
 from app.modules.agents.notices import announce, notice, notify
 from app.modules.agents.read_repository import ReadRepository
+from app.modules.agents.run_models import EventKind, Run, StopReason
 from app.modules.agents.run_repository import RunRepository
 from app.modules.agents.standing import refusal
 from app.modules.automations import runs as automation_runs

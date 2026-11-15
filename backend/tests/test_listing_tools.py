@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.toolbox import listing
 from app.modules.agents.toolbox.base import NOT_FOUND
 from app.modules.ai.models import AiPolicy

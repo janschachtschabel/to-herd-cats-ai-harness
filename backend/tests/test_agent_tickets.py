@@ -11,7 +11,8 @@ from sqlalchemy import func, select, update
 
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
-from app.modules.agents.models import Agent, AgentStatus, Run, StopReason
+from app.modules.agents.models import Agent, AgentStatus
+from app.modules.agents.run_models import Run, StopReason
 from app.modules.messaging.models import Conversation, ConversationKind, Message
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.tickets.models import WorkItem

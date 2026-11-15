@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.toolbox import wiki_tools
 from app.modules.agents.toolbox.catalog import CATALOG, offered
 from app.modules.agents.toolbox.policy import Grant, allowed

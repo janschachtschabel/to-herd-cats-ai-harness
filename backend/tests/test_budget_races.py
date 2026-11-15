@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import StopReason
+from app.modules.agents.run_models import StopReason
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.agents.step_host import RunHost, units_of

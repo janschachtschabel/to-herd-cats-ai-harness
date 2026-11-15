@@ -10,7 +10,8 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import delete, select
 
 from app.core.permissions import SpaceRole
-from app.modules.agents.models import AgentStatus, StopReason
+from app.modules.agents.models import AgentStatus
+from app.modules.agents.run_models import StopReason
 from app.modules.audit.models import ADMIN_ACCESS, AuditLog
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
 from app.runtime.models import wrap_model

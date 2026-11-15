@@ -13,7 +13,7 @@ from app.core.models_base import utcnow
 from app.core.permissions import SpaceRole
 from app.modules.agents.control import resume_waiting
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import Run, RunState
+from app.modules.agents.run_models import Run, RunState
 from app.modules.agents.run_repository import RunRepository
 from tests.factories_agents import LEASE, make_agent
 from tests.factories_messaging import post

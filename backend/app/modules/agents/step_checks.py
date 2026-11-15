@@ -10,14 +10,14 @@ from app.core.access import Actor
 from app.modules.agents.actor import allowed_actor
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import RunSteps
-from app.modules.agents.models import (
-    STEP_LOCK_TIMEOUT_SECONDS,
-    STEP_STATEMENT_TIMEOUT_SECONDS,
-    Agent,
-    Run,
-)
+from app.modules.agents.models import Agent
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
+from app.modules.agents.run_models import (
+    STEP_LOCK_TIMEOUT_SECONDS,
+    STEP_STATEMENT_TIMEOUT_SECONDS,
+    Run,
+)
 from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.policy import Grant, effective, watched
 from app.modules.agents.working import Lost, Working

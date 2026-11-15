@@ -20,7 +20,8 @@ from app.modules.agents import control
 from app.modules.agents.approvals.models import Approval, ApprovalState
 from app.modules.agents.executor import Executor
 from app.modules.agents.executor_repository import claim
-from app.modules.agents.models import Agent, Run, RunState, StopReason
+from app.modules.agents.models import Agent
+from app.modules.agents.run_models import Run, RunState, StopReason
 from app.modules.agents.schemas import AgentCreate
 from app.modules.agents.service import AgentService
 from app.modules.agents.step_host import units_of

@@ -35,14 +35,9 @@ from sqlalchemy.orm import aliased
 from app.core.models_base import utcnow
 from app.core.principal import PrincipalType
 from app.core.repository import limit_time, locked_batch
-from app.modules.agents.models import (
-    Agent,
-    EventKind,
-    Run,
-    RunEvent,
-    RunState,
-)
+from app.modules.agents.models import Agent
 from app.modules.agents.run_control_models import RateWindow
+from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState
 from app.modules.ai.models import AiConnection
 from app.modules.messaging.models import Conversation, Message, MessageKind
 

@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.core.permissions import SpaceRole
 from app.core.principal import SystemRole
-from app.modules.agents.models import EventKind, RunEvent, StopReason
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.agents.step_host import RunHost
 from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.catalog import CATALOG

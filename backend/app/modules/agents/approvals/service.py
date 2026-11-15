@@ -41,7 +41,7 @@ from app.modules.agents.approvals.models import (
 )
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.control_repository import ControlRepository
-from app.modules.agents.models import Run, RunState
+from app.modules.agents.run_models import Run, RunState
 from app.modules.agents.runs import RunService
 from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.catalog import CATALOG
