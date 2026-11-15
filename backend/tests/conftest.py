@@ -46,6 +46,14 @@ from tests.factories_groups import group, group_with_member, make_group  # noqa:
 from tests.factories_mcp import _mcp_stub, mcp_egress, mcp_stub  # noqa: E402, F401
 from tests.factories_mcp_endpoint import connect, mcp_app, mcp_http  # noqa: E402, F401
 from tests.factories_messaging import chat  # noqa: E402, F401
+from tests.factories_oauth import (  # noqa: E402, F401
+    _oauth_stub,
+    oauth_egress,
+    oauth_ready,
+    oauth_stub,
+    oauth_units,
+    public_url,
+)
 from tests.factories_skills import lab  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_tickets import desk  # noqa: E402, F401

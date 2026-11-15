@@ -25,8 +25,8 @@ from app.mcp import client as mcp
 from app.mcp.client import RemoteFailure, RemoteStatus
 from app.modules.ai.access import require_ai
 from app.modules.audit.recorder import record
-from app.modules.mcp_servers.endpoints import endpoint_for
-from app.modules.mcp_servers.errors import CredentialUnavailable
+from app.modules.mcp_servers.endpoints import prepared_endpoint
+from app.modules.mcp_servers.errors import CredentialUnavailable, NotConnected
 from app.modules.mcp_servers.listing import apply, new_tool, usable
 from app.modules.mcp_servers.models import Classification, McpServer, McpServerTool, ToolState
 from app.modules.mcp_servers.repository import ServerRepository, ToolRepository
@@ -89,18 +89,30 @@ class ToolService:
         return TestOut(status=status, tools=count, duration_ms=_ms_since(started))
 
     async def _read(self, actor: Actor, server: McpServer) -> list[mcp.ListedTool]:
+        # Nothing held from here on: not while an OAuth token is renewed (a transaction
+        # of its own that locks the connector), not while the server answers.
+        await self.session.commit()
         try:
-            endpoint = await endpoint_for(self.session, server, actor.principal.id, strict=False)
+            endpoint, renewal = await prepared_endpoint(
+                self.session, server, actor.principal.id, strict=False
+            )
         except CredentialUnavailable:
             raise RemoteFailure(RemoteStatus.SECRET_UNAVAILABLE) from None
         server_id = server.id
-        await self.session.commit()  # nothing held while the server answers
+        await self.session.commit()
         started = time.monotonic()
         status = RemoteStatus.OK
         try:
-            return await mcp.list_tools(
-                endpoint, seconds=LIST_TIMEOUT_SECONDS, max_bytes=MAX_LIST_BYTES
-            )
+            try:
+                return await self._list(endpoint)
+            except RemoteFailure as failure:
+                if failure.status != RemoteStatus.UNAUTHORIZED or renewal is None:
+                    raise
+                try:
+                    endpoint = await renewal()
+                except (CredentialUnavailable, NotConnected):
+                    raise RemoteFailure(RemoteStatus.SECRET_UNAVAILABLE) from None
+                return await self._list(endpoint)
         except RemoteFailure as failure:
             status = failure.status
             raise
@@ -113,6 +125,11 @@ class ToolService:
                     "duration_ms": _ms_since(started),
                 },
             )
+
+    async def _list(self, endpoint: mcp.Endpoint) -> list[mcp.ListedTool]:
+        return await mcp.list_tools(
+            endpoint, seconds=LIST_TIMEOUT_SECONDS, max_bytes=MAX_LIST_BYTES
+        )
 
     async def _store(self, server: McpServer, listed: list[mcp.ListedTool]) -> RefreshOut:
         repo = ToolRepository(self.session, server.org_id)

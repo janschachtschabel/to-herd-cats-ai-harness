@@ -3,7 +3,8 @@
 `mcp_server`: an endpoint (Streamable HTTP over https), the `data_location` its calls
 send data to (as for an AI connection; the policy uses it in task 7), and which
 credential it uses: `none`, `shared` (one shared connector, `connector_id`) or
-`personal` (each person's own connector bound to this server, `connector.mcp_server_id`).
+`personal` (each person's own connector bound to this server, `connector.mcp_server_id`;
+`oauth_client_id` names the OAuth client people connect it with, if any).
 
 `mcp_server_tool`: one tool as the server listed it. `fingerprint` is the SHA-256 over
 name, description and input schema as last read; `approved_fingerprint` the one an
@@ -71,6 +72,9 @@ class McpServer(UuidPk, OrgScoped, Timestamps, Base):
         CheckConstraint(
             "(connector_scope = 'shared') = (connector_id IS NOT NULL)", name="connector"
         ),
+        CheckConstraint(
+            "oauth_client_id IS NULL OR connector_scope = 'personal'", name="oauth_client"
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
@@ -79,6 +83,10 @@ class McpServer(UuidPk, OrgScoped, Timestamps, Base):
     connector_scope: Mapped[ConnectorUse] = mapped_column(String(16), nullable=False)
     connector_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("connector.id", ondelete="RESTRICT"), index=True
+    )
+    # Personal scope only: the OAuth client people connect their own connector with.
+    oauth_client_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("oauth_client.id", ondelete="RESTRICT"), index=True
     )
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Bumped by every write; a write names the version it read (409).

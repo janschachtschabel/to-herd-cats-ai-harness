@@ -38,6 +38,7 @@ from app.modules.messaging import router_dms as messaging_dms
 from app.modules.messaging import router_live as messaging_live
 from app.modules.messaging import router_social as messaging_social
 from app.modules.messaging.live import LiveHub
+from app.modules.oauth import router as oauth
 from app.modules.proposals import router as proposals
 from app.modules.search.router import router as search_router
 from app.modules.skills import assignment_router as skill_assignments
@@ -114,6 +115,8 @@ def api_router() -> APIRouter:
     api.include_router(connectors.personal)
     api.include_router(mcp_servers.servers)
     api.include_router(mcp_servers.personal)
+    api.include_router(oauth.clients)
+    api.include_router(oauth.callback)
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
     api.include_router(ai_budgets.budgets)

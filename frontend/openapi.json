@@ -1666,10 +1666,25 @@
       "AuthKind": {
         "enum": [
           "bearer",
-          "header"
+          "header",
+          "oauth"
         ],
         "title": "AuthKind",
         "type": "string"
+      },
+      "AuthorizeOut": {
+        "description": "Where the browser goes to approve the connection.",
+        "properties": {
+          "authorization_url": {
+            "title": "Authorization Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_url"
+        ],
+        "title": "AuthorizeOut",
+        "type": "object"
       },
       "AutomationCreate": {
         "additionalProperties": false,
@@ -2575,6 +2590,318 @@
         "title": "Classification",
         "type": "string"
       },
+      "ClientCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "authorization_endpoint": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Authorization Endpoint",
+            "type": "string"
+          },
+          "client_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[ -~]+$",
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "revocation_endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revocation Endpoint"
+          },
+          "scopes": {
+            "default": "",
+            "maxLength": 1000,
+            "pattern": "^([\\x21\\x23-\\x5b\\x5d-\\x7e]+( [\\x21\\x23-\\x5b\\x5d-\\x7e]+)*)?$",
+            "title": "Scopes",
+            "type": "string"
+          },
+          "token_auth": {
+            "$ref": "#/components/schemas/TokenAuth",
+            "default": "client_secret_post"
+          },
+          "token_endpoint": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Token Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "authorization_endpoint",
+          "token_endpoint",
+          "client_id"
+        ],
+        "title": "ClientCreate",
+        "type": "object"
+      },
+      "ClientOut": {
+        "properties": {
+          "authorization_endpoint": {
+            "title": "Authorization Endpoint",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "has_client_secret": {
+            "title": "Has Client Secret",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "revocation_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revocation Endpoint"
+          },
+          "scopes": {
+            "title": "Scopes",
+            "type": "string"
+          },
+          "token_auth": {
+            "$ref": "#/components/schemas/TokenAuth"
+          },
+          "token_endpoint": {
+            "title": "Token Endpoint",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "authorization_endpoint",
+          "token_endpoint",
+          "revocation_endpoint",
+          "client_id",
+          "has_client_secret",
+          "client_secret_kind",
+          "token_auth",
+          "scopes",
+          "resource",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientOut",
+        "type": "object"
+      },
+      "ClientUpdate": {
+        "additionalProperties": false,
+        "description": "Only the fields sent change; `client_secret` replaces the stored one, `null`\nremoves it (a public client).",
+        "properties": {
+          "authorization_endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorization Endpoint"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "pattern": "^[ -~]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "revocation_endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revocation Endpoint"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "pattern": "^([\\x21\\x23-\\x5b\\x5d-\\x7e]+( [\\x21\\x23-\\x5b\\x5d-\\x7e]+)*)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "token_auth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenAuth"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "token_endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Endpoint"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ClientUpdate",
+        "type": "object"
+      },
       "ConnectionCreate": {
         "additionalProperties": false,
         "description": "Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else\nempty; `param_family` is `max_completion_tokens` for `openai`, else `max_tokens`;\n`data_location` is `local` for `local`, else `external`. The first model is the\nconnection's standard model.",
@@ -3044,14 +3371,32 @@
             "title": "Name",
             "type": "string"
           },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
           "secret": {
-            "$ref": "#/components/schemas/SecretIn"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "name",
-          "auth_kind",
-          "secret"
+          "auth_kind"
         ],
         "title": "ConnectorCreate",
         "type": "object"
@@ -3102,11 +3447,30 @@
             "title": "Name",
             "type": "string"
           },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
           "scope": {
             "$ref": "#/components/schemas/ConnectorScope"
           },
           "secret_kind": {
-            "$ref": "#/components/schemas/SecretKind"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "format": "date-time",
@@ -3124,6 +3488,7 @@
           "scope",
           "auth_kind",
           "header_name",
+          "oauth_client_id",
           "mcp_server_id",
           "has_secret",
           "secret_kind",
@@ -3144,7 +3509,7 @@
       },
       "ConnectorUpdate": {
         "additionalProperties": false,
-        "description": "Only the fields sent change; `secret` replaces the stored one.",
+        "description": "Only the fields sent change; `secret` replaces the stored one. An `oauth`\nconnector stays one (its tokens change by connecting and disconnecting), and no\nother connector becomes one.",
         "properties": {
           "auth_kind": {
             "anyOf": [
@@ -3383,6 +3748,18 @@
             "title": "Name",
             "type": "string"
           },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
           "refresh": {
             "$ref": "#/components/schemas/RefreshOut"
           },
@@ -3407,6 +3784,7 @@
           "data_location",
           "connector_scope",
           "connector_id",
+          "oauth_client_id",
           "enabled",
           "version",
           "created_at",
@@ -3658,6 +4036,124 @@
         ],
         "title": "DirectoryEntryOut",
         "type": "object"
+      },
+      "DiscoverIn": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "DiscoverIn",
+        "type": "object"
+      },
+      "DiscoveryOut": {
+        "description": "A proposal for an OAuth client, found from an MCP server's address; the\nendpoints are None unless `status` is `ok` (`modules/oauth/discovery.py`).",
+        "properties": {
+          "authorization_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorization Endpoint"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "pkce": {
+            "title": "Pkce",
+            "type": "boolean"
+          },
+          "registration": {
+            "title": "Registration",
+            "type": "boolean"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "revocation_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revocation Endpoint"
+          },
+          "scopes": {
+            "title": "Scopes",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DiscoveryStatus"
+          },
+          "token_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Endpoint"
+          }
+        },
+        "required": [
+          "status",
+          "resource",
+          "issuer",
+          "authorization_endpoint",
+          "token_endpoint",
+          "revocation_endpoint",
+          "scopes",
+          "pkce",
+          "registration"
+        ],
+        "title": "DiscoveryOut",
+        "type": "object"
+      },
+      "DiscoveryStatus": {
+        "enum": [
+          "ok",
+          "blocked",
+          "timeout",
+          "unreachable",
+          "no_metadata",
+          "resource_mismatch",
+          "no_authorization_server",
+          "invalid_metadata"
+        ],
+        "title": "DiscoveryStatus",
+        "type": "string"
       },
       "DmOpen": {
         "additionalProperties": false,
@@ -6485,6 +6981,33 @@
         "title": "Page[BudgetOut]",
         "type": "object"
       },
+      "Page_ClientOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ClientOut]",
+        "type": "object"
+      },
       "Page_ConnectionOut_": {
         "properties": {
           "items": {
@@ -7677,12 +8200,25 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
           }
         },
         "required": [
           "id",
           "name",
-          "connected"
+          "connected",
+          "oauth_client_id"
         ],
         "title": "PersonalServerOut",
         "type": "object"
@@ -9300,6 +9836,18 @@
             "title": "Name",
             "type": "string"
           },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
           "url": {
             "maxLength": 500,
             "minLength": 1,
@@ -9352,6 +9900,18 @@
             "title": "Name",
             "type": "string"
           },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -9373,6 +9933,7 @@
           "data_location",
           "connector_scope",
           "connector_id",
+          "oauth_client_id",
           "enabled",
           "version",
           "created_at",
@@ -9440,6 +10001,18 @@
               }
             ],
             "title": "Name"
+          },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
           },
           "url": {
             "anyOf": [
@@ -12123,6 +12696,15 @@
         ],
         "title": "TodayOut",
         "type": "object"
+      },
+      "TokenAuth": {
+        "description": "How a client secret goes to the token endpoint (RFC 6749 2.3.1).",
+        "enum": [
+          "client_secret_basic",
+          "client_secret_post"
+        ],
+        "title": "TokenAuth",
+        "type": "string"
       },
       "TokenCreatedOut": {
         "description": "`secret`: the token's clear text, shown this once and stored nowhere.",
@@ -16378,6 +16960,104 @@
         ]
       }
     },
+    "/api/ai/connectors/{connector_id}/authorize": {
+      "post": {
+        "description": "OAuth: where the browser goes to approve; it comes back to the callback.",
+        "operationId": "authorize_connector_api_ai_connectors__connector_id__authorize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Authorize Connector",
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/ai/connectors/{connector_id}/disconnect": {
+      "post": {
+        "description": "OAuth: forget the tokens and revoke them at the provider.",
+        "operationId": "disconnect_connector_api_ai_connectors__connector_id__disconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect Connector",
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
     "/api/ai/mcp": {
       "get": {
         "operationId": "get_mcp_settings_api_ai_mcp_get",
@@ -17433,6 +18113,104 @@
         ]
       }
     },
+    "/api/ai/my-connectors/{connector_id}/authorize": {
+      "post": {
+        "description": "OAuth: where the browser goes to approve; it comes back to the callback.",
+        "operationId": "authorize_connector_api_ai_my_connectors__connector_id__authorize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Authorize Connector",
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/ai/my-connectors/{connector_id}/disconnect": {
+      "post": {
+        "description": "OAuth: forget the tokens and revoke them at the provider.",
+        "operationId": "disconnect_connector_api_ai_my_connectors__connector_id__disconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect Connector",
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
     "/api/ai/my-mcp-servers": {
       "get": {
         "operationId": "list_personal_servers_api_ai_my_mcp_servers_get",
@@ -17491,6 +18269,363 @@
         "summary": "List Personal Servers",
         "tags": [
           "mcp"
+        ]
+      }
+    },
+    "/api/ai/oauth-clients": {
+      "get": {
+        "operationId": "list_clients_api_ai_oauth_clients_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ClientOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Clients",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "post": {
+        "operationId": "create_client_api_ai_oauth_clients_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Client",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/ai/oauth-clients/discover": {
+      "post": {
+        "description": "Find an MCP server's authorization server (RFC 9728, RFC 8414): a proposal for\na client; nothing is stored, every request goes through the egress guard.",
+        "operationId": "discover_client_api_ai_oauth_clients_discover_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discover Client",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/ai/oauth-clients/{client_id}": {
+      "delete": {
+        "operationId": "delete_client_api_ai_oauth_clients__client_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Client",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "get": {
+        "operationId": "get_client_api_ai_oauth_clients__client_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Client",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "patch": {
+        "operationId": "update_client_api_ai_oauth_clients__client_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Client",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/ai/oauth/callback": {
+      "get": {
+        "description": "The authorization server's redirect: finish the flow, then send the browser to\nthe result page (`/ai/oauth/done?status=...`).",
+        "operationId": "oauth_callback_api_ai_oauth_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Callback",
+        "tags": [
+          "oauth"
         ]
       }
     },

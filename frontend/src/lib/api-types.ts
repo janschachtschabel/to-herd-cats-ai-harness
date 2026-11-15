@@ -798,6 +798,46 @@ export interface paths {
         patch: operations["update_connector_api_ai_connectors__connector_id__patch"];
         trace?: never;
     };
+    "/api/ai/connectors/{connector_id}/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize Connector
+         * @description OAuth: where the browser goes to approve; it comes back to the callback.
+         */
+        post: operations["authorize_connector_api_ai_connectors__connector_id__authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/connectors/{connector_id}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect Connector
+         * @description OAuth: forget the tokens and revoke them at the provider.
+         */
+        post: operations["disconnect_connector_api_ai_connectors__connector_id__disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/mcp": {
         parameters: {
             query?: never;
@@ -1064,6 +1104,46 @@ export interface paths {
         patch: operations["update_connector_api_ai_my_connectors__connector_id__patch"];
         trace?: never;
     };
+    "/api/ai/my-connectors/{connector_id}/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize Connector
+         * @description OAuth: where the browser goes to approve; it comes back to the callback.
+         */
+        post: operations["authorize_connector_api_ai_my_connectors__connector_id__authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/my-connectors/{connector_id}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disconnect Connector
+         * @description OAuth: forget the tokens and revoke them at the provider.
+         */
+        post: operations["disconnect_connector_api_ai_my_connectors__connector_id__disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/my-mcp-servers": {
         parameters: {
             query?: never;
@@ -1073,6 +1153,85 @@ export interface paths {
         };
         /** List Personal Servers */
         get: operations["list_personal_servers_api_ai_my_mcp_servers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/oauth-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Clients */
+        get: operations["list_clients_api_ai_oauth_clients_get"];
+        put?: never;
+        /** Create Client */
+        post: operations["create_client_api_ai_oauth_clients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/oauth-clients/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discover Client
+         * @description Find an MCP server's authorization server (RFC 9728, RFC 8414): a proposal for
+         *     a client; nothing is stored, every request goes through the egress guard.
+         */
+        post: operations["discover_client_api_ai_oauth_clients_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/oauth-clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client */
+        get: operations["get_client_api_ai_oauth_clients__client_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Client */
+        delete: operations["delete_client_api_ai_oauth_clients__client_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Client */
+        patch: operations["update_client_api_ai_oauth_clients__client_id__patch"];
+        trace?: never;
+    };
+    "/api/ai/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oauth Callback
+         * @description The authorization server's redirect: finish the flow, then send the browser to
+         *     the result page (`/ai/oauth/done?status=...`).
+         */
+        get: operations["oauth_callback_api_ai_oauth_callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3943,7 +4102,15 @@ export interface components {
          * AuthKind
          * @enum {string}
          */
-        AuthKind: "bearer" | "header";
+        AuthKind: "bearer" | "header" | "oauth";
+        /**
+         * AuthorizeOut
+         * @description Where the browser goes to approve the connection.
+         */
+        AuthorizeOut: {
+            /** Authorization Url */
+            authorization_url: string;
+        };
         /** AutomationCreate */
         AutomationCreate: {
             /**
@@ -4230,6 +4397,92 @@ export interface components {
          * @enum {string}
          */
         Classification: "read" | "write";
+        /** ClientCreate */
+        ClientCreate: {
+            /** Authorization Endpoint */
+            authorization_endpoint: string;
+            /** Client Id */
+            client_id: string;
+            client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Name */
+            name: string;
+            /** Resource */
+            resource?: string | null;
+            /** Revocation Endpoint */
+            revocation_endpoint?: string | null;
+            /**
+             * Scopes
+             * @default
+             */
+            scopes?: string;
+            /** @default client_secret_post */
+            token_auth?: components["schemas"]["TokenAuth"];
+            /** Token Endpoint */
+            token_endpoint: string;
+        };
+        /** ClientOut */
+        ClientOut: {
+            /** Authorization Endpoint */
+            authorization_endpoint: string;
+            /** Client Id */
+            client_id: string;
+            client_secret_kind: components["schemas"]["SecretKind"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Has Client Secret */
+            has_client_secret: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Resource */
+            resource: string | null;
+            /** Revocation Endpoint */
+            revocation_endpoint: string | null;
+            /** Scopes */
+            scopes: string;
+            token_auth: components["schemas"]["TokenAuth"];
+            /** Token Endpoint */
+            token_endpoint: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ClientUpdate
+         * @description Only the fields sent change; `client_secret` replaces the stored one, `null`
+         *     removes it (a public client).
+         */
+        ClientUpdate: {
+            /** Authorization Endpoint */
+            authorization_endpoint?: string | null;
+            /** Client Id */
+            client_id?: string | null;
+            client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Name */
+            name?: string | null;
+            /** Resource */
+            resource?: string | null;
+            /** Revocation Endpoint */
+            revocation_endpoint?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+            token_auth?: components["schemas"]["TokenAuth"] | null;
+            /** Token Endpoint */
+            token_endpoint?: string | null;
+            /** Version */
+            version: number;
+        };
         /**
          * ConnectionCreate
          * @description Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else
@@ -4382,7 +4635,9 @@ export interface components {
             mcp_server_id?: string | null;
             /** Name */
             name: string;
-            secret: components["schemas"]["SecretIn"];
+            /** Oauth Client Id */
+            oauth_client_id?: string | null;
+            secret?: components["schemas"]["SecretIn"] | null;
         };
         /** ConnectorOut */
         ConnectorOut: {
@@ -4405,8 +4660,10 @@ export interface components {
             mcp_server_id: string | null;
             /** Name */
             name: string;
+            /** Oauth Client Id */
+            oauth_client_id: string | null;
             scope: components["schemas"]["ConnectorScope"];
-            secret_kind: components["schemas"]["SecretKind"];
+            secret_kind: components["schemas"]["SecretKind"] | null;
             /**
              * Updated At
              * Format: date-time
@@ -4422,7 +4679,9 @@ export interface components {
         ConnectorScope: "shared" | "personal";
         /**
          * ConnectorUpdate
-         * @description Only the fields sent change; `secret` replaces the stored one.
+         * @description Only the fields sent change; `secret` replaces the stored one. An `oauth`
+         *     connector stays one (its tokens change by connecting and disconnecting), and no
+         *     other connector becomes one.
          */
         ConnectorUpdate: {
             auth_kind?: components["schemas"]["AuthKind"] | null;
@@ -4505,6 +4764,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Oauth Client Id */
+            oauth_client_id: string | null;
             refresh: components["schemas"]["RefreshOut"];
             /**
              * Updated At
@@ -4622,6 +4883,40 @@ export interface components {
              */
             type: "user" | "group" | "agent";
         };
+        /** DiscoverIn */
+        DiscoverIn: {
+            /** Url */
+            url: string;
+        };
+        /**
+         * DiscoveryOut
+         * @description A proposal for an OAuth client, found from an MCP server's address; the
+         *     endpoints are None unless `status` is `ok` (`modules/oauth/discovery.py`).
+         */
+        DiscoveryOut: {
+            /** Authorization Endpoint */
+            authorization_endpoint: string | null;
+            /** Issuer */
+            issuer: string | null;
+            /** Pkce */
+            pkce: boolean;
+            /** Registration */
+            registration: boolean;
+            /** Resource */
+            resource: string | null;
+            /** Revocation Endpoint */
+            revocation_endpoint: string | null;
+            /** Scopes */
+            scopes: string;
+            status: components["schemas"]["DiscoveryStatus"];
+            /** Token Endpoint */
+            token_endpoint: string | null;
+        };
+        /**
+         * DiscoveryStatus
+         * @enum {string}
+         */
+        DiscoveryStatus: "ok" | "blocked" | "timeout" | "unreachable" | "no_metadata" | "resource_mismatch" | "no_authorization_server" | "invalid_metadata";
         /**
          * DmOpen
          * @description The other people (the caller is added); 2 to 9 people in all. Or, with
@@ -5747,6 +6042,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[ClientOut] */
+        Page_ClientOut_: {
+            /** Items */
+            items: components["schemas"]["ClientOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[ConnectionOut] */
         Page_ConnectionOut_: {
             /** Items */
@@ -6114,6 +6416,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Oauth Client Id */
+            oauth_client_id: string | null;
         };
         /** PlaceOut */
         PlaceOut: {
@@ -6712,6 +7016,8 @@ export interface components {
             enabled?: boolean;
             /** Name */
             name: string;
+            /** Oauth Client Id */
+            oauth_client_id?: string | null;
             /** Url */
             url: string;
         };
@@ -6735,6 +7041,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Oauth Client Id */
+            oauth_client_id: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -6758,6 +7066,8 @@ export interface components {
             enabled?: boolean | null;
             /** Name */
             name?: string | null;
+            /** Oauth Client Id */
+            oauth_client_id?: string | null;
             /** Url */
             url?: string | null;
             /** Version */
@@ -7792,6 +8102,12 @@ export interface components {
             /** Unpriced Calls */
             unpriced_calls: number;
         };
+        /**
+         * TokenAuth
+         * @description How a client secret goes to the token endpoint (RFC 6749 2.3.1).
+         * @enum {string}
+         */
+        TokenAuth: "client_secret_basic" | "client_secret_post";
         /**
          * TokenCreatedOut
          * @description `secret`: the token's clear text, shown this once and stored nowhere.
@@ -10205,6 +10521,72 @@ export interface operations {
             };
         };
     };
+    authorize_connector_api_ai_connectors__connector_id__authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_connector_api_ai_connectors__connector_id__disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_mcp_settings_api_ai_mcp_get: {
         parameters: {
             query?: never;
@@ -10881,6 +11263,72 @@ export interface operations {
             };
         };
     };
+    authorize_connector_api_ai_my_connectors__connector_id__authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_connector_api_ai_my_connectors__connector_id__disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_personal_servers_api_ai_my_mcp_servers_get: {
         parameters: {
             query?: {
@@ -10901,6 +11349,232 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_PersonalServerOut_"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_clients_api_ai_oauth_clients_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ClientOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_client_api_ai_oauth_clients_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_client_api_ai_oauth_clients_discover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_api_ai_oauth_clients__client_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_client_api_ai_oauth_clients__client_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_client_api_ai_oauth_clients__client_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth_callback_api_ai_oauth_callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

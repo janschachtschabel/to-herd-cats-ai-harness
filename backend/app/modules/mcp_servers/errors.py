@@ -27,7 +27,9 @@ class ToolUnavailable(ExternalToolError):
 
 class NotConnected(ExternalToolError):
     """The server acts with each person's own connector, and this person has none for
-    it: they connect it under "my connections"."""
+    it: they connect it under "my connections". Also: the OAuth connector the call
+    needs has no tokens (never connected, disconnected, or its refresh token was
+    refused); its owner connects it again."""
 
     code = "mcp_tool.not_connected"
 

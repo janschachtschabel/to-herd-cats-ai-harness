@@ -7,10 +7,17 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
-from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.deps import ActorDep, AuthDep, SessionDep
 from app.modules.connectors.models import ConnectorScope
-from app.modules.connectors.schemas import ConnectorCreate, ConnectorOut, ConnectorUpdate
+from app.modules.connectors.schemas import (
+    ConnectorCreate,
+    ConnectorOut,
+    ConnectorUpdate,
+    VersionIn,
+)
 from app.modules.connectors.service import ConnectorService
+from app.modules.oauth.flow import FlowService
+from app.modules.oauth.schemas import AuthorizeOut
 
 shared = APIRouter(prefix="/ai/connectors", tags=["connectors"])
 personal = APIRouter(prefix="/ai/my-connectors", tags=["connectors"])
@@ -43,6 +50,22 @@ def _routes(router: APIRouter, scope: ConnectorScope) -> None:
         connector_id: uuid.UUID, body: ConnectorUpdate, actor: ActorDep, session: SessionDep
     ) -> ConnectorOut:
         connector = await ConnectorService(session).update(actor, scope, connector_id, body)
+        return ConnectorOut.of(connector)
+
+    @router.post("/{connector_id}/authorize", response_model=AuthorizeOut)
+    async def authorize_connector(
+        connector_id: uuid.UUID, ctx: AuthDep, actor: ActorDep, session: SessionDep
+    ) -> AuthorizeOut:
+        """OAuth: where the browser goes to approve; it comes back to the callback."""
+        url = await FlowService(session).start(actor, ctx.session_id, scope, connector_id)
+        return AuthorizeOut(authorization_url=url)
+
+    @router.post("/{connector_id}/disconnect", response_model=ConnectorOut)
+    async def disconnect_connector(
+        connector_id: uuid.UUID, body: VersionIn, actor: ActorDep, session: SessionDep
+    ) -> ConnectorOut:
+        """OAuth: forget the tokens and revoke them at the provider."""
+        connector = await FlowService(session).disconnect(actor, scope, connector_id, body.version)
         return ConnectorOut.of(connector)
 
     @router.delete("/{connector_id}", status_code=204)

@@ -37,8 +37,17 @@ from app.modules.mcp_servers.schemas import (
     check_connector,
 )
 from app.modules.mcp_servers.tools import ToolService
+from app.modules.oauth.repository import ClientRepository
 
-_FIELDS = ("name", "url", "data_location", "connector_scope", "connector_id", "enabled")
+_FIELDS = (
+    "name",
+    "url",
+    "data_location",
+    "connector_scope",
+    "connector_id",
+    "oauth_client_id",
+    "enabled",
+)
 
 
 def server_not_found() -> NotFound:
@@ -70,7 +79,10 @@ class ServerService:
         rows = await self.repo(actor).personal_page(actor.principal.id, after, params.limit + 1)
         page = id_page(rows, params.limit, lambda row: row[0].id)
         items = [
-            PersonalServerOut(id=s.id, name=s.name, connected=c is not None) for s, c in page.items
+            PersonalServerOut(
+                id=s.id, name=s.name, connected=c is not None, oauth_client_id=s.oauth_client_id
+            )
+            for s, c in page.items
         ]
         return Page[PersonalServerOut](items=items, next_cursor=page.next_cursor)
 
@@ -82,6 +94,8 @@ class ServerService:
             raise Conflict(code="mcp_server.name_taken")
         if data.connector_id is not None:
             await self._hold_connector(actor, data.connector_id)
+        if data.oauth_client_id is not None:
+            await self._hold_oauth_client(actor, data.oauth_client_id)
         server = await repo.add(
             McpServer(
                 org_id=actor.org_id,
@@ -90,10 +104,15 @@ class ServerService:
                 data_location=data.data_location,
                 connector_scope=data.connector_scope,
                 connector_id=data.connector_id,
+                oauth_client_id=data.oauth_client_id,
                 enabled=data.enabled,
             )
         )
-        details = {**snapshot(server, _FIELDS), "connector_id": _str(server.connector_id)}
+        details = {
+            **snapshot(server, _FIELDS),
+            "connector_id": _str(server.connector_id),
+            "oauth_client_id": _str(server.oauth_client_id),
+        }
         await self._audit(actor, "mcp_server.created", server, details)
         refresh = await ToolService(self.session).refresh(actor, server.id)
         return found(await repo.get(server.id)), refresh
@@ -112,12 +131,19 @@ class ServerService:
             setattr(server, name, _url(value) if name == "url" else value)
         if server.connector_scope != ConnectorUse.SHARED:
             server.connector_id = None
+        if server.connector_scope != ConnectorUse.PERSONAL:
+            if data.oauth_client_id is not None:
+                raise ValidationFailed(code="mcp_server.oauth_client_invalid")
+            server.oauth_client_id = None
         try:
             check_connector(ConnectorUse(server.connector_scope), server.connector_id)
         except ValueError:
             raise ValidationFailed(code="mcp_server.connector_invalid") from None
         if server.connector_id is not None and server.connector_id != before["connector_id"]:
             await self._hold_connector(actor, server.connector_id)
+        client_id = server.oauth_client_id
+        if client_id is not None and client_id != before["oauth_client_id"]:
+            await self._hold_oauth_client(actor, client_id)
         changed = changes(before, server)
         if "url" in changed:
             await ToolRepository(self.session, actor.org_id).withdraw_approvals(server.id)
@@ -138,6 +164,10 @@ class ServerService:
         shared = ConnectorRepository(self.session, actor.org_id, None)
         if await shared.get_shared_lock(connector_id) is None:
             raise ValidationFailed(code="mcp_server.connector_invalid")
+
+    async def _hold_oauth_client(self, actor: Actor, client_id: uuid.UUID) -> None:
+        if await ClientRepository(self.session, actor.org_id).get_shared_lock(client_id) is None:
+            raise ValidationFailed(code="mcp_server.oauth_client_invalid")
 
     async def _current(
         self, repo: ServerRepository, server_id: uuid.UUID, version: int

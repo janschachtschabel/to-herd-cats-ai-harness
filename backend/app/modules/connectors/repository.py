@@ -76,11 +76,12 @@ class ConnectorRepository:
 
 
 async def encrypted_connectors(session: AsyncSession) -> list[Connector]:
-    """Every connector with an `enc:` secret, in every organisation and of every owner,
-    locked: for the operator's key rotation (`scripts/rotate_secrets.py`)."""
+    """Every connector with an `enc:` secret (or OAuth refresh token), in every
+    organisation and of every owner, locked: for the operator's key rotation
+    (`scripts/rotate_secrets.py`)."""
     stmt = (
         select(Connector)
-        .where(Connector.secret_ref.like("enc:%"))
+        .where(Connector.secret_ref.like("enc:%") | Connector.refresh_token_ref.like("enc:%"))
         .order_by(Connector.id)
         .with_for_update()
     )

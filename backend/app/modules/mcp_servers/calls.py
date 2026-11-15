@@ -10,7 +10,8 @@ returns an `UntrustedResult` or raises an `ExternalToolError` (`errors.py`):
 2. `execute` (no database): in one session with the server, the tools are listed and
    the tool is called only if the server lists it with exactly the approved
    fingerprint; the listing never approves anything. Through the egress guard, with a
-   deadline and a cap on the answer.
+   deadline and a cap on the answer. A 401 with an OAuth connector renews the token
+   (in a transaction of its own) and calls once more.
 3. A refusal in step 2 marks the tool `changed` (or missing) in the caller's
    transaction (`note_refusal`), then raises `ToolUnavailable`.
 
@@ -23,15 +24,15 @@ log names ids, status, duration and size.
 import logging
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.mcp import client as mcp
-from app.mcp.client import Endpoint, ListedTool, Refused, RemoteFailure
-from app.modules.mcp_servers.endpoints import endpoint_for
-from app.modules.mcp_servers.errors import RemoteFailed, ToolUnavailable
+from app.mcp.client import CallResult, Endpoint, ListedTool, Refused, RemoteFailure, RemoteStatus
+from app.modules.mcp_servers.endpoints import Renewal, prepared_endpoint
+from app.modules.mcp_servers.errors import ExternalToolError, RemoteFailed, ToolUnavailable
 from app.modules.mcp_servers.listing import apply, fingerprint
 from app.modules.mcp_servers.models import ToolState
 from app.modules.mcp_servers.repository import ServerRepository, ToolRepository
@@ -65,6 +66,8 @@ class PreparedCall:
     tool_name: str
     approved_fingerprint: str
     endpoint: Endpoint
+    # An OAuth connector's way to a renewed token after a 401 (`endpoints.py`).
+    renewal: Renewal | None = field(default=None, repr=False)
 
 
 class ToolCaller:
@@ -105,8 +108,8 @@ class ToolCaller:
             raise ToolUnavailable("not_approved")
         if tool.fingerprint != approved:
             raise ToolUnavailable("changed")
-        endpoint = await endpoint_for(self.session, server, on_behalf_of, strict=True)
-        return PreparedCall(org_id, server.id, tool.id, tool.name, approved, endpoint)
+        endpoint, renewal = await prepared_endpoint(self.session, server, on_behalf_of, strict=True)
+        return PreparedCall(org_id, server.id, tool.id, tool.name, approved, endpoint, renewal)
 
     async def note_refusal(self, prepared: PreparedCall, listed: ListedTool | None) -> None:
         """The server listed the tool otherwise than approved (or not at all): store
@@ -126,20 +129,31 @@ async def execute(prepared: PreparedCall, arguments: dict[str, Any]) -> Untruste
     def accept(listed: ListedTool | None) -> bool:
         return listed is not None and fingerprint(listed) == prepared.approved_fingerprint
 
-    started = time.monotonic()
-    status, size = "ok", 0
-    try:
-        outcome = await mcp.call_tool(
-            prepared.endpoint,
+    async def call(endpoint: Endpoint) -> CallResult | Refused:
+        return await mcp.call_tool(
+            endpoint,
             prepared.tool_name,
             arguments,
             accept=accept,
             seconds=CALL_TIMEOUT_SECONDS,
             max_bytes=MAX_RESULT_BYTES,
         )
+
+    started = time.monotonic()
+    status, size = "ok", 0
+    try:
+        try:
+            outcome = await call(prepared.endpoint)
+        except RemoteFailure as failure:
+            if failure.status != RemoteStatus.UNAUTHORIZED or prepared.renewal is None:
+                raise
+            outcome = await call(await prepared.renewal())  # once, with a renewed token
     except RemoteFailure as failure:
         status = failure.status.value
         raise RemoteFailed(failure.status) from None
+    except ExternalToolError as error:  # the renewal's own failure
+        status = error.code
+        raise
     else:
         if isinstance(outcome, Refused):
             status = "refused"

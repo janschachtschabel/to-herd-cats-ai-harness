@@ -36,6 +36,7 @@ from app.modules.messaging.models import (
 )
 from app.modules.messaging.notification_models import Notification
 from app.modules.messaging.social_models import ConversationRead, MessageMention, Reaction
+from app.modules.oauth.models import OAuthClient, OAuthFlow
 from app.modules.orgs.models import Organization
 from app.modules.proposals.models import PageProposal
 from app.modules.skills.models import AgentSkill, Skill, SkillVersion
@@ -91,6 +92,8 @@ __all__ = [
     "McpCall",
     "McpServer",
     "McpServerTool",
+    "OAuthClient",
+    "OAuthFlow",
     "Message",
     "MessageMention",
     "Notification",

@@ -47,7 +47,8 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
   in `HERD_SECRET_KEY`, alten in `HERD_SECRET_KEY_PREVIOUS`, ausrollen,
   `cd backend && uv run python -m scripts.rotate_secrets`, danach
   `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript schlüsselt alle `enc:`-Werte (der
-  KI-Verbindungen und der Konnektoren, geteilter wie persönlicher, siehe
+  KI-Verbindungen und der Konnektoren, geteilter wie persönlicher, samt OAuth-Token,
+  OAuth-Client-Geheimnissen und den Prüfwerten offener OAuth-Abläufe, siehe
   [`MCP.md`](MCP.md#konnektoren)) in einer Transaktion neu um (alles oder nichts) und
   nennt nur ihre Zahl. Das Image enthält
   `backend/scripts/` nicht: den Wechsel aus einem Quellstand desselben Release starten,

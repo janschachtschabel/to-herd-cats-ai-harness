@@ -11,6 +11,10 @@
 - A personal connector may serve one external MCP server that acts with each
   person's own connector (`mcp_server_id`; one per person and server). A shared
   connector a server names is not deleted (409 `connector.in_use`).
+- An `oauth` connector names one of the organisation's OAuth clients (422
+  `connector.oauth_client_invalid`) and has no secret until it is connected
+  (`modules/oauth/flow.py`); it stays `oauth` (422 `connector.oauth_fixed`).
+  Deleting a connected one revokes its tokens at the provider after the commit.
 - Every write names the version it read (409 `connector.version_conflict`).
 """
 
@@ -32,6 +36,8 @@ from app.modules.connectors.repository import ConnectorRepository
 from app.modules.connectors.schemas import ConnectorCreate, ConnectorUpdate, check_auth
 from app.modules.mcp_servers.models import ConnectorUse
 from app.modules.mcp_servers.repository import ServerRepository
+from app.modules.oauth.repository import ClientRepository
+from app.modules.oauth.revocation import schedule_revocation
 
 _FIELDS = ("name", "auth_kind", "header_name")
 
@@ -73,6 +79,10 @@ class ConnectorService:
             raise Conflict(code="connector.name_taken")
         if data.mcp_server_id is not None:
             await self._check_server(actor, scope, repo, data.mcp_server_id)
+        if data.oauth_client_id is not None:
+            clients = ClientRepository(self.session, actor.org_id)
+            if await clients.get_shared_lock(data.oauth_client_id) is None:
+                raise ValidationFailed(code="connector.oauth_client_invalid")
         connector = await repo.add(
             Connector(
                 org_id=actor.org_id,
@@ -81,14 +91,15 @@ class ConnectorService:
                 name=data.name,
                 auth_kind=data.auth_kind,
                 header_name=data.header_name,
-                secret_ref=_secret_ref(data.secret, scope),
+                secret_ref=_secret_ref(data.secret, scope) if data.secret else None,
+                oauth_client_id=data.oauth_client_id,
                 mcp_server_id=data.mcp_server_id,
             )
         )
         details = {
             "scope": scope.value,
             "auth_kind": data.auth_kind.value,
-            "secret": secrets.kind_of(connector.secret_ref).value,
+            "secret": secrets.kind_of(ref).value if (ref := connector.secret_ref) else None,
         }
         await self._audit(actor, "connector.created", connector, details)
         return connector
@@ -103,9 +114,14 @@ class ConnectorService:
         repo = await self.repo(actor, scope)
         if "name" in data.model_fields_set:
             await repo.lock_names()
-        connector = await self._current(repo, connector_id, data.version)
+        connector = await self.current(repo, connector_id, data.version)
         if data.name is not None and await repo.name_taken(data.name, other_than=connector.id):
             raise Conflict(code="connector.name_taken")
+        oauth = connector.auth_kind == AuthKind.OAUTH
+        if (data.auth_kind is not None and (data.auth_kind == AuthKind.OAUTH) != oauth) or (
+            oauth and data.secret is not None
+        ):
+            raise ValidationFailed(code="connector.oauth_fixed")
         changed: set[str] = set()
         for name in data.model_fields_set & set(_FIELDS):
             value = getattr(data, name)
@@ -132,9 +148,15 @@ class ConnectorService:
         self, actor: Actor, scope: ConnectorScope, connector_id: uuid.UUID, version: int
     ) -> None:
         repo = await self.repo(actor, scope)
-        connector = await self._current(repo, connector_id, version)
+        connector = await self.current(repo, connector_id, version)
         if await ServerRepository(self.session, actor.org_id).uses_connector(connector.id):
             raise Conflict(code="connector.in_use")
+        if connector.oauth_client_id is not None:
+            client = await ClientRepository(self.session, actor.org_id).get(
+                connector.oauth_client_id
+            )
+            assert client is not None
+            schedule_revocation(self.session, connector, client)
         await repo.delete(connector)
         await self._audit(actor, "connector.deleted", connector, {"scope": scope.value})
 
@@ -152,7 +174,7 @@ class ConnectorService:
         if await repo.for_server(server_id) is not None:
             raise Conflict(code="connector.server_taken")
 
-    async def _current(
+    async def current(
         self, repo: ConnectorRepository, connector_id: uuid.UUID, version: int
     ) -> Connector:
         connector = _found(await repo.get(connector_id, lock=True))

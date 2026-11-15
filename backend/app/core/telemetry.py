@@ -77,12 +77,20 @@ def _tracer_provider(settings: Settings) -> TracerProvider:
     return _provider
 
 
+# Routes whose query carries one-time secrets (the OAuth callback's code and state):
+# no span, since a span records the URL with its query.
+UNTRACED_PATHS = ("/api/ai/oauth/callback",)
+
+
 def configure_tracing(app: FastAPI, settings: Settings) -> None:
     """Every request gets a server span of its own, started in a fresh context
     (`FreshContext` wraps the instrumented stack)."""
     propagate.set_global_textmap(propagator_from_env())
     FastAPIInstrumentor.instrument_app(
-        app, tracer_provider=_tracer_provider(settings), exclude_spans=["receive", "send"]
+        app,
+        tracer_provider=_tracer_provider(settings),
+        exclude_spans=["receive", "send"],
+        excluded_urls=",".join(UNTRACED_PATHS),
     )
     instrumented = app.build_middleware_stack
 

@@ -4,11 +4,14 @@ of the rows (no session is held while the server answers).
 The credential is the server's shared connector, or, for a server that acts with each
 person's own connector, the connector of the person the call is made for. Its secret
 is resolved here, at the moment of the call, into the endpoint's headers and nowhere
-else. A server on a host the operator lists as private (`HERD_MCP_ALLOWED_HOSTS`) is
-dialled directly, past an egress proxy meant for the outside.
+else; an OAuth token about to expire is renewed first, and a call the server answers
+401 may renew it once more (`Renewal`). A server on a host the operator lists as
+private (`HERD_MCP_ALLOWED_HOSTS`) is dialled directly, past an egress proxy meant for
+the outside.
 """
 
 import uuid
+from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,10 +21,11 @@ from app.core.egress_allowance import PrivateAllowance, parse_allowance
 from app.mcp.client import RULES, Endpoint
 from app.modules.ai.provider import egress_proxy
 from app.modules.connectors import credentials
-from app.modules.connectors.models import Connector
+from app.modules.connectors.models import AuthKind, Connector
 from app.modules.connectors.repository import ConnectorRepository
 from app.modules.mcp_servers.errors import CredentialUnavailable, NotConnected
 from app.modules.mcp_servers.models import ConnectorUse, McpServer
+from app.modules.oauth import tokens
 
 
 async def connector_for(
@@ -37,24 +41,62 @@ async def connector_for(
     return None
 
 
+# Called after the server answered 401: the endpoint again, with a renewed token.
+Renewal = Callable[[], Awaitable[Endpoint]]
+
+
 async def endpoint_for(
     session: AsyncSession, server: McpServer, person_id: uuid.UUID | None, *, strict: bool
 ) -> Endpoint:
     """With `strict`, a personal server without the person's connector is
     `NotConnected` (a call); without, it is reached without credential (an admin
     reading the tool list of a server that lists tools to anyone)."""
+    endpoint, _ = await prepared_endpoint(session, server, person_id, strict=strict)
+    return endpoint
+
+
+async def prepared_endpoint(
+    session: AsyncSession, server: McpServer, person_id: uuid.UUID | None, *, strict: bool
+) -> tuple[Endpoint, Renewal | None]:
+    """The endpoint, and for an OAuth connector with a refresh token how to renew it
+    once after a 401. An OAuth connector without tokens is `NotConnected` for a call
+    and an unavailable credential for reading the tool list."""
     connector = await connector_for(session, server, person_id)
     if connector is None and strict and server.connector_scope == ConnectorUse.PERSONAL:
         raise NotConnected()
-    headers: dict[str, str] = {}
-    if connector is not None:
+    allowance = private_allowance()
+    url, rules = server.url, allowance.rules(RULES)
+    proxy = None if allowance.covers(url) else egress_proxy()  # in-house: direct
+    if connector is None:
+        return Endpoint(url, {}, proxy, rules), None
+    try:
+        headers = await credentials.credential_headers(connector)
+    except credentials.NotAuthorized:
+        if strict:
+            raise NotConnected() from None
+        raise CredentialUnavailable() from None
+    except credentials.CredentialUnavailable:
+        raise CredentialUnavailable() from None
+    renewal = None
+    if connector.auth_kind == AuthKind.OAUTH and connector.refresh_token_ref is not None:
+        used = headers["Authorization"].removeprefix("Bearer ")
+        renewal = _renewal(Endpoint(url, {}, proxy, rules), connector, used)
+    return Endpoint(url, headers, proxy, rules), renewal
+
+
+def _renewal(endpoint: Endpoint, connector: Connector, used: str) -> Renewal:
+    org_id, connector_id = connector.org_id, connector.id
+
+    async def renew() -> Endpoint:
         try:
-            headers = credentials.headers_for(connector)
+            headers = await tokens.renew(org_id, connector_id, used=used)
+        except credentials.NotAuthorized:
+            raise NotConnected() from None
         except credentials.CredentialUnavailable:
             raise CredentialUnavailable() from None
-    allowance = private_allowance()
-    proxy = None if allowance.covers(server.url) else egress_proxy()  # in-house: direct
-    return Endpoint(server.url, headers, proxy, allowance.rules(RULES))
+        return Endpoint(endpoint.url, headers, endpoint.proxy, endpoint.rules)
+
+    return renew
 
 
 def private_allowance() -> PrivateAllowance:

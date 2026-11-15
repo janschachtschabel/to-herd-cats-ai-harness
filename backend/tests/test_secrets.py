@@ -200,3 +200,73 @@ async def test_connector_secrets_are_rotated_too(
     with pytest.raises(RotationFailed) as caught:
         await rotate_secrets(session)
     assert caught.value.row_id == rows[1].id and caught.value.table == "connector"
+
+
+async def test_oauth_secrets_are_rotated_too(
+    session: AsyncSession, org: Organization, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OAuth (plan M8 task 8): the client secret, a connector's access and refresh
+    tokens and an open flow's PKCE verifier are `enc:` and rotate with the rest."""
+    from datetime import timedelta
+
+    from app.core.models_base import utcnow
+    from app.modules.auth.models import UserSession
+    from app.modules.oauth.models import OAuthClient, OAuthFlow
+
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    owner = User(
+        org_id=org.id, email="o@example.com", name="O", password_hash="x", system_role="member"
+    )
+    session.add(owner)
+    await session.flush()
+    login = UserSession(org_id=org.id, user_id=owner.id, token_hash="h" * 64, expires_at=utcnow())
+    client = OAuthClient(
+        org_id=org.id,
+        name="App",
+        authorization_endpoint="https://as.example/authorize",
+        token_endpoint="https://as.example/token",
+        client_id="c",
+        client_secret_ref=secrets.encrypt(PLAIN),
+        token_auth="client_secret_post",
+        scopes="",
+    )
+    session.add_all([login, client])
+    await session.flush()
+    connector = Connector(
+        org_id=org.id,
+        scope=ConnectorScope.SHARED,
+        name="O",
+        auth_kind=AuthKind.OAUTH,
+        oauth_client_id=client.id,
+        secret_ref=secrets.encrypt(PLAIN),
+        refresh_token_ref=secrets.encrypt(PLAIN),
+    )
+    session.add(connector)
+    await session.flush()
+    flow = OAuthFlow(
+        org_id=org.id,
+        connector_id=connector.id,
+        session_id=login.id,
+        state_hash="s" * 64,
+        verifier_ref=secrets.encrypt(PLAIN),
+        redirect_uri="https://herd.example/api/ai/oauth/callback",
+        expires_at=utcnow() + timedelta(minutes=5),
+    )
+    session.add(flow)
+    await session.flush()
+    refs = [client.client_secret_ref, connector.secret_ref, connector.refresh_token_ref]
+    old = [*refs, flow.verifier_ref]
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(OTHER_KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", SecretStr(KEY))
+    assert await rotate_secrets(session) == 4
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    new = [
+        client.client_secret_ref,
+        connector.secret_ref,
+        connector.refresh_token_ref,
+        flow.verifier_ref,
+    ]
+    for before, after in zip(old, new, strict=True):
+        assert after is not None and after != before
+        assert secrets.resolve(after).get_secret_value() == PLAIN

@@ -31,6 +31,11 @@ def check_connector(scope: ConnectorUse | None, connector_id: uuid.UUID | None) 
         raise ValueError("connector_id is needed for connector_scope shared, and only for it")
 
 
+def check_oauth_client(scope: ConnectorUse | None, oauth_client_id: uuid.UUID | None) -> None:
+    if oauth_client_id is not None and scope != ConnectorUse.PERSONAL:
+        raise ValueError("oauth_client_id goes only with connector_scope personal")
+
+
 class ServerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -39,11 +44,14 @@ class ServerCreate(BaseModel):
     data_location: DataLocation = DataLocation.EXTERNAL
     connector_scope: ConnectorUse = ConnectorUse.NONE
     connector_id: uuid.UUID | None = None
+    # `personal` only: the OAuth client people connect their own connector with.
+    oauth_client_id: uuid.UUID | None = None
     enabled: bool = True
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
         check_connector(self.connector_scope, self.connector_id)
+        check_oauth_client(self.connector_scope, self.oauth_client_id)
         return self
 
 
@@ -58,6 +66,7 @@ class ServerUpdate(BaseModel):
     data_location: DataLocation | None = None
     connector_scope: ConnectorUse | None = None
     connector_id: uuid.UUID | None = None
+    oauth_client_id: uuid.UUID | None = None
     enabled: bool | None = None
 
     @model_validator(mode="after")
@@ -85,6 +94,7 @@ class ServerOut(BaseModel):
     data_location: DataLocation
     connector_scope: ConnectorUse
     connector_id: uuid.UUID | None
+    oauth_client_id: uuid.UUID | None
     enabled: bool
     version: int
     created_at: datetime
@@ -99,6 +109,7 @@ class ServerOut(BaseModel):
             data_location=server.data_location,
             connector_scope=server.connector_scope,
             connector_id=server.connector_id,
+            oauth_client_id=server.oauth_client_id,
             enabled=server.enabled,
             version=server.version,
             created_at=server.created_at,
@@ -123,6 +134,8 @@ class PersonalServerOut(BaseModel):
     id: uuid.UUID
     name: str
     connected: bool
+    # The OAuth client to connect with (create an `oauth` connector naming it), if any.
+    oauth_client_id: uuid.UUID | None
 
 
 class ToolOut(BaseModel):

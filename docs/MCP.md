@@ -1,8 +1,8 @@
 # MCP: das System als MCP-Server und als MCP-Client
 
 Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
-`mcp.use`** (Plan M8, Task 1), **Konnektoren** (Task 5) und **externe MCP-Server**
-mit Werkzeugfreigabe (Task 6). Der Endpunkt `/mcp` selbst, externe Agenten, externe
+`mcp.use`** (Plan M8, Task 1), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
+**externe MCP-Server** mit Werkzeugfreigabe (Task 6). Der Endpunkt `/mcp` selbst, externe Agenten, externe
 Werkzeuge im Lauf und der Katalog folgen.
 
 ## Zugangstoken
@@ -128,8 +128,8 @@ im Log.
   `PRIVATE-TOKEN` bei GitLab). Köpfe, die der HTTP-Client oder das MCP-Protokoll
   selbst setzen (`Host`, `Content-Type`, `Accept`, `Mcp-Session-Id`,
   `Mcp-Protocol-Version`, `Proxy-*`, `Sec-*` u. a.), sind nicht erlaubt. Der Wert ist
-  sichtbares ASCII ohne Leerzeichen (wie bei KI-Schlüsseln, `core/secrets.py`). OAuth
-  folgt mit Task 8.
+  sichtbares ASCII ohne Leerzeichen (wie bei KI-Schlüsseln, `core/secrets.py`).
+  `oauth` holt das Token beim Verbinden selbst (siehe „OAuth-Konnektoren“).
 - **Geheimnis**: `{"value": "…"}` wird als `enc:` unter `HERD_SECRET_KEY` gespeichert;
   ein geteilter Konnektor darf stattdessen eine Umgebungsvariable nennen
   (`{"env": "HERD_AI_…"}`, dieselben Regeln wie bei KI-Verbindungen). Persönliche
@@ -153,6 +153,154 @@ im Log.
 - **In Gebrauch**: Ein geteilter Konnektor, den ein Server nennt, wird nicht gelöscht
   (409 `connector.in_use`).
 
+## OAuth-Konnektoren
+
+Ein Konnektor der Art `oauth` holt sein Zugangstoken über OAuth 2 (Autorisierungscode
+mit PKCE, OAuth 2.1, RFC 7636) bei einem Autorisierungsserver und erneuert es selbst
+(Plan M8, Task 8). Geltung wie bei jedem Konnektor: geteilt (der Admin verbindet ihn
+einmal, etwa mit einem Bot-Konto) oder persönlich (jede Person verbindet ihren eigenen,
+er handelt in ihrem Namen).
+
+### OAuth-Clients
+
+Die Registrierung der Organisation beim Anbieter (eine GitHub-OAuth-App, eine
+GitLab-Anwendung) heißt **OAuth-Client**; Verwaltung unter `/api/ai/oauth-clients`
+mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
+…/{id}` (`DELETE ?version=`).
+
+- **Felder**: `name` (je Organisation eindeutig, 409 `oauth_client.name_taken`),
+  `authorization_endpoint`, `token_endpoint`, optional `revocation_endpoint` (RFC
+  7009), `client_id`, `client_secret` (schreibend: `{"value": …}` → `enc:`, `{"env":
+  "HERD_AI_…"}` oder `null` für einen öffentlichen Client, der nur mit PKCE arbeitet),
+  `token_auth` (`client_secret_post`, Standard, oder `client_secret_basic`: wie das
+  Geheimnis zum Token-Endpunkt geht), `scopes` (leerzeichengetrennt), optional
+  `resource` (RFC 8707: die Adresse des MCP-Servers, für den die Token gelten; MCP
+  verlangt sie in Autorisierungs- und Token-Anfrage). Antworten zeigen nur
+  `has_client_secret` und `client_secret_kind`.
+- Die Adressen gehen durch dieselben Regeln wie die eines MCP-Servers (https, keine
+  Zugangsdaten, Query oder Fragment, keine private oder Metadaten-Adresse als Literal;
+  422 `oauth_client.url_not_allowed`); private Hosts nur, wenn
+  `HERD_MCP_ALLOWED_HOSTS` sie nennt (ein GitLab im Firmennetz ist sein eigener
+  Autorisierungsserver). Aufgerufen wird der Anbieter nur über den geschützten Ausgang.
+- Schreiben nennt die `version` (409 `oauth_client.version_conflict`). Ein Client, den
+  ein Konnektor oder ein Server nennt, wird nicht gelöscht (409 `oauth_client.in_use`).
+- Audit `oauth_client.created`, `.updated` (Feldnamen, beim Geheimnis nur seine Art),
+  `.deleted`; nie Werte.
+- **Beim Anbieter registrieren**: Als Rückleitungsadresse (Callback-URL) trägt man
+  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` ein, genau so.
+- **Ermitteln** (`POST /api/ai/oauth-clients/discover` mit `{"url": "<MCP-Server>"}`):
+  schlägt die Felder vor, wie die MCP-Autorisierung (Stand 2025-11-25) es vorsieht:
+  Zuerst wird der Server ohne Token gefragt; nennt seine 401-Antwort in
+  `WWW-Authenticate` `resource_metadata` (RFC 9728), gilt diese Adresse und ihr
+  `scope`. Sonst die Well-known-Adressen (`/.well-known/oauth-protected-resource/<Pfad>`,
+  dann an der Wurzel). Das `resource` der Metadaten muss die Adresse des Servers sein
+  (sonst `resource_mismatch`); vom ersten Autorisierungsserver werden die Metadaten
+  gelesen (RFC 8414, OpenID Discovery, mit den Pfadvarianten). `pkce` sagt, ob der
+  Server S256 ankündigt (gesendet wird S256 immer), `registration`, ob er dynamische
+  Registrierung anbietet (genutzt wird sie nicht: der Client wird von Hand
+  registriert). Gespeichert wird nichts; jede Anfrage über den geschützten Ausgang,
+  Antworten höchstens 64 KiB. `status`: `ok`, `blocked`, `timeout`, `unreachable`,
+  `no_metadata`, `resource_mismatch`, `no_authorization_server`, `invalid_metadata`.
+
+### Konnektor anlegen, verbinden, trennen
+
+- **Anlegen**: `{"name", "auth_kind": "oauth", "oauth_client_id"}` ohne `secret` (ein
+  unbekannter Client: 422 `connector.oauth_client_invalid`). Bis er verbunden ist, ist
+  `has_secret` `false`. Ein OAuth-Konnektor bleibt einer, und kein anderer wird es (422
+  `connector.oauth_fixed`); ein Geheimnis lässt sich ihm nicht geben.
+- **Verbinden**: `POST /api/ai/connectors/{id}/authorize` bzw.
+  `/api/ai/my-connectors/{id}/authorize` (wer den Konnektor verwalten darf) antwortet
+  `{"authorization_url"}`; die Oberfläche schickt den Browser dorthin. Die Adresse
+  trägt `response_type=code`, `client_id`, `redirect_uri`, `state`, die
+  S256-`code_challenge`, `scope` und `resource`, nie das Client-Geheimnis.
+- **Rückkehr**: Der Anbieter schickt den Browser an `GET /api/ai/oauth/callback`. Der
+  Code wird eingelöst (mit Prüfwert, derselben Rückleitungsadresse und `resource`),
+  die Token als `enc:` gespeichert, die Version des Konnektors erhöht, Audit
+  `connector.connected` (Geltung, ob ein Erneuerungstoken kam). Danach geht der
+  Browser auf die Seite `/ai/oauth/done?status=…` (mit `connector` und `scope`, wenn
+  bekannt); `status` ist `connected`, `denied` (abgelehnt beim Anbieter), `failed`
+  (Fehler des Anbieters oder beim Einlösen) oder `invalid` (unbekannter, benutzter,
+  abgelaufener oder fremder `state`, Konnektor weg, Rechte weg). Was der Anbieter
+  sagt, steht nie in dieser Adresse.
+- **Trennen**: `POST …/{id}/disconnect` mit `{"version"}` löscht die Token (Audit
+  `connector.disconnected`) und widerruft sie nach dem Commit beim Anbieter (RFC 7009,
+  erst das Erneuerungstoken, dann das Zugangstoken), sofern der Client einen
+  `revocation_endpoint` hat; ohne einen (GitHub-OAuth-Apps haben keinen) bleibt der
+  Widerruf in den Einstellungen des Kontos beim Anbieter. Das Löschen eines
+  verbundenen Konnektors widerruft ebenso.
+
+### `state`, PKCE und Rückleitungsadresse
+
+- `state` (256 Bit) und Prüfwert entstehen beim Start und liegen in Postgres
+  (`oauth_flow`), nicht im Prozess: vom `state` nur der SHA-256, der Prüfwert als
+  `enc:`; dazu die Anmeldesitzung, die Rückleitungsadresse und ein Ablauf (10
+  Minuten). Die Rückkehr gilt nur in **derselben Anmeldesitzung**; die Zeile wird in
+  der Anweisung gelöscht, die sie findet, also genau **einmal** eingelöst. Eine
+  Rückkehr aus einer anderen Sitzung verbraucht sie nicht. Abgemeldete Sitzungen
+  nehmen ihre offenen Abläufe mit.
+- Die **Rückleitungsadresse** ist `HERD_PUBLIC_URL` plus `/api/ai/oauth/callback`, nie
+  aus Kopfzeilen der Anfrage (`Host`, `X-Forwarded-Host`). Ohne `HERD_PUBLIC_URL` oder
+  mit `http` außer für `localhost`/`127.0.0.1` gibt es kein OAuth (422
+  `connector.oauth_unconfigured`).
+- Das Sitzungs-Cookie ist `SameSite=Lax`; die Rückkehr ist eine Navigation, es kommt
+  also mit. Ohne gültige Sitzung endet sie mit `invalid`.
+
+### Erneuerung
+
+- Läuft das Zugangstoken in weniger als 60 Sekunden ab, wird es vor dem Aufruf
+  erneuert; antwortet der Server mit 401, wird es einmal erneuert und der Aufruf
+  wiederholt (beim Aufruf im Lauf wie beim Einlesen der Werkzeuge). Ein zweites 401
+  ist die Antwort des Servers (`unauthorized`).
+- Die Erneuerung läuft in einer **eigenen Transaktion**, die die Zeile des Konnektors
+  sperrt (`FOR UPDATE`, Wartezeit 30 s), bevor sie den Anbieter fragt, und die neuen
+  Token festschreibt, bevor sie die Sperre löst. Ein zweiter Worker, der zugleich
+  erneuern will, wartet und nimmt dann das neue Token, ohne selbst zu fragen. Das ist
+  nötig, weil Anbieter Erneuerungstoken nach einmaligem Gebrauch ungültig machen
+  (GitHub, GitLab); ein zweiter Versuch mit dem alten würde scheitern.
+- Lehnt der Anbieter das Erneuerungstoken ab (`invalid_grant`), werden die Token
+  gelöscht; der Konnektor ist nicht mehr verbunden, ein Aufruf endet mit
+  `mcp_tool.not_connected`, bis jemand neu verbindet. Ist der Anbieter nicht
+  erreichbar oder antwortet anders falsch, bleiben die Token (Fehler
+  `mcp_tool.credential_unavailable`; der nächste Aufruf versucht es wieder). Schickt
+  der Anbieter kein neues Erneuerungstoken, gilt das alte weiter.
+- Ein Konnektor ohne Token: Aufruf `mcp_tool.not_connected`, Einlesen der
+  Werkzeugliste `secret_unavailable`.
+
+### Was nie irgendwo steht
+
+Code, `state`, Prüfwert, Zugangs- und Erneuerungstoken und Client-Geheimnis stehen in
+keiner Logzeile, keinem Audit-Eintrag, keinem Outbox-Ereignis, keiner Fehlermeldung,
+keiner Adresse, die die App schreibt, und keinem Trace (die Rückkehr-Route erzeugt
+keinen Span, weil ein Span die Adresse mit Query aufzeichnet; Test
+`test_oauth_secrecy.py`). Fehlerantworten des Anbieters werden verworfen; was schief
+ging, ist ein fester Zustand (`invalid_grant`, `rejected`, `blocked`, `timeout`,
+`unreachable`, `redirect`, `server_error`, `invalid_response`). Logzeile
+`oauth.token_request` mit Konnektor, Art (`authorization_code`, `refresh_token`,
+`revocation`), Zustand und Dauer. Hinweis für den Betrieb: Der Code steht in der Query
+der Rückkehr und damit im Zugriffsprotokoll eines vorgeschalteten Proxys; er ist nur
+einmal und nur mit Prüfwert (und Client-Geheimnis) einlösbar.
+
+### Schlüsselwechsel
+
+`scripts/rotate_secrets.py` schlüsselt auch Zugangs- und Erneuerungstoken,
+Client-Geheimnisse und die Prüfwerte offener Abläufe um.
+
+### Persönliche Server mit OAuth
+
+Ein Server mit `connector_scope` `personal` kann `oauth_client_id` nennen (nur dann;
+422 `mcp_server.oauth_client_invalid`): den Client, mit dem die Leute ihren eigenen
+Konnektor verbinden. `GET /api/ai/my-mcp-servers` nennt ihn je Server
+(`oauth_client_id`); die Oberfläche legt damit einen persönlichen Konnektor
+`{"auth_kind": "oauth", "oauth_client_id", "mcp_server_id"}` an und startet
+`authorize`.
+
+### Tests
+
+Gegen einen eigenen Autorisierungsserver im Testprozess
+(`backend/tests/support/oauth_stub.py`, https für `oauth.test`: Code mit PKCE,
+Erneuerung mit Rotation, Widerruf, Metadaten nach RFC 8414 und RFC 9728, skriptbar;
+als Prozess `python -m tests.support.oauth_stub --port 8099`), nie gegen das Netz.
+
 ## Externe MCP-Server
 
 Externe MCP-Server sind eine Werkzeugquelle für die eigenen Agenten (Plan M8,
@@ -173,8 +321,9 @@ Recht 404 `ai.not_found`.
 - **Felder**: Name (je Organisation eindeutig), `url`, `data_location`
   (`local`/`eu`/`external`, wie bei einer Verbindung; die KI-Richtlinie nutzt es mit
   Task 7), `connector_scope` (`none`, `shared` mit `connector_id` eines geteilten
-  Konnektors, `personal`: der Zugang der Person, in deren Auftrag aufgerufen wird),
-  `enabled`, `version` (409 `mcp_server.version_conflict`).
+  Konnektors, `personal`: der Zugang der Person, in deren Auftrag aufgerufen wird,
+  optional mit `oauth_client_id`), `enabled`, `version` (409
+  `mcp_server.version_conflict`).
 - **Werkzeugliste**: wird beim Anlegen und mit `POST …/{id}/refresh` eingelesen, ohne
   offene Transaktion, mit Zeitlimit (20 s) und Größenlimit (2 MiB); höchstens 500
   Werkzeuge, Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen

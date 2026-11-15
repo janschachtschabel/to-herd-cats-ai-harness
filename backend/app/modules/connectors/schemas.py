@@ -64,13 +64,28 @@ def check_auth(kind: AuthKind, header_name: str | None) -> None:
         raise ValueError("header_name is needed for auth_kind header, and only for it")
 
 
+def check_secret(
+    kind: AuthKind, secret: SecretIn | None, oauth_client_id: uuid.UUID | None
+) -> None:
+    """An `oauth` connector names its OAuth client and gets its secret (the tokens) by
+    being connected; the other kinds take a secret and no client."""
+    oauth = kind == AuthKind.OAUTH
+    if oauth != (oauth_client_id is not None):
+        raise ValueError("oauth_client_id is needed for auth_kind oauth, and only for it")
+    if oauth == (secret is not None):
+        raise ValueError("a secret is needed for auth_kind bearer and header, never for oauth")
+
+
 class ConnectorCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Name
     auth_kind: AuthKind
     header_name: HeaderName | None = None
-    secret: SecretIn
+    # `bearer`, `header`: required; `oauth`: none (the tokens come by connecting).
+    secret: SecretIn | None = None
+    # `oauth` only: the organisation's OAuth client it connects with (plan M8 task 8).
+    oauth_client_id: uuid.UUID | None = None
     # Personal connectors only: the external MCP server it serves (plan M8 task 6).
     mcp_server_id: uuid.UUID | None = None
 
@@ -78,11 +93,14 @@ class ConnectorCreate(BaseModel):
     def _shape(self) -> Self:
         _check_header(self.header_name)
         check_auth(self.auth_kind, self.header_name)
+        check_secret(self.auth_kind, self.secret, self.oauth_client_id)
         return self
 
 
 class ConnectorUpdate(BaseModel):
-    """Only the fields sent change; `secret` replaces the stored one."""
+    """Only the fields sent change; `secret` replaces the stored one. An `oauth`
+    connector stays one (its tokens change by connecting and disconnecting), and no
+    other connector becomes one."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -107,9 +125,11 @@ class ConnectorOut(BaseModel):
     scope: ConnectorScope
     auth_kind: AuthKind
     header_name: str | None
+    oauth_client_id: uuid.UUID | None
     mcp_server_id: uuid.UUID | None
+    # For `oauth`: whether it is connected (has tokens).
     has_secret: bool
-    secret_kind: SecretKind
+    secret_kind: SecretKind | None
     version: int
     created_at: datetime
     updated_at: datetime
@@ -122,10 +142,17 @@ class ConnectorOut(BaseModel):
             scope=connector.scope,
             auth_kind=connector.auth_kind,
             header_name=connector.header_name,
+            oauth_client_id=connector.oauth_client_id,
             mcp_server_id=connector.mcp_server_id,
-            has_secret=True,
-            secret_kind=kind_of(connector.secret_ref),
+            has_secret=connector.secret_ref is not None,
+            secret_kind=kind_of(connector.secret_ref) if connector.secret_ref else None,
             version=connector.version,
             created_at=connector.created_at,
             updated_at=connector.updated_at,
         )
+
+
+class VersionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
