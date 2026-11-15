@@ -1046,7 +1046,7 @@
         "type": "object"
       },
       "AgentToolOut": {
-        "description": "One tool for this agent: its own `level` (the lowest that allows it) and\n`effect`; `default` (from the agent's level; an external tool's is `block`: it\nneeds an entry), `entry` (the agent's, or null) and `effective` (what a run gets).\n`external`: set for an external MCP server's tool (name `ext_\u2026`; a write tool is\nlevel 4 and at most `confirm`), null for the catalog's.",
+        "description": "One tool for this agent: its own `level` (the lowest that allows it) and\n`effect`; `default` (from the agent's level; an external tool's is `block`: it\nneeds an entry), `entry` (the agent's, or null) and `effective` (what a run gets).\n`external`: set for an external MCP server's tool (name `ext_\u2026`; a write tool is\nlevel 4 and at most `confirm`), null for the catalog's. `via_mcp`: only for an\nexternal agent (plan M8): the catalog tool can reach its token over `/mcp` (offered\nthere, level 2 at most); false for every other agent and tool.",
         "properties": {
           "default": {
             "$ref": "#/components/schemas/Grant"
@@ -1084,6 +1084,11 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "via_mcp": {
+            "default": false,
+            "title": "Via Mcp",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4330,12 +4335,22 @@
         "type": "object"
       },
       "DirectoryEntryOut": {
-        "description": "Who can be added to a space or written to. Deliberately no email or role: any\nmember may read it.",
+        "description": "Who can be added to a space or written to. Deliberately no email or role: any\nmember may read it. `kind`: an agent's kind (`external`: it works from outside\nthrough `/mcp` and answers nothing here by itself, plan M8); null for people and\ngroups.",
         "properties": {
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "title": "Name",

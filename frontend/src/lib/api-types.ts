@@ -3976,7 +3976,9 @@ export interface components {
          *     `effect`; `default` (from the agent's level; an external tool's is `block`: it
          *     needs an entry), `entry` (the agent's, or null) and `effective` (what a run gets).
          *     `external`: set for an external MCP server's tool (name `ext_…`; a write tool is
-         *     level 4 and at most `confirm`), null for the catalog's.
+         *     level 4 and at most `confirm`), null for the catalog's. `via_mcp`: only for an
+         *     external agent (plan M8): the catalog tool can reach its token over `/mcp` (offered
+         *     there, level 2 at most); false for every other agent and tool.
          */
         AgentToolOut: {
             default: components["schemas"]["Grant"];
@@ -3988,6 +3990,11 @@ export interface components {
             level: number;
             /** Name */
             name: string;
+            /**
+             * Via Mcp
+             * @default false
+             */
+            via_mcp?: boolean;
         };
         /**
          * AgentToolsOut
@@ -5118,7 +5125,9 @@ export interface components {
         /**
          * DirectoryEntryOut
          * @description Who can be added to a space or written to. Deliberately no email or role: any
-         *     member may read it.
+         *     member may read it. `kind`: an agent's kind (`external`: it works from outside
+         *     through `/mcp` and answers nothing here by itself, plan M8); null for people and
+         *     groups.
          */
         DirectoryEntryOut: {
             /**
@@ -5126,6 +5135,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            kind?: components["schemas"]["AgentKind"] | null;
             /** Name */
             name: string;
             /**
