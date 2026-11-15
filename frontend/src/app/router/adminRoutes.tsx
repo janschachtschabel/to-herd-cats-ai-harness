@@ -11,6 +11,10 @@ const GroupsPage = lazyRouteComponent(
   'GroupsPage',
 )
 const GroupPage = lazyRouteComponent(() => import('@/features/admin/groups/GroupPage'), 'GroupPage')
+const OidcProvidersPage = lazyRouteComponent(
+  () => import('@/features/admin/oidc/OidcProvidersPage'),
+  'OidcProvidersPage',
+)
 const TagsPage = lazyRouteComponent(() => import('@/features/admin/tags/TagsPage'), 'TagsPage')
 const AuditPage = lazyRouteComponent(() => import('@/features/admin/audit/AuditPage'), 'AuditPage')
 const DmInspectPage = lazyRouteComponent(
@@ -90,6 +94,14 @@ const usersRoute = createRoute({
   path: '/users',
   loader: ({ context }) => requirePermission(context.me, 'user.manage'),
   component: UsersPage,
+})
+
+/** Sign-in providers (plan M9): Google and other OIDC providers, self-registration. */
+const signInRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/sign-in',
+  loader: ({ context }) => requirePermission(context.me, 'user.manage'),
+  component: OidcProvidersPage,
 })
 
 const groupsRoute = createRoute({
@@ -244,6 +256,7 @@ const skillsRoute = createRoute({
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
   usersRoute,
+  signInRoute,
   groupsRoute,
   groupRoute,
   tagsRoute,

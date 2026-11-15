@@ -1,0 +1,155 @@
+{
+  "signin": {
+    "or": "oder mit E-Mail und Passwort",
+    "withGoogle": "Mit Google anmelden",
+    "with": "Anmelden mit {{name}}",
+    "failed": "Die Anmeldung hat nicht geklappt.",
+    "errors": {
+      "link_refused": "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich mit deinem Passwort an und verknüpfe das Konto dann in deinem Profil.",
+      "signup_closed": "Für dieses Konto gibt es hier keinen Zugang. Bitte wende dich an die Verwaltung.",
+      "domain_not_allowed": "Konten dieser Domain können sich hier nicht selbst registrieren.",
+      "email_unverified": "Der Anbieter hat keine bestätigte E-Mail-Adresse übermittelt.",
+      "account_inactive": "Dieses Konto ist deaktiviert.",
+      "identity_taken": "Dieses Konto ist schon mit einer anderen Person verknüpft.",
+      "flow_invalid": "Die Anmeldung ist abgelaufen oder wurde in einem anderen Browser begonnen. Bitte versuche es noch einmal.",
+      "denied": "Die Anmeldung wurde beim Anbieter abgebrochen.",
+      "not_found": "Diese Anmeldeart ist nicht verfügbar.",
+      "unavailable": "Diese Anmeldeart ist nicht verfügbar.",
+      "rate_limited": "Zu viele Versuche. Bitte warte eine Minute.",
+      "provider_unreachable": "Der Anbieter ist gerade nicht erreichbar.",
+      "provider_error": "Der Anbieter hat unerwartet geantwortet. Bitte versuche es später noch einmal.",
+      "issuer_mismatch": "Der Anbieter hat unerwartet geantwortet. Bitte versuche es später noch einmal.",
+      "id_token_invalid": "Die Antwort des Anbieters konnte nicht geprüft werden. Bitte versuche es später noch einmal.",
+      "public_url_missing": "Die Anmeldung über Anbieter ist nicht eingerichtet."
+    },
+    "hintWithProviders": "Melde dich mit dem Konto deiner Organisation oder mit E-Mail-Adresse und Passwort an."
+  },
+  "profile": {
+    "identities": {
+      "title": "Verknüpfte Konten",
+      "description": "Konten bei Anmeldeanbietern, mit denen du dich hier anmelden kannst.",
+      "empty": "Noch kein Konto verknüpft.",
+      "linkedAt": "Verknüpft am {{date}}",
+      "lastLogin": "zuletzt angemeldet {{date}}",
+      "link": "Mit {{name}} verknüpfen",
+      "linking": "Weiter zum Anbieter …",
+      "unlink": "Lösen",
+      "unlinkNamed": "Verknüpfung mit {{name}} lösen",
+      "unlinkTitle": "Verknüpfung lösen?",
+      "unlinkText": "Du kannst dich danach nicht mehr mit {{name}} anmelden, bis du das Konto erneut verknüpfst.",
+      "linked": "Das Konto bei {{name}} ist jetzt verknüpft.",
+      "linkFailed": "Das Konto wurde nicht verknüpft."
+    }
+  },
+  "oidcAdmin": {
+    "title": "Anmeldung",
+    "description": "Anmeldung über OpenID-Connect-Anbieter wie Google, optional mit Selbstregistrierung für erlaubte Domains.",
+    "addGoogle": "Google hinzufügen",
+    "addGeneric": "Anderen Anbieter hinzufügen",
+    "empty": "Noch kein Anbieter eingerichtet. Personen melden sich mit Passwort an.",
+    "kinds": {
+      "google": "Google",
+      "generic": "OpenID Connect"
+    },
+    "status": {
+      "on": "Eingeschaltet",
+      "off": "Ausgeschaltet"
+    },
+    "signupOff": "Aus",
+    "signupFor": "Für {{domains}}",
+    "check": "Prüfen",
+    "checking": "Wird geprüft …",
+    "checkOk": "Discovery und Schlüssel sind erreichbar.",
+    "checkFailed": "Prüfung fehlgeschlagen.",
+    "delete": "Löschen",
+    "deleteNamed": "{{name}} löschen",
+    "deleteTitle": "Anbieter löschen?",
+    "deleteText": "{{name}} wird gelöscht, mit allen Verknüpfungen von Personen. Wer sich nur so angemeldet hat, braucht danach ein Passwort.",
+    "editNamed": "{{name}} bearbeiten",
+    "callback": "Rückruf-Adresse",
+    "callbackHint": "Beim Anbieter als erlaubte Weiterleitungs-URI eintragen.",
+    "callbackMissing": "Ohne HERD_PUBLIC_URL gibt es keine Rückruf-Adresse; der Anbieter lässt sich nicht einschalten.",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "form": {
+      "createGoogle": "Google einrichten",
+      "createGeneric": "Anbieter einrichten",
+      "edit": "Anbieter bearbeiten",
+      "googleHint": "Lege in der Google Cloud Console eine OAuth-Client-ID vom Typ Webanwendung an und übernimm Client-ID und Secret. Die Rückruf-Adresse erscheint nach dem Speichern.",
+      "genericHint": "Der Anbieter muss OpenID Connect Discovery unterstützen.",
+      "key": "Schlüssel",
+      "keyHint": "Kleinbuchstaben, Ziffern und Bindestriche; erscheint in der Rückruf-Adresse.",
+      "name": "Name",
+      "nameHint": "Steht auf dem Anmeldeknopf.",
+      "issuer": "Issuer",
+      "clientId": "Client-ID",
+      "secret": "Client-Secret",
+      "secretModes": {
+        "keep": "Gespeichertes Secret behalten",
+        "value": "Secret eingeben",
+        "env": "Aus Umgebungsvariable HERD_OIDC_…",
+        "none": "Kein Secret (öffentlicher Client)"
+      },
+      "secretValue": "Secret",
+      "secretValueHint": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+      "secretEnv": "Name der Umgebungsvariable",
+      "scopes": "Scopes",
+      "trustEmail": "E-Mail-Adressen dieses Anbieters vertrauen",
+      "trustEmailHint": "Nur einschalten, wenn der Anbieter für jede bestätigte Adresse maßgeblich ist; dann verknüpft die erste Anmeldung ein bestehendes Konto mit derselben Adresse.",
+      "allowSignup": "Selbstregistrierung erlauben",
+      "allowSignupHint": "Neue Personen aus den erlaubten Domains bekommen ein Konto als Mitglied, zunächst ohne KI, bis die Verwaltung sie freigibt.",
+      "domains": "Erlaubte Domains",
+      "domainsHint": "Eine Domain je Zeile, genau so (keine Subdomains).",
+      "domainsRequired": "Mit Selbstregistrierung ist mindestens eine Domain nötig.",
+      "enabled": "Eingeschaltet (Knopf auf der Anmeldeseite)",
+      "submitCreate": "Anbieter anlegen",
+      "issuerPlaceholder": "https://login.example.com/realms/firma",
+      "secretEnvPlaceholder": "HERD_OIDC_GOOGLE_SECRET",
+      "domainsPlaceholder": "example.com",
+      "editHint": "Das gespeicherte Secret wird nie angezeigt; lass es stehen oder ersetze es."
+    },
+    "userIdentities": {
+      "title": "Verknüpfte Konten",
+      "empty": "Keine verknüpften Konten.",
+      "unlinkNamed": "Verknüpfung mit {{name}} lösen"
+    },
+    "secretStored": "Ein Secret ist gespeichert.",
+    "secretMissing": "Kein Secret gespeichert (öffentlicher Client).",
+    "secretKinds": {
+      "env": "Secret aus Umgebungsvariable",
+      "enc": "Secret verschlüsselt gespeichert"
+    },
+    "noSecret": "Öffentlicher Client (kein Secret)",
+    "notDiscovered": "Noch nicht geprüft",
+    "discovered": "Geprüft",
+    "enable": "Einschalten",
+    "disable": "Ausschalten",
+    "listLabel": "Anmeldeanbieter",
+    "signup": "Selbstregistrierung"
+  },
+  "nav": {
+    "signIn": "Anmeldung"
+  },
+  "errors": {
+    "oidc": {
+      "not_found": "Dieser Anbieter existiert nicht (mehr).",
+      "preset_fixed": "Bei Google sind Issuer und Scopes fest vorgegeben.",
+      "secret_required": "Google verlangt ein Client-Secret.",
+      "fields_required": "Schlüssel, Name und Issuer sind nötig.",
+      "url_not_allowed": "Diese Adresse ist nicht erlaubt (nur https, keine privaten Adressen ohne Freigabe).",
+      "scopes_invalid": "Die Scopes müssen openid enthalten.",
+      "domains_required": "Mit Selbstregistrierung ist mindestens eine Domain nötig.",
+      "domain_invalid": "Eine Domain ist ungültig (keine Platzhalter, kein Punkt am Ende).",
+      "public_url_missing": "HERD_PUBLIC_URL ist nicht gesetzt; ohne sie lässt sich kein Anbieter einschalten.",
+      "key_taken": "Diesen Schlüssel gibt es schon.",
+      "version_conflict": "Jemand hat den Anbieter inzwischen geändert.",
+      "last_identity": "Das ist die letzte Anmeldemöglichkeit dieses Kontos. Lege zuerst ein Passwort fest.",
+      "identity_not_found": "Diese Verknüpfung gibt es nicht (mehr).",
+      "rate_limited": "Zu viele Versuche. Bitte warte eine Minute.",
+      "secret_unavailable": "Das Client-Secret ist nicht lesbar (Umgebungsvariable fehlt oder falscher Schlüssel).",
+      "provider_unreachable": "Der Anbieter ist nicht erreichbar.",
+      "provider_error": "Der Anbieter hat unerwartet geantwortet.",
+      "issuer_mismatch": "Das Discovery-Dokument nennt einen anderen Issuer."
+    }
+  }
+}

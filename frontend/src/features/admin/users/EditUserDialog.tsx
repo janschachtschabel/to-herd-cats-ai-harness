@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
+import { UserIdentities } from '@/features/admin/oidc/UserIdentities'
 import { Field, FormActions, SaveError } from '@/features/shared/forms'
 import type { Page, Schemas, User } from '@/lib/api'
 import { blankToNull, bodySchema } from '@/lib/schemas'
@@ -20,11 +21,12 @@ export function EditUserDialog({ user, onClose }: { user: User | null; onClose: 
   const { t } = useTranslation()
   return (
     <Dialog open={user !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('users.edit.title', { name: user?.name ?? '' })}</DialogTitle>
         </DialogHeader>
         {user && <EditUserForm user={user} onDone={onClose} />}
+        {user && <UserIdentities userId={user.id} />}
       </DialogContent>
     </Dialog>
   )

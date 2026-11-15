@@ -43,6 +43,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
 export interface AdminLink {
   to:
     | '/admin/users'
+    | '/admin/sign-in'
     | '/admin/groups'
     | '/admin/tags'
     | '/admin/audit'
@@ -52,6 +53,7 @@ export interface AdminLink {
     | '/admin/skills'
   labelKey:
     | 'nav.users'
+    | 'nav.signIn'
     | 'nav.groups'
     | 'nav.tags'
     | 'nav.audit'
@@ -64,6 +66,7 @@ export interface AdminLink {
 
 export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/users', labelKey: 'nav.users', permission: 'user.manage' },
+  { to: '/admin/sign-in', labelKey: 'nav.signIn', permission: 'user.manage' },
   { to: '/admin/groups', labelKey: 'nav.groups', permission: 'group.manage' },
   { to: '/admin/tags', labelKey: 'nav.tags', permission: 'tag.manage' },
   { to: '/admin/audit', labelKey: 'nav.audit', permission: 'audit.read' },

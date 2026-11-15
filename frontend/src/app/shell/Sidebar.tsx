@@ -3,6 +3,7 @@ import {
   Bot,
   Eye,
   History,
+  LogIn,
   ScrollText,
   Search,
   Shield,
@@ -25,6 +26,7 @@ import { WorkSection } from './SidebarWork'
 
 const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/users': UserRound,
+  '/admin/sign-in': LogIn,
   '/admin/groups': UsersRound,
   '/admin/tags': Tags,
   '/admin/audit': History,

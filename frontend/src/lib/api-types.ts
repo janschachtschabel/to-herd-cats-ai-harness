@@ -222,6 +222,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/oidc-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_admin_oidc_providers_get"];
+        put?: never;
+        /** Create Provider */
+        post: operations["create_provider_api_admin_oidc_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/oidc-providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Provider */
+        get: operations["get_provider_api_admin_oidc_providers__provider_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Provider */
+        delete: operations["delete_provider_api_admin_oidc_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Provider */
+        patch: operations["update_provider_api_admin_oidc_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/oidc-providers/{provider_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Provider
+         * @description Discovery and the JWKS, fetched now through the egress guard; a fixed code.
+         */
+        post: operations["check_provider_api_admin_oidc_providers__provider_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users": {
         parameters: {
             query?: never;
@@ -269,6 +326,40 @@ export interface paths {
         /** Deactivate User */
         post: operations["deactivate_user_api_admin_users__user_id__deactivate_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Identities */
+        get: operations["list_user_identities_api_admin_users__user_id__identities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/identities/{identity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink User Identity */
+        delete: operations["unlink_user_identity_api_admin_users__user_id__identities__identity_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1584,6 +1675,61 @@ export interface paths {
         patch: operations["update_me_api_auth_me_patch"];
         trace?: never;
     };
+    "/api/auth/me/identities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Identities */
+        get: operations["my_identities_api_auth_me_identities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/identities/{identity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink Mine */
+        delete: operations["unlink_mine_api_auth_me_identities__identity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/identities/{key}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link
+         * @description Start linking the caller's account at the provider (from the profile): the
+         *     browser goes to the returned address; the binding cookie comes with this answer.
+         */
+        post: operations["link_api_auth_me_identities__key__link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me/password": {
         parameters: {
             query?: never;
@@ -1598,6 +1744,68 @@ export interface paths {
          * @description The caller's own password; this session stays, every other one ends.
          */
         post: operations["change_my_password_api_auth_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/{key}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Callback
+         * @description The provider's redirect: finish the flow, then the app's start page signed in,
+         *     or the sign-in (profile) page with `?error=` (`?link_error=`) and a fixed code.
+         */
+        get: operations["callback_api_auth_oidc__key__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/{key}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start
+         * @description To the provider's sign-in page, with the browser binding as a cookie; a provider
+         *     that is unknown, off or unreachable sends the browser back to the sign-in page.
+         */
+        get: operations["start_api_auth_oidc__key__start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description The enabled providers (key, name, kind) for the sign-in page; no session needed.
+         */
+        get: operations["list_providers_api_auth_providers_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5592,6 +5800,26 @@ export interface components {
             /** Lines */
             lines: string[];
         };
+        /** IdentityOut */
+        IdentityOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Provider Key */
+            provider_key: string;
+            provider_kind: components["schemas"]["ProviderKind"];
+            /** Provider Name */
+            provider_name: string;
+        };
         /**
          * ImportResultOut
          * @description `created`: pages, folders without a file of their own included.
@@ -5740,6 +5968,14 @@ export interface components {
             run_id: string | null;
             run_state: components["schemas"]["RunState"] | null;
             stop_reason: components["schemas"]["StopReason"] | null;
+        };
+        /**
+         * LinkStartOut
+         * @description Where the browser goes to link an account (the provider's sign-in page).
+         */
+        LinkStartOut: {
+            /** Url */
+            url: string;
         };
         /**
          * LinkedPageOut
@@ -6218,6 +6454,17 @@ export interface components {
             /** Token Endpoint */
             token_endpoint: string;
         };
+        /**
+         * OidcSecretIn
+         * @description Either the secret itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or
+         *     the name of an environment variable `HERD_OIDC_*` (`env`).
+         */
+        OidcSecretIn: {
+            /** Env */
+            env?: string | null;
+            /** Value */
+            value?: string | null;
+        };
         /** OnceIn */
         OnceIn: {
             /**
@@ -6535,6 +6782,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[IdentityOut] */
+        Page_IdentityOut_: {
+            /** Items */
+            items: components["schemas"]["IdentityOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[InspectableDmOut] */
         Page_InspectableDmOut_: {
             /** Items */
@@ -6581,6 +6835,20 @@ export interface components {
         Page_ProposalOut_: {
             /** Items */
             items: components["schemas"]["ProposalOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ProviderOut] */
+        Page_ProviderOut_: {
+            /** Items */
+            items: components["schemas"]["ProviderOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[PublicProviderOut] */
+        Page_PublicProviderOut_: {
+            /** Items */
+            items: components["schemas"]["PublicProviderOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -7137,6 +7405,127 @@ export interface components {
          */
         ProposalState: "open" | "accepted" | "rejected" | "withdrawn";
         /**
+         * ProviderCheckOut
+         * @description `code` is None when discovery and the JWKS answered as OIDC promises.
+         */
+        ProviderCheckOut: {
+            /** Code */
+            code: string | null;
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * ProviderCreate
+         * @description `google`: issuer and scopes are the preset's (`issuer`, `scopes`, `trust_email`
+         *     are refused); `generic`: `issuer` is required, `scopes` must hold `openid`.
+         */
+        ProviderCreate: {
+            /**
+             * Allow Signup
+             * @default false
+             */
+            allow_signup?: boolean;
+            /**
+             * Allowed Domains
+             * @default []
+             */
+            allowed_domains?: string[];
+            /** Client Id */
+            client_id: string;
+            client_secret?: components["schemas"]["OidcSecretIn"] | null;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled?: boolean;
+            /** Issuer */
+            issuer?: string | null;
+            /** Key */
+            key?: string | null;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+            /**
+             * Trust Email
+             * @default false
+             */
+            trust_email?: boolean;
+        };
+        /**
+         * ProviderKind
+         * @enum {string}
+         */
+        ProviderKind: "google" | "generic";
+        /** ProviderOut */
+        ProviderOut: {
+            /** Allow Signup */
+            allow_signup: boolean;
+            /** Allowed Domains */
+            allowed_domains: string[];
+            /** Callback Url */
+            callback_url: string | null;
+            /** Client Id */
+            client_id: string;
+            client_secret: components["schemas"]["SecretState"];
+            /** Discovered */
+            discovered: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issuer */
+            issuer: string;
+            /** Key */
+            key: string;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string;
+            /** Trust Email */
+            trust_email: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProviderUpdate
+         * @description Only the fields sent change; `client_secret` replaces the stored one.
+         */
+        ProviderUpdate: {
+            /** Allow Signup */
+            allow_signup?: boolean | null;
+            /** Allowed Domains */
+            allowed_domains?: string[] | null;
+            /** Client Id */
+            client_id?: string | null;
+            client_secret?: components["schemas"]["OidcSecretIn"] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+            /** Trust Email */
+            trust_email?: boolean | null;
+            /** Version */
+            version: number;
+        };
+        /** PublicProviderOut */
+        PublicProviderOut: {
+            /** Key */
+            key: string;
+            kind: components["schemas"]["ProviderKind"];
+            /** Name */
+            name: string;
+        };
+        /**
          * Purpose
          * @enum {string}
          */
@@ -7441,6 +7830,12 @@ export interface components {
         SecretKind: "env" | "enc";
         /** SecretOut */
         SecretOut: {
+            kind: components["schemas"]["SecretKind"] | null;
+            /** Set */
+            set: boolean;
+        };
+        /** SecretState */
+        SecretState: {
             kind: components["schemas"]["SecretKind"] | null;
             /** Set */
             set: boolean;
@@ -9601,6 +9996,199 @@ export interface operations {
             };
         };
     };
+    list_providers_api_admin_oidc_providers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProviderOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_provider_api_admin_oidc_providers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_provider_api_admin_oidc_providers__provider_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_api_admin_oidc_providers__provider_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_provider_api_admin_oidc_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_provider_api_admin_oidc_providers__provider_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_users_api_admin_users_get: {
         parameters: {
             query?: {
@@ -9707,6 +10295,70 @@ export interface operations {
             header?: never;
             path: {
                 user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_identities_api_admin_users__user_id__identities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IdentityOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_user_identity_api_admin_users__user_id__identities__identity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                identity_id: string;
             };
             cookie?: never;
         };
@@ -12768,6 +13420,98 @@ export interface operations {
             };
         };
     };
+    my_identities_api_auth_me_identities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IdentityOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_mine_api_auth_me_identities__identity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_api_auth_me_identities__key__link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     change_my_password_api_auth_me_password_post: {
         parameters: {
             query?: never;
@@ -12787,6 +13531,100 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    callback_api_auth_oidc__key__callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_auth_oidc__key__start_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_auth_providers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PublicProviderOut_"];
+                };
             };
             /** @description Validation Error */
             422: {

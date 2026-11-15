@@ -46,6 +46,32 @@ export function safeRedirect(value: unknown): string | undefined {
     : undefined
 }
 
+/** The login page: where to go afterwards, and a refused sign-in's code. */
+export interface LoginSearch {
+  redirect?: string | undefined
+  error?: string | undefined
+}
+
+/** A sign-in's refusal code from the address (`oidc.<reason>`); nothing else. */
+export function signInError(value: unknown): string | undefined {
+  return typeof value === 'string' && /^oidc\.[a-z_]{1,40}$/.test(value) ? value : undefined
+}
+
+/** The profile after linking an account: the provider's key, or the refusal code. */
+export interface ProfileSearch {
+  linked?: string | undefined
+  link_error?: string | undefined
+}
+
+export function profileSearch(search: Record<string, unknown>): ProfileSearch {
+  const linked =
+    typeof search.linked === 'string' && /^[a-z0-9-]{1,40}$/.test(search.linked)
+      ? search.linked
+      : undefined
+  // Explicitly undefined when refused: the router lays this over the raw search.
+  return { linked, link_error: signInError(search.link_error) }
+}
+
 export interface SkillsSearch {
   /** The proposals beside the skills (for those who decide them). */
   view?: 'proposals'

@@ -4,7 +4,7 @@ import { ticketSearch } from '@/features/tickets/filters'
 import { adminTree } from './adminRoutes'
 import { aiWorkRoutes } from './aiRoutes'
 import { appRoute, loginRoute, rootRoute } from './base'
-import { messageSearch } from './search'
+import { messageSearch, profileSearch } from './search'
 import { skillProposalRoute, skillRoute, spaceTree } from './spaceRoutes'
 import { tokenRoutes } from './tokenRoutes'
 
@@ -135,7 +135,11 @@ const activityRoute = createRoute({
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
-  component: ProfilePage,
+  validateSearch: profileSearch,
+  component: function ProfileRoute() {
+    const { linked, link_error } = profileRoute.useSearch()
+    return <ProfilePage linked={linked} linkError={link_error} />
+  },
 })
 
 export const routeTree = rootRoute.addChildren([

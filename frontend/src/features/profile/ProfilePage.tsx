@@ -6,11 +6,12 @@ import { PageHeader } from '@/features/shared/states'
 import { MyUsage } from '@/features/ai/usage/MyUsage'
 import { TokensLink } from '@/features/tokens/TokensLink'
 import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
+import { LinkedAccounts } from './identities/LinkedAccounts'
 import { PasswordForm } from './PasswordForm'
 import { useChangeLocale } from './queries'
 
-/** The person's own settings. */
-export function ProfilePage() {
+/** The person's own settings; `linked`/`linkError` come back from linking an account. */
+export function ProfilePage({ linked, linkError }: { linked?: string; linkError?: string }) {
   const { t, i18n } = useTranslation()
   const changeLocale = useChangeLocale()
   const languageId = useId()
@@ -34,6 +35,7 @@ export function ProfilePage() {
       <section className="mt-8 border-t pt-6">
         <PasswordForm />
       </section>
+      <LinkedAccounts linked={linked} linkError={linkError} />
       <TokensLink />
       <MyUsage />
     </div>

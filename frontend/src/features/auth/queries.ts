@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, unwrap, type Me, type Permission } from '@/lib/api'
+import { api, unwrap, type Me, type Permission, type Schemas } from '@/lib/api'
 import { runBeforeLogout } from '@/lib/beforeLogout'
 
 export const meQuery = queryOptions({
@@ -50,4 +50,24 @@ export function useLogout() {
       queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
     },
   })
+}
+
+export type SignInProvider = Schemas['PublicProviderOut']
+
+/** The providers to offer on the sign-in page (no session needed); none on failure. */
+export const providersQuery = queryOptions({
+  queryKey: ['auth', 'providers'],
+  queryFn: async (): Promise<SignInProvider[]> =>
+    unwrap(await api.GET('/api/auth/providers', { params: { query: { limit: 100 } } })).items,
+  staleTime: 60_000,
+  retry: false,
+})
+
+export function useSignInProviders(): SignInProvider[] {
+  return useQuery(providersQuery).data ?? []
+}
+
+/** Where a provider's sign-in starts: a full page load (the API redirects to it). */
+export function signInHref(key: string): string {
+  return `/api/auth/oidc/${encodeURIComponent(key)}/start`
 }

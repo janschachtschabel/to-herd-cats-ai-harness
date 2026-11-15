@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, SaveError } from '@/features/shared/forms'
-import { useLogin } from './queries'
+import { OidcButtons } from './OidcButtons'
+import { useLogin, useSignInProviders } from './queries'
 
 export function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { redirect } = useSearch({ from: '/login' })
+  const { redirect, error } = useSearch({ from: '/login' })
   const login = useLogin()
+  const withProviders = useSignInProviders().length > 0
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -34,9 +36,12 @@ export function LoginPage() {
           <CardTitle>
             <h1 className="text-lg font-semibold">{t('auth.title')}</h1>
           </CardTitle>
-          <CardDescription>{t('auth.hint')}</CardDescription>
+          <CardDescription>
+            {withProviders ? t('signin.hintWithProviders') : t('auth.hint')}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <OidcButtons error={error} />
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <Field label={t('auth.email')}>
               {(props) => (

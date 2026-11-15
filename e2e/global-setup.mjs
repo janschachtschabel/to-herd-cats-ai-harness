@@ -31,6 +31,11 @@
 // operator catalogue file whose entry points at the MCP stub (and one broken file).
 // The browser accepts the stubs' certificate per context (`ignoreHTTPSErrors`), as do
 // the tests' requests to their control routes (tests/mcp-helpers.mjs).
+//
+// Sign-in (plan M9 task 5): the OIDC stub of the backend tests (public port + 7) runs
+// the same way over https for `localhost`; HERD_OIDC_ALLOWED_HOSTS=localhost lets the
+// app reach it, and HERD_OIDC_STUB_SECRET is the client secret a provider may name as
+// `env:` (tests/oidc-helpers.mjs).
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { get as httpsGet } from "node:https";
@@ -162,6 +167,8 @@ export default async function globalSetup() {
     HERD_PUBLIC_URL: `http://127.0.0.1:${port}`,
     HERD_MCP_ALLOWED_HOSTS: "localhost",
     HERD_MCP_CATALOG_DIR: catalogDir,
+    HERD_OIDC_ALLOWED_HOSTS: "localhost",
+    HERD_OIDC_STUB_SECRET: "oidc-SECRET-value-7",
     SSL_CERT_FILE: tls.cert,
   };
   const startApp = () => {
@@ -260,19 +267,21 @@ export default async function globalSetup() {
   };
   const mcpStub = tlsStub("tests.support.mcp_stub", port + 5);
   const oauthStub = tlsStub("tests.support.oauth_stub", port + 6);
+  const oidcStub = tlsStub("tests.support.oidc_stub", port + 7);
   const teardown = async () => {
     control.closeAllConnections();
     await new Promise((resolve) => control.close(resolve));
     await restarting;
     if (app.child.exitCode === null) killGroup(app.child, "SIGTERM");
     if (stub.exitCode === null) stub.kill("SIGTERM");
-    for (const { child } of [mcpStub, oauthStub]) {
+    for (const { child } of [mcpStub, oauthStub, oidcStub]) {
       if (child.exitCode === null) child.kill("SIGTERM");
     }
     await app.exited;
     await stubExited;
     await mcpStub.exited;
     await oauthStub.exited;
+    await oidcStub.exited;
     process.removeListener("exit", orphanGuard);
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
@@ -283,6 +292,7 @@ export default async function globalSetup() {
     const ca = readFileSync(tls.cert);
     await readyTls(`https://localhost:${port + 5}/_stub/log`, ca, Date.now() + 90_000);
     await readyTls(`https://localhost:${port + 6}/_stub/log`, ca, Date.now() + 90_000);
+    await readyTls(`https://localhost:${port + 7}/_stub/log`, ca, Date.now() + 90_000);
   } catch (error) {
     await teardown();
     throw error;
