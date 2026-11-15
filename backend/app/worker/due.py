@@ -24,7 +24,8 @@ At most every CLEANUP_EVERY_SECONDS a round also removes, in batches of CLEANUP_
 events a term took, EVENT_RETENTION after that term, and terms older than
 FIRING_RETENTION with their events; never a term whose run is still open, never an
 event still waiting for an active rule's quiet time to end. Events waiting with a
-deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago.
+deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago. The
+same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION.
 
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
@@ -41,11 +42,14 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
 from app.modules.automations.firing import Fired, fire_next, set_aside
 from app.modules.automations.metrics import automation_metrics
 from app.modules.automations.upkeep_repository import UpkeepRepository
+from app.modules.mcp_tools.repository import delete_calls_before
 from app.modules.wiki.review_pass import Step, review_next
 from app.modules.wiki.review_repository import ReviewRepository
 
@@ -58,6 +62,7 @@ MAX_ERROR_WAIT_SECONDS = 30.0
 METRICS_SECONDS = 10.0
 FIRING_RETENTION = timedelta(days=90)  # terms in the log (with the events they took)
 EVENT_RETENTION = timedelta(days=7)  # events a term took, after that term
+MCP_CALL_RETENTION = timedelta(days=90)  # `/mcp`'s call rows
 CLEANUP_BATCH = 1000
 CLEANUP_EVERY_SECONDS = 60.0
 
@@ -183,7 +188,7 @@ class DueLoop:
             self.metrics.firings.labels(outcome=found.label).inc()
         return found
 
-    async def cleanup_if_due(self) -> tuple[int, int] | None:
+    async def cleanup_if_due(self) -> tuple[int, int, int] | None:
         """`cleanup` at most every CLEANUP_EVERY_SECONDS; None when not yet."""
         now = time.monotonic()
         if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_EVERY_SECONDS:
@@ -191,33 +196,33 @@ class DueLoop:
         self._last_cleanup = now
         return await self.cleanup()
 
-    async def cleanup(self) -> tuple[int, int]:
+    async def cleanup(self) -> tuple[int, int, int]:
         """Remove what the log no longer needs, batch by batch (one transaction each):
         events a term took more than EVENT_RETENTION ago, events waiting with a deleted
         rule or (taken in more than EVENT_RETENTION ago) a paused one, then terms older
         than FIRING_RETENTION; never what an open run may read, never what an active
-        rule still waits to fire. How many terms and events."""
-        now = self.clock.now()
+        rule still waits to fire. Then `/mcp`'s call rows older than MCP_CALL_RETENTION.
+        How many terms, events and call rows."""
+        now, limit = self.clock.now(), self.cleanup_batch
         events = await self._batches(
-            lambda upkeep: upkeep.delete_events_taken_before(
-                now - EVENT_RETENTION, self.cleanup_batch
-            )
+            lambda s: UpkeepRepository(s).delete_events_taken_before(now - EVENT_RETENTION, limit)
         )
         events += await self._batches(
-            lambda upkeep: upkeep.delete_waiting_of_idle_rules(
-                now - EVENT_RETENTION, self.cleanup_batch
-            )
+            lambda s: UpkeepRepository(s).delete_waiting_of_idle_rules(now - EVENT_RETENTION, limit)
         )
         terms = await self._batches(
-            lambda upkeep: upkeep.delete_terms_before(now - FIRING_RETENTION, self.cleanup_batch)
+            lambda s: UpkeepRepository(s).delete_terms_before(now - FIRING_RETENTION, limit)
         )
-        return terms, events
+        calls = await self._batches(
+            lambda s: delete_calls_before(s, now - MCP_CALL_RETENTION, limit)
+        )
+        return terms, events, calls
 
-    async def _batches(self, step: Callable[[UpkeepRepository], Awaitable[int]]) -> int:
+    async def _batches(self, step: Callable[[AsyncSession], Awaitable[int]]) -> int:
         removed = 0
         while True:
             async with self.database.session_factory() as session, session.begin():
-                count = await step(UpkeepRepository(session))
+                count = await step(session)
             removed += count
             if count < self.cleanup_batch:
                 return removed

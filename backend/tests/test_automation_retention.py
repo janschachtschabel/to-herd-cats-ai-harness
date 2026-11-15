@@ -125,11 +125,11 @@ async def test_old_terms_and_taken_events_go_and_waiting_events_stay(
         session.add_all([_event(place, rule_id, None) for _ in range(2)])
         await session.commit()
     loop = DueLoop(real_db.database, clock=SettableClock(NOW))
-    assert await loop.cleanup() == (1, 2)  # the ancient term (its event with it); old's event
+    assert await loop.cleanup() == (1, 2, 0)  # the ancient term (its event with it); old's event
     left, events, waiting = await _log(real_db)
     assert left == {old, recent}
     assert (events, waiting) == (3, 2)  # recent's event and the two waiting
-    assert await loop.cleanup() == (0, 0)
+    assert await loop.cleanup() == (0, 0, 0)
 
 
 async def test_what_an_open_run_may_still_read_stays(
@@ -146,12 +146,12 @@ async def test_what_an_open_run_may_still_read_stays(
         session.add(_event(place, rule_id, term.id))
         await session.commit()
     loop = DueLoop(real_db.database, clock=SettableClock(NOW))
-    assert await loop.cleanup() == (0, 0)  # its run is open: the term and its event stay
+    assert await loop.cleanup() == (0, 0, 0)  # its run is open: the term and its event stay
     async with real_db.database.session_factory() as session:
         await finish_runs(session)
         await session.commit()
         assert await session.scalar(select(Run.state)) == RunState.DONE
-    assert await loop.cleanup() == (1, 1)  # now both go
+    assert await loop.cleanup() == (1, 1, 0)  # now both go
     assert await _log(real_db) == (set(), 0, 0)
 
 
@@ -170,7 +170,7 @@ async def test_the_cleanup_goes_in_bounded_batches_at_most_once_a_while(
         )
         await session.commit()
     loop = DueLoop(real_db.database, clock=SettableClock(NOW), cleanup_batch=2)
-    assert await loop.cleanup_if_due() == (5, 0)  # three transactions of at most two
+    assert await loop.cleanup_if_due() == (5, 0, 0)  # three transactions of at most two
     async with real_db.database.session_factory() as session:
         session.add(_firing(place, rule_id, ancient, FiringOutcome.SKIPPED_BUSY))
         await session.commit()
@@ -200,7 +200,7 @@ async def test_waiting_events_of_a_deleted_rule_and_of_one_paused_long_go(
         )
         await session.commit()
     loop = DueLoop(real_db.database, clock=SettableClock(NOW))
-    assert await loop.cleanup() == (0, 2)
+    assert await loop.cleanup() == (0, 2, 0)
     async with real_db.database.session_factory() as session:
         left = set(await session.scalars(select(AutomationEvent.automation_id)))
     assert left == {rules["short"], rules["busy"]}

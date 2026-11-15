@@ -293,7 +293,11 @@ Werkzeugname ist ein Protokollfehler (`-32602`).
 
 Jeder Werkzeugaufruf wird gezählt (`mcp_call`: Token, Werkzeug, Ergebnisart `ok`,
 `refused`, `invalid` oder `failed`, Dauer, Zeit; nur IDs, nie Argumente oder
-Ergebnisse) und in der Metrik `herd_mcp_calls_total{tool, outcome}`.
+Ergebnisse) und in der Metrik `herd_mcp_calls_total{tool, outcome}`. Die Zeilen
+bleiben 90 Tage: die Fälligkeits-Schleife des Workers löscht ältere einmal je Minute in
+Stapeln von höchstens 1.000 (`MCP_CALL_RETENTION` in `app/worker/due.py`, Index auf
+`created_at`; siehe [`AGENTEN.md`](AGENTEN.md#aufbewahrung)). Ein widerrufenes Token
+behält seine Zeilen bis dahin.
 
 - `GET /api/tokens/{id}/calls` (seitenweise, neueste zuerst): die Aufrufe eines eigenen
   Tokens (`mcp.use`; fremde Token 404 `token.not_found`).

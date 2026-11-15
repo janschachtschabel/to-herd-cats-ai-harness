@@ -98,7 +98,7 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   gauges and retention SQL (`metrics.py`, `upkeep_repository.py`). The due loop is
   `app/worker/due.py` (`SKIP LOCKED`, one transaction per term, unique
   `(automation_id, due_at)`; it also runs the wiki's review pass,
-  `modules/wiki/review_pass.py`, and the log's retention). Time comes from
+  `modules/wiki/review_pass.py`, the log's retention and `mcp_call`'s after 90 days). Time comes from
   `core/clock.py`. Frontend `features/automations`.
 - MCP (M8): `app/mcp/` is the only code that imports the MCP SDK (`mcp`, `mcp_types`;
   `tests/test_mcp_imports.py`): the endpoint (`endpoint.py`: Origin, token, POST only;

@@ -1,7 +1,8 @@
 """What `/mcp` counts (plan M8 decision 6): one `mcp_call` row per tool call, with
 the token, the tool's name (always one of the catalog's), the outcome and how long it
 took. Ids, names and numbers only: never arguments or results. The token's person and
-the AI administration read them as the token's usage; they go with the token.
+the AI administration read them as the token's usage; they go with the token, and
+after 90 days (`app/worker/due.py`, MCP_CALL_RETENTION).
 """
 
 import uuid
@@ -32,6 +33,7 @@ class McpCall(UuidPk, OrgScoped, Base):
         ),
         CheckConstraint("duration_ms >= 0", name="duration_ms"),
         Index("ix_mcp_call_token_id_id", "token_id", "id"),
+        Index("ix_mcp_call_created_at", "created_at"),  # the due loop's retention
     )
 
     token_id: Mapped[uuid.UUID] = mapped_column(
