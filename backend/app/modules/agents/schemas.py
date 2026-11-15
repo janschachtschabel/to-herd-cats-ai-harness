@@ -141,13 +141,16 @@ class AgentOut(BaseModel):
 class AgentExternalToolOut(BaseModel):
     """What an external tool is (plan M8 decision 8): its server and its name there;
     `usable`: approved, unchanged and on an enabled server (else a run never gets it,
-    whatever the entry says)."""
+    whatever the entry says). `left_out`: granted and usable, but left out of every
+    model call by the bound on all of the agent's external tool definitions (module
+    review M8 2, finding G5): the tools listed first come first."""
 
     server_id: uuid.UUID
     server_name: str
     tool_id: uuid.UUID
     tool_name: str
     usable: bool
+    left_out: bool = False
 
 
 class AgentToolOut(BaseModel):
@@ -206,6 +209,7 @@ class AgentToolsOut(BaseModel):
                             tool_id=t.external.tool_id,
                             tool_name=t.external.tool_name,
                             usable=t.external.usable,
+                            left_out=t.external.left_out,
                         )
                         if t.external
                         else None

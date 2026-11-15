@@ -1015,6 +1015,7 @@ in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der
 | `herd_wiki_review_spaces_unchecked` | Gauge (nur mit Worker) | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat |
 | `herd_mcp_calls_total{tool,outcome}` | Zähler (API) | Werkzeugaufrufe über `/mcp` je eingebautem Werkzeug und Ergebnis (`ok`, `refused`, `invalid`, `failed`) |
 | `herd_external_tool_calls_total{outcome,effect}` | Zähler (nur mit Worker) | Aufrufe externer MCP-Werkzeuge in Läufen: `ok`, `error`, `refused`, `limited`, `failed`, `timeout`, `unknown`; `read` oder `write` |
+| `herd_external_tool_definitions_left_out_total` | Zähler (nur mit Worker) | Externe Werkzeuge, die die Grenze aller Werkzeugbeschreibungen eines Modellaufrufs (100.000 Zeichen) weglässt; ohne Namen |
 | `herd_oauth_refreshes_total{status}` | Zähler (API und Worker) | Erneuerungen von OAuth-Token je Antwort des Anbieters |
 | `herd_mcp_catalog_problems` | Gauge (API) | übersprungene Katalog-Dateien |
 

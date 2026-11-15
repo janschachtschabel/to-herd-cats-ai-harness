@@ -606,8 +606,13 @@
         "type": "object"
       },
       "AgentExternalToolOut": {
-        "description": "What an external tool is (plan M8 decision 8): its server and its name there;\n`usable`: approved, unchanged and on an enabled server (else a run never gets it,\nwhatever the entry says).",
+        "description": "What an external tool is (plan M8 decision 8): its server and its name there;\n`usable`: approved, unchanged and on an enabled server (else a run never gets it,\nwhatever the entry says). `left_out`: granted and usable, but left out of every\nmodel call by the bound on all of the agent's external tool definitions (module\nreview M8 2, finding G5): the tools listed first come first.",
         "properties": {
+          "left_out": {
+            "default": false,
+            "title": "Left Out",
+            "type": "boolean"
+          },
           "server_id": {
             "format": "uuid",
             "title": "Server Id",

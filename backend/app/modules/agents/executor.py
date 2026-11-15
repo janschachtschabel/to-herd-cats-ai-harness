@@ -22,7 +22,9 @@ works.
 - Every tool call: the rights again, the tool through the services with the run's
   actor (`tools.py`), and its `run_event` with the full result. The tools offered:
   the catalog's and the external tools the agent has an entry for, as its level and
-  grants allow (`toolbox/policy.py`); an external tool's call: `external_step.py`. A
+  grants allow (`toolbox/policy.py`), the external ones within the bound on all their
+  definitions (`toolbox/external_bound.py`, the same at every step and take-up); an
+  external tool's call: `external_step.py`. A
   step that cannot be recorded, or a tool that fails, ends the run with `error` at
   once (the call's usage is still recorded).
 - The end, in one transaction: `closing.close`. A run that holds a result of the
@@ -55,12 +57,15 @@ from app.modules.agents.actor import Reads, allowed_actor
 from app.modules.agents.closing import PERSONAL_DETAIL, close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
+from app.modules.agents.external_metrics import count_left_out
 from app.modules.agents.journal import renamed, replay
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_models import EventKind, StopReason
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
+from app.modules.agents.toolbox import external_bound
+from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.catalog import offered
 from app.modules.agents.toolbox.external import (
     every_external,
@@ -156,10 +161,11 @@ class Executor:
             deadline = self.clock() + agent.max_runtime_seconds
             entries = await AgentRepository(session, org).tool_entries(agent.id)
             grants = {name: Grant(policy) for name, policy in entries.items()}
-            tools = []
+            tools: list[ToolSpec] = []
+            dropped = 0
             if target.supports_tools:  # the catalog's, then the external ones it is granted
                 specs = offered() + await offered_external(session, org)
-                tools = allowed(agent.level, specs, grants)
+                tools, dropped = external_bound.bounded(allowed(agent.level, specs, grants))
             known = {spec.name for spec in tools}
             if any(
                 is_external(c.name) and c.name not in known
@@ -181,6 +187,8 @@ class Executor:
                 reply_to=found.reply_to,
                 event_rule=found.automation_kind == AutomationKind.EVENT,
             )
+        if dropped:  # after the take-up's transaction: counted, never named
+            count_left_out(dropped)
         sections = [*briefed.sections, personal_mark.PRESENT] if present else briefed.sections
         instructions = context.instructions(
             agent.name,

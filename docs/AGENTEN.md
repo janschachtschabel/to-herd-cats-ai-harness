@@ -387,7 +387,7 @@ oder `confirm` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
 
 Freigegebene Werkzeuge externer MCP-Server ([`MCP.md`](MCP.md#externe-mcp-server))
 erscheinen in derselben Liste, nach dem Katalog, mit `external` (Server-ID und -Name,
-Werkzeug-ID und -Name, `usable`). Die Liste hat keine Seiten, sondern eine feste
+Werkzeug-ID und -Name, `usable`, `left_out`). Die Liste hat keine Seiten, sondern eine feste
 Obergrenze: sie ist ein Dokument mit der Version des Agenten, das `PUT` als Ganzes
 ersetzt, und Seiten würden das teilen. Gezeigt werden die 22 Werkzeuge des Katalogs, die
 freigegebenen externen Werkzeuge (höchstens 200 je Organisation, siehe
@@ -418,6 +418,17 @@ neuen fortgesetzt; eine offene Freigabe unter altem Namen wird beim Fortsetzen
   der Admin es während eines Laufs auf `write` um, braucht schon der nächste Aufruf
   Stufe 4 und die Freigabe (sonst endet der Lauf mit `rights_revoked`; Review M8 1,
   Befund 6).
+- **Höchstens 100.000 Zeichen zusammen** (Review M8 2, Befund G5;
+  `toolbox/external_bound.py`): Name, Beschreibung und Argumentschema aller externen
+  Werkzeuge, die ein Lauf des Agenten bekäme, gehen mit jedem Modellaufruf mit. Sind
+  es zusammen mehr, nimmt der Lauf sie in Namensreihenfolge (`ext_<Werkzeug-ID>`, eine
+  UUIDv7: in der Reihenfolge, in der sie zuerst gelistet wurden), jedes, solange die
+  Summe in der Grenze bleibt; eines, das nicht mehr passt, bleibt weg, kleinere danach
+  können noch passen. Dieselben Werkzeuge und Einträge ergeben bei jedem Schritt, nach
+  jeder Fortsetzung und beim Wiederholen aus dem Journal dieselbe Auswahl. Die
+  Werkzeugliste des Agenten zeigt ein weggelassenes Werkzeug mit
+  `external.left_out: true` („Nicht im Modellaufruf“ mit Erklärung); die Metrik
+  `herd_external_tool_definitions_left_out_total` zählt sie ohne Namen.
 - **Beschreibung** für das Modell: Werkzeug, Server, ob es liest oder nach außen
   handelt; die Beschreibung des Servers folgt gerahmt als nicht vertrauenswürdig und
   auf 1.000 Zeichen gekürzt, ebenso gerahmt und gekürzt, was er über die Argumente
@@ -1665,6 +1676,7 @@ liest jeder Worker alle 10 s, Labels sind nur Aufzählungswerte, nie Inhalte.
 | `herd_wiki_review_reminders_total` | Zähler | Seiten, deren Prüffrist der tägliche Durchlauf dieses Workers gemeldet hat ([`WIKI.md`](WIKI.md#prüffrist-veraltete-seiten-seit-m7)) |
 | `herd_wiki_review_spaces_unchecked` | Gauge | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat; tagsüber 0 |
 | `herd_external_tool_calls_total{outcome,effect}` | Zähler | Aufrufe externer MCP-Werkzeuge in Läufen dieses Workers (seit M8), gezählt nach dem Commit ihres Schritts, je Ergebnis (`ok`, `error`: das Werkzeug meldet selbst einen Fehler, `refused`: nicht gesendet wegen einer Regel, `limited`: Grenze des Laufs, `failed`, `timeout`, `unknown`: gesendet, Ergebnis nicht festgehalten, auch wenn die Laufzeit den Aufruf abschnitt) und Wirkung (`read`, `write`); nie Server, Werkzeug oder Argumente |
+| `herd_external_tool_definitions_left_out_total` | Zähler | Externe Werkzeuge, die die Grenze von 100.000 Zeichen für alle externen Werkzeugbeschreibungen eines Modellaufrufs aus den Läufen dieses Workers weglässt, gezählt bei jedem Start und jeder Fortsetzung eines Laufs (Review M8 2, Befund G5); nie ein Name |
 
 Die Metriken von `/mcp`, der OAuth-Erneuerung und des Katalogs (auch von API-Pods)
 stehen in [`MCP.md`](MCP.md#metriken-und-alarme).

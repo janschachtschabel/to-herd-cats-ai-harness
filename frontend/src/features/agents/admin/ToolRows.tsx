@@ -72,7 +72,8 @@ export function BuiltInToolRow({ tool, choice, onChoose }: RowProps) {
 
 /** An external server's tool: granted only with an entry; a writing one always waits
  *  for the asking person's release; one that is not usable now (not approved, changed,
- *  or its server off) keeps its entry but is never offered to a run. */
+ *  or its server off) keeps its entry but is never offered to a run, and neither is one
+ *  the bound on all external definitions of a model call leaves out (`left_out`). */
 export function ExternalToolRow({ tool, level, choice, onChoose }: RowProps) {
   const { t } = useTranslation()
   const name = tool.external?.tool_name ?? tool.name
@@ -86,7 +87,15 @@ export function ExternalToolRow({ tool, level, choice, onChoose }: RowProps) {
           {tool.external?.usable === false && (
             <Badge variant="destructive">{t('agents.tools.external.unusable')}</Badge>
           )}
+          {tool.external?.left_out && (
+            <Badge variant="destructive">{t('agents.tools.external.leftOut')}</Badge>
+          )}
         </span>
+        {tool.external?.left_out && (
+          <span className="mt-1 block text-xs text-amber-800 dark:text-amber-300">
+            {t('agents.tools.external.leftOutHint')}
+          </span>
+        )}
         {tool.effect === 'write' && (
           <span className="mt-1 block text-xs text-muted-foreground">
             {t('agents.tools.external.alwaysReleased')}

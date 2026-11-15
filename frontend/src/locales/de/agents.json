@@ -77,6 +77,8 @@
         "group": "Externe Werkzeuge · {{server}}",
         "groupHint": "Nur zugeteilte Werkzeuge bekommt der Agent; jeder Aufruf schickt Daten an diesen Server.",
         "unusable": "Nicht nutzbar: nicht (mehr) freigegeben oder Server aus",
+        "leftOut": "Nicht im Modellaufruf",
+        "leftOutHint": "Die Beschreibungen aller externen Werkzeuge dieses Agenten zusammen sind länger, als ein Modellaufruf mitnimmt (100.000 Zeichen). Dieses Werkzeug bekommt er deshalb nicht; die zuerst gelisteten haben Vorrang. Nimm ihm andere externe Werkzeuge weg, damit es passt.",
         "alwaysReleased": "Handelt nach außen: jeder Aufruf nach Freigabe",
         "needsLevel": "Wirkt erst ab Stufe {{level}}",
         "choices": {

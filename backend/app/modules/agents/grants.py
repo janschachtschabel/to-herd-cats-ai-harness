@@ -16,10 +16,12 @@ every other one the agent has an entry for (its `effective` is then `block` and
 `usable` false, so the entry is kept but nothing is offered). An external tool is
 offered only with an entry (its `default` is `block`); a write tool needs level 4 and
 is at most `confirm`. Entries name an external tool by its `ext_…` name; a name that
-is no tool of the organisation is refused like an unknown one."""
+is no tool of the organisation is refused like an unknown one. `left_out`: an offered
+external tool that the bound on all external definitions of a model call leaves out
+(module review M8 2, finding G5; `toolbox/external_bound.py`), exactly as a run would."""
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +33,7 @@ from app.modules.agents.service import AgentService
 from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.catalog import CATALOG
 from app.modules.agents.toolbox.external import every_external, tool_id_of
+from app.modules.agents.toolbox.external_bound import left_out
 from app.modules.agents.toolbox.policy import (
     FREE_LEVEL,
     Grant,
@@ -49,6 +52,7 @@ class ExternalOf:
     tool_id: uuid.UUID
     tool_name: str
     usable: bool
+    left_out: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,11 +102,19 @@ class GrantService:
 
     async def _shown(self, actor: Actor, agent: Agent) -> AgentTools:
         stored = await AgentRepository(self.session, actor.org_id).tool_entries(agent.id)
-        tools = [_grant(agent, spec, stored, None) for spec in CATALOG.values()]
+        tools = [_grant(agent, spec, stored, None)[1] for spec in CATALOG.values()]
         named = {i for name in stored if (i := tool_id_of(name)) is not None}
-        for spec, usable in await every_external(self.session, actor.org_id, named):
-            if usable or spec.name in stored:
-                tools.append(_grant(agent, spec, stored, usable))
+        externals = [
+            _grant(agent, spec, stored, usable)
+            for spec, usable in await every_external(self.session, actor.org_id, named)
+            if usable or spec.name in stored
+        ]
+        offered = [spec for spec, grant in externals if grant.effective != Grant.BLOCK]
+        dropped = left_out(offered)  # as a run applies it (`external_bound.py`)
+        for _, grant in externals:
+            if grant.name in dropped and grant.external is not None:
+                grant = replace(grant, external=replace(grant.external, left_out=True))
+            tools.append(grant)
         return AgentTools(agent, tools, self.max_level(actor, agent))
 
     def max_level(self, actor: Actor, agent: Agent) -> int:
@@ -113,7 +125,9 @@ class GrantService:
         return MAX_LEVEL if may_grant_level(actor, MAX_LEVEL) else FREE_LEVEL
 
 
-def _grant(agent: Agent, spec: ToolSpec, stored: dict[str, str], usable: bool | None) -> ToolGrant:
+def _grant(
+    agent: Agent, spec: ToolSpec, stored: dict[str, str], usable: bool | None
+) -> tuple[ToolSpec, ToolGrant]:
     """`usable`: None for the catalog's tools; for an external one, whether a run may
     call it now (else it counts as `block`)."""
     entry = Grant(stored[spec.name]) if spec.name in stored else None
@@ -124,7 +138,7 @@ def _grant(agent: Agent, spec: ToolSpec, stored: dict[str, str], usable: bool | 
         of = ExternalOf(
             remote.server_id, remote.server_name, remote.tool_id, remote.tool_name, bool(usable)
         )
-    return ToolGrant(
+    return spec, ToolGrant(
         spec.name,
         spec.level,
         spec.effect.value,

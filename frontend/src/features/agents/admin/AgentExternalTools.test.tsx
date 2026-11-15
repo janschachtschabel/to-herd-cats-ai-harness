@@ -134,6 +134,28 @@ describe('external tools in an agent’s grants', () => {
     expect(within(unusable).getByText(/Nicht nutzbar/)).toBeVisible()
   })
 
+  test('a tool left out by the bound on all definitions says so (module review M8 2, G5)', async () => {
+    const shown = tools()
+    shown.tools = shown.tools.map((tool) =>
+      tool.external?.tool_name === 'list_issues'
+        ? {
+            ...tool,
+            entry: 'allow',
+            effective: 'allow',
+            external: { ...tool.external, left_out: true },
+          }
+        : tool,
+    )
+    setup(shown)
+    await renderApp(`/admin/agents/${AGENT_ID}`)
+    const table = await screen.findByRole('table', { name: 'Werkzeuge des Agenten' })
+    const left = within(table).getByRole('row', { name: /list_issues/ })
+    expect(within(left).getByText('Nicht im Modellaufruf')).toBeVisible()
+    expect(within(left).getByText(/Beschreibungen aller externen Werkzeuge/)).toBeVisible()
+    const kept = within(table).getByRole('row', { name: /create_issue/ })
+    expect(within(kept).queryByText('Nicht im Modellaufruf')).toBeNull()
+  })
+
   test('saving keeps the entries made, adds the new grant, drops what is not granted', async () => {
     const api = setup(tools(), { 'PUT /api/agents/:id/tools': tools({ version: 8 }) })
     const { user } = await renderApp(`/admin/agents/${AGENT_ID}`)

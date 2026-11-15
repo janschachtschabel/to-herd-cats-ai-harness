@@ -738,7 +738,11 @@ Recht 404 `ai.not_found`.
   [`AGENTEN.md`](AGENTEN.md#externe-werkzeuge-seit-m8)): Ein Agent bekommt ein
   externes Werkzeug nur mit einem Eintrag in seinen Werkzeugfreigaben
   (`PUT /api/agents/{id}/tools`, Name `ext_…`), und nur, solange es brauchbar ist
-  (freigegeben, unverändert, gelistet, Server eingeschaltet). Lesende Werkzeuge sind
+  (freigegeben, unverändert, gelistet, Server eingeschaltet), und nur, solange die
+  Beschreibungen aller seiner externen Werkzeuge zusammen in 100.000 Zeichen je
+  Modellaufruf passen (die zuerst gelisteten zuerst; was nicht passt, bleibt bei jedem
+  Schritt und jeder Fortsetzung gleich weg und steht in seiner Werkzeugliste als
+  `left_out`; Review M8 2, Befund G5). Lesende Werkzeuge sind
   Stufe 2; schreibende Stufe 4 und immer mit Freigabe der fragenden Person
   (Fingerabdruck über Werkzeug, Argumente und die Versionen von Server und Werkzeug:
   ändert sich eins davon vor dem Ausführen, ist die Freigabe veraltet, und nichts wird
@@ -1036,6 +1040,7 @@ keine Variable, sondern die Einstellung der Organisation in der KI-Verwaltung
 | freigegebene externe Werkzeuge | 200 je Organisation (`MAX_APPROVED_TOOLS`) |
 | externer Server: Werkzeugliste | 20 s, 2 MiB, 500 Werkzeuge, Beschreibung gespeichert bis 10.000 Zeichen, Eingabeschema bis 64 KiB (dem Modell: Struktur bis 8.000 Zeichen, Worte des Servers gerahmt bis 2.000) |
 | externer Server: Aufruf | 60 s (und die Laufzeit des Laufs), Antwort 512 KiB, Ergebnis im Prompt 8.000 Zeichen, Beschreibung im Prompt 1.000 Zeichen |
+| externe Werkzeuge je Modellaufruf | Name, Beschreibung und Argumentschema aller externen Werkzeuge eines Agenten zusammen 100.000 Zeichen (`MAX_DEFINITION_CHARS`); was nicht passt, bleibt weg (`left_out`) |
 | externe Aufrufe je Lauf | `HERD_MCP_MAX_CALLS_PER_RUN` (Standard 20); externe Aufrufe kosten keine Modell-Tokens und zählen zu keinem Tagesbudget |
 | OAuth | Ablauf (`state`) 10 Minuten; Erneuerung 60 s vor Ablauf oder nach einem 401, Sperre der Zeile höchstens 30 s; Antworten des Anbieters 64 KiB |
 | Katalog | 100 Dateien je Verzeichnis, 256 KiB je Datei |
@@ -1051,6 +1056,7 @@ Werkzeugnamen externer Server, Argumente oder Inhalte.
 | `herd_mcp_calls_total{tool,outcome}` | Zähler | API | Werkzeugaufrufe über `/mcp` je eingebautem Werkzeug und Ergebnis (`ok`, `refused`, `invalid`, `failed`); dieselben Aufrufe je Token in `mcp_call` |
 | `herd_http_requests_total{route="/mcp",status}` | Zähler | API | alle Anfragen an `/mcp`: 200, 401 (Token ungültig), 403 (`Origin`), 405, 413, 429 (Ratenbegrenzung) |
 | `herd_external_tool_calls_total{outcome,effect}` | Zähler | Worker | Aufrufe externer Werkzeuge in Läufen, nach dem Commit ihres Schritts: `ok`, `error` (das Werkzeug meldet einen Fehler), `refused` (nicht gesendet: Richtlinie, Freigabe abgelehnt oder veraltet, Werkzeug nicht brauchbar, Person nicht verbunden), `limited` (Grenze des Laufs), `failed` (gesendet und gescheitert, oder Zugang nicht nutzbar), `timeout`, `unknown` (gesendet, Ergebnis nicht festgehalten, auch wenn die Laufzeit des Laufs den Aufruf abschnitt); `effect` `read` oder `write` |
+| `herd_external_tool_definitions_left_out_total` | Zähler | Worker | Externe Werkzeuge, die die Grenze aller Werkzeugbeschreibungen eines Modellaufrufs (100.000 Zeichen) aus einem Lauf weglässt, bei jedem Start und jeder Fortsetzung; ohne Namen |
 | `herd_oauth_refreshes_total{status}` | Zähler | API, Worker | Erneuerungen von OAuth-Token je Antwort des Anbieters: `ok`, `invalid_grant` (Konnektor getrennt), `rejected`, `blocked`, `timeout`, `unreachable`, `redirect`, `server_error`, `invalid_response` |
 | `herd_mcp_catalog_problems` | Gauge | API | übersprungene Katalog-Dateien beim letzten Lesen (bei jedem Scrape neu geprüft) |
 

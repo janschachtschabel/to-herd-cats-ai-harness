@@ -32,6 +32,7 @@ class CallOutcome(StrEnum):
 
 
 _calls: Counter | None = None
+_left_out: Counter | None = None
 
 
 def _counter() -> Counter:
@@ -61,3 +62,18 @@ def outcome_of(outcome: UntrustedResult | Refused | ExternalToolError) -> CallOu
 
 def count(outcome: CallOutcome, *, writes: bool) -> None:
     _counter().labels(outcome=outcome.value, effect="write" if writes else "read").inc()
+
+
+def count_left_out(tools: int) -> None:
+    """External tools a run's model calls go without, for the bound on all of the
+    agent's definitions (module review M8 2, finding G5); counted at each start or
+    take-up of a run, never named."""
+    global _left_out  # noqa: PLW0603 -- one registration per process
+    if _left_out is None:
+        _left_out = Counter(
+            "herd_external_tool_definitions_left_out_total",
+            "External tool definitions left out of an agent run's model calls by the bound "
+            "on their total size, counted at each start or take-up of a run.",
+            registry=REGISTRY,
+        )
+    _left_out.inc(tools)

@@ -77,6 +77,8 @@
         "group": "External tools · {{server}}",
         "groupHint": "The agent gets granted tools only; every call sends data to this server.",
         "unusable": "Not usable: not (or no longer) approved, or server off",
+        "leftOut": "Not in the model call",
+        "leftOutHint": "The descriptions of all of this agent's external tools together are longer than one model call takes (100,000 characters), so it does not get this tool; those listed first come first. Take other external tools away from it to make room.",
         "alwaysReleased": "Acts outside: every call after release",
         "needsLevel": "Takes effect from level {{level}}",
         "choices": {

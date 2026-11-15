@@ -3766,9 +3766,16 @@ export interface components {
          * AgentExternalToolOut
          * @description What an external tool is (plan M8 decision 8): its server and its name there;
          *     `usable`: approved, unchanged and on an enabled server (else a run never gets it,
-         *     whatever the entry says).
+         *     whatever the entry says). `left_out`: granted and usable, but left out of every
+         *     model call by the bound on all of the agent's external tool definitions (module
+         *     review M8 2, finding G5): the tools listed first come first.
          */
         AgentExternalToolOut: {
+            /**
+             * Left Out
+             * @default false
+             */
+            left_out?: boolean;
             /**
              * Server Id
              * Format: uuid

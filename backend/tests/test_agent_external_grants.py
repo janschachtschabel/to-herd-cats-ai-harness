@@ -27,6 +27,7 @@ async def test_usable_external_tools_are_listed_with_their_server(ext: Ext) -> N
         "tool_id": tools["search_issues"]["id"],
         "tool_name": "search_issues",
         "usable": True,
+        "left_out": False,  # the bound on all definitions (G5) leaves nothing out here
     }
     assert is_external(search["name"]) and len(search["name"]) <= 64
     assert (search["level"], search["effect"], search["default"], search["effective"]) == (
