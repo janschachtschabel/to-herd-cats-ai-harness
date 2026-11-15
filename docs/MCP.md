@@ -75,6 +75,24 @@ Personen mit `ai.manage` (alle anderen: 404 `ai.not_found`):
   `access_token.revoked` mit der Person, der es gehört). Beides geht auch bei
   ausgeschaltetem Schalter.
 
+### In der Oberfläche
+
+- **Eigene Token:** Benutzermenü → „Zugangstoken“ (`/profile/tokens`, auch verlinkt im
+  Profil), nur mit `mcp.use`. Anlegen mit Name, „Nur lesen“ oder „Lesen und
+  schreiben“, allen oder ausgewählten Bereichen und der Gültigkeit in Tagen. Danach
+  zeigt ein Dialog den Klartext genau einmal, mit Kopierknopf, Warnung und den
+  Befehlen für Claude Code und Codex (mit der Adresse dieser Installation und
+  `$HERD_TOKEN`). Je Token: Zustand (aktiv, abgelaufen, widerrufen), letzte Nutzung,
+  „Aufrufe“ (die letzten Werkzeugaufrufe mit Ergebnis und Dauer) und „Widerrufen“
+  (mit Rückfrage).
+- **Verwaltung:** Administration → KI → „MCP-Zugang“ (`/admin/ai/mcp`, nur mit
+  `ai.manage`): der Schalter, der Datenort der Clients (Speichern mit der gelesenen
+  Version; bei 409 bleibt die Auswahl stehen und lässt sich neu speichern) und alle
+  Token der Organisation mit ihrer Person oder ihrem Agenten, Aufrufen und Widerrufen.
+- Was über ein Token geschrieben wurde (Nachrichten, Kommentare, Einträge der
+  Ticket- und Seitenverläufe, Vorschläge, Seitenversionen), trägt das KI-Kennzeichen und
+  „über Token „Name““; eine Seitenversion aus `/mcp` heißt „Über MCP“.
+
 ### Rechte eines Tokens
 
 Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeichert:
@@ -348,6 +366,13 @@ Nur mit einem Agenten-Token:
 - Einem externen Agenten zugewiesene, noch offene Tickets tragen in der API
   `awaiting_pickup: true` („wartet auf Abholung“). Die Zuweisung startet keinen Lauf und
   schreibt keinen Hinweis in die Ticket-Diskussion.
+- In der Oberfläche: Administration → Agenten → „Externen Agenten anlegen“ (Name,
+  Kurzvorstellung, verantwortliche Person, Status, Stufe 1 oder 2; kein Modell). Die
+  Seite des Agenten zeigt nur, was für ihn zählt: Stufe bis 2, „Werkzeuge über MCP“
+  (nur „Erlaubt“ oder „Gesperrt“) und „Token des Agenten“ (anlegen mit Klartext einmal
+  und `$HERD_AGENT_TOKEN`, Aufrufe, widerrufen); keine Läufe, Skills oder Aufgaben.
+  Tickets, die auf Abholung warten, tragen „Wartet auf Abholung“ in Liste, Board und
+  Ticket; Personen- und Erwähnungsauswahl markieren einen externen Agenten mit „extern“.
 
 ### Einrichten in Claude Code und Codex
 
