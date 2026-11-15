@@ -9,7 +9,9 @@ admin (`GET /api/ai/mcp-catalog/problems`) and logged once per change as
 never the file's content. An operator's entry cannot replace a shipped one.
 
 Files are read again when the directory's listing, a file's size or its modification
-time changes, so a new file needs no restart.
+time changes, so a new file needs no restart. The number of files skipped is the gauge
+`herd_mcp_catalog_problems`, set whenever the catalogue is read again (and so on every
+scrape of an API process, `app/web/internal.py`).
 """
 
 import logging
@@ -19,9 +21,11 @@ from enum import StrEnum
 from pathlib import Path
 
 import yaml
+from prometheus_client import Gauge
 from pydantic import ValidationError
 
 from app.core.config import get_settings
+from app.core.metrics import REGISTRY
 from app.modules.mcp_catalog.entry import CatalogEntry
 from app.modules.mcp_servers.models import Classification
 
@@ -31,6 +35,14 @@ SHIPPED_DIR = Path(__file__).resolve().parents[2] / "mcp" / "catalog"
 SUFFIXES = (".yaml", ".yml")
 MAX_FILES = 100
 MAX_FILE_BYTES = 256 * 1024
+
+PROBLEMS = Gauge(
+    "herd_mcp_catalog_problems",
+    "Catalogue files this API process skipped when it last read the catalogue "
+    "(GET /api/ai/mcp-catalog/problems names them).",
+    registry=REGISTRY,
+    multiprocess_mode="livemax",
+)
 
 
 class Source(StrEnum):
@@ -163,4 +175,5 @@ def catalog() -> Catalog:
     with _lock:
         if _cached is None or _cached[0] != key:
             _cached = (key, load(operator_dir))
+            PROBLEMS.set(len(_cached[1].problems))
         return _cached[1]

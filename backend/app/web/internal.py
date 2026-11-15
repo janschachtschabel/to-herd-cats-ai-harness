@@ -25,6 +25,7 @@ from app.core.errors import AppError, Unauthorized, UnhandledErrorMiddleware, in
 from app.core.metrics import render_metrics
 from app.core.migrations import schema_is_compatible
 from app.core.request_context import FreshContext
+from app.modules.mcp_catalog.loader import catalog
 from app.modules.wiki.collab_router import router as collab_router
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,8 @@ def create_internal_app(
 
     @app.get("/metrics")
     async def metrics() -> Response:
+        if get_settings().role != "worker":
+            catalog()  # an operator's changed file shows without anyone reading it
         body, content_type = render_metrics()
         if collab_metrics_url is not None:
             body += await _collab_metrics(collab_metrics_url)

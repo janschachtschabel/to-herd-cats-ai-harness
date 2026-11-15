@@ -16,7 +16,8 @@ the old one would fail. The new tokens commit before the lock is released.
 
 The plaintext exists only in the returned headers and the request to the provider;
 the log line `oauth.token_request` names the connector, the grant, the status and
-the duration.
+the duration; every renewal counts in `herd_oauth_refreshes_total{status}`
+(`metrics.py`) once its transaction is over.
 """
 
 import logging
@@ -36,6 +37,7 @@ from app.core.models_base import utcnow
 from app.modules.connectors.credentials import CredentialUnavailable, NotAuthorized
 from app.modules.connectors.models import AuthKind, Connector
 from app.modules.oauth import protocol
+from app.modules.oauth.metrics import OAUTH_REFRESHES
 from app.modules.oauth.models import OAuthClient
 from app.modules.oauth.protocol import ClientCredentials, TokenFailure, Tokens, TokenStatus
 
@@ -103,13 +105,15 @@ async def renew(org_id: uuid.UUID, connector_id: uuid.UUID, *, used: str | None)
             store(connector, tokens, keep_refresh=True)
         except TokenFailure as failure:
             if failure.status != TokenStatus.INVALID_GRANT:
+                OAUTH_REFRESHES.labels(status=failure.status.value).inc()  # nothing to keep
                 raise CredentialUnavailable() from None
             forget(connector)
-            disconnected = True
+            status = TokenStatus.INVALID_GRANT
         else:
-            disconnected = False
+            status = TokenStatus.OK
         await session.flush()
-    if disconnected:  # committed: the dead tokens are gone for every worker
+    OAUTH_REFRESHES.labels(status=status.value).inc()  # committed
+    if status == TokenStatus.INVALID_GRANT:  # the dead tokens are gone for every worker
         raise NotAuthorized()
     return bearer(tokens.access_token)
 
