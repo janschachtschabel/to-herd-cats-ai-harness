@@ -52,7 +52,7 @@ RESERVED_HEADERS = frozenset(
 _RESERVED_PREFIX = re.compile(r"^(proxy-|sec-)", re.IGNORECASE)
 
 
-def _check_header(name: str | None) -> str | None:
+def check_header(name: str | None) -> str | None:
     if name is not None and (name.lower() in RESERVED_HEADERS or _RESERVED_PREFIX.match(name)):
         raise ValueError("this header is set by the client itself")
     return name
@@ -91,7 +91,7 @@ class ConnectorCreate(BaseModel):
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
-        _check_header(self.header_name)
+        check_header(self.header_name)
         check_auth(self.auth_kind, self.header_name)
         check_secret(self.auth_kind, self.secret, self.oauth_client_id)
         return self
@@ -112,7 +112,7 @@ class ConnectorUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
-        _check_header(self.header_name)
+        check_header(self.header_name)
         for field in ("name", "auth_kind", "secret"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be removed")

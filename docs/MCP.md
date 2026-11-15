@@ -2,8 +2,9 @@
 
 Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
 `mcp.use`** (Plan M8, Task 1), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
-**externe MCP-Server** mit Werkzeugfreigabe (Task 6). Der Endpunkt `/mcp` selbst, externe Agenten, externe
-Werkzeuge im Lauf und der Katalog folgen.
+**externe MCP-Server** mit Werkzeugfreigabe (Task 6), ihre Werkzeuge im Lauf (Task 7)
+und der **Katalog** mitgelieferter Vorlagen (Task 9). Der Endpunkt `/mcp` selbst und
+externe Agenten folgen.
 
 ## Zugangstoken
 
@@ -101,6 +102,7 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
 |---|---|---|
 | `HERD_MCP_RATE_PER_MINUTE` | `120` | Aufrufe je Token und Minute (API; Chart `mcp.ratePerMinute`) |
 | `HERD_MCP_ALLOWED_HOSTS` | leer | private Hosts externer MCP-Server: Hostnamen oder private Netze (CIDR), kommagetrennt (API und Worker; Chart `mcp.allowedHosts`; siehe „Externe MCP-Server“) |
+| `HERD_MCP_CATALOG_DIR` | leer | Verzeichnis mit eigenen Katalog-Vorlagen (API; Chart `mcp.catalogConfigMap`; siehe „Katalog“) |
 
 ### Für die folgenden Tasks
 
@@ -345,7 +347,10 @@ Recht 404 `ai.not_found`.
 - **Einstufung** `read`/`write`: Vorschlag `read` nur, wenn der Server das Werkzeug als
   nur lesend kennzeichnet (`readOnlyHint`), sonst `write`. Ein nicht so gekennzeichnetes
   Werkzeug auf `read` zu setzen, verlangt `confirm_loosen: true` (422
-  `mcp_tool.loosen_unconfirmed`); das Audit vermerkt `loosened`.
+  `mcp_tool.loosen_unconfirmed`); das Audit vermerkt `loosened`. Bei einem Server aus
+  dem Katalog schlägt die Vorlage zusätzlich vor (`suggested_classification`); ein
+  Vorschlag `write` verschärft den Vorschlag des Servers, ein Vorschlag `read` lockert
+  nie von selbst (siehe „Katalog“).
 - **Aufruf** (`backend/app/modules/mcp_servers/calls.py`): nur ein freigegebenes, noch
   gelistetes Werkzeug mit dem freigegebenen Fingerabdruck eines eingeschalteten Servers. Im selben
   Gespräch mit dem Server wird zuerst die Werkzeugliste gelesen; nennt der Server das
@@ -412,3 +417,136 @@ Recht 404 `ai.not_found`.
   Werkzeugliste, Ergebnisse, Verzögerung, Umleitung, Fehlerstatus, verlangter Kopf),
   nie gegen das Netz. Das SDK (`mcp`) wird nur unter `backend/app/mcp/` importiert
   (`tests/test_mcp_imports.py`).
+
+## Katalog
+
+Der Katalog hält Vorlagen für bekannte MCP-Server (Plan M8, Entscheidung 10). Aus
+einer Vorlage legt die Verwaltung einen Server samt dem an, was er braucht; sie trägt
+nur den Zugang und seinen Geltungsbereich ein. Freigegeben wird trotzdem jedes
+Werkzeug einzeln: Eine Vorlage schlägt nur vor.
+
+### Mitgeliefert: GitHub und GitLab
+
+| Vorlage | Adresse | Anmeldung | geprüft am 2026-11-15 |
+|---|---|---|---|
+| `github` | `https://api.githubcopilot.com/mcp/` | OAuth (eigene GitHub-App oder OAuth-App; `https://github.com/login/oauth/authorize`, `…/access_token`, Scopes `repo read:org`, PKCE S256) oder persönliches Zugriffstoken als Bearer | Adresse, Anmeldearten, Endpunkte, PKCE aus der Dokumentation von GitHub; der Server war vom Bauort aus nicht erreichbar |
+| `gitlab` | `{base_url}/api/v4/mcp`, `base_url` Standard `https://gitlab.com` | OAuth (`{base_url}/oauth/authorize`, `/token`, `/revoke`, Scope `mcp`, PKCE) oder fein granulares persönliches Zugriffstoken als Bearer | Adresse, Scope, Endpunkte, PKCE und Widerruf live an gitlab.com (401 mit `resource_metadata`, RFC 9728/8414) und aus der Dokumentation |
+
+- **GitHub** bietet keine dynamische Client-Registrierung: Für OAuth legt die
+  Organisation eine eigene GitHub-App (empfohlen: Token laufen ab und werden erneuert)
+  oder OAuth-App an, Callback-URL `<HERD_PUBLIC_URL>/api/ai/oauth/callback`. GitHub
+  hat keinen Widerrufs-Endpunkt nach RFC 7009; Zugänge widerruft man bei GitHub in den
+  Einstellungen des Kontos. GitHub Enterprise Server hat keinen entfernten MCP-Server.
+  Nicht geprüft werden konnte, ob GitHubs Autorisierungsserver den Parameter
+  `resource` (RFC 8707, von MCP-Clients verlangt) annimmt oder übergeht, und welche
+  Scopes eine OAuth-App mindestens braucht.
+- **GitLab** (GitLab.com, Self-Managed, Dedicated; allgemein verfügbar seit 19.5): Für
+  OAuth eine Anwendung mit Scope `mcp` anlegen, „Confidential“ abwählen (dann ohne
+  Client-Geheimnis, nur PKCE). Klassische, Projekt- und Gruppen-Token lehnt der Server
+  ab (403). Für eine eigene Instanz wird beim Anlegen `base_url` angegeben (etwa
+  `https://gitlab.example.com`, auch mit Pfad); liegt sie im Firmennetz, muss der
+  Betrieb den Host in `HERD_MCP_ALLOWED_HOSTS` freigeben. Nicht geprüft: in welcher
+  Kopfzeile der Server ein persönliches Zugriffstoken erwartet (angeboten wird
+  Bearer) und ob eine Instanz unter einem Pfad dieselben Pfade darunter bedient.
+- Die vorgeschlagenen Einstufungen stammen aus den Werkzeuglisten der Dokumentation
+  (Namen und Beschreibungen), nicht aus den Annotationen der Server; der Vorschlag
+  `write` gilt für alles, was schreibt, zusammenführt, startet oder Sitzungen anlegt.
+  Die Kommentare oben in den Dateien nennen die Quellen und das Ungeprüfte.
+
+### Anlegen aus einer Vorlage
+
+`ai.manage`, ohne das Recht 404 `ai.not_found`:
+
+- `GET /api/ai/mcp-catalog` (seitenweise nach ID) und `GET /api/ai/mcp-catalog/{id}`:
+  die Vorlagen, wie sie geladen sind (Name, Beschreibung und Hinweise auf Deutsch und
+  Englisch, Adresse bzw. Adressmuster, `base_url` mit Standard, `data_location`,
+  erlaubte `connector_scopes`, Anmeldearten mit OAuth-Endpunkten und Scopes, die
+  vorgeschlagene Einstufung je Werkzeug, Dokumentation). Eine Vorlage enthält nie eine
+  Client-ID oder ein Geheimnis. Unbekannt: 404 `mcp_catalog.not_found`.
+- `GET /api/ai/mcp-catalog/problems` (seitenweise): Dateien, die nicht geladen wurden,
+  mit Quelle (`shipped`/`operator`), Dateiname und Grund.
+- `POST /api/ai/mcp-catalog/{id}/install` (201) mit `connector_scope` und, außer bei
+  `none`, `auth_kind`; optional `name` (Standard: Name der Vorlage), `base_url` (nur
+  bei Vorlagen mit Adressmuster), `data_location`, `enabled`:
+  - `none`: nur der Server.
+  - `shared` mit `bearer`/`header`: dazu ein geteilter Konnektor mit `secret`
+    (`{"value": …}` verschlüsselt oder `{"env": "HERD_AI_…"}`).
+  - `shared` mit `oauth`: dazu ein OAuth-Client aus den Endpunkten der Vorlage mit
+    `client_id` (und `client_secret`, wenn vertraulich; `resource` ist die Adresse des
+    Servers) und ein geteilter OAuth-Konnektor, der danach verbunden wird
+    (`POST /api/ai/connectors/{id}/authorize`).
+  - `personal` mit `oauth`: dazu der OAuth-Client, mit dem jede Person ihren eigenen
+    Konnektor verbindet (`oauth_client_id` am Server); mit `bearer`/`header` legt jede
+    Person ihren Konnektor selbst an.
+
+  Die Antwort nennt den Server (mit `catalog_id` und dem Ergebnis des Einlesens der
+  Werkzeuge, `refresh`), `oauth_client_id` und `connector_id`. Alles geschieht in einer
+  Transaktion über dieselben Services wie von Hand, mit denselben Regeln und demselben
+  Audit (`oauth_client.created`, `connector.created`, `mcp_server.created` mit
+  `catalog_id`); scheitert ein Schritt (Name vergeben: 409 `…name_taken`), bleibt
+  nichts zurück. Fehler: 422 `mcp_catalog.install_invalid` mit `details.field`
+  (`connector_scope` oder `auth_kind`, die die Vorlage nicht anbietet; `base_url` bei
+  einer Vorlage ohne Muster), 422 `mcp_catalog.base_url_not_allowed` mit
+  `details.reason` (Adresse, die die Ausgangsregeln nicht erlauben, etwa `http` oder
+  eine nicht freigegebene private Adresse).
+- **Vorschläge**: Liest ein Refresh bei einem Server aus dem Katalog ein Werkzeug zum
+  ersten Mal, wird es `write` vorgeschlagen, wenn die Vorlage das sagt, auch wenn der
+  Server es als nur lesend kennzeichnet. Ein Vorschlag `read` für ein nicht so
+  gekennzeichnetes Werkzeug ändert nichts; `read` setzt nur die Verwaltung, mit
+  `confirm_loosen`. `GET …/mcp-servers/{id}/tools` nennt je Werkzeug
+  `suggested_classification` (oder `null`). Alle Werkzeuge kommen als `pending`.
+
+### Eigene Vorlagen
+
+Eine Vorlage ist eine YAML-Datei (`*.yaml`, `*.yml`, höchstens 256 KiB, UTF-8).
+Mitgelieferte liegen unter `backend/app/mcp/catalog/` (eine neue Datei dort braucht
+keine Codeänderung); eigene der Installation in `HERD_MCP_CATALOG_DIR` (Compose: das
+Verzeichnis im Container, schreibgeschützt eingebunden; Chart:
+`mcp.catalogConfigMap`, eine vorhandene ConfigMap, deren Schlüssel die Dateien sind,
+eingebunden unter `/etc/herd/mcp-catalog`). Gelesen wird nur von der API; eine neue
+oder geänderte Datei gilt ohne Neustart (geprüft an Dateiliste, Größe und
+Änderungszeit).
+
+```yaml
+id: tracker                  # a-z, 0-9, „-“, bis 40 Zeichen, eindeutig
+name: Tracker
+description: {de: "Unser Tracker.", en: "Our tracker."}
+url: "{base_url}/mcp"        # https; nur {base_url} wird eingesetzt
+base_url:                    # nur mit Muster
+  default: https://tracker.example.com
+  note: {de: "…", en: "…"}
+data_location: external      # local | eu | external
+connector_scopes: [personal, shared]   # none | personal | shared
+auth:
+  - kind: oauth              # oauth | bearer | header
+    oauth:
+      authorization_endpoint: "{base_url}/oauth/authorize"
+      token_endpoint: "{base_url}/oauth/token"
+      revocation_endpoint: "{base_url}/oauth/revoke"   # optional
+      scopes: "mcp"
+      resource: true         # Adresse des Servers als RFC-8707-resource senden
+      token_auth: client_secret_post   # oder client_secret_basic
+    note: {de: "…", en: "…"}
+  - kind: header
+    header_name: X-Api-Key
+tools:                       # Vorschläge, höchstens 500
+  search: read
+  create_ticket: write
+docs: ["https://tracker.example.com/docs/mcp"]
+```
+
+- Beim Laden wird jede Datei geprüft (unbekannte Felder, fehlende Pflichtfelder,
+  Adressen ohne https, mit Zugangsdaten, Query oder Fragment, andere Platzhalter als
+  `{base_url}`, Anmeldeart ohne passenden Geltungsbereich). Eine fehlerhafte Datei
+  wird übersprungen, nie ein Startfehler: Sie steht unter
+  `GET /api/ai/mcp-catalog/problems` und im Log (`mcp.catalog_problem` mit Quelle,
+  Dateiname und Ort und Art des Fehlers, nie dem Inhalt). Eine eigene Vorlage kann
+  keine mitgelieferte ersetzen (dieselbe ID: übersprungen, „id … already taken“).
+  Versteckte Dateien und andere Endungen werden nicht gelesen, höchstens 100 Dateien
+  je Verzeichnis.
+- Vorab prüfen: `cd backend && uv run python -m scripts.check_mcp_catalog <verzeichnis>`
+  nennt jede Vorlage und jedes Problem und endet mit 1, wenn eines da ist. Die CI
+  prüft so die mitgelieferten Vorlagen.
+- Die Adressen prüfen die Ausgangsregeln erst beim Anlegen (Server und OAuth-Client wie
+  von Hand); eine Vorlage für ein internes Ziel braucht dessen Host in
+  `HERD_MCP_ALLOWED_HOSTS`.

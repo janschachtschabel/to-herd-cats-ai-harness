@@ -98,6 +98,12 @@ spec:
             {{- include "herd.volumeMounts" . | nindent 12 }}
             - name: data
               mountPath: /data
+            {{- if .Values.mcp.catalogConfigMap }}
+            # The operator's catalogue entries (HERD_MCP_CATALOG_DIR).
+            - name: mcp-catalog
+              mountPath: {{ include "herd.mcpCatalogDir" . }}
+              readOnly: true
+            {{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
         # The files (attachments); fsGroup 10001 makes the volume writable.
@@ -108,3 +114,8 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- with .Values.mcp.catalogConfigMap }}
+        - name: mcp-catalog
+          configMap:
+            name: {{ . }}
+        {{- end }}

@@ -33,9 +33,16 @@ def fingerprint(listed: ListedTool) -> str:
     return hashlib.sha256(material.encode()).hexdigest()
 
 
-def new_tool(org_id: uuid.UUID, server_id: uuid.UUID, listed: ListedTool) -> McpServerTool:
+def new_tool(
+    org_id: uuid.UUID,
+    server_id: uuid.UUID,
+    listed: ListedTool,
+    suggested: Classification | None = None,
+) -> McpServerTool:
     """A tool seen for the first time: pending, proposed `read` only if annotated
-    read-only by the server."""
+    read-only by the server and not suggested `write` by the server's catalogue entry
+    (a suggestion only tightens)."""
+    read = listed.read_only and suggested != Classification.WRITE
     return McpServerTool(
         org_id=org_id,
         server_id=server_id,
@@ -44,7 +51,7 @@ def new_tool(org_id: uuid.UUID, server_id: uuid.UUID, listed: ListedTool) -> Mcp
         input_schema=listed.input_schema,
         read_only_hint=listed.read_only,
         fingerprint=fingerprint(listed),
-        classification=Classification.READ if listed.read_only else Classification.WRITE,
+        classification=Classification.READ if read else Classification.WRITE,
         state=ToolState.PENDING,
         missing=False,
     )

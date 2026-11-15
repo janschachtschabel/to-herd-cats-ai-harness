@@ -1,0 +1,106 @@
+# GitHub's remote MCP server (plan M8 task 9). Checked on 2026-11-15 against:
+# - https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server
+#   (URL https://api.githubcopilot.com/mcp/, OAuth by default, PAT as `Authorization: Bearer`)
+# - https://github.com/github/github-mcp-server README and docs/remote-server.md
+#   (/readonly, /x/{toolset} variants; X-MCP-Toolsets, X-MCP-Readonly headers; the host
+#   needs its own GitHub App or OAuth App; GitHub Enterprise Server has no remote server;
+#   GHE.com data residency: https://copilot-api.<subdomain>.ghe.com/mcp)
+# - docs/host-integration.md: dynamic client registration is NOT supported
+# - https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
+#   (authorize/access_token endpoints, PKCE S256 only, JSON with Accept header, expiring
+#   tokens with refresh tokens and rotation; no RFC 7009 revocation endpoint)
+# NOT verified from here (the server's host was not reachable from the build machine):
+# - whether GitHub's authorization server accepts the RFC 8707 `resource` parameter
+#   (MCP clients must send it; GitHub is expected to ignore it);
+# - the scopes the remote server needs with an OAuth App (`repo read:org` is the usual
+#   set; a GitHub App ignores scopes and uses its permissions instead);
+# - the read/write split below is taken from the tool names and the README's toolset
+#   lists, not from the server's annotations at the time of writing.
+id: github
+name: GitHub
+description:
+  de: >-
+    Der von GitHub betriebene MCP-Server: Repositories, Issues, Pull Requests, Code und
+    Aktionen. Anmeldung mit einer eigenen GitHub-App bzw. OAuth-App (OAuth) oder einem
+    persönlichen Zugriffstoken.
+  en: >-
+    The MCP server GitHub runs: repositories, issues, pull requests, code and actions.
+    Sign in with your own GitHub App or OAuth App (OAuth) or a personal access token.
+url: https://api.githubcopilot.com/mcp/
+data_location: external
+connector_scopes: [personal, shared]
+auth:
+  - kind: oauth
+    oauth:
+      authorization_endpoint: https://github.com/login/oauth/authorize
+      token_endpoint: https://github.com/login/oauth/access_token
+      scopes: repo read:org
+      resource: true
+      token_auth: client_secret_post
+    note:
+      de: >-
+        Eine GitHub-App (empfohlen, Token laufen ab und werden erneuert) oder OAuth-App
+        anlegen; Callback-URL ist <HERD_PUBLIC_URL>/api/ai/oauth/callback. Widerrufen
+        lässt sich nur in den Einstellungen des Kontos bei GitHub.
+      en: >-
+        Create a GitHub App (recommended: tokens expire and are renewed) or an OAuth
+        App; the callback URL is <HERD_PUBLIC_URL>/api/ai/oauth/callback. Revoking is
+        only possible in the account's settings at GitHub.
+  - kind: bearer
+    note:
+      de: Persönliches Zugriffstoken (fein granular empfohlen), gesendet als Bearer-Token.
+      en: A personal access token (fine-grained recommended), sent as a bearer token.
+tools:
+  # context
+  get_me: read
+  get_teams: read
+  get_team_members: read
+  # issues
+  issue_read: read
+  list_issues: read
+  search_issues: read
+  list_issue_types: read
+  list_issue_fields: read
+  get_label: read
+  issue_write: write
+  add_issue_comment: write
+  update_issue_comment: write
+  sub_issue_write: write
+  # pull requests
+  pull_request_read: read
+  list_pull_requests: read
+  search_pull_requests: read
+  create_pull_request: write
+  update_pull_request: write
+  update_pull_request_branch: write
+  merge_pull_request: write
+  pull_request_review_write: write
+  add_comment_to_pending_review: write
+  add_reply_to_pull_request_comment: write
+  request_copilot_review: write
+  resolve_review_thread: write
+  unresolve_review_thread: write
+  # repositories
+  get_file_contents: read
+  list_branches: read
+  list_commits: read
+  get_commit: read
+  list_tags: read
+  get_tag: read
+  list_releases: read
+  get_latest_release: read
+  get_release_by_tag: read
+  list_repository_collaborators: read
+  search_repositories: read
+  search_code: read
+  create_or_update_file: write
+  delete_file: write
+  push_files: write
+  create_branch: write
+  create_repository: write
+  fork_repository: write
+  # users
+  search_users: read
+docs:
+  - https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server
+  - https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md

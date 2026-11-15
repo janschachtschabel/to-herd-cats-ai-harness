@@ -233,6 +233,28 @@ for workload in t-to-herd-cats-ai-api t-to-herd-cats-ai-worker; do
 done
 if render --set 'mcp.allowedHosts={a b}' >/dev/null; then fail "mcp.allowedHosts took a space"; fi
 
+# MCP (M8 Task 9): the operator's catalogue entries are a ConfigMap mounted read-only
+# into the API pods only, named by HERD_MCP_CATALOG_DIR; without one the variable is
+# empty (the shipped entries only) and nothing is mounted.
+out=$(render)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_MCP_CATALOG_DIR" <<<"$api" | grep -q 'value: ""' \
+  || fail "the API has no empty HERD_MCP_CATALOG_DIR by default"
+grep -q "mcp-catalog" <<<"$api" && fail "a catalogue volume without mcp.catalogConfigMap"
+out=$(render --set mcp.catalogConfigMap=herd-catalog)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_MCP_CATALOG_DIR" <<<"$api" | grep -q 'value: "/etc/herd/mcp-catalog"' \
+  || fail "mcp.catalogConfigMap does not set HERD_MCP_CATALOG_DIR"
+grep -A2 -- "- name: mcp-catalog" <<<"$api" | grep -q "mountPath: /etc/herd/mcp-catalog" \
+  || fail "the catalogue is not mounted at HERD_MCP_CATALOG_DIR"
+grep -A3 -- "- name: mcp-catalog" <<<"$api" | grep -q "readOnly: true" \
+  || fail "the catalogue is mounted writable"
+grep -A2 -- "- name: mcp-catalog" <<<"$api" | grep -A1 "configMap:" | grep -q "name: herd-catalog" \
+  || fail "the catalogue volume is not the ConfigMap named"
+grep -q "HERD_MCP_CATALOG_DIR\|mcp-catalog" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker gets the catalogue"
+if render --set mcp.catalogConfigMap=Bad_Name >/dev/null; then fail "mcp.catalogConfigMap took a bad name"; fi
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.

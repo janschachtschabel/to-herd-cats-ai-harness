@@ -162,6 +162,7 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_RUN_LEASE_SECONDS` | no | `30` | A running run's lease (s), at least 3; after a crash another process takes the run up after it (`app`, `worker`) |
 | `HERD_MCP_RATE_PER_MINUTE` | no | `120` | Calls one access token may make to `/mcp` per minute, 1 to 10,000, counted across all nodes (`app`, API nodes) |
 | `HERD_MCP_ALLOWED_HOSTS` | no | empty | Private hosts external MCP servers may run on: exact host names or private networks (CIDR), comma separated; empty: public addresses only (`app`, API nodes, `worker`) |
+| `HERD_MCP_CATALOG_DIR` | no | empty | Directory inside the container with the operator's own catalogue entries (`*.yaml`, see `docs/MCP.md`, "Katalog"); mount it read-only, e.g. `./catalog:/etc/herd/mcp-catalog:ro` in `compose.override.yml`; a broken file is reported and skipped; empty: the shipped entries only (`app`, API nodes) |
 
 The AI keys (`HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS`, `HERD_AI_EGRESS_PROXY`,
 `HERD_AI_<NAME>`) belong in `ai.env`, not in `.env`: they are passed to the containers

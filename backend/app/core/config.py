@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, PrivateAttr, SecretStr, model_validator
+from pydantic import Field, PrivateAttr, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
@@ -119,6 +119,9 @@ class Settings(BaseSettings):
     # or private networks (CIDR), comma separated, that the egress guard lets their
     # calls reach (`core/egress_allowance.py`); empty: public addresses only.
     mcp_allowed_hosts: str = ""
+    # The operator's own catalogue entries (plan M8 task 9): a directory of YAML files
+    # added to the shipped ones; a broken file is reported and skipped, never fatal.
+    mcp_catalog_dir: Path | None = None
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")
@@ -170,6 +173,11 @@ class Settings(BaseSettings):
         if self.ai_egress_proxy is not None and not self.ai_egress_proxy.get_secret_value():
             self.ai_egress_proxy = None  # compose: `${HERD_AI_EGRESS_PROXY:-}`
         return self
+
+    @field_validator("mcp_catalog_dir", mode="before")
+    @classmethod
+    def _empty_catalog_dir_is_none(cls, value: object) -> object:
+        return None if value == "" else value  # compose: `${HERD_MCP_CATALOG_DIR:-}`
 
     @model_validator(mode="after")
     def _mcp_allowed_hosts_parse(self) -> Self:

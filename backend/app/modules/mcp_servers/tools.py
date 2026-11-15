@@ -5,8 +5,10 @@ approved, blocked and classified one by one (`ai.manage`).
   with no transaction open; the credential is the shared connector, or for a personal
   server the admin's own connector for it if there is one.
 - A refresh adds what is new as `pending` (classification proposed from the server's
-  read-only annotation), updates what is there (an approved tool whose fingerprint
-  is no longer the approved one becomes `changed`) and marks what vanished `missing`.
+  read-only annotation, or `write` where the server's catalogue entry suggests it:
+  a suggestion only tightens and never approves), updates what is there (an approved
+  tool whose fingerprint is no longer the approved one becomes `changed`) and marks
+  what vanished `missing`.
 - An approval stores the fingerprint it approved; only that exact tool is callable.
 - Classifying a tool `read` that the server does not annotate read-only needs
   `confirm_loosen` (422 `mcp_tool.loosen_unconfirmed`).
@@ -25,6 +27,7 @@ from app.mcp import client as mcp
 from app.mcp.client import RemoteFailure, RemoteStatus
 from app.modules.ai.access import require_ai
 from app.modules.audit.recorder import record
+from app.modules.mcp_catalog.loader import catalog
 from app.modules.mcp_servers.endpoints import prepared_endpoint
 from app.modules.mcp_servers.errors import CredentialUnavailable, NotConnected
 from app.modules.mcp_servers.listing import apply, new_tool, usable
@@ -133,6 +136,7 @@ class ToolService:
 
     async def _store(self, server: McpServer, listed: list[mcp.ListedTool]) -> RefreshOut:
         repo = ToolRepository(self.session, server.org_id)
+        suggested = catalog().suggestions(server.catalog_id)
         stored = {tool.name: tool for tool in await repo.all_of(server.id)}
         new = changed = missing = 0
         seen: set[str] = set()
@@ -142,7 +146,7 @@ class ToolService:
             seen.add(item.name)
             tool = stored.pop(item.name, None)
             if tool is None:
-                await repo.add(new_tool(server.org_id, server.id, item))
+                await repo.add(new_tool(server.org_id, server.id, item, suggested.get(item.name)))
                 new += 1
             elif apply(tool, item):
                 changed += 1
@@ -161,6 +165,10 @@ class ToolService:
         repo = ToolRepository(self.session, actor.org_id)
         rows = await repo.page(server_id, after, params.limit + 1)
         return id_page(rows, params.limit, lambda t: t.id)
+
+    async def suggestions(self, actor: Actor, server_id: uuid.UUID) -> dict[str, Classification]:
+        """The classifications the server's catalogue entry suggests, by tool name."""
+        return catalog().suggestions((await self._server(actor, server_id)).catalog_id)
 
     async def approve(
         self, actor: Actor, server_id: uuid.UUID, tool_id: uuid.UUID, version: int

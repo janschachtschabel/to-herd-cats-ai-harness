@@ -182,7 +182,14 @@ seccompProfile:
 {{- define "herd.mcpApiEnv" -}}
 - name: HERD_MCP_RATE_PER_MINUTE
   value: {{ .Values.mcp.ratePerMinute | quote }}
+- name: HERD_MCP_CATALOG_DIR
+  value: {{ ternary (include "herd.mcpCatalogDir" .) "" (ne .Values.mcp.catalogConfigMap "") | quote }}
 {{ include "herd.mcpServersEnv" . }}
+{{- end -}}
+
+{{/* Where the operator's catalogue entries (mcp.catalogConfigMap) are mounted. */}}
+{{- define "herd.mcpCatalogDir" -}}
+/etc/herd/mcp-catalog
 {{- end -}}
 
 {{/* Where external MCP servers may run (API pods: their tool lists; worker pods: runs). */}}

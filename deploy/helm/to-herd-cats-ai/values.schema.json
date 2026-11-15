@@ -136,9 +136,15 @@
           "uniqueItems": true,
           "items": {"type": "string", "pattern": "^[A-Za-z0-9.:/-]+$", "minLength": 1, "maxLength": 253},
           "description": "HERD_MCP_ALLOWED_HOSTS (API and worker): host names or private networks (CIDR)"
+        },
+        "catalogConfigMap": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
+          "description": "A ConfigMap of catalogue entries, mounted for HERD_MCP_CATALOG_DIR (API); empty: none"
         }
       },
-      "required": ["ratePerMinute", "allowedHosts"],
+      "required": ["ratePerMinute", "allowedHosts", "catalogConfigMap"],
       "description": "The MCP endpoint and its access tokens"
     },
     "collab": {

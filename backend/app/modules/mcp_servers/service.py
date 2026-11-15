@@ -86,7 +86,10 @@ class ServerService:
         ]
         return Page[PersonalServerOut](items=items, next_cursor=page.next_cursor)
 
-    async def create(self, actor: Actor, data: ServerCreate) -> tuple[McpServer, RefreshOut]:
+    async def create(
+        self, actor: Actor, data: ServerCreate, *, catalog_id: str | None = None
+    ) -> tuple[McpServer, RefreshOut]:
+        """`catalog_id`: the catalogue entry it is created from (`modules/mcp_catalog`)."""
         await require_ai(self.session, actor, Action.AI_MANAGE)
         repo = self.repo(actor)
         await repo.lock_names()
@@ -105,6 +108,7 @@ class ServerService:
                 connector_scope=data.connector_scope,
                 connector_id=data.connector_id,
                 oauth_client_id=data.oauth_client_id,
+                catalog_id=catalog_id,
                 enabled=data.enabled,
             )
         )
@@ -112,6 +116,7 @@ class ServerService:
             **snapshot(server, _FIELDS),
             "connector_id": _str(server.connector_id),
             "oauth_client_id": _str(server.oauth_client_id),
+            "catalog_id": catalog_id,
         }
         await self._audit(actor, "mcp_server.created", server, details)
         refresh = await ToolService(self.session).refresh(actor, server.id)

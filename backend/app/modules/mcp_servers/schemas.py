@@ -95,6 +95,8 @@ class ServerOut(BaseModel):
     connector_scope: ConnectorUse
     connector_id: uuid.UUID | None
     oauth_client_id: uuid.UUID | None
+    # The catalogue entry it was created from, if any.
+    catalog_id: str | None
     enabled: bool
     version: int
     created_at: datetime
@@ -110,6 +112,7 @@ class ServerOut(BaseModel):
             connector_scope=server.connector_scope,
             connector_id=server.connector_id,
             oauth_client_id=server.oauth_client_id,
+            catalog_id=server.catalog_id,
             enabled=server.enabled,
             version=server.version,
             created_at=server.created_at,
@@ -148,13 +151,16 @@ class ToolOut(BaseModel):
     fingerprint: str
     approved_fingerprint: str | None
     classification: Classification
+    # What the server's catalogue entry suggests, if it was created from one and the
+    # entry knows the tool; a suggestion, never an approval.
+    suggested_classification: Classification | None
     state: ToolState
     missing: bool
     version: int
     updated_at: datetime
 
     @classmethod
-    def of(cls, tool: McpServerTool) -> "ToolOut":
+    def of(cls, tool: McpServerTool, suggested: Classification | None = None) -> "ToolOut":
         return cls(
             id=tool.id,
             server_id=tool.server_id,
@@ -165,6 +171,7 @@ class ToolOut(BaseModel):
             fingerprint=tool.fingerprint,
             approved_fingerprint=tool.approved_fingerprint,
             classification=tool.classification,
+            suggested_classification=suggested,
             state=tool.state,
             missing=tool.missing,
             version=tool.version,

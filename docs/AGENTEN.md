@@ -1481,6 +1481,7 @@ erst nach der Freigabe einer Person:
 | `HERD_AI_EGRESS_PROXY` | – | API, Worker | Proxy für Anbieteraufrufe ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)) |
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | 20 | API | Zeitlimit für Verbindungstest und Modellliste |
 | `HERD_MCP_ALLOWED_HOSTS` | leer | API, Worker | private Hosts, auf denen externe MCP-Server laufen dürfen (Hostnamen oder private Netze, kommagetrennt; [`MCP.md`](MCP.md#externe-mcp-server)) |
+| `HERD_MCP_CATALOG_DIR` | leer | API | Verzeichnis mit eigenen Katalog-Vorlagen der Installation (`*.yaml`, zusätzlich zu GitHub und GitLab; Chart `mcp.catalogConfigMap`; [`MCP.md`](MCP.md#katalog)) |
 | `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
 
 **Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage

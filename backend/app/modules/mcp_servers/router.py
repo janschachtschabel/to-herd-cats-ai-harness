@@ -6,8 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
+from app.core.access import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.mcp_servers.models import McpServerTool
 from app.modules.mcp_servers.schemas import (
     CreatedServerOut,
     PersonalServerOut,
@@ -87,8 +89,11 @@ async def list_tools(
     actor: ActorDep,
     session: SessionDep,
 ) -> Page[ToolOut]:
-    page = await ToolService(session).list(actor, server_id, params)
-    return Page[ToolOut](items=[ToolOut.of(t) for t in page.items], next_cursor=page.next_cursor)
+    tools = ToolService(session)
+    page = await tools.list(actor, server_id, params)
+    suggested = await tools.suggestions(actor, server_id)
+    items = [ToolOut.of(t, suggested.get(t.name)) for t in page.items]
+    return Page[ToolOut](items=items, next_cursor=page.next_cursor)
 
 
 @servers.patch("/{server_id}/tools/{tool_id}", response_model=ToolOut)
@@ -99,7 +104,8 @@ async def classify_tool(
     actor: ActorDep,
     session: SessionDep,
 ) -> ToolOut:
-    return ToolOut.of(await ToolService(session).classify(actor, server_id, tool_id, body))
+    tools = ToolService(session)
+    return await _out(tools, actor, await tools.classify(actor, server_id, tool_id, body))
 
 
 @servers.post("/{server_id}/tools/{tool_id}/approve", response_model=ToolOut)
@@ -111,8 +117,8 @@ async def approve_tool(
     session: SessionDep,
 ) -> ToolOut:
     """Approve exactly the tool as last read (its fingerprint)."""
-    tool = await ToolService(session).approve(actor, server_id, tool_id, body.version)
-    return ToolOut.of(tool)
+    tools = ToolService(session)
+    return await _out(tools, actor, await tools.approve(actor, server_id, tool_id, body.version))
 
 
 @servers.post("/{server_id}/tools/{tool_id}/block", response_model=ToolOut)
@@ -123,8 +129,13 @@ async def block_tool(
     actor: ActorDep,
     session: SessionDep,
 ) -> ToolOut:
-    tool = await ToolService(session).block(actor, server_id, tool_id, body.version)
-    return ToolOut.of(tool)
+    tools = ToolService(session)
+    return await _out(tools, actor, await tools.block(actor, server_id, tool_id, body.version))
+
+
+async def _out(tools: ToolService, actor: Actor, tool: McpServerTool) -> ToolOut:
+    suggested = await tools.suggestions(actor, tool.server_id)
+    return ToolOut.of(tool, suggested.get(tool.name))
 
 
 @personal.get("", response_model=Page[PersonalServerOut])

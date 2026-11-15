@@ -859,6 +859,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/mcp-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Entries */
+        get: operations["list_entries_api_ai_mcp_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-catalog/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Problems
+         * @description Files that could not be loaded and were skipped: which, and why.
+         */
+        get: operations["list_problems_api_ai_mcp_catalog_problems_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-catalog/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Entry */
+        get: operations["get_entry_api_ai_mcp_catalog__entry_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-catalog/{entry_id}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Entry
+         * @description Create the server (and its OAuth client and shared connector, as the scope and
+         *     kind need) from the entry; `server.refresh` says how reading its tools went.
+         */
+        post: operations["install_entry_api_ai_mcp_catalog__entry_id__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/mcp-servers": {
         parameters: {
             query?: never;
@@ -4151,6 +4226,14 @@ export interface components {
          * @enum {string}
          */
         AuthKind: "bearer" | "header" | "oauth";
+        /** AuthOption */
+        AuthOption: {
+            /** Header Name */
+            header_name?: string | null;
+            kind: components["schemas"]["AuthKind"];
+            note?: components["schemas"]["Localized"] | null;
+            oauth?: components["schemas"]["OAuthSpec"] | null;
+        };
         /**
          * AuthorizeOut
          * @description Where the browser goes to approve the connection.
@@ -4248,6 +4331,15 @@ export interface components {
             schedule?: (components["schemas"]["OnceIn"] | components["schemas"]["RecurringIn"] | components["schemas"]["HeartbeatIn"] | components["schemas"]["EventIn"]) | null;
             /** Version */
             version: number;
+        };
+        /**
+         * BaseUrlSpec
+         * @description The instance's address, which the admin may change (a self-managed GitLab).
+         */
+        BaseUrlSpec: {
+            /** Default */
+            default: string;
+            note?: components["schemas"]["Localized"] | null;
         };
         /**
          * BoardCellOut
@@ -4367,6 +4459,29 @@ export interface components {
              */
             id: string;
             type: components["schemas"]["MessageKind"];
+        };
+        /** CatalogEntry */
+        CatalogEntry: {
+            /** Auth */
+            auth?: components["schemas"]["AuthOption"][];
+            base_url?: components["schemas"]["BaseUrlSpec"] | null;
+            /** Connector Scopes */
+            connector_scopes: components["schemas"]["ConnectorUse"][];
+            /** @default external */
+            data_location?: components["schemas"]["DataLocation"];
+            description: components["schemas"]["Localized"];
+            /** Docs */
+            docs?: string[];
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Tools */
+            tools?: {
+                [key: string]: components["schemas"]["Classification"];
+            };
+            /** Url */
+            url: string;
         };
         /** ChannelCreate */
         ChannelCreate: {
@@ -4794,6 +4909,8 @@ export interface components {
         };
         /** CreatedServerOut */
         CreatedServerOut: {
+            /** Catalog Id */
+            catalog_id: string | null;
             /** Connector Id */
             connector_id: string | null;
             connector_scope: components["schemas"]["ConnectorUse"];
@@ -5406,6 +5523,44 @@ export interface components {
             reason: string;
         };
         /**
+         * InstallIn
+         * @description A server (and what it needs) from a catalogue entry. The admin brings only the
+         *     access and its scope; every tool is still approved one by one.
+         *
+         *     - `none`: no credential.
+         *     - `shared`: one shared connector, created here: `bearer`/`header` with `secret`,
+         *       `oauth` with an OAuth client (`client_id`, `client_secret` if confidential),
+         *       connected afterwards (`POST /api/ai/connectors/{id}/authorize`).
+         *     - `personal`: each person connects their own; `oauth` creates the OAuth client
+         *       they connect with, `bearer`/`header` need nothing more here.
+         */
+        InstallIn: {
+            auth_kind?: components["schemas"]["AuthKind"] | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Client Id */
+            client_id?: string | null;
+            client_secret?: components["schemas"]["SecretIn"] | null;
+            connector_scope: components["schemas"]["ConnectorUse"];
+            data_location?: components["schemas"]["DataLocation"] | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled?: boolean;
+            /** Name */
+            name?: string | null;
+            secret?: components["schemas"]["SecretIn"] | null;
+        };
+        /** InstallOut */
+        InstallOut: {
+            /** Connector Id */
+            connector_id: string | null;
+            /** Oauth Client Id */
+            oauth_client_id: string | null;
+            server: components["schemas"]["CreatedServerOut"];
+        };
+        /**
          * LastRunOut
          * @description The latest term: how it went (`outcome`), its run and how that ended.
          */
@@ -5459,6 +5614,13 @@ export interface components {
             space_name: string;
             /** Title */
             title: string;
+        };
+        /** Localized */
+        Localized: {
+            /** De */
+            de: string;
+            /** En */
+            en: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -5857,6 +6019,27 @@ export interface components {
          * @enum {string}
          */
         NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due";
+        /** OAuthSpec */
+        OAuthSpec: {
+            /** Authorization Endpoint */
+            authorization_endpoint: string;
+            /**
+             * Resource
+             * @default true
+             */
+            resource?: boolean;
+            /** Revocation Endpoint */
+            revocation_endpoint?: string | null;
+            /**
+             * Scopes
+             * @default
+             */
+            scopes?: string;
+            /** @default client_secret_post */
+            token_auth?: components["schemas"]["TokenAuth"];
+            /** Token Endpoint */
+            token_endpoint: string;
+        };
         /** OnceIn */
         OnceIn: {
             /**
@@ -6090,6 +6273,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[CatalogEntry] */
+        Page_CatalogEntry_: {
+            /** Items */
+            items: components["schemas"]["CatalogEntry"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[ClientOut] */
         Page_ClientOut_: {
             /** Items */
@@ -6199,6 +6389,13 @@ export interface components {
         Page_PersonalServerOut_: {
             /** Items */
             items: components["schemas"]["PersonalServerOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ProblemOut] */
+        Page_ProblemOut_: {
+            /** Items */
+            items: components["schemas"]["ProblemOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -6535,6 +6732,14 @@ export interface components {
          * @enum {string}
          */
         Priority: "low" | "normal" | "high" | "urgent";
+        /** ProblemOut */
+        ProblemOut: {
+            /** File */
+            file: string;
+            /** Reason */
+            reason: string;
+            source: components["schemas"]["Source"];
+        };
         /** ProfileUpdateIn */
         ProfileUpdateIn: {
             /** Locale */
@@ -7071,6 +7276,8 @@ export interface components {
         };
         /** ServerOut */
         ServerOut: {
+            /** Catalog Id */
+            catalog_id: string | null;
             /** Connector Id */
             connector_id: string | null;
             connector_scope: components["schemas"]["ConnectorUse"];
@@ -7463,6 +7670,11 @@ export interface components {
          * @enum {string}
          */
         Sort: "updated" | "due" | "priority" | "number";
+        /**
+         * Source
+         * @enum {string}
+         */
+        Source: "shipped" | "operator";
         /**
          * SpaceCreate
          * @description `personal` is a valid kind but not one the API creates (422 spaces.kind_not_allowed).
@@ -8297,6 +8509,7 @@ export interface components {
              */
             server_id: string;
             state: components["schemas"]["ToolState"];
+            suggested_classification: components["schemas"]["Classification"] | null;
             /**
              * Updated At
              * Format: date-time
@@ -10675,6 +10888,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["McpSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_entries_api_ai_mcp_catalog_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CatalogEntry_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_problems_api_ai_mcp_catalog_problems_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProblemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entry_api_ai_mcp_catalog__entry_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_entry_api_ai_mcp_catalog__entry_id__install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallOut"];
                 };
             };
             /** @description Validation Error */

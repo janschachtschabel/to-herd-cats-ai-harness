@@ -58,6 +58,8 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy app scripts
       - run: uv run pytest -q
+      - name: Catalogue entries (app/mcp/catalog)
+        run: uv run python -m scripts.check_mcp_catalog
       - name: pip-audit (runtime dependencies, hashed from uv.lock)
         run: |
           uv export --frozen --no-dev --no-emit-project > "$RUNNER_TEMP/runtime.txt"

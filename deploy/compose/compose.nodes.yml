@@ -45,6 +45,7 @@ x-api-env: &api-env
   HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}
   HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
   HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
+  HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.

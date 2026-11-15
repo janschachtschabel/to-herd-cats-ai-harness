@@ -5,6 +5,8 @@ send data to (as for an AI connection; the policy uses it in task 7), and which
 credential it uses: `none`, `shared` (one shared connector, `connector_id`) or
 `personal` (each person's own connector bound to this server, `connector.mcp_server_id`;
 `oauth_client_id` names the OAuth client people connect it with, if any).
+`catalog_id` names the catalogue entry it was created from (plan M8 task 9), whose
+suggested classifications a refresh applies to the tools it adds.
 
 `mcp_server_tool`: one tool as the server listed it. `fingerprint` is the SHA-256 over
 name, description and input schema as last read; `approved_fingerprint` the one an
@@ -37,6 +39,7 @@ from app.modules.ai.models import DataLocation
 
 MAX_NAME_CHARS = 120
 MAX_URL_CHARS = 500
+MAX_CATALOG_ID_CHARS = 40
 MAX_TOOL_NAME_CHARS = 128
 MAX_DESCRIPTION_CHARS = 10_000
 
@@ -88,6 +91,8 @@ class McpServer(UuidPk, OrgScoped, Timestamps, Base):
     oauth_client_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("oauth_client.id", ondelete="RESTRICT"), index=True
     )
+    # The catalogue entry it was created from (`modules/mcp_catalog`), if any.
+    catalog_id: Mapped[str | None] = mapped_column(String(MAX_CATALOG_ID_CHARS))
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Bumped by every write; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

@@ -2,9 +2,8 @@
 with the old key in `HERD_SECRET_KEY_PREVIOUS`, every `enc:` reference (AI
 connections; connectors, shared and personal, with their OAuth access and refresh
 tokens; OAuth client secrets; open OAuth flows' verifiers) is rotated in one
-transaction; if
-any cannot be decrypted, nothing changes. The values are never shown; a failure names
-only the table and the row's id."""
+transaction; if any cannot be decrypted, nothing changes. The values are never shown;
+a failure names only the table and the row's id."""
 
 import uuid
 

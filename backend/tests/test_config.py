@@ -175,6 +175,15 @@ def test_an_empty_egress_proxy_means_none(monkeypatch: pytest.MonkeyPatch) -> No
     assert proxy is not None and proxy.get_secret_value() == "http://proxy.internal:3128"
 
 
+def test_an_empty_catalogue_directory_means_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}`: empty is "only the shipped
+    entries", not the working directory; a missing directory is no start error."""
+    monkeypatch.setenv("HERD_MCP_CATALOG_DIR", "")
+    assert Settings().mcp_catalog_dir is None
+    monkeypatch.setenv("HERD_MCP_CATALOG_DIR", "/etc/herd/catalog-nowhere")
+    assert str(Settings().mcp_catalog_dir) == "/etc/herd/catalog-nowhere"
+
+
 def test_bootstrap_password_is_hidden(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

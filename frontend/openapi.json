@@ -1750,6 +1750,52 @@
         "title": "AuthKind",
         "type": "string"
       },
+      "AuthOption": {
+        "additionalProperties": false,
+        "properties": {
+          "header_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AuthKind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Localized"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "oauth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OAuthSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "AuthOption",
+        "type": "object"
+      },
       "AuthorizeOut": {
         "description": "Where the browser goes to approve the connection.",
         "properties": {
@@ -2151,6 +2197,33 @@
         "title": "AutomationUpdate",
         "type": "object"
       },
+      "BaseUrlSpec": {
+        "additionalProperties": false,
+        "description": "The instance's address, which the admin may change (a self-managed GitLab).",
+        "properties": {
+          "default": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Default",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Localized"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "default"
+        ],
+        "title": "BaseUrlSpec",
+        "type": "object"
+      },
       "BoardCellOut": {
         "description": "A person's tickets in one status: how many, how many changed status since the\nboard's `changed_since`, the first of them in board order, and the cursor for more\n(`GET /api/spaces/{space_id}/board/{status_id}?assignee=<id>|none`).",
         "properties": {
@@ -2463,6 +2536,93 @@
           "id"
         ],
         "title": "CardOut",
+        "type": "object"
+      },
+      "CatalogEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "items": {
+              "$ref": "#/components/schemas/AuthOption"
+            },
+            "maxItems": 3,
+            "title": "Auth",
+            "type": "array"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaseUrlSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connector_scopes": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorUse"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Connector Scopes",
+            "type": "array"
+          },
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation",
+            "default": "external"
+          },
+          "description": {
+            "$ref": "#/components/schemas/Localized"
+          },
+          "docs": {
+            "items": {
+              "maxLength": 500,
+              "pattern": "^https://[^\\s]+$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Docs",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "tools": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Classification"
+            },
+            "maxProperties": 500,
+            "propertyNames": {
+              "maxLength": 128,
+              "minLength": 1
+            },
+            "title": "Tools",
+            "type": "object"
+          },
+          "url": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "url",
+          "connector_scopes"
+        ],
+        "title": "CatalogEntry",
         "type": "object"
       },
       "ChannelCreate": {
@@ -3790,6 +3950,17 @@
       },
       "CreatedServerOut": {
         "properties": {
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
+          },
           "connector_id": {
             "anyOf": [
               {
@@ -3863,6 +4034,7 @@
           "connector_scope",
           "connector_id",
           "oauth_client_id",
+          "catalog_id",
           "enabled",
           "version",
           "created_at",
@@ -5264,6 +5436,143 @@
         "title": "InspectionOut",
         "type": "object"
       },
+      "InstallIn": {
+        "additionalProperties": false,
+        "description": "A server (and what it needs) from a catalogue entry. The admin brings only the\naccess and its scope; every tool is still approved one by one.\n\n- `none`: no credential.\n- `shared`: one shared connector, created here: `bearer`/`header` with `secret`,\n  `oauth` with an OAuth client (`client_id`, `client_secret` if confidential),\n  connected afterwards (`POST /api/ai/connectors/{id}/authorize`).\n- `personal`: each person connects their own; `oauth` creates the OAuth client\n  they connect with, `bearer`/`header` need nothing more here.",
+        "properties": {
+          "auth_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "pattern": "^[ -~]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connector_scope": {
+            "$ref": "#/components/schemas/ConnectorUse"
+          },
+          "data_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "connector_scope"
+        ],
+        "title": "InstallIn",
+        "type": "object"
+      },
+      "InstallOut": {
+        "properties": {
+          "connector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector Id"
+          },
+          "oauth_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Client Id"
+          },
+          "server": {
+            "$ref": "#/components/schemas/CreatedServerOut"
+          }
+        },
+        "required": [
+          "server",
+          "oauth_client_id",
+          "connector_id"
+        ],
+        "title": "InstallOut",
+        "type": "object"
+      },
       "LastRunOut": {
         "description": "The latest term: how it went (`outcome`), its run and how that ended.",
         "properties": {
@@ -5375,6 +5684,29 @@
           "linked_at"
         ],
         "title": "LinkedPageOut",
+        "type": "object"
+      },
+      "Localized": {
+        "additionalProperties": false,
+        "properties": {
+          "de": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "De",
+            "type": "string"
+          },
+          "en": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "En",
+            "type": "string"
+          }
+        },
+        "required": [
+          "de",
+          "en"
+        ],
+        "title": "Localized",
         "type": "object"
       },
       "LoginRequest": {
@@ -6414,6 +6746,58 @@
         "title": "NotificationReason",
         "type": "string"
       },
+      "OAuthSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "authorization_endpoint": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Authorization Endpoint",
+            "type": "string"
+          },
+          "resource": {
+            "default": true,
+            "title": "Resource",
+            "type": "boolean"
+          },
+          "revocation_endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revocation Endpoint"
+          },
+          "scopes": {
+            "default": "",
+            "maxLength": 1000,
+            "pattern": "^([\\x21\\x23-\\x5b\\x5d-\\x7e]+( [\\x21\\x23-\\x5b\\x5d-\\x7e]+)*)?$",
+            "title": "Scopes",
+            "type": "string"
+          },
+          "token_auth": {
+            "$ref": "#/components/schemas/TokenAuth",
+            "default": "client_secret_post"
+          },
+          "token_endpoint": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Token Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authorization_endpoint",
+          "token_endpoint"
+        ],
+        "title": "OAuthSpec",
+        "type": "object"
+      },
       "OnceIn": {
         "additionalProperties": false,
         "properties": {
@@ -7059,6 +7443,33 @@
         "title": "Page[BudgetOut]",
         "type": "object"
       },
+      "Page_CatalogEntry_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[CatalogEntry]",
+        "type": "object"
+      },
       "Page_ClientOut_": {
         "properties": {
           "items": {
@@ -7489,6 +7900,33 @@
           "items"
         ],
         "title": "Page[PersonalServerOut]",
+        "type": "object"
+      },
+      "Page_ProblemOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ProblemOut]",
         "type": "object"
       },
       "Page_ProposalOut_": {
@@ -8509,6 +8947,28 @@
         ],
         "title": "Priority",
         "type": "string"
+      },
+      "ProblemOut": {
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          }
+        },
+        "required": [
+          "source",
+          "file",
+          "reason"
+        ],
+        "title": "ProblemOut",
+        "type": "object"
       },
       "ProfileUpdateIn": {
         "additionalProperties": false,
@@ -9942,6 +10402,17 @@
       },
       "ServerOut": {
         "properties": {
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
+          },
           "connector_id": {
             "anyOf": [
               {
@@ -10012,6 +10483,7 @@
           "connector_scope",
           "connector_id",
           "oauth_client_id",
+          "catalog_id",
           "enabled",
           "version",
           "created_at",
@@ -11015,6 +11487,14 @@
           "number"
         ],
         "title": "Sort",
+        "type": "string"
+      },
+      "Source": {
+        "enum": [
+          "shipped",
+          "operator"
+        ],
+        "title": "Source",
         "type": "string"
       },
       "SpaceCreate": {
@@ -13111,6 +13591,16 @@
           "state": {
             "$ref": "#/components/schemas/ToolState"
           },
+          "suggested_classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Classification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -13131,6 +13621,7 @@
           "fingerprint",
           "approved_fingerprint",
           "classification",
+          "suggested_classification",
           "state",
           "missing",
           "version",
@@ -17194,6 +17685,226 @@
         "summary": "Set Mcp Settings",
         "tags": [
           "ai"
+        ]
+      }
+    },
+    "/api/ai/mcp-catalog": {
+      "get": {
+        "operationId": "list_entries_api_ai_mcp_catalog_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CatalogEntry_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Entries",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-catalog/problems": {
+      "get": {
+        "description": "Files that could not be loaded and were skipped: which, and why.",
+        "operationId": "list_problems_api_ai_mcp_catalog_problems_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ProblemOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Problems",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-catalog/{entry_id}": {
+      "get": {
+        "operationId": "get_entry_api_ai_mcp_catalog__entry_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Entry",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-catalog/{entry_id}/install": {
+      "post": {
+        "description": "Create the server (and its OAuth client and shared connector, as the scope and\nkind need) from the entry; `server.refresh` says how reading its tools went.",
+        "operationId": "install_entry_api_ai_mcp_catalog__entry_id__install_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Entry",
+        "tags": [
+          "mcp"
         ]
       }
     },
