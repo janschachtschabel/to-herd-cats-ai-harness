@@ -272,7 +272,8 @@ if render --set mcp.maxCallsPerRun=0 >/dev/null; then fail "mcp.maxCallsPerRun=0
 out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMonitor.enabled=true)
 rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
 for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
-  HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing; do
+  HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing \
+  HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \

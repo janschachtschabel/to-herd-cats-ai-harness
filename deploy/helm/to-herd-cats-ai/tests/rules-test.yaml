@@ -500,3 +500,166 @@ tests:
       - eval_time: 100m
         alertname: HerdAutomationsFailing
         exp_alerts: []
+
+  # HerdExternalToolsFailing: most external calls sent in 15 minutes failed or timed out,
+  # at least 3, for 5 minutes. Calls kept back on purpose (refused, limited) do not count.
+  - name: HerdExternalToolsFailing fires when most calls sent fail, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-b", outcome="timeout", effect="write"}'
+        values: "0+1x20 20x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="ok", effect="read"}'
+        values: "0+1x50"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HerdExternalToolsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "Most external tool calls of herd/herd-worker fail"
+              description: "Calls to tools of external MCP servers fail or time out. Test the servers in the AI administration (MCP servers, Test: unreachable, unauthorized, forbidden, server_error, timeout, blocked); look for mcp.tool_call with its status in the workers' logs and for HerdOAuthRefreshFailing. A private server must be named in mcp.allowedHosts; with networkPolicy.enabled the way out must be allowed in networkPolicy.aiEgress."
+      - eval_time: 45m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  - name: HerdExternalToolsFailing stays quiet for calls kept back on purpose and rare failures
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="refused", effect="read"}'
+        values: "0+5x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="limited", effect="read"}'
+        values: "0+5x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0+1x30"
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="ok", effect="read"}'
+        values: "0+3x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  - name: HerdExternalToolsFailing stays quiet for fewer than 3 failed calls
+    interval: 1m
+    input_series:
+      - series: 'herd_external_tool_calls_total{namespace="herd", job="herd-worker", pod="herd-worker-a", outcome="failed", effect="read"}'
+        values: "0 0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HerdExternalToolsFailing
+        exp_alerts: []
+
+  # HerdOAuthRefreshFailing: at least 3 renewals in 30 minutes failed for another reason
+  # than invalid_grant, for 5 minutes.
+  - name: HerdOAuthRefreshFailing fires when renewals keep failing, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-worker", pod="herd-worker-a", status="server_error"}'
+        values: "0+1x20 20x50"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-worker", pod="herd-worker-a", status="ok"}'
+        values: "0+2x70"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "OAuth renewals of herd/herd-worker keep failing"
+              description: "The authorization server does not renew access tokens (status rejected, blocked, timeout, unreachable, redirect, server_error or invalid_response; log entries oauth.token_request with grant refresh_token). The tokens are kept and tried again, but external tools of the affected servers fail until then. Check the OAuth client in the AI administration (client id and secret, token endpoint) and the way out (mcp.allowedHosts, networkPolicy.aiEgress, HERD_AI_EGRESS_PROXY)."
+      - eval_time: 65m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+
+  - name: HerdOAuthRefreshFailing stays quiet for refused refresh tokens and a single failure
+    interval: 1m
+    input_series:
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="invalid_grant"}'
+        values: "0+1x60"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="timeout"}'
+        values: "0 0 1x58"
+      - series: 'herd_oauth_refreshes_total{namespace="herd", job="herd-internal", pod="herd-api-a", status="ok"}'
+        values: "0+5x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: HerdOAuthRefreshFailing
+        exp_alerts: []
+
+  # HerdMcpAuthFailures: more than 50 requests to /mcp answered 401 in 5 minutes, for 10
+  # minutes (the API's request counter, route /mcp).
+  - name: HerdMcpAuthFailures fires on a stream of 401 at /mcp, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="401"}'
+        values: "0+20x30 600x30"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="200"}'
+        values: "0+100x60"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HerdMcpAuthFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "Many requests to /mcp of herd/herd-internal carry no valid token"
+              description: "Over 50 requests to /mcp in 5 minutes were answered 401 (token.invalid: unknown, revoked, expired, its person inactive or without mcp.use, or the organisation's MCP switch off). The reverse proxy's access log names the clients; the app logs http.request lines with path /mcp and status 401, never the token. Revoke tokens in the AI administration, or block the clients at the proxy."
+      - eval_time: 50m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+
+  - name: HerdMcpAuthFailures stays quiet for a few 401 at /mcp and for 401 elsewhere
+    interval: 1m
+    input_series:
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="401"}'
+        values: "0+5x40"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="POST", route="/mcp", status="429"}'
+        values: "0+50x40"
+      - series: 'herd_http_requests_total{namespace="herd", job="herd-internal", pod="herd-api-a", method="GET", route="/api/auth/me", status="401"}'
+        values: "0+100x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: HerdMcpAuthFailures
+        exp_alerts: []
+
+  # HerdMcpCatalogProblems: the API skips catalogue files, for 15 minutes.
+  - name: HerdMcpCatalogProblems fires while catalogue files are skipped, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_mcp_catalog_problems{namespace="herd", job="herd-internal", pod="herd-api-a"}'
+        values: "0x5 2x30 0x10"
+      - series: 'herd_mcp_catalog_problems{namespace="herd", job="herd-internal", pod="herd-api-b"}'
+        values: "0x5 2x30 0x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-internal
+            exp_annotations:
+              summary: "2 catalogue files of herd/herd-internal are skipped"
+              description: "The AI administration lists them under Catalogue, problems (GET /api/ai/mcp-catalog/problems); the log entries mcp.catalog_problem name the file and what is wrong, never its content. Check the files with uv run python -m scripts.check_mcp_catalog <dir> and fix the ConfigMap (mcp.catalogConfigMap)."
+      - eval_time: 40m
+        alertname: HerdMcpCatalogProblems
+        exp_alerts: []
