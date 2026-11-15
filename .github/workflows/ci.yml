@@ -53,6 +53,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+      - name: PostgreSQL 17 client tools (pg_dump/pg_restore for backups, plan M9)
+        working-directory: .
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -64,6 +75,51 @@ jobs:
         run: |
           uv export --frozen --no-dev --no-emit-project > "$RUNNER_TEMP/runtime.txt"
           uvx --from pip-audit==2.10.1 pip-audit --strict --disable-pip -r "$RUNNER_TEMP/runtime.txt"
+
+
+  restore:
+    # The restore rehearsal (plan M9 task 2): back up a running installation, restore
+    # it into an empty database, compare, sign in; against PostgreSQL 17 with the
+    # client tools 17 the image carries.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+        env:
+          POSTGRES_USER: herd
+          POSTGRES_PASSWORD: herd
+          POSTGRES_DB: herd_test
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U herd -d herd_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: "5433"
+      PGUSER: herd
+      PGPASSWORD: herd
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: PostgreSQL 17 client tools (pg_dump/pg_restore for backups, plan M9)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - run: uv sync --locked
+        working-directory: backend
+      - run: bash deploy/scripts/restore-rehearsal.sh
 
   frontend:
     runs-on: ubuntu-24.04
