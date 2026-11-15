@@ -3,9 +3,13 @@ of the organisation's MCP servers as a `ToolSpec` beside the catalog's
 (`catalog.py`); the host calls it (`agents/external_step.py`).
 
 - **Name** for the model and for the agent's entry (`agent_tool`):
-  `ext_<12 hex of the tool's id>_<its name>` (`.` and anything else a model may not
-  use becomes `_`; at most 64 characters). Stable for the tool, unique in the
-  organisation, never a name of the catalog.
+  `ext_<the tool's whole id, 32 hex>_<its name>` (`.` and anything else a model may
+  not use becomes `_`; at most 64 characters, so the id is never cut). Stable for the
+  tool, unique because its id is, never a name of the catalog (module review M8 1,
+  finding 1: the first 12 hex of a UUIDv7 are only its millisecond). A run's journal
+  of an earlier release may name a tool by its old name, `ext_<12 hex>_<name>`
+  (`legacy_names`): the replay reads it as the tool's name now where it stands for
+  exactly one tool of the organisation, else not at all.
 - **Level and grant**: a `read` tool is level 2; a `write` tool is level 4 (acting
   outside) and never looser than `confirm`, so every call waits for the release of the
   person who asked, bound to a fingerprint over the tool, the arguments and the
@@ -102,7 +106,25 @@ def is_external(name: str) -> bool:
 
 
 def tool_name(tool: McpServerTool) -> str:
-    return f"{PREFIX}{tool.id.hex[:12]}_{_UNSAFE.sub('_', tool.name)}"[:MAX_NAME_CHARS]
+    return _named(tool.id.hex, tool.name)
+
+
+def legacy_name(remote: RemoteTool) -> str:
+    """The name an earlier release gave the tool (not unique: see the module)."""
+    return _named(remote.tool_id.hex[:12], remote.tool_name)
+
+
+def legacy_names(specs: list[tuple[ToolSpec, bool]]) -> dict[str, str]:
+    """Old name -> name now, for the old names that stand for exactly one tool."""
+    found: dict[str, list[str]] = {}
+    for spec, _ in specs:
+        if spec.remote is not None:
+            found.setdefault(legacy_name(spec.remote), []).append(spec.name)
+    return {old: names[0] for old, names in found.items() if len(names) == 1}
+
+
+def _named(key: str, name: str) -> str:
+    return f"{PREFIX}{key}_{_UNSAFE.sub('_', name)}"[:MAX_NAME_CHARS]
 
 
 def usable(tool: McpServerTool, server: McpServer) -> bool:

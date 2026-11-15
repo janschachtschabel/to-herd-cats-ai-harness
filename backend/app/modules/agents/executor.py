@@ -53,14 +53,19 @@ from app.modules.agents.actor import Reads, allowed_actor
 from app.modules.agents.closing import close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
-from app.modules.agents.journal import replay
+from app.modules.agents.journal import renamed, replay
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_models import StopReason
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
-from app.modules.agents.toolbox.external import offered_external
+from app.modules.agents.toolbox.external import (
+    every_external,
+    is_external,
+    legacy_names,
+    offered_external,
+)
 from app.modules.agents.toolbox.policy import Grant, allowed
 from app.modules.agents.toolbox.writing import into_own
 from app.modules.ai.budget_metrics import budget_stops
@@ -148,6 +153,14 @@ class Executor:
             if target.supports_tools:  # the catalog's, then the external ones it is granted
                 specs = offered() + await offered_external(session, org)
                 tools = allowed(agent.level, specs, grants)
+            known = {spec.name for spec in tools}
+            if any(
+                is_external(c.name) and c.name not in known
+                for step in journal.steps
+                for c in step.tool_calls
+            ):  # a journal of an earlier release names external tools the old way
+                old = legacy_names(await every_external(session, org))
+                journal = replace(journal, steps=renamed(journal.steps, old))
             run = Working(
                 claimed,
                 agent,

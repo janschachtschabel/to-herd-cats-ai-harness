@@ -5,11 +5,14 @@ The journal is the run's `run_event`s ordered by `seq`, which counts on across
 take-ups. Step k is the model call recorded for step k with the tool results recorded
 for its calls (by call id). The steps run from 1 without a gap; should one be missing,
 the journal ends before it and the loop calls the model again from there.
+
+`renamed` gives recorded calls a tool's name as it is now (an external tool's journal
+of an earlier release: `toolbox/external.legacy_names`).
 """
 
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.modules.agents.actor import Reads
@@ -53,6 +56,19 @@ def replay(events: Iterable[RunEvent]) -> Replay:
             Recorded(str(answer.get("text") or ""), calls, results.get(len(steps) + 1, {}))
         )
     return Replay(steps, reads, seq)
+
+
+def renamed(steps: list[Recorded], names: Mapping[str, str]) -> list[Recorded]:
+    """`steps` with each call of an old name under its name now (others as they are)."""
+    return [
+        replace(
+            step,
+            tool_calls=tuple(
+                replace(call, name=names.get(call.name, call.name)) for call in step.tool_calls
+            ),
+        )
+        for step in steps
+    ]
 
 
 def _result(content: Mapping[str, Any]) -> ToolResult:

@@ -386,8 +386,16 @@ oder `confirm` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
 Freigegebene Werkzeuge externer MCP-Server ([`MCP.md`](MCP.md#externe-mcp-server))
 erscheinen in derselben Liste, nach dem Katalog, mit `external` (Server-ID und -Name,
 Werkzeug-ID und -Name, `usable`). Ihr Name im Lauf und in den Einträgen ist
-`ext_<12 Hexzeichen der Werkzeug-ID>_<Name>` (höchstens 64 Zeichen; Zeichen, die ein
-Modell nicht nutzen darf, werden `_`).
+`ext_<Werkzeug-ID, alle 32 Hexzeichen>_<Name>` (höchstens 64 Zeichen, die ID wird nie
+gekürzt; Zeichen, die ein Modell nicht nutzen darf, werden `_`). So steht jeder Name für
+genau ein Werkzeug, gleich wie ein Server seine Werkzeuge nennt (Review M8 1, Befund 1:
+bis dahin waren es nur die ersten 12 Hexzeichen, bei einer UUIDv7 die Millisekunde, in
+der ein Abruf alle Werkzeuge eines Servers anlegt). Beim Update bekommt jeder Eintrag
+unter einem alten Namen, der für genau ein Werkzeug stand, einen Zwilling unter dem
+neuen; ein alter Name, der für zwei Werkzeuge stand, gibt keinem mehr etwas (beide
+erscheinen ohne Eintrag). Ein Lauf, dessen Journal noch alte Namen trägt, wird mit den
+neuen fortgesetzt; eine offene Freigabe unter altem Namen wird beim Fortsetzen
+`approval_stale`, und das Modell kann neu fragen.
 
 - **Nur mit Eintrag.** Ein externes Werkzeug hat die Voreinstellung `block`: Ein Agent
   bekommt es erst mit einem Eintrag (`allow` oder `confirm`), und auch dann höchstens,

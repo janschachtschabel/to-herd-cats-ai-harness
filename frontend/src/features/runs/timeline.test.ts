@@ -74,6 +74,7 @@ describe('external calls in a run’s timeline', () => {
 
   test('an external tool’s own name from its run name', () => {
     expect(externalToolName(TOOL)).toBe('create_issue')
+    expect(externalToolName('ext_0123456789abcdef0123456789abcdef_get_items')).toBe('get_items')
     expect(externalToolName('search')).toBeNull()
   })
 })

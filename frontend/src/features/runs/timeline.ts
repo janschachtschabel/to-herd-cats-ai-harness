@@ -62,9 +62,10 @@ export function externalOutcome(result: string | null): ExternalOutcome | null {
   return OUTCOME_PREFIXES.find(([prefix]) => result.startsWith(`${prefix}:`))?.[1] ?? null
 }
 
-const EXTERNAL_NAME = /^ext_[0-9a-f]{12}_(.+)$/
+const EXTERNAL_NAME = /^ext_(?:[0-9a-f]{32}|[0-9a-f]{12})_(.+)$/
 
-/** An external tool's own name from the name a run gives it (`ext_<id>_<name>`). */
+/** An external tool's own name from the name a run gives it (`ext_<id>_<name>`, the
+ * id whole; runs of an earlier release: its first 12 hex). */
 export function externalToolName(name: string): string | null {
   return EXTERNAL_NAME.exec(name)?.[1] ?? null
 }
