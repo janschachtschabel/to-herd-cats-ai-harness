@@ -28,7 +28,8 @@ works.
 - The end, in one transaction: `closing.close`. A run that holds a result of the
   person's own connector answers only where the person is alone with the agent
   (`writing.into_own`); anywhere else it ends `policy_blocked` (`personal_connector`)
-  without its answer. A run whose question was deleted
+  without its answer. A later run alone with the person where an earlier one read that
+  way starts with the mark (the history holds what was said). A run whose question was deleted
   before it started (no person's message after the last answer, the mentioning
   message deleted, the ticket gone, the automation's term gone) ends `completed` at
   once, without a call, an answer or a notice.
@@ -47,6 +48,8 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core import secrets
 from app.modules.agents import briefing, place
 from app.modules.agents.actor import Reads, allowed_actor
@@ -57,6 +60,7 @@ from app.modules.agents.journal import renamed, replay
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.repository import AgentRepository
 from app.modules.agents.run_models import StopReason
+from app.modules.agents.scope import PlaceKind, place_of
 from app.modules.agents.standing import run_target
 from app.modules.agents.step_host import Lost, RunHost, Suspended, Unit, Working
 from app.modules.agents.toolbox.catalog import offered
@@ -141,6 +145,8 @@ class Executor:
             # a draft's thread (or a draft memory page) is its editors' alone: the mark
             drafts = await ReadRepository(session, org).draft_spaces(journal.reads.pages)
             journal.reads.drafts |= drafts
+            if await _said_personal(session, claimed):
+                journal.reads.personal = True
             found = await place.asked(session, claimed)
             if found is None:  # its question was deleted: nothing to answer
                 return Outcome("completed")
@@ -230,6 +236,17 @@ class Executor:
         if reason == StopReason.BUDGET:  # committed; the detail is the budget's scope
             budget_stops().labels(scope=outcome.detail or "unknown").inc()
         return reason
+
+
+async def _said_personal(session: AsyncSession, claimed: Claimed) -> bool:
+    """Alone with the agent, an earlier run may have said there what its asker read
+    with her own connector; the history holds it, so a later run carries the mark on
+    (module review M8 1). Elsewhere no such run wrote anything into the conversation."""
+    org, conversation = claimed.org_id, claimed.conversation_id
+    spot = await place_of(session, org, conversation, claimed.user_id)
+    if spot is None or spot.kind != PlaceKind.ALONE:
+        return False
+    return await ReadRepository(session, org).personal_before(conversation, claimed.id)
 
 
 def _target(connection: AiConnection, model: str) -> models.ModelTarget:

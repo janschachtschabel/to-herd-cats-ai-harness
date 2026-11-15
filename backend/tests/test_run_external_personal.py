@@ -145,3 +145,82 @@ async def test_a_run_taken_up_again_keeps_the_mark(
     assert ext.stub.state.calls == [("search_issues", {"q": "meine"})]
     assert PERSONAL in ext.bench.stub.state.texts()
     assert not any(SECRET in body for body in await _bodies(ext))
+
+
+async def _two_mentions(ext: Ext, channel: str, second: list[dict[str, Any]]) -> None:
+    """Alice asks in the channel twice: first through her own connector (the answer is
+    held back), then again, with the model's `second` replies."""
+    name = await _personal(ext)
+    alice = ext.bench.people.alice
+    ext.bench.stub.state.replies.extend([call(name, q="meine"), {"content": f"Da: {SECRET}"}])
+    body = {"body_md": "@Ava such meine Issues", "mentions": [str(ext.bench.agent.id)]}
+    r = await alice.post(f"/api/conversations/{channel}/messages", json=body)
+    assert r.status_code == 201, r.text
+    assert await ext.bench.run_next() == StopReason.POLICY_BLOCKED
+    ext.bench.stub.state.replies.extend(second)
+    body = {"body_md": "@Ava was hattest du gefunden?", "mentions": [str(ext.bench.agent.id)]}
+    r = await alice.post(f"/api/conversations/{channel}/messages", json=body)
+    assert r.status_code == 201, r.text
+
+
+async def test_a_later_run_in_the_channel_finds_nothing_of_a_personal_run(
+    ext: Ext, work: Work
+) -> None:
+    """Suspicion of module review M8 1: `search_past_runs` in a later run of the same
+    channel found the held-back run's words, and that run carried no mark."""
+    channel = await _channel(work)
+    second = [call("search_past_runs", query="Da:"), {"content": "Nichts gefunden."}]
+    await _two_mentions(ext, channel, second)
+    assert await ext.bench.run_next() == StopReason.COMPLETED
+    (searched,) = [e for e in await ext.tool_events() if e["name"] == "search_past_runs"]
+    assert SECRET not in searched["text"]
+    assert SECRET not in str(ext.bench.stub.state.log[-1].body)
+    assert not any(SECRET in body for body in await _bodies(ext))
+
+
+async def test_alone_with_the_agent_a_personal_runs_words_are_found_and_mark_the_run(
+    ext: Ext, work: Work
+) -> None:
+    channel = await _channel(work)
+    name = await _personal(ext)
+    ext.bench.stub.state.replies.extend([call(name, q="meine"), {"content": f"Da: {SECRET}"}])
+    body = {"body_md": "@Ava such meine Issues", "mentions": [str(ext.bench.agent.id)]}
+    r = await ext.bench.people.alice.post(f"/api/conversations/{channel}/messages", json=body)
+    assert r.status_code == 201, r.text
+    assert await ext.bench.run_next() == StopReason.POLICY_BLOCKED
+    ext.bench.stub.state.replies.extend(
+        [
+            call("search_past_runs", query="Da:"),
+            call("post_message", conversation_id=channel, text="Siehe oben."),
+            {"content": "Erledigt."},
+        ]
+    )
+    await ext.bench.say("Was hattest du gefunden?")  # her DM alone with the agent
+    assert await ext.bench.run_next() == StopReason.COMPLETED
+    events = {e["name"]: e for e in await ext.tool_events()}
+    searched, posted = events["search_past_runs"], events["post_message"]
+    assert SECRET in searched["text"]
+    assert posted["text"] == PERSONAL  # what she alone read stays with her
+
+
+async def test_a_later_run_in_her_dm_carries_the_mark_of_what_it_said_there(
+    ext: Ext, work: Work
+) -> None:
+    """Suspicion of module review M8 1: the DM's history holds the personal answer; a
+    later run there reads it (history, `read_conversation`) and wrote it on before."""
+    channel = await _channel(work)
+    name = await _personal(ext)
+    ext.bench.stub.state.replies.extend([call(name, q="meine"), {"content": f"Da: {SECRET}"}])
+    await ext.bench.say("Such meine Issues")
+    assert await ext.bench.run_next() == StopReason.COMPLETED
+    ext.bench.stub.state.replies.extend(
+        [
+            call("post_message", conversation_id=channel, text=f"Für alle: {SECRET}"),
+            {"content": "Erledigt."},
+        ]
+    )
+    await ext.bench.say("Schreib das dem Team")
+    assert await ext.bench.run_next() == StopReason.COMPLETED
+    (posted,) = [e for e in await ext.tool_events() if e["name"] == "post_message"]
+    assert posted["text"] == PERSONAL
+    assert f"Für alle: {SECRET}" not in await _bodies(ext)

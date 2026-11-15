@@ -508,7 +508,12 @@ eigene Gespräch ist nur ausgenommen, solange die Person allein mit dem Agenten 
 Seite oder eines Tickets, Direktnachricht mit mehreren) ebenfalls abgelehnt; der Lauf
 endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, im
 Halt-Ereignis und im Hinweis des Gesprächs, `system.stop_detail`: die Person liest dort,
-dass sie in einer Direktnachricht allein mit dem Agenten fragen kann). Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
+dass sie in einer Direktnachricht allein mit dem Agenten fragen kann). Die Marke reicht
+über den Lauf hinaus, so weit das Gesagte reicht (Review M8 1, Verdachtsprüfung): Ein
+späterer Lauf in der Direktnachricht allein mit dem Agenten, in der ein Lauf mit Marke
+lief, beginnt mit der Marke (ihr Verlauf hält, was dort gesagt wurde); `search_past_runs`
+findet die Worte eines Laufs mit Marke nur allein mit dem Agenten und markiert dann den
+suchenden Lauf, in einem Kanal oder Thread findet es sie nicht. Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
 unbekanntem Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
 noch die Entwurfsmarke: Sie warten immer auf die Freigabe der fragenden Person über
 genau diese Argumente. Mit der Marke gilt das auch für jedes **lesende** externe

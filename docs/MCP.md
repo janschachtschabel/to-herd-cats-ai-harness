@@ -753,7 +753,10 @@ Recht 404 `ai.not_found`.
   werden abgelehnt („Not allowed: you have read something through the asking person's
   own connection …“), und in einem Kanal, Thread oder einer Direktnachricht mit
   mehreren endet der Lauf statt mit seiner Antwort mit `policy_blocked`
-  (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Ergebnisse über einen geteilten Konnektor, Fehler und
+  (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Spätere
+  Läufe erben die Marke, wo sie das Gesagte lesen können: in der Direktnachricht allein
+  mit dem Agenten, und über `search_past_runs` (das die Worte eines markierten Laufs nur
+  dort findet; siehe [`AGENTEN.md`](AGENTEN.md)). Ergebnisse über einen geteilten Konnektor, Fehler und
   `external_outcome_unknown` markieren nicht. Trägt der Lauf die Marke, wartet jeder
   Aufruf eines externen Servers, den er nicht mit dem eigenen Konnektor der fragenden
   Person nutzt (geteilter Konnektor oder keiner), auch eines **lesenden** Werkzeugs, auf

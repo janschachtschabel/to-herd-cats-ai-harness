@@ -17,7 +17,10 @@ the model's words are the conversation's content, which the run view shows nobod
 else, whatever spaces the other hits came from (review M6 finding 10).
 Outside a DM of the person alone with the agent, only runs of the same conversation:
 another conversation's audience is not this one's (plan M6 decision 5). A run whose
-conversation the person no longer sees is left out too.
+conversation the person no longer sees is left out too. The words of a run that read
+through the person's own connector (its personal mark) are found only alone with the
+agent, and mark the run that finds them (module review M8 1: a later run in the same
+channel found them before and could post them there).
 """
 
 import uuid
@@ -81,9 +84,12 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
     private = False
     for hit in hits:
         noted = of_runs[hit.run_id] if _words(hit) else event_reads(hit.content)
+        if noted.personal and place.kind != PlaceKind.ALONE:
+            continue  # what the person read with her own connector: hers alone
         now = await checker.readable(hit, noted)
         if now is None:
             continue
+        ctx.reads.personal |= noted.personal
         spaces |= now
         private |= _words(hit) or not now or bool((hit.content.get("attrs") or {}).get(ASKER_ONLY))
         ctx.reads.spaces |= now

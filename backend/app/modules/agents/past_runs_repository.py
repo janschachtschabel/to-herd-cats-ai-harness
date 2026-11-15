@@ -28,13 +28,15 @@ class PastHit:
 
 @dataclass(slots=True)
 class RunReads:
-    """What a run's tool calls read: their spaces, pages and tickets, and the spaces
-    of the drafts among them."""
+    """What a run's tool calls read: their spaces, pages and tickets, the spaces of
+    the drafts among them, and whether one read through the asking person's own
+    connector (the personal mark)."""
 
     spaces: set[uuid.UUID] = field(default_factory=set)
     pages: set[uuid.UUID] = field(default_factory=set)
     tickets: set[uuid.UUID] = field(default_factory=set)
     drafts: set[uuid.UUID] = field(default_factory=set)
+    personal: bool = False
 
 
 def _escaped(text: str) -> str:
@@ -126,6 +128,7 @@ class PastRunRepository:
             into.pages |= noted.pages
             into.tickets |= noted.tickets
             into.drafts |= noted.drafts
+            into.personal |= noted.personal
         return found
 
 
@@ -137,6 +140,7 @@ def event_reads(content: dict[str, Any]) -> RunReads:
         _ids(read.get("pages")),
         _ids(read.get("tickets")),
         _ids(read.get("drafts")),
+        read.get("personal") is True,
     )
 
 

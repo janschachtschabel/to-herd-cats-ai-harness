@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Actor, visible_space_ids
 from app.core.principal import PrincipalType
 from app.modules.agents.models import Agent
-from app.modules.agents.run_models import Run
+from app.modules.agents.run_models import EventKind, Run, RunEvent
 from app.modules.ai.policy import Policy
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.spaces.models import Space
@@ -213,3 +213,20 @@ class ReadRepository:
         """Which of the spaces the actor (with its read scope) may read now."""
         stmt = visible_space_ids(actor).where(Space.id.in_(sorted(space_ids)))
         return set(await self.session.scalars(stmt))
+
+    async def personal_before(self, conversation_id: uuid.UUID, run_id: uuid.UUID) -> bool:
+        """Whether an earlier run in the conversation read through its asker's own
+        connector (a tool event with `read.personal`): what it said there is in the
+        conversation's history, which a later run reads."""
+        stmt = select(
+            exists().where(
+                Run.org_id == self.org_id,
+                Run.conversation_id == conversation_id,
+                Run.id != run_id,
+                RunEvent.org_id == self.org_id,
+                RunEvent.run_id == Run.id,
+                RunEvent.kind == EventKind.TOOL_CALL,
+                RunEvent.content["read"]["personal"].as_boolean().is_(True),
+            )
+        )
+        return bool(await self.session.scalar(stmt))

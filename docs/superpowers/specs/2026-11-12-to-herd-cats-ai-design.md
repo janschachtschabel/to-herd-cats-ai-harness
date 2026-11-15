@@ -218,6 +218,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Trägt ein Lauf die persönliche Marke, wartet auch jeder Aufruf eines **lesenden** externen Werkzeugs auf die Freigabe der fragenden Person über genau diese Argumente (in Läufen von Automationen und Ereignisregeln: der Eigentümerin), sofern der Server nicht mit ihrem eigenen Konnektor genutzt wird. Sonst könnte ein Ergebnis ihres eigenen Kontos als Argument an einen Server mit geteiltem Zugang gehen, den andere einsehen. Review M8 1, Befund 3.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Die persönliche Marke reicht so weit wie das Gesagte. Ein späterer Lauf in der Direktnachricht allein mit dem Agenten, in der ein markierter Lauf lief, beginnt mit der Marke; `search_past_runs` findet die Worte eines markierten Laufs nur allein mit dem Agenten und markiert dann den suchenden Lauf. Vorher konnte ein späterer Lauf sie in einen Kanal tragen. Review M8 1, Verdachtsprüfung.*
+
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]
 
 Die Schnittmenge in 5.4 schützt das **Lesen**. Ein Agent schreibt aber in Gespräche mit eigenem Publikum. Damit dort nichts durchsickert, wird der Lesebereich eines Laufs zusätzlich auf das **Publikum des Ausgabeorts** begrenzt:
