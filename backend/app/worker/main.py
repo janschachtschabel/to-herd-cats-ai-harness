@@ -39,6 +39,7 @@ from app.core.config import get_settings
 from app.core.db import Database
 from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL
+from app.modules.backups.metrics import update_backup_metrics
 from app.worker.dispatcher import Dispatcher
 from app.worker.due import DueLoop
 from app.worker.metrics import worker_metrics
@@ -191,6 +192,11 @@ class Worker:
                     await self.dispatcher.update_metrics()
             except Exception as exc:  # the next round tries again
                 logger.warning("outbox.metrics_failed", extra={"error": type(exc).__name__})
+            try:  # the backups' gauges (plan M9 decision 11), from backup_run
+                async with asyncio.timeout(METRICS_SECONDS):
+                    await update_backup_metrics(self.dispatcher.database, get_settings())
+            except Exception as exc:
+                logger.warning("backup.metrics_failed", extra={"error": type(exc).__name__})
             await asyncio.sleep(METRICS_SECONDS)
 
 

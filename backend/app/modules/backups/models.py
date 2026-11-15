@@ -31,6 +31,12 @@ class BackupState(StrEnum):
     INTERRUPTED = "interrupted"  # its process ended without finishing (restore marks it)
 
 
+class OffsiteState(StrEnum):
+    OFF = "off"  # no offsite repository configured, or the backup itself failed
+    OK = "ok"
+    FAILED = "failed"
+
+
 def _one_of(column: str, values: type[StrEnum]) -> CheckConstraint:
     return CheckConstraint(f"{column} IN ({', '.join(repr(v.value) for v in values)})", column)
 
@@ -40,6 +46,7 @@ class BackupRun(UuidPk, OrgScoped, Base):
     __table_args__ = (
         _one_of("trigger", BackupTrigger),
         _one_of("state", BackupState),
+        _one_of("offsite_state", OffsiteState),
         Index("ix_backup_run_started_at", "started_at", "id"),
     )
 
@@ -51,3 +58,6 @@ class BackupRun(UuidPk, OrgScoped, Base):
     bytes: Mapped[int | None] = mapped_column(BigInteger)
     archive_sha256: Mapped[str | None] = mapped_column(String(64))
     error_code: Mapped[str | None] = mapped_column(String(MAX_ERROR_CHARS))
+    offsite_state: Mapped[OffsiteState] = mapped_column(
+        String(16), nullable=False, default=OffsiteState.OFF, server_default=OffsiteState.OFF.value
+    )

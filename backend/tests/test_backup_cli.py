@@ -64,11 +64,12 @@ async def test_create_verify_and_list(
         "sha256",
         "archive",
         "error",
+        "offsite",
     ]
     newest, oldest = (line.split() for line in lines[1:])
     assert newest[0] == "2026-11-16T02:30:07Z" and newest[6] == second.name
     assert oldest[2:4] == ["cli", "ok"] and oldest[4] == str(_size(archive))
-    assert oldest[7] == "-" and len(oldest[5]) == 12
+    assert oldest[7:] == ["-", "off"] and len(oldest[5]) == 12
 
     _flip_a_byte(archive)
     assert await run(["backup", "verify", str(archive)], settings, clock) == 1
@@ -87,4 +88,12 @@ async def test_a_failed_backup_says_its_code(
     assert capsys.readouterr().out.strip().splitlines()[-1] == "failed backup.tool_missing"
     assert await run(["backup", "list"], settings, SettableClock(AT)) == 0
     (_, row) = capsys.readouterr().out.strip().splitlines()
-    assert row.split()[2:] == ["cli", "failed", "-", "-", "-", "backup.tool_missing"]
+    assert row.split()[2:] == ["cli", "failed", "-", "-", "-", "backup.tool_missing", "off"]
+
+
+async def test_backup_run_from_the_command_line(
+    real_db: RealDb, settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert await run(["backup", "run"], settings, SettableClock(AT)) == 0
+    last = capsys.readouterr().out.strip().splitlines()[-1]
+    assert last == f"{settings.backup_dir / 'herd-20261115T023007Z-0.1.0.tar'} offsite=off"

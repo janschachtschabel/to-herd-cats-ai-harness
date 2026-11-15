@@ -3,6 +3,8 @@
     python -m app.ops backup create [--dir DIR]   # an archive; prints its path
     python -m app.ops backup verify ARCHIVE       # "ok" or one problem code per line
     python -m app.ops backup list [--limit N]     # the recorded backups, newest first
+    python -m app.ops backup run                  # backup, retention, offsite (cron job)
+    python -m app.ops backup schedule             # `run` at every HERD_BACKUP_SCHEDULE term
     python -m app.ops restore check ARCHIVE       # problem codes and warnings, or "ok"
     python -m app.ops restore apply ARCHIVE [--without-secrets]   # empty installation
 

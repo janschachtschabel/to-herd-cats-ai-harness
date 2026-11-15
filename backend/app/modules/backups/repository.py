@@ -3,13 +3,23 @@ its row belongs to the installation's organisation (there is one, `orgs/models.p
 
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.backups.models import BackupRun, BackupState, BackupTrigger
+from app.modules.backups.models import BackupRun, BackupState, BackupTrigger, OffsiteState
 from app.modules.orgs.models import Organization
+
+
+@dataclass(frozen=True)
+class BackupFigures:
+    last_ok: datetime | None
+    last_failed: datetime | None
+    last_bytes: int | None
+    offsite_ok: datetime | None
+    offsite_failed: datetime | None
 
 
 class BackupRunRepository:
@@ -48,6 +58,35 @@ class BackupRunRepository:
                 archive_sha256=archive_sha256,
                 error_code=error_code,
             )
+        )
+
+    async def set_offsite(self, run_id: uuid.UUID, state: OffsiteState) -> None:
+        await self.session.execute(
+            update(BackupRun).where(BackupRun.id == run_id).values(offsite_state=state)
+        )
+
+    async def figures(self) -> BackupFigures:
+        """For the gauges, over every organisation (there is one): the last finish of a
+        good and of a failed backup, the size of the last good one, the last finish of
+        a good backup whose offsite push worked and of one whose push failed."""
+        ok = BackupRun.state == BackupState.OK
+        last_ok = await self.session.scalar(select(func.max(BackupRun.finished_at)).where(ok))
+        last_failed = await self.session.scalar(
+            select(func.max(BackupRun.finished_at)).where(BackupRun.state == BackupState.FAILED)
+        )
+        size = await self.session.scalar(
+            select(BackupRun.bytes)
+            .where(ok)
+            .order_by(BackupRun.finished_at.desc(), BackupRun.id.desc())
+            .limit(1)
+        )
+        offsite: dict[OffsiteState, datetime | None] = {}
+        for state in (OffsiteState.OK, OffsiteState.FAILED):
+            offsite[state] = await self.session.scalar(
+                select(func.max(BackupRun.finished_at)).where(ok, BackupRun.offsite_state == state)
+            )
+        return BackupFigures(
+            last_ok, last_failed, size, offsite[OffsiteState.OK], offsite[OffsiteState.FAILED]
         )
 
     async def interrupt_running(self, at: datetime) -> None:
