@@ -680,7 +680,10 @@ Recht 404 `ai.not_found`.
   Stufe 2; schreibende Stufe 4 und immer mit Freigabe der fragenden Person
   (Fingerabdruck über Werkzeug, Argumente und die Versionen von Server und Werkzeug:
   ändert sich eins davon vor dem Ausführen, ist die Freigabe veraltet, und nichts wird
-  gesendet). In Läufen von Ereignisregeln gilt das ebenso. Vor jedem Aufruf entscheidet
+  gesendet). In Läufen von Ereignisregeln gilt das ebenso, und dort wartet auch jeder
+  Aufruf eines **lesenden** externen Werkzeugs auf die Freigabe der Eigentümerin über
+  genau diese Argumente (der Text der auslösenden Person kann sie bestimmen; Review M8
+  1, Befund 5). Vor jedem Aufruf entscheidet
   die KI-Richtlinie aller bisher gelesenen Bereiche (und des Bereichs des Ortes) über
   den `data_location` des Servers wie über den einer Verbindung; lässt sie ihn nicht
   zu, wird nicht aufgerufen (`policy_blocked` als Ergebnis). Der Zugang ist der

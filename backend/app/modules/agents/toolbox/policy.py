@@ -16,7 +16,9 @@
   write) whose grant is `allow` becomes `confirm`: the text of whoever caused the
   event reaches the model with the owner's rights, so the owner releases each such
   call (review M7, finding 8). Level 2 (tickets, comments, proposals) stays as
-  granted, so chains of rules go on; the run's own answer is no tool call.
+  granted, so chains of rules go on; the run's own answer is no tool call. An
+  external tool asks there whatever its level: even a read sends its arguments out of
+  the system (module review M8 1, finding 5).
 - A level above 2 is given only by an admin. (Spec 8.2 also names whoever manages every
   space of the agent; but changing an organisation's agent at all needs
   `agent.manage`, which only admins hold, and a personal agent stays at 2, so that
@@ -61,9 +63,10 @@ def effective(level: int, spec: ToolSpec, entry: Grant | None) -> Grant:
 
 
 def watched(grant: Grant, spec: ToolSpec, *, event_rule: bool) -> Grant:
-    """The grant in a run: in an event rule's run a direct write that is `allow` asks
-    its owner (`confirm`)."""
-    if event_rule and spec.level >= UNWATCHED_LEVEL and grant == Grant.ALLOW:
+    """The grant in a run: in an event rule's run a direct write or an external tool
+    that is `allow` asks its owner (`confirm`)."""
+    outward = spec.level >= UNWATCHED_LEVEL or spec.remote is not None
+    if event_rule and outward and grant == Grant.ALLOW:
         return Grant.CONFIRM
     return grant
 

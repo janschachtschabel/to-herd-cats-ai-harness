@@ -226,7 +226,9 @@ die nächsten Termine (in ihrer Zeitzone) und das **Protokoll** jedes Termins: g
   Freigabe (wie `confirm`, eine Karte am Ort und eine Aktivität). Werkzeuge der Stufe 2
   (Tickets anlegen, kommentieren, Status, Vorschläge, Gedächtnis) bleiben, wie sie dem
   Agenten erlaubt sind, damit Ketten von Regeln ohne Freigabe weiterlaufen; die Antwort
-  des Laufs in seinem Thread braucht keine. **Budget:** Läufe einer Ereignis-Regel gehen
+  des Laufs in seinem Thread braucht keine. Ein **externes Werkzeug** fragt dort immer,
+  auch ein lesendes der Stufe 2: Seine Argumente verlassen das System, und der Text der
+  auslösenden Person kann sie bestimmen (Review M8 1, Befund 5). **Budget:** Läufe einer Ereignis-Regel gehen
   auf das Budget der Eigentümerin (und des Agenten), nicht auf das der Person, die das
   Ereignis ausgelöst hat.
 - **Angehalten:** von Hand, oder vom System: wenn die Eigentümerin die Aufgabe nicht mehr
@@ -1063,7 +1065,8 @@ Bereich des Ereignisses, je Regel gesperrt in fester Reihenfolge:
    dessen Erlaubnis `allow` ist, wie `confirm` behandelt (`toolbox/policy.watched`,
    geprüft vom Schritt-Host bei jedem Aufruf; `Working.event_rule` aus der Art der
    Aufgabe). Die Freigabe geht an die Eigentümerin (die fragende Person des Laufs).
-   Stufe 2 bleibt unverändert (Review M7, Befund 8).
+   Stufe 2 bleibt unverändert (Review M7, Befund 8), außer externen Werkzeugen: Auch
+   ein lesendes wartet dort auf die Eigentümerin (Review M8 1, Befund 5).
 
 Die Termine, die der Handler feuert, gehen durch dieselben Prüfungen (`term.fire`) und
 zählen in derselben Metrik, sobald seine Zustellung festgeschrieben ist.

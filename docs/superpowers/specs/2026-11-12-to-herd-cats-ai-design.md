@@ -423,6 +423,8 @@ Eine Stufe über 2 darf nur ein Admin vergeben.
 
 *Geändert in M8 [Claude, 15.11.2026]: Stufe 4 ist gebaut und enthält nur **schreibende externe Werkzeuge**; kein eingebautes Werkzeug liegt auf Stufe 4. Statt „als kritisch markierte Aufrufe“ gilt: **Jeder** Aufruf eines schreibenden externen Werkzeugs braucht die Freigabe der fragenden Person (lockerste mögliche Freigabe `confirm`, auch nicht per `agent_tool` auf `allow` zu lockern, auch in Läufen von Ereignisregeln), gebunden an einen Fingerabdruck über Werkzeug, Argumente und die Versionen von Server und Werkzeug. Lesende externe Werkzeuge sind Stufe 2. Ob ein Werkzeug lesend oder schreibend ist, stuft der Admin je Werkzeug ein; der Vorschlag ist nur dann lesend, wenn der Server es so kennzeichnet, und eine Lockerung auf lesend muss bestätigt werden. Ein externes Werkzeug bekommt ein Agent nur mit einem ausdrücklichen Eintrag in seinen Freigaben (ohne Eintrag `block`). Stufe 4 vergibt nur ein Admin; persönliche und externe Agenten haben höchstens Stufe 2. Plan M8, Entscheidungen 7, 8 und 11.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Im Lauf einer Ereignisregel wartet auch jeder Aufruf eines **lesenden** externen Werkzeugs (Stufe 2) auf die Freigabe der Eigentümerin über genau diese Argumente, wie ein direkt schreibendes Werkzeug der Stufe 3 (Review M7, Befund 8): Seine Argumente verlassen das System, und der Text der Person, die das Ereignis ausgelöst hat, kann sie bestimmen. Review M8 1, Befund 5.*
+
 ### 8.3 Lauf
 
 1. **Auslöser** (8.4) legt `run` an (`queued`) → DBOS-Workflow `run_agent(run_id)`.
