@@ -12424,7 +12424,7 @@
         "type": "string"
       },
       "SystemEntryOut": {
-        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6),\n`automation_id` the automation whose term `automation.started` opened (plan M7;\n`actor` is its owner), `budget_scope` whose daily limit stopped a run\n(`run.stopped` to `budget`: `user`, `agent` or `organisation`).",
+        "description": "A system message's timeline entry, for the client to word: `key` is the page or\nticket event (`page.published`, `ticket.status_changed`, ...), `actor` who caused\nit (null if unknown; an agent with `type` `agent`), `number` the restored version\n(only for `page.version_restored`), `old`/`new` what a ticket field changed from\nand to (null where there was nothing, and always for title and description),\n`run_id` the agent's run that made a ticket change (plan M6 task 6),\n`automation_id` the automation whose term `automation.started` opened (plan M7;\n`actor` is its owner), `budget_scope` whose daily limit stopped a run\n(`run.stopped` to `budget`: `user`, `agent` or `organisation`), `stop_detail` why\nbeyond the reason (`run.stopped` to `policy_blocked`: `personal_connector`, the\nanswer held what the asking person read with her own connector).",
         "properties": {
           "actor": {
             "anyOf": [
@@ -12504,6 +12504,18 @@
               }
             ],
             "title": "Run Id"
+          },
+          "stop_detail": {
+            "anyOf": [
+              {
+                "const": "personal_connector",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Detail"
           }
         },
         "required": [

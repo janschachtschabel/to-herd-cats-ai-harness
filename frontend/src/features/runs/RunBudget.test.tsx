@@ -75,4 +75,26 @@ describe('a run stopped by a daily budget', () => {
     expect(screen.getByText('Hilda hat ohne Antwort aufgehört:')).toBeInTheDocument()
     expect(screen.getByText(/Das Tagesbudget für KI ist erreicht/)).toBeInTheDocument()
   })
+
+  test('a notice held back for the person’s own connector says why', () => {
+    const message = makeMessage({
+      kind: 'system',
+      author: null,
+      body_md: '',
+      system: {
+        key: 'run.stopped',
+        actor: { id: 'a1', name: 'Hilda', type: 'agent' },
+        number: null,
+        old: null,
+        new: { value: 'policy_blocked', name: null },
+        stop_detail: 'personal_connector',
+      },
+    })
+    render(
+      <Providers queryClient={createQueryClient()}>
+        <RunStoppedNotice message={message} />
+      </Providers>,
+    )
+    expect(screen.getByText(/mit dem persönlichen Zugang der fragenden Person/)).toBeInTheDocument()
+  })
 })

@@ -9,7 +9,8 @@ import { noRunText, RUN_REFUSED, stopText } from './display'
 /** A run notice of a conversation or thread, in words (the reason comes as
  *  `system.new.value`, never as text from the provider): a run that stopped without
  *  an answer (`run.stopped`), or one that could not start or hand over
- *  (`run.refused`, its code from the run refusals). The agent is named where the
+ *  (`run.refused`, its code from the run refusals); one that held back an answer
+ *  for what the asking person read with her own connector says so. The agent is named where the
  *  server names it, with the AI mark; the run is linked for those who may see it. */
 export function RunStoppedNotice({ message }: { message: Message }) {
   const { t } = useTranslation()
@@ -42,6 +43,9 @@ export function RunStoppedNotice({ message }: { message: Message }) {
             </span>{' '}
             <span>{stopText(t, reason)}</span>
           </p>
+        )}
+        {!refused && entry?.stop_detail === 'personal_connector' && (
+          <p className="mt-0.5">{t('runs.external.personalConnector')}</p>
         )}
         {entry?.run_id && <VisibleRunLink runId={entry.run_id} className="mt-1" />}
       </div>

@@ -8114,7 +8114,9 @@ export interface components {
          *     `run_id` the agent's run that made a ticket change (plan M6 task 6),
          *     `automation_id` the automation whose term `automation.started` opened (plan M7;
          *     `actor` is its owner), `budget_scope` whose daily limit stopped a run
-         *     (`run.stopped` to `budget`: `user`, `agent` or `organisation`).
+         *     (`run.stopped` to `budget`: `user`, `agent` or `organisation`), `stop_detail` why
+         *     beyond the reason (`run.stopped` to `policy_blocked`: `personal_connector`, the
+         *     answer held what the asking person read with her own connector).
          */
         SystemEntryOut: {
             actor: components["schemas"]["PersonNameOut"] | null;
@@ -8129,6 +8131,8 @@ export interface components {
             old: components["schemas"]["SystemValueOut"] | null;
             /** Run Id */
             run_id?: string | null;
+            /** Stop Detail */
+            stop_detail?: "personal_connector" | null;
         };
         /**
          * SystemRole

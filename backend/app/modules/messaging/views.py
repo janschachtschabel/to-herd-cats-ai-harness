@@ -47,6 +47,11 @@ class SystemValue:
     name: str | None
 
 
+# Why a run stopped, beyond its reason, as a notice says it: the asking person's own
+# connector held the answer back (`agents/closing.PERSONAL_DETAIL`).
+STOP_DETAILS = frozenset({"personal_connector"})
+
+
 @dataclass(frozen=True, slots=True)
 class SystemEntry:
     """A timeline entry: the page or ticket event (`key`), who caused it, the restored
@@ -64,6 +69,7 @@ class SystemEntry:
     run_id: uuid.UUID | None = None  # the agent's run that made the change
     automation_id: uuid.UUID | None = None  # `automation.started`: whose term (plan M7)
     budget_scope: BudgetScope | None = None  # `run.stopped` by a budget: whose limit
+    stop_detail: str | None = None  # `run.stopped`: one of STOP_DETAILS
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,7 +156,12 @@ def _system_entry(
         run_id=_uuid(body.get("run_id")),
         automation_id=_uuid(body.get("automation_id")),
         budget_scope=_scope(body.get("scope")) if key == "run.stopped" else None,
+        stop_detail=_detail(body.get("detail")) if key == "run.stopped" else None,
     )
+
+
+def _detail(value: object) -> str | None:
+    return value if isinstance(value, str) and value in STOP_DETAILS else None
 
 
 def _scope(value: object) -> BudgetScope | None:

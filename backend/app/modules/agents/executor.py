@@ -50,7 +50,7 @@ from dataclasses import replace
 from app.core import secrets
 from app.modules.agents import briefing, place
 from app.modules.agents.actor import Reads, allowed_actor
-from app.modules.agents.closing import close
+from app.modules.agents.closing import PERSONAL_DETAIL, close
 from app.modules.agents.control_repository import ControlRepository
 from app.modules.agents.executor_repository import Claimed, RunSteps
 from app.modules.agents.journal import renamed, replay
@@ -75,7 +75,6 @@ from app.modules.automations.models import AutomationKind
 from app.runtime import context, models
 from app.runtime.loop import Outcome, Recorded, run_loop
 
-PERSONAL_DETAIL = "personal_connector"  # an answer the person's own connector held back
 MAX_RECOVERIES = 2  # a run taken up again this often after its worker died: `error`
 
 ModelMaker = Callable[[models.ModelTarget, float], models.BuiltModel]

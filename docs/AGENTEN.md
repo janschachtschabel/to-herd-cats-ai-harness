@@ -507,7 +507,8 @@ eigene Gespräch ist nur ausgenommen, solange die Person allein mit dem Agenten 
 `post_message` dorthin, `ask_user` und die Antwort sind sonst (Kanal, Thread einer
 Seite oder eines Tickets, Direktnachricht mit mehreren) ebenfalls abgelehnt; der Lauf
 endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, im
-Halt-Ereignis). Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
+Halt-Ereignis und im Hinweis des Gesprächs, `system.stop_detail`: die Person liest dort,
+dass sie in einer Direktnachricht allein mit dem Agenten fragen kann). Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
 unbekanntem Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
 noch die Entwurfsmarke: Sie warten immer auf die Freigabe der fragenden Person über
 genau diese Argumente. Mit der Marke gilt das auch für jedes **lesende** externe

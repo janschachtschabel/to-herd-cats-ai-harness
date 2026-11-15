@@ -3,7 +3,7 @@ writing a message, a message with its reactions and timeline entry, read positio
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -107,7 +107,9 @@ class SystemEntryOut(BaseModel):
     `run_id` the agent's run that made a ticket change (plan M6 task 6),
     `automation_id` the automation whose term `automation.started` opened (plan M7;
     `actor` is its owner), `budget_scope` whose daily limit stopped a run
-    (`run.stopped` to `budget`: `user`, `agent` or `organisation`)."""
+    (`run.stopped` to `budget`: `user`, `agent` or `organisation`), `stop_detail` why
+    beyond the reason (`run.stopped` to `policy_blocked`: `personal_connector`, the
+    answer held what the asking person read with her own connector)."""
 
     key: str
     actor: PersonNameOut | None
@@ -117,6 +119,7 @@ class SystemEntryOut(BaseModel):
     run_id: uuid.UUID | None = None
     automation_id: uuid.UUID | None = None
     budget_scope: BudgetScope | None = None
+    stop_detail: Literal["personal_connector"] | None = None
 
     @classmethod
     def of(cls, entry: SystemEntry) -> "SystemEntryOut":
@@ -132,6 +135,7 @@ class SystemEntryOut(BaseModel):
             run_id=entry.run_id,
             automation_id=entry.automation_id,
             budget_scope=entry.budget_scope,
+            stop_detail="personal_connector" if entry.stop_detail == "personal_connector" else None,
         )
 
 

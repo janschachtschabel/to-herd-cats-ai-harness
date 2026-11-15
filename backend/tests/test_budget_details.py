@@ -76,3 +76,4 @@ async def test_other_stops_name_no_budget(bench: Bench) -> None:
     await bench.run_next()
     notices = [m for m in await bench.messages() if m["kind"] == "system"]
     assert notices and all(n["system"]["budget_scope"] is None for n in notices)
+    assert all(n["system"]["stop_detail"] is None for n in notices)

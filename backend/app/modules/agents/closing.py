@@ -1,7 +1,8 @@
 """The end of a run, in one transaction (plan M5 task 6, M6, M7; the run's host:
 `executor.py`): the answer (`kind=agent`, `client_id` = the run, so there is never a
 second one), or on any other stop a timeline notice (`run.stopped` with the reason,
-for the client to word), where the run answers (`place.py`: the DM, the mentioning
+for the client to word; with whose budget, or that the person's own connector held
+the answer back), where the run answers (`place.py`: the DM, the mentioning
 message's thread, the ticket's thread, an automation's place or the thread its term
 opened); the run `done`. A heartbeat's answer `HEARTBEAT_OK` is delivered nowhere
 (no message, no thread, no activity; its term's row notes it, plan M7 decision 7);
@@ -35,6 +36,7 @@ from app.modules.messaging.models import MAX_BODY_CHARS, Message
 from app.modules.messaging.notification_models import NotificationReason
 
 STOP_KEY = "run.stopped"
+PERSONAL_DETAIL = "personal_connector"  # an answer the person's own connector held back
 STOP_SEQ = 0  # the stop's event; the steps' events count from 1
 # A DM's run that ended so queues no run for what came meanwhile: a cancelled one
 # writes nothing more; one stopped by a daily budget would stop again at once.
@@ -73,6 +75,8 @@ async def close(
         content = {"key": STOP_KEY, "actor": str(claimed.agent_id), "to": reason.value}
         if reason == StopReason.BUDGET and detail is not None:
             content["scope"] = detail  # whose daily limit: user, agent or organisation
+        if reason == StopReason.POLICY_BLOCKED and detail == PERSONAL_DETAIL:
+            content["detail"] = detail  # why: hers to fix, alone with the agent
         conversation = await steps.conversation()
         message = await notice(
             session, claimed.org_id, claimed.agent_id, conversation, claimed.id, content, root

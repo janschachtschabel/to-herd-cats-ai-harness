@@ -117,6 +117,12 @@ async def test_the_final_answer_in_a_channel_is_refused(ext: Ext, work: Work) ->
     assert await ext.bench.run_next() == StopReason.POLICY_BLOCKED
     assert not any(SECRET in body for body in await _bodies(ext))
     assert (await _stop(ext))["detail"] == "personal_connector"
+    # the notice in the thread says why, for the person to ask where she is alone
+    # with the agent (module review M8 1, finding 14)
+    replies = await ext.bench.people.alice.get(f"/api/messages/{r.json()['id']}/replies?limit=100")
+    (notice,) = [m for m in replies.json()["items"] if m["kind"] == "system"]
+    assert notice["system"]["new"]["value"] == "policy_blocked"
+    assert notice["system"]["stop_detail"] == "personal_connector"
 
 
 async def test_a_run_taken_up_again_keeps_the_mark(
