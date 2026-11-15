@@ -6,6 +6,7 @@ import { aiWorkRoutes } from './aiRoutes'
 import { appRoute, loginRoute, rootRoute } from './base'
 import { messageSearch } from './search'
 import { skillProposalRoute, skillRoute, spaceTree } from './spaceRoutes'
+import { tokenRoutes } from './tokenRoutes'
 
 export type { RouterContext } from './base'
 
@@ -152,6 +153,7 @@ export const routeTree = rootRoute.addChildren([
     ticketRoute,
     activityRoute,
     profileRoute,
+    ...tokenRoutes,
     ...aiWorkRoutes,
     adminTree,
   ]),

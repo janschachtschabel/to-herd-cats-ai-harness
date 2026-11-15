@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronDown, Languages, LogOut, Monitor, Moon, Sun, UserCog } from 'lucide-react'
+import { ChevronDown, KeyRound, Languages, LogOut, Monitor, Moon, Sun, UserCog } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useTranslation } from 'react-i18next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useLogout, useMe } from '@/features/auth/queries'
+import { hasPermission, useLogout, useMe } from '@/features/auth/queries'
 import { useChangeLocale } from '@/features/profile/queries'
 import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
 
@@ -91,6 +91,12 @@ export function UserMenu() {
           <UserCog className="size-4" aria-hidden />
           {t('userMenu.profile')}
         </DropdownMenuItem>
+        {hasPermission(me, 'mcp.use') && (
+          <DropdownMenuItem onSelect={() => void navigate({ to: '/profile/tokens' })}>
+            <KeyRound className="size-4" aria-hidden />
+            {t('userMenu.tokens')}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={() =>
             logout.mutate(undefined, { onSettled: () => void navigate({ to: '/login' }) })

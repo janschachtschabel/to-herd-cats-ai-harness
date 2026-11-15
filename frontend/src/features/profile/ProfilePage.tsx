@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { PageHeader } from '@/features/shared/states'
 import { MyUsage } from '@/features/ai/usage/MyUsage'
+import { TokensLink } from '@/features/tokens/TokensLink'
 import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
 import { PasswordForm } from './PasswordForm'
 import { useChangeLocale } from './queries'
@@ -33,6 +34,7 @@ export function ProfilePage() {
       <section className="mt-8 border-t pt-6">
         <PasswordForm />
       </section>
+      <TokensLink />
       <MyUsage />
     </div>
   )
