@@ -13,6 +13,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
 
 from app.core.pagination import Page, PageParams
+from app.modules.auth.cookies import session_token
 from app.modules.auth.deps import ActorDep, SessionDep, SettingsDep
 from app.modules.auth.service import AuthService
 from app.modules.oauth.clients import ClientService
@@ -85,7 +86,7 @@ async def oauth_callback(
 ) -> RedirectResponse:
     """The authorization server's redirect: finish the flow, then send the browser to
     the result page (`/ai/oauth/done?status=...`)."""
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     auth = await AuthService(session, settings).resolve(token) if token else None
     finished = await FlowService(session).finish(auth, state, code, error)
     return RedirectResponse(finished.location(), status_code=303)

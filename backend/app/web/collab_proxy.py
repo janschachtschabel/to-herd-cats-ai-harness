@@ -41,6 +41,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_database
 from app.core.errors import AppError
 from app.core.metrics import COLLAB_CONNECTIONS
+from app.modules.auth.cookies import session_token
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
 from app.modules.wiki.collab_service import CollabService
 
@@ -106,7 +107,7 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
     raw_generation = websocket.query_params.get("generation", "")
     if not raw_generation.isdigit() or len(raw_generation) > 9:
         return await _deny(websocket, 400, "collab.generation_invalid")
-    token = websocket.cookies.get(settings.session_cookie_name)
+    token = session_token(websocket, settings)
     if not token:
         return await _deny(websocket, 401, "auth.required")
     generation = int(raw_generation)

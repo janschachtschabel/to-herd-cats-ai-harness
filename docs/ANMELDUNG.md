@@ -119,7 +119,8 @@ eines Admins; zu ändern an einer Stelle, `SIGNUP_GETS_NO_AI` in
 
 Autorisierungscode mit PKCE (S256), `state` und `nonce` (je 256 Bit; gespeichert nur
 der SHA-256 von `state`), 10 Minuten gültig, einmal verwendbar. Der Ablauf ist an den
-Browser gebunden: das Cookie `herd_oidc` (HttpOnly, SameSite=Lax, Pfad
+Browser gebunden: das Cookie `__Host-herd_oidc` (über https: Secure, HttpOnly,
+SameSite=Lax, Pfad `/`, ohne Domain; über http zum Ausprobieren `herd_oidc` mit Pfad
 `/api/auth/oidc`) trägt einen Wert, dessen Hash am Ablauf steht; ein Rückruf aus einem
 anderen Browser findet keinen Ablauf (`oidc.flow_invalid`, gegen Login-CSRF). Das
 ID-Token wird mit PyJWT geprüft: nur RS256/ES256 (nie `none` oder HMAC), Schlüssel aus

@@ -12,6 +12,7 @@ from app.core.db import get_session
 from app.core.errors import Forbidden, Unauthorized
 from app.core.logging import bind_request_fields, log_context
 from app.modules.auth.context import AuthContext
+from app.modules.auth.cookies import session_token
 from app.modules.auth.service import AuthService
 
 CSRF_HEADER = "x-requested-with"
@@ -33,7 +34,7 @@ async def current_auth(
 ) -> AsyncIterator[AuthContext]:
     """The caller, from the session cookie; every log line of the request names them,
     the request line included."""
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     if not token:
         raise Unauthorized(code="auth.required")
     ctx = await AuthService(session, settings).resolve(token)

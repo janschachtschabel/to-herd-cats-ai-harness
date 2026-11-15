@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Response
 
 from app.modules.auth.context import AuthContext
-from app.modules.auth.cookies import set_session_cookie
+from app.modules.auth.cookies import clear_session_cookie, session_token, set_session_cookie
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
 from app.modules.auth.schemas import LoginRequest, MeOut
 from app.modules.auth.service import AuthService
@@ -30,10 +30,10 @@ async def login(
 async def logout(
     request: Request, response: Response, session: SessionDep, settings: SettingsDep
 ) -> None:
-    token = request.cookies.get(settings.session_cookie_name)
+    token = session_token(request, settings)
     if token:
         await AuthService(session, settings).logout(token)
-    response.delete_cookie(settings.session_cookie_name, path="/")
+    clear_session_cookie(response, request, settings)
 
 
 @router.get("/me", response_model=MeOut)

@@ -4,7 +4,8 @@ PKCE (S256), `state` and `nonce`, bound to the browser.
 - `start`: a fresh `state`, `nonce`, verifier and browser binding (each 256 bits);
   Postgres keeps the SHA-256 of state and binding, nonce and verifier, for
   `FLOW_MINUTES`. The binding goes into the HttpOnly cookie `herd_oidc` (SameSite=Lax,
-  path `/api/auth/oidc`): a callback from another browser (login CSRF, a stolen
+  path `/api/auth/oidc`; over https `__Host-herd_oidc` on path `/`, see
+  `auth/cookies.py`): a callback from another browser (login CSRF, a stolen
   link) finds no flow. The redirect URI is `HERD_PUBLIC_URL` plus the provider's
   callback path, never taken from the request; without that address (or with plain
   http other than localhost) there is no sign-in (`oidc.public_url_missing`).

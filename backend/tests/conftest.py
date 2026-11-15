@@ -149,7 +149,8 @@ MakeClient = Callable[..., Awaitable[AsyncClient]]
 async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
     """New clients of one public app, all on the test session; each has its own cookies.
 
-    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends."""
+    `csrf=True` sends the `X-Requested-With: herd` header the browser app sends;
+    `base_url="https://test"` is a browser that reached the app over https."""
     app = create_public_app()
     _session_override = session_override(session)
 
@@ -158,9 +159,9 @@ async def make_client(session: AsyncSession) -> AsyncIterator[MakeClient]:
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     clients: list[AsyncClient] = []
 
-    async def _make(*, csrf: bool = False) -> AsyncClient:
+    async def _make(*, csrf: bool = False, base_url: str = "http://test") -> AsyncClient:
         headers = {"X-Requested-With": "herd"} if csrf else {}
-        client = AsyncClient(transport=transport, base_url="http://test", headers=headers)
+        client = AsyncClient(transport=transport, base_url=base_url, headers=headers)
         clients.append(client)
         return client
 

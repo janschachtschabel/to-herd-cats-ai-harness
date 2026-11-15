@@ -165,7 +165,7 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_HOST_PORT` | no | `8080` | Host port for the app (node A in `compose.nodes.yml`) |
 | `HERD_HOST_PORT_B` | no | `8081` | Host port for node B (`compose.nodes.yml` only) |
 | `HERD_FORWARDED_ALLOW_IPS` | no | `127.0.0.1` | Reverse proxies whose `X-Forwarded-For`/`-Proto` are believed (IPs or networks, comma separated) |
-| `HERD_COOKIE_SECURE` | no | `false` | Always mark the session cookie `Secure` (it is anyway when the request came over https) |
+| `HERD_COOKIE_SECURE` | no | `false` | Always mark the session cookie `Secure` and name it `__Host-herd_session` (both happen anyway when the request came over https) |
 | `HERD_LOG_LEVEL` | no | `INFO` | Log level |
 | `HERD_IMAGE_TAG` | no | `local` | Tag of the `to-herd-cats-ai` image to run |
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | no | `20` | Longest wait (s) for a provider when a connection is tested or its models listed (`app`, API nodes) |

@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse
 
 from app.core.errors import AppError
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
-from app.modules.auth.cookies import secure_cookie, set_session_cookie
+from app.modules.auth.cookies import cookie_name, secure_cookie, set_session_cookie
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
 from app.modules.oidc.flow import BINDING_COOKIE, COOKIE_PATH, FLOW_MINUTES, LOGIN_PAGE, FlowService
 from app.modules.oidc.identities import IdentityService
@@ -32,15 +32,23 @@ def _client(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def _binding_cookie(request: Request, settings: SettingsDep) -> tuple[str, str]:
+    """Name and path of the binding cookie: `__Host-herd_oidc` on Path=/ when secure
+    (ASVS 5.0 V3.3.3, no other host can plant one), else the flow's path only."""
+    name = cookie_name(request, settings, BINDING_COOKIE)
+    return name, "/" if name != BINDING_COOKIE else COOKIE_PATH
+
+
 def _set_binding(response: Response, request: Request, settings: SettingsDep, binding: str) -> None:
+    name, path = _binding_cookie(request, settings)
     response.set_cookie(
-        BINDING_COOKIE,
+        name,
         binding,
         max_age=FLOW_MINUTES * 60,
         httponly=True,
         secure=secure_cookie(request, settings),
         samesite="lax",
-        path=COOKIE_PATH,
+        path=path,
     )
 
 
@@ -90,16 +98,23 @@ async def callback(
 ) -> RedirectResponse:
     """The provider's redirect: finish the flow, then the app's start page signed in,
     or the sign-in (profile) page with `?error=` (`?link_error=`) and a fixed code."""
+    binding_name, binding_path = _binding_cookie(request, settings)
     finished = await FlowService(session, settings).finish(
         key,
         _client(request),
-        binding=request.cookies.get(BINDING_COOKIE),
+        binding=request.cookies.get(binding_name),
         state=state,
         code=code,
         error=error,
     )
     response = RedirectResponse(finished.location, status_code=302)
-    response.delete_cookie(BINDING_COOKIE, path=COOKIE_PATH)
+    response.delete_cookie(
+        binding_name,
+        path=binding_path,
+        secure=secure_cookie(request, settings),
+        httponly=True,
+        samesite="lax",
+    )
     if finished.session_token is not None:
         set_session_cookie(response, request, settings, finished.session_token)
     return response
