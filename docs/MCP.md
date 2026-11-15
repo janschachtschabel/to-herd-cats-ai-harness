@@ -373,8 +373,10 @@ Bei jedem Aufruf neu aufgelöst, wie bei persönlichen Token:
 - Der Agent **ruht** (das Token antwortet 401 `token.invalid`, wie ein unbekanntes),
   solange er nicht aktiv ist (pausiert oder Entwurf), seine verantwortliche Person
   kein `mcp.use` hat (inaktiv, Gast, „keine KI“, Schalter aus) oder eine andere Person
-  für ihn verantwortlich ist. Nach einem Wechsel der Verantwortung stellt man neue
-  Token aus.
+  für ihn verantwortlich ist. Ein Wechsel der Verantwortung **widerruft** alle seine
+  Token (Audit `agent.updated` mit `tokens_revoked`), sodass sie auch dann nicht wieder
+  gelten, wenn die Verantwortung zurückgeht (Review M8 1, Befund 9); man stellt neue
+  aus.
 - Was das Token schreibt, ist **des Agenten** (`author`/`reporter` vom Typ `agent`,
   Nachrichten der Art `agent`), mit dem Namen des Tokens in `via_token`, auch in den
   Systemeinträgen der Zeitleiste. Seine Nachrichten erwähnen niemanden und starten

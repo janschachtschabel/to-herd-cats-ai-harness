@@ -273,3 +273,34 @@ async def test_no_agent_token_value_leaks_anywhere(
     for value in (made["secret"], row.token_hash.hex()):
         assert value not in haystack
         assert value[-20:] not in haystack
+
+
+async def test_a_change_of_responsibility_revokes_the_agents_tokens(
+    work: Work, session: AsyncSession
+) -> None:
+    """Module review M8 1, finding 9: the tokens of the first responsible person came
+    back to life when responsibility returned to them. They are revoked at the change."""
+    agent = await _ready(work)
+    token = await agent_token(work.admin, agent)
+    alice = work.bench.people.users["alice"]
+    admin = work.bench.people.users["admin"]
+    await mcp_on(work.admin)
+    url = f"/api/agents/{agent.id}"
+    version = (await work.admin.get(url)).json()["version"]
+    r = await work.admin.patch(url, json={"responsible_user_id": str(admin.id), "version": version})
+    assert r.status_code == 200, r.text
+    r = await work.admin.patch(
+        url, json={"responsible_user_id": str(alice.id), "version": r.json()["version"]}
+    )
+    assert r.status_code == 200, r.text
+    with pytest.raises(Unauthorized):
+        await resolver(session).resolve(bearer(token))
+    revoked = await session.scalars(select(AccessToken).where(AccessToken.agent_id == agent.id))
+    assert all(t.revoked_at is not None for t in revoked)
+    audit = await session.scalar(
+        select(AuditLog)
+        .where(AuditLog.action == "agent.updated")
+        .order_by(AuditLog.id)
+        .limit(1)
+    )
+    assert audit is not None and audit.details["tokens_revoked"] == 1

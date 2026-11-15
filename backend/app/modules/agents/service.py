@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import Action, Actor, can
 from app.core.errors import Conflict, Forbidden, ValidationFailed
+from app.core.models_base import utcnow
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
 from app.modules.agents.models import EXTERNAL_MAX_LEVEL, Agent, AgentKind
@@ -45,6 +46,7 @@ from app.modules.agents.toolbox.policy import may_grant_level
 from app.modules.ai.effective import CHAT_PURPOSES
 from app.modules.ai.repository import ConnectionRepository
 from app.modules.audit.recorder import changes, record, snapshot
+from app.modules.tokens.repository import TokenRepository
 from app.modules.users.repository import UserRepository
 
 _FIELDS = (
@@ -237,6 +239,12 @@ class AgentService:
         details: dict[str, Any] = {"changes": changes(before, agent)}
         if "instructions" in given:
             details["instructions_chars"] = len(agent.instructions)
+        if agent.external and "responsible_user_id" in details["changes"]:
+            # its tokens were the former person's: never valid again (review M8 1, F9)
+            tokens = TokenRepository(self.session)
+            details["tokens_revoked"] = await tokens.revoke_of_agent(
+                actor.org_id, agent.id, utcnow()
+            )
         await self._audit(actor, "agent.updated", agent, details)
         return agent
 

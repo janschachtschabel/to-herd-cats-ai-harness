@@ -164,6 +164,20 @@ class TokenRepository:
         )
         return (await self.session.scalar(stmt)) is not None
 
+    async def revoke_of_agent(self, org_id: uuid.UUID, agent_id: uuid.UUID, now: datetime) -> int:
+        """Revoke every token of the agent not yet revoked: how many this call did."""
+        stmt = (
+            update(AccessToken)
+            .where(
+                AccessToken.org_id == org_id,
+                AccessToken.agent_id == agent_id,
+                AccessToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=now)
+            .returning(AccessToken.id)
+        )
+        return len((await self.session.scalars(stmt)).all())
+
     async def own_page(
         self, org_id: uuid.UUID, user_id: uuid.UUID, before: uuid.UUID | None, limit: int
     ) -> list[AccessToken]:
