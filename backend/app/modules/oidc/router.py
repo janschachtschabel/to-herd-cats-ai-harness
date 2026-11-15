@@ -14,8 +14,14 @@ from fastapi.responses import RedirectResponse
 
 from app.core.errors import AppError
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
-from app.modules.auth.cookies import cookie_name, secure_cookie, set_session_cookie
+from app.modules.auth.cookies import (
+    cookie_name,
+    secure_cookie,
+    session_token,
+    set_session_cookie,
+)
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
+from app.modules.auth.service import AuthService
 from app.modules.oidc.flow import BINDING_COOKIE, COOKIE_PATH, FLOW_MINUTES, LOGIN_PAGE, FlowService
 from app.modules.oidc.identities import IdentityService
 from app.modules.oidc.metrics import count_outcome
@@ -116,6 +122,7 @@ async def callback(
         samesite="lax",
     )
     if finished.session_token is not None:
+        await AuthService(session, settings).end_replaced(session_token(request, settings))
         set_session_cookie(response, request, settings, finished.session_token)
     return response
 

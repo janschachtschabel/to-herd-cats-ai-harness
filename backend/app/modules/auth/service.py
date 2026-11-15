@@ -113,6 +113,12 @@ class AuthService:
         user.last_login_at = now
         return token
 
+    async def end_replaced(self, token: str | None) -> None:
+        """A sign-in replaces the browser's session: the token it had ends (ASVS 5.0
+        V7.2.4), whoever it belonged to."""
+        if token:
+            await self.sessions.end_by_hash(hash_token(token), utcnow())
+
     async def logout(self, token: str) -> None:
         ended = await self.sessions.end_by_hash(hash_token(token), utcnow())
         if ended is not None:

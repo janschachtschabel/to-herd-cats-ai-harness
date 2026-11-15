@@ -14,7 +14,7 @@ from app.core.security import new_session_token
 from app.modules.users.models import User
 from tests.conftest import MakeClient
 from tests.factories import CSRF, PASSWORD
-from tests.factories_oidc import make_provider, start
+from tests.factories_oidc import make_provider, sign_in, start
 from tests.support.oidc_stub import OidcStub
 
 
@@ -95,3 +95,33 @@ async def test_the_oidc_binding_cookie_is_host_bound_over_https(
     name, flags = _cookie(started)
     _hardened(name, flags, "herd_oidc")
     assert int(flags["max-age"]) <= 600
+
+
+async def test_signing_in_again_ends_the_session_it_replaces(
+    make_client: MakeClient, owner_user: User
+) -> None:
+    """ASVS 5.0 V7.2.4: a sign-in issues a new token and ends the one the browser had."""
+    browser = await make_client()
+    await _login(browser, owner_user)
+    old = browser.cookies["herd_session"]
+    await _login(browser, owner_user)
+    assert browser.cookies["herd_session"] != old
+    assert (await browser.get("/api/auth/me")).status_code == 200
+    stale = await make_client()
+    stale.cookies.set("herd_session", old)
+    assert (await stale.get("/api/auth/me")).status_code == 401
+
+
+@pytest.mark.usefixtures("oidc_egress")
+async def test_an_oidc_sign_in_ends_the_session_it_replaces(
+    owner: AsyncClient, member: User, make_client: MakeClient, oidc_stub: OidcStub
+) -> None:
+    await make_provider(owner, oidc_stub, trust_email=True)
+    browser = await make_client()
+    await _login(browser, member)
+    old = browser.cookies["herd_session"]
+    done = await sign_in(browser, oidc_stub, email=member.email, sub="s-again")
+    assert done.headers["location"] == "/"
+    stale = await make_client()
+    stale.cookies.set("herd_session", old)
+    assert (await stale.get("/api/auth/me")).status_code == 401
