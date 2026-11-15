@@ -11,6 +11,7 @@ from app.core.errors import RateLimited, Unauthorized
 from app.core.failure_limit import FailureLimiter
 from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
+from app.core.retention import upkeep_after
 from app.core.security import (
     hash_token,
     new_session_token,
@@ -30,7 +31,7 @@ from app.modules.users.repository import UserRepository
 EXPIRED_SESSION_BATCH = 500
 # Ended sessions (logout, expiry) are kept this long, so live editing can still save
 # the last edits of a person whose session ended mid-session (review M2 R2).
-ENDED_SESSION_KEEP = timedelta(hours=1)
+ENDED_SESSION_KEEP = upkeep_after("user_session")
 
 
 class AuthService:

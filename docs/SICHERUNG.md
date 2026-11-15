@@ -146,6 +146,30 @@ und KI-Schlüssel erreichen restic nie; das Passwort steht nie in einer Argument
 Ausgaben von restic werden nicht protokolliert, nur Schritt und Exit-Status
 (`backup.offsite_failed`).
 
+## Aufbewahrung je Tabelle
+
+Jede Tabelle hat eine Regel im Katalog `backend/app/core/retention.py`; ein Test
+(`tests/test_retention.py::test_every_table_has_a_retention_rule`) schlägt fehl, sobald
+eine neue Tabelle keine hat. Drei Arten:
+
+- **Bleibt** (`Keep`, mit Begründung): Inhalte der Organisation (Seiten, Nachrichten,
+  Tickets, Skills, Anhänge), Einstellungen (Verbindungen, Agenten, Aufgaben, Anbieter,
+  Konnektoren, Server) und alles, was mit seinem Elternteil geht (Versionen, Erwähnungen,
+  Reaktionen, Mitgliedschaften). Benachrichtigungen bleiben, bis die Person sie
+  aufräumt. Nachweise bleiben ebenfalls: `audit_log`, `usage_record`, `run`/`run_event`
+  (mit Rückfragen, Freigaben, Abbrüchen), `dm_inspection`, `backup_run` (eine Zeile je
+  Sicherung). Sie zu löschen ist eine Entscheidung des Betreibers (Aufbewahrungspflichten,
+  Datenschutz), nicht des Codes; wer kürzen will, löscht mit SQL in einem Wartungsfenster
+  und sichert vorher.
+- **Fälligkeits-Schleife** (`Upkeep`, mit Frist): `automation_event` (7 Tage nach seinem
+  Termin), `automation_firing` und `mcp_call` (90 Tage), `storage_tombstone` (48 h, dann
+  die Datei, wenn sie unbenutzt ist), und die abgelaufenen Zeilen: `user_session`
+  (1 h nach Ende), `oauth_flow` und `oidc_flow` (bei Ablauf), `collab_grant` (1 h nach
+  Ablauf), `rate_limit_hit` (60 s), `ai_rate_window` (1 h).
+- **Räumt selbst auf** (`Cleans`): die Outbox (`event_outbox` 7 Tage nach der
+  Zustellung, mit `event_delivery`; gescheiterte Ereignisse bleiben für den Betreiber,
+  `herd_outbox_failed`) und `event_lane` (sobald der Handler das Ereignis hatte).
+
 ## Überwachung
 
 Jeder Worker liest die Sicherungsläufe alle 10 s aus `backup_run` (ein kurzlebiger Job

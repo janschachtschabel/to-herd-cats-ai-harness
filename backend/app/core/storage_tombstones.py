@@ -13,17 +13,18 @@ content and the removal cannot cross.
 
 import uuid
 from collections.abc import Awaitable, Callable, Iterable
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models_base import utcnow
+from app.core.retention import upkeep_after
 from app.core.storage import Storage
 from app.core.storage_tombstone_repository import StorageTombstone, TombstoneRepository
 
 __all__ = ["GRACE", "InUse", "StorageTombstone", "bury", "remove_buried"]
 
-GRACE = timedelta(hours=48)
+GRACE = upkeep_after("storage_tombstone")
 
 InUse = Callable[[AsyncSession, uuid.UUID, str], Awaitable[bool]]
 

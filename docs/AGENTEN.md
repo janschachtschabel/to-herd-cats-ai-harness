@@ -1814,9 +1814,17 @@ Zeilen eines anderen Workers übersprungen):
   jede Wiederaufnahme liest diese Kopie, nie die Regel;
 - die Aufrufzeilen von `/mcp` (`mcp_call`, siehe [`MCP.md`](MCP.md#nutzung-je-token))
   nach 90 Tagen (`MCP_CALL_RETENTION`; Index auf `mcp_call.created_at`, Migration
-  `729e9c8f5547`).
+  `729e9c8f5547`);
+- Zeilen, deren Zeit abgelaufen ist (`app/worker/upkeep.py`, seit M9): beendete
+  Anmeldesitzungen eine Stunde nach ihrem Ende, OAuth- und OIDC-Abläufe bei Ablauf,
+  Collab-Berechtigungen eine Stunde nach Ablauf, Treffer der Ratenbegrenzung nach ihrem
+  Fenster (60 s), Ratenfenster der KI-Verbindungen eine Stunde nach Beginn. Die Module
+  räumen unterwegs weiter selbst auf (beim Anmelden, beim nächsten Ablauf, bei der
+  nächsten Berechtigung); die Fälligkeits-Schleife erfasst, wozu niemand zurückkommt.
 
-Die Fristen sind Konstanten in `app/worker/due.py`, keine Einstellungen. Folge: Eine
+Die Fristen stehen im Aufbewahrungskatalog `app/core/retention.py` (eine Regel je
+Tabelle, siehe [`SICHERUNG.md`](SICHERUNG.md#aufbewahrung-je-tabelle)), keine
+Einstellungen. Folge: Eine
 Aufgabe, die 90 Tage nicht gefeuert hat, zeigt keinen letzten Lauf mehr (ihre Läufe
 bleiben in der Laufliste).
 

@@ -26,8 +26,10 @@ FIRING_RETENTION with their events; never a term whose run is still open, never 
 event still waiting for an active rule's quiet time to end. Events waiting with a
 deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago. The
 same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION,
-and the files of storage tombstones older than their grace that nothing uses again
-(`core/storage_tombstones.py`, plan M9 decision 4).
+the files of storage tombstones older than their grace that nothing uses again
+(`core/storage_tombstones.py`, plan M9 decision 4), and the rows whose time has run
+out (`upkeep.py`: sessions, flows, grants, rate limits). The periods are the
+retention catalogue's (`core/retention.py`).
 
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
@@ -42,12 +44,14 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
+from functools import partial
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
+from app.core.retention import upkeep_after
 from app.core.storage import get_storage
 from app.core.storage_tombstones import remove_buried
 from app.modules.automations.firing import Fired, fire_next, set_aside
@@ -57,6 +61,7 @@ from app.modules.mcp_tools.repository import delete_calls_before
 from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.review_pass import Step, review_next
 from app.modules.wiki.review_repository import ReviewRepository
+from app.worker.upkeep import EXPIRING, remove_expired
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +70,9 @@ BATCH = 50
 REVIEW_STEPS = 20
 MAX_ERROR_WAIT_SECONDS = 30.0
 METRICS_SECONDS = 10.0
-FIRING_RETENTION = timedelta(days=90)  # terms in the log (with the events they took)
-EVENT_RETENTION = timedelta(days=7)  # events a term took, after that term
-MCP_CALL_RETENTION = timedelta(days=90)  # `/mcp`'s call rows
+FIRING_RETENTION = upkeep_after("automation_firing")  # terms (with the events they took)
+EVENT_RETENTION = upkeep_after("automation_event")  # events a term took, after that term
+MCP_CALL_RETENTION = upkeep_after("mcp_call")  # `/mcp`'s call rows
 CLEANUP_BATCH = 1000
 CLEANUP_EVERY_SECONDS = 60.0
 
@@ -201,6 +206,18 @@ class DueLoop:
         self._last_cleanup = now
         removed = await self.cleanup()
         await self.remove_buried_files()
+        await self.remove_expired()
+        return removed
+
+    async def remove_expired(self) -> int:
+        """The rows whose time has run out (`upkeep.py`), table by table, batch by
+        batch (one transaction each); how many."""
+        now, limit = self.clock.now(), self.cleanup_batch
+        removed = 0
+        for table in EXPIRING:
+            removed += await self._batches(
+                partial(remove_expired, table=table, now=now, limit=limit)
+            )
         return removed
 
     async def cleanup(self) -> tuple[int, int, int]:

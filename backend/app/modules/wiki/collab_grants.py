@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.retention import upkeep_after
 from app.modules.wiki.collab_grant_repository import CollabGrantRepository
 from app.modules.wiki.collab_models import CollabGrant
 
@@ -37,7 +38,7 @@ RANDOM_BYTES = 32
 GRANT_TTL = timedelta(minutes=10)
 # An expired grant is kept this long before it is cleared away (a check may still
 # name it while the API was away); then it is unknown.
-EXPIRED_GRANT_KEEP = timedelta(hours=1)
+EXPIRED_GRANT_KEEP = upkeep_after("collab_grant")
 EXPIRED_GRANT_BATCH = 500
 MAX_GRANT_CHARS = 100  # longer is no grant (the schemas cap what they take)
 
