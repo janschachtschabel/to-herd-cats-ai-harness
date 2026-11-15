@@ -562,7 +562,11 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
 - **Was das Modell erfährt**: Ein Lauf, den sein Verlauf markiert, bekommt in seinen
   Anweisungen, dass frühere Nachrichten persönlich sind und dass er selbst in diesem
   Lauf nichts dergleichen gelesen hat, außer ein Werkzeugergebnis sagt es; was er
-  anderswo schreiben will, wartet auf ihre Freigabe genau dieses Textes. Ein
+  anderswo schreiben will, wartet auf ihre Freigabe genau dieses Textes. Wer
+  `read_conversation` oder `search_past_runs` aufrufen darf, erfährt in seinen
+  Anweisungen außerdem, was eine Zeile mit `(personal)` am Anfang bedeutet: Gelesenes
+  über den eigenen Zugang der Person, nur für sie, und was er danach anderswo schreibt,
+  wartet auf ihre Freigabe (Review M8 3, Befund H4). Ein
   abgelehnter Rückfrage- oder Antwortversuch nennt den Grund („others read along
   here“).
 - **Was die Person sieht**: In ihrer Direktnachricht trägt eine markierte Nachricht das

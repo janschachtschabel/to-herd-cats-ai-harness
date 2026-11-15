@@ -29,6 +29,9 @@ content and is persisted, never only in a worker's memory.
   run's final answer where others read stays held back (`writing.into_own`), and so
   does a question there; external calls follow `external_step.py`. The draft mark is
   another matter and still refuses (`writing.DRAFTS`).
+- **What the model is told** (`sections`): `PRESENT` when its history holds marked
+  messages; `PERSONAL_LINES` whenever it may call a tool whose result marks lines
+  `(personal) ` (`MARKS_LINES`).
 - **When it ends**: a run whose window and tool results hold nothing personal starts
   and stays unmarked. A later run never inherits a mark from an earlier one as such,
   only through content it is given. Since every answer of a marked run is marked, in
@@ -55,6 +58,23 @@ PRESENT = (
     "of exactly that text."
 )
 PERSONAL_LINE = "(personal) "  # before a marked message or hit in a tool's result
+# The tools whose results may hold such lines, and what the model is told about them
+# whenever it is offered one of them (module review M8 3, H4).
+MARKS_LINES = frozenset({"read_conversation", "search_past_runs"})
+PERSONAL_LINES = (
+    "A line that starts with (personal) in a result of read_conversation or "
+    "search_past_runs holds what the person read through her own connection: it is for "
+    "her alone. Once you get such a line, this run holds it: answer her where you are "
+    "alone with her; anything you write where others could read it first waits for her "
+    "release of exactly that text."
+)
+
+
+def sections(offered: Sequence[str], present: bool) -> list[str]:
+    """What the run's instructions say about the mark: that its history holds personal
+    messages (`PRESENT`), and what a personal line means if a tool may give one."""
+    told = [PRESENT] if present else []
+    return told + ([PERSONAL_LINES] if MARKS_LINES & set(offered) else [])
 
 
 def in_window(turns: Sequence[Turn]) -> bool:
