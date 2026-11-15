@@ -112,7 +112,9 @@ async def test_writes_name_the_version_and_are_audited(
     actions = [
         a.action
         for a in (
-            await session.scalars(select(AuditLog).where(AuditLog.target_id == made["id"]))
+            await session.scalars(
+                select(AuditLog).where(AuditLog.target_id == made["id"]).order_by(AuditLog.id)
+            )
         ).all()
     ]
     assert actions == [
