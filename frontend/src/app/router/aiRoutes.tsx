@@ -4,6 +4,7 @@ import { hasPermission } from '@/features/auth/queries'
 import type { RunFilters } from '@/features/runs/queries'
 import type { Me } from '@/lib/api'
 import { appRoute } from './base'
+import { oauthDoneSearch } from './search'
 
 // Working with agents (plan M6 task 12): runs, the run page, an agent's runs, my
 // releases. Every
@@ -30,6 +31,15 @@ const AutomationScreen = lazyRouteComponent(
 const ApprovalsPage = lazyRouteComponent(
   () => import('@/features/approvals/ApprovalsPage'),
   'ApprovalsPage',
+)
+
+const MyConnectionsPage = lazyRouteComponent(
+  () => import('@/features/mcp/my/MyConnectionsPage'),
+  'MyConnectionsPage',
+)
+const OAuthDonePage = lazyRouteComponent(
+  () => import('@/features/mcp/OAuthDonePage'),
+  'OAuthDonePage',
 )
 
 const RUN_STATES = new Set(['queued', 'running', 'waiting', 'done'])
@@ -165,7 +175,33 @@ const automationRoute = createRoute({
   },
 })
 
+/** My connections to external servers that act in my name (plan M8): people with AI. */
+const myConnectionsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/my-connections',
+  loader: ({ context }) => {
+    requireAi(context.me)
+    return MyConnectionsPage.preload?.()
+  },
+  component: MyConnectionsPage,
+})
+
+/** Where a provider's sign-in comes back to (the API's callback redirects here with a
+ *  fixed status word); anyone signed in may land here, the links say where to go on. */
+const oauthDoneRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/ai/oauth/done',
+  validateSearch: oauthDoneSearch,
+  loader: () => OAuthDonePage.preload?.(),
+  component: function OAuthDoneRoute() {
+    const { status } = oauthDoneRoute.useSearch()
+    return <OAuthDonePage status={status} />
+  },
+})
+
 export const aiWorkRoutes = [
+  myConnectionsRoute,
+  oauthDoneRoute,
   myRunsRoute,
   runRoute,
   agentRunsRoute,

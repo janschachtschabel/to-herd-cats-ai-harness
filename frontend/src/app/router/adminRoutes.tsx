@@ -3,7 +3,7 @@ import { adminLinks } from '@/app/shell/nav'
 import { hasPermission } from '@/features/auth/queries'
 import type { Me, Permission } from '@/lib/api'
 import { appRoute } from './base'
-import { skillsSearch } from './search'
+import { serverSearch, skillsSearch } from './search'
 
 const UsersPage = lazyRouteComponent(() => import('@/features/admin/users/UsersPage'), 'UsersPage')
 const GroupsPage = lazyRouteComponent(
@@ -29,6 +29,22 @@ const UsagePage = lazyRouteComponent(() => import('@/features/ai/usage/UsagePage
 const BudgetsPage = lazyRouteComponent(
   () => import('@/features/ai/budgets/BudgetsPage'),
   'BudgetsPage',
+)
+const ServersPage = lazyRouteComponent(
+  () => import('@/features/mcp/servers/ServersPage'),
+  'ServersPage',
+)
+const ServerPage = lazyRouteComponent(
+  () => import('@/features/mcp/servers/ServerPage'),
+  'ServerPage',
+)
+const ConnectorsPage = lazyRouteComponent(
+  () => import('@/features/mcp/connectors/ConnectorsPage'),
+  'ConnectorsPage',
+)
+const CatalogPage = lazyRouteComponent(
+  () => import('@/features/mcp/catalog/CatalogPage'),
+  'CatalogPage',
 )
 const AgentsPage = lazyRouteComponent(() => import('@/features/agents/AgentsPage'), 'AgentsPage')
 const AgentAdminPage = lazyRouteComponent(
@@ -141,6 +157,43 @@ const aiBudgetsRoute = createRoute({
   component: BudgetsPage,
 })
 
+/** External MCP servers (plan M8): the list, and one server with its tools. */
+const mcpServersRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/mcp-servers',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: ServersPage,
+})
+
+const mcpServerRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/mcp-servers/$serverId',
+  validateSearch: serverSearch,
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'ai.manage')
+    await ServerPage.preload?.()
+  },
+  component: function McpServerRoute() {
+    const { serverId } = mcpServerRoute.useParams()
+    const { read } = mcpServerRoute.useSearch()
+    return <ServerPage serverId={serverId} read={read} />
+  },
+})
+
+const mcpConnectorsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/connectors',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: ConnectorsPage,
+})
+
+const mcpCatalogRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/catalog',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: CatalogPage,
+})
+
 const agentsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/agents',
@@ -188,6 +241,10 @@ export const adminTree = adminRoute.addChildren([
   aiAssignmentsRoute,
   aiUsageRoute,
   aiBudgetsRoute,
+  mcpServersRoute,
+  mcpServerRoute,
+  mcpConnectorsRoute,
+  mcpCatalogRoute,
   agentsRoute,
   agentRoute,
   skillsRoute,

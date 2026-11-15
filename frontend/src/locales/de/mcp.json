@@ -1,0 +1,396 @@
+{
+  "nav": {
+    "myConnections": "Meine Verbindungen"
+  },
+  "ai": {
+    "tabs": {
+      "mcpServers": "MCP-Server",
+      "connectors": "Konnektoren",
+      "catalog": "Katalog"
+    }
+  },
+  "mcp": {
+    "access": {
+      "none": "Ohne Zugang",
+      "shared": "Geteilter Zugang",
+      "personal": "Persönlicher Zugang",
+      "hints": {
+        "none": "Der Server braucht keine Anmeldung.",
+        "shared": "Alle Agenten nutzen denselben Zugang der Organisation (einen geteilten Konnektor).",
+        "personal": "Der Server handelt im Namen der Person, die einen Agenten fragt: Jede Person verbindet ihren eigenen Zugang unter „Meine Verbindungen“."
+      }
+    },
+    "remote": {
+      "ok": "Der Server hat geantwortet.",
+      "blocked": "Gesperrt: Die Adresse ist nicht erlaubt (privates Netz oder Umleitung dorthin). Der Betrieb kann Hosts in HERD_MCP_ALLOWED_HOSTS freigeben.",
+      "timeout": "Zeitüberschreitung: Der Server hat nicht rechtzeitig geantwortet.",
+      "unreachable": "Nicht erreichbar: Der Server konnte nicht verbunden werden.",
+      "unauthorized": "Abgelehnt: Der Zugang fehlt oder ist ungültig.",
+      "forbidden": "Abgelehnt: Der Zugang reicht für diesen Server nicht.",
+      "not_found": "Nicht gefunden: Unter dieser Adresse antwortet kein MCP-Server.",
+      "rate_limited": "Zu viele Anfragen: Der Server bittet um eine Pause.",
+      "redirect": "Der Server leitet um; Umleitungen werden nicht gefolgt.",
+      "server_error": "Fehler beim Server.",
+      "too_large": "Die Antwort des Servers ist zu groß.",
+      "protocol_error": "Der Server spricht kein gültiges MCP über Streamable HTTP.",
+      "secret_unavailable": "Der hinterlegte Zugang lässt sich gerade nicht verwenden (Schlüssel oder Umgebungsvariable fehlt)."
+    },
+    "refresh": {
+      "new_one": "{{count}} neues Werkzeug",
+      "new_other": "{{count}} neue Werkzeuge",
+      "changed_one": "{{count}} geändertes Werkzeug",
+      "changed_other": "{{count}} geänderte Werkzeuge",
+      "missing_one": "{{count}} Werkzeug fehlt",
+      "missing_other": "{{count}} Werkzeuge fehlen",
+      "unchanged": "Werkzeugliste eingelesen: nichts Neues."
+    },
+    "servers": {
+      "description": "Externe MCP-Server als Werkzeugquelle für Agenten. Jedes Werkzeug wird einzeln freigegeben und als lesend oder schreibend eingestuft.",
+      "listLabel": "MCP-Server",
+      "empty": "Noch kein MCP-Server eingerichtet.",
+      "toCatalog": "Aus dem Katalog",
+      "fromCatalog": "Aus dem Katalog",
+      "on": "Eingeschaltet",
+      "off": "Ausgeschaltet",
+      "back": "Alle MCP-Server",
+      "dataLocationBadge": "Datenort: {{location}}",
+      "create": {
+        "open": "Server hinzufügen",
+        "title": "MCP-Server hinzufügen",
+        "description": "Nur Streamable HTTP über https. Beim Anlegen wird die Werkzeugliste eingelesen; jedes Werkzeug wartet dann auf Ihre Freigabe.",
+        "submit": "Hinzufügen und einlesen",
+        "reading": "Liest Werkzeuge …"
+      },
+      "edit": {
+        "title": "MCP-Server bearbeiten"
+      },
+      "fields": {
+        "name": "Name",
+        "url": "Adresse",
+        "dataLocation": "Datenort",
+        "access": "Zugang",
+        "connector": "Geteilter Konnektor",
+        "oauthClient": "OAuth-App zum Verbinden",
+        "enabled": "Eingeschaltet"
+      },
+      "urlHint": "Die Adresse des MCP-Endpunkts, etwa https://example.com/mcp.",
+      "urlPlaceholder": "https://",
+      "urlWithdraws": "Eine neue Adresse zieht alle Freigaben zurück: Jedes Werkzeug muss danach neu freigegeben werden.",
+      "dataLocationHint": "Wohin die Daten eines Aufrufs gehen. Die KI-Richtlinie eines Bereichs entscheidet danach, ob ein Lauf diesen Server aufrufen darf.",
+      "chooseConnector": "Bitte wählen",
+      "noConnectors": "Noch kein geteilter Konnektor: zuerst unter „Konnektoren“ anlegen.",
+      "oauthClientHint": "Mit welcher OAuth-App sich Personen verbinden. Ohne App hinterlegt jede Person ein eigenes Token.",
+      "personalToken": "Keine (eigenes Token)",
+      "test": "Verbindung testen",
+      "testing": "Testet …",
+      "testOk_one": "Verbunden: {{count}} Werkzeug, {{ms}} ms.",
+      "testOk_other": "Verbunden: {{count}} Werkzeuge, {{ms}} ms.",
+      "refresh": "Werkzeuge neu einlesen",
+      "refreshing": "Liest ein …",
+      "enable": "Einschalten",
+      "disable": "Ausschalten",
+      "deleteNamed": "{{name}} löschen",
+      "deleteTitle": "Server löschen?",
+      "deleteText": "{{name}} wird mit allen Werkzeugen und Freigaben gelöscht; persönliche Zugänge zu diesem Server gehen mit. Agenten können seine Werkzeuge danach nicht mehr nutzen.",
+      "accessTitle": "Zugang",
+      "personalWithOAuth": "Personen verbinden sich mit der hinterlegten OAuth-App.",
+      "personalWithToken": "Personen hinterlegen ein eigenes Token.",
+      "toConnectors": "Konnektoren verwalten"
+    },
+    "tools": {
+      "title": "Werkzeuge",
+      "hint": "Agenten bekommen nur freigegebene Werkzeuge, und nur wenn sie ihnen in den Freigaben des Agenten zugeteilt sind.",
+      "listLabel": "Werkzeuge des Servers",
+      "empty": "Der Server hat (noch) keine Werkzeuge gemeldet. Einlesen oder Verbindung testen.",
+      "noneOpen": "Nichts offen: Alle Werkzeuge sind entschieden.",
+      "filterLabel": "Werkzeuge filtern",
+      "filterAll": "Alle",
+      "filterOpen": "Offen",
+      "counts": {
+        "new_one": "{{count}} neu",
+        "new_other": "{{count}} neu",
+        "changed_one": "{{count}} geändert",
+        "changed_other": "{{count}} geändert",
+        "approved_one": "{{count}} freigegeben",
+        "approved_other": "{{count}} freigegeben",
+        "blocked_one": "{{count}} gesperrt",
+        "blocked_other": "{{count}} gesperrt",
+        "missing_one": "{{count}} fehlt",
+        "missing_other": "{{count}} fehlen"
+      },
+      "states": {
+        "new": "Neu",
+        "approved": "Freigegeben",
+        "blocked": "Gesperrt",
+        "changed": "Geändert",
+        "missing": "Fehlt"
+      },
+      "classification": "Einstufung",
+      "classifyFor": "Einstufung von {{name}}",
+      "classes": {
+        "read": "Lesend",
+        "write": "Schreibend"
+      },
+      "means": {
+        "read": "Lesend: ab Stufe 2, ohne Freigabe je Aufruf.",
+        "write": "Schreibend (handelt nach außen): Stufe 4, jeder Aufruf erst nach Freigabe der fragenden Person über genau diese Argumente."
+      },
+      "hintReadOnly": "Der Server kennzeichnet es als nur lesend.",
+      "hintNone": "Der Server kennzeichnet es nicht als nur lesend.",
+      "suggested": "Vorschlag des Katalogs: {{classification}}.",
+      "suggestedDiffers": "Weicht von der Einstufung ab.",
+      "changedNote": "Beschreibung oder Eingabeschema haben sich seit der Freigabe geändert. Bis zur neuen Freigabe ist das Werkzeug gesperrt. Prüfen Sie die aktuelle Fassung unten.",
+      "fingerprints": "Fingerabdruck freigegeben {{approved}} … · jetzt {{now}} …",
+      "missingNote": "Der Server bietet dieses Werkzeug nicht mehr an; es kann nicht freigegeben werden.",
+      "details": "Beschreibung und Eingabeschema (vom Server)",
+      "approve": "Freigeben",
+      "approveAgain": "Erneut freigeben",
+      "approveNamed": "{{name}} freigeben",
+      "block": "Sperren",
+      "blockNamed": "{{name}} sperren",
+      "loosenTitle": "Als lesend einstufen?",
+      "loosenText": "Der Server kennzeichnet {{name}} nicht als nur lesend. Lesende Werkzeuge laufen ohne Freigabe je Aufruf. Nur bestätigen, wenn Sie sicher sind, dass es nichts verändert.",
+      "loosenConfirm": "Als lesend einstufen"
+    },
+    "connectors": {
+      "title": "Geteilte Konnektoren",
+      "description": "Gespeicherte Zugänge der Organisation zu externen Servern: ein Token, ein Schlüssel in einer eigenen Kopfzeile oder OAuth. Geheimnisse werden nur geschrieben, nie angezeigt.",
+      "listLabel": "Geteilte Konnektoren",
+      "empty": "Noch kein geteilter Konnektor.",
+      "secretNote": "Ein Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.",
+      "create": {
+        "open": "Konnektor anlegen",
+        "title": "Konnektor anlegen",
+        "submit": "Anlegen",
+        "submitConnect": "Anlegen und verbinden"
+      },
+      "edit": {
+        "title": "Konnektor bearbeiten"
+      },
+      "fields": {
+        "name": "Name",
+        "kind": "Art",
+        "headerName": "Name der Kopfzeile",
+        "oauthClient": "OAuth-App",
+        "key": "Schlüssel",
+        "keyValue": "Schlüssel oder Token",
+        "keyEnv": "Umgebungsvariable"
+      },
+      "kinds": {
+        "bearer": "Bearer-Token",
+        "header": "Eigene Kopfzeile",
+        "oauth": "OAuth"
+      },
+      "kindHints": {
+        "bearer": "Ein API-Schlüssel oder persönliches Zugriffstoken, gesendet als Authorization: Bearer.",
+        "header": "Ein Schlüssel in einer Kopfzeile mit eigenem Namen, etwa X-Api-Key.",
+        "oauth": "Anmeldung beim Anbieter über eine OAuth-App; danach verbinden."
+      },
+      "headerNameHint": "Nur der Name, etwa X-Api-Key. Protokoll-Kopfzeilen wie Host oder Content-Type sind nicht erlaubt.",
+      "oauthClientHint": "Die App, mit der sich der Konnektor beim Anbieter anmeldet.",
+      "noClients": "Noch keine OAuth-App: zuerst unten unter „OAuth-Apps“ anlegen.",
+      "chooseClient": "Bitte wählen",
+      "oauthFixed": "Art: OAuth (lässt sich nicht ändern).",
+      "keyModes": {
+        "keep": "Behalten",
+        "value": "Neuer Schlüssel",
+        "env": "Umgebungsvariable"
+      },
+      "keyHint": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+      "keyEnvHint": "Name einer Umgebungsvariable des Servers, die mit HERD_AI_ beginnt.",
+      "keyEnvPlaceholder": "HERD_AI_…",
+      "keyStored": "Ein Schlüssel ist hinterlegt.",
+      "keyMissing": "Kein Schlüssel hinterlegt.",
+      "states": {
+        "connected": "Verbunden",
+        "disconnected": "Nicht verbunden",
+        "enc": "Schlüssel hinterlegt (verschlüsselt)",
+        "env": "Schlüssel aus Umgebungsvariable"
+      },
+      "connect": "Verbinden",
+      "reconnect": "Neu verbinden",
+      "disconnect": "Trennen",
+      "replaceKey": "Schlüssel ersetzen",
+      "unsafeAddress": "Die Anmeldeadresse des Anbieters ist keine https-Adresse; sie wird nicht geöffnet.",
+      "deleteNamed": "{{name}} löschen",
+      "deleteTitle": "Konnektor löschen?",
+      "deleteText": {
+        "shared": "{{name}} wird gelöscht. Ein Server, der ihn nutzt, muss zuerst auf einen anderen Zugang umgestellt werden.",
+        "personal": "Ihr Zugang {{name}} wird gelöscht. Agenten können diesen Server danach nicht mehr für Sie nutzen."
+      }
+    },
+    "clients": {
+      "title": "OAuth-Apps",
+      "hint": "Apps, die beim Anbieter registriert sind (etwa eine GitHub- oder GitLab-Anwendung). OAuth-Konnektoren und persönliche Server melden sich damit an. Der Katalog legt sie selbst an.",
+      "listLabel": "OAuth-Apps",
+      "empty": "Noch keine OAuth-App.",
+      "create": {
+        "open": "OAuth-App anlegen",
+        "title": "OAuth-App anlegen",
+        "description": "Als Rückleitungsadresse beim Anbieter eintragen: <HERD_PUBLIC_URL>/api/ai/oauth/callback.",
+        "submit": "Anlegen"
+      },
+      "edit": {
+        "title": "OAuth-App bearbeiten"
+      },
+      "discoverLabel": "Adresse des MCP-Servers",
+      "discoverHint": "Liest die OAuth-Angaben des Servers und füllt leere Felder aus (nichts wird gespeichert).",
+      "discover": "Ermitteln",
+      "discovered": "Angaben gefunden und eingetragen. PKCE: {{pkce}}.",
+      "pkceYes": "unterstützt",
+      "pkceNo": "nicht angegeben",
+      "discovery": {
+        "ok": "Angaben gefunden.",
+        "blocked": "Gesperrt: Die Adresse ist nicht erlaubt.",
+        "timeout": "Zeitüberschreitung beim Lesen der Angaben.",
+        "unreachable": "Der Server ist nicht erreichbar.",
+        "no_metadata": "Der Server nennt keine OAuth-Angaben; bitte von Hand eintragen.",
+        "resource_mismatch": "Die Angaben des Servers passen nicht zu seiner Adresse.",
+        "no_authorization_server": "Der Server nennt keinen Anmeldedienst.",
+        "invalid_metadata": "Die Angaben des Anmeldedienstes sind ungültig."
+      },
+      "fields": {
+        "name": "Name",
+        "authorizationEndpoint": "Anmeldeadresse (authorization endpoint)",
+        "tokenEndpoint": "Token-Adresse (token endpoint)",
+        "revocationEndpoint": "Widerrufsadresse (revocation endpoint)",
+        "clientId": "Client-ID",
+        "tokenAuth": "Übergabe des Client-Geheimnisses",
+        "secret": "Client-Geheimnis",
+        "secretValue": "Client-Geheimnis",
+        "scopes": "Scopes",
+        "resource": "Ressource"
+      },
+      "optional": "Optional.",
+      "scopesHint": "Durch Leerzeichen getrennt, etwa „mcp“.",
+      "resourceHint": "Optional: die Adresse des Servers, für den das Token gelten soll (RFC 8707).",
+      "tokenAuths": {
+        "client_secret_post": "Im Formular (client_secret_post)",
+        "client_secret_basic": "Als Basic-Anmeldung (client_secret_basic)"
+      },
+      "secretModes": {
+        "none": "Keines (öffentliche App, nur PKCE)",
+        "keep": "Behalten",
+        "value": "Neues Geheimnis",
+        "env": "Umgebungsvariable"
+      },
+      "secretKinds": {
+        "enc": "Hinterlegt (verschlüsselt)",
+        "env": "Aus Umgebungsvariable"
+      },
+      "secretStored": "Ein Client-Geheimnis ist hinterlegt.",
+      "secretNone": "Kein Client-Geheimnis (öffentliche App)",
+      "deleteNamed": "{{name}} löschen",
+      "deleteTitle": "OAuth-App löschen?",
+      "deleteText": "{{name}} wird gelöscht. Solange ein Konnektor oder Server sie nutzt, ist das nicht möglich."
+    },
+    "catalog": {
+      "description": "Vorlagen für externe Server, mitgeliefert und aus dem Verzeichnis des Betriebs. Eine Vorlage schlägt nur vor: Jedes Werkzeug wird trotzdem einzeln freigegeben.",
+      "listLabel": "Vorlagen",
+      "empty": "Der Katalog ist leer.",
+      "installNamed": "{{name}} einrichten",
+      "suggestions_one": "Schlägt die Einstufung für {{count}} Werkzeug vor ({{writes}} schreibend).",
+      "suggestions_other": "Schlägt die Einstufung für {{count}} Werkzeuge vor ({{writes}} schreibend).",
+      "problems": {
+        "title": "Katalogdateien mit Fehlern",
+        "hint": "Diese Dateien wurden nicht gelesen. Der Betrieb kann sie korrigieren; der Rest des Katalogs gilt.",
+        "sources": {
+          "shipped": "mitgeliefert",
+          "operator": "Betrieb"
+        }
+      },
+      "install": {
+        "title": "{{name}} einrichten",
+        "description": "Legt den Server an und liest seine Werkzeuge ein. Danach geben Sie jedes Werkzeug auf der Seite des Servers frei.",
+        "submit": "Einrichten",
+        "fields": {
+          "baseUrl": "Adresse der Instanz",
+          "auth": "Anmeldung",
+          "keyValue": "Schlüssel oder Token",
+          "clientSecretValue": "Client-Geheimnis"
+        },
+        "secretModes": {
+          "none": "Kein Client-Geheimnis",
+          "value": "Wert eingeben",
+          "env": "Umgebungsvariable"
+        },
+        "oauthApp": "OAuth-App beim Anbieter",
+        "personalToken": "Jede Person hinterlegt ihr eigenes Token unter „Meine Verbindungen“."
+      }
+    },
+    "my": {
+      "title": "Meine Verbindungen",
+      "description": "Externe Server, die in Ihrem Namen handeln. Agenten, die Sie fragen, nutzen dafür Ihren eigenen Zugang; niemand sonst sieht oder nutzt ihn, auch kein Admin.",
+      "listLabel": "Server, die in Ihrem Namen handeln",
+      "empty": "Kein Server verlangt einen persönlichen Zugang.",
+      "notConnected": "Nicht verbunden",
+      "connectNamed": "Mit {{name}} verbinden",
+      "storeToken": "Token hinterlegen",
+      "tokenTitle": "Eigenes Token für {{name}}",
+      "othersTitle": "Weitere Zugänge",
+      "othersHint": "Zugänge zu Servern, die gerade ausgeschaltet oder entfernt sind."
+    },
+    "oauthDone": {
+      "toMine": "Zu meinen Verbindungen",
+      "toShared": "Zu den Konnektoren",
+      "connected": {
+        "title": "Verbunden",
+        "text": "Die Anmeldung beim Anbieter hat geklappt. Agenten können den Zugang jetzt nutzen."
+      },
+      "denied": {
+        "title": "Nicht verbunden",
+        "text": "Die Anmeldung wurde beim Anbieter abgelehnt oder abgebrochen. Sie können es erneut versuchen."
+      },
+      "failed": {
+        "title": "Verbinden fehlgeschlagen",
+        "text": "Der Anbieter hat die Anmeldung nicht bestätigt. Versuchen Sie es erneut; hilft das nicht, prüft ein Admin die OAuth-App."
+      },
+      "invalid": {
+        "title": "Anmeldung abgelaufen",
+        "text": "Diese Anmeldung ist abgelaufen oder wurde schon verwendet. Bitte erneut verbinden."
+      }
+    }
+  },
+  "errors": {
+    "connector": {
+      "env_not_allowed": "Ein persönlicher Zugang kann keine Umgebungsvariable nutzen.",
+      "header_name_invalid": "Dieser Name der Kopfzeile ist nicht erlaubt.",
+      "in_use": "Ein Server nutzt diesen Konnektor; stellen Sie ihn zuerst um.",
+      "name_taken": "Diesen Namen trägt schon ein Konnektor.",
+      "not_found": "Diesen Konnektor gibt es nicht.",
+      "not_oauth": "Das ist kein OAuth-Konnektor.",
+      "oauth_client_invalid": "Diese OAuth-App gibt es nicht.",
+      "oauth_fixed": "Die Art eines OAuth-Konnektors lässt sich nicht ändern.",
+      "oauth_unconfigured": "OAuth ist nicht eingerichtet: Der Betrieb muss HERD_PUBLIC_URL setzen.",
+      "server_invalid": "Für diesen Server ist kein persönlicher Zugang vorgesehen.",
+      "server_taken": "Sie haben für diesen Server schon einen Zugang.",
+      "version_conflict": "Der Konnektor wurde inzwischen geändert."
+    },
+    "mcp_server": {
+      "connector_invalid": "Bitte einen geteilten Konnektor der Organisation wählen.",
+      "name_taken": "Diesen Namen trägt schon ein Server.",
+      "not_found": "Diesen Server gibt es nicht.",
+      "oauth_client_invalid": "Diese OAuth-App gibt es nicht.",
+      "url_not_allowed": "Diese Adresse ist nicht erlaubt: nur https, kein privates Netz, keine Zugangsdaten oder Parameter in der Adresse.",
+      "version_conflict": "Der Server wurde inzwischen geändert."
+    },
+    "mcp_tool": {
+      "loosen_unconfirmed": "Bitte bestätigen, dass das Werkzeug nur liest.",
+      "missing": "Der Server bietet dieses Werkzeug nicht mehr an.",
+      "not_found": "Dieses Werkzeug gibt es nicht.",
+      "version_conflict": "Das Werkzeug wurde inzwischen geändert."
+    },
+    "oauth_client": {
+      "in_use": "Ein Konnektor oder Server nutzt diese OAuth-App.",
+      "name_taken": "Diesen Namen trägt schon eine OAuth-App.",
+      "not_found": "Diese OAuth-App gibt es nicht.",
+      "url_not_allowed": "Diese Adresse ist nicht erlaubt (nur https, kein privates Netz).",
+      "version_conflict": "Die OAuth-App wurde inzwischen geändert."
+    },
+    "mcp_catalog": {
+      "base_url_not_allowed": "Diese Adresse der Instanz ist nicht erlaubt.",
+      "install_invalid": "Diese Angaben passen nicht zur Vorlage.",
+      "not_found": "Diese Vorlage gibt es nicht."
+    }
+  }
+}

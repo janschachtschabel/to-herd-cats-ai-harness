@@ -1,0 +1,396 @@
+{
+  "nav": {
+    "myConnections": "My connections"
+  },
+  "ai": {
+    "tabs": {
+      "mcpServers": "MCP servers",
+      "connectors": "Connectors",
+      "catalog": "Catalogue"
+    }
+  },
+  "mcp": {
+    "access": {
+      "none": "No access",
+      "shared": "Shared access",
+      "personal": "Personal access",
+      "hints": {
+        "none": "The server needs no sign-in.",
+        "shared": "All agents use the same access of the organisation (a shared connector).",
+        "personal": "The server acts on behalf of the person who asks an agent: each person connects their own access under \"My connections\"."
+      }
+    },
+    "remote": {
+      "ok": "The server answered.",
+      "blocked": "Blocked: the address is not allowed (private network, or a redirect there). The operator can allow hosts in HERD_MCP_ALLOWED_HOSTS.",
+      "timeout": "Timeout: the server did not answer in time.",
+      "unreachable": "Unreachable: no connection to the server.",
+      "unauthorized": "Refused: the access is missing or invalid.",
+      "forbidden": "Refused: the access is not enough for this server.",
+      "not_found": "Not found: no MCP server answers at this address.",
+      "rate_limited": "Too many requests: the server asks for a pause.",
+      "redirect": "The server redirects; redirects are not followed.",
+      "server_error": "Error at the server.",
+      "too_large": "The server's answer is too large.",
+      "protocol_error": "The server does not speak valid MCP over Streamable HTTP.",
+      "secret_unavailable": "The stored access cannot be used now (key or environment variable missing)."
+    },
+    "refresh": {
+      "new_one": "{{count}} new tool",
+      "new_other": "{{count}} new tools",
+      "changed_one": "{{count}} changed tool",
+      "changed_other": "{{count}} changed tools",
+      "missing_one": "{{count}} tool missing",
+      "missing_other": "{{count}} tools missing",
+      "unchanged": "Tool list read: nothing new."
+    },
+    "servers": {
+      "description": "External MCP servers as a source of tools for agents. Every tool is approved one by one and classified as reading or writing.",
+      "listLabel": "MCP servers",
+      "empty": "No MCP server set up yet.",
+      "toCatalog": "From the catalogue",
+      "fromCatalog": "From the catalogue",
+      "on": "On",
+      "off": "Off",
+      "back": "All MCP servers",
+      "dataLocationBadge": "Data location: {{location}}",
+      "create": {
+        "open": "Add server",
+        "title": "Add an MCP server",
+        "description": "Streamable HTTP over https only. Its tool list is read when it is added; every tool then waits for your approval.",
+        "submit": "Add and read",
+        "reading": "Reading tools …"
+      },
+      "edit": {
+        "title": "Edit MCP server"
+      },
+      "fields": {
+        "name": "Name",
+        "url": "Address",
+        "dataLocation": "Data location",
+        "access": "Access",
+        "connector": "Shared connector",
+        "oauthClient": "OAuth app to connect with",
+        "enabled": "On"
+      },
+      "urlHint": "The address of the MCP endpoint, e.g. https://example.com/mcp.",
+      "urlPlaceholder": "https://",
+      "urlWithdraws": "A new address withdraws every approval: each tool must be approved again afterwards.",
+      "dataLocationHint": "Where a call's data goes. A space's AI policy decides by it whether a run may call this server.",
+      "chooseConnector": "Please choose",
+      "noConnectors": "No shared connector yet: create one under \"Connectors\" first.",
+      "oauthClientHint": "Which OAuth app people connect with. Without one, each person stores a token of their own.",
+      "personalToken": "None (own token)",
+      "test": "Test connection",
+      "testing": "Testing …",
+      "testOk_one": "Connected: {{count}} tool, {{ms}} ms.",
+      "testOk_other": "Connected: {{count}} tools, {{ms}} ms.",
+      "refresh": "Read tools again",
+      "refreshing": "Reading …",
+      "enable": "Switch on",
+      "disable": "Switch off",
+      "deleteNamed": "Delete {{name}}",
+      "deleteTitle": "Delete server?",
+      "deleteText": "{{name}} is deleted with all its tools and approvals; personal access to this server goes with it. Agents can no longer use its tools.",
+      "accessTitle": "Access",
+      "personalWithOAuth": "People connect with the stored OAuth app.",
+      "personalWithToken": "People store a token of their own.",
+      "toConnectors": "Manage connectors"
+    },
+    "tools": {
+      "title": "Tools",
+      "hint": "Agents get approved tools only, and only those granted to them in the agent's tool grants.",
+      "listLabel": "Tools of the server",
+      "empty": "The server has not reported any tools (yet). Read again or test the connection.",
+      "noneOpen": "Nothing open: every tool is decided.",
+      "filterLabel": "Filter tools",
+      "filterAll": "All",
+      "filterOpen": "Open",
+      "counts": {
+        "new_one": "{{count}} new",
+        "new_other": "{{count}} new",
+        "changed_one": "{{count}} changed",
+        "changed_other": "{{count}} changed",
+        "approved_one": "{{count}} approved",
+        "approved_other": "{{count}} approved",
+        "blocked_one": "{{count}} blocked",
+        "blocked_other": "{{count}} blocked",
+        "missing_one": "{{count}} missing",
+        "missing_other": "{{count}} missing"
+      },
+      "states": {
+        "new": "New",
+        "approved": "Approved",
+        "blocked": "Blocked",
+        "changed": "Changed",
+        "missing": "Missing"
+      },
+      "classification": "Classification",
+      "classifyFor": "Classification of {{name}}",
+      "classes": {
+        "read": "Reading",
+        "write": "Writing"
+      },
+      "means": {
+        "read": "Reading: from level 2, no release per call.",
+        "write": "Writing (acts outside): level 4, every call only after the asking person releases exactly these arguments."
+      },
+      "hintReadOnly": "The server marks it as read-only.",
+      "hintNone": "The server does not mark it as read-only.",
+      "suggested": "Catalogue suggests: {{classification}}.",
+      "suggestedDiffers": "Differs from the classification.",
+      "changedNote": "Its description or input schema changed since it was approved. It is held back until approved again. Check the current version below.",
+      "fingerprints": "Fingerprint approved {{approved}} … · now {{now}} …",
+      "missingNote": "The server no longer offers this tool; it cannot be approved.",
+      "details": "Description and input schema (from the server)",
+      "approve": "Approve",
+      "approveAgain": "Approve again",
+      "approveNamed": "Approve {{name}}",
+      "block": "Block",
+      "blockNamed": "Block {{name}}",
+      "loosenTitle": "Classify as reading?",
+      "loosenText": "The server does not mark {{name}} as read-only. Reading tools run without a release per call. Confirm only if you are sure it changes nothing.",
+      "loosenConfirm": "Classify as reading"
+    },
+    "connectors": {
+      "title": "Shared connectors",
+      "description": "The organisation's stored access to external servers: a token, a key in a header of its own, or OAuth. Secrets are only ever written, never shown.",
+      "listLabel": "Shared connectors",
+      "empty": "No shared connector yet.",
+      "secretNote": "A key is stored encrypted and never shown again.",
+      "create": {
+        "open": "Create connector",
+        "title": "Create connector",
+        "submit": "Create",
+        "submitConnect": "Create and connect"
+      },
+      "edit": {
+        "title": "Edit connector"
+      },
+      "fields": {
+        "name": "Name",
+        "kind": "Kind",
+        "headerName": "Header name",
+        "oauthClient": "OAuth app",
+        "key": "Key",
+        "keyValue": "Key or token",
+        "keyEnv": "Environment variable"
+      },
+      "kinds": {
+        "bearer": "Bearer token",
+        "header": "Own header",
+        "oauth": "OAuth"
+      },
+      "kindHints": {
+        "bearer": "An API key or personal access token, sent as Authorization: Bearer.",
+        "header": "A key in a header with a name of its own, e.g. X-Api-Key.",
+        "oauth": "Sign-in at the provider with an OAuth app; connect afterwards."
+      },
+      "headerNameHint": "The name only, e.g. X-Api-Key. Protocol headers such as Host or Content-Type are not allowed.",
+      "oauthClientHint": "The app the connector signs in with at the provider.",
+      "noClients": "No OAuth app yet: create one below under \"OAuth apps\" first.",
+      "chooseClient": "Please choose",
+      "oauthFixed": "Kind: OAuth (cannot be changed).",
+      "keyModes": {
+        "keep": "Keep",
+        "value": "New key",
+        "env": "Environment variable"
+      },
+      "keyHint": "Stored encrypted and never shown again.",
+      "keyEnvHint": "The name of a server environment variable starting with HERD_AI_.",
+      "keyEnvPlaceholder": "HERD_AI_…",
+      "keyStored": "A key is stored.",
+      "keyMissing": "No key stored.",
+      "states": {
+        "connected": "Connected",
+        "disconnected": "Not connected",
+        "enc": "Key stored (encrypted)",
+        "env": "Key from an environment variable"
+      },
+      "connect": "Connect",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "replaceKey": "Replace key",
+      "unsafeAddress": "The provider's sign-in address is not an https address; it is not opened.",
+      "deleteNamed": "Delete {{name}}",
+      "deleteTitle": "Delete connector?",
+      "deleteText": {
+        "shared": "{{name}} is deleted. A server that uses it must be switched to another access first.",
+        "personal": "Your access {{name}} is deleted. Agents can then no longer use this server for you."
+      }
+    },
+    "clients": {
+      "title": "OAuth apps",
+      "hint": "Apps registered at a provider (e.g. a GitHub or GitLab application). OAuth connectors and personal servers sign in with them. The catalogue creates them by itself.",
+      "listLabel": "OAuth apps",
+      "empty": "No OAuth app yet.",
+      "create": {
+        "open": "Create OAuth app",
+        "title": "Create OAuth app",
+        "description": "Enter this as the redirect address at the provider: <HERD_PUBLIC_URL>/api/ai/oauth/callback.",
+        "submit": "Create"
+      },
+      "edit": {
+        "title": "Edit OAuth app"
+      },
+      "discoverLabel": "Address of the MCP server",
+      "discoverHint": "Reads the server's OAuth details and fills in empty fields (nothing is stored).",
+      "discover": "Discover",
+      "discovered": "Details found and filled in. PKCE: {{pkce}}.",
+      "pkceYes": "supported",
+      "pkceNo": "not stated",
+      "discovery": {
+        "ok": "Details found.",
+        "blocked": "Blocked: the address is not allowed.",
+        "timeout": "Timeout while reading the details.",
+        "unreachable": "The server is unreachable.",
+        "no_metadata": "The server names no OAuth details; please enter them by hand.",
+        "resource_mismatch": "The server's details do not match its address.",
+        "no_authorization_server": "The server names no authorization server.",
+        "invalid_metadata": "The authorization server's details are invalid."
+      },
+      "fields": {
+        "name": "Name",
+        "authorizationEndpoint": "Authorization endpoint",
+        "tokenEndpoint": "Token endpoint",
+        "revocationEndpoint": "Revocation endpoint",
+        "clientId": "Client ID",
+        "tokenAuth": "How the client secret is sent",
+        "secret": "Client secret",
+        "secretValue": "Client secret",
+        "scopes": "Scopes",
+        "resource": "Resource"
+      },
+      "optional": "Optional.",
+      "scopesHint": "Separated by spaces, e.g. \"mcp\".",
+      "resourceHint": "Optional: the address of the server the token is meant for (RFC 8707).",
+      "tokenAuths": {
+        "client_secret_post": "In the form (client_secret_post)",
+        "client_secret_basic": "As basic sign-in (client_secret_basic)"
+      },
+      "secretModes": {
+        "none": "None (public app, PKCE only)",
+        "keep": "Keep",
+        "value": "New secret",
+        "env": "Environment variable"
+      },
+      "secretKinds": {
+        "enc": "Stored (encrypted)",
+        "env": "From an environment variable"
+      },
+      "secretStored": "A client secret is stored.",
+      "secretNone": "No client secret (public app)",
+      "deleteNamed": "Delete {{name}}",
+      "deleteTitle": "Delete OAuth app?",
+      "deleteText": "{{name}} is deleted. This is not possible while a connector or server uses it."
+    },
+    "catalog": {
+      "description": "Templates for external servers, shipped and from the operator's directory. A template only suggests: every tool is still approved one by one.",
+      "listLabel": "Templates",
+      "empty": "The catalogue is empty.",
+      "installNamed": "Set up {{name}}",
+      "suggestions_one": "Suggests the classification of {{count}} tool ({{writes}} writing).",
+      "suggestions_other": "Suggests the classification of {{count}} tools ({{writes}} writing).",
+      "problems": {
+        "title": "Catalogue files with errors",
+        "hint": "These files were not read. The operator can fix them; the rest of the catalogue applies.",
+        "sources": {
+          "shipped": "shipped",
+          "operator": "operator"
+        }
+      },
+      "install": {
+        "title": "Set up {{name}}",
+        "description": "Creates the server and reads its tools. Then you approve each tool on the server's page.",
+        "submit": "Set up",
+        "fields": {
+          "baseUrl": "Instance address",
+          "auth": "Sign-in",
+          "keyValue": "Key or token",
+          "clientSecretValue": "Client secret"
+        },
+        "secretModes": {
+          "none": "No client secret",
+          "value": "Enter value",
+          "env": "Environment variable"
+        },
+        "oauthApp": "OAuth app at the provider",
+        "personalToken": "Each person stores their own token under \"My connections\"."
+      }
+    },
+    "my": {
+      "title": "My connections",
+      "description": "External servers that act on your behalf. Agents you ask use your own access for them; no one else sees or uses it, not even an admin.",
+      "listLabel": "Servers that act on your behalf",
+      "empty": "No server asks for personal access.",
+      "notConnected": "Not connected",
+      "connectNamed": "Connect with {{name}}",
+      "storeToken": "Store a token",
+      "tokenTitle": "Your own token for {{name}}",
+      "othersTitle": "Other access",
+      "othersHint": "Access to servers that are switched off or removed at the moment."
+    },
+    "oauthDone": {
+      "toMine": "To my connections",
+      "toShared": "To the connectors",
+      "connected": {
+        "title": "Connected",
+        "text": "The sign-in at the provider worked. Agents can use the access now."
+      },
+      "denied": {
+        "title": "Not connected",
+        "text": "The sign-in was declined or cancelled at the provider. You can try again."
+      },
+      "failed": {
+        "title": "Connecting failed",
+        "text": "The provider did not confirm the sign-in. Try again; if that does not help, an admin checks the OAuth app."
+      },
+      "invalid": {
+        "title": "Sign-in expired",
+        "text": "This sign-in has expired or was already used. Please connect again."
+      }
+    }
+  },
+  "errors": {
+    "connector": {
+      "env_not_allowed": "Personal access cannot use an environment variable.",
+      "header_name_invalid": "This header name is not allowed.",
+      "in_use": "A server uses this connector; switch it over first.",
+      "name_taken": "A connector already has this name.",
+      "not_found": "This connector does not exist.",
+      "not_oauth": "This is not an OAuth connector.",
+      "oauth_client_invalid": "This OAuth app does not exist.",
+      "oauth_fixed": "An OAuth connector's kind cannot be changed.",
+      "oauth_unconfigured": "OAuth is not set up: the operator must set HERD_PUBLIC_URL.",
+      "server_invalid": "This server does not take personal access.",
+      "server_taken": "You already have access for this server.",
+      "version_conflict": "The connector was changed meanwhile."
+    },
+    "mcp_server": {
+      "connector_invalid": "Please choose a shared connector of the organisation.",
+      "name_taken": "A server already has this name.",
+      "not_found": "This server does not exist.",
+      "oauth_client_invalid": "This OAuth app does not exist.",
+      "url_not_allowed": "This address is not allowed: https only, no private network, no credentials or parameters in the address.",
+      "version_conflict": "The server was changed meanwhile."
+    },
+    "mcp_tool": {
+      "loosen_unconfirmed": "Please confirm that the tool only reads.",
+      "missing": "The server no longer offers this tool.",
+      "not_found": "This tool does not exist.",
+      "version_conflict": "The tool was changed meanwhile."
+    },
+    "oauth_client": {
+      "in_use": "A connector or server uses this OAuth app.",
+      "name_taken": "An OAuth app already has this name.",
+      "not_found": "This OAuth app does not exist.",
+      "url_not_allowed": "This address is not allowed (https only, no private network).",
+      "version_conflict": "The OAuth app was changed meanwhile."
+    },
+    "mcp_catalog": {
+      "base_url_not_allowed": "This instance address is not allowed.",
+      "install_invalid": "These details do not fit the template.",
+      "not_found": "This template does not exist."
+    }
+  }
+}
