@@ -298,9 +298,6 @@ async def test_a_change_of_responsibility_revokes_the_agents_tokens(
     revoked = await session.scalars(select(AccessToken).where(AccessToken.agent_id == agent.id))
     assert all(t.revoked_at is not None for t in revoked)
     audit = await session.scalar(
-        select(AuditLog)
-        .where(AuditLog.action == "agent.updated")
-        .order_by(AuditLog.id)
-        .limit(1)
+        select(AuditLog).where(AuditLog.action == "agent.updated").order_by(AuditLog.id).limit(1)
     )
     assert audit is not None and audit.details["tokens_revoked"] == 1

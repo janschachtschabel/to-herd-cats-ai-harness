@@ -27,7 +27,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
@@ -36,10 +35,12 @@ from app.core.errors import ValidationFailed
 from app.core.models_base import utcnow
 from app.modules.connectors.credentials import CredentialUnavailable, NotAuthorized
 from app.modules.connectors.models import AuthKind, Connector
+from app.modules.connectors.repository import lock_for_renewal
 from app.modules.oauth import protocol
 from app.modules.oauth.metrics import OAUTH_REFRESHES
 from app.modules.oauth.models import OAuthClient
 from app.modules.oauth.protocol import ClientCredentials, TokenFailure, Tokens, TokenStatus
+from app.modules.oauth.repository import ClientRepository
 
 logger = logging.getLogger(__name__)
 
@@ -81,13 +82,7 @@ async def renew(org_id: uuid.UUID, connector_id: uuid.UUID, *, used: str | None)
     """Renew the connector's token unless someone did meanwhile. `used` is the token a
     server refused (None: renew because it is about to expire)."""
     async with open_unit() as session:
-        await session.execute(text(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'"))
-        connector = await session.scalar(
-            select(Connector)
-            .where(Connector.org_id == org_id, Connector.id == connector_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
+        connector = await lock_for_renewal(session, org_id, connector_id, LOCK_TIMEOUT)
         if connector is None or connector.secret_ref is None:
             raise NotAuthorized()
         current = _plain(connector.secret_ref)
@@ -97,8 +92,9 @@ async def renew(org_id: uuid.UUID, connector_id: uuid.UUID, *, used: str | None)
             stale = expiring(connector.token_expires_at, utcnow())
         if not stale or connector.refresh_token_ref is None:
             return bearer(current)
-        client = await session.get(OAuthClient, connector.oauth_client_id)
-        assert client is not None and client.org_id == org_id
+        assert connector.oauth_client_id is not None
+        client = await ClientRepository(session, org_id).get(connector.oauth_client_id)
+        assert client is not None
         refresh = protocol.refresh(credentials_of(client), _plain(connector.refresh_token_ref))
         try:
             tokens = await timed(connector.id, "refresh_token", refresh)

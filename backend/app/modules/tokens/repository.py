@@ -150,6 +150,12 @@ class TokenRepository:
             )
         return await self.session.scalar(stmt)
 
+    async def name_of(self, org_id: uuid.UUID, token_id: uuid.UUID) -> str | None:
+        stmt = select(AccessToken.name).where(
+            AccessToken.org_id == org_id, AccessToken.id == token_id
+        )
+        return await self.session.scalar(stmt)
+
     async def revoke(self, org_id: uuid.UUID, token_id: uuid.UUID, now: datetime) -> bool:
         """Revoke it unless it was revoked before: whether this call did."""
         stmt = (

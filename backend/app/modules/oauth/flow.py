@@ -25,7 +25,6 @@ from datetime import timedelta
 from enum import StrEnum
 from urllib.parse import urlencode, urlsplit
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
@@ -37,7 +36,7 @@ from app.modules.audit.recorder import record
 from app.modules.auth.context import AuthContext
 from app.modules.connectors.credentials import CredentialUnavailable
 from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
-from app.modules.connectors.repository import ConnectorRepository
+from app.modules.connectors.repository import ConnectorRepository, scope_of
 from app.modules.connectors.service import ConnectorService, connector_not_found
 from app.modules.oauth import protocol
 from app.modules.oauth.models import OAuthClient, OAuthFlow
@@ -153,11 +152,7 @@ class FlowService:
         if flow is None:
             return Finished(Outcome.INVALID)
         actor = await actor_for(self.session, auth)
-        scope = await self.session.scalar(
-            select(Connector.scope).where(
-                Connector.org_id == auth.org_id, Connector.id == flow.connector_id
-            )
-        )
+        scope = await scope_of(self.session, auth.org_id, flow.connector_id)
         if scope is None:
             return Finished(Outcome.INVALID)
         try:

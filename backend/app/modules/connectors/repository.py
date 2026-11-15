@@ -4,7 +4,7 @@ person's personal ones. No statement reaches both."""
 
 import uuid
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
@@ -111,3 +111,25 @@ async def delete_connectors(session: AsyncSession, connectors: list[Connector]) 
     for connector in connectors:
         await session.delete(connector)
     await session.flush()
+
+
+async def scope_of(session: AsyncSession, org_id: uuid.UUID, connector_id: uuid.UUID) -> str | None:
+    """A connector's scope, whoever owns it (None: no such connector): an OAuth flow's
+    end learns from it which owner to look for (`oauth/flow.py`)."""
+    stmt = select(Connector.scope).where(Connector.org_id == org_id, Connector.id == connector_id)
+    return await session.scalar(stmt)
+
+
+async def lock_for_renewal(
+    session: AsyncSession, org_id: uuid.UUID, connector_id: uuid.UUID, lock_timeout: str
+) -> Connector | None:
+    """The connector, locked and read afresh, waiting at most `lock_timeout` (a
+    Postgres interval) for another renewal's lock (`oauth/tokens.py`)."""
+    await session.execute(text(f"SET LOCAL lock_timeout = '{lock_timeout}'"))
+    stmt = (
+        select(Connector)
+        .where(Connector.org_id == org_id, Connector.id == connector_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return await session.scalar(stmt)
