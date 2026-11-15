@@ -11,6 +11,22 @@ export const MCP_STUB = `https://localhost:${port + 5}`;
 export const MCP_STUB_URL = `${MCP_STUB}/mcp`;
 export const OAUTH_STUB = `https://localhost:${port + 6}`;
 
+/** The MCP stub's tools after a reset (`tests/support/mcp_stub.py`, `default_tools`):
+ *  give them again, changed, to change one tool's fingerprint. */
+export const STUB_TOOLS = [
+  {
+    name: "search_issues",
+    description: "Search issues by text.",
+    input_schema: { type: "object", properties: { q: { type: "string" } } },
+    read_only: true,
+  },
+  {
+    name: "create_issue",
+    description: "Create an issue.",
+    input_schema: { type: "object", properties: { title: { type: "string" } } },
+  },
+];
+
 /** A request context for the stubs' control routes (their certificate is the run's). */
 async function stubs() {
   return playwrightRequest.newContext({ ignoreHTTPSErrors: true });
