@@ -81,12 +81,16 @@ class TokenService:
         rows = await self.repo.own_page(actor.org_id, actor.principal.id, before, params.limit + 1)
         return id_page(rows, params.limit, lambda t: t.id)
 
-    async def revoke_mine(self, actor: Actor, token_id: uuid.UUID) -> None:
+    async def own(self, actor: Actor, token_id: uuid.UUID) -> AccessToken:
+        """One of the actor's own tokens (404 for anyone else's, or without `mcp.use`)."""
         await self._require_mcp(actor)
         token = await self.repo.get(actor.org_id, token_id, actor.principal.id)
         if token is None:
             raise token_not_found()
-        await self._revoke(actor, token, {})
+        return token
+
+    async def revoke_mine(self, actor: Actor, token_id: uuid.UUID) -> None:
+        await self._revoke(actor, await self.own(actor, token_id), {})
 
     async def everyone(self, actor: Actor, params: PageParams) -> Page[Listed]:
         await require_ai(self.session, actor, Action.AI_MANAGE)
@@ -94,11 +98,16 @@ class TokenService:
         rows = await self.repo.all_page(actor.org_id, before, params.limit + 1)
         return id_page(rows, params.limit, lambda listed: listed.token.id)
 
-    async def revoke_any(self, actor: Actor, token_id: uuid.UUID) -> None:
+    async def any_of_org(self, actor: Actor, token_id: uuid.UUID) -> AccessToken:
+        """Any token of the organisation, for `ai.manage` (404 `ai.not_found` without)."""
         await require_ai(self.session, actor, Action.AI_MANAGE)
         token = await self.repo.get(actor.org_id, token_id)
         if token is None:
             raise token_not_found()
+        return token
+
+    async def revoke_any(self, actor: Actor, token_id: uuid.UUID) -> None:
+        token = await self.any_of_org(actor, token_id)
         await self._revoke(actor, token, {"user_id": str(token.user_id)})
 
     async def _revoke(self, actor: Actor, token: AccessToken, details: dict[str, Any]) -> None:

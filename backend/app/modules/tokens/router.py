@@ -10,6 +10,9 @@ from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.mcp_tools.models import McpCall
+from app.modules.mcp_tools.schemas import McpCallOut
+from app.modules.mcp_tools.usage import McpUsageService
 from app.modules.tokens.schemas import (
     AdminTokenOut,
     McpSettingsIn,
@@ -45,6 +48,18 @@ async def create_token(body: TokenIn, actor: ActorDep, session: SessionDep) -> T
     return TokenCreatedOut.of(token, secret)
 
 
+@tokens.get("/{token_id}/calls", response_model=Page[McpCallOut])
+async def list_my_token_calls(
+    token_id: uuid.UUID,
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+) -> Page[McpCallOut]:
+    """The token's tool calls through `/mcp`, newest first (its usage)."""
+    page = await McpUsageService(session).mine(actor, token_id, params)
+    return _calls(page)
+
+
 @tokens.delete("/{token_id}", status_code=204)
 async def revoke_my_token(token_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
     await TokenService(session).revoke_mine(actor, token_id)
@@ -75,9 +90,27 @@ async def list_all_tokens(
     )
 
 
+@mcp_admin.get("/tokens/{token_id}/calls", response_model=Page[McpCallOut])
+async def list_any_token_calls(
+    token_id: uuid.UUID,
+    params: Annotated[PageParams, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+) -> Page[McpCallOut]:
+    """Any token's tool calls through `/mcp`, newest first: metadata only."""
+    page = await McpUsageService(session).any(actor, token_id, params)
+    return _calls(page)
+
+
 @mcp_admin.delete("/tokens/{token_id}", status_code=204)
 async def revoke_any_token(token_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
     await TokenService(session).revoke_any(actor, token_id)
+
+
+def _calls(page: Page[McpCall]) -> Page[McpCallOut]:
+    return Page[McpCallOut](
+        items=[McpCallOut.model_validate(c) for c in page.items], next_cursor=page.next_cursor
+    )
 
 
 def _settings(found: McpSettings) -> McpSettingsOut:

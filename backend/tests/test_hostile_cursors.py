@@ -82,6 +82,8 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/agents/{agent_id}/runs",
         "/api/tokens",
         "/api/ai/mcp/tokens",
+        "/api/tokens/{token_id}/calls",
+        "/api/ai/mcp/tokens/{token_id}/calls",
     } <= set(endpoints)
 
 
@@ -117,6 +119,9 @@ async def test_hostile_cursors_answer_422_everywhere(
     )
     ticket = await owner.post(f"/api/spaces/{space_id}/tickets", json={"title": "Ticket"})
     skill = await owner.post("/api/skills", json={"name": "s", "description": "d", "content": "c"})
+    token = await owner.post(
+        "/api/tokens", json={"name": "t", "mode": "read", "expires_in_days": 1}
+    )
     ids = {
         "{number}": str(ticket.json()["number"]),
         "{category}": "open",
@@ -128,6 +133,7 @@ async def test_hostile_cursors_answer_422_everywhere(
         "{conversation_id}": channel.json()["id"],
         "{message_id}": message.json()["id"],
         "{skill_id}": skill.json()["id"],
+        "{token_id}": token.json()["id"],
     }
     for template in _list_endpoints():
         if template in NEED_A_RUN:

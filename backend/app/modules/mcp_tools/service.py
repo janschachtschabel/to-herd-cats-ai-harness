@@ -11,15 +11,14 @@ what it wrote, and the client gets a tool error without any internal detail. The
 arguments are checked against the tool's model first; an invalid call names the
 fields, never their values. A result longer than `MAX_TEXT_CHARS` is cut.
 
-What is logged is the tool's name, the outcome and the time taken, never arguments or
-results.
+Every call is counted (`mcp_call`, the metric `herd_mcp_calls_total`) and logged with
+the tool's name, the outcome and the time taken, never arguments or results.
 """
 
 import logging
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any
 
 from pydantic import ValidationError
@@ -28,6 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.agents.actor import Reads
 from app.modules.agents.toolbox.base import CallContext
 from app.modules.mcp_tools.exposed import Exposed, tool_for, tools_for
+from app.modules.mcp_tools.metrics import MCP_CALLS
+from app.modules.mcp_tools.models import McpCall, Outcome
+from app.modules.mcp_tools.repository import McpCallRepository
 from app.modules.tokens.resolve import TokenActor
 
 logger = logging.getLogger(__name__)
@@ -35,12 +37,6 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_CHARS = 100_000
 CUT = "\n[cut: the result was longer than {limit} characters]"
 FAILED = "The call failed. Try again later."
-
-
-class Outcome(StrEnum):
-    OK = "ok"
-    INVALID = "invalid"  # the arguments did not fit the tool's model
-    FAILED = "failed"  # the tool raised: undone, no detail for the client
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +66,16 @@ class McpToolService:
         started = time.perf_counter()
         answer = await self._answer(token, tool, arguments or {})
         millis = round((time.perf_counter() - started) * 1000)
+        await McpCallRepository(self.session, token.actor.org_id).add(
+            McpCall(
+                org_id=token.actor.org_id,
+                token_id=token.token_id,
+                tool=tool.name,
+                outcome=answer.outcome,
+                duration_ms=millis,
+            )
+        )
+        MCP_CALLS.labels(tool=tool.name, outcome=answer.outcome.value).inc()
         logger.info(
             "mcp.tool_call",
             extra={"tool": tool.name, "outcome": answer.outcome.value, "duration_ms": millis},
