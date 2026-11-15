@@ -20,9 +20,29 @@
 // so a term comes due at once instead of in minutes or days (`clockTo()` in
 // tests/automations-helpers.mjs). The launcher lives in the backend's test tree,
 // which the image never contains; nothing under `app/` knows it.
+//
+// MCP (plan M8 task 12): the MCP stub (public port + 5, endpoint `/mcp`) and the OAuth
+// stub (public port + 6) of the backend tests run as processes over https for the name
+// `localhost`, with a certificate made here for the run. The app dials external servers
+// and OAuth endpoints over https only and private hosts only when the operator lists
+// them, so it gets HERD_MCP_ALLOWED_HOSTS=localhost and trusts the certificate through
+// SSL_CERT_FILE (its outbound clients read it; nothing else it calls uses TLS here).
+// HERD_PUBLIC_URL makes the OAuth redirect address; HERD_MCP_CATALOG_DIR holds an
+// operator catalogue file whose entry points at the MCP stub (and one broken file).
+// The browser accepts the stubs' certificate per context (`ignoreHTTPSErrors`), as do
+// the tests' requests to their control routes (tests/mcp-helpers.mjs).
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { get as httpsGet } from "node:https";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +70,56 @@ async function ready(url, deadline) {
   throw new Error(`not ready: ${url}`);
 }
 
+/** Answers once `url` (https, trusting only `ca`) answers 200. */
+async function readyTls(url, ca, deadline) {
+  const once = () =>
+    new Promise((resolve) => {
+      const request = httpsGet(url, { ca }, (response) => {
+        response.resume();
+        resolve(response.statusCode === 200);
+      });
+      request.on("error", () => resolve(false));
+    });
+  while (Date.now() < deadline) {
+    if (await once()) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`not ready: ${url}`);
+}
+
+/** A certificate for `localhost` (its own CA) and its key, in `directory`. */
+function stubCertificate(directory) {
+  const script = [
+    "import sys",
+    "from pathlib import Path",
+    "from tests.support.openai_stub import self_signed",
+    "self_signed(Path(sys.argv[1]), ['localhost'])",
+  ].join("\n");
+  execFileSync("uv", ["run", "--no-sync", "python", "-c", script, directory], { cwd: BACKEND });
+  return { cert: join(directory, "stub-cert.pem"), key: join(directory, "stub-key.pem") };
+}
+
+/** An operator catalogue: one entry for the MCP stub, one file that does not load. */
+function operatorCatalogue(directory, mcpUrl) {
+  mkdirSync(directory);
+  const entry = [
+    "id: e2e-tracker",
+    "name: Tracker",
+    'description: {de: "Der Tracker der Browser-Tests.", en: "The browser tests\' tracker."}',
+    `url: "${mcpUrl}"`,
+    "data_location: local",
+    "connector_scopes: [none, shared, personal]",
+    "auth:",
+    "  - kind: bearer",
+    "tools:",
+    "  search_issues: read",
+    "  create_issue: write",
+    "",
+  ].join("\n");
+  writeFileSync(join(directory, "tracker.yaml"), entry);
+  writeFileSync(join(directory, "broken.yaml"), "id: broken\nname: Kaputt\nunknown_field: 1\n");
+}
+
 export default async function globalSetup() {
   if (!existsSync(join(DIST, "index.html"))) {
     throw new Error("frontend/dist is missing: run `npm run build` in frontend/ first");
@@ -63,6 +133,10 @@ export default async function globalSetup() {
   psql(adminUrl, `CREATE DATABASE ${database}`);
   const dataDir = mkdtempSync(join(tmpdir(), "herd-e2e-"));
   const clockFile = join(dataDir, "clock-offset");
+  const tls = stubCertificate(dataDir);
+  const mcpUrl = `https://localhost:${port + 5}/mcp`;
+  const catalogDir = join(dataDir, "mcp-catalog");
+  operatorCatalogue(catalogDir, mcpUrl);
   const databaseUrl = `postgresql+asyncpg://${url.username}:${url.password}@${url.host}/${database}`;
   // For what the tests make through the backend itself (`seedProposal`): the workers
   // inherit this process's environment.
@@ -85,6 +159,10 @@ export default async function globalSetup() {
     HERD_SECRET_KEY: SECRET_KEY,
     HERD_RUN_LEASE_SECONDS: "5",
     HERD_E2E_CLOCK_FILE: clockFile,
+    HERD_PUBLIC_URL: `http://127.0.0.1:${port}`,
+    HERD_MCP_ALLOWED_HOSTS: "localhost",
+    HERD_MCP_CATALOG_DIR: catalogDir,
+    SSL_CERT_FILE: tls.cert,
   };
   const startApp = () => {
     const child = spawn("uv", ["run", "--no-sync", "python", "-m", "tests.support.e2e_clock"], {
@@ -158,14 +236,43 @@ export default async function globalSetup() {
     { cwd: BACKEND, stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore" },
   );
   const stubExited = new Promise((resolve) => stub.once("exit", resolve));
+  const tlsStub = (module, stubPort) => {
+    const child = spawn(
+      "uv",
+      [
+        "run",
+        "--no-sync",
+        "python",
+        "-m",
+        module,
+        "--port",
+        String(stubPort),
+        "--certfile",
+        tls.cert,
+        "--keyfile",
+        tls.key,
+        "--name",
+        "localhost",
+      ],
+      { cwd: BACKEND, stdio: process.env.HERD_E2E_VERBOSE ? "inherit" : "ignore" },
+    );
+    return { child, exited: new Promise((resolve) => child.once("exit", resolve)) };
+  };
+  const mcpStub = tlsStub("tests.support.mcp_stub", port + 5);
+  const oauthStub = tlsStub("tests.support.oauth_stub", port + 6);
   const teardown = async () => {
     control.closeAllConnections();
     await new Promise((resolve) => control.close(resolve));
     await restarting;
     if (app.child.exitCode === null) killGroup(app.child, "SIGTERM");
     if (stub.exitCode === null) stub.kill("SIGTERM");
+    for (const { child } of [mcpStub, oauthStub]) {
+      if (child.exitCode === null) child.kill("SIGTERM");
+    }
     await app.exited;
     await stubExited;
+    await mcpStub.exited;
+    await oauthStub.exited;
     process.removeListener("exit", orphanGuard);
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
@@ -173,6 +280,9 @@ export default async function globalSetup() {
   try {
     await appReady();
     await ready(`http://127.0.0.1:${port + 3}/_stub/log`, Date.now() + 90_000);
+    const ca = readFileSync(tls.cert);
+    await readyTls(`https://localhost:${port + 5}/_stub/log`, ca, Date.now() + 90_000);
+    await readyTls(`https://localhost:${port + 6}/_stub/log`, ca, Date.now() + 90_000);
   } catch (error) {
     await teardown();
     throw error;
