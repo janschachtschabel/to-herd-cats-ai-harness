@@ -203,6 +203,15 @@ class Settings(OpsSettings, AuthSettings, BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _production_is_safe(self) -> Self:
+        """Production reached over https marks its cookies Secure (and `__Host-`) even
+        behind a TLS proxy that sends no X-Forwarded-Proto (ASVS 5.0 V3.3.1)."""
+        https = (self.public_url or "").startswith("https://")
+        if self.environment == "production" and https and not self.cookie_secure:
+            raise ValueError("HERD_COOKIE_SECURE must be true when HERD_PUBLIC_URL is https")
+        return self
+
+    @model_validator(mode="after")
     def _resolve_database_password(self) -> Self:
         if self.database_password is not None and self.database_password_file is not None:
             raise ValueError("set HERD_DATABASE_PASSWORD or HERD_DATABASE_PASSWORD_FILE, not both")

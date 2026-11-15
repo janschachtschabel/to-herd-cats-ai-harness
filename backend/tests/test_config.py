@@ -221,3 +221,24 @@ def test_bootstrap_password_follows_the_password_rule(
 def test_no_bootstrap_password_is_allowed() -> None:
     """Without one, bootstrap is skipped (and says so in the log)."""
     assert Settings(bootstrap_admin_password="").bootstrap_admin_password.get_secret_value() == ""
+
+
+def test_production_start_refuses_unsafe_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ASVS 5.0 V13.4.2/V3.3.1: a production installation reached over https always marks
+    its cookies Secure, even behind a TLS proxy that sends no X-Forwarded-Proto. The
+    refusal names the setting and echoes no value."""
+    monkeypatch.setenv("HERD_ENVIRONMENT", "production")
+    monkeypatch.setenv("HERD_PUBLIC_URL", "https://wiki.example")
+    monkeypatch.setenv("HERD_COOKIE_SECURE", "false")
+    with pytest.raises(ValidationError, match="HERD_COOKIE_SECURE must be true") as caught:
+        Settings()
+    assert "wiki.example" not in str(caught.value)
+    monkeypatch.setenv("HERD_COOKIE_SECURE", "true")
+    assert Settings().cookie_secure is True
+    # A local trial over http, and development, keep starting.
+    monkeypatch.setenv("HERD_COOKIE_SECURE", "false")
+    monkeypatch.setenv("HERD_PUBLIC_URL", "http://localhost:8080")
+    assert Settings().cookie_secure is False
+    monkeypatch.setenv("HERD_ENVIRONMENT", "development")
+    monkeypatch.setenv("HERD_PUBLIC_URL", "https://wiki.example")
+    assert Settings().cookie_secure is False

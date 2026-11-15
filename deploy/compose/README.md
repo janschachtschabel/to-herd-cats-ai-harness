@@ -64,7 +64,8 @@ This reference serves plain http for local trials, so the session cookie is not
 `Secure` by default. Behind a TLS reverse proxy, set `HERD_BIND_ADDRESS` /
 `HERD_HOST_PORT` to where the proxy connects, `HERD_FORWARDED_ALLOW_IPS` to the
 proxy's address (otherwise every client has the proxy's address, in the audit and
-for the login limits) and `HERD_COOKIE_SECURE=true`.
+for the login limits) and `HERD_COOKIE_SECURE=true`. With an `https://`
+`HERD_PUBLIC_URL` the image (production) refuses to start without it.
 
 ## Stop
 
