@@ -186,3 +186,31 @@ async def test_new_client_endpoints_disconnect_and_revoke_at_the_old_provider(
     r = await ai_people.admin.patch(f"{CLIENTS}/{client['id']}", json=again)
     assert r.status_code == 200, r.text
     assert (await ai_people.admin.get(f"{SHARED}/{shared}")).json()["has_secret"] is False
+
+
+async def test_deleting_a_server_revokes_the_personal_tokens_bound_to_it(
+    oauth_ready: OAuthStub, ai_people: People, mcp_stub: McpStub, session: AsyncSession
+) -> None:
+    """Module review M8 1, finding 8: the personal connectors went with the server by
+    the foreign key, their tokens still valid at the provider."""
+    client = await make_oauth_client(ai_people.admin, oauth_ready)
+    made = await make_server(
+        ai_people.admin, mcp_stub, connector_scope="personal", oauth_client_id=client["id"]
+    )
+    body = {
+        "name": "Mine",
+        "auth_kind": "oauth",
+        "oauth_client_id": client["id"],
+        "mcp_server_id": made["id"],
+    }
+    mine = (await ai_people.alice.post(MY_CONNECTORS, json=body)).json()
+    await connect(ai_people.alice, MY_CONNECTORS, mine["id"], oauth_ready)
+    alices = oauth_ready.state.issued[-1]
+    version = (await ai_people.admin.get(f"{SERVERS}/{made['id']}")).json()["version"]
+    r = await ai_people.admin.delete(f"{SERVERS}/{made['id']}", params={"version": version})
+    assert r.status_code == 204, r.text
+    assert alices in oauth_ready.state.revoked
+    assert await _audit(session, "mcp_server.deleted") == {
+        "name": "Tracker",
+        "personal_connectors_disconnected": 1,
+    }

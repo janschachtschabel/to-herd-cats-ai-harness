@@ -180,12 +180,15 @@ class ServerService:
         return server
 
     async def delete(self, actor: Actor, server_id: uuid.UUID, version: int) -> None:
-        """Its tools and the personal connectors bound to it go with it."""
+        """Its tools go with it, and the personal connectors bound to it, their OAuth
+        tokens revoked at the provider after the commit (module review M8 1, F8)."""
         await require_ai(self.session, actor, Action.AI_MANAGE)
         repo = self.repo(actor)
         server = await self._current(repo, server_id, version)
+        gone = await disconnect_server(self.session, actor.org_id, server.id)
         await repo.delete(server)
-        await self._audit(actor, "mcp_server.deleted", server, {"name": server.name})
+        details = {"name": server.name, "personal_connectors_disconnected": gone.personal}
+        await self._audit(actor, "mcp_server.deleted", server, details)
 
     async def _hold_connector(self, actor: Actor, connector_id: uuid.UUID) -> None:
         shared = ConnectorRepository(self.session, actor.org_id, None)

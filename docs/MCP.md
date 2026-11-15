@@ -464,7 +464,9 @@ im Log.
   arbeitet; je Person und Server einer (409 `connector.server_taken`), andere Server
   422 `connector.server_invalid`. `GET /api/ai/my-mcp-servers` (`ai.use`) listet diese
   Server mit `url` (wohin der eigene Zugang geht) und `connected`. Wird der Server
-  gelöscht, gehen die daran gebundenen persönlichen Konnektoren mit.
+  gelöscht, gehen die daran gebundenen persönlichen Konnektoren mit; ihre OAuth-Token
+  werden nach dem Commit beim Anbieter widerrufen (Review M8 1, Befund 8), und das
+  Audit `mcp_server.deleted` nennt ihre Zahl (`personal_connectors_disconnected`).
 - **Wohin ein Geheimnis geht**: Jeder Konnektor nennt `server_urls`, die Adressen der
   Server, an die sein Geheimnis geht (ein geteilter: jeder Server, der ihn nennt; ein
   persönlicher: sein Server). Ein Geheimnis geht nur dorthin, wofür es hinterlegt wurde
