@@ -387,7 +387,12 @@ oder `confirm` an und prüft die Freigabe vor jedem Aufruf neu (entzogen:
 
 Freigegebene Werkzeuge externer MCP-Server ([`MCP.md`](MCP.md#externe-mcp-server))
 erscheinen in derselben Liste, nach dem Katalog, mit `external` (Server-ID und -Name,
-Werkzeug-ID und -Name, `usable`). Ihr Name im Lauf und in den Einträgen ist
+Werkzeug-ID und -Name, `usable`). Die Liste hat keine Seiten, sondern eine feste
+Obergrenze: sie ist ein Dokument mit der Version des Agenten, das `PUT` als Ganzes
+ersetzt, und Seiten würden das teilen. Gezeigt werden die 22 Werkzeuge des Katalogs, die
+freigegebenen externen Werkzeuge (höchstens 200 je Organisation, siehe
+[`MCP.md`](MCP.md#externe-mcp-server)) und Werkzeuge mit Eintrag (höchstens 100 je
+`PUT`); gelesen werden in SQL nur diese. Ihr Name im Lauf und in den Einträgen ist
 `ext_<Werkzeug-ID, alle 32 Hexzeichen>_<Name>` (höchstens 64 Zeichen, die ID wird nie
 gekürzt; Zeichen, die ein Modell nicht nutzen darf, werden `_`). So steht jeder Name für
 genau ein Werkzeug, gleich wie ein Server seine Werkzeuge nennt (Review M8 1, Befund 1:

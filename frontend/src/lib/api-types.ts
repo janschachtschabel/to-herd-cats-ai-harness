@@ -4000,7 +4000,9 @@ export interface components {
          * AgentToolsOut
          * @description An agent's tool grants: every tool of the catalog (a fixed, short list, so not
          *     paged), then the organisation's usable external tools and those with an entry
-         *     (approved ones only, so the list stays short). `version`: the agent's.
+         *     (approved ones only, at most `mcp_servers/tools.MAX_APPROVED_TOOLS` of them, plus at
+         *     most 100 entries: a hard cap instead of pages, as the list is one versioned
+         *     document the PUT replaces whole). `version`: the agent's.
          *     `max_level`: the highest level the caller may give the agent (above 2: admins
          *     only).
          */

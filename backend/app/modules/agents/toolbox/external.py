@@ -33,6 +33,7 @@ import copy
 import json
 import re
 import uuid
+from collections.abc import Collection
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
@@ -68,6 +69,7 @@ READ_LEVEL = 2
 WRITE_LEVEL = 4
 SOURCE = "mcp"
 _UNSAFE = re.compile(r"[^A-Za-z0-9_-]")
+_NAMED = re.compile(rf"^{PREFIX}([0-9a-f]{{32}})_")
 
 OUTCOME_UNKNOWN = (
     "external_outcome_unknown: this call was sent to the external server, but its answer "
@@ -114,6 +116,12 @@ def tool_name(tool: McpServerTool) -> str:
     return _named(tool.id.hex, tool.name)
 
 
+def tool_id_of(name: str) -> uuid.UUID | None:
+    """The tool a name of today stands for (None: no such name)."""
+    found = _NAMED.match(name)
+    return uuid.UUID(found.group(1)) if found else None
+
+
 def legacy_name(remote: RemoteTool) -> str:
     """The name an earlier release gave the tool (not unique: see the module)."""
     return _named(remote.tool_id.hex[:12], remote.tool_name)
@@ -149,9 +157,13 @@ async def offered_external(session: AsyncSession, org_id: uuid.UUID) -> list[Too
     return [spec_of(t, s, v) for t, s, v in viewed if v.problem is None]
 
 
-async def every_external(session: AsyncSession, org_id: uuid.UUID) -> list[tuple[ToolSpec, bool]]:
-    """Every external tool of the organisation, and whether it is usable now."""
-    rows = await ToolRepository(session, org_id).of_org(usable_only=False)
+async def every_external(
+    session: AsyncSession, org_id: uuid.UUID, approved_or: Collection[uuid.UUID] | None = None
+) -> list[tuple[ToolSpec, bool]]:
+    """Every external tool of the organisation, and whether it is usable now. With
+    `approved_or`: only those holding an approval and those ids (an agent's grant
+    list, bounded by `mcp_servers/tools.MAX_APPROVED_TOOLS`)."""
+    rows = await ToolRepository(session, org_id).of_org(usable_only=False, approved_or=approved_or)
     found = []
     for tool, server in rows:
         seen = schema_view.view(tool.input_schema)

@@ -13,6 +13,9 @@ approved, blocked and classified one by one (`ai.manage`).
   A tool whose input schema cannot be offered to a model (`schema_view`: over 64 KiB,
   a structure too large or too deep, a property name a model cannot take) is not
   approvable (409 `mcp_tool.schema_problem`); the admin sees why (`schema_problem`).
+- An organisation holds at most MAX_APPROVED_TOOLS approved tools (approved or
+  changed, of every server; 409 `mcp_tool.approved_limit`): an agent's grant list
+  shows each of them, so this bounds that list (module review M8 1, finding 14).
 - Classifying a tool `read` that the server does not annotate read-only needs
   `confirm_loosen` (422 `mcp_tool.loosen_unconfirmed`).
 """
@@ -43,6 +46,7 @@ logger = logging.getLogger(__name__)
 LIST_TIMEOUT_SECONDS = 20.0
 MAX_LIST_BYTES = 2 * 1024 * 1024
 MAX_TOOLS = 500
+MAX_APPROVED_TOOLS = 200  # per organisation: what an agent's grant list shows at most
 
 
 def tool_not_found() -> NotFound:
@@ -183,6 +187,10 @@ class ToolService:
             raise Conflict(code="mcp_tool.missing")
         if problem_of(tool) is not None:  # could never be offered to a model
             raise Conflict(code="mcp_tool.schema_problem")
+        repo = ToolRepository(self.session, actor.org_id)
+        await repo.lock_approvals()
+        if await repo.approved_count(other_than=tool.id) >= MAX_APPROVED_TOOLS:
+            raise Conflict(code="mcp_tool.approved_limit", details={"limit": MAX_APPROVED_TOOLS})
         tool.state = ToolState.APPROVED
         tool.approved_fingerprint = tool.fingerprint
         return await self._saved(actor, tool, "mcp_tool.approved", {"state": tool.state})

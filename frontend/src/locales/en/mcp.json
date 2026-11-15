@@ -384,9 +384,11 @@
       "version_conflict": "The server was changed meanwhile."
     },
     "mcp_tool": {
+      "approved_limit": "The organisation already has 200 approved tools. Block one first, then approve this one.",
       "loosen_unconfirmed": "Please confirm that the tool only reads.",
       "missing": "The server no longer offers this tool.",
       "not_found": "This tool does not exist.",
+      "schema_problem": "This tool's input schema cannot be offered to a model.",
       "version_conflict": "The tool was changed meanwhile."
     },
     "oauth_client": {

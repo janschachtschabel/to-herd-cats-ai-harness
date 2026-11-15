@@ -197,6 +197,34 @@ async def test_over_the_cap_the_first_names_are_kept_whatever_the_order(
     assert refreshed == {"status": "ok", "new": 0, "changed": 0, "missing": 0}
 
 
+async def test_an_organisation_approves_at_most_the_cap(
+    ai_people: People, mcp_egress: McpStub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Module review M8 1, finding 14: the agents' grant list shows every approved
+    external tool, so their number is held (`MAX_APPROVED_TOOLS`); a blocked one frees
+    its place, a changed one keeps it."""
+    monkeypatch.setattr(tools_module, "MAX_APPROVED_TOOLS", 1)
+    made = await make_server(ai_people.admin, mcp_egress)
+    tools = await tools_of(ai_people.admin, made["id"])
+    first = await approve(ai_people.admin, made["id"], tools["search_issues"])
+    path = f"{SERVERS}/{made['id']}/tools"
+    second = tools["create_issue"]
+    refused = await ai_people.admin.post(
+        f"{path}/{second['id']}/approve", json={"version": second["version"]}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "mcp_tool.approved_limit"
+    again = await ai_people.admin.post(
+        f"{path}/{first['id']}/approve", json={"version": first["version"]}
+    )
+    assert again.status_code == 200, again.text  # itself is no second one
+    blocked = await ai_people.admin.post(
+        f"{path}/{first['id']}/block", json={"version": again.json()["version"]}
+    )
+    assert blocked.status_code == 200, blocked.text
+    await approve(ai_people.admin, made["id"], second)
+
+
 async def test_odd_tool_names_are_skipped_and_long_descriptions_cut(
     ai_people: People, mcp_egress: McpStub
 ) -> None:

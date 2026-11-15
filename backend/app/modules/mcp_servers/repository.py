@@ -2,6 +2,7 @@
 organisation."""
 
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,6 +111,21 @@ class ToolRepository:
         self.session = session
         self.org_id = org_id
 
+    async def lock_approvals(self) -> None:
+        """Until the transaction ends: approvals of the organisation one at a time, so
+        two cannot pass the cap together."""
+        await advisory_xact_lock(self.session, f"mcp_tool.approvals:{self.org_id}")
+
+    async def approved_count(self, other_than: uuid.UUID) -> int:
+        """The organisation's tools holding an approval (approved, or changed since),
+        but `other_than`."""
+        stmt = select(func.count()).where(
+            McpServerTool.org_id == self.org_id,
+            McpServerTool.approved_fingerprint.is_not(None),
+            McpServerTool.id != other_than,
+        )
+        return int(await self.session.scalar(stmt) or 0)
+
     async def all_of(self, server_id: uuid.UUID) -> list[McpServerTool]:
         stmt = (
             select(McpServerTool)
@@ -156,16 +172,24 @@ class ToolRepository:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         return await self.session.scalar(stmt)
 
-    async def of_org(self, *, usable_only: bool) -> list[tuple[McpServerTool, McpServer]]:
+    async def of_org(
+        self, *, usable_only: bool, approved_or: Collection[uuid.UUID] | None = None
+    ) -> list[tuple[McpServerTool, McpServer]]:
         """The organisation's tools with their servers, by server and tool name. With
         `usable_only`: only those a run may call now (approved, listed as approved,
-        still listed, a schema that may be offered, on an enabled server)."""
+        still listed, a schema that may be offered, on an enabled server). With
+        `approved_or`: only those holding an approval, and those ids."""
         stmt = (
             select(McpServerTool, McpServer)
             .join(McpServer, McpServer.id == McpServerTool.server_id)
             .where(McpServerTool.org_id == self.org_id, McpServer.org_id == self.org_id)
             .order_by(McpServer.name, McpServerTool.name)
         )
+        if approved_or is not None:
+            stmt = stmt.where(
+                McpServerTool.approved_fingerprint.is_not(None)
+                | McpServerTool.id.in_(list(approved_or))
+            )
         if usable_only:
             stmt = stmt.where(
                 McpServer.enabled.is_(True),

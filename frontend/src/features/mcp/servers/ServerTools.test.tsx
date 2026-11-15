@@ -185,4 +185,17 @@ describe('a server’s tools', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await within(row).findByRole('button', { name: 'Aktuelle Fassung laden' })).toBeVisible()
   })
+
+  test('at the organisation’s cap an approval says why it was refused', async () => {
+    setup([fresh], {
+      [`POST /api/ai/mcp-servers/${SRV}/tools/t-new/approve`]: apiError(
+        409,
+        'mcp_tool.approved_limit',
+      ),
+    })
+    const { user } = await renderApp(`/admin/ai/mcp-servers/${SRV}`)
+    const row = await screen.findByRole('article', { name: 'get_project' })
+    await user.click(within(row).getByRole('button', { name: /get_project freigeben/ }))
+    expect(await within(row).findByText(/schon 200 freigegebene Werkzeuge/)).toBeVisible()
+  })
 })

@@ -384,9 +384,11 @@
       "version_conflict": "Der Server wurde inzwischen geändert."
     },
     "mcp_tool": {
+      "approved_limit": "Die Organisation hat schon 200 freigegebene Werkzeuge. Erst eines sperren, dann dieses freigeben.",
       "loosen_unconfirmed": "Bitte bestätigen, dass das Werkzeug nur liest.",
       "missing": "Der Server bietet dieses Werkzeug nicht mehr an.",
       "not_found": "Dieses Werkzeug gibt es nicht.",
+      "schema_problem": "Das Eingabeschema dieses Werkzeugs kann keinem Modell angeboten werden.",
       "version_conflict": "Das Werkzeug wurde inzwischen geändert."
     },
     "oauth_client": {

@@ -30,7 +30,7 @@ from app.modules.agents.repository import AgentRepository
 from app.modules.agents.service import AgentService
 from app.modules.agents.toolbox.base import ToolSpec
 from app.modules.agents.toolbox.catalog import CATALOG
-from app.modules.agents.toolbox.external import every_external
+from app.modules.agents.toolbox.external import every_external, tool_id_of
 from app.modules.agents.toolbox.policy import (
     FREE_LEVEL,
     Grant,
@@ -99,7 +99,8 @@ class GrantService:
     async def _shown(self, actor: Actor, agent: Agent) -> AgentTools:
         stored = await AgentRepository(self.session, actor.org_id).tool_entries(agent.id)
         tools = [_grant(agent, spec, stored, None) for spec in CATALOG.values()]
-        for spec, usable in await every_external(self.session, actor.org_id):
+        named = {i for name in stored if (i := tool_id_of(name)) is not None}
+        for spec, usable in await every_external(self.session, actor.org_id, named):
             if usable or spec.name in stored:
                 tools.append(_grant(agent, spec, stored, usable))
         return AgentTools(agent, tools, self.max_level(actor, agent))

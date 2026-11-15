@@ -685,7 +685,12 @@ Recht 404 `ai.not_found`.
   einen anderen, wird ein freigegebenes Werkzeug `changed` und ist gesperrt, bis es
   erneut freigegeben wird (kehrt der Server zum freigegebenen Stand zurück, ist es
   wieder `approved`). Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
-  nicht freizugeben (409 `mcp_tool.missing`). Eine neue Adresse des Servers zieht alle
+  nicht freizugeben (409 `mcp_tool.missing`). Eine Organisation hält höchstens 200
+  freigegebene Werkzeuge über alle Server (freigegeben oder seitdem `changed`; 409
+  `mcp_tool.approved_limit`, gezählt in SQL, eine Freigabe nach der anderen): die
+  Werkzeugliste eines Agenten zeigt jedes davon und hat statt Seiten diese Grenze
+  (Review M8 1, Befund 14). Ein gesperrtes Werkzeug gibt seinen Platz frei. Eine neue
+  Adresse des Servers zieht alle
   Freigaben zurück; ein neuer Ursprung trennt zudem seine Konnektoren (siehe
   „Konnektoren“, „Wohin ein Geheimnis geht“).
 - **Eingabeschema und Modell** (Review M8 1, Befund 2): Jedes Wort eines Schemas ist
@@ -1008,6 +1013,7 @@ keine Variable, sondern die Einstellung der Organisation in der KI-Verwaltung
 | Laufzeit eines Tokens | 1 bis 365 Tage, Pflicht |
 | Bereiche eines Tokens | 1 bis 50 oder „alle meine“ |
 | `list_my_tickets` | 50 Tickets |
+| freigegebene externe Werkzeuge | 200 je Organisation (`MAX_APPROVED_TOOLS`) |
 | externer Server: Werkzeugliste | 20 s, 2 MiB, 500 Werkzeuge, Beschreibung gespeichert bis 10.000 Zeichen, Eingabeschema bis 64 KiB (dem Modell: Struktur bis 8.000 Zeichen, Worte des Servers gerahmt bis 2.000) |
 | externer Server: Aufruf | 60 s (und die Laufzeit des Laufs), Antwort 512 KiB, Ergebnis im Prompt 8.000 Zeichen, Beschreibung im Prompt 1.000 Zeichen |
 | externe Aufrufe je Lauf | `HERD_MCP_MAX_CALLS_PER_RUN` (Standard 20); externe Aufrufe kosten keine Modell-Tokens und zählen zu keinem Tagesbudget |
