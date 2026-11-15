@@ -1872,7 +1872,8 @@ bleiben in der Laufliste).
 
 ### Bekannte Grenzen
 
-- **Ein Schritt über seine Sperrfrist hinaus zählt nicht für `max_concurrency`:**
+- **Ein Schritt über seine Sperrfrist hinaus zählt nicht für `max_concurrency`** (M6,
+  mit M9 als Grenze belassen):
   Hält ein Schritt die Zeile seines Laufs länger als die Sperrfrist
   (`HERD_RUN_LEASE_SECONDS`, 30 s; ein Schritt darf bis zu 5 s auf Sperren warten und
   je Anweisung 20 s rechnen), steht `lease_until` bis zum Festschreiben in der
@@ -1882,6 +1883,14 @@ bleiben in der Laufliste).
   Zeilen erkennen; als laufend zählen auch abgelaufene Läufe ohne Sperre würde einen
   abgestürzten Lauf seine eigene Wiederaufnahme blockieren lassen. Werkzeugschritte
   dauern Millisekunden bis Sekunden, daher bleibt es dabei.
+- **Abbrechen während eines Schritts** (M6, seit M7 mit kurzer Sperrgrenze; mit M9 als
+  Grenze belassen): Der Abbruch wartet höchstens 0,5 s auf die Zeile des Laufs
+  (`REASSIGN_LOCK_TIMEOUT_SECONDS`). Hält ein Schritt sie länger (Abschluss eines
+  Schritts unter Last, ein langer Werkzeugschritt), antwortet er 409 `conflict.retry`
+  mit `Retry-After: 1` und schreibt nichts; die Weboberfläche fragt einmal von selbst
+  erneut, ein API-Aufrufer muss es selbst tun. Einen Abbruch, der in den laufenden
+  Schritt hineingreift, gibt es nicht: Er wirkt vor dem nächsten Schritt oder im
+  Abschluss.
 - **Verbrauch wird in zwei seltenen Fällen zu wenig gezählt**, nie doppelt: Ein
   Anbieteraufruf eines Workers, der danach abstürzt oder seine Sperrfrist verliert, ist
   bezahlt, aber nicht gebucht; und scheitern beim Abschluss eines Schritts sowohl das
