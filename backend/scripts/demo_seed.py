@@ -6,10 +6,14 @@ stories, tasks and a bug in several statuses, assignments, tags, a linked page,
 comments, a ticket key in a channel; see scripts/demo_tickets.py) and sprints (one
 closed with its tally, one running, one planned, a backlog; scripts/demo_sprints.py);
 with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai_model.py) also agents at
-work (M6) and automations and budgets (M7, scripts/demo_automations.py).
+work (M6) and automations and budgets (M7, scripts/demo_automations.py); MCP (M8,
+scripts/demo_mcp.py): the switch on and Anna's read token, with a model an external
+agent with a ticket waiting for pick-up, and with `--mcp-stub URL` a server on that
+stub (never the outside network by default).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
-        uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
+        uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com \\
+        [--mcp-stub https://localhost:8098/mcp]
 
 `HERD_DEMO_ADMIN_PASSWORD` is the admin's password, `HERD_DEMO_PASSWORD` (at least 10
 characters) becomes the demo people's password. Passwords are read from the
@@ -23,14 +27,20 @@ import argparse
 import asyncio
 import os
 import sys
-import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 import httpx
 
-from scripts import demo_ai, demo_automations, demo_sprints, demo_tickets
-from scripts.demo_api import DemoFailed, call, mention, post
+from scripts import (
+    demo_ai,
+    demo_automations,
+    demo_mcp,
+    demo_messaging,
+    demo_sprints,
+    demo_tickets,
+)
+from scripts.demo_api import DemoFailed, call
 from scripts.demo_tickets import SeededTickets
 
 Connect = Callable[[], Awaitable[httpx.AsyncClient]]
@@ -40,7 +50,6 @@ PEOPLE = {
     "ben": ("Ben Berg", "ben.berg@demo.example", "editor"),
     "clara": ("Clara Klein", "clara.klein@demo.example", "viewer"),
 }
-SYSTEM_ENTRIES = 3  # page.created, page.published, page.version_restored
 
 
 class DemoExists(Exception):
@@ -60,6 +69,7 @@ class Seeded:
     sprints: dict[str, str] = field(default_factory=dict)  # ids by name
     ai: demo_ai.SeededAi | None = None
     automations: demo_automations.SeededAutomations | None = None
+    mcp: demo_mcp.SeededMcp = field(default_factory=demo_mcp.SeededMcp)
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -110,75 +120,6 @@ async def _pages(anna: httpx.AsyncClient, seeded: Seeded) -> None:
     seeded.page_id = page_id
 
 
-async def _channels(people: dict[str, httpx.AsyncClient], seeded: Seeded) -> None:
-    anna, ben, clara = people["anna"], people["ben"], people["clara"]
-    channels = f"/api/spaces/{seeded.space_id}/channels"
-    for name, topic in (("team-nord", "Alles rund ums Team"), ("projekt-kranich", None)):
-        channel = await call(anna, "POST", channels, {"name": name, "topic": topic})
-        seeded.channels[name] = str(channel["id"])
-
-    team = seeded.channels["team-nord"]
-    welcome = await post(anna, team, "Willkommen im Kanal von **Team Nord**! 👋")
-    clara_id = seeded.ids["clara"]
-    await post(
-        ben,
-        team,
-        f"Danke! {mention('Clara Klein', clara_id)}, das Handbuch hat jetzt eine Urlaubsseite.",
-        mentions=(clara_id,),
-    )
-    for client, emoji in ((clara, "👍"), (ben, "🎉")):
-        await call(client, "PUT", f"/api/messages/{welcome}/reactions/{emoji}")
-
-    kranich, ben_id = seeded.channels["projekt-kranich"], seeded.ids["ben"]
-    kickoff = await post(
-        anna,
-        kranich,
-        f"Kick-off am Montag um 10 Uhr. {mention('Ben Berg', ben_id)}, bringst du die Zahlen mit?",
-        mentions=(ben_id,),
-    )
-    await post(ben, kranich, "Mache ich, inklusive Prognose.", parent_id=kickoff)
-    await post(clara, kranich, "Ich lese mit und schreibe Protokoll.", parent_id=kickoff)
-
-
-async def _dm(people: dict[str, httpx.AsyncClient], seeded: Seeded) -> None:
-    dm = await call(people["anna"], "POST", "/api/dms", {"user_ids": [seeded.ids["ben"]]})
-    seeded.dm_id = str(dm["id"])
-    await post(people["anna"], seeded.dm_id, "Hast du kurz Zeit wegen des Budgets?")
-    await post(people["ben"], seeded.dm_id, "Klar, ruf einfach an.")
-
-
-async def timeline_ready(
-    client: httpx.AsyncClient, conversation_id: str, *, wait_seconds: float
-) -> None:
-    """Waits until the worker wrote the page's system entries (DemoFailed after
-    `wait_seconds`; 0 checks once)."""
-    deadline = time.monotonic() + wait_seconds
-    path = f"/api/conversations/{conversation_id}/messages"
-    while True:
-        items = (await call(client, "GET", path))["items"]
-        if sum(1 for m in items if m["kind"] == "system") >= SYSTEM_ENTRIES:
-            return
-        if time.monotonic() >= deadline:
-            raise DemoFailed("no system entries in the page discussion: is the worker running?")
-        await asyncio.sleep(0.5)
-
-
-async def _discussion(
-    people: dict[str, httpx.AsyncClient], seeded: Seeded, wait_seconds: float
-) -> None:
-    ben, anna = people["ben"], people["anna"]
-    thread = await call(ben, "GET", f"/api/pages/{seeded.page_id}/thread")
-    await timeline_ready(ben, str(thread["id"]), wait_seconds=wait_seconds)
-    anna_id = seeded.ids["anna"]
-    question = await post(
-        ben,
-        str(thread["id"]),
-        f"{mention('Anna Nord', anna_id)}, gilt die Regel auch für Teilzeit?",
-        mentions=(anna_id,),
-    )
-    await post(anna, str(thread["id"]), "Ja, anteilig nach Arbeitstagen.", parent_id=question)
-
-
 async def seed(
     connect: Connect,
     *,
@@ -188,11 +129,13 @@ async def seed(
     settle: Callable[[], Awaitable[None]],
     wait_seconds: float = 60,
     ai: demo_ai.Ai | None = None,
+    mcp_stub: str | None = None,
 ) -> Seeded:
     """Creates the demo. `connect()` gives a new client (own cookies, CSRF header) of
     the installation; `settle()` is awaited before the page discussion is used (a
     no-op against a running installation, whose worker writes the system entries);
-    `ai`: the model for the agents (none: no agents)."""
+    `ai`: the model for the agents (none: no agents); `mcp_stub`: an MCP server's
+    address for the demo's server (none: no server)."""
     seeded = Seeded()
     admin = await _login(connect, admin_email, admin_password)
     await _people(admin, people_password, seeded)
@@ -201,10 +144,10 @@ async def seed(
         key: await _login(connect, email, people_password) for key, email in seeded.emails.items()
     }
     await _pages(people["anna"], seeded)
-    await _channels(people, seeded)
-    await _dm(people, seeded)
+    await demo_messaging.channels(people, seeded)
+    await demo_messaging.direct_message(people, seeded)
     await settle()
-    await _discussion(people, seeded, wait_seconds)
+    await demo_messaging.discussion(people, seeded, wait_seconds)
     seeded.tickets = await demo_tickets.build(
         admin,
         people,
@@ -239,6 +182,14 @@ async def seed(
             channels=seeded.channels,
             wait_seconds=wait_seconds,
         )
+    seeded.mcp = await demo_mcp.build(
+        admin,
+        people,
+        ids=seeded.ids,
+        space_id=seeded.space_id,
+        with_agents=ai is not None,
+        mcp_stub=mcp_stub,
+    )
     return seeded
 
 
@@ -257,7 +208,7 @@ LEAVE = """# Urlaub
 """
 
 
-async def _main(base: str, admin_email: str) -> int:
+async def _main(base: str, admin_email: str, mcp_stub: str | None) -> int:
     admin_password = os.environ.get("HERD_DEMO_ADMIN_PASSWORD", "")
     people_password = os.environ.get("HERD_DEMO_PASSWORD", "")
     if not admin_password or len(people_password) < 10:
@@ -282,6 +233,7 @@ async def _main(base: str, admin_email: str) -> int:
             people_password=people_password,
             settle=nothing,
             ai=ai,
+            mcp_stub=mcp_stub,
         )
     except DemoExists as exists:
         print(f"demo data present already ({exists}); nothing changed")
@@ -300,6 +252,13 @@ async def _main(base: str, admin_email: str) -> int:
         f"{sprints} sprints, people {people}"
         + (f", agents Hilda and Otto (ticket HC-{seeded.ai.ticket_number})" if seeded.ai else "")
         + (f", {len(seeded.automations.ids)} automations" if seeded.automations else "")
+        + ", MCP on with Anna's read token"
+        + (
+            f", external agent Pipeline (ticket HC-{seeded.mcp.ticket_number} waiting for pick-up)"
+            if seeded.mcp.agent_id
+            else ""
+        )
+        + (f", MCP server {demo_mcp.SERVER}" if seeded.mcp.server_id else "")
     )
     return 0
 
@@ -308,8 +267,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--base", default="http://127.0.0.1:8080")
     parser.add_argument("--admin", required=True, help="the admin's email")
+    parser.add_argument(
+        "--mcp-stub", help="an MCP server's address (a stub) for the demo's server; none: none"
+    )
     args = parser.parse_args(argv)
-    return asyncio.run(_main(args.base.rstrip("/"), args.admin))
+    return asyncio.run(_main(args.base.rstrip("/"), args.admin, args.mcp_stub))
 
 
 if __name__ == "__main__":

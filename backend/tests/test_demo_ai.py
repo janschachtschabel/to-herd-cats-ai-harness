@@ -107,7 +107,13 @@ async def test_connection_assignments_agents_and_skill(demo: dict[str, Any]) -> 
     assert skills["skills"][0]["id"] == made.skill_id
     members = await _get(admin, f"/api/spaces/{seeded.space_id}/members?limit=100")
     roles = {m["member_id"]: m["role"] for m in members["items"] if m["member_type"] == "agent"}
-    assert roles == {made.agents["hilda"]: "viewer", made.agents["otto"]: "editor"}
+    # The external agent of the MCP part (scripts/demo_mcp.py) is an editor too.
+    pipeline = seeded.mcp.agent_id
+    assert roles == {
+        made.agents["hilda"]: "viewer",
+        made.agents["otto"]: "editor",
+        pipeline: "editor",
+    }
 
 
 async def test_an_answer_a_ticket_in_review_and_a_proposal(demo: dict[str, Any]) -> None:
