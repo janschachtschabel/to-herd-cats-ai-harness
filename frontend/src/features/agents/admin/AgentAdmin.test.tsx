@@ -15,6 +15,7 @@ const agent: Agent = {
   id: AGENT_ID,
   name: 'Hilda',
   intro: 'Hilft beim Handbuch.',
+  kind: 'internal',
   instructions: 'Antworte kurz.',
   connection_id: '00000000-0000-7000-8000-00000000c001',
   model: 'gpt-6-luna',

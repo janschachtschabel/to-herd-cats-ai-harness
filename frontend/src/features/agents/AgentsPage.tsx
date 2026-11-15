@@ -56,7 +56,9 @@ export function AgentsPage() {
             <li key={agent.id}>
               <AgentCard
                 agent={agent}
-                connectionName={names.get(agent.connection_id) ?? null}
+                connectionName={
+                  agent.connection_id ? (names.get(agent.connection_id) ?? null) : null
+                }
                 onEdit={() => setEditing(agent)}
               />
             </li>

@@ -35,6 +35,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     id: '00000000-0000-7000-8000-0000000000a1',
     name: 'Hilda',
     intro: 'Hilft beim Handbuch.',
+    kind: 'internal',
     instructions: 'Antworte kurz.',
     connection_id: CONNECTION.id,
     model: 'gpt-6-luna',
@@ -92,6 +93,7 @@ describe('agents administration', () => {
       max_runtime_seconds: 600,
       level: 2,
       personal: false, // an organisation agent (the schema's default)
+      kind: 'internal', // with a model of its own (the schema's default)
     })
     expect(await screen.findByRole('article', { name: 'Hilda' })).toBeInTheDocument()
   })

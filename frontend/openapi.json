@@ -395,8 +395,30 @@
         "type": "object"
       },
       "AdminTokenOut": {
-        "description": "A token in the admins' list: its metadata and whose it is.",
+        "description": "A token in the admins' list: its metadata and whose it is (`user`: its person;\nfor an agent token the agent's responsible person, and `agent` the agent).",
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenAgentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -482,7 +504,7 @@
       },
       "AgentCreate": {
         "additionalProperties": false,
-        "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.\nBoth are needed for the organisation's agents (`agent.manage`). `personal`: the\ncaller's own agent (`agent.create_personal`), which takes the caller's connection\nand model and has the caller as responsible person (given, they must be those).",
+        "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.\nBoth are needed for the organisation's agents (`agent.manage`). `personal`: the\ncaller's own agent (`agent.create_personal`), which takes the caller's connection\nand model and has the caller as responsible person (given, they must be those).\n`kind: external` (plan M8 decision 11, `agent.manage`): an agent that works from\noutside through `/mcp`; no connection, no model, not personal, level at most 2\n(else 422 `agent.external_invalid`), a responsible person required.",
         "properties": {
           "connection_id": {
             "anyOf": [
@@ -507,6 +529,10 @@
             "maxLength": 500,
             "title": "Intro",
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentKind",
+            "default": "internal"
           },
           "level": {
             "default": 2,
@@ -615,13 +641,28 @@
         "title": "AgentExternalToolOut",
         "type": "object"
       },
+      "AgentKind": {
+        "enum": [
+          "internal",
+          "external"
+        ],
+        "title": "AgentKind",
+        "type": "string"
+      },
       "AgentOut": {
-        "description": "An agent as those who manage it see it (`agent.manage`; a personal agent's\nowner); `responsible_name`: the responsible person's name; `owner_user_id`: a\npersonal agent's owner (null: the organisation's).",
+        "description": "An agent as those who manage it see it (`agent.manage`; a personal agent's\nowner); `responsible_name`: the responsible person's name; `owner_user_id`: a\npersonal agent's owner (null: the organisation's). `kind`: `external` for an\nagent that works from outside through `/mcp` (plan M8): no connection or model\n(both null).",
         "properties": {
           "connection_id": {
-            "format": "uuid",
-            "title": "Connection Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
           },
           "created_at": {
             "format": "date-time",
@@ -641,6 +682,9 @@
             "title": "Intro",
             "type": "string"
           },
+          "kind": {
+            "$ref": "#/components/schemas/AgentKind"
+          },
           "level": {
             "title": "Level",
             "type": "integer"
@@ -654,8 +698,15 @@
             "type": "integer"
           },
           "model": {
-            "title": "Model",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "name": {
             "title": "Name",
@@ -705,6 +756,7 @@
         "required": [
           "id",
           "name",
+          "kind",
           "intro",
           "instructions",
           "connection_id",
@@ -744,7 +796,7 @@
         "type": "object"
       },
       "AgentProfileOut": {
-        "description": "What a person with `ai.use` learns of an agent to talk to: no instructions, no\nconnection.",
+        "description": "What a person with `ai.use` learns of an agent to talk to: no instructions, no\nconnection. `kind`: `external` for one that works from outside (plan M8): it\nanswers no message here.",
         "properties": {
           "id": {
             "format": "uuid",
@@ -754,6 +806,9 @@
           "intro": {
             "title": "Intro",
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentKind"
           },
           "name": {
             "title": "Name",
@@ -766,6 +821,7 @@
         "required": [
           "id",
           "name",
+          "kind",
           "intro",
           "status"
         ],
@@ -1105,7 +1161,7 @@
       },
       "AgentUpdate": {
         "additionalProperties": false,
-        "description": "Fields left out stay as they are; `connection_id` and `model` go together. A\npersonal agent takes its owner's connection and model anew with every change.",
+        "description": "Fields left out stay as they are; `connection_id` and `model` go together. A\npersonal agent takes its owner's connection and model anew with every change. The\nkind stays; an external agent takes no connection or model and no level above 2\n(422 `agent.external_invalid`).",
         "properties": {
           "connection_id": {
             "anyOf": [
@@ -4057,6 +4113,11 @@
               }
             ]
           },
+          "awaiting_pickup": {
+            "default": false,
+            "title": "Awaiting Pickup",
+            "type": "boolean"
+          },
           "changed": {
             "title": "Changed",
             "type": "boolean"
@@ -4618,6 +4679,11 @@
                 "type": "null"
               }
             ]
+          },
+          "awaiting_pickup": {
+            "default": false,
+            "title": "Awaiting Pickup",
+            "type": "boolean"
           },
           "children": {
             "$ref": "#/components/schemas/ChildCounts"
@@ -6494,6 +6560,11 @@
                 "type": "null"
               }
             ]
+          },
+          "awaiting_pickup": {
+            "default": false,
+            "title": "Awaiting Pickup",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -12835,6 +12906,11 @@
               }
             ]
           },
+          "awaiting_pickup": {
+            "default": false,
+            "title": "Awaiting Pickup",
+            "type": "boolean"
+          },
           "children": {
             "$ref": "#/components/schemas/ChildCounts"
           },
@@ -13029,7 +13105,7 @@
         "type": "object"
       },
       "TicketSummaryOut": {
-        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409). `tags` by name.\n`status_changed_at`: when its status last changed (or it was made). `via_token`:\nmade by its reporter's AI client through an access token at `/mcp` (the token's\nname, the AI mark; plan M8).",
+        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409). `tags` by name.\n`status_changed_at`: when its status last changed (or it was made). `via_token`:\nmade by its reporter's AI client through an access token at `/mcp` (the token's\nname, the AI mark; plan M8). `awaiting_pickup`: assigned to an external agent and\nstill open: it waits for the agent to pick it up through `/mcp` (plan M8).",
         "properties": {
           "assignee": {
             "anyOf": [
@@ -13040,6 +13116,11 @@
                 "type": "null"
               }
             ]
+          },
+          "awaiting_pickup": {
+            "default": false,
+            "title": "Awaiting Pickup",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -13354,6 +13435,25 @@
         "title": "TodayOut",
         "type": "object"
       },
+      "TokenAgentOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TokenAgentOut",
+        "type": "object"
+      },
       "TokenAuth": {
         "description": "How a client secret goes to the token endpoint (RFC 6749 2.3.1).",
         "enum": [
@@ -13366,6 +13466,18 @@
       "TokenCreatedOut": {
         "description": "`secret`: the token's clear text, shown this once and stored nowhere.",
         "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -13513,7 +13625,20 @@
         "type": "string"
       },
       "TokenOut": {
+        "description": "`agent_id`: an agent token's external agent (kind `agent`), else null.",
         "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -16288,6 +16413,258 @@
           }
         },
         "summary": "List Agent Spaces",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/tokens": {
+      "get": {
+        "description": "An external agent's tokens, newest first (`agent.manage`).",
+        "operationId": "list_agent_tokens_api_agents__agent_id__tokens_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TokenOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agent Tokens",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "description": "A token for an external agent (`herd_agt_\u2026`); `secret` is shown this once.",
+        "operationId": "create_agent_token_api_agents__agent_id__tokens_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Agent Token",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_agent_token_api_agents__agent_id__tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Agent Token",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/{agent_id}/tokens/{token_id}/calls": {
+      "get": {
+        "description": "The agent token's tool calls through `/mcp`, newest first.",
+        "operationId": "list_agent_token_calls_api_agents__agent_id__tokens__token_id__calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_McpCallOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agent Token Calls",
         "tags": [
           "agents"
         ]

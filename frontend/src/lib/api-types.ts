@@ -435,6 +435,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{agent_id}/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Tokens
+         * @description An external agent's tokens, newest first (`agent.manage`).
+         */
+        get: operations["list_agent_tokens_api_agents__agent_id__tokens_get"];
+        put?: never;
+        /**
+         * Create Agent Token
+         * @description A token for an external agent (`herd_agt_…`); `secret` is shown this once.
+         */
+        post: operations["create_agent_token_api_agents__agent_id__tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{agent_id}/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Agent Token */
+        delete: operations["revoke_agent_token_api_agents__agent_id__tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{agent_id}/tokens/{token_id}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Token Calls
+         * @description The agent token's tool calls through `/mcp`, newest first.
+         */
+        get: operations["list_agent_token_calls_api_agents__agent_id__tokens__token_id__calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/tools": {
         parameters: {
             query?: never;
@@ -3610,9 +3671,13 @@ export interface components {
         };
         /**
          * AdminTokenOut
-         * @description A token in the admins' list: its metadata and whose it is.
+         * @description A token in the admins' list: its metadata and whose it is (`user`: its person;
+         *     for an agent token the agent's responsible person, and `agent` the agent).
          */
         AdminTokenOut: {
+            agent?: components["schemas"]["TokenAgentOut"] | null;
+            /** Agent Id */
+            agent_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3647,6 +3712,9 @@ export interface components {
          *     Both are needed for the organisation's agents (`agent.manage`). `personal`: the
          *     caller's own agent (`agent.create_personal`), which takes the caller's connection
          *     and model and has the caller as responsible person (given, they must be those).
+         *     `kind: external` (plan M8 decision 11, `agent.manage`): an agent that works from
+         *     outside through `/mcp`; no connection, no model, not personal, level at most 2
+         *     (else 422 `agent.external_invalid`), a responsible person required.
          */
         AgentCreate: {
             /** Connection Id */
@@ -3661,6 +3729,8 @@ export interface components {
              * @default
              */
             intro?: string;
+            /** @default internal */
+            kind?: components["schemas"]["AgentKind"];
             /**
              * Level
              * @description autonomy level (spec 8.2); above 2: admins
@@ -3717,17 +3787,21 @@ export interface components {
             usable: boolean;
         };
         /**
+         * AgentKind
+         * @enum {string}
+         */
+        AgentKind: "internal" | "external";
+        /**
          * AgentOut
          * @description An agent as those who manage it see it (`agent.manage`; a personal agent's
          *     owner); `responsible_name`: the responsible person's name; `owner_user_id`: a
-         *     personal agent's owner (null: the organisation's).
+         *     personal agent's owner (null: the organisation's). `kind`: `external` for an
+         *     agent that works from outside through `/mcp` (plan M8): no connection or model
+         *     (both null).
          */
         AgentOut: {
-            /**
-             * Connection Id
-             * Format: uuid
-             */
-            connection_id: string;
+            /** Connection Id */
+            connection_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3742,6 +3816,7 @@ export interface components {
             instructions: string;
             /** Intro */
             intro: string;
+            kind: components["schemas"]["AgentKind"];
             /** Level */
             level: number;
             /** Max Runtime Seconds */
@@ -3749,7 +3824,7 @@ export interface components {
             /** Max Steps */
             max_steps: number;
             /** Model */
-            model: string;
+            model: string | null;
             /** Name */
             name: string;
             /** Owner User Id */
@@ -3786,7 +3861,8 @@ export interface components {
         /**
          * AgentProfileOut
          * @description What a person with `ai.use` learns of an agent to talk to: no instructions, no
-         *     connection.
+         *     connection. `kind`: `external` for one that works from outside (plan M8): it
+         *     answers no message here.
          */
         AgentProfileOut: {
             /**
@@ -3796,6 +3872,7 @@ export interface components {
             id: string;
             /** Intro */
             intro: string;
+            kind: components["schemas"]["AgentKind"];
             /** Name */
             name: string;
             status: components["schemas"]["AgentStatus"];
@@ -3949,7 +4026,9 @@ export interface components {
         /**
          * AgentUpdate
          * @description Fields left out stay as they are; `connection_id` and `model` go together. A
-         *     personal agent takes its owner's connection and model anew with every change.
+         *     personal agent takes its owner's connection and model anew with every change. The
+         *     kind stays; an external agent takes no connection or model and no level above 2
+         *     (422 `agent.external_invalid`).
          */
         AgentUpdate: {
             /** Connection Id */
@@ -4949,6 +5028,11 @@ export interface components {
          */
         DailyCardOut: {
             assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Awaiting Pickup
+             * @default false
+             */
+            awaiting_pickup?: boolean;
             /** Changed */
             changed: boolean;
             /**
@@ -5154,6 +5238,11 @@ export interface components {
          */
         EpicOut: {
             assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Awaiting Pickup
+             * @default false
+             */
+            awaiting_pickup?: boolean;
             children: components["schemas"]["ChildCounts"];
             /**
              * Created At
@@ -5915,6 +6004,11 @@ export interface components {
          */
         MyCardOut: {
             assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Awaiting Pickup
+             * @default false
+             */
+            awaiting_pickup?: boolean;
             /**
              * Created At
              * Format: date-time
@@ -8194,6 +8288,11 @@ export interface components {
          */
         TicketOut: {
             assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Awaiting Pickup
+             * @default false
+             */
+            awaiting_pickup?: boolean;
             children: components["schemas"]["ChildCounts"];
             /**
              * Created At
@@ -8275,10 +8374,16 @@ export interface components {
          *     number. `version` guards writes (send it back; stale → 409). `tags` by name.
          *     `status_changed_at`: when its status last changed (or it was made). `via_token`:
          *     made by its reporter's AI client through an access token at `/mcp` (the token's
-         *     name, the AI mark; plan M8).
+         *     name, the AI mark; plan M8). `awaiting_pickup`: assigned to an external agent and
+         *     still open: it waits for the agent to pick it up through `/mcp` (plan M8).
          */
         TicketSummaryOut: {
             assignee: components["schemas"]["PersonOut"] | null;
+            /**
+             * Awaiting Pickup
+             * @default false
+             */
+            awaiting_pickup?: boolean;
             /**
              * Created At
              * Format: date-time
@@ -8386,6 +8491,16 @@ export interface components {
             /** Unpriced Calls */
             unpriced_calls: number;
         };
+        /** TokenAgentOut */
+        TokenAgentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /**
          * TokenAuth
          * @description How a client secret goes to the token endpoint (RFC 6749 2.3.1).
@@ -8397,6 +8512,8 @@ export interface components {
          * @description `secret`: the token's clear text, shown this once and stored nowhere.
          */
         TokenCreatedOut: {
+            /** Agent Id */
+            agent_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -8450,8 +8567,13 @@ export interface components {
          * @enum {string}
          */
         TokenMode: "read" | "write";
-        /** TokenOut */
+        /**
+         * TokenOut
+         * @description `agent_id`: an agent token's external agent (kind `agent`), else null.
+         */
         TokenOut: {
+            /** Agent Id */
+            agent_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -9891,6 +10013,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AgentSpaceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_tokens_api_agents__agent_id__tokens_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TokenOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_token_api_agents__agent_id__tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_agent_token_api_agents__agent_id__tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_token_calls_api_agents__agent_id__tokens__token_id__calls_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_McpCallOut_"];
                 };
             };
             /** @description Validation Error */

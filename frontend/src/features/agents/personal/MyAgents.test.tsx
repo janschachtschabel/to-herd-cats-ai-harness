@@ -15,6 +15,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     id: OWN,
     name: 'Notizfuchs',
     intro: 'Sortiert meine Notizen.',
+    kind: 'internal',
     instructions: '',
     connection_id: 'c-1',
     model: 'gpt-6-luna',
