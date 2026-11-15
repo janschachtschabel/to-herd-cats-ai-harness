@@ -7,6 +7,7 @@ const TABS = [
   { to: '/admin/ai/assignments', labelKey: 'ai.tabs.assignments', exact: true },
   { to: '/admin/ai/usage', labelKey: 'ai.tabs.usage', exact: true },
   { to: '/admin/ai/budgets', labelKey: 'ai.tabs.budgets', exact: true },
+  { to: '/admin/ai/mcp', labelKey: 'ai.tabs.mcp', exact: true },
   { to: '/admin/ai/mcp-servers', labelKey: 'ai.tabs.mcpServers', exact: false },
   { to: '/admin/ai/connectors', labelKey: 'ai.tabs.connectors', exact: true },
   { to: '/admin/ai/catalog', labelKey: 'ai.tabs.catalog', exact: true },

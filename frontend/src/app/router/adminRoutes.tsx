@@ -30,6 +30,10 @@ const BudgetsPage = lazyRouteComponent(
   () => import('@/features/ai/budgets/BudgetsPage'),
   'BudgetsPage',
 )
+const McpAdminPage = lazyRouteComponent(
+  () => import('@/features/tokens/McpAdminPage'),
+  'McpAdminPage',
+)
 const ServersPage = lazyRouteComponent(
   () => import('@/features/mcp/servers/ServersPage'),
   'ServersPage',
@@ -157,6 +161,14 @@ const aiBudgetsRoute = createRoute({
   component: BudgetsPage,
 })
 
+/** MCP access (plan M8): the switch, the data location and every access token. */
+const mcpAccessRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/ai/mcp',
+  loader: ({ context }) => requirePermission(context.me, 'ai.manage'),
+  component: McpAdminPage,
+})
+
 /** External MCP servers (plan M8): the list, and one server with its tools. */
 const mcpServersRoute = createRoute({
   getParentRoute: () => adminRoute,
@@ -241,6 +253,7 @@ export const adminTree = adminRoute.addChildren([
   aiAssignmentsRoute,
   aiUsageRoute,
   aiBudgetsRoute,
+  mcpAccessRoute,
   mcpServersRoute,
   mcpServerRoute,
   mcpConnectorsRoute,
