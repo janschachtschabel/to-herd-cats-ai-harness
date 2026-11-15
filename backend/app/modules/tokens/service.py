@@ -72,7 +72,7 @@ class TokenService:
                 expires_at=now + timedelta(days=expires_in_days),
             )
         )
-        await self._audit(actor, "access_token.created", token, _details(token))
+        await self._audit(actor, "access_token.created", token, details_of(token))
         return token, secret
 
     async def mine(self, actor: Actor, params: PageParams) -> Page[AccessToken]:
@@ -124,7 +124,8 @@ class TokenService:
         await record(self.session, actor, action, TARGET, token.id, details or None)
 
 
-def _details(token: AccessToken) -> dict[str, Any]:
+def details_of(token: AccessToken) -> dict[str, Any]:
+    """What the audit says of a new token (never its hash or clear text)."""
     return {
         "kind": token.kind,
         "mode": token.mode,

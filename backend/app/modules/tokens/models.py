@@ -61,6 +61,7 @@ class AccessToken(UuidPk, OrgScoped, Base):
             name="space_ids",
         ),
         CheckConstraint(f"expires_at <= created_at + interval '{MAX_DAYS} days'", name="expiry"),
+        CheckConstraint("(kind = 'agent') = (agent_id IS NOT NULL)", name="agent"),
     )
 
     kind: Mapped[TokenKind] = mapped_column(String(16), nullable=False)
@@ -69,6 +70,11 @@ class AccessToken(UuidPk, OrgScoped, Base):
         ForeignKey("app_user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+    # An agent token's external agent (`kind = agent`, plan M8 decision 11); `user_id`
+    # is then the agent's responsible person when it was issued.
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("agent.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, unique=True)

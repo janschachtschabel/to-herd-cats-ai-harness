@@ -1,6 +1,6 @@
 """A token's clear text and the hash that is all the database keeps (plan M8 decision
 2): 32 random bytes (256 bits) behind a recognisable prefix, `herd_pat_` for a
-person's token (`herd_agt_` comes with agent tokens, task 4). Lookups go by the hash
+person's token, `herd_agt_` for an external agent's (task 4). Lookups go by the hash
 alone, so comparing a guess costs the same whatever it matches."""
 
 import hashlib
@@ -8,7 +8,7 @@ import secrets
 
 from app.modules.tokens.models import TokenKind
 
-PREFIXES = {TokenKind.PERSONAL: "herd_pat_"}
+PREFIXES = {TokenKind.PERSONAL: "herd_pat_", TokenKind.AGENT: "herd_agt_"}
 RANDOM_BYTES = 32
 
 

@@ -125,7 +125,8 @@ class TicketSummaryOut(BaseModel):
     number. `version` guards writes (send it back; stale → 409). `tags` by name.
     `status_changed_at`: when its status last changed (or it was made). `via_token`:
     made by its reporter's AI client through an access token at `/mcp` (the token's
-    name, the AI mark; plan M8)."""
+    name, the AI mark; plan M8). `awaiting_pickup`: assigned to an external agent and
+    still open: it waits for the agent to pick it up through `/mcp` (plan M8)."""
 
     id: uuid.UUID
     number: int
@@ -146,6 +147,7 @@ class TicketSummaryOut(BaseModel):
     updated_at: datetime
     status_changed_at: datetime
     via_token: str | None = None
+    awaiting_pickup: bool = False
 
     @classmethod
     def fields_of(cls, view: TicketView) -> dict[str, object]:
@@ -181,6 +183,7 @@ class TicketSummaryOut(BaseModel):
             "updated_at": t.updated_at,
             "status_changed_at": t.status_changed_at,
             "via_token": t.via_token,
+            "awaiting_pickup": view.awaiting_pickup,
         }
 
     @classmethod

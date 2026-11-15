@@ -119,6 +119,7 @@ async def test_the_profile_for_people_with_ai(bench: Bench) -> None:
         "name": "Ava",
         "intro": "Answers questions from the wiki.",
         "status": "active",
+        "kind": "internal",
     }
     assert (await bench.people.gast.get(url)).status_code == 404
     draft = (await bench.people.admin.post(AGENTS, json=body(bench))).json()

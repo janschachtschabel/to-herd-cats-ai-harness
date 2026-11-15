@@ -56,6 +56,12 @@ class AgentHooks(Protocol):
         """The names of the agents with these ids."""
         ...
 
+    async def external_ids(
+        self, session: AsyncSession, org_id: uuid.UUID, ids: Iterable[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """Those of these ids that are external agents (plan M8 decision 11)."""
+        ...
+
 
 _registered: list[AgentHooks] = []
 

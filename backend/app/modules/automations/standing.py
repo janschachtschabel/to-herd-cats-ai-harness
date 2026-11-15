@@ -2,8 +2,8 @@
 decisions 2, 3, 6, 12 and 13).
 
 **Owning** (`may_own`): a person may own an automation (make it, take it over, keep
-it) while they have `ai.use`, reach its agent (not a draft; a personal agent only
-its owner) and may write at its place:
+it) while they have `ai.use`, reach its agent (not a draft, not an external agent,
+which never runs here; a personal agent only its owner) and may write at its place:
 
 - the person's DM with the agent (the two of them alone);
 - a channel or a ticket's thread of a space where the person may post
@@ -69,7 +69,7 @@ async def may_own(
         return False
     if not await can(session, actor, Action.AI_USE):
         return False
-    if agent.status == AgentStatus.DRAFT or not owned_by(agent, actor):
+    if agent.status == AgentStatus.DRAFT or agent.external or not owned_by(agent, actor):
         return False
     if conversation.kind == ConversationKind.DM:
         return await _alone_with(session, actor, agent, conversation)

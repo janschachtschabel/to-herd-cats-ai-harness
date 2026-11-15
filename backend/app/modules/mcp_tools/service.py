@@ -66,12 +66,12 @@ class McpToolService:
         self.session = session
 
     def offered(self, token: TokenActor) -> tuple[Exposed, ...]:
-        return tools_for(token.mode)
+        return tools_for(token)
 
     async def call(
         self, token: TokenActor, name: str, arguments: Mapping[str, Any] | None
     ) -> Answer:
-        tool = tool_for(token.mode, name)
+        tool = tool_for(token, name)
         if tool is None:
             raise UnknownTool
         started = time.perf_counter()
@@ -108,7 +108,14 @@ class McpToolService:
         except ValidationError as exc:
             return Answer(_invalid(exc), True, Outcome.INVALID)
         ctx = TokenContext(
-            self.session, token.actor, token.location, Reads(), token.token_id, token.name, call_id
+            self.session,
+            token.actor,
+            token.location,
+            Reads(),
+            token.token_id,
+            token.name,
+            call_id,
+            token.agent.id if token.agent else None,
         )
         try:
             async with self.session.begin_nested():

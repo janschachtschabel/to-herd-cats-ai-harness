@@ -8,6 +8,13 @@ from above; its autonomy level (spec 8.2: 1 reads, 2 proposes, 3 writes inside, 
 acts outside through external tools, plan M8 decision 8), the default of its tool
 grants.
 
+An external agent (`kind = external`, plan M8 decision 11) is a principal with
+memberships like every agent, but has no connection, no model and no runs in the
+system: it works from outside through `/mcp` with an agent token
+(`modules/tokens`), at level 2 at most, never a personal agent. Its responsible
+person's rights bound what its tokens may do; while that person is inactive, or the
+agent paused, its tokens rest.
+
 A personal agent (`owner_user_id`, plan M6 decision 13) belongs to one person: it is
 a member only of that person's personal space, its responsible person is its owner,
 it has at most level 2 and uses the owner's connection and model (`personal.py`).
@@ -85,6 +92,14 @@ MAX_HANDOVERS_PER_RUN = 5  # tickets one run hands to agents (review M6 finding 
 DEFAULT_LEVEL = 2
 
 
+EXTERNAL_MAX_LEVEL = 2  # an external agent proposes at most (plan M8 decision 11)
+
+
+class AgentKind(StrEnum):
+    INTERNAL = "internal"  # run by the worker on a connection and model
+    EXTERNAL = "external"  # works from outside through `/mcp` (plan M8 decision 11)
+
+
 class AgentStatus(StrEnum):
     DRAFT = "draft"
     ACTIVE = "active"
@@ -138,17 +153,31 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
             f"max_runtime_seconds BETWEEN 10 AND {MAX_RUNTIME_SECONDS}", name="max_runtime"
         ),
         CheckConstraint(f"level BETWEEN 1 AND {MAX_LEVEL}", name="level"),
+        CheckConstraint(_in("kind", AgentKind), name="kind"),
+        CheckConstraint(
+            "kind = 'external' OR (connection_id IS NOT NULL AND model IS NOT NULL)",
+            name="internal_target",
+        ),
+        CheckConstraint(
+            "kind = 'internal' OR (connection_id IS NULL AND model IS NULL"
+            f" AND owner_user_id IS NULL AND level <= {EXTERNAL_MAX_LEVEL})",
+            name="external_fields",
+        ),
         Index("ix_agent_connection_id", "connection_id"),
         Index("ix_agent_owner_user_id", "owner_user_id"),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
+    kind: Mapped[AgentKind] = mapped_column(
+        String(16), nullable=False, default=AgentKind.INTERNAL, server_default="internal"
+    )
     intro: Mapped[str] = mapped_column(String(MAX_INTRO_CHARS), nullable=False, default="")
     instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    connection_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT"), nullable=False
+    # NULL only for an external agent (`kind`).
+    connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_connection.id", ondelete="RESTRICT")
     )
-    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(200))
     responsible_user_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=False
     )
@@ -166,6 +195,10 @@ class Agent(UuidPk, OrgScoped, Timestamps, Base):
         Integer, nullable=False, default=DEFAULT_LEVEL, server_default=text(str(DEFAULT_LEVEL))
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    @property
+    def external(self) -> bool:
+        return self.kind == AgentKind.EXTERNAL
 
 
 class AgentTool(OrgScoped, Base):

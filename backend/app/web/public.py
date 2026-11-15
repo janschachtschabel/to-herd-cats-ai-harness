@@ -124,6 +124,7 @@ def api_router() -> APIRouter:
     api.include_router(ai_budgets.budgets)
     api.include_router(tokens_router.mcp_admin)
     api.include_router(tokens_router.tokens)
+    api.include_router(tokens_router.agent_tokens)
     api.include_router(agents_router.agents)
     api.include_router(run_router.agent_runs)
     api.include_router(run_router.runs)

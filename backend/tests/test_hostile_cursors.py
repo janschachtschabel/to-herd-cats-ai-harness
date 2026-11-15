@@ -16,7 +16,10 @@ from app.modules.users.models import User
 from app.web.public import create_public_app
 from tests.factories_agents import Bench
 from tests.factories_dms import People
+from tests.factories_external_agents import agent_token, make_external
 from tests.factories_mcp import make_server
+from tests.factories_tokens import mcp_on
+from tests.factories_writing import Work
 from tests.support.mcp_stub import McpStub
 
 UUID = "0190f0f0-0000-7000-8000-000000000000"
@@ -99,6 +102,11 @@ NEED_A_RUN = {
 
 SERVER_TOOLS = "/api/ai/mcp-servers/{server_id}/tools"
 
+AGENT_TOKENS = {
+    "/api/agents/{agent_id}/tokens",
+    "/api/agents/{agent_id}/tokens/{token_id}/calls",
+}
+
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
 async def test_hostile_cursors_answer_422_everywhere(
@@ -140,6 +148,8 @@ async def test_hostile_cursors_answer_422_everywhere(
             continue  # test_hostile_cursors_on_a_runs_events
         if template == SERVER_TOOLS:
             continue  # test_hostile_cursors_on_a_servers_tools
+        if template in AGENT_TOKENS:
+            continue  # test_hostile_cursors_on_an_agents_tokens
         path = template
         for placeholder, value in ids.items():
             path = path.replace(placeholder, value)
@@ -188,6 +198,22 @@ async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
                 assert response.status_code == 200, (name, response.text)
                 continue
             assert response.status_code == 422, (name, response.text)
+            assert response.json()["error"]["code"] == "validation_failed"
+
+
+async def test_hostile_cursors_on_an_agents_tokens(work: Work) -> None:
+    """The token lists of an external agent (plan M8 task 4)."""
+    await mcp_on(work.admin)
+    agent = await make_external(work)
+    token = await agent_token(work.admin, agent)
+    for template in AGENT_TOKENS:
+        path = template.replace("{agent_id}", str(agent.id)).replace("{token_id}", token["id"])
+        for name, cursor in HOSTILE.items():
+            response = await work.admin.get(path, params={"cursor": cursor})
+            if name == "empty":
+                assert response.status_code == 200, (path, response.text)
+                continue
+            assert response.status_code == 422, (path, name, response.text)
             assert response.json()["error"]["code"] == "validation_failed"
 
 

@@ -72,7 +72,8 @@ class ParentRef:
 @dataclass(frozen=True, slots=True)
 class TicketView:
     """A ticket with what showing it needs: its status, parent, people's names and
-    (filled in by the services, `base.with_tags`) its tags."""
+    (filled in by the services, `base.with_tags`) its tags and whether it waits for
+    an external agent to pick it up."""
 
     ticket: WorkItem
     status: TicketStatus
@@ -80,6 +81,7 @@ class TicketView:
     assignee_name: str | None
     reporter_name: str | None
     tags: tuple[Tag, ...] = ()
+    awaiting_pickup: bool = False
 
 
 def _sort_key(sort: Sort) -> ColumnElement[object]:
@@ -266,6 +268,11 @@ class TicketRepository:
         if f.assignee_id is not None:
             stmt = stmt.where(
                 WorkItem.assignee_type == PrincipalType.USER, WorkItem.assignee_id == f.assignee_id
+            )
+        if f.agent_assignee_id is not None:
+            stmt = stmt.where(
+                WorkItem.assignee_type == PrincipalType.AGENT,
+                WorkItem.assignee_id == f.agent_assignee_id,
             )
         if f.unassigned:
             stmt = stmt.where(WorkItem.assignee_id.is_(None))

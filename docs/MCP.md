@@ -4,7 +4,8 @@ Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
 `mcp.use`** (Plan M8, Task 1), **der Endpunkt `/mcp`** mit lesenden und schreibenden
 Werkzeugen (Tasks 2 und 3), **Konnektoren** (Task 5) mit **OAuth** (Task 8) und
 **externe MCP-Server** mit Werkzeugfreigabe (Task 6), ihre Werkzeuge im Lauf (Task 7)
-und der **Katalog** mitgelieferter Vorlagen (Task 9). Externe Agenten folgen.
+und der **Katalog** mitgelieferter Vorlagen (Task 9), dazu **externe Agenten** mit
+Agenten-Token und Ticket-Abholung (Task 4).
 
 ## Zugangstoken
 
@@ -266,6 +267,102 @@ selbst, Argumente und Ergebnisse stehen in keiner Logzeile (Test
 - Tests: `tests/test_mcp_endpoint.py`, `test_mcp_read_tools.py`,
   `test_mcp_write_tools.py`, `test_mcp_endpoint_usage.py`, `test_mcp_offered_tools.py`
   (ein echter Client des SDK über ASGI gegen die App).
+
+## Externe Agenten
+
+Ein externer Agent (Plan M8, Entscheidungen 11 und 12; Bedienung:
+[`AGENTEN.md`](AGENTEN.md#externe-agenten-seit-m8)) arbeitet von außen über `/mcp`, mit
+einem **Agenten-Token** statt eines persönlichen. Zum Beispiel ein Claude Code oder
+Codex, das ein Team als Mitarbeiter betreibt: Er holt sich Tickets ab, arbeitet sie ab
+und bringt sie bis „Zur Prüfung“.
+
+### Agenten-Token ausstellen
+
+Personen, die den Agenten verwalten (`agent.manage`; alle anderen 404
+`agent.not_found` wie für einen unbekannten Agenten):
+
+- `POST /api/agents/{id}/tokens` mit denselben Feldern wie ein persönliches Token
+  (`name`, `mode`, `expires_in_days`, optional `space_ids`). Die Antwort enthält den
+  Klartext in `secret`, **genau einmal**, mit dem Präfix `herd_agt_`.
+  - Nur für externe Agenten (422 `token.agent_not_external`).
+  - Nur solange die verantwortliche Person `mcp.use` hat (Schalter an, aktiv, kein
+    Gast, nicht „keine KI“; sonst 422 `token.responsible_without_mcp`).
+  - `space_ids`: nur Bereiche, die der Agent lesen darf (Mitgliedschaft oder offener
+    Bereich), sonst 422 `token.space_invalid`. Ohne: alle diese Bereiche.
+- `GET /api/agents/{id}/tokens` (seitenweise, neueste zuerst; nur Metadaten, mit
+  `agent_id`), `DELETE /api/agents/{id}/tokens/{token_id}` (Widerruf, 204, idempotent;
+  das Token eines anderen Agenten antwortet 404 `token.not_found`),
+  `GET /api/agents/{id}/tokens/{token_id}/calls` (die Aufrufe des Tokens: die Aktivität
+  des Agenten über `/mcp`).
+- Das Token gehört in der Datenbank der **verantwortlichen Person** (`user_id`) und
+  nennt den Agenten (`agent_id`, Art `agent`). In der eigenen Token-Liste der Person
+  erscheint es nicht; die Verwaltung (`GET /api/ai/mcp/tokens`) zeigt es mit `agent`
+  (ID und Name) und widerruft es wie jedes Token.
+- Audit: `access_token.created` (mit `agent_id`, Art, Modus, Umfang, Ablauf) und
+  `access_token.revoked` (mit `agent_id`), nie Hash oder Klartext.
+
+### Rechte eines Agenten-Tokens
+
+Bei jedem Aufruf neu aufgelöst, wie bei persönlichen Token:
+
+- Lesbar und beschreibbar ist die Schnittmenge aus den **Mitgliedschaften des Agenten**
+  (seine Rolle je Bereich; in offenen Bereichen liest er), den **Rechten der
+  verantwortlichen Person**, dem **Umfang des Tokens** und der **KI-Richtlinie** für
+  den Datenort des Endpunkts; nie Entwürfe. Nimmt man dem Agenten oder der Person
+  einen Bereich, ist er sofort weg.
+- **Höchstens Stufe 2**, und nur bis zur Stufe des Agenten: Ein `write`-Token eines
+  Agenten auf Stufe 2 bekommt die lesenden Werkzeuge, `list_my_tickets`,
+  `claim_ticket`, `create_ticket`, `comment_ticket`, `set_ticket_status`,
+  `link_ticket_page`, `propose_page_change` und `propose_new_page`; nie `update_page`
+  oder `post_message` (Stufe 3). Auf Stufe 1 oder mit einem `read`-Token nur die
+  lesenden Werkzeuge und `list_my_tickets`. Werkzeugfreigaben des Agenten
+  (`agent_tool`) schränken weiter ein: Angeboten wird nur, was `allow` bleibt.
+- Der Agent **ruht** (das Token antwortet 401 `token.invalid`, wie ein unbekanntes),
+  solange er nicht aktiv ist (pausiert oder Entwurf), seine verantwortliche Person
+  kein `mcp.use` hat (inaktiv, Gast, „keine KI“, Schalter aus) oder eine andere Person
+  für ihn verantwortlich ist. Nach einem Wechsel der Verantwortung stellt man neue
+  Token aus.
+- Was das Token schreibt, ist **des Agenten** (`author`/`reporter` vom Typ `agent`,
+  Nachrichten der Art `agent`), mit dem Namen des Tokens in `via_token`, auch in den
+  Systemeinträgen der Zeitleiste. Seine Nachrichten erwähnen niemanden und starten
+  keinen Lauf.
+
+### Ticket-Abholung
+
+Nur mit einem Agenten-Token:
+
+| Werkzeug | Was es tut |
+|---|---|
+| `list_my_tickets` | die Tickets, die dem Agenten zugewiesen und nicht erledigt oder verworfen sind, zuletzt geänderte zuerst, je mit Schlüssel, Status und `version` (höchstens 50) |
+| `claim_ticket` | ein nicht zugewiesenes Ticket (oder ein schon eigenes) übernehmen: es wird dem Agenten zugewiesen und wechselt aus einem offenen Status in den ersten Status der Kategorie „in Arbeit“ des Bereichs; mit der gelesenen `version` (ohne: die aktuelle). Ein Ticket einer anderen Person oder eines anderen Agenten, eines zur Prüfung, erledigt oder verworfen wird abgelehnt |
+
+- Von zwei Agenten, die dasselbe Ticket zugleich übernehmen, bekommt es einer; der
+  andere bekommt einen Werkzeugfehler („Changed meanwhile (ticket.version_conflict)“
+  oder „Assigned to someone else“). Die Zeile des Tickets ist dabei gesperrt
+  (`tickets/claiming.py`).
+- Übernehmen kann der Agent nur in Bereichen, in denen er (und seine Person) Tickets
+  bearbeiten darf (`ticket.edit`; Mitglied mindestens als `editor`).
+- Danach wie bei internen Agenten: kommentieren, den Status höchstens bis zur Kategorie
+  „Zur Prüfung“ setzen (`set_ticket_status`; „erledigt“ und „verworfen“ setzt ein
+  Mensch), Seitenvorschläge.
+- Einem externen Agenten zugewiesene, noch offene Tickets tragen in der API
+  `awaiting_pickup: true` („wartet auf Abholung“). Die Zuweisung startet keinen Lauf und
+  schreibt keinen Hinweis in die Ticket-Diskussion.
+
+### Einrichten in Claude Code und Codex
+
+Wie für ein persönliches Token ([Einen Client verbinden](#einen-client-verbinden)), nur
+mit dem Agenten-Token in der Umgebung des Rechners oder der Pipeline, auf dem der Agent
+läuft:
+
+```bash
+claude mcp add --transport http herd https://herd.example.com/mcp \
+  --header "Authorization: Bearer $HERD_AGENT_TOKEN"
+```
+
+Für Codex `bearer_token_env_var = "HERD_AGENT_TOKEN"`. Ein sinnvoller Auftrag an den
+Agenten: „Rufe `list_my_tickets` auf, übernimm das erste Ticket mit `claim_ticket`,
+arbeite es ab, kommentiere das Ergebnis und setze es auf ‚Zur Prüfung‘.“
 
 ## Konnektoren
 

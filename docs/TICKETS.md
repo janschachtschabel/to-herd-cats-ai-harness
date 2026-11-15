@@ -133,6 +133,12 @@ Kategorie `cancelled` („Verworfen“). Zwischen Bereichen verschieben lässt e
   den Grund (`run.refused`); die verantwortliche Person des Agenten erfährt es in
   ihrer Aktivität. Einzelheiten und Übergaben zwischen Agenten:
   [`AGENTEN.md`](AGENTEN.md#auslöser-erwähnung-ticket-zuweisung-übergabe). In Kanäle und Direktnachrichten schreibt auch ein solcher Lauf nichts.
+- Ein **externer Agent** (seit M8) bekommt keinen Lauf: Das Ticket **wartet auf
+  Abholung** (`awaiting_pickup: true` in Liste und Ansicht, solange sein Status offen
+  ist), ohne Hinweis im Thread. Der Agent übernimmt es über `/mcp` (`claim_ticket`:
+  zugewiesen und in den ersten Status „in Arbeit“, mit `version`; 409
+  `ticket.taken`, wenn es schon jemand anderem gehört) und bringt es höchstens bis
+  „Zur Prüfung“ ([`MCP.md`](MCP.md#ticket-abholung)).
 - **„Übernehmen“** weist ein nicht zugewiesenes Ticket sich selbst zu, **„Abgeben“**
   löst die eigene Zuweisung (beides mit `ticket.edit`). **„Jemandem zuweisen“** (mit
   `ticket.assign`) öffnet eine Personenauswahl mit genau den Personen, die den Bereich

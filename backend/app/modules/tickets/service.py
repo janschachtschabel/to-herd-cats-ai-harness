@@ -112,7 +112,7 @@ class TicketService:
             changes[Field.ASSIGNEE] = (None, assignee.id)
         await emit_change(self.session, actor, TICKET_CREATED, ticket, changes, by)
         await self._audit(actor, "ticket.created", ticket, {"number": ticket.number})
-        await self._after_changes(actor, ticket, changes, status, by)
+        await self.after_changes(actor, ticket, changes, status, by)
         return await view_of(self.session, actor, repo, ticket.id)
 
     async def get(self, actor: Actor, number: int) -> TicketView:
@@ -171,7 +171,7 @@ class TicketService:
         ticket.version += 1
         await self.session.flush()
         await emit_change(self.session, actor, TICKET_UPDATED, ticket, changes, by)
-        await self._after_changes(actor, ticket, changes, status, by)
+        await self.after_changes(actor, ticket, changes, status, by)
         return await view_of(self.session, actor, repo, ticket.id)
 
     async def list(
@@ -241,7 +241,7 @@ class TicketService:
             await hierarchy.check_change(repo, ticket, values, changes)
         return changes
 
-    async def _after_changes(
+    async def after_changes(
         self,
         actor: Actor,
         ticket: WorkItem,

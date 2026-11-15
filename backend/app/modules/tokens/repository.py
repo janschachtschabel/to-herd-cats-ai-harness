@@ -11,10 +11,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.principal import SystemRole
+from app.modules.agents.models import Agent, AgentKind, AgentStatus
 from app.modules.ai.models import DataLocation, UserAssignment
 from app.modules.ai.policy_filters import ai_space_ids
 from app.modules.spaces.models import Space, SpaceKind
-from app.modules.tokens.models import AccessToken, McpSetting
+from app.modules.tokens.models import AccessToken, McpSetting, TokenKind
 from app.modules.users.models import User
 
 
@@ -31,13 +32,26 @@ class McpStanding:
 
 
 @dataclass(frozen=True, slots=True)
+class AgentFacts:
+    """An agent token's agent as it is now (plan M8 decision 11)."""
+
+    id: uuid.UUID
+    kind: AgentKind
+    status: AgentStatus
+    responsible_user_id: uuid.UUID
+    level: int
+
+
+@dataclass(frozen=True, slots=True)
 class Found:
-    """A token with what decides whether it may act now: its person's standing and the
-    organisation's MCP settings, all from the one statement."""
+    """A token with what decides whether it may act now: its person's standing, the
+    organisation's MCP settings and an agent token's agent, all from the one
+    statement."""
 
     token: AccessToken
     standing: McpStanding
     location: DataLocation
+    agent: AgentFacts | None = None
 
     @property
     def system_role(self) -> SystemRole:
@@ -48,6 +62,7 @@ class Found:
 class Listed:
     token: AccessToken
     user_name: str
+    agent_name: str | None = None  # an agent token's agent
 
 
 class TokenRepository:
@@ -63,18 +78,30 @@ class TokenRepository:
                 func.coalesce(McpSetting.enabled, false()),
                 _kept_from_ai(),
                 func.coalesce(McpSetting.data_location, DataLocation.EXTERNAL.value),
+                Agent.kind,
+                Agent.status,
+                Agent.responsible_user_id,
+                Agent.level,
             )
             .join(User, and_(User.id == AccessToken.user_id, User.org_id == AccessToken.org_id))
             .outerjoin(McpSetting, McpSetting.org_id == AccessToken.org_id)
             .outerjoin(UserAssignment, _own_assignment())
+            .outerjoin(
+                Agent, and_(Agent.id == AccessToken.agent_id, Agent.org_id == AccessToken.org_id)
+            )
             .where(AccessToken.token_hash == digest)
         )
         row = (await self.session.execute(stmt)).one_or_none()
         if row is None:
             return None
-        token, active, role, enabled, kept, location = row
+        token, active, role, enabled, kept, location, kind, status, responsible, level = row
         standing = McpStanding(bool(active), SystemRole(role), bool(enabled), bool(kept))
-        return Found(token, standing, DataLocation(location))
+        agent = None
+        if token.agent_id is not None and kind is not None:
+            agent = AgentFacts(
+                token.agent_id, AgentKind(kind), AgentStatus(status), responsible, int(level)
+            )
+        return Found(token, standing, DataLocation(location), agent)
 
     async def touch(self, org_id: uuid.UUID, token_id: uuid.UUID, minute: datetime) -> None:
         """`last_used_at` to `minute`, unless it is there already (or later)."""
@@ -117,8 +144,10 @@ class TokenRepository:
         self, org_id: uuid.UUID, token_id: uuid.UUID, user_id: uuid.UUID | None = None
     ) -> AccessToken | None:
         stmt = select(AccessToken).where(AccessToken.org_id == org_id, AccessToken.id == token_id)
-        if user_id is not None:
-            stmt = stmt.where(AccessToken.user_id == user_id)
+        if user_id is not None:  # one's own: personal tokens only (an agent's are the agent's)
+            stmt = stmt.where(
+                AccessToken.user_id == user_id, AccessToken.kind == TokenKind.PERSONAL
+            )
         return await self.session.scalar(stmt)
 
     async def revoke(self, org_id: uuid.UUID, token_id: uuid.UUID, now: datetime) -> bool:
@@ -138,9 +167,11 @@ class TokenRepository:
     async def own_page(
         self, org_id: uuid.UUID, user_id: uuid.UUID, before: uuid.UUID | None, limit: int
     ) -> list[AccessToken]:
-        """The person's tokens, newest first."""
+        """The person's own tokens (not an agent's they answer for), newest first."""
         stmt = select(AccessToken).where(
-            AccessToken.org_id == org_id, AccessToken.user_id == user_id
+            AccessToken.org_id == org_id,
+            AccessToken.user_id == user_id,
+            AccessToken.kind == TokenKind.PERSONAL,
         )
         if before is not None:
             stmt = stmt.where(AccessToken.id < before)
@@ -150,16 +181,41 @@ class TokenRepository:
     async def all_page(
         self, org_id: uuid.UUID, before: uuid.UUID | None, limit: int
     ) -> list[Listed]:
-        """Every token of the organisation with its person's name, newest first."""
+        """Every token of the organisation with its person's name (and an agent
+        token's agent's), newest first."""
         stmt = (
-            select(AccessToken, User.name)
+            select(AccessToken, User.name, Agent.name)
             .join(User, User.id == AccessToken.user_id)
+            .outerjoin(Agent, and_(Agent.id == AccessToken.agent_id, Agent.org_id == org_id))
             .where(AccessToken.org_id == org_id, User.org_id == org_id)
         )
         if before is not None:
             stmt = stmt.where(AccessToken.id < before)
         stmt = stmt.order_by(AccessToken.id.desc()).limit(limit)
-        return [Listed(token, name) for token, name in (await self.session.execute(stmt)).all()]
+        rows = (await self.session.execute(stmt)).all()
+        return [Listed(token, name, agent) for token, name, agent in rows]
+
+    async def agent_page(
+        self, org_id: uuid.UUID, agent_id: uuid.UUID, before: uuid.UUID | None, limit: int
+    ) -> list[AccessToken]:
+        """An external agent's tokens, newest first."""
+        stmt = select(AccessToken).where(
+            AccessToken.org_id == org_id, AccessToken.agent_id == agent_id
+        )
+        if before is not None:
+            stmt = stmt.where(AccessToken.id < before)
+        stmt = stmt.order_by(AccessToken.id.desc()).limit(limit)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def of_agent(
+        self, org_id: uuid.UUID, agent_id: uuid.UUID, token_id: uuid.UUID
+    ) -> AccessToken | None:
+        stmt = select(AccessToken).where(
+            AccessToken.org_id == org_id,
+            AccessToken.id == token_id,
+            AccessToken.agent_id == agent_id,
+        )
+        return await self.session.scalar(stmt)
 
 
 class McpSettingRepository:

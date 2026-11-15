@@ -124,7 +124,7 @@ class AssignTicketArgs(BaseModel):
 
 async def comment_ticket(ctx: WriteContext, args: CommentTicketArgs) -> ToolResult:
     attrs = {"key": args.key}
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     if ticket is None:
         return refusal("ticket", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, ticket.space_id):
@@ -139,7 +139,7 @@ async def comment_ticket(ctx: WriteContext, args: CommentTicketArgs) -> ToolResu
 
 async def set_ticket_status(ctx: WriteContext, args: SetTicketStatusArgs) -> ToolResult:
     attrs = {"key": args.key}
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     if ticket is None:
         return refusal("ticket", NOT_FOUND, attrs)
     statuses = await status_repository(ctx.session, ctx.actor).in_space(ticket.space_id)
@@ -180,7 +180,7 @@ async def create_ticket(ctx: WriteContext, args: CreateTicketArgs) -> ToolResult
         return refusal("ticket", why, attrs)
     parent_id = None
     if args.parent_key is not None:
-        parent = await _ticket(ctx, args.parent_key)
+        parent = await find_ticket(ctx, args.parent_key)
         if parent is None:
             return refusal("ticket", NOT_FOUND, {"key": args.parent_key})
         parent_id = parent.id
@@ -203,7 +203,7 @@ async def create_ticket(ctx: WriteContext, args: CreateTicketArgs) -> ToolResult
 
 async def link_ticket_page(ctx: WriteContext, args: LinkTicketPageArgs) -> ToolResult:
     attrs = {"key": args.key, "page": str(args.page_id)}
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     try:
         page = await PageReader(ctx.session).for_ai(ctx.actor, args.page_id)
     except NotFound:
@@ -225,7 +225,7 @@ async def link_ticket_page(ctx: WriteContext, args: LinkTicketPageArgs) -> ToolR
 
 async def assign_ticket(ctx: ToolContext, args: AssignTicketArgs) -> ToolResult:
     attrs = {"key": args.key}
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     if ticket is None:
         return refusal("ticket", NOT_FOUND, attrs)
     if why := await leaks_into(ctx, ticket.space_id):
@@ -261,7 +261,7 @@ async def assign_action(session: AsyncSession, actor: Actor, args: dict[str, Any
 
 async def ticket_subjects(ctx: ToolContext, args: CommentTicketArgs) -> list[Subject] | None:
     """For every tool that changes one ticket, named by `key`."""
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     return None if ticket is None else [_subject(ticket)]
 
 
@@ -272,7 +272,7 @@ async def create_subjects(ctx: ToolContext, args: CreateTicketArgs) -> list[Subj
 
 
 async def link_subjects(ctx: ToolContext, args: LinkTicketPageArgs) -> list[Subject] | None:
-    ticket = await _ticket(ctx, args.key)
+    ticket = await find_ticket(ctx, args.key)
     try:
         page = await PageReader(ctx.session).for_ai(ctx.actor, args.page_id)
     except NotFound:
@@ -286,7 +286,7 @@ def _subject(ticket: WorkItem) -> Subject:
     return Subject("ticket", ticket.id, ticket.version, ticket.space_id)
 
 
-async def _ticket(ctx: CallContext, key: str) -> WorkItem | None:
+async def find_ticket(ctx: CallContext, key: str) -> WorkItem | None:
     number = key_number(key)
     if number is None:
         return None

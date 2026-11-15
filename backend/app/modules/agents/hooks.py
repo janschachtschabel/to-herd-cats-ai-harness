@@ -80,6 +80,11 @@ class _Hooks:
     ) -> dict[uuid.UUID, str]:
         return await AgentRepository(session, org_id).names(set(ids))
 
+    async def external_ids(
+        self, session: AsyncSession, org_id: uuid.UUID, ids: Iterable[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        return await AgentRepository(session, org_id).external_ids(set(ids))
+
 
 class _Assignees:
     async def assignable(
@@ -91,8 +96,16 @@ class _Assignees:
         agent = await repo.get(agent_id)
         if agent is None or agent.status == AgentStatus.DRAFT or not owned_by(agent, actor):
             return False
-        role = (await repo.roles(agent_id)).get(space_id)
-        return role is not None and role >= SPACE_ACTION_MIN_ROLE[Action.TICKET_EDIT]
+        return await _works_on_tickets(repo, agent_id, space_id)
+
+    async def claimable(
+        self, session: AsyncSession, actor: Actor, space_id: uuid.UUID, agent_id: uuid.UUID
+    ) -> bool:
+        repo = AgentRepository(session, actor.org_id)
+        agent = await repo.get(agent_id)
+        if agent is None or agent.status == AgentStatus.DRAFT:
+            return False
+        return await _works_on_tickets(repo, agent_id, space_id)
 
     async def assigned(
         self, session: AsyncSession, actor: Actor, ticket: WorkItem, by: Authorship | None
@@ -111,6 +124,14 @@ class _Assignees:
         for run_id in await RunRepository(session, actor.org_id).open_on_ticket(former, ticket.id):
             if run_id != handing:
                 await control.request_cancel(session, actor.org_id, run_id, actor.principal.id)
+
+
+async def _works_on_tickets(
+    repo: AgentRepository, agent_id: uuid.UUID, space_id: uuid.UUID
+) -> bool:
+    """A member of the space with a role that edits tickets there."""
+    role = (await repo.roles(agent_id)).get(space_id)
+    return role is not None and role >= SPACE_ACTION_MIN_ROLE[Action.TICKET_EDIT]
 
 
 register_agent_hooks(_Hooks())

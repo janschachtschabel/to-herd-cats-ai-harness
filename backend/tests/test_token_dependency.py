@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.errors import install_error_handlers
+from app.modules.agents.models import Agent, AgentKind, AgentStatus
 from app.modules.tokens.models import AccessToken, TokenKind, TokenMode
 from app.modules.tokens.resolve import TokenActorDep
 from app.modules.tokens.values import token_digest
@@ -50,14 +51,26 @@ async def test_the_dependency_gives_the_tokens_actor(
 
 
 async def test_anything_else_is_401_in_the_error_shape(
-    session: AsyncSession, probe: AsyncClient, owner: AsyncClient, member: User
+    session: AsyncSession, probe: AsyncClient, owner: AsyncClient, owner_user: User, member: User
 ) -> None:
     await mcp_on(owner)
+    # an agent token in the name of someone who is not the agent's responsible person
+    agent = Agent(
+        org_id=member.org_id,
+        name="Fremd",
+        kind=AgentKind.EXTERNAL,
+        responsible_user_id=owner_user.id,
+        status=AgentStatus.ACTIVE,
+        level=2,
+    )
+    session.add(agent)
+    await session.flush()
     secret = "herd_agt_" + "B" * 43
     session.add(
         AccessToken(
             org_id=member.org_id,
             kind=TokenKind.AGENT,
+            agent_id=agent.id,
             user_id=member.id,
             name="extern",
             token_hash=token_digest(secret),

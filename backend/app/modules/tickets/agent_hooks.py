@@ -24,6 +24,13 @@ class AssigneeHooks(Protocol):
         it work on tickets there."""
         ...
 
+    async def claimable(
+        self, session: AsyncSession, actor: Actor, space_id: uuid.UUID, agent_id: uuid.UUID
+    ) -> bool:
+        """Whether the agent may take tickets of the space for itself (`claiming.py`):
+        no draft, a member with a role that lets it work on tickets there."""
+        ...
+
     async def assigned(
         self, session: AsyncSession, actor: Actor, ticket: WorkItem, by: Authorship | None
     ) -> None:

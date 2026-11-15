@@ -23,7 +23,9 @@ task 8); a DM's runs: `hooks.py`.
   the thread. If it cannot start (a refusal, or another run already open in the
   thread: one run per ticket), the ticket stays assigned, the thread names why (a
   notice `run.refused`: the agent as its actor, the code in `to`) and the agent's
-  responsible person gets an activity entry (`run_stopped`).
+  responsible person gets an activity entry (`run_stopped`). A ticket assigned to an
+  external agent (plan M8 decision 12) starts nothing and notes nothing: it waits for
+  the agent to pick it up through `/mcp` (`awaiting_pickup` on the ticket).
 - **Handover**: an agent's run that assigns the ticket to another agent
   (`assign_ticket`) starts that agent's run for the same person (the run acts as the
   person who asked the first run, so `user_id` stays theirs), one link further down
@@ -91,6 +93,8 @@ async def on_assignment(
     assert ticket.assignee_id is not None
     agent = await AgentRepository(session, actor.org_id).get(ticket.assignee_id)
     assert agent is not None  # `assignable` found it
+    if agent.external:  # it picks the ticket up itself, through `/mcp`
+        return
     runs = RunRepository(session, actor.org_id)
     handing = await runs.of_run(by.run_id) if by is not None and by.run_id else None
     depth = handing.chain_depth + 1 if handing is not None else 0

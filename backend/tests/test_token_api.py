@@ -22,6 +22,7 @@ from tests.factories_tokens import mcp_on, new_token
 SHOWN = {
     "id",
     "kind",
+    "agent_id",
     "name",
     "mode",
     "space_ids",

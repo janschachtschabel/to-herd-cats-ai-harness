@@ -1,7 +1,10 @@
-"""A tool call's context at `/mcp` (plan M8 decision 3): the person's token as the
-writer. What a tool writes through it is the person's (the token's actor holds the
-rights, the scope and the policy), with the token's name as the AI mark
-(`Authorship.via_token`) and a page version's source `mcp`.
+"""A tool call's context at `/mcp` (plan M8 decision 3): the token as the writer. What
+a tool writes through a personal token is the person's (the token's actor holds the
+rights, the scope and the policy); through an agent token (decision 11) the external
+agent's (`agent_id`), with the responsible person's rights held to the agent's roles.
+Either way with the token's name as the AI mark (`Authorship.via_token`) and a page
+version's source `mcp`; an agent's message is of kind `agent`, mentions nobody and
+starts no run.
 
 - Keys of what a call writes (a message's `client_id`) are the call's own: every call
   writes anew; nothing is folded into what an earlier call wrote.
@@ -15,6 +18,7 @@ import uuid
 from dataclasses import dataclass
 
 from app.core.authorship import Authorship
+from app.core.principal import Principal
 from app.modules.agents.toolbox.base import WriteContext
 from app.modules.wiki.models import VersionSource
 
@@ -24,10 +28,12 @@ class TokenContext(WriteContext):
     token_id: uuid.UUID
     token_name: str
     call_id: uuid.UUID
+    agent_id: uuid.UUID | None = None  # an agent token's external agent
 
     @property
     def by(self) -> Authorship:
-        return Authorship(self.actor.principal, via_token=self.token_name)
+        author = Principal.agent(self.agent_id) if self.agent_id else self.actor.principal
+        return Authorship(author, via_token=self.token_name)
 
     @property
     def source(self) -> VersionSource:

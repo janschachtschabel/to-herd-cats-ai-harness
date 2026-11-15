@@ -17,17 +17,26 @@ up to review, link a page; page proposals) and two of level 3 that decision 3 na
 tells the client to propose elsewhere, and `post_message`, into a channel of a space
 the token may write in. Not `assign_ticket` (a handover starts agents' runs), not an
 agent's memory or skills.
+
+An external agent's token (decision 11) also gets the pick-up tools (`pickup.py`:
+`list_my_tickets`, with a `write` token `claim_ticket`), but only tools up to its
+agent's level, at most 2 (so not `update_page` or `post_message`), and none its
+grants (`agent_tool`) keep from `allow`.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.modules.agents.models import EXTERNAL_MAX_LEVEL
 from app.modules.agents.toolbox import listing, message_tools, reading, ticket_tools, wiki_tools
-from app.modules.agents.toolbox.base import Effect, ToolSpec
+from app.modules.agents.toolbox.base import Effect, Grant, ToolSpec
 from app.modules.agents.toolbox.catalog import CATALOG
+from app.modules.agents.toolbox.policy import effective
+from app.modules.mcp_tools import pickup
 from app.modules.mcp_tools.context import TokenContext
 from app.modules.tokens.models import TokenMode
+from app.modules.tokens.resolve import TokenActor
 from app.runtime.loop import ToolResult
 
 Runner = Callable[[TokenContext, Any], Awaitable[ToolResult]]
@@ -74,16 +83,34 @@ WRITE_TOOLS: tuple[Exposed, ...] = (
     _exposed("post_message", message_tools.post_message),
 )
 
+# Only for an external agent's token (decision 12; `pickup.py`).
+PICKUP_READ: tuple[Exposed, ...] = (Exposed(pickup.LIST_MY_TICKETS, pickup.list_my_tickets),)
+PICKUP_WRITE: tuple[Exposed, ...] = (Exposed(pickup.CLAIM_TICKET, pickup.claim_ticket),)
+
 _BY_MODE: Mapping[TokenMode, tuple[Exposed, ...]] = {
     TokenMode.READ: READ_TOOLS,
     TokenMode.WRITE: READ_TOOLS + WRITE_TOOLS,
 }
+_AGENT_BY_MODE: Mapping[TokenMode, tuple[Exposed, ...]] = {
+    TokenMode.READ: READ_TOOLS + PICKUP_READ,
+    TokenMode.WRITE: READ_TOOLS + PICKUP_READ + WRITE_TOOLS + PICKUP_WRITE,
+}
 
 
-def tools_for(mode: TokenMode) -> tuple[Exposed, ...]:
-    """The tools a token of this mode is offered, in the catalog's order."""
-    return _BY_MODE[mode]
+def tools_for(token: TokenActor) -> tuple[Exposed, ...]:
+    """The tools the token is offered: by its mode; an agent token's also the pick-up
+    tools, and only those its agent's level allows (at most 2, decision 11) and its
+    grants leave `allow` (`toolbox/policy.effective`; a release does not exist here)."""
+    if token.agent is None:
+        return _BY_MODE[token.mode]
+    level = min(token.agent.level, EXTERNAL_MAX_LEVEL)
+    entries = token.agent.entries
+    return tuple(
+        tool
+        for tool in _AGENT_BY_MODE[token.mode]
+        if effective(level, tool.spec, entries.get(tool.name)) == Grant.ALLOW
+    )
 
 
-def tool_for(mode: TokenMode, name: str) -> Exposed | None:
-    return next((tool for tool in tools_for(mode) if tool.name == name), None)
+def tool_for(token: TokenActor, name: str) -> Exposed | None:
+    return next((tool for tool in tools_for(token) if tool.name == name), None)

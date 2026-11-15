@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.agents.toolbox.base import CallContext
 from app.modules.mcp_tools import service as service_module
-from app.modules.mcp_tools.exposed import Exposed, tool_for
+from app.modules.mcp_tools.exposed import READ_TOOLS, Exposed, tool_for
 from app.modules.mcp_tools.models import McpCall
-from app.modules.tokens.models import TokenMode
+from app.modules.tokens.resolve import TokenActor
 from app.runtime.loop import ToolResult
 from tests.conftest import json_lines
 from tests.factories_mcp_endpoint import Connect, text_of
@@ -77,16 +77,15 @@ async def test_someone_elses_tokens_usage_answers_like_an_unknown_token(
 
 @pytest.fixture
 def failing_search(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    search = tool_for(TokenMode.READ, "search")
-    assert search is not None
+    (search,) = [t for t in READ_TOOLS if t.spec.name == "search"]
 
     async def boom(ctx: CallContext, args: object) -> ToolResult:
         raise RuntimeError("Zebrastreifen secret detail")
 
     broken = Exposed(search.spec, boom)
 
-    def patched(mode: TokenMode, name: str) -> Exposed | None:
-        return broken if name == "search" else tool_for(mode, name)
+    def patched(token: TokenActor, name: str) -> Exposed | None:
+        return broken if name == "search" else tool_for(token, name)
 
     monkeypatch.setattr(service_module, "tool_for", patched)
     yield

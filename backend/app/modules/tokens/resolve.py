@@ -2,9 +2,16 @@
 
 - One path for every caller: the header's value (empty if there is none or it is no
   bearer) is hashed and looked up once, by its hash; then one decision. An unknown,
-  revoked or expired token, an agent token (not usable before task 4), and a token
-  whose person is inactive or no longer holds `mcp.use` all answer the same 401
+  revoked or expired token, a token whose person is inactive or no longer holds
+  `mcp.use`, and an agent token whose agent rests all answer the same 401
   `token.invalid`, with no extra statement in between.
+- An agent token (plan M8 decision 11) acts for its external agent: the person is the
+  agent's responsible person (the token's `user_id`, who must still be responsible
+  for it), and the `ReadScope` is further held to the agent's roles (its memberships,
+  `viewer` in the open spaces): the agent's memberships ∩ the person's rights ∩ the
+  token's scope ∩ the policy. The agent rests (its tokens answer 401) while it is not
+  active, while its responsible person does not hold `mcp.use`, and once someone else
+  answers for it.
 - Nothing about the person's rights is kept in the token: every call builds the actor
   from the person as they are now (role, groups; memberships are read by the check
   itself), with a `ReadScope` of the token's scope ∩ the spaces whose AI policy lets
@@ -20,8 +27,8 @@ into an error.
 
 import hmac
 import uuid
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Annotated
 
@@ -36,6 +43,9 @@ from app.core.logging import bind_request_fields, log_context
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.core.ratelimit import WINDOW, RateLimiter
+from app.modules.agents.models import AgentKind, AgentStatus
+from app.modules.agents.repository import AgentRepository
+from app.modules.agents.toolbox.base import Grant
 from app.modules.ai.models import DataLocation
 from app.modules.auth.deps import SessionDep, SettingsDep
 from app.modules.groups.repository import GroupRepository
@@ -48,16 +58,28 @@ BEARER = "bearer "
 
 
 @dataclass(frozen=True, slots=True)
+class TokenAgent:
+    """An agent token's external agent: what it writes is the agent's; its level and
+    its tool grants (`agent_tool` entries, by tool) bound the tools
+    (`mcp_tools/exposed.py`)."""
+
+    id: uuid.UUID
+    level: int
+    entries: Mapping[str, Grant] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class TokenActor:
     """Who calls through a token: the person's actor held to the token, the token's
-    id and name (the source of what it writes), its mode, and the data location the
-    AI policy treats the client as."""
+    id and name (the source of what it writes), its mode, the data location the AI
+    policy treats the client as, and an agent token's agent."""
 
     token_id: uuid.UUID
     name: str
     mode: TokenMode
     location: DataLocation
     actor: Actor
+    agent: TokenAgent | None = None
 
 
 def token_invalid() -> Unauthorized:
@@ -81,7 +103,12 @@ class TokenResolver:
         await repo.touch(token.org_id, token.id, now.replace(second=0, microsecond=0))
         await self._limit(token, now)  # commits, the touch with it
         actor = await self._actor(token, found)
-        return TokenActor(token.id, token.name, TokenMode(token.mode), found.location, actor)
+        agent = None
+        if found.agent is not None:
+            stored = await AgentRepository(self.session, token.org_id).tool_entries(found.agent.id)
+            entries = {name: Grant(grant) for name, grant in stored.items()}
+            agent = TokenAgent(found.agent.id, found.agent.level, entries)
+        return TokenActor(token.id, token.name, TokenMode(token.mode), found.location, actor, agent)
 
     async def _limit(self, token: AccessToken, now: datetime) -> None:
         limiter = RateLimiter(self.session, limit=self.settings.mcp_rate_per_minute)
@@ -96,8 +123,12 @@ class TokenResolver:
         spaces = await TokenRepository(self.session).scope_spaces(
             token.org_id, token.user_id, token.space_ids, found.location
         )
-        read = ReadScope.of(dict.fromkeys(spaces, SpaceRole.ADMIN), drafts=False)
-        write = WriteScope.of(spaces if token.mode == TokenMode.WRITE else ())
+        caps = dict.fromkeys(spaces, SpaceRole.ADMIN)
+        if found.agent is not None:  # held to the agent's roles too
+            roles = await AgentRepository(self.session, token.org_id).roles(found.agent.id)
+            caps = {sid: role for sid, role in roles.items() if sid in caps}
+        read = ReadScope.of(caps, drafts=False)
+        write = WriteScope.of(caps if token.mode == TokenMode.WRITE else ())
         return Actor(token.org_id, principal, found.system_role, groups, read, write)
 
 
@@ -111,10 +142,25 @@ def _usable(found: Found, digest: bytes, now: datetime) -> bool:
     token = found.token
     return (
         hmac.compare_digest(token.token_hash, digest)
-        and token.kind == TokenKind.PERSONAL
+        and _whose(found)
         and token.revoked_at is None
         and token.expires_at > now
         and may_use_mcp(found.standing)
+    )
+
+
+def _whose(found: Found) -> bool:
+    """A personal token, or an agent token whose agent is an active external agent
+    its person still answers for."""
+    token, agent = found.token, found.agent
+    if token.kind == TokenKind.PERSONAL:
+        return token.agent_id is None
+    return (
+        token.kind == TokenKind.AGENT
+        and agent is not None
+        and agent.kind == AgentKind.EXTERNAL
+        and agent.status == AgentStatus.ACTIVE
+        and agent.responsible_user_id == token.user_id
     )
 
 

@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import OPEN_SPACE_FLOOR, SpaceRole
 from app.core.principal import PrincipalType
-from app.modules.agents.models import Agent, AgentStatus, AgentTool, Run
+from app.modules.agents.models import Agent, AgentKind, AgentStatus, AgentTool, Run
 from app.modules.ai.models import AiConnection
 from app.modules.messaging.models import ConversationParticipant
 from app.modules.spaces.models import Space, SpaceKind, SpaceMember
+from app.modules.tokens.models import AccessToken
 from app.modules.users.models import User
 
 
@@ -68,15 +69,17 @@ class AgentRepository:
         await self.session.flush()
 
     async def in_use(self, agent_id: uuid.UUID) -> bool:
-        """Whether the agent takes part in a conversation or has runs (then it is
-        paused, not deleted: its answers stay attributed)."""
+        """Whether the agent takes part in a conversation, has runs or (an external
+        agent) was given a token (then it is paused, not deleted: what it wrote stays
+        attributed, and so do its tokens' calls)."""
         talks = exists().where(
             ConversationParticipant.org_id == self.org_id,
             ConversationParticipant.principal_type == PrincipalType.AGENT,
             ConversationParticipant.principal_id == agent_id,
         )
         ran = exists().where(Run.org_id == self.org_id, Run.agent_id == agent_id)
-        return bool(await self.session.scalar(select(talks | ran)))
+        tokens = exists().where(AccessToken.org_id == self.org_id, AccessToken.agent_id == agent_id)
+        return bool(await self.session.scalar(select(talks | ran | tokens)))
 
     async def responsible_names(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         """Each agent's responsible person's name, by agent id (one join)."""
@@ -115,6 +118,15 @@ class AgentRepository:
             return {}
         stmt = select(Agent.id, Agent.name).where(Agent.org_id == self.org_id, Agent.id.in_(ids))
         return {agent_id: name for agent_id, name in await self.session.execute(stmt)}
+
+    async def external_ids(self, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        """Those of `ids` that are external agents."""
+        if not ids:
+            return set()
+        stmt = select(Agent.id).where(
+            Agent.org_id == self.org_id, Agent.id.in_(ids), Agent.kind == AgentKind.EXTERNAL
+        )
+        return set(await self.session.scalars(stmt))
 
     async def standing(self, agent: Agent, connection_id: uuid.UUID, model: str) -> Standing:
         """The agent's status, its responsible person, and the connection and model it

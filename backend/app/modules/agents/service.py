@@ -11,6 +11,10 @@ space of the agent (403 `agent.level_denied`, `toolbox/policy.py`). An
 agent that took part in a conversation or ran is not deleted (409 `agent.in_use`):
 it is paused, so its answers stay attributed. Every change is audited (without the
 instructions' text, which may be long; their length instead).
+
+An external agent (plan M8 decision 11, `kind = external`) is made only with
+`agent.manage`: no connection or model, never personal, level at most 2 (422
+`agent.external_invalid`, also for such a change later); its kind never changes.
 """
 
 import json
@@ -24,7 +28,7 @@ from app.core.access import Action, Actor, can
 from app.core.errors import Conflict, Forbidden, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
-from app.modules.agents.models import Agent
+from app.modules.agents.models import EXTERNAL_MAX_LEVEL, Agent, AgentKind
 from app.modules.agents.personal import (
     check_given,
     join_home,
@@ -45,6 +49,7 @@ from app.modules.users.repository import UserRepository
 
 _FIELDS = (
     "name",
+    "kind",
     "owner_user_id",
     "intro",
     "connection_id",
@@ -55,6 +60,13 @@ _FIELDS = (
     "max_runtime_seconds",
     "level",
 )
+
+
+def external_invalid() -> ValidationFailed:
+    return ValidationFailed(
+        "An external agent has no connection or model, is nobody's own and has level 2 at most",
+        code="agent.external_invalid",
+    )
 
 
 async def require_agents(session: AsyncSession, actor: Actor) -> None:
@@ -100,6 +112,8 @@ class AgentService:
         return await visible_agent(self.session, actor, agent_id)
 
     async def create(self, actor: Actor, data: AgentCreate) -> Agent:
+        if data.kind == AgentKind.EXTERNAL:
+            return await self._create_external(actor, data)
         owner = actor.principal.id if data.personal else None
         if owner is not None:
             await require_personal_right(self.session, actor)
@@ -150,9 +164,43 @@ class AgentService:
         await self._audit(actor, "agent.created", agent, details)
         return agent
 
+    async def _create_external(self, actor: Actor, data: AgentCreate) -> Agent:
+        """An external agent (plan M8 decision 11): `agent.manage`, no connection or
+        model, not personal, level at most 2, a responsible person."""
+        await require_agents(self.session, actor)
+        if data.personal or data.connection_id is not None or data.model is not None:
+            raise external_invalid()
+        if data.level > EXTERNAL_MAX_LEVEL:
+            raise external_invalid()
+        if data.responsible_user_id is None:
+            raise ValidationFailed(code="agent.responsible_invalid")
+        await self._responsible(actor, data.responsible_user_id)
+        agent = await self.repo(actor).add(
+            Agent(
+                org_id=actor.org_id,
+                kind=AgentKind.EXTERNAL,
+                name=data.name,
+                intro=data.intro,
+                instructions=data.instructions,
+                responsible_user_id=data.responsible_user_id,
+                status=data.status,
+                max_steps=data.max_steps,
+                max_runtime_seconds=data.max_runtime_seconds,
+                level=data.level,
+            )
+        )
+        details = {**snapshot(agent, _FIELDS), "instructions_chars": len(agent.instructions)}
+        await self._audit(actor, "agent.created", agent, details)
+        return agent
+
     async def update(self, actor: Actor, agent_id: uuid.UUID, data: AgentUpdate) -> Agent:
         agent = await self._current(actor, agent_id, data.version)
         given = data.model_fields_set - {"version"}
+        if agent.external and (
+            {"connection_id", "model"} & given
+            or (data.level is not None and data.level > EXTERNAL_MAX_LEVEL)
+        ):
+            raise external_invalid()
         if ("connection_id" in given or "model" in given) and (
             data.connection_id is None or data.model is None
         ):

@@ -45,10 +45,13 @@ class TokenIn(BaseModel):
 
 
 class TokenOut(BaseModel):
+    """`agent_id`: an agent token's external agent (kind `agent`), else null."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     kind: TokenKind
+    agent_id: uuid.UUID | None = None
     name: str
     mode: TokenMode
     space_ids: list[uuid.UUID] | None
@@ -73,15 +76,27 @@ class TokenUserOut(BaseModel):
     name: str
 
 
+class TokenAgentOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class AdminTokenOut(TokenOut):
-    """A token in the admins' list: its metadata and whose it is."""
+    """A token in the admins' list: its metadata and whose it is (`user`: its person;
+    for an agent token the agent's responsible person, and `agent` the agent)."""
 
     user: TokenUserOut
+    agent: TokenAgentOut | None = None
 
     @classmethod
     def of(cls, listed: Listed) -> "AdminTokenOut":
         shown = TokenOut.model_validate(listed.token).model_dump()
-        return cls(**shown, user=TokenUserOut(id=listed.token.user_id, name=listed.user_name))
+        token = listed.token
+        agent = None
+        if token.agent_id is not None and listed.agent_name is not None:
+            agent = TokenAgentOut(id=token.agent_id, name=listed.agent_name)
+        user = TokenUserOut(id=token.user_id, name=listed.user_name)
+        return cls(**shown, user=user, agent=agent)
 
 
 class McpSettingsOut(BaseModel):

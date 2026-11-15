@@ -16,6 +16,7 @@ from app.modules.agents.models import (
     MAX_RUNTIME_SECONDS,
     MAX_STEPS,
     Agent,
+    AgentKind,
     AgentStatus,
 )
 from app.modules.agents.toolbox.policy import Effect, Grant
@@ -47,11 +48,15 @@ class AgentCreate(BaseModel):
     models. `responsible_user_id`: an active person (no guest) who answers for it.
     Both are needed for the organisation's agents (`agent.manage`). `personal`: the
     caller's own agent (`agent.create_personal`), which takes the caller's connection
-    and model and has the caller as responsible person (given, they must be those)."""
+    and model and has the caller as responsible person (given, they must be those).
+    `kind: external` (plan M8 decision 11, `agent.manage`): an agent that works from
+    outside through `/mcp`; no connection, no model, not personal, level at most 2
+    (else 422 `agent.external_invalid`), a responsible person required."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: Name
+    kind: AgentKind = AgentKind.INTERNAL
     intro: Intro = ""
     instructions: Instructions = ""
     personal: bool = False
@@ -66,7 +71,9 @@ class AgentCreate(BaseModel):
 
 class AgentUpdate(BaseModel):
     """Fields left out stay as they are; `connection_id` and `model` go together. A
-    personal agent takes its owner's connection and model anew with every change."""
+    personal agent takes its owner's connection and model anew with every change. The
+    kind stays; an external agent takes no connection or model and no level above 2
+    (422 `agent.external_invalid`)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -86,14 +93,17 @@ class AgentUpdate(BaseModel):
 class AgentOut(BaseModel):
     """An agent as those who manage it see it (`agent.manage`; a personal agent's
     owner); `responsible_name`: the responsible person's name; `owner_user_id`: a
-    personal agent's owner (null: the organisation's)."""
+    personal agent's owner (null: the organisation's). `kind`: `external` for an
+    agent that works from outside through `/mcp` (plan M8): no connection or model
+    (both null)."""
 
     id: uuid.UUID
     name: str
+    kind: AgentKind
     intro: str
     instructions: str
-    connection_id: uuid.UUID
-    model: str
+    connection_id: uuid.UUID | None
+    model: str | None
     responsible_user_id: uuid.UUID
     responsible_name: str | None
     owner_user_id: uuid.UUID | None
@@ -110,6 +120,7 @@ class AgentOut(BaseModel):
         return cls(
             id=agent.id,
             name=agent.name,
+            kind=agent.kind,
             intro=agent.intro,
             instructions=agent.instructions,
             connection_id=agent.connection_id,
@@ -226,13 +237,17 @@ class AgentToolsPut(BaseModel):
 
 class AgentProfileOut(BaseModel):
     """What a person with `ai.use` learns of an agent to talk to: no instructions, no
-    connection."""
+    connection. `kind`: `external` for one that works from outside (plan M8): it
+    answers no message here."""
 
     id: uuid.UUID
     name: str
+    kind: AgentKind
     intro: str
     status: AgentStatus
 
     @classmethod
     def of(cls, agent: Agent) -> "AgentProfileOut":
-        return cls(id=agent.id, name=agent.name, intro=agent.intro, status=agent.status)
+        return cls(
+            id=agent.id, name=agent.name, kind=agent.kind, intro=agent.intro, status=agent.status
+        )

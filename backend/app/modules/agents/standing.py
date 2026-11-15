@@ -14,7 +14,9 @@ run starts (`run_target`), so an admin's change of the owner's assignment applie
 from the next run without saving the agent (review M6 finding 13). Otherwise the
 message is kept
 without a run and the answer says why, as a code the client words (`Refusal`). The
-run checks the same again before every model call (`modules/agents/actor.py`).
+run checks the same again before every model call (`modules/agents/actor.py`). An
+external agent (plan M8 decision 11) never runs here: every trigger answers
+`agent.external` (a ticket assigned to it waits to be picked up, `triggers.py`).
 """
 
 import uuid
@@ -39,6 +41,7 @@ class Refusal(StrEnum):
     THREAD_REPLY = "run.thread_reply"  # replies in a thread do not ask the agent
     RUN_WAITING = "run.waiting"  # the place has a run that answers first (one at a time)
     PERSONAL_DISABLED = "agent.personal_disabled"  # the organisation stopped personal agents
+    EXTERNAL = "agent.external"  # works from outside through `/mcp`, never a run here
     NOT_FOUND = "agent.not_found"  # someone else's personal agent: not there for them
     HANDOVER_LIMIT = "run.handover_limit"  # a run at the chain's end hands over no more
 
@@ -51,8 +54,12 @@ class Target:
 
 async def run_target(session: AsyncSession, org_id: uuid.UUID, agent: Agent) -> Target | None:
     """The connection and model a run of the agent uses now: an organisation agent's
-    own; a personal agent's owner's effective assignment (None: the owner has no AI)."""
+    own; a personal agent's owner's effective assignment (None: the owner has no AI;
+    an external agent, which has none)."""
+    if agent.external:
+        return None
     if agent.owner_user_id is None:
+        assert agent.connection_id is not None and agent.model is not None  # internal
         return Target(agent.connection_id, agent.model)
     found = await effective_assignment(session, org_id, agent.owner_user_id)
     return Target(found.connection_id, found.model) if found is not None else None
@@ -81,7 +88,10 @@ def owned_by(agent: Agent, actor: Actor) -> bool:
 
 async def agent_refusal(session: AsyncSession, org_id: uuid.UUID, agent: Agent) -> Refusal | None:
     """Why the agent may not run now (None: it may). A personal agent also needs its
-    owner's AI and the organisation's switch; its connection is the owner's."""
+    owner's AI and the organisation's switch; its connection is the owner's. An
+    external agent never runs here (plan M8 decision 11)."""
+    if agent.external:
+        return Refusal.EXTERNAL
     target = await run_target(session, org_id, agent)
     if target is None:
         return Refusal.AI_UNAVAILABLE

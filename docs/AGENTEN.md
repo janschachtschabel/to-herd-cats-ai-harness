@@ -7,7 +7,7 @@ führen je Bereich ein Gedächtnis. Jeder Lauf ist Schritt für Schritt einsehba
 lässt sich abbrechen. Seit M7 arbeiten sie auch ohne Anstoß im Gespräch: als Aufgabe
 einer Person zu einem Zeitpunkt, wiederkehrend, als Heartbeat oder auf Ereignisse im
 Bereich hin, begrenzt durch Tagesbudgets. Stand: M7 (Spezifikation 5.4, 5.6, 6.3, 7.4,
-8, 9 und 11, soweit gebaut; externe Werkzeuge kommen mit M8).
+8, 9 und 11, soweit gebaut); aus M8 externe Werkzeuge und externe Agenten.
 
 Die KI-Anbindung selbst (Verbindungen, Schlüssel, ausgehende Aufrufe, wer welches
 Modell nutzt, Verbrauch, KI-Richtlinie je Bereich und KI-Sperre) steht in
@@ -154,6 +154,30 @@ Bereich und nur für seine Eigentümerin erreichbar (Direktnachricht, Erwähnung
 Zuweisung); alle anderen sehen ihn nicht. Admins sehen ihn in der Verwaltung, mit
 Vermerk im Audit.
 
+### Externe Agenten (seit M8)
+
+Ein **externer Agent** (etwa Claude Code oder Codex, das ein Team auf einem eigenen
+Rechner oder in einer Pipeline betreibt) ist ein Teammitglied wie jeder Agent: mit
+Namen, Kurzvorstellung, verantwortlicher Person und Mitgliedschaften in Bereichen. Er
+hat aber **kein Modell, keine Läufe, keine Aufgaben und kein Budget im System**: Er
+arbeitet von außen über den Endpunkt `/mcp` mit einem **Agenten-Token** (siehe
+[`MCP.md`](MCP.md#externe-agenten)).
+
+- Erwähnungen, Direktnachrichten und Aufgaben starten bei ihm nichts; die Antwort auf
+  eine Nachricht nennt den Grund `agent.external`.
+- Ein Ticket, das man ihm zuweist, startet keinen Lauf und bekommt keinen Hinweis in der
+  Diskussion: Es **wartet auf Abholung** (`awaiting_pickup: true`, solange es offen
+  ist). Der Agent holt es ab (`claim_ticket`), kommentiert, setzt den Status höchstens
+  auf „Zur Prüfung“; **erledigt setzt ein Mensch**. Er kann auch ein nicht
+  zugewiesenes Ticket eines Bereichs, in dem er Mitglied mit Bearbeitungsrecht ist,
+  selbst übernehmen.
+- Was er schreibt, steht unter seinem Namen, mit KI-Kennzeichen und dem Namen des
+  Tokens (`via_token`), auch in den Systemeinträgen der Ticket-Zeitleiste.
+- Er darf nie mehr als seine verantwortliche Person, nie mehr als er selbst als
+  Mitglied und nie mehr als der Umfang seines Tokens; höchstens Stufe 2. Ist seine
+  verantwortliche Person nicht mehr aktiv (oder hat sie kein `mcp.use` mehr), oder
+  ist der Agent pausiert, **ruht** er: seine Token antworten 401.
+
 ### Aufgaben: Agenten arbeiten ohne Anstoß (seit M7)
 
 Eine **Aufgabe** lässt einen Agenten arbeiten, ohne dass ihn jemand im Gespräch
@@ -293,6 +317,22 @@ gehört in die Anweisungen; Avatar und Ersatzmodell gibt es nicht.
 - `POST /api/dms` mit `{"agent_id": …}` (ohne weitere Personen, sonst 422
   `dm.agent_pair_only`): die Direktnachricht der Person mit dem Agenten; ohne `ai.use`
   404 `agent.not_found`.
+
+### Externe Agenten anlegen (seit M8)
+
+Mit `agent.manage`: `POST /api/agents` mit `"kind": "external"`, Name, Kurzvorstellung,
+verantwortlicher Person (Pflicht; 422 `agent.responsible_invalid`), Status und Stufe
+(1 oder 2). Eine Verbindung oder ein Modell, `personal: true` oder eine Stufe über 2
+sind 422 `agent.external_invalid`, auch bei einer späteren Änderung; die Art ändert sich
+nie. Antworten nennen `kind` (`internal|external`); bei externen Agenten sind
+`connection_id` und `model` `null`. Das Profil (`/profile`) nennt `kind` ebenfalls,
+damit die Oberfläche keine Direktnachricht anbietet. Mitgliedschaften wie bei jedem
+Agenten (`PUT /api/spaces/{id}/members`, `member_type: agent`). Wer Token bekommen
+hat, wird nicht gelöscht, sondern pausiert (409 `agent.in_use`). Aufgaben lassen sich
+für externe Agenten nicht anlegen (403 `automation.not_allowed`). Seine Token:
+[`MCP.md`](MCP.md#externe-agenten). Werkzeugfreigaben (`agent_tool`) wirken auch für
+ihn, nur verschärfend: Was nicht `allow` ist, bietet `/mcp` ihm nicht an (Freigaben
+mit `confirm` gibt es dort nicht).
 
 ### Stufen und Werkzeugfreigaben
 
@@ -1620,7 +1660,8 @@ bleiben in der Laufliste).
 - Antwort auf das Senden einer Nachricht: `agent_run: {id, reason, agent_id}` oder `null`;
   Gründe ohne Lauf: `ai.unavailable`, `agent.paused`, `agent.draft`,
   `agent.responsible_inactive`, `agent.connection_unavailable`,
-  `agent.personal_disabled`, `run.thread_reply`, `run.waiting`.
+  `agent.personal_disabled`, `agent.external` (ein externer Agent, M8),
+  `run.thread_reply`, `run.waiting`.
 - Aufgaben: [Aufgaben-API (M7)](#aufgaben-api-m7); Budgets:
   [`KI.md`](KI.md#budgets-apiaibudgets-aimanage).
 - Live: `run.progress` (`conversation_id`, `run_id`, `step`), `card.changed`,

@@ -109,10 +109,12 @@ async def with_tags(
         SubjectType.TICKET, [v.ticket.id for v in views]
     )
     agents = await agent_names(session, actor.org_id, views)
+    waiting = await awaiting_pickup(session, actor.org_id, views)
     return [
         dataclasses.replace(
             v,
             tags=tuple(tags.get(v.ticket.id, ())),
+            awaiting_pickup=v.ticket.id in waiting,
             assignee_name=_name(v.ticket.assignee_type, v.ticket.assignee_id, agents)
             or v.assignee_name,
             reporter_name=_name(v.ticket.reporter_type, v.ticket.reporter_id, agents)
@@ -137,6 +139,24 @@ async def agent_names(
         if ptype == PrincipalType.AGENT and pid is not None
     }
     return await agent_hooks().names(session, org_id, ids) if ids else {}
+
+
+async def awaiting_pickup(
+    session: AsyncSession, org_id: uuid.UUID, views: Sequence[TicketView]
+) -> set[uuid.UUID]:
+    """The tickets (ids) that wait for an external agent to pick them up (plan M8
+    decision 12): assigned to one and still in a status of category `open`."""
+    candidates = {
+        v.ticket.id: v.ticket.assignee_id
+        for v in views
+        if v.ticket.assignee_type == PrincipalType.AGENT
+        and v.ticket.assignee_id is not None
+        and v.status.category == StatusCategory.OPEN
+    }
+    if not candidates:
+        return set()
+    external = await agent_hooks().external_ids(session, org_id, set(candidates.values()))
+    return {ticket_id for ticket_id, agent_id in candidates.items() if agent_id in external}
 
 
 def _name(
