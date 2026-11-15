@@ -68,6 +68,6 @@ export function updateBody(values: ServerValues, version: number): Schemas['Serv
 }
 
 /** Whether saving withdraws every approval: a new address is another server. */
-export function urlChanged(server: Server, values: ServerValues): boolean {
-  return values.url.trim() !== server.url
+export function urlChanged(server: Server, url: string): boolean {
+  return url.trim() !== server.url
 }

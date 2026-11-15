@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -120,7 +120,7 @@ function EditForm({ server, onDone }: { server: Server; onDone: () => void }) {
     resolver: serverResolver((v) => updateBody(v, version), false),
     defaultValues: serverValues(server),
   })
-  const moved = urlChanged(server, form.watch())
+  const moved = urlChanged(server, useWatch({ control: form.control, name: 'url' }))
 
   const reload = async () => {
     const fresh = await queryClient.fetchQuery({ ...serverQuery(server.id), staleTime: 0 })

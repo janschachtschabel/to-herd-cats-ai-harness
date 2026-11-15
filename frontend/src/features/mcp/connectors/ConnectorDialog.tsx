@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -100,7 +100,7 @@ function CreateForm({
     resolver: requiring(bodyResolver(createSchema, toBody, fieldOf), (v) => missingFields(v, true)),
     defaultValues: newConnectorValues(server?.name ?? ''),
   })
-  const isOAuth = form.watch('auth_kind') === 'oauth'
+  const isOAuth = useWatch({ control: form.control, name: 'auth_kind' }) === 'oauth'
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
