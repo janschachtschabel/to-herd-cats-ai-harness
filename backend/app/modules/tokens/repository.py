@@ -6,16 +6,28 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import and_, false, func, not_, or_, select, true, update
+from sqlalchemy import ColumnElement, and_, false, func, not_, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.principal import SystemRole
-from app.modules.ai.models import DataLocation
+from app.modules.ai.models import DataLocation, UserAssignment
 from app.modules.ai.policy_filters import ai_space_ids
 from app.modules.spaces.models import Space, SpaceKind
 from app.modules.tokens.models import AccessToken, McpSetting
 from app.modules.users.models import User
+
+
+@dataclass(frozen=True, slots=True)
+class McpStanding:
+    """What decides a person's `mcp.use` (`standing.may_use_mcp`): whether they are
+    active, their system role, the organisation's switch, and whether their own AI
+    assignment expressly keeps them from AI (`no_ai`)."""
+
+    is_active: bool
+    system_role: SystemRole
+    enabled: bool
+    kept_from_ai: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,10 +36,12 @@ class Found:
     organisation's MCP settings, all from the one statement."""
 
     token: AccessToken
-    is_active: bool
-    system_role: SystemRole
-    enabled: bool
+    standing: McpStanding
     location: DataLocation
+
+    @property
+    def system_role(self) -> SystemRole:
+        return self.standing.system_role
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,17 +61,20 @@ class TokenRepository:
                 User.is_active,
                 User.system_role,
                 func.coalesce(McpSetting.enabled, false()),
+                _kept_from_ai(),
                 func.coalesce(McpSetting.data_location, DataLocation.EXTERNAL.value),
             )
             .join(User, and_(User.id == AccessToken.user_id, User.org_id == AccessToken.org_id))
             .outerjoin(McpSetting, McpSetting.org_id == AccessToken.org_id)
+            .outerjoin(UserAssignment, _own_assignment())
             .where(AccessToken.token_hash == digest)
         )
         row = (await self.session.execute(stmt)).one_or_none()
         if row is None:
             return None
-        token, active, role, enabled, location = row
-        return Found(token, bool(active), SystemRole(role), bool(enabled), DataLocation(location))
+        token, active, role, enabled, kept, location = row
+        standing = McpStanding(bool(active), SystemRole(role), bool(enabled), bool(kept))
+        return Found(token, standing, DataLocation(location))
 
     async def touch(self, org_id: uuid.UUID, token_id: uuid.UUID, minute: datetime) -> None:
         """`last_used_at` to `minute`, unless it is there already (or later)."""
@@ -154,16 +171,24 @@ class McpSettingRepository:
         stmt = select(McpSetting).where(McpSetting.org_id == self.org_id)
         return await self.session.scalar(stmt)
 
-    async def standing(self, user_id: uuid.UUID) -> tuple[bool, SystemRole, bool] | None:
-        """The person's activity and role and the switch, in one statement (None: no
-        such person here)."""
+    async def standing(self, user_id: uuid.UUID) -> McpStanding | None:
+        """The person's activity, role and exclusion from AI and the switch, in one
+        statement (None: no such person here)."""
         stmt = (
-            select(User.is_active, User.system_role, func.coalesce(McpSetting.enabled, false()))
+            select(
+                User.is_active,
+                User.system_role,
+                func.coalesce(McpSetting.enabled, false()),
+                _kept_from_ai(),
+            )
             .outerjoin(McpSetting, McpSetting.org_id == User.org_id)
+            .outerjoin(UserAssignment, _own_assignment())
             .where(User.org_id == self.org_id, User.id == user_id)
         )
         row = (await self.session.execute(stmt)).one_or_none()
-        return None if row is None else (bool(row[0]), SystemRole(row[1]), bool(row[2]))
+        if row is None:
+            return None
+        return McpStanding(bool(row[0]), SystemRole(row[1]), bool(row[2]), bool(row[3]))
 
     async def lock(self) -> McpSetting:
         """The row, created at version 1 if missing, locked until the transaction ends."""
@@ -179,3 +204,13 @@ class McpSettingRepository:
             .execution_options(populate_existing=True)
         )
         return (await self.session.scalars(stmt)).one()
+
+
+def _own_assignment() -> ColumnElement[bool]:
+    """The person's own AI assignment (joined to `User`)."""
+    return and_(UserAssignment.org_id == User.org_id, UserAssignment.user_id == User.id)
+
+
+def _kept_from_ai() -> ColumnElement[bool]:
+    """Whether the person's own assignment expressly says no AI (spec 7.2)."""
+    return func.coalesce(UserAssignment.no_ai, false())

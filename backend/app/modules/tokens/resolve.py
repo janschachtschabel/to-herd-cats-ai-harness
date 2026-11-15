@@ -114,7 +114,7 @@ def _usable(found: Found, digest: bytes, now: datetime) -> bool:
         and token.kind == TokenKind.PERSONAL
         and token.revoked_at is None
         and token.expires_at > now
-        and may_use_mcp(found.is_active, found.system_role, found.enabled)
+        and may_use_mcp(found.standing)
     )
 
 

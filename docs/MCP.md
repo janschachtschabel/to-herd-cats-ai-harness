@@ -16,7 +16,12 @@ Rechten als sie, und nur in seinem Umfang.
 
 - Das Recht `mcp.use` wird nie an der Person gespeichert. Es gilt für **jede aktive
   Person außer Gästen**, solange der **MCP-Schalter der Organisation** an ist
-  (Standard: aus).
+  (Standard: aus), **außer wer ausdrücklich keine KI hat**: Steht in der persönlichen
+  KI-Zuweisung einer Person „keine KI“ (`no_ai`), hat sie auch kein `mcp.use`, denn ein
+  externer Client ist eine KI, die Daten der Organisation liest. Ein Modell braucht
+  `mcp.use` dagegen nicht: Wem gar keine Zuweisung gilt (kein Standard, keine Gruppe),
+  der behält `mcp.use`. Wird „keine KI“ gesetzt, antworten die Token der Person sofort
+  401; wird es wieder entfernt, gelten sie wieder.
 - Den Schalter stellen Personen mit `ai.manage` in der KI-Verwaltung
   (`PUT /api/ai/mcp`). Jede Änderung steht im Audit (`mcp.settings_set`, mit altem und
   neuem Wert), und jede aktive Person bekommt `access.changed`, damit ihr Client
@@ -80,8 +85,8 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
 - Ein `read`-Token schreibt nirgends. Ein `write`-Token schreibt höchstens in den
   Bereichen seines Umfangs und nur, was die Person dort selbst darf (die Werkzeuge
   dafür: [Der Endpunkt `/mcp`](#der-endpunkt-mcp)).
-- Ist die Person nicht mehr aktiv, wird sie Gast oder ist der Schalter aus,
-  antwortet das Token 401.
+- Ist die Person nicht mehr aktiv, wird sie Gast, bekommt sie „keine KI“ oder ist der
+  Schalter aus, antwortet das Token 401.
 
 ### Sicherheit
 
