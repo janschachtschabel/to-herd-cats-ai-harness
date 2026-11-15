@@ -233,6 +233,28 @@ for workload in t-to-herd-cats-ai-api t-to-herd-cats-ai-worker; do
 done
 if render --set 'mcp.allowedHosts={a b}' >/dev/null; then fail "mcp.allowedHosts took a space"; fi
 
+# OIDC (M9 Task 4): the sign-in settings reach the API pods only, private hosts empty by
+# default; the client secrets' Secret is the API's alone.
+out=$(render)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_OIDC_ALLOWED_HOSTS" <<<"$api" | grep -q 'value: ""' \
+  || fail "the API has no empty HERD_OIDC_ALLOWED_HOSTS by default"
+grep -A1 -- "- name: HERD_OIDC_RATE_PER_MINUTE" <<<"$api" | grep -q 'value: "30"' \
+  || fail "the API has no HERD_OIDC_RATE_PER_MINUTE"
+out=$(render --set 'oidc.allowedHosts={sso.corp.example,10.30.0.0/16}' --set oidc.ratePerMinute=12 \
+  --set oidc.existingSecret=herd-oidc)
+api=$(doc Deployment t-to-herd-cats-ai-api "$out")
+grep -A1 -- "- name: HERD_OIDC_ALLOWED_HOSTS" <<<"$api" | grep -q 'value: "sso.corp.example,10.30.0.0/16"' \
+  || fail "oidc.allowedHosts does not reach the API"
+grep -A1 -- "- name: HERD_OIDC_RATE_PER_MINUTE" <<<"$api" | grep -q 'value: "12"' \
+  || fail "oidc.ratePerMinute does not reach the API"
+grep -A1 -- "- secretRef:" <<<"$api" | grep -q "name: herd-oidc" \
+  || fail "oidc.existingSecret is not the API's envFrom"
+grep -q "HERD_OIDC_\|herd-oidc" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker gets the sign-in settings"
+if render --set 'oidc.allowedHosts={a b}' >/dev/null; then fail "oidc.allowedHosts took a space"; fi
+if render --set oidc.ratePerMinute=0 >/dev/null; then fail "oidc.ratePerMinute=0 rendered"; fi
+
 # MCP (M8 Task 9): the operator's catalogue entries are a ConfigMap mounted read-only
 # into the API pods only, named by HERD_MCP_CATALOG_DIR; without one the variable is
 # empty (the shipped entries only) and nothing is mounted.

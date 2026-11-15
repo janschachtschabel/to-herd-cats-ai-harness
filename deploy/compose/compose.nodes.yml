@@ -47,6 +47,9 @@ x-api-env: &api-env
   HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
   HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
   HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
+  # Sign-in through OIDC (docs/ANMELDUNG.md); client secrets env:HERD_OIDC_<NAME> in ai.env.
+  HERD_OIDC_ALLOWED_HOSTS: ${HERD_OIDC_ALLOWED_HOSTS:-}
+  HERD_OIDC_RATE_PER_MINUTE: ${HERD_OIDC_RATE_PER_MINUTE:-30}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.

@@ -187,6 +187,14 @@ seccompProfile:
 {{ include "herd.mcpServersEnv" . }}
 {{- end -}}
 
+{{/* Sign-in through OIDC (API pods: start, callback, discovery, keys). */}}
+{{- define "herd.oidcApiEnv" -}}
+- name: HERD_OIDC_ALLOWED_HOSTS
+  value: {{ join "," .Values.oidc.allowedHosts | quote }}
+- name: HERD_OIDC_RATE_PER_MINUTE
+  value: {{ .Values.oidc.ratePerMinute | quote }}
+{{- end -}}
+
 {{/* Where the operator's catalogue entries (mcp.catalogConfigMap) are mounted. */}}
 {{- define "herd.mcpCatalogDir" -}}
 /etc/herd/mcp-catalog

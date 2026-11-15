@@ -192,6 +192,8 @@ Geändert in M9: `keep_set(archives, rule)` ohne `now` (die Stufen zählen vom n
 **Abnahme:** Anmeldung und Selbstregistrierung gegen den Stub, alle Ablehnungsfälle mit Code. **Hier:** alles. **Nur CI:** nichts zusätzlich. Gegen echtes Google nicht prüfbar (markiert in `docs/ANMELDUNG.md`).
 **Commits:** `auth: add OIDC providers with a Google preset`, `auth: sign up through OIDC within allowed domains`.
 
+Geändert in M9: Die Personenverwaltung liest und löst Verknüpfungen unter `/api/admin/users/{id}/identities[/{identity_id}]` (wie die übrige Personenverwaltung unter `/api/admin/users`), nicht `/api/users/…`; auch dort bleibt die letzte Anmeldemöglichkeit eines Kontos ohne Passwort (409 `oidc.last_identity`). `admission.decide` bekommt für `by_subject` ein `ExistingUser` (Kennung und aktiv), damit ein deaktiviertes Konto `oidc.account_inactive` erhält. `OidcProvider` speichert zusätzlich die drei Endpunkte aus der Discovery, `OidcFlow` optional die Sitzung, aus der im Profil verknüpft wird (`link_session_id`); das Verknüpfen im Profil startet mit `POST /api/auth/me/identities/{key}/link` (setzt das Bindungs-Cookie, liefert die Adresse des Anbieters). Weitere Codes: `oidc.flow_invalid`, `oidc.denied`, `oidc.identity_taken`, `oidc.rate_limited`, `oidc.unavailable`, `oidc.id_token_invalid`, `oidc.provider_error`, `oidc.issuer_mismatch`, `oidc.provider_unreachable`. Selbstregistrierung bei einem allgemeinen Anbieter braucht kein `trust_email` (nur `allow_signup` und Domains). `HERD_AI_EGRESS_PROXY` gilt für OIDC nicht. Die Admin-Prüfung heißt im Schema `ProviderCheckOut`. Ohne `user.manage` antworten die Anbieter-Routen 403 `auth.permission_denied` wie jede Route unter `/api/admin` (`test_route_guards.py` verlangt das), nicht 404; die Verknüpfungs-Routen der Verwaltung verlangen `user.manage` auch für die eigenen Konten (dafür gibt es `/api/auth/me/identities`).
+
 ### Task 5: Oberfläche Anmeldung und Browsertests (M9a)
 
 **Ziel:** Anmeldeseite mit Knöpfen je Anbieter und Fehlertexten aus `?error=`, Verwaltung → Anmeldung (Anbieter anlegen, Google-Vorlage mit nur Client-ID, Secret, Selbstregistrierung, Domains; Prüfen; Rückruf-Adresse zum Kopieren), Profil → Verknüpfte Konten, Personenverwaltung zeigt Verknüpfungen. Sichtbarkeit nur aus `permissions` (`user.manage`).
@@ -202,6 +204,8 @@ Geändert in M9: `keep_set(archives, rule)` ohne `now` (die Stufen zählen vom n
 
 **Abnahme:** `npm run lint/typecheck/test/build`, `check-i18n`, `check:api`, e2e `oidc` grün. **Hier:** alles (Chromium vorhanden wie in M8).
 **Commit:** `web: sign in with OIDC providers and manage them`.
+
+Geändert in M9: Die Hilfsdatei liegt wie alle anderen unter `e2e/tests/oidc-helpers.mjs`. Verwaltung → Anmeldung ist `/admin/sign-in`; die Verknüpfungen einer Person stehen im Dialog **Bearbeiten** der Personenverwaltung. Die Google-Vorlage zeigt die Rückruf-Adresse nach dem Speichern (auf der Karte und im Bearbeiten-Dialog), weil sie aus `HERD_PUBLIC_URL` kommt; `docs/ANMELDUNG.md` ordnet die Schritte entsprechend. In e2e zeigt die Google-Vorlage auf den Stub, indem `stubGoogle` nur die gespeicherten Endpunkte in der Wegwerf-Datenbank setzt (der Issuer bleibt `https://accounts.google.com`, der Stub signiert damit). Es gibt keine eigenen e2e-Specs für Anmeldung mit Passwort; jede Spec meldet sich über `/api/auth/login` an.
 
 ### Task 6: Collab mit kurzlebigen Berechtigungen (R14, M9a)
 

@@ -824,3 +824,44 @@ tests:
       - eval_time: 27h
         alertname: HerdBackupNeverRan
         exp_alerts: []
+
+  # HerdOidcFailing: over half of the OIDC callbacks in 15 minutes failed at the provider,
+  # at least 3, for 5 minutes.
+  - name: HerdOidcFailing fires when the provider keeps failing, then clears
+    interval: 1m
+    input_series:
+      - series: 'herd_oidc_logins_total{namespace="herd", job="herd-api", pod="herd-api-a", outcome="provider_unreachable"}'
+        values: "0+1x20 20x60"
+      - series: 'herd_oidc_logins_total{namespace="herd", job="herd-api", pod="herd-api-a", outcome="login"}'
+        values: "0x80"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HerdOidcFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdOidcFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-api
+            exp_annotations:
+              summary: "OIDC sign-ins of herd/herd-api fail at the provider"
+              description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (networkPolicy.egress). Password sign-in keeps working."
+      - eval_time: 50m
+        alertname: HerdOidcFailing
+        exp_alerts: []
+
+  - name: HerdOidcFailing stays quiet for refused people and a few failures among many sign-ins
+    interval: 1m
+    input_series:
+      - series: 'herd_oidc_logins_total{namespace="herd", job="herd-api", pod="herd-api-a", outcome="domain_not_allowed"}'
+        values: "0+5x30"
+      - series: 'herd_oidc_logins_total{namespace="herd", job="herd-api", pod="herd-api-a", outcome="provider_error"}'
+        values: "0+1x30"
+      - series: 'herd_oidc_logins_total{namespace="herd", job="herd-api", pod="herd-api-a", outcome="login"}'
+        values: "0+10x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HerdOidcFailing
+        exp_alerts: []

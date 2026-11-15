@@ -74,9 +74,14 @@ services:
       # Backups (docs/SICHERUNG.md): the worker exports the age of the last good backup
       # at which HerdBackupTooOld fires, in hours.
       HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
+      # Sign-in through OIDC (docs/ANMELDUNG.md): private hosts (names or CIDR, comma
+      # separated) an identity provider may run on (empty: public ones only); starts
+      # and callbacks per client address and minute. HERD_PUBLIC_URL must be set.
+      HERD_OIDC_ALLOWED_HOSTS: ${HERD_OIDC_ALLOWED_HOSTS:-}
+      HERD_OIDC_RATE_PER_MINUTE: ${HERD_OIDC_RATE_PER_MINUTE:-30}
     # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
-    # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
-    # default would hide them.
+    # keys (env:HERD_AI_<NAME>), OIDC client secrets (env:HERD_OIDC_<NAME>); never
+    # listed under environment, where an empty default would hide them.
     env_file:
       - path: ai.env
         required: false

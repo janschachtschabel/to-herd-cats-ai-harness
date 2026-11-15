@@ -37,6 +37,7 @@ spec:
             {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
             {{- include "herd.aiApiEnv" . | nindent 12 }}
             {{- include "herd.mcpApiEnv" . | nindent 12 }}
+            {{- include "herd.oidcApiEnv" . | nindent 12 }}
             {{- if include "herd.publicUrl" . }}
             {{- include "herd.publicUrlEnv" . | nindent 12 }}
             {{- end }}
@@ -47,7 +48,7 @@ spec:
             - name: HERD_COLLAB_URL
               value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
             {{- end }}
-          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret }}
+          {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret .Values.oidc.existingSecret }}
           envFrom:
             {{- with .Values.secrets.existingSecret }}
             - secretRef:
@@ -55,6 +56,11 @@ spec:
             {{- end }}
             {{- with .Values.ai.existingSecret }}
             # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- with .Values.oidc.existingSecret }}
+            # OIDC client secrets: HERD_OIDC_<NAME>.
             - secretRef:
                 name: {{ . }}
             {{- end }}

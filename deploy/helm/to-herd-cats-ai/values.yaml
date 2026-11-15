@@ -80,6 +80,16 @@ mcp:
   catalogConfigMap: ""
   maxCallsPerRun: 20
 
+## @section Sign-in through OIDC (M9; docs/ANMELDUNG.md)
+
+## @param oidc.allowedHosts Private hosts an OIDC identity provider may run on (an in-house Keycloak): exact host names or private networks in CIDR form (HERD_OIDC_ALLOWED_HOSTS; API). Empty: public addresses only (Google needs nothing here). With networkPolicy.enabled, networkPolicy.egress must also let the API pods reach the provider (Google: accounts.google.com, oauth2.googleapis.com, www.googleapis.com on 443). Providers themselves are set up in the administration; publicUrl (or an Ingress host) is required
+## @param oidc.ratePerMinute Starts and callbacks of OIDC sign-ins per client address and minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_OIDC_RATE_PER_MINUTE; API)
+## @param oidc.existingSecret Name of an existing Secret with the client secrets providers reference as env:HERD_OIDC_<NAME> (API pods; envFrom). Empty: none; a secret can instead be stored encrypted under HERD_SECRET_KEY (ai.existingSecret)
+oidc:
+  allowedHosts: []
+  ratePerMinute: 30
+  existingSecret: ""
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 

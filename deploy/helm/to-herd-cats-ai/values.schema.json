@@ -208,6 +208,27 @@
       "required": ["ratePerMinute", "allowedHosts", "catalogConfigMap", "maxCallsPerRun"],
       "description": "The MCP endpoint and its access tokens"
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowedHosts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9.:/-]+$", "minLength": 1, "maxLength": 253},
+          "description": "HERD_OIDC_ALLOWED_HOSTS (API): host names or private networks (CIDR)"
+        },
+        "ratePerMinute": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "HERD_OIDC_RATE_PER_MINUTE (API)"},
+        "existingSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
+          "description": "A Secret with HERD_OIDC_<NAME> client secrets for the API pods; empty: none"
+        }
+      },
+      "required": ["allowedHosts", "ratePerMinute", "existingSecret"],
+      "description": "Sign-in through OIDC providers"
+    },
     "collab": {
       "type": "object",
       "additionalProperties": false,
@@ -442,5 +463,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "publicUrl", "persistence", "backup", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "backup", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

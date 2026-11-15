@@ -288,3 +288,21 @@ groups:
         annotations:
           summary: "{{ $labels.namespace }}/{{ $labels.job }} has no good backup after 26 hours"
           description: "Is the backup job there (backup.enabled; compose service backup) and does its schedule fire? python -m app.ops backup list shows the runs; python -m app.ops backup run makes one by hand."
+      # Sign-in through OIDC (M9): over half of the callbacks in 15 minutes failed because
+      # of the provider (unreachable, an answer that is not OIDC, a wrong issuer, an ID
+      # token that does not verify), at least 3 of them, for 5 minutes. People refused by
+      # the rules (domains, links) do not count.
+      - alert: HerdOidcFailing
+        expr: |
+          (
+            sum by (namespace, job) (increase(herd_oidc_logins_total{outcome=~"provider_unreachable|provider_error|issuer_mismatch|id_token_invalid"}[15m]))
+              / sum by (namespace, job) (increase(herd_oidc_logins_total[15m]))
+          ) > 0.5
+          and
+          sum by (namespace, job) (increase(herd_oidc_logins_total{outcome=~"provider_unreachable|provider_error|issuer_mismatch|id_token_invalid"}[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OIDC sign-ins of {{ $labels.namespace }}/{{ $labels.job }} fail at the provider"
+          description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (networkPolicy.egress). Password sign-in keeps working."
