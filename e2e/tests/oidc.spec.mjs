@@ -1,7 +1,8 @@
 // Sign-in through OpenID Connect (plan M9 task 5) in the real app against the OIDC
 // stub: a person links an account in the profile and then signs in with it; someone
-// from an allowed domain registers through the Google preset and starts as a member
-// without AI; someone from another domain is refused with the reason on the page.
+// from an allowed domain registers through the Google preset, waits for an admin's
+// approval (plan M9 task 5b) and then starts as a member without AI; someone from
+// another domain is refused with the reason on the page.
 import { expect, test } from "@playwright/test";
 import { stubConnection, standardAssignment } from "./ai-helpers.mjs";
 import { call, OWNER, signIn } from "./helpers.mjs";
@@ -62,24 +63,45 @@ test("a person links an account in the profile and then signs in with it", async
   await Promise.all([admin.close(), dora.close(), fresh.close()]);
 });
 
-test("someone from an allowed domain registers through Google and starts without AI", async ({
+test("someone from an allowed domain registers through Google, waits for approval and starts without AI", async ({
   browser,
 }) => {
   const admin = await adminContext(browser);
   // AI for everyone by default: the new account is the exception (its own "no AI").
   await standardAssignment(admin, await stubConnection(admin, "Stub"));
   await stubGoogle(admin, { allow_signup: true, allowed_domains: ["firma.example"] });
-  await scriptOidc({
-    identity: googleIdentity("g-clara", "clara", "firma.example", "Clara Neu"),
-    issuer_claim: GOOGLE_ISSUER,
-  });
+  const clara = googleIdentity("g-clara", "clara", "firma.example", "Clara Neu");
+  await scriptOidc({ identity: clara, issuer_claim: GOOGLE_ISSUER });
 
-  const clara = await newContext(browser);
-  const page = await clara.newPage();
+  const claraContext = await newContext(browser);
+  const page = await claraContext.newPage();
   await page.goto("/login");
   await page.getByRole("link", { name: "Mit Google anmelden" }).click();
+  // The account exists but nobody gets in without an admin's approval.
+  await expect(page).toHaveURL(/\/login\?error=oidc\.account_pending$/);
+  await expect(page.getByRole("heading", { name: "Dein Konto wartet auf Freigabe" })).toBeVisible();
+  await expect(page.getByLabel("Passwort")).toHaveCount(0);
+  expect((await claraContext.request.get("/api/auth/me")).status()).toBe(401);
+
+  // The admin sees the count, the waiting account and approves it.
+  const adminPage = await admin.newPage();
+  await adminPage.goto("/admin/users");
+  const nav = adminPage.getByRole("link", { name: /Personen/ });
+  await expect(nav.getByText("1 Konto wartet auf Freigabe")).toBeAttached();
+  await adminPage.getByRole("link", { name: /Wartet auf Freigabe/ }).click();
+  await expect(adminPage).toHaveURL(/filter=pending/);
+  await adminPage.getByRole("button", { name: "Clara Neu freigeben" }).click();
+  const dialog = adminPage.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Freigeben" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(adminPage.getByText("Niemand wartet auf Freigabe.")).toBeVisible();
+
+  // Now the same sign-in brings her in.
+  await scriptOidc({ identity: clara, issuer_claim: GOOGLE_ISSUER });
+  await page.getByRole("link", { name: "Zur Anmeldung" }).click();
+  await page.getByRole("link", { name: "Mit Google anmelden" }).click();
   await expect(page).toHaveURL(/\/spaces/);
-  const me = await call(clara, "GET", "/api/auth/me");
+  const me = await call(claraContext, "GET", "/api/auth/me");
   expect(me.user).toMatchObject({ email: "clara@firma.example", name: "Clara Neu" });
   expect(me.user.system_role).toBe("member");
   expect(me.permissions).not.toContain("ai.use");
@@ -87,7 +109,7 @@ test("someone from an allowed domain registers through Google and starts without
   // Her own space is there; the agents' section is not.
   await expect(page.getByRole("heading", { name: "Bereiche", level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: "Agenten" })).toHaveCount(0);
-  await Promise.all([admin.close(), clara.close()]);
+  await Promise.all([admin.close(), claraContext.close()]);
 });
 
 test("someone from another domain is refused, with the reason on the sign-in page", async ({
