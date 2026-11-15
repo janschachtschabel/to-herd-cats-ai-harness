@@ -1007,6 +1007,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/mcp/tokens/{token_id}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Any Token Calls
+         * @description Any token's tool calls through `/mcp`, newest first: metadata only.
+         */
+        get: operations["list_any_token_calls_api_ai_mcp_tokens__token_id__calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/my-connectors": {
         parameters: {
             query?: never;
@@ -3179,6 +3199,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tokens/{token_id}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Token Calls
+         * @description The token's tool calls through `/mcp`, newest first (its usage).
+         */
+        get: operations["list_my_token_calls_api_tokens__token_id__calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5087,6 +5127,24 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** McpCallOut */
+        McpCallOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            outcome: components["schemas"]["Outcome"];
+            /** Tool */
+            tool: string;
+        };
         /** McpSettingsIn */
         McpSettingsIn: {
             data_location: components["schemas"]["DataLocation"];
@@ -5479,6 +5537,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "ok" | "refused" | "invalid" | "failed";
         /** PageCreate */
         PageCreate: {
             /**
@@ -5765,6 +5828,13 @@ export interface components {
         Page_LinkedPageOut_: {
             /** Items */
             items: components["schemas"]["LinkedPageOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[McpCallOut] */
+        Page_McpCallOut_: {
+            /** Items */
+            items: components["schemas"]["McpCallOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -10615,6 +10685,40 @@ export interface operations {
             };
         };
     };
+    list_any_token_calls_api_ai_mcp_tokens__token_id__calls_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_McpCallOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_connectors_api_ai_my_connectors_get: {
         parameters: {
             query?: {
@@ -15453,6 +15557,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_token_calls_api_tokens__token_id__calls_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_McpCallOut_"];
+                };
             };
             /** @description Validation Error */
             422: {

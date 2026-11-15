@@ -4824,6 +4824,40 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "McpCallOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool",
+          "outcome",
+          "duration_ms",
+          "created_at"
+        ],
+        "title": "McpCallOut",
+        "type": "object"
+      },
       "McpSettingsIn": {
         "additionalProperties": false,
         "properties": {
@@ -5846,6 +5880,16 @@
         "title": "OrgOut",
         "type": "object"
       },
+      "Outcome": {
+        "enum": [
+          "ok",
+          "refused",
+          "invalid",
+          "failed"
+        ],
+        "title": "Outcome",
+        "type": "string"
+      },
       "PageCreate": {
         "additionalProperties": false,
         "properties": {
@@ -6763,6 +6807,33 @@
           "items"
         ],
         "title": "Page[LinkedPageOut]",
+        "type": "object"
+      },
+      "Page_McpCallOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/McpCallOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[McpCallOut]",
         "type": "object"
       },
       "Page_MessageOut_": {
@@ -17053,6 +17124,78 @@
         ]
       }
     },
+    "/api/ai/mcp/tokens/{token_id}/calls": {
+      "get": {
+        "description": "Any token's tool calls through `/mcp`, newest first: metadata only.",
+        "operationId": "list_any_token_calls_api_ai_mcp_tokens__token_id__calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_McpCallOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Any Token Calls",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/api/ai/my-connectors": {
       "get": {
         "operationId": "list_connectors_api_ai_my_connectors_get",
@@ -25728,6 +25871,78 @@
           }
         },
         "summary": "Revoke My Token",
+        "tags": [
+          "tokens"
+        ]
+      }
+    },
+    "/api/tokens/{token_id}/calls": {
+      "get": {
+        "description": "The token's tool calls through `/mcp`, newest first (its usage).",
+        "operationId": "list_my_token_calls_api_tokens__token_id__calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_McpCallOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List My Token Calls",
         "tags": [
           "tokens"
         ]
