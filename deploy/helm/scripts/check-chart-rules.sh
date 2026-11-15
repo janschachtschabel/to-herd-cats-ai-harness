@@ -299,7 +299,7 @@ grep -q 'schedule: "30 2 \* \* \*"' <<<"$cron" || fail "the backup schedule is n
 grep -q "timeZone: Etc/UTC" <<<"$cron" || fail "the backup schedule is not UTC"
 grep -q "concurrencyPolicy: Forbid" <<<"$cron" || fail "backups may run at once"
 grep -q "backoffLimit: 0" <<<"$cron" || fail "a failed backup is retried"
-grep -qF '"python", "-m", "app.ops", "backup", "run"]' <<<"$cron" || fail "the CronJob does not run backup run"
+grep -qF '"python", "-m", "app.ops", "backup", "run", "--scheduled"]' <<<"$cron" || fail "the CronJob does not run backup run --scheduled"
 grep -A2 -- "- name: data" <<<"$cron" | grep -q "readOnly: true" || fail "the files claim is mounted writable"
 grep -A2 -- "- name: backups" <<<"$cron" | grep -q "claimName: t-to-herd-cats-ai-backups" \
   || fail "the archives are not on the chart's claim"

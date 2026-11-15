@@ -42,6 +42,9 @@ def add_commands(areas: Any) -> None:
     verify.add_argument("archive", type=Path)
     verify.set_defaults(handler=_verify)
     run = commands.add_parser("run", help="a backup, retention and offsite (the cron job)")
+    run.add_argument(
+        "--scheduled", action="store_true", help="record the run as scheduled (the cron job)"
+    )
     run.set_defaults(handler=_run)
     schedule = commands.add_parser(
         "schedule", help="back up at every term of HERD_BACKUP_SCHEDULE until stopped"
@@ -64,7 +67,8 @@ async def _create(args: argparse.Namespace, settings: Settings, clock: Clock) ->
 
 
 async def _run(args: argparse.Namespace, settings: Settings, clock: Clock) -> int:
-    outcome = await run_backup(settings, clock, trigger=BackupTrigger.SCHEDULE)
+    trigger = BackupTrigger.SCHEDULE if args.scheduled else BackupTrigger.CLI
+    outcome = await run_backup(settings, clock, trigger=trigger)
     if outcome.state != BackupState.OK:
         print(f"failed {outcome.error_code}")
         return 1

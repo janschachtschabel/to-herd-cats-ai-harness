@@ -7,10 +7,24 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import func, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger, OffsiteState
 from app.modules.orgs.models import Organization
+
+# A backup holds this advisory lock on a connection of its own while it runs: whoever
+# takes it knows no backup is running, so every `running` row is one whose process died.
+BACKUP_LOCK = "herd.backup"
+_KEY = func.hashtextextended(BACKUP_LOCK, 0)
+
+
+async def hold_backup_lock(connection: AsyncConnection) -> bool:
+    """Take the backup lock for the connection's session; False if a backup holds it."""
+    return bool(await connection.scalar(select(func.pg_try_advisory_lock(_KEY))))
+
+
+async def release_backup_lock(connection: AsyncConnection) -> None:
+    await connection.scalar(select(func.pg_advisory_unlock(_KEY)))
 
 
 @dataclass(frozen=True)
@@ -89,13 +103,22 @@ class BackupRunRepository:
             last_ok, last_failed, size, offsite[OffsiteState.OK], offsite[OffsiteState.FAILED]
         )
 
-    async def interrupt_running(self, at: datetime) -> None:
-        """Runs still `running` (their process is gone: after a restore)."""
-        await self.session.execute(
+    async def interrupt_running(self, at: datetime) -> int:
+        """Runs still `running` whose process is gone (after a restore, or seen by
+        whoever holds the backup lock); how many."""
+        result = await self.session.execute(
             update(BackupRun)
             .where(BackupRun.state == BackupState.RUNNING)
             .values(state=BackupState.INTERRUPTED, finished_at=at)
         )
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
+    async def interrupt_dead(self, at: datetime) -> int:
+        """`interrupt_running` if no backup is running (the lock, for this
+        transaction); how many."""
+        if not await self.session.scalar(select(func.pg_try_advisory_xact_lock(_KEY))):
+            return 0
+        return await self.interrupt_running(at)
 
     async def latest(self, org_id: uuid.UUID, limit: int) -> list[BackupRun]:
         """Newest first."""

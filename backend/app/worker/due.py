@@ -28,7 +28,8 @@ deleted rule go, and those a paused rule took in more than EVENT_RETENTION ago. 
 same cleanup removes `/mcp`'s call rows (`mcp_call`) older than MCP_CALL_RETENTION,
 the files of storage tombstones older than their grace that nothing uses again
 (`core/storage_tombstones.py`, plan M9 decision 4), and the rows whose time has run
-out (`upkeep.py`: sessions, flows, grants, rate limits). The periods are the
+out (`upkeep.py`: sessions, flows, grants, rate limits; and backups whose process
+died). The periods are the
 retention catalogue's (`core/retention.py`).
 
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
@@ -45,7 +46,6 @@ import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from datetime import UTC, datetime
-from functools import partial
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,7 +61,7 @@ from app.modules.mcp_tools.repository import delete_calls_before
 from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.review_pass import Step, review_next
 from app.modules.wiki.review_repository import ReviewRepository
-from app.worker.upkeep import EXPIRING, remove_expired
+from app.worker.upkeep import run_upkeep
 
 logger = logging.getLogger(__name__)
 
@@ -206,18 +206,7 @@ class DueLoop:
         self._last_cleanup = now
         removed = await self.cleanup()
         await self.remove_buried_files()
-        await self.remove_expired()
-        return removed
-
-    async def remove_expired(self) -> int:
-        """The rows whose time has run out (`upkeep.py`), table by table, batch by
-        batch (one transaction each); how many."""
-        now, limit = self.clock.now(), self.cleanup_batch
-        removed = 0
-        for table in EXPIRING:
-            removed += await self._batches(
-                partial(remove_expired, table=table, now=now, limit=limit)
-            )
+        await run_upkeep(self.database, self.clock.now(), self.cleanup_batch)
         return removed
 
     async def cleanup(self) -> tuple[int, int, int]:

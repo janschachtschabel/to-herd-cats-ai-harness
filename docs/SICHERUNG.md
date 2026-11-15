@@ -69,12 +69,33 @@ python -m app.ops backup list [--limit N]     # die Sicherungen aus backup_run, 
 | `HERD_BACKUP_DIR` | `/backups` | Zielverzeichnis der Archive (ein eigenes Volume) |
 
 Weitere Befehle für den Zeitplan (unten): `python -m app.ops backup run` (eine Sicherung
-mit Aufbewahrung und Offsite, der CronJob im Chart) und `python -m app.ops backup
-schedule` (läuft dauerhaft und ruft `run` zu jedem Termin, der Compose-Dienst `backup`).
+mit Aufbewahrung und Offsite; von Hand mit Auslöser `cli`, der CronJob im Chart ruft
+`backup run --scheduled` und hält `schedule` fest) und `python -m app.ops backup
+schedule` (läuft dauerhaft und ruft `run` zu jedem Termin, Auslöser `schedule`, der
+Compose-Dienst `backup`).
 
 Exit-Status 0 bei Erfolg, 1 bei einem Fehler, 2 bei falschem Aufruf. Die
 Kommandozeile handelt als `system`: Eine gelungene Sicherung steht im Audit-Log als
-`backup.created` (Archivname, Bytes, `via=cli`).
+`backup.created` (Archivname, Bytes, `via` = Auslöser).
+
+Vor allem anderen prüft ein Lauf die Datenbank und ob schon eine Sicherung läuft; dann
+endet er ohne Zeile in `backup_run`, mit Exit-Status 1 und einem Code (nie mit einem
+Traceback):
+
+| Code | Bedeutung |
+|---|---|
+| `backup.database_unavailable` | die Datenbank ist nicht erreichbar |
+| `backup.no_schema` | die Datenbank ist nicht migriert |
+| `backup.no_organization` | die Datenbank hat noch keine Organisation |
+| `backup.schema_behind` | die Datenbank steht auf einer älteren Revision als der Code: erst migrieren |
+| `backup.schema_ahead` | die Datenbank steht auf einer Revision, die der Code nicht kennt (eine neuere Version hat migriert): mit dem Image dieser Version sichern |
+| `backup.already_running` | eine andere Sicherung läuft gerade (sie hält die Advisory-Sperre `herd.backup` auf einer eigenen Verbindung, solange sie läuft) |
+
+Zeilen, die noch `running` sind, während niemand die Sperre hält, gehören zu Sicherungen,
+deren Prozess starb (etwa vom Zeitlimit des CronJobs, 6 Stunden, beendet): Die nächste
+Sicherung und die Fälligkeits-Schleife des Workers (einmal je Minute) setzen sie auf
+`interrupted` (Endzeit = Zeitpunkt des Markierens); eine Wiederherstellung ebenso.
+`HerdBackupTooOld` meldet weiterhin, wenn die letzte gelungene zu alt ist.
 
 Ein Lauf schreibt zuerst eine Zeile `backup_run` (`running`), dann Dump und Dateien in
 eine versteckte `.part`-Datei, die erst am Ende umbenannt wird; danach liest er das
@@ -83,8 +104,6 @@ wird alles Geschriebene entfernt und der Lauf mit einem Code `failed`:
 
 | Code | Bedeutung |
 |---|---|
-| `backup.no_organization` | die Datenbank hat noch keine Organisation |
-| `backup.no_schema` | die Datenbank ist nicht migriert |
 | `backup.tool_missing` | `pg_dump` fehlt im `PATH` |
 | `backup.tools_too_old` | `pg_dump` ist älter als der Server (Hauptversion) |
 | `backup.dump_failed` | `pg_dump` endete mit einem Fehler (Verbindung, Rechte) |

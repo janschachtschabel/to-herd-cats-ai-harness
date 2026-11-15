@@ -1,5 +1,6 @@
 """Alembic from code: the config, `upgrade head`, and whether this code fits the schema."""
 
+from enum import StrEnum
 from functools import cache
 from pathlib import Path
 
@@ -64,6 +65,25 @@ def _code_revisions() -> tuple[frozenset[str], frozenset[str]]:
     script = ScriptDirectory.from_config(alembic_config())
     known = frozenset(rev.revision for rev in script.walk_revisions())
     return frozenset(script.get_heads()), known
+
+
+class SchemaState(StrEnum):
+    NONE = "none"  # no revision recorded
+    HEAD = "head"  # the code's head
+    BEHIND = "behind"  # a known, older revision: migrate first
+    AHEAD = "ahead"  # a revision this code does not know: a newer release migrated
+
+
+async def schema_state(engine: AsyncEngine) -> SchemaState:
+    """Where the database's schema stands against this code's migrations."""
+    async with engine.connect() as connection:
+        database = await connection.run_sync(_database_heads)
+    heads, known = _code_revisions()
+    if not database:
+        return SchemaState.NONE
+    if database == heads:
+        return SchemaState.HEAD
+    return SchemaState.BEHIND if database <= known else SchemaState.AHEAD
 
 
 async def schema_is_compatible(engine: AsyncEngine) -> bool:

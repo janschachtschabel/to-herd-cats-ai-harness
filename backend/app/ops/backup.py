@@ -1,7 +1,14 @@
 """Making one backup (plan M9 decisions 2 to 5 and 11).
 
-1. A `backup_run` row (`running`) is committed first, so a backup that dies midway is
-   visible (a restore later marks such rows `interrupted`).
+0. The database must stand at the code's head (`backup.no_schema`,
+   `backup.schema_behind`, `backup.schema_ahead`; unreachable:
+   `backup.database_unavailable`), and no other backup may run: a backup holds the
+   backup lock on a connection of its own while it runs (`backup.already_running`).
+   These refusals write no `backup_run` row.
+1. Rows still `running` belong to backups whose process died (killed by the job's time
+   limit, say): holding the lock, the backup marks them `interrupted` (as the worker's
+   due loop and a restore do). Its own `running` row is committed first, so a backup
+   that dies midway is visible.
 2. In one exported snapshot: the figures (`snapshot.py`) and `pg_dump -Fc --snapshot`.
 3. The snapshot's attachment files are copied from the storage (a deleted file stays
    for its tombstone's grace, `core/storage_tombstones.py`), then the manifest.
@@ -21,16 +28,22 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.db import make_engine
+from app.core.migrations import SchemaState, schema_state
 from app.core.secrets import key_id
 from app.core.storage import LocalStorage, Storage, StoredFileMissing
 from app.modules.audit.recorder import record_system
 from app.modules.backups.models import BackupState, BackupTrigger
-from app.modules.backups.repository import BackupRunRepository
+from app.modules.backups.repository import (
+    BackupRunRepository,
+    hold_backup_lock,
+    release_backup_lock,
+)
 from app.ops.archive import (
     DUMP_MEMBER,
     FILES_PREFIX,
@@ -48,6 +61,11 @@ from app.version import app_version
 logger = logging.getLogger(__name__)
 
 ARCHIVE_PREFIX = "herd-"
+SCHEMA_CODES = {
+    SchemaState.NONE: "backup.no_schema",
+    SchemaState.BEHIND: "backup.schema_behind",
+    SchemaState.AHEAD: "backup.schema_ahead",
+}
 
 
 class BackupFailed(Exception):
@@ -79,7 +97,34 @@ async def create_backup(
         await engine.dispose()
 
 
+def _refused(code: str) -> BackupOutcome:
+    logger.warning("backup.refused", extra={"code": code})
+    return BackupOutcome(None, None, BackupState.FAILED, code)
+
+
 async def _create(
+    settings: Settings,
+    engine: AsyncEngine,
+    sessions: async_sessionmaker[AsyncSession],
+    trigger: BackupTrigger,
+    clock: Clock,
+) -> BackupOutcome:
+    try:
+        schema = await schema_state(engine)
+    except (OSError, SQLAlchemyError):
+        return _refused("backup.database_unavailable")
+    if schema != SchemaState.HEAD:
+        return _refused(SCHEMA_CODES[schema])
+    async with engine.connect() as holder:
+        if not await hold_backup_lock(holder):
+            return _refused("backup.already_running")
+        try:
+            return await _locked(settings, engine, sessions, trigger, clock)
+        finally:
+            await release_backup_lock(holder)
+
+
+async def _locked(
     settings: Settings,
     engine: AsyncEngine,
     sessions: async_sessionmaker[AsyncSession],
@@ -92,6 +137,8 @@ async def _create(
         org_id = await runs.installation_org()
         if org_id is None:
             return BackupOutcome(None, None, BackupState.FAILED, "backup.no_organization")
+        if dead := await runs.interrupt_running(started):
+            logger.warning("backup.interrupted_found", extra={"count": dead})
         run_id = (await runs.start(org_id, trigger, started)).id
     path = settings.backup_dir / archive_name(started, app_version())
     written = False
