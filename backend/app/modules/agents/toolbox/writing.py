@@ -55,6 +55,7 @@ from app.modules.agents.actor import Reads
 from app.modules.agents.personal_mark import ReleaseFirst
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.scope import PlaceKind, organisation_audience, place_of, space_audience
+from app.modules.agents.scope_repository import ScopeRepository
 from app.modules.agents.toolbox.base import NOT_FOUND, CallContext, ToolContext, WriteContext
 from app.modules.ai.models import AiPolicy
 from app.runtime.loop import ToolResult
@@ -111,7 +112,7 @@ async def leaks_into(
     read = await _read(ctx)
     if read and not read <= await space_audience(ctx.session, ctx.actor.org_id, space_id):
         return LEAKS
-    release_first(ctx)
+    await release_first(ctx, space_id)
     return None
 
 
@@ -123,17 +124,19 @@ async def leaks_into_organisation(ctx: CallContext) -> str | None:
     read = await _read(ctx)
     if read and not read <= await organisation_audience(ctx.session, ctx.actor.org_id):
         return LEAKS
-    release_first(ctx)
+    await release_first(ctx)
     return None
 
 
-async def carries_draft(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str | None:
+async def carries_draft(
+    ctx: CallContext, editors_of: uuid.UUID | None = None, *, into: tuple[uuid.UUID, ...] = ()
+) -> str | None:
     """`DRAFTS` while the run holds a draft, unless every draft it read is of
     `editors_of`, the space whose editors alone read what is written; then, under the
-    personal mark, the person's release (`release_first`)."""
+    personal mark, the person's release of a write into `into` (`release_first`)."""
     if why := await _drafted(ctx, editors_of):
         return why
-    release_first(ctx)
+    await release_first(ctx, *into)
     return None
 
 
@@ -144,13 +147,23 @@ async def _drafted(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str
     return None
 
 
-def release_first(ctx: CallContext) -> None:
+async def release_first(ctx: CallContext, *into: uuid.UUID) -> None:
     """Under the personal mark, a write others could read needs the asking person's
     release of this very call: noted here, asked by `effect` right before it writes
-    (`ReleaseFirst`, which the host turns into a release). Outside a run (`/mcp`)
-    there is no mark."""
-    if ctx.reads.personal and isinstance(ctx, ToolContext):
-        ctx.owed.release = True
+    (`ReleaseFirst`, which the host turns into a release). A write into spaces
+    (`into`) nobody but she reads needs none (module review M8 3, H7: her own space;
+    an admin's look by admin right is audited); with no space named, others read it.
+    Outside a run (`/mcp`) there is no mark."""
+    if not ctx.reads.personal or not isinstance(ctx, ToolContext):
+        return
+    scope = ScopeRepository(ctx.session, ctx.actor.org_id)
+    for space_id in into:
+        if await scope.read_by_others(space_id, ctx.run.user_id):
+            break
+    else:
+        if into:
+            return
+    ctx.owed.release = True
 
 
 def _ask_release(ctx: CallContext) -> None:

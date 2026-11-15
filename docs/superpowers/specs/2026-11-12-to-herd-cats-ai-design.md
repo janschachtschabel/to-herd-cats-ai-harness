@@ -228,6 +228,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Unter der persönlichen Marke wird die Freigabe erst verlangt, wenn nichts anderes den Aufruf ablehnt (Entwurfsmarke, Leck, für KI geschlossener Bereich, die eigenen Ablehnungen des Werkzeugs); die Person wird nie um etwas gebeten, das ohnehin abgelehnt würde. Review M8 3, Befund H3.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Was unter der persönlichen Marke nur die fragende Person lesen kann (ihr persönlicher Bereich oder ein Bereich, in dem sie allein ist; ihre Direktnachricht allein mit dem Agenten), braucht keine Freigabe. Review M8 3, Befund H7.*
+
 *Geändert nach Review M8 [Claude, 15.11.2026]: Was die externen Werkzeuge eines Agenten zu jedem Modellaufruf beitragen (Name, Beschreibung, Argumentschema), ist zusammen auf 100.000 Zeichen begrenzt. Die Werkzeuge werden in der Reihenfolge genommen, in der sie zuerst gelistet wurden, jedes, solange die Summe passt; die Auswahl ist bei jedem Schritt, jeder Fortsetzung und beim Wiederholen dieselbe. Die Werkzeugliste des Agenten zeigt, was wegbleibt, und eine Metrik zählt es ohne Namen. Review M8 2, Befund G5.*
 
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]

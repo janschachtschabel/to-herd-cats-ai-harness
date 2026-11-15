@@ -521,7 +521,12 @@ offen; im Lauf einer Automatisierung oder Ereignisregel gibt die Eigentümerin f
 Gibt sie frei, läuft genau dieser Aufruf, und was so geschrieben wird, ist nicht
 markiert: Sie hat entschieden, es zu veröffentlichen. Lehnt sie ab, sieht das Modell
 die Ablehnung. Ins eigene Gespräch allein mit dem Agenten braucht es keine Freigabe;
-was dort steht, ist markiert. Zurückgehalten bleiben die eigene Antwort des Laufs und
+was dort steht, ist markiert. Ebenso wenig in einen Bereich, den außer ihr niemand
+liest (ihr persönlicher Bereich oder ein Bereich, in dem sie allein Mitglied ist; ein
+Admin, der kraft Adminrecht hineinsieht, wird auditiert): Ein Gedächtnis, ein Ticket
+oder eine Seite dort schreibt der Lauf ohne Freigabe (Review M8 3, Befund H7). Wer
+später weitere Personen in einen solchen Bereich holt, entscheidet selbst darüber,
+was sie dort lesen. Zurückgehalten bleiben die eigene Antwort des Laufs und
 `ask_user`, wo andere mitlesen (Kanal, Thread einer Seite oder eines Tickets,
 Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
 `policy_blocked` (`personal_connector`, im Halt-Ereignis und im Hinweis des Gesprächs,

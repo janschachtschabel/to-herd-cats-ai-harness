@@ -761,7 +761,8 @@ Recht 404 `ai.not_found`.
   Gedächtnis), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
   `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
   freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Allein mit ihr in
-  der Direktnachricht geht alles ohne Freigabe weiter. In einem Kanal, Thread oder
+  der Direktnachricht und in Bereichen, die außer ihr niemand liest (ihr persönlicher
+  Bereich), geht alles ohne Freigabe weiter (Review M8 3, Befund H7). In einem Kanal, Thread oder
   einer Direktnachricht mit mehreren bleiben seine Antwort und seine Rückfrage
   zurückgehalten: Er endet statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Die
