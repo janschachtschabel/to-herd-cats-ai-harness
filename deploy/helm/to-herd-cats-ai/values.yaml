@@ -18,13 +18,22 @@ imagePullSecrets: []
 
 ## @section API (HERD_ROLE=api)
 
-## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops)
+## @param api.replicas Number of API pods; the processes are stateless (each holds one database connection for live updates, LISTEN, besides its pool; browsers reconnect to another pod when one stops). Ignored with api.autoscaling.enabled
+## @param api.autoscaling.enabled Scale the API pods with a HorizontalPodAutoscaler (autoscaling/v2) on CPU instead of api.replicas; needs metrics-server and api.resources.requests.cpu. Every pod holds up to 16 database connections (docs/STECKBRIEF.md, Clusterfähigkeit): maxReplicas × 16 plus the worker's must fit the database's max_connections
+## @param api.autoscaling.minReplicas Fewest API pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
+## @param api.autoscaling.maxReplicas Most API pods (more than 1 needs persistence.accessModes [ReadWriteMany])
+## @param api.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of api.resources.requests.cpu, the autoscaler aims at (1 to 100)
 ## @param api.resources Resource requests and limits of the API container
 ## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
 ## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
 ## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL
 api:
   replicas: 2
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
   resources:
     requests:
       cpu: 100m
@@ -37,11 +46,20 @@ api:
 
 ## @section Worker (HERD_ROLE=worker)
 
-## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these
+## @param worker.replicas Number of worker pods (the outbox dispatcher: notifications, page timelines, live updates). One is enough; more are safe (they claim disjoint batches) and only add throughput or a spare. 0 stops the delivery of all of these. Ignored with worker.autoscaling.enabled
+## @param worker.autoscaling.enabled Scale the worker pods with a HorizontalPodAutoscaler (autoscaling/v2) on CPU instead of worker.replicas; needs metrics-server and worker.resources.requests.cpu. Agent runs mostly wait for providers, so CPU rises with the outbox and the due loop rather than with runs; a pod removed on scale-down drops its runs, which another worker takes up after their lease
+## @param worker.autoscaling.minReplicas Fewest worker pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
+## @param worker.autoscaling.maxReplicas Most worker pods (each holds up to 16 database connections)
+## @param worker.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of worker.resources.requests.cpu, the autoscaler aims at (1 to 100)
 ## @param worker.resources Resource requests and limits of the worker container
 ## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here)
 worker:
   replicas: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
   resources:
     requests:
       cpu: 50m
@@ -82,13 +100,15 @@ mcp:
 
 ## @section Sign-in through OIDC (M9; docs/ANMELDUNG.md)
 
-## @param oidc.allowedHosts Private hosts an OIDC identity provider may run on (an in-house Keycloak): exact host names or private networks in CIDR form (HERD_OIDC_ALLOWED_HOSTS; API). Empty: public addresses only (Google needs nothing here). With networkPolicy.enabled, networkPolicy.egress must also let the API pods reach the provider (Google: accounts.google.com, oauth2.googleapis.com, www.googleapis.com on 443). Providers themselves are set up in the administration; publicUrl (or an Ingress host) is required
+## @param oidc.allowedHosts Private hosts an OIDC identity provider may run on (an in-house Keycloak): exact host names or private networks in CIDR form (HERD_OIDC_ALLOWED_HOSTS; API). Empty: public addresses only (Google needs nothing here). With networkPolicy.enabled, oidc.egress must also let the API pods reach the provider. Providers themselves are set up in the administration; publicUrl (or an Ingress host) is required
 ## @param oidc.ratePerMinute Starts and callbacks of OIDC sign-ins per client address and minute, counted in PostgreSQL across all API pods, 1 to 10000 (HERD_OIDC_RATE_PER_MINUTE; API)
 ## @param oidc.existingSecret Name of an existing Secret with the client secrets providers reference as env:HERD_OIDC_<NAME> (API pods; envFrom). Empty: none; a secret can instead be stored encrypted under HERD_SECRET_KEY (ai.existingSecret)
+## @param oidc.egress Egress rules (NetworkPolicyEgressRule list) of the API pods alone to the identity providers, with networkPolicy.enabled (Google: accounts.google.com, oauth2.googleapis.com and www.googleapis.com on 443; NetworkPolicy knows no host names, so their address ranges or an egress gateway). OIDC never goes through HERD_AI_EGRESS_PROXY, so networkPolicy.aiEgress does not cover it. Empty: with networkPolicy.enabled no provider is reachable (Check answers provider_unreachable)
 oidc:
   allowedHosts: []
   ratePerMinute: 30
   existingSecret: ""
+  egress: []
 
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
@@ -110,7 +130,7 @@ persistence:
 
 ## @section Backups (plan M9; docs/SICHERUNG.md)
 
-## @param backup.enabled Run the backup CronJob (`python -m app.ops backup run`): an archive of the database and the attachments, read back and checked, on a PersistentVolumeClaim of its own, then the retention below and, with backup.offsite.existingSecret, a restic copy offsite. It mounts the files claim (persistence) read-only, so with an existing or ReadWriteOnce files claim its pod must be able to mount it (ReadWriteMany, or the same node). Needs persistence.enabled
+## @param backup.enabled Run the backup CronJob (`python -m app.ops backup run`): an archive of the database and the attachments, read back and checked, on a PersistentVolumeClaim of its own, then the retention below and, with backup.offsite.existingSecret, a restic copy offsite. It mounts the files claim (persistence) read-only: on a claim the chart creates with ReadWriteOnce its pod is placed on an API pod's node (pod affinity); ReadWriteOncePod cannot be shared and is refused; an existing claim must be ReadWriteMany or the job must land on the right node by other means. Needs persistence.enabled
 ## @param backup.schedule When the CronJob runs (cron, five fields, time zone Etc/UTC). One at a time (concurrencyPolicy Forbid); a failed run is not retried (backoffLimit 0) and fires HerdBackupFailing
 ## @param backup.keepDaily Days whose newest good archive stays on the claim, 0 to 1000 (HERD_BACKUP_KEEP_DAILY); the newest good archive always stays, failed ones are removed at once
 ## @param backup.keepWeekly Older weeks whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_WEEKLY); offsite, restic forget keeps the same
@@ -145,6 +165,14 @@ backup:
   offsite:
     existingSecret: ""
     egress: []
+
+## @section Disruptions
+
+## @param podDisruptionBudget.enabled A PodDisruptionBudget (policy/v1) for each of api and worker that runs at least two pods (replicas, or autoscaling.minReplicas); one pod alone gets none, so a node drain never hangs on it. The collab process is one pod by design and gets none. Pods that are not ready may always be evicted
+## @param podDisruptionBudget.maxUnavailable Pods of one component a voluntary disruption (drain, cluster upgrade) may take at once (at least 1; keep it below the component's pods)
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
 
 ## @section Live editing (HERD_ROLE=collab)
 

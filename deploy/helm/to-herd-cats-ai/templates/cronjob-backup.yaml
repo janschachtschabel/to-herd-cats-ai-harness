@@ -2,6 +2,12 @@
 {{- if not .Values.persistence.enabled }}
 {{- fail "backup.enabled needs persistence.enabled: the backup reads the attachments from the files claim (set backup.enabled=false for trials without one)" }}
 {{- end }}
+{{- if and (not .Values.persistence.existingClaim) (has "ReadWriteOncePod" .Values.persistence.accessModes) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+{{- fail "backup.enabled cannot use a ReadWriteOncePod files claim: the backup pod mounts it beside the API pod (use ReadWriteOnce or ReadWriteMany, or backup.enabled=false)" }}
+{{- end }}
+{{- /* On a ReadWriteOnce claim the chart created, the backup pod must run where an API
+pod has the claim mounted. */ -}}
+{{- $besideApi := and (not .Values.persistence.existingClaim) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
 # Backups (plan M9, docs/SICHERUNG.md): `python -m app.ops backup run` writes an archive
 # of the database (pg_dump from one snapshot) and the attachments to /backups, reads it
 # back and checks it, applies the retention and, with backup.offsite.existingSecret,
@@ -48,6 +54,17 @@ spec:
           {{- end }}
           securityContext:
             {{- include "herd.podSecurityContext" . | nindent 12 }}
+          {{- if $besideApi }}
+          # The files claim is ReadWriteOnce: mountable only on the node of the API pod.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      {{- include "herd.selectorLabels" . | nindent 22 }}
+                      app.kubernetes.io/component: api
+                  topologyKey: kubernetes.io/hostname
+          {{- end }}
           containers:
             - name: backup
               image: {{ include "herd.image" . | quote }}

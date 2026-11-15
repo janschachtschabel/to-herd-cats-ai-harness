@@ -847,7 +847,7 @@ tests:
               job: herd-api
             exp_annotations:
               summary: "OIDC sign-ins of herd/herd-api fail at the provider"
-              description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (networkPolicy.egress). Password sign-in keeps working."
+              description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (oidc.egress). Password sign-in keeps working."
       - eval_time: 50m
         alertname: HerdOidcFailing
         exp_alerts: []
@@ -864,4 +864,50 @@ tests:
     alert_rule_test:
       - eval_time: 25m
         alertname: HerdOidcFailing
+        exp_alerts: []
+
+  # HerdAutoscalerAtMax: an autoscaler of ours (its name holds the chart's) has run at its
+  # maximum for 30 minutes. Needs kube-state-metrics.
+  - name: HerdAutoscalerAtMax fires after 30 minutes at the maximum, only for ours
+    interval: 1m
+    input_series:
+      - series: 'kube_horizontalpodautoscaler_status_current_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-api"}'
+        values: "6x45"
+      - series: 'kube_horizontalpodautoscaler_spec_max_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-api"}'
+        values: "6x45"
+      # Below its maximum: never.
+      - series: 'kube_horizontalpodautoscaler_status_current_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-worker"}'
+        values: "2x45"
+      - series: 'kube_horizontalpodautoscaler_spec_max_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-worker"}'
+        values: "3x45"
+      # At its maximum, but not ours.
+      - series: 'kube_horizontalpodautoscaler_status_current_replicas{namespace="herd", horizontalpodautoscaler="shop-api"}'
+        values: "4x45"
+      - series: 'kube_horizontalpodautoscaler_spec_max_replicas{namespace="herd", horizontalpodautoscaler="shop-api"}'
+        values: "4x45"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: HerdAutoscalerAtMax
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: HerdAutoscalerAtMax
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              horizontalpodautoscaler: herd-to-herd-cats-ai-api
+            exp_annotations:
+              summary: "Autoscaler herd/herd-to-herd-cats-ai-api has run at its maximum for 30 minutes"
+              description: "Its pods stay busy at autoscaling.maxReplicas (api or worker). Raise maxReplicas only while the database has room for 16 more connections per pod (docs/STECKBRIEF.md, Clusterfähigkeit); otherwise look at what keeps the CPU busy or give the pods a larger CPU request."
+
+  - name: HerdAutoscalerAtMax stays quiet when the autoscaler steps back within 30 minutes
+    interval: 1m
+    input_series:
+      - series: 'kube_horizontalpodautoscaler_status_current_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-api"}'
+        values: "6x20 5x25"
+      - series: 'kube_horizontalpodautoscaler_spec_max_replicas{namespace="herd", horizontalpodautoscaler="herd-to-herd-cats-ai-api"}'
+        values: "6x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: HerdAutoscalerAtMax
         exp_alerts: []

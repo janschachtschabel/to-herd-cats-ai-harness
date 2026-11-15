@@ -210,9 +210,11 @@ eine Sicherung mit dem echten restic in ein Repository im Container.
 `backup.schedule` (Zeitzone Etc/UTC), `concurrencyPolicy: Forbid`, `backoffLimit: 0`
 (ein Fehlschlag wird nicht wiederholt, `HerdBackupFailing` meldet ihn) und höchstens 6
 Stunden Laufzeit, auf einer eigenen PVC `<release>-backups` (bleibt beim Deinstallieren;
-`backup.persistence.*`). Die Anhänge-PVC wird schreibgeschützt eingehängt: Bei
-ReadWriteOnce muss der Job-Pod auf demselben Knoten laufen können (ReadWriteMany
-empfohlen). Offsite: `backup.offsite.existingSecret` nennt ein Secret mit
+`backup.persistence.*`). Die Anhänge-PVC wird schreibgeschützt eingehängt: Legt das
+Chart sie mit ReadWriteOnce an, setzt es eine Pod-Affinität des Job-Pods zum Knoten
+eines API-Pods (dort ist der Claim eingehängt); ReadWriteOncePod lässt sich nicht teilen
+und wird mit `backup.enabled` abgelehnt; ein eigener Claim (`persistence.existingClaim`)
+sollte ReadWriteMany sein, sonst muss der Job anders auf den richtigen Knoten kommen. Offsite: `backup.offsite.existingSecret` nennt ein Secret mit
 `HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` und den
 Speicherzugangsdaten; es erreicht nur den Backup-Job, von `ai.existingSecret` bekommt er
 allein `HERD_SECRET_KEY`. Mit `networkPolicy.enabled` darf der Job nur DNS, die Datenbank

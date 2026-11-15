@@ -344,7 +344,8 @@ rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
 for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
   HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing \
   HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems \
-  HerdBackupTooOld HerdBackupFailing HerdOffsiteBackupFailing HerdBackupNeverRan; do
+  HerdBackupTooOld HerdBackupFailing HerdOffsiteBackupFailing HerdBackupNeverRan HerdOidcFailing \
+  HerdAutoscalerAtMax; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \
@@ -355,5 +356,9 @@ for name in t-to-herd-cats-ai-internal t-to-herd-cats-ai-worker; do
   grep -q "app.kubernetes.io/endpoint: internal" <<<"$service" || fail "the ServiceMonitor does not scrape $name"
 done
 grep -q "HERD_ROLE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" || fail "no worker to report"
+
+# Scaling, and where the M9 settings and secrets go (plan M9 Task 7).
+source "$root/deploy/helm/scripts/chart-rules-scaling.sh"
+source "$root/deploy/helm/scripts/chart-rules-placement.sh"
 
 echo "chart rules OK"

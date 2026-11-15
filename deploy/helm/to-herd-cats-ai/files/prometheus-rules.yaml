@@ -305,4 +305,17 @@ groups:
           severity: warning
         annotations:
           summary: "OIDC sign-ins of {{ $labels.namespace }}/{{ $labels.job }} fail at the provider"
-          description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (networkPolicy.egress). Password sign-in keeps working."
+          description: "Sign-ins through an OIDC provider fail because of the provider (outcome provider_unreachable, provider_error, issuer_mismatch or id_token_invalid of herd_oidc_logins_total; log entries oidc id token refused name the provider's key and the reason). Run Check for the provider in the administration (Anmeldung); a private provider must be named in oidc.allowedHosts, and with networkPolicy.enabled the way out must be allowed (oidc.egress). Password sign-in keeps working."
+      # An autoscaler of ours (api.autoscaling, worker.autoscaling; its name holds the
+      # chart's) has run at its maximum for 30 minutes: the bounds are too low for the
+      # load, or something keeps the CPU busy. Needs kube-state-metrics.
+      - alert: HerdAutoscalerAtMax
+        expr: |
+          max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=~".*to-herd-cats-ai.*-(api|worker)"})
+            >= max by (namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler=~".*to-herd-cats-ai.*-(api|worker)"})
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Autoscaler {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} has run at its maximum for 30 minutes"
+          description: "Its pods stay busy at autoscaling.maxReplicas (api or worker). Raise maxReplicas only while the database has room for 16 more connections per pod (docs/STECKBRIEF.md, Clusterfähigkeit); otherwise look at what keeps the CPU busy or give the pods a larger CPU request."

@@ -576,6 +576,18 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Replika kann jede Anfrage bedienen. Chart-Standard: 2 API-Replikas. Anhänge liegen
   auf einem Volume (`/data`), das alle API-Replikas teilen (Chart: PVC mit
   `ReadWriteMany`).
+- **Autoskalierung und Wartungen (M9):** Auf Wunsch je ein HorizontalPodAutoscaler
+  (`autoscaling/v2`, CPU-Ziel 70 % des Requests) für API (2 bis 6 Pods) und Worker
+  (1 bis 3), Standard aus; herunter höchstens ein Pod je 2 Minuten. PodDisruptionBudgets
+  (`maxUnavailable: 1`, nicht bereite Pods dürfen immer gehen) für API und Worker ab
+  zwei Pods; der Collab-Prozess (eine Replika) bekommt keins. **Datenbankverbindungen,
+  gerechnet, nicht gemessen:** je API- oder Worker-Prozess ein Pool von 5, unter Last
+  bis 15 (SQLAlchemy: `pool_size` 5, `max_overflow` 10), dazu eine für LISTEN, also
+  höchstens 16. Mit den Obergrenzen 6 API + 3 Worker: ohne Lastspitze bis 54, in der
+  Spitze 144, mit Backup-Job (Engine und `pg_dump`) und Migrations-Job rund 150.
+  PostgreSQL erlaubt ab Werk 100: Für die vollen Grenzen `max_connections` ≥ 160 oder
+  kleinere `maxReplicas`. Kein PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht
+  erst mit einem Leser); die gemessene Zahl unter Last liefert der Lasttest (M9 Task 10).
 - **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
   (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
   zwei Prozesse würden die Bearbeitenden einer Seite aufteilen. Der Zustand wird über
@@ -628,7 +640,8 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 
 ## Zeitpläne
 
-Keine Cronjobs. Die **Fälligkeits-Schleife** jedes Workers (M7) schaut alle 5 s nach
+Ein CronJob im Chart: die Sicherung (M9, `backup.schedule`, Standard 02:30 UTC; in
+Compose der Dienst `backup`, [`SICHERUNG.md`](SICHERUNG.md)). Die **Fälligkeits-Schleife** jedes Workers (M7) schaut alle 5 s nach
 fälligen Terminen der Aufgaben (bis 50 je Durchlauf, ohne Pause weiter, solange es mehr
 gibt), geht in jeder Runde bis zu 20 Schritte des täglichen Prüfdurchlaufs der
 Wiki-Seiten (ein Bereich je Schritt, höchstens einmal je UTC-Tag) und löscht einmal je
@@ -1038,7 +1051,11 @@ Stunde wegen Fehlschlägen angehalten). Seit M8, je als Warnung:
 5 Minuten, 10 Minuten lang; aus `herd_http_requests_total{route="/mcp"}`) und
 `HerdMcpCatalogProblems` (übersprungene Katalog-Dateien, 15 Minuten). Bedeutung und
 Abhilfe in [`AGENTEN.md`](AGENTEN.md#metriken-und-alarme) und
-[`MCP.md`](MCP.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
+[`MCP.md`](MCP.md#metriken-und-alarme). Seit M9: `HerdBackupTooOld`,
+`HerdBackupFailing`, `HerdOffsiteBackupFailing`, `HerdBackupNeverRan`
+([`SICHERUNG.md`](SICHERUNG.md)), `HerdOidcFailing` ([`ANMELDUNG.md`](ANMELDUNG.md))
+und `HerdAutoscalerAtMax` (ein Autoscaler des Charts 30 Minuten am Maximum, Warnung;
+braucht kube-state-metrics). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
 ## Tests (Backend Stand M7, sonst M6)

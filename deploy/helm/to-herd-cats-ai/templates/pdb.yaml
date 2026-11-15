@@ -1,0 +1,15 @@
+{{- /*
+PodDisruptionBudgets (podDisruptionBudget; _scaling.tpl): one for the API and one for
+the worker when it runs at least two pods. The collab process runs one pod by design
+(its live documents live in memory; spec 12.4 stage 1), so it gets none: a budget for a
+single pod would only block node drains.
+*/ -}}
+{{- $api := include "herd.pdb" (dict "root" . "component" "api") }}
+{{- $worker := include "herd.pdb" (dict "root" . "component" "worker") }}
+{{- $api }}
+{{- if and $api $worker }}
+---
+{{- end }}
+{{- if $worker }}
+{{ $worker }}
+{{- end }}

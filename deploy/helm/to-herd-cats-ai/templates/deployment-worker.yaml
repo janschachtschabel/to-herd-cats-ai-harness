@@ -16,7 +16,10 @@ metadata:
     {{- include "herd.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
 spec:
+  {{- if not .Values.worker.autoscaling.enabled }}
+  # With worker.autoscaling the autoscaler owns the count (hpa-worker.yaml).
   replicas: {{ .Values.worker.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "herd.selectorLabels" . | nindent 6 }}

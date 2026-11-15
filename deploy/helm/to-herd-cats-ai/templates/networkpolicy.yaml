@@ -237,6 +237,27 @@ spec:
   egress:
     {{- toYaml . | nindent 4 }}
 {{- end }}
+{{- with .Values.oidc.egress }}
+---
+# Sign-in providers (OIDC: discovery, token endpoint, keys): the API pods alone, and
+# never through HERD_AI_EGRESS_PROXY, so networkPolicy.aiEgress does not cover them.
+# Empty, it is not rendered and no provider is reachable.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" $ }}-oidc-egress
+  labels:
+    {{- include "herd.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: api
+  policyTypes: [Egress]
+  egress:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
 # The bundled PostgreSQL: reachable only from the app pods (and the backup job), no

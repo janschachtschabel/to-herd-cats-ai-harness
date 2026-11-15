@@ -2,7 +2,20 @@ to-herd-cats-ai {{ .Chart.AppVersion }} is installed as {{ include "herd.fullnam
 
 Public port 8080: service {{ include "herd.fullname" . }}{{ if .Values.ingress.enabled }} (Ingress: {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}){{ end }}.
 Internal port 9090 (/health, /ready, /metrics): service {{ include "herd.fullname" . }}-internal (API pods) and {{ include "herd.fullname" . }}-worker (worker pods).
-Worker (outbox: notifications, page timelines, live updates): {{ .Values.worker.replicas }} replica(s){{ if eq (int .Values.worker.replicas) 0 }}; with none, nothing of this is delivered{{ end }}.
+API pods: {{ if .Values.api.autoscaling.enabled }}autoscaled from {{ .Values.api.autoscaling.minReplicas }} to {{ .Values.api.autoscaling.maxReplicas }} at {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }} % CPU (needs metrics-server){{ else }}{{ .Values.api.replicas }} replica(s){{ end }}.
+Worker (outbox: notifications, page timelines, live updates; agent runs; due automations): {{ if .Values.worker.autoscaling.enabled }}autoscaled from {{ .Values.worker.autoscaling.minReplicas }} to {{ .Values.worker.autoscaling.maxReplicas }} at {{ .Values.worker.autoscaling.targetCPUUtilizationPercentage }} % CPU{{ else }}{{ .Values.worker.replicas }} replica(s){{ if eq (int .Values.worker.replicas) 0 }}; with none, nothing of this is delivered{{ end }}{{ end }}.
+{{- if or .Values.api.autoscaling.enabled .Values.worker.autoscaling.enabled }}
+Every API or worker pod holds up to 16 database connections: with the most pods the database needs room for {{ mul 16 (add (include "herd.maxReplicas" (dict "root" . "component" "api")) (include "herd.maxReplicas" (dict "root" . "component" "worker"))) }} (PostgreSQL allows 100 by default; docs/STECKBRIEF.md).
+{{- end }}
+{{- $budgets := list }}
+{{- range $component := list "api" "worker" }}
+{{- if and $.Values.podDisruptionBudget.enabled (ge (int (include "herd.minReplicas" (dict "root" $ "component" $component))) 2) }}
+{{- $budgets = append $budgets $component }}
+{{- end }}
+{{- end }}
+{{- with $budgets }}
+PodDisruptionBudgets (at most {{ $.Values.podDisruptionBudget.maxUnavailable }} pod away at a time): {{ join ", " . }}; a component with one pod and the collab process get none.
+{{- end }}
 {{- if .Values.ingress.enabled }}
 Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the Ingress must not buffer them and must allow a long read timeout (see ingress.annotations in values.yaml).
 {{- end }}
@@ -11,9 +24,12 @@ Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab 
 {{- with include "herd.publicUrl" . }} Browsers must open the app at {{ . }}.{{ else }} No publicUrl: WebSocket Origins must match the host the request came to.{{ end }}
 {{- end }}
 Files (attachments): {{ if .Values.persistence.enabled }}{{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }} on /data (kept on uninstall){{ else }}an emptyDir per API pod: files are lost with the pod (persistence.enabled=false){{ end }}.
+{{- if .Values.backup.enabled }}
+Backups: CronJob {{ include "herd.fullname" . }}-backup at "{{ .Values.backup.schedule }}" (UTC) onto {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "herd.fullname" .)) }}{{ if .Values.backup.offsite.existingSecret }}, copied offsite with restic{{ else }}; no offsite copy (backup.offsite.existingSecret){{ end }}. See docs/SICHERUNG.md.
+{{- end }}
 {{- if .Values.postgresql.enabled }}
 
-The bundled PostgreSQL is for test and staging only (no replication, no backups).
+The bundled PostgreSQL is for test and staging only (one pod, no replication).
 For production set postgresql.enabled=false, database.url and database.existingSecret.
 {{- end }}
 {{- if not .Values.secrets.existingSecret }}
@@ -26,6 +42,11 @@ secrets.existingSecret to its name.
 
 ai.existingSecret is empty: connections cannot store AI keys encrypted (HERD_SECRET_KEY),
 and provider keys (env:HERD_AI_<NAME>) have no Secret to come from. See docs/KI.md.
+{{- end }}
+{{- if and .Values.networkPolicy.enabled (not .Values.oidc.egress) }}
+
+oidc.egress is empty: with the NetworkPolicy the API pods reach no OIDC provider (sign-in
+through Google or another provider answers provider_unreachable). See docs/ANMELDUNG.md.
 {{- end }}
 {{- if and .Values.networkPolicy.enabled (not .Values.networkPolicy.aiEgress) }}
 

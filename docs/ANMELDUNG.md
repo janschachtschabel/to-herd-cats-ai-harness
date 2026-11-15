@@ -17,9 +17,13 @@ Optional legen sich Personen aus erlaubten Domains dabei selbst ein Konto an.
 Compose: beide Einstellungen stehen in `compose.yml` und `compose.nodes.yml`; Secrets
 `HERD_OIDC_<NAME>` gehören in `ai.env` (siehe `ai.env.example`). Helm: `oidc.allowedHosts`,
 `oidc.ratePerMinute`, `oidc.existingSecret` (ein Secret mit `HERD_OIDC_<NAME>` für die
-API-Pods); mit `networkPolicy.enabled` muss `networkPolicy.egress` den API-Pods den Weg
+API-Pods); mit `networkPolicy.enabled` muss `oidc.egress` den API-Pods den Weg
 zum Anbieter erlauben (Google: `accounts.google.com`, `oauth2.googleapis.com`,
-`www.googleapis.com`, Port 443).
+`www.googleapis.com`, Port 443; NetworkPolicy kennt keine Hostnamen, also deren
+Adressbereiche oder öffentliche Adressen auf 443, siehe `ci/production-values.yaml`).
+Die Regeln gelten nur für die API-Pods; `networkPolicy.aiEgress` deckt OIDC nicht ab,
+weil OIDC nie über `HERD_AI_EGRESS_PROXY` geht. Ohne `oidc.egress` meldet „Prüfen“
+`provider_unreachable`.
 
 Alle Aufrufe zum Anbieter (Discovery, Token-Endpunkt, JWKS) gehen durch die
 Egress-Sperre (`core/egress.py`): nur https, keine Weiterleitungen, kein Proxy aus der

@@ -200,8 +200,12 @@ Das Secret `herd-db` enthält das Datenbank-Passwort unter dem Schlüssel `passw
 `herd-env` die Variablen `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD`. Jeder Wert ist in [`values.yaml`](deploy/helm/to-herd-cats-ai/values.yaml) beschrieben;
 `ci/production-values.yaml` ist ein vollständiges Beispiel (externe Datenbank, Ingress
-mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule). Vor dem Einsatz die
-[Betriebshinweise](#betriebshinweise) lesen.
+mit TLS, NetworkPolicy, ServiceMonitor, PrometheusRule, Autoskalierung, Sicherung mit
+Offsite, OIDC), `ci/full-values.yaml` schaltet alles zugleich ein. Vor dem Einsatz die
+[Betriebshinweise](#betriebshinweise) lesen. Lokal ohne helm prüft
+`cd backend && uv run python ../deploy/helm/scripts/check_values.py` jede Werte-Datei
+gegen `values.schema.json` und jede `@param` gegen das Schema (auch als Test
+`tests/test_chart_values.py`).
 
 > **Wichtig – Volume für Anhänge:** Das Chart legt den PersistentVolumeClaim
 > `<release>-data` (10Gi, `/data`) mit **`ReadWriteMany`** an, weil alle API-Replikas
@@ -263,6 +267,27 @@ JSON-Antworten). Vier Alarme kommen dazu: `HerdExternalToolsFailing`,
 `HerdOAuthRefreshFailing`, `HerdMcpAuthFailures` und `HerdMcpCatalogProblems` (alle
 Warnung; [`docs/MCP.md`](docs/MCP.md#betrieb)).
 Einzelheiten: [`docs/AGENTEN.md`](docs/AGENTEN.md#umgebungsvariablen).
+
+Seit M9 skaliert das Chart auf Wunsch selbst und hält Pods bei Wartungen: Mit
+`api.autoscaling.enabled` bzw. `worker.autoscaling.enabled` (Standard aus) legt es je
+einen HorizontalPodAutoscaler (`autoscaling/v2`) auf CPU an, Ziel 70 % des
+CPU-Requests, API 2 bis 6 Pods, Worker 1 bis 3; das Deployment nennt dann keine
+`replicas` mehr. Das braucht metrics-server und einen CPU-Request (sonst bricht das
+Chart ab; für die API empfiehlt der Steckbrief 250m), mehr als ein API-Pod braucht die
+Anhänge-PVC mit ReadWriteMany. Herunter geht es behutsam (ein Pod je 2 Minuten nach 5
+ruhigen Minuten). Jeder Pod hält bis zu 16 Datenbankverbindungen; die Grenzen so
+wählen, dass `max_connections` der Datenbank reicht (Rechnung im
+[Steckbrief](docs/STECKBRIEF.md#clusterfähigkeit)). Der Alarm `HerdAutoscalerAtMax`
+meldet einen Autoscaler, der 30 Minuten am Maximum steht (braucht kube-state-metrics).
+`podDisruptionBudget` (Standard an, `maxUnavailable: 1`) legt für API und Worker je ein
+PodDisruptionBudget an, sobald sie mindestens zwei Pods haben (Replikas oder
+`minReplicas`); ein einzelner Pod und der Collab-Prozess (eine Replika) bekommen keins,
+damit ein Knoten-Drain nie hängt. Dazu kommen der Sicherungs-CronJob
+([`docs/SICHERUNG.md`](docs/SICHERUNG.md#betrieb-compose-und-helm)) und die Werte der
+Anmeldung über OIDC (`oidc.*`, mit `oidc.egress` für die NetworkPolicy der API-Pods;
+[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)). Geheimnisse kommen nur aus Secrets: Das
+Schema lehnt in `api.env`, `worker.env` und `collab.env` Namen mit `PASSWORD`, `SECRET`,
+`TOKEN`, `EGRESS_PROXY` oder `OFFSITE` ab.
 
 Drei Werte betreffen jeden Betrieb hinter einem Ingress:
 
@@ -395,6 +420,13 @@ kennen.
   check|apply` spielt in eine leere Installation ein. Format, Schlüssel, Fehlercodes und
   Betrieb in [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das
   Volume schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
+- **Autoskalierung und Datenbankverbindungen** (M9): Jeder API- und Worker-Prozess hat
+  einen Pool von 5 Verbindungen, der unter Last um bis zu 10 wächst, dazu eine für
+  LISTEN: höchstens 16 je Pod. Mit den Standardgrenzen der Autoscaler (API 6, Worker 3)
+  sind das im Ruhezustand 54, in der Spitze 144 Verbindungen, mit Backup-Job und
+  Migration rund 150. PostgreSQL hat ab Werk `max_connections = 100`: Für die vollen
+  Grenzen `max_connections` auf mindestens 160 setzen oder `maxReplicas` senken. Einen
+  Verbindungs-Pooler (PgBouncer) bringt das Chart nicht mit.
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
@@ -604,7 +636,9 @@ kennen.
   `networkPolicy.internalFrom` niemanden an Port 9090 außer dem Collab-Prozess, also
   auch Prometheus nicht: Prometheus dort eintragen. Den Collab-Prozess (Port 1234)
   erreichen nur die API-Pods; er selbst darf nur zu DNS und Port 9090 der API. Mit externer Datenbank braucht es eine Egress-Regel zu
-  ihr (`networkPolicy.egress`).
+  ihr (`networkPolicy.egress`), für KI-Anbieter `networkPolicy.aiEgress` (API und
+  Worker), für OIDC-Anbieter `oidc.egress` (nur API), für die Offsite-Sicherung
+  `backup.offsite.egress` (nur der Backup-Job).
 - **Image nur für linux/amd64.** arm64 würde Cross-Builds der Node- und uv-Stufen
   brauchen.
 - **Trivy** prüft das Image mit `ignore-unfixed`: Nicht behebbare CVEs der

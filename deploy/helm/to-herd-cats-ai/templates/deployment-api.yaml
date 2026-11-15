@@ -6,7 +6,10 @@ metadata:
     {{- include "herd.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  # With api.autoscaling the autoscaler owns the count (hpa-api.yaml).
   replicas: {{ .Values.api.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "herd.selectorLabels" . | nindent 6 }}

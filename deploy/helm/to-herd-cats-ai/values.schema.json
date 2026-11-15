@@ -36,7 +36,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "replicas": {"type": "integer", "minimum": 0, "description": "Number of API pods"},
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of API pods; ignored with autoscaling.enabled"},
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A HorizontalPodAutoscaler (autoscaling/v2) on CPU in place of replicas",
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Scale the API pods with a HorizontalPodAutoscaler"},
+            "minReplicas": {"type": "integer", "minimum": 1, "description": "Fewest pods (default 2)"},
+            "maxReplicas": {"type": "integer", "minimum": 1, "description": "Most pods (default 6); not below minReplicas"},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Average CPU use the autoscaler aims at, percent of the CPU request"}
+          },
+          "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"]
+        },
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -60,12 +72,12 @@
         "forwardedAllowIps": {"type": "string", "description": "Trusted reverse proxies (HERD_FORWARDED_ALLOW_IPS); required when ingress.enabled"},
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "resources", "cookieSecure", "forwardedAllowIps", "env"],
+      "required": ["replicas", "autoscaling", "resources", "cookieSecure", "forwardedAllowIps", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
     },
     "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},
@@ -152,7 +164,19 @@
       "additionalProperties": false,
       "description": "The worker Deployment (HERD_ROLE=worker, the outbox dispatcher)",
       "properties": {
-        "replicas": {"type": "integer", "minimum": 0, "description": "Number of worker pods; more than one is safe"},
+        "replicas": {"type": "integer", "minimum": 0, "description": "Number of worker pods; more than one is safe; ignored with autoscaling.enabled"},
+        "autoscaling": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A HorizontalPodAutoscaler (autoscaling/v2) on CPU in place of replicas",
+          "properties": {
+            "enabled": {"type": "boolean", "description": "Scale the worker pods with a HorizontalPodAutoscaler"},
+            "minReplicas": {"type": "integer", "minimum": 1, "description": "Fewest pods (default 1)"},
+            "maxReplicas": {"type": "integer", "minimum": 1, "description": "Most pods (default 3); not below minReplicas"},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Average CPU use the autoscaler aims at, percent of the CPU request"}
+          },
+          "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"]
+        },
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -164,12 +188,12 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "resources", "env"]
+      "required": ["replicas", "autoscaling", "resources", "env"]
     },
     "ai": {
       "type": "object",
@@ -224,10 +248,21 @@
           "maxLength": 253,
           "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
           "description": "A Secret with HERD_OIDC_<NAME> client secrets for the API pods; empty: none"
-        }
+        },
+        "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the API pods alone to the identity providers, with networkPolicy.enabled", "items": {"type": "object"}}
       },
-      "required": ["allowedHosts", "ratePerMinute", "existingSecret"],
+      "required": ["allowedHosts", "ratePerMinute", "existingSecret", "egress"],
       "description": "Sign-in through OIDC providers"
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "A PodDisruptionBudget for api and worker when they run at least two pods"},
+        "maxUnavailable": {"type": "integer", "minimum": 1, "description": "Pods of one component a voluntary disruption may take at once"}
+      },
+      "required": ["enabled", "maxUnavailable"],
+      "description": "PodDisruptionBudgets (policy/v1)"
     },
     "collab": {
       "type": "object",
@@ -255,8 +290,8 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
           "additionalProperties": {"type": "string"}
         },
         "internalToken": {
@@ -463,5 +498,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "backup", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }
