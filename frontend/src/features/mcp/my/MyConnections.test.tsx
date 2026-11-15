@@ -55,7 +55,7 @@ describe('my connections', () => {
       'GET /api/ai/my-mcp-servers': page([
         makePersonalServer({ id: GITLAB, name: 'GitLab', oauth_client_id: CLIENT }),
         makePersonalServer({ id: WIKI, name: 'Wiki', connected: true }),
-        makePersonalServer({ id: JIRA, name: 'Jira' }),
+        makePersonalServer({ id: JIRA, name: 'Jira', url: 'https://jira.example/mcp' }),
       ]),
       'GET /api/ai/my-connectors': () => page(mineNow),
       'POST /api/ai/my-connectors': () => {
@@ -77,6 +77,8 @@ describe('my connections', () => {
 
     const jira = screen.getByRole('article', { name: 'Jira' })
     expect(within(jira).getByText('Nicht verbunden')).toBeInTheDocument()
+    // where one's own secret would go, before connecting (module review M8 1, F4)
+    expect(within(jira).getByText(/Geht an: https:\/\/jira\.example\/mcp/)).toBeInTheDocument()
     await user.click(within(jira).getByRole('button', { name: 'Token hinterlegen' }))
     const dialog = await screen.findByRole('dialog', { name: 'Eigenes Token für Jira' })
     // One's own key is a value; an environment variable is the operator's.

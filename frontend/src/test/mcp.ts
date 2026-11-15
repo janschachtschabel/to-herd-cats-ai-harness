@@ -62,6 +62,7 @@ export function makeConnector(overrides: Partial<Connector> = {}): Connector {
     mcp_server_id: null,
     has_secret: true,
     secret_kind: 'enc',
+    server_urls: [],
     version: 1,
     created_at: AT,
     updated_at: AT,
@@ -120,5 +121,12 @@ export function makeEntry(overrides: Partial<Entry> = {}): Entry {
 }
 
 export function makePersonalServer(overrides: Partial<PersonalServer> = {}): PersonalServer {
-  return { id: id(), name: 'GitLab', connected: false, oauth_client_id: null, ...overrides }
+  return {
+    id: id(),
+    name: 'GitLab',
+    url: 'https://gitlab.com/api/v4/mcp',
+    connected: false,
+    oauth_client_id: null,
+    ...overrides,
+  }
 }

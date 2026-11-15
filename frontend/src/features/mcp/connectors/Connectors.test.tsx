@@ -154,6 +154,50 @@ describe('shared connectors', () => {
   })
 })
 
+describe('where a secret goes', () => {
+  test('a shared connector names the addresses of the servers that use it', async () => {
+    const connector = makeConnector({
+      server_urls: ['https://a.example/mcp', 'https://b.example/mcp'],
+    })
+    mockApi({
+      ...shell,
+      'GET /api/ai/connectors': page([connector]),
+      'GET /api/ai/oauth-clients': page([]),
+    })
+    await renderApp('/admin/ai/connectors')
+    const card = await screen.findByRole('article', { name: 'GitHub-Token' })
+    expect(
+      within(card).getByText('Geht an: https://a.example/mcp, https://b.example/mcp'),
+    ).toBeInTheDocument()
+  })
+
+  test('new endpoints of an OAuth app disconnect; shared ones are kept only on request', async () => {
+    const client = makeClient({ id: 'cl-1', version: 4 })
+    const api = mockApi({
+      ...shell,
+      'GET /api/ai/connectors': page([]),
+      'GET /api/ai/oauth-clients': page([client]),
+      'PATCH /api/ai/oauth-clients/cl-1': { ...client, version: 5 },
+    })
+    const { user } = await renderApp('/admin/ai/connectors')
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByText(/trennt jede Verbindung/)).not.toBeInTheDocument()
+    const token = within(dialog).getByLabelText('Token-Adresse (token endpoint)')
+    await user.clear(token)
+    await user.type(token, 'https://gitlab.example/oauth/token')
+    expect(within(dialog).getByText(/trennt jede Verbindung/)).toBeInTheDocument()
+    await user.click(within(dialog).getByLabelText(/Geteilte Konnektoren verbunden lassen/))
+    await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
+    await waitFor(() => expect(api.find('PATCH', '/api/ai/oauth-clients/cl-1')).toHaveLength(1))
+    expect(api.find('PATCH', '/api/ai/oauth-clients/cl-1')[0]!.body).toMatchObject({
+      token_endpoint: 'https://gitlab.example/oauth/token',
+      keep_shared_connectors: true,
+      version: 4,
+    })
+  })
+})
+
 describe('OAuth apps', () => {
   test('a server’s metadata fills the empty fields; the secret stays write-only', async () => {
     const api = mockApi({

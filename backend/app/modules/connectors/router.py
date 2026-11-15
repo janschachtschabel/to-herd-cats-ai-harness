@@ -6,9 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
+from app.core.access import Actor
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep
-from app.modules.connectors.models import ConnectorScope
+from app.modules.connectors.models import Connector, ConnectorScope
 from app.modules.connectors.schemas import (
     ConnectorCreate,
     ConnectorOut,
@@ -23,34 +24,44 @@ shared = APIRouter(prefix="/ai/connectors", tags=["connectors"])
 personal = APIRouter(prefix="/ai/my-connectors", tags=["connectors"])
 
 
+async def _out(session: SessionDep, actor: Actor, connector: Connector) -> ConnectorOut:
+    urls = await ConnectorService(session).urls(actor, [connector])
+    return ConnectorOut.of(connector, urls)
+
+
 def _routes(router: APIRouter, scope: ConnectorScope) -> None:
     @router.get("", response_model=Page[ConnectorOut])
     async def list_connectors(
         params: Annotated[PageParams, Query()], actor: ActorDep, session: SessionDep
     ) -> Page[ConnectorOut]:
-        page = await ConnectorService(session).list(actor, scope, params)
+        service = ConnectorService(session)
+        page = await service.list(actor, scope, params)
+        urls = await service.urls(actor, page.items)
         return Page[ConnectorOut](
-            items=[ConnectorOut.of(c) for c in page.items], next_cursor=page.next_cursor
+            items=[ConnectorOut.of(c, urls) for c in page.items], next_cursor=page.next_cursor
         )
 
     @router.post("", response_model=ConnectorOut, status_code=201)
     async def create_connector(
         body: ConnectorCreate, actor: ActorDep, session: SessionDep
     ) -> ConnectorOut:
-        return ConnectorOut.of(await ConnectorService(session).create(actor, scope, body))
+        return await _out(
+            session, actor, await ConnectorService(session).create(actor, scope, body)
+        )
 
     @router.get("/{connector_id}", response_model=ConnectorOut)
     async def get_connector(
         connector_id: uuid.UUID, actor: ActorDep, session: SessionDep
     ) -> ConnectorOut:
-        return ConnectorOut.of(await ConnectorService(session).get(actor, scope, connector_id))
+        connector = await ConnectorService(session).get(actor, scope, connector_id)
+        return await _out(session, actor, connector)
 
     @router.patch("/{connector_id}", response_model=ConnectorOut)
     async def update_connector(
         connector_id: uuid.UUID, body: ConnectorUpdate, actor: ActorDep, session: SessionDep
     ) -> ConnectorOut:
         connector = await ConnectorService(session).update(actor, scope, connector_id, body)
-        return ConnectorOut.of(connector)
+        return await _out(session, actor, connector)
 
     @router.post("/{connector_id}/authorize", response_model=AuthorizeOut)
     async def authorize_connector(
@@ -66,7 +77,7 @@ def _routes(router: APIRouter, scope: ConnectorScope) -> None:
     ) -> ConnectorOut:
         """OAuth: forget the tokens and revoke them at the provider."""
         connector = await FlowService(session).disconnect(actor, scope, connector_id, body.version)
-        return ConnectorOut.of(connector)
+        return await _out(session, actor, connector)
 
     @router.delete("/{connector_id}", status_code=204)
     async def delete_connector(

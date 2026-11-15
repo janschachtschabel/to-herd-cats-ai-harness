@@ -130,12 +130,15 @@ class ConnectorOut(BaseModel):
     # For `oauth`: whether it is connected (has tokens).
     has_secret: bool
     secret_kind: SecretKind | None
+    # The addresses of the external servers its secret goes to (a shared one: every
+    # server naming it; a personal one: its server's).
+    server_urls: list[str]
     version: int
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def of(cls, connector: Connector) -> "ConnectorOut":
+    def of(cls, connector: Connector, urls: dict[uuid.UUID, list[str]]) -> "ConnectorOut":
         return cls(
             id=connector.id,
             name=connector.name,
@@ -146,6 +149,7 @@ class ConnectorOut(BaseModel):
             mcp_server_id=connector.mcp_server_id,
             has_secret=connector.secret_ref is not None,
             secret_kind=kind_of(connector.secret_ref) if connector.secret_ref else None,
+            server_urls=urls.get(connector.id, []),
             version=connector.version,
             created_at=connector.created_at,
             updated_at=connector.updated_at,

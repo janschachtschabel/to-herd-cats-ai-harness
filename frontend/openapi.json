@@ -3115,6 +3115,11 @@
               }
             ]
           },
+          "keep_shared_connectors": {
+            "default": false,
+            "title": "Keep Shared Connectors",
+            "type": "boolean"
+          },
           "name": {
             "anyOf": [
               {
@@ -3771,6 +3776,13 @@
               }
             ]
           },
+          "server_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Server Urls",
+            "type": "array"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -3791,6 +3803,7 @@
           "mcp_server_id",
           "has_secret",
           "secret_kind",
+          "server_urls",
           "version",
           "created_at",
           "updated_at"
@@ -8869,11 +8882,16 @@
               }
             ],
             "title": "Oauth Client Id"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
+          "url",
           "connected",
           "oauth_client_id"
         ],
@@ -10665,7 +10683,7 @@
       },
       "ServerUpdate": {
         "additionalProperties": false,
-        "description": "Only the fields sent change. A new URL withdraws every approval.",
+        "description": "Only the fields sent change. A new URL withdraws every approval; a new origin\nalso disconnects every personal connector of the server and detaches its shared\nconnector, unless `keep_shared_connector` says to keep it or the change names\nanother shared connector (`connectors/moving.py`).",
         "properties": {
           "connector_id": {
             "anyOf": [
@@ -10709,6 +10727,11 @@
               }
             ],
             "title": "Enabled"
+          },
+          "keep_shared_connector": {
+            "default": false,
+            "title": "Keep Shared Connector",
+            "type": "boolean"
           },
           "name": {
             "anyOf": [

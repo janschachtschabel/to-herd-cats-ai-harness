@@ -86,3 +86,28 @@ async def encrypted_connectors(session: AsyncSession) -> list[Connector]:
         .with_for_update()
     )
     return list((await session.scalars(stmt)).all())
+
+
+async def bound_connectors(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    *,
+    server_id: uuid.UUID | None = None,
+    client_id: uuid.UUID | None = None,
+) -> list[Connector]:
+    """The organisation's connectors of every owner bound to the external server
+    `server_id` (personal ones) or connecting through the OAuth client `client_id`,
+    locked: what a move of that server or client disconnects (`connectors/moving.py`)."""
+    stmt = select(Connector).where(Connector.org_id == org_id).order_by(Connector.id)
+    if server_id is not None:
+        stmt = stmt.where(Connector.mcp_server_id == server_id)
+    if client_id is not None:
+        stmt = stmt.where(Connector.oauth_client_id == client_id)
+    stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return list((await session.scalars(stmt)).all())
+
+
+async def delete_connectors(session: AsyncSession, connectors: list[Connector]) -> None:
+    for connector in connectors:
+        await session.delete(connector)
+    await session.flush()

@@ -18,6 +18,7 @@
 - Every write names the version it read (409 `connector.version_conflict`).
 """
 
+import builtins
 import uuid
 from typing import Any
 
@@ -67,6 +68,13 @@ class ConnectorService:
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await repo.page(after, params.limit + 1)
         return id_page(rows, params.limit, lambda c: c.id)
+
+    async def urls(
+        self, actor: Actor, connectors: "builtins.list[Connector]"
+    ) -> dict[uuid.UUID, "builtins.list[str]"]:
+        """Where each connector's secret goes (the caller already got the connectors
+        through this service, so may see them)."""
+        return await ServerRepository(self.session, actor.org_id).urls_for(connectors)
 
     async def get(self, actor: Actor, scope: ConnectorScope, connector_id: uuid.UUID) -> Connector:
         repo = await self.repo(actor, scope)

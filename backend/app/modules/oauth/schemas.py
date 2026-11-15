@@ -77,6 +77,9 @@ class ClientUpdate(BaseModel):
     token_auth: TokenAuth | None = None
     scopes: Scopes | None = None
     resource: Url | None = None
+    # A new authorization, token or revocation endpoint disconnects every connector
+    # through the client; a shared one keeps its tokens only with this set.
+    keep_shared_connectors: bool = False
 
     @model_validator(mode="after")
     def _shape(self) -> Self:

@@ -298,6 +298,9 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
     the draft mark): it writes nothing others may read, and every call of an external
     server it does not use with the asker's own connector (read tools included) waits
     for the asker's release of the exact arguments (automation runs: the owner).
+  - A connector's secret goes only to the origin (OAuth: the endpoints) it was given
+    for: a server's new origin or a client's new endpoints disconnect its connectors
+    (`connectors/moving.py`; a shared one stays only when the change says so).
   - Settings use the `HERD_MCP_` prefix (never `HERD_AI_`); add each to both Compose
     files, the chart (values, schema, chart rule) and `docs/MCP.md`.
 - Automations:

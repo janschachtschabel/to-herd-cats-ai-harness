@@ -150,4 +150,33 @@ describe('external MCP servers', () => {
     await user.type(url, 'https://mcp.example.com/mcp')
     expect(within(dialog).getByText(/zieht alle Freigaben zurück/)).toBeInTheDocument()
   })
+
+  test('a new origin disconnects personal access; a shared connector is kept only on request', async () => {
+    const server = makeServer({ id: 'srv-5', connector_scope: 'shared', connector_id: CONN })
+    const api = mockApi({
+      ...shell(AI_ADMIN),
+      'GET /api/ai/mcp-servers/srv-5': server,
+      'GET /api/ai/mcp-servers/srv-5/tools': page([]),
+      'GET /api/ai/connectors': page([makeConnector({ id: CONN })]),
+      'GET /api/ai/oauth-clients': page([]),
+      'PATCH /api/ai/mcp-servers/srv-5': { ...server, version: 2 },
+    })
+    const { user } = await renderApp('/admin/ai/mcp-servers/srv-5')
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }))
+    const dialog = await screen.findByRole('dialog')
+    const url = within(dialog).getByLabelText('Adresse')
+    await user.clear(url)
+    await user.type(url, 'https://api.githubcopilot.com/other/') // the path only
+    expect(within(dialog).queryByText(/trennt jede eigene Verbindung/)).not.toBeInTheDocument()
+    await user.clear(url)
+    await user.type(url, 'https://mcp.example.com/mcp')
+    expect(within(dialog).getByText(/trennt jede eigene Verbindung/)).toBeInTheDocument()
+    await user.click(within(dialog).getByLabelText(/Geteilten Konnektor behalten/))
+    await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
+    await waitFor(() => expect(api.find('PATCH', '/api/ai/mcp-servers/srv-5')).toHaveLength(1))
+    expect(api.find('PATCH', '/api/ai/mcp-servers/srv-5')[0]!.body).toMatchObject({
+      url: 'https://mcp.example.com/mcp',
+      keep_shared_connector: true,
+    })
+  })
 })

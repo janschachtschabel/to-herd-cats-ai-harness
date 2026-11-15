@@ -187,6 +187,7 @@ async def test_a_personal_server_uses_each_persons_own_token(
         {
             "id": server["id"],
             "name": server["name"],
+            "url": mcp_stub.url,
             "connected": False,
             "oauth_client_id": app["id"],
         }

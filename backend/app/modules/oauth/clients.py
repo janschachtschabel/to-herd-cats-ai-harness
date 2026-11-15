@@ -6,6 +6,11 @@
   422 `oauth_client.url_not_allowed`); names are checked again when dialled.
 - The client secret arrives as a value (stored `enc:`) or an `env:HERD_AI_*` name;
   `null` makes a public client. It is in no answer, audit entry or log line.
+- A new authorization, token or revocation endpoint (any change of the address)
+  disconnects every connector through the client before it takes effect: personal
+  ones are revoked at the old endpoints and deleted, shared ones lose their tokens
+  unless `keep_shared_connectors` (`connectors/moving.py`; module review M8 1,
+  finding 4). The audit names how many.
 - A client a connector or an MCP server names is not deleted (409
   `oauth_client.in_use`). Every write names the version it read (409
   `oauth_client.version_conflict`).
@@ -23,6 +28,7 @@ from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.ai.access import require_ai
 from app.modules.ai.schemas import SecretIn
 from app.modules.audit.recorder import record
+from app.modules.connectors.moving import MOVING_ENDPOINTS, disconnect_client
 from app.modules.oauth.discovery import Discovery, discover
 from app.modules.oauth.models import OAuthClient
 from app.modules.oauth.protocol import egress_for
@@ -99,6 +105,21 @@ class ClientService:
             )
         if data.name is not None and await repo.name_taken(data.name, other_than=client.id):
             raise Conflict(code="oauth_client.name_taken")
+        moving = [
+            name
+            for name in MOVING_ENDPOINTS
+            if name in data.model_fields_set and getattr(data, name) != getattr(client, name)
+        ]
+        for name in moving:
+            _check_url(getattr(data, name))
+        details: dict[str, Any] = {}
+        if moving:  # while the client still names the old endpoints (revocation)
+            keep = data.keep_shared_connectors
+            gone = await disconnect_client(self.session, client, keep_shared=keep)
+            details["moved"] = {
+                "personal_connectors_disconnected": gone.personal,
+                "shared_connectors_disconnected": gone.shared,
+            }
         changed: set[str] = set()
         for name in data.model_fields_set & set(_FIELDS):
             value = getattr(data, name)
@@ -107,7 +128,6 @@ class ClientService:
             if getattr(client, name) != value:
                 setattr(client, name, value)
                 changed.add(name)
-        details: dict[str, Any] = {}
         if "client_secret" in data.model_fields_set:
             client.client_secret_ref = _secret_ref(data.client_secret)
             changed.add("client_secret")

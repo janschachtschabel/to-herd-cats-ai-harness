@@ -20,6 +20,7 @@ import { ServerFields } from './ServerFields'
 import {
   createBody,
   newServerValues,
+  originChanged,
   serverValues,
   updateBody,
   urlChanged,
@@ -120,7 +121,12 @@ function EditForm({ server, onDone }: { server: Server; onDone: () => void }) {
     resolver: serverResolver((v) => updateBody(v, version), false),
     defaultValues: serverValues(server),
   })
-  const moved = urlChanged(server, useWatch({ control: form.control, name: 'url' }))
+  const url = useWatch({ control: form.control, name: 'url' })
+  const moved = urlChanged(server, url)
+  const elsewhere = originChanged(server, url)
+  const scope = useWatch({ control: form.control, name: 'connector_scope' })
+  const connector = useWatch({ control: form.control, name: 'connector_id' })
+  const sharedStays = scope === 'shared' && connector === (server.connector_id ?? '')
 
   const reload = async () => {
     const fresh = await queryClient.fetchQuery({ ...serverQuery(server.id), staleTime: 0 })
@@ -141,6 +147,17 @@ function EditForm({ server, onDone }: { server: Server; onDone: () => void }) {
         <p role="note" className="text-sm text-amber-800 dark:text-amber-300">
           {t('mcp.servers.urlWithdraws')}
         </p>
+      )}
+      {elsewhere && (
+        <p role="note" className="text-sm text-amber-800 dark:text-amber-300">
+          {t('mcp.servers.originDisconnects')}
+        </p>
+      )}
+      {elsewhere && sharedStays && (
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" {...form.register('keep_shared_connector')} />
+          {t('mcp.servers.keepSharedConnector')}
+        </label>
       )}
       <SaveError error={update.error} onReload={() => void reload()} />
       <FormActions>

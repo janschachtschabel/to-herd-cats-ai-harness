@@ -19,6 +19,8 @@ export interface ClientValues {
   token_auth: TokenAuth
   scopes: string
   resource: string
+  /** On new endpoints: shared connectors keep their tokens (personal ones never). */
+  keep_shared_connectors: boolean
 }
 
 export function newClientValues(): ClientValues {
@@ -34,6 +36,7 @@ export function newClientValues(): ClientValues {
     token_auth: 'client_secret_post',
     scopes: '',
     resource: '',
+    keep_shared_connectors: false,
   }
 }
 
@@ -50,6 +53,7 @@ export function clientValues(client: OAuthClient): ClientValues {
     token_auth: client.token_auth,
     scopes: client.scopes,
     resource: client.resource ?? '',
+    keep_shared_connectors: false,
   }
 }
 
@@ -103,7 +107,12 @@ export function createBody(values: ClientValues): Schemas['ClientCreate'] {
 
 export function updateBody(values: ClientValues, version: number): Schemas['ClientUpdate'] {
   const secret = secretOf(values)
-  return { ...fields(values), ...(secret !== undefined && { client_secret: secret }), version }
+  return {
+    ...fields(values),
+    ...(secret !== undefined && { client_secret: secret }),
+    keep_shared_connectors: values.keep_shared_connectors,
+    version,
+  }
 }
 
 export function missingSecret(values: ClientValues): string[] {
@@ -115,4 +124,14 @@ export function missingSecret(values: ClientValues): string[] {
 export function fieldOf(path: string): string {
   if (path.startsWith('client_secret')) return path.endsWith('env') ? 'secretEnv' : 'secretValue'
   return path.split('.')[0] ?? path
+}
+
+/** Whether saving disconnects every connector through the app: a new authorization,
+ *  token or revocation endpoint (tokens go there). */
+export function endpointsMoved(client: OAuthClient, values: ClientValues): boolean {
+  return (
+    values.authorization_endpoint.trim() !== client.authorization_endpoint ||
+    values.token_endpoint.trim() !== client.token_endpoint ||
+    (values.revocation_endpoint.trim() || null) !== (client.revocation_endpoint ?? null)
+  )
 }

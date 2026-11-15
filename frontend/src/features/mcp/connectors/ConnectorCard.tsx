@@ -34,6 +34,11 @@ export function ConnectorCard({
         <div className="min-w-0">
           <h3 className="font-semibold break-words">{name}</h3>
           <ConnectorStateText connector={connector} />
+          {connector.server_urls.length > 0 && (
+            <p className="text-xs break-all text-muted-foreground">
+              {t('mcp.connectors.goesTo', { urls: connector.server_urls.join(', ') })}
+            </p>
+          )}
         </div>
         <span className="flex flex-wrap gap-1.5">
           <Badge variant="outline">{t(`mcp.connectors.kinds.${connector.auth_kind}`)}</Badge>

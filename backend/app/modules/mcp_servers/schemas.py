@@ -58,7 +58,10 @@ class ServerCreate(BaseModel):
 
 
 class ServerUpdate(BaseModel):
-    """Only the fields sent change. A new URL withdraws every approval."""
+    """Only the fields sent change. A new URL withdraws every approval; a new origin
+    also disconnects every personal connector of the server and detaches its shared
+    connector, unless `keep_shared_connector` says to keep it or the change names
+    another shared connector (`connectors/moving.py`)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -70,6 +73,7 @@ class ServerUpdate(BaseModel):
     connector_id: uuid.UUID | None = None
     oauth_client_id: uuid.UUID | None = None
     enabled: bool | None = None
+    keep_shared_connector: bool = False
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
@@ -138,6 +142,8 @@ class PersonalServerOut(BaseModel):
 
     id: uuid.UUID
     name: str
+    # Where the person's own secret goes once connected (a new origin disconnects it).
+    url: str
     connected: bool
     # The OAuth client to connect with (create an `oauth` connector naming it), if any.
     oauth_client_id: uuid.UUID | None

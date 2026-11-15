@@ -23,6 +23,9 @@ function NotConnected({ server }: { server: PersonalServer }) {
       <div>
         <h3 className="font-semibold break-words">{server.name}</h3>
         <p className="text-sm text-amber-700 dark:text-amber-400">{t('mcp.my.notConnected')}</p>
+        <p className="text-xs break-all text-muted-foreground">
+          {t('mcp.connectors.goesTo', { urls: server.url })}
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         {clientId ? (

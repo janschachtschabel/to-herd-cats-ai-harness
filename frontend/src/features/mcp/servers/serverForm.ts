@@ -12,6 +12,8 @@ export interface ServerValues {
   connector_id: string
   oauth_client_id: string
   enabled: boolean
+  /** On a new origin: keep the shared connector (else the server is detached from it). */
+  keep_shared_connector: boolean
 }
 
 export function newServerValues(): ServerValues {
@@ -23,6 +25,7 @@ export function newServerValues(): ServerValues {
     connector_id: '',
     oauth_client_id: '',
     enabled: true,
+    keep_shared_connector: false,
   }
 }
 
@@ -35,6 +38,7 @@ export function serverValues(server: Server): ServerValues {
     connector_id: server.connector_id ?? '',
     oauth_client_id: server.oauth_client_id ?? '',
     enabled: server.enabled,
+    keep_shared_connector: false,
   }
 }
 
@@ -63,6 +67,7 @@ export function updateBody(values: ServerValues, version: number): Schemas['Serv
     data_location: values.data_location,
     enabled: values.enabled,
     ...access(values),
+    keep_shared_connector: values.keep_shared_connector,
     version,
   }
 }
@@ -70,4 +75,20 @@ export function updateBody(values: ServerValues, version: number): Schemas['Serv
 /** Whether saving withdraws every approval: a new address is another server. */
 export function urlChanged(server: Server, url: string): boolean {
   return url.trim() !== server.url
+}
+
+function origin(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim())
+    return `${parsed.protocol}//${parsed.host}` // the default port is left out
+  } catch {
+    return null
+  }
+}
+
+/** Whether saving disconnects the server's personal connectors (and detaches its
+ *  shared one unless kept): another scheme, host or port; the path does not count. */
+export function originChanged(server: Server, url: string): boolean {
+  const now = origin(url)
+  return now !== null && now !== origin(server.url)
 }

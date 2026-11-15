@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +17,7 @@ import { requiring } from '../required'
 import {
   clientValues,
   createBody,
+  endpointsMoved,
   fieldOf,
   missingSecret,
   newClientValues,
@@ -70,6 +71,8 @@ function ClientForm({ client, onDone }: { client?: OAuthClient; onDone: () => vo
     defaultValues: client ? clientValues(client) : newClientValues(),
   })
   const error = create.error ?? update.error
+  const watched = useWatch({ control: form.control }) as ClientValues
+  const moved = client !== undefined && endpointsMoved(client, watched)
   return (
     <form
       onSubmit={form.handleSubmit((values) =>
@@ -81,6 +84,17 @@ function ClientForm({ client, onDone }: { client?: OAuthClient; onDone: () => vo
       className="flex flex-col gap-4"
     >
       <ClientFields form={form} creating={!client} secretStored={client?.has_client_secret} />
+      {moved && (
+        <>
+          <p role="note" className="text-sm text-amber-800 dark:text-amber-300">
+            {t('mcp.clients.endpointsDisconnect')}
+          </p>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" {...form.register('keep_shared_connectors')} />
+            {t('mcp.clients.keepSharedConnectors')}
+          </label>
+        </>
+      )}
       <SaveError error={error} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onDone}>

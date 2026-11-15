@@ -95,7 +95,9 @@
       "accessTitle": "Zugang",
       "personalWithOAuth": "Personen verbinden sich mit der hinterlegten OAuth-App.",
       "personalWithToken": "Personen hinterlegen ein eigenes Token.",
-      "toConnectors": "Konnektoren verwalten"
+      "toConnectors": "Konnektoren verwalten",
+      "originDisconnects": "Eine neue Adresse (anderes Schema, anderer Host oder Port) trennt jede eigene Verbindung, die Personen für diesen Server hinterlegt haben: Ihre Zugänge werden gelöscht, und sie verbinden sich mit der neuen Adresse neu. Ein geteilter Konnektor wird gelöst, außer du behältst ihn.",
+      "keepSharedConnector": "Geteilten Konnektor behalten (sein Zugang geht dann an die neue Adresse)"
     },
     "tools": {
       "title": "Werkzeuge",
@@ -221,7 +223,8 @@
       "deleteText": {
         "shared": "{{name}} wird gelöscht. Ein Server, der ihn nutzt, muss zuerst auf einen anderen Zugang umgestellt werden.",
         "personal": "Dein Zugang {{name}} wird gelöscht. Agenten können diesen Server danach nicht mehr für dich nutzen."
-      }
+      },
+      "goesTo": "Geht an: {{urls}}"
     },
     "clients": {
       "title": "OAuth-Apps",
@@ -286,7 +289,9 @@
       "secretNone": "Kein Client-Geheimnis (öffentliche App)",
       "deleteNamed": "{{name}} löschen",
       "deleteTitle": "OAuth-App löschen?",
-      "deleteText": "{{name}} wird gelöscht. Solange ein Konnektor oder Server sie nutzt, ist das nicht möglich."
+      "deleteText": "{{name}} wird gelöscht. Solange ein Konnektor oder Server sie nutzt, ist das nicht möglich.",
+      "endpointsDisconnect": "Neue Adressen für Anmeldung, Token oder Widerruf trennt jede Verbindung über diese App: Eigene Verbindungen von Personen werden gelöscht und bei der bisherigen Adresse widerrufen; sie verbinden sich neu. Geteilte Konnektoren verlieren ihre Token, außer du lässt sie verbunden.",
+      "keepSharedConnectors": "Geteilte Konnektoren verbunden lassen (ihre Token gehen dann an die neuen Adressen)"
     },
     "catalog": {
       "description": "Vorlagen für externe Server, mitgeliefert und aus dem Verzeichnis des Betriebs. Eine Vorlage schlägt nur vor: Jedes Werkzeug wird trotzdem einzeln freigegeben.",

@@ -463,8 +463,21 @@ im Log.
   einen externen MCP-Server nennen (`mcp_server_id`), der mit dem Zugang jeder Person
   arbeitet; je Person und Server einer (409 `connector.server_taken`), andere Server
   422 `connector.server_invalid`. `GET /api/ai/my-mcp-servers` (`ai.use`) listet diese
-  Server mit `connected`. Wird der Server gelöscht, gehen die daran gebundenen
-  persönlichen Konnektoren mit.
+  Server mit `url` (wohin der eigene Zugang geht) und `connected`. Wird der Server
+  gelöscht, gehen die daran gebundenen persönlichen Konnektoren mit.
+- **Wohin ein Geheimnis geht**: Jeder Konnektor nennt `server_urls`, die Adressen der
+  Server, an die sein Geheimnis geht (ein geteilter: jeder Server, der ihn nennt; ein
+  persönlicher: sein Server). Ein Geheimnis geht nur dorthin, wofür es hinterlegt wurde
+  (Review M8 1, Befund 4): Bekommt ein Server einen **neuen Ursprung** (Schema, Host oder
+  Port; ein anderer Pfad zählt nicht, denn derselbe Ursprung ist derselbe Empfänger, der
+  das Geheimnis schon hat), werden in derselben Transaktion alle persönlichen
+  Konnektoren dieses Servers getrennt: gelöscht, OAuth-Token nach dem Commit beim
+  bisherigen Anbieter widerrufen. Die Personen sehen unter „Meine Verbindungen“ „Nicht
+  verbunden“ mit der neuen Adresse und verbinden sich bewusst neu. Ein geteilter
+  Konnektor wird vom Server gelöst (`connector_scope` `none`), außer die Änderung sagt
+  `keep_shared_connector: true` oder nennt mit ihr einen anderen geteilten Konnektor.
+  Audit `mcp_server.updated` mit `moved` (`personal_connectors_disconnected`,
+  `shared_connector_detached`).
 - **In Gebrauch**: Ein geteilter Konnektor, den ein Server nennt, wird nicht gelöscht
   (409 `connector.in_use`).
 
@@ -499,8 +512,15 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   Autorisierungsserver). Aufgerufen wird der Anbieter nur über den geschützten Ausgang.
 - Schreiben nennt die `version` (409 `oauth_client.version_conflict`). Ein Client, den
   ein Konnektor oder ein Server nennt, wird nicht gelöscht (409 `oauth_client.in_use`).
-- Audit `oauth_client.created`, `.updated` (Feldnamen, beim Geheimnis nur seine Art),
-  `.deleted`; nie Werte.
+- **Neue Endpunkte trennen** (Review M8 1, Befund 4): Ändert sich
+  `authorization_endpoint`, `token_endpoint` oder `revocation_endpoint` (jede Änderung
+  der Adresse; an Token- und Widerrufsadresse gehen Token), wird jeder Konnektor über
+  diesen Client getrennt, bevor die neuen Adressen gelten: persönliche werden beim
+  bisherigen Anbieter widerrufen und gelöscht, geteilte verlieren ihre Token (ebenfalls
+  widerrufen), außer `keep_shared_connectors: true`.
+- Audit `oauth_client.created`, `.updated` (Feldnamen, beim Geheimnis nur seine Art,
+  bei neuen Endpunkten `moved` mit den Zahlen getrennter Konnektoren), `.deleted`; nie
+  Werte.
 - **Beim Anbieter registrieren**: Als Rückleitungsadresse (Callback-URL) trägt man
   `<HERD_PUBLIC_URL>/api/ai/oauth/callback` ein, genau so.
 - **Ermitteln** (`POST /api/ai/oauth-clients/discover` mit `{"url": "<MCP-Server>"}`):
@@ -657,7 +677,8 @@ Recht 404 `ai.not_found`.
   erneut freigegeben wird (kehrt der Server zum freigegebenen Stand zurück, ist es
   wieder `approved`). Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
   nicht freizugeben (409 `mcp_tool.missing`). Eine neue Adresse des Servers zieht alle
-  Freigaben zurück.
+  Freigaben zurück; ein neuer Ursprung trennt zudem seine Konnektoren (siehe
+  „Konnektoren“, „Wohin ein Geheimnis geht“).
 - **Eingabeschema und Modell** (Review M8 1, Befund 2): Jedes Wort eines Schemas ist
   ein Wort des Servers. Ein Modell bekommt deshalb nur die **Struktur** (Typen,
   Feldnamen, Pflichtfelder, Elemente, Verschachtelung, Zahl- und Längengrenzen, gängige

@@ -73,6 +73,28 @@ class ServerRepository:
         )
         return bool(await self.session.scalar(stmt))
 
+    async def urls_for(self, connectors: list[Connector]) -> dict[uuid.UUID, list[str]]:
+        """Per connector, the addresses of the servers its secret goes to: a shared
+        one's, every server naming it; a personal one's, the server it is bound to."""
+        ids = [c.id for c in connectors]
+        bound = {c.mcp_server_id: c.id for c in connectors if c.mcp_server_id is not None}
+        found: dict[uuid.UUID, list[str]] = {c.id: [] for c in connectors}
+        if not connectors:
+            return found
+        stmt = (
+            select(McpServer.id, McpServer.connector_id, McpServer.url)
+            .where(
+                McpServer.org_id == self.org_id,
+                McpServer.connector_id.in_(ids) | McpServer.id.in_(list(bound)),
+            )
+            .order_by(McpServer.url)
+        )
+        for server_id, connector_id, url in (await self.session.execute(stmt)).all():
+            owner = connector_id if connector_id in found else bound.get(server_id)
+            if owner is not None:
+                found[owner].append(url)
+        return found
+
     async def add(self, server: McpServer) -> McpServer:
         self.session.add(server)
         await self.session.flush()

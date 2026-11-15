@@ -4718,6 +4718,11 @@ export interface components {
             /** Client Id */
             client_id?: string | null;
             client_secret?: components["schemas"]["SecretIn"] | null;
+            /**
+             * Keep Shared Connectors
+             * @default false
+             */
+            keep_shared_connectors?: boolean;
             /** Name */
             name?: string | null;
             /** Resource */
@@ -4913,6 +4918,8 @@ export interface components {
             oauth_client_id: string | null;
             scope: components["schemas"]["ConnectorScope"];
             secret_kind: components["schemas"]["SecretKind"] | null;
+            /** Server Urls */
+            server_urls: string[];
             /**
              * Updated At
              * Format: date-time
@@ -6779,6 +6786,8 @@ export interface components {
             name: string;
             /** Oauth Client Id */
             oauth_client_id: string | null;
+            /** Url */
+            url: string;
         };
         /** PlaceOut */
         PlaceOut: {
@@ -7437,7 +7446,10 @@ export interface components {
         };
         /**
          * ServerUpdate
-         * @description Only the fields sent change. A new URL withdraws every approval.
+         * @description Only the fields sent change. A new URL withdraws every approval; a new origin
+         *     also disconnects every personal connector of the server and detaches its shared
+         *     connector, unless `keep_shared_connector` says to keep it or the change names
+         *     another shared connector (`connectors/moving.py`).
          */
         ServerUpdate: {
             /** Connector Id */
@@ -7446,6 +7458,11 @@ export interface components {
             data_location?: components["schemas"]["DataLocation"] | null;
             /** Enabled */
             enabled?: boolean | null;
+            /**
+             * Keep Shared Connector
+             * @default false
+             */
+            keep_shared_connector?: boolean;
             /** Name */
             name?: string | null;
             /** Oauth Client Id */

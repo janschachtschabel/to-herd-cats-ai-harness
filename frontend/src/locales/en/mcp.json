@@ -95,7 +95,9 @@
       "accessTitle": "Access",
       "personalWithOAuth": "People connect with the stored OAuth app.",
       "personalWithToken": "People store a token of their own.",
-      "toConnectors": "Manage connectors"
+      "toConnectors": "Manage connectors",
+      "originDisconnects": "A new address (another scheme, host or port) disconnects every personal connection people made for this server: their access is deleted, and they connect again to the new address. A shared connector is detached unless you keep it.",
+      "keepSharedConnector": "Keep the shared connector (its access then goes to the new address)"
     },
     "tools": {
       "title": "Tools",
@@ -221,7 +223,8 @@
       "deleteText": {
         "shared": "{{name}} is deleted. A server that uses it must be switched to another access first.",
         "personal": "Your access {{name}} is deleted. Agents can then no longer use this server for you."
-      }
+      },
+      "goesTo": "Goes to: {{urls}}"
     },
     "clients": {
       "title": "OAuth apps",
@@ -286,7 +289,9 @@
       "secretNone": "No client secret (public app)",
       "deleteNamed": "Delete {{name}}",
       "deleteTitle": "Delete OAuth app?",
-      "deleteText": "{{name}} is deleted. This is not possible while a connector or server uses it."
+      "deleteText": "{{name}} is deleted. This is not possible while a connector or server uses it.",
+      "endpointsDisconnect": "New authorization, token or revocation addresses disconnect every connection through this app: people’s own connections are deleted and revoked at the old address; they connect again. Shared connectors lose their tokens unless you keep them connected.",
+      "keepSharedConnectors": "Keep shared connectors connected (their tokens then go to the new addresses)"
     },
     "catalog": {
       "description": "Templates for external servers, shipped and from the operator's directory. A template only suggests: every tool is still approved one by one.",
