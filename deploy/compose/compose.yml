@@ -9,6 +9,9 @@
 # optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
 # the collab port stay inside. Attachments live on the volume app-data (/data).
+# The service backup makes the backups (docs/SICHERUNG.md): on HERD_BACKUP_SCHEDULE
+# into the volume backups (/backups), with retention and, with the optional
+# backup.env (see backup.env.example), a restic copy offsite.
 name: to-herd-cats-ai
 
 services:
@@ -68,6 +71,9 @@ services:
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
       HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
       HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
+      # Backups (docs/SICHERUNG.md): the worker exports the age of the last good backup
+      # at which HerdBackupTooOld fires, in hours.
+      HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
     # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
     # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
     # default would hide them.
@@ -87,6 +93,54 @@ services:
     stop_grace_period: 30s
     restart: unless-stopped
 
+  # Backups (plan M9, docs/SICHERUNG.md): `python -m app.ops backup schedule` makes an
+  # archive (database dump and attachments) on HERD_BACKUP_SCHEDULE (cron, UTC), checks
+  # it, keeps the newest of the last days, weeks and months on the volume backups, and
+  # with HERD_BACKUP_OFFSITE_REPOSITORY (in backup.env) copies it with restic. It reads
+  # the attachments, never writes them. HERD_SECRET_KEY (ai.env) only names its key id
+  # in the archive, for the restore's check; restic gets none of the app's environment.
+  # By hand: docker compose exec backup python -m app.ops backup run (or list).
+  backup:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.ops"]
+    command: ["backup", "schedule"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
+      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
+      HERD_BACKUP_KEEP_DAILY: ${HERD_BACKUP_KEEP_DAILY:-7}
+      HERD_BACKUP_KEEP_WEEKLY: ${HERD_BACKUP_KEEP_WEEKLY:-4}
+      HERD_BACKUP_KEEP_MONTHLY: ${HERD_BACKUP_KEEP_MONTHLY:-6}
+      HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
+    # ai.env for HERD_SECRET_KEY; backup.env for HERD_BACKUP_OFFSITE_REPOSITORY,
+    # HERD_BACKUP_OFFSITE_PASSWORD and the storage's credentials (AWS_*, B2_*, ...).
+    env_file:
+      - path: ai.env
+        required: false
+      - path: backup.env
+        required: false
+    # It serves no port: the image's health check (port 9090) does not apply.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - app-data:/data:ro
+      - backups:/backups
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
 volumes:
   db-data:
   app-data:
+  backups:

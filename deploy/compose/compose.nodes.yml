@@ -8,7 +8,8 @@
 # `api-b` serve (role api, published on HERD_HOST_PORT and HERD_HOST_PORT_B); `worker`
 # is the only outbox dispatcher (role worker: notifications, page timelines, live
 # updates) and works on the agent runs; `collab` runs live editing (role collab) and calls the API nodes' internal
-# port under the alias `api`. Both API nodes share the files volume (one host). Only the
+# port under the alias `api`; `backup` (compose.yml) starts after the migration. Both API
+# nodes share the files volume (one host). Only the
 # two public ports are published; 9090 and the collab port stay inside.
 
 x-node: &node
@@ -113,9 +114,15 @@ services:
       HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
       HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
       HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
+      # The worker exports the backups' gauges (docs/SICHERUNG.md).
+      HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
     env_file: *ai-keys
     depends_on: *after-migrate
     stop_grace_period: 30s
+
+  # The service backup of compose.yml (docs/SICHERUNG.md), here after the migration.
+  backup:
+    depends_on: *after-migrate
 
   collab:
     <<: *node

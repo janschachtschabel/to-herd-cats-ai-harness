@@ -390,9 +390,11 @@ kennen.
 
 - **Sicherung** (M9): `python -m app.ops backup create|verify|list` schreibt und prüft
   Archive des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) nach
-  `HERD_BACKUP_DIR`; Format, Schlüssel und Fehlercodes in
-  [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das Volume
-  schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
+  `HERD_BACKUP_DIR`; `backup run` dazu mit Aufbewahrung und restic-Kopie, nach Zeitplan
+  im Compose-Dienst `backup` bzw. im CronJob des Charts, mit Alarmen; `restore
+  check|apply` spielt in eine leere Installation ein. Format, Schlüssel, Fehlercodes und
+  Betrieb in [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das
+  Volume schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort

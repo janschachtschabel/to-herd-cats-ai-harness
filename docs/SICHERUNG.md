@@ -160,6 +160,42 @@ lässt sich nicht abfragen) und meldet:
 | `herd_backup_offsite_last_failure_timestamp_seconds` | letzte gelungene Sicherung, deren Offsite-Schritt scheiterte |
 | `herd_backup_alert_after_seconds` | `HERD_BACKUP_ALERT_AFTER_HOURS` in Sekunden |
 
+Alarme (`files/prometheus-rules.yaml` des Charts, `metrics.prometheusRule.enabled`;
+geprüft mit `promtool test rules` und `scripts/check_alert_metrics.py`):
+
+| Alarm | Wann | Stufe |
+|---|---|---|
+| `HerdBackupTooOld` | die letzte gelungene Sicherung ist älter als `HERD_BACKUP_ALERT_AFTER_HOURS` (`backup.alertAfterHours`, 26), 10 Minuten lang | critical |
+| `HerdBackupFailing` | die letzte Sicherung scheiterte (jünger als die letzte gelungene); weg mit der nächsten gelungenen | warning |
+| `HerdOffsiteBackupFailing` | die letzte gelungene Sicherung erreichte das restic-Repository nicht | warning |
+| `HerdBackupNeverRan` | 26 Stunden lang keine gelungene Sicherung, seit ein Worker die Metrik meldet (Job fehlt, Zeitplan feuert nicht) | critical |
+
+## Betrieb: Compose und Helm
+
+**Compose** (`deploy/compose/compose.yml`, auch mit `compose.nodes.yml`): der Dienst
+`backup` (dasselbe Image, `python -m app.ops backup schedule`) sichert nach
+`HERD_BACKUP_SCHEDULE` in das Volume `backups` (`/backups`), liest die Anhänge
+schreibgeschützt und öffnet keinen Port. `HERD_SECRET_KEY` kommt aus `ai.env` (nur für die
+Schlüsselkennung im Archiv), Repository, Passwort und Speicherzugang für restic aus
+`backup.env` (Vorlage `backup.env.example`). Von Hand:
+`docker compose exec backup python -m app.ops backup run` (oder `list`, `verify`).
+`smoke.sh` sichert im Dienst, spielt das Archiv in eine zweite Datenbank ein und kopiert
+eine Sicherung mit dem echten restic in ein Repository im Container.
+
+**Helm**: ein CronJob `<release>-backup` (Standard an, `backup.enabled`) mit
+`backup.schedule` (Zeitzone Etc/UTC), `concurrencyPolicy: Forbid`, `backoffLimit: 0`
+(ein Fehlschlag wird nicht wiederholt, `HerdBackupFailing` meldet ihn) und höchstens 6
+Stunden Laufzeit, auf einer eigenen PVC `<release>-backups` (bleibt beim Deinstallieren;
+`backup.persistence.*`). Die Anhänge-PVC wird schreibgeschützt eingehängt: Bei
+ReadWriteOnce muss der Job-Pod auf demselben Knoten laufen können (ReadWriteMany
+empfohlen). Offsite: `backup.offsite.existingSecret` nennt ein Secret mit
+`HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` und den
+Speicherzugangsdaten; es erreicht nur den Backup-Job, von `ai.existingSecret` bekommt er
+allein `HERD_SECRET_KEY`. Mit `networkPolicy.enabled` darf der Job nur DNS, die Datenbank
+und `backup.offsite.egress` erreichen. Der Worker bekommt `HERD_BACKUP_ALERT_AFTER_HOURS`
+aus `backup.alertAfterHours`. Das Image bringt restic 0.18.1 mit (Prüfsumme je
+Architektur aus den `SHA256SUMS` der Veröffentlichung).
+
 ## Wiederherstellen (in eine leere Installation)
 
 Eingespielt wird über die Kommandozeile, mit den `HERD_*`-Einstellungen der

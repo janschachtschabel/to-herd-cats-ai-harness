@@ -75,18 +75,29 @@ docker compose down -v      # deletes the data as well
 
 ## Backup
 
-The data is the PostgreSQL database and the attachments on `app-data`; back up both,
-for example:
+The service `backup` (same image, `python -m app.ops backup schedule`) backs up the
+database and the attachments together, on `HERD_BACKUP_SCHEDULE` (cron, UTC, default
+`30 2 * * *`), into the volume `backups` (`/backups`, mode 0700): one checked archive
+`herd-<UTC time>-<version>.tar` per run with its `.manifest.json`, the newest of the
+last 7 days, 4 weeks and 6 months kept (`HERD_BACKUP_KEEP_*`). It mounts the
+attachments read-only and serves no port. With the optional file `backup.env` (copy
+`backup.env.example`; ignored by git) it copies every archive offsite with restic
+(`HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` and the storage's
+credentials, which go to restic alone). It reads `HERD_SECRET_KEY` from `ai.env` only
+to name the key's id in the archive.
 
 ```bash
-docker compose exec -T db pg_dump -U herd -Fc herd > herd-$(date +%F).dump
-docker compose exec -T app tar -C /data -c attachments > herd-files-$(date +%F).tar
+docker compose exec backup python -m app.ops backup run     # one now (with retention and offsite)
+docker compose exec backup python -m app.ops backup list    # the last runs, their state and offsite
+docker compose exec backup python -m app.ops backup verify /backups/<archive>.tar
 ```
 
-Restore only into an empty database (a fresh installation, before its first start:
-`docker compose up -d --wait db`, then `docker compose exec -T db pg_restore -U herd
--d herd < herd.dump`). The attachments go back with `docker compose exec -T app tar -C
-/data -x < herd-files.tar`. Test the restore regularly.
+The archives are not encrypted: protect the volume, or rely on the offsite copy
+(restic encrypts). Restore only into an empty installation, with the app stopped:
+`python -m app.ops restore check <archive>`, then `restore apply <archive>`
+(docs/SICHERUNG.md, "Wiederherstellen"; `deploy/scripts/restore-rehearsal.sh` rehearses
+it). The worker (`app`; `worker` in `compose.nodes.yml`) exports the backups' gauges,
+`HerdBackupTooOld` fires after `HERD_BACKUP_ALERT_AFTER_HOURS`.
 
 ## Two API nodes and a worker
 
@@ -125,7 +136,10 @@ stream (`/api/stream`), posts a message in `#allgemein` and waits for its
 automation come due 15 s after it was made (an agent on an AI connection to a closed
 local port: only the term counts) and checks that its log holds exactly one started term
 and the worker counted one (`herd_automation_firings_total{outcome="started"}`), and
-tears everything down again. It ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built
+makes a backup in the service `backup` (`backup run`, offsite off), waits for the
+worker's gauge of it, restores the archive into a second database (`herd_restore`) and
+finds the page and its file there, makes a second backup with restic into a repository
+in the container's `/tmp` (`offsite=ok`, one snapshot), and tears everything down again. It ends with `SMOKE OK`. `SMOKE_SKIP_BUILD=1` uses an image built
 beforehand. `SMOKE_NODES=1` runs the same on `compose.nodes.yml` (project
 `to-herd-cats-ai-smoke-nodes`, ports `SMOKE_PORT`/`SMOKE_PORT_B`, default 18080/18081):
 `/ready` of both API nodes and the worker, the message posted on node A and received on
@@ -164,6 +178,12 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_MCP_ALLOWED_HOSTS` | no | empty | Private hosts external MCP servers may run on: exact host names or private networks (CIDR), comma separated; empty: public addresses only (`app`, API nodes, `worker`) |
 | `HERD_MCP_CATALOG_DIR` | no | empty | Directory inside the container with the operator's own catalogue entries (`*.yaml`, see `docs/MCP.md`, "Katalog"); mount it read-only, e.g. `./catalog:/etc/herd/mcp-catalog:ro` in `compose.override.yml`; a broken file is reported and skipped; empty: the shipped entries only (`app`, API nodes) |
 | `HERD_MCP_MAX_CALLS_PER_RUN` | no | `20` | Calls one agent run may send to tools of external MCP servers, 1 to 500; the next is refused as the tool's result and nothing is sent (`app`, `worker`) |
+| `HERD_BACKUP_SCHEDULE` | no | `30 2 * * *` | When the service `backup` backs up: cron, five fields, UTC (`backup`) |
+| `HERD_BACKUP_KEEP_DAILY` | no | `7` | Days whose newest good archive stays, 0 to 1000 (`backup`) |
+| `HERD_BACKUP_KEEP_WEEKLY` | no | `4` | Older weeks whose newest good archive stays, 0 to 1000 (`backup`) |
+| `HERD_BACKUP_KEEP_MONTHLY` | no | `6` | Older months whose newest good archive stays, 0 to 1000 (`backup`) |
+| `HERD_BACKUP_ALERT_AFTER_HOURS` | no | `26` | Age (h) of the last good backup at which `HerdBackupTooOld` fires, exported by the worker (`app`, `worker`) |
+| `HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` | no | empty | restic repository and its password, in `backup.env` (`backup`); empty: no offsite copy |
 
 The AI keys (`HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS`, `HERD_AI_EGRESS_PROXY`,
 `HERD_AI_<NAME>`) belong in `ai.env`, not in `.env`: they are passed to the containers

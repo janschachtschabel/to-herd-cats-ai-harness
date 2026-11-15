@@ -87,6 +87,66 @@
       "required": ["enabled", "existingClaim", "size", "storageClass", "accessModes"],
       "description": "The files volume (attachments) of the API pods"
     },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run); needs persistence.enabled"},
+        "schedule": {"type": "string", "pattern": "^\\S+( \\S+){4}$", "description": "Cron schedule of the CronJob, five fields, Etc/UTC"},
+        "keepDaily": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_DAILY"},
+        "keepWeekly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_WEEKLY"},
+        "keepMonthly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_MONTHLY"},
+        "alertAfterHours": {"type": "number", "exclusiveMinimum": 0, "maximum": 1440, "description": "HERD_BACKUP_ALERT_AFTER_HOURS (worker): HerdBackupTooOld"},
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes ResourceRequirements",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "integer", "number"]
+              }
+            }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingClaim": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing PersistentVolumeClaim; empty: the chart creates one"},
+            "size": {"type": "string", "minLength": 1, "description": "Size of the created claim"},
+            "storageClass": {"type": "string", "description": "Storage class; empty: cluster default"},
+            "accessModes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadWriteOncePod"]},
+              "description": "Access modes of the created claim"
+            }
+          },
+          "required": ["existingClaim", "size", "storageClass", "accessModes"],
+          "description": "The archives' PersistentVolumeClaim on /backups"
+        },
+        "offsite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing Secret with HERD_BACKUP_OFFSITE_REPOSITORY, HERD_BACKUP_OFFSITE_PASSWORD and the storage's credentials, for the backup job alone; empty: no offsite copy"},
+            "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the backup pods to the offsite storage", "items": {"type": "object"}}
+          },
+          "required": ["existingSecret", "egress"],
+          "description": "Offsite copies with restic"
+        }
+      },
+      "required": ["enabled", "schedule", "keepDaily", "keepWeekly", "keepMonthly", "alertAfterHours", "resources", "persistence", "offsite"],
+      "description": "The backup CronJob, its claim and the offsite copy"
+    },
     "worker": {
       "type": "object",
       "additionalProperties": false,
@@ -382,5 +442,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "publicUrl", "persistence", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "publicUrl", "persistence", "backup", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

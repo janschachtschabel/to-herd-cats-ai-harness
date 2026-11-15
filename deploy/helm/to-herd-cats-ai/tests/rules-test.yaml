@@ -663,3 +663,164 @@ tests:
       - eval_time: 40m
         alertname: HerdMcpCatalogProblems
         exp_alerts: []
+
+  # Backups (plan M9): the workers export backup_run's last runs as timestamps; both
+  # worker pods export the same values. promtool's time() starts at 0.
+  # HerdBackupTooOld: the last good backup (at 1 h) gets older than 26 h, for 10 minutes.
+
+  - name: HerdBackupTooOld fires once the last good backup is older than the limit
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "3600x1700"
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "3600x1700"
+      - series: 'herd_backup_alert_after_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "93600x1700"
+      - series: 'herd_backup_alert_after_seconds{namespace="herd", job="herd-worker", pod="herd-worker-b"}'
+        values: "93600x1700"
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: HerdBackupTooOld
+        exp_alerts: []
+      - eval_time: 27h5m
+        alertname: HerdBackupTooOld
+        exp_alerts: []
+      - eval_time: 28h
+        alertname: HerdBackupTooOld
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "The last good backup of herd/herd-worker is older than its limit"
+              description: "No backup has succeeded within backup.alertAfterHours. Look at the backup job (CronJob herd-backup, or the compose service backup) and at python -m app.ops backup list: the state and error code of the last runs (backup.dump_failed, backup.tools_too_old, backup.io, ...). Without a backup, a restore can only go back to the last good archive."
+
+  - name: HerdBackupTooOld stays quiet after a newer backup, and without any (HerdBackupNeverRan)
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "3600x1200 72000x500"
+      - series: 'herd_backup_alert_after_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "93600x1700"
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="fresh", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x1700"
+      - series: 'herd_backup_alert_after_seconds{namespace="fresh", job="herd-worker", pod="herd-worker-a"}'
+        values: "93600x1700"
+    alert_rule_test:
+      - eval_time: 28h
+        alertname: HerdBackupTooOld
+        exp_alerts: []
+
+  # HerdBackupFailing: the last backup failed (at 10 min), until a good one (at 30 min).
+
+  - name: HerdBackupFailing fires after a failed backup and clears with the next good one
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x30 1800x10"
+      - series: 'herd_backup_last_failure_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x10 600x30"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: HerdBackupFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdBackupFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "The last backup of herd/herd-worker failed"
+              description: "python -m app.ops backup list names its error code; the job's exit status is 1. A failed archive is removed at once and never counts for retention; older archives stay."
+      - eval_time: 35m
+        alertname: HerdBackupFailing
+        exp_alerts: []
+
+  - name: HerdBackupFailing stays quiet when a good backup followed the failed one
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "600x20"
+      - series: 'herd_backup_last_failure_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "300x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdBackupFailing
+        exp_alerts: []
+
+  # HerdOffsiteBackupFailing: restic failed for the last good backup (at 10 min).
+
+  - name: HerdOffsiteBackupFailing fires when the last push failed and clears with a good one
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_offsite_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x30 1800x10"
+      - series: 'herd_backup_offsite_last_failure_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x10 600x30"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: HerdOffsiteBackupFailing
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HerdOffsiteBackupFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "The last backup of herd/herd-worker did not reach the offsite repository"
+              description: "The archive on the backups volume is good (backup list: offsite=failed). restic could not reach or open the repository, or init, backup, forget or check failed: check the repository, its password and the storage's credentials in the backup's own Secret (backup.offsite.existingSecret) or backup.env, and run restic snapshots by hand with them."
+      - eval_time: 35m
+        alertname: HerdOffsiteBackupFailing
+        exp_alerts: []
+
+  - name: HerdOffsiteBackupFailing stays quiet with offsite off (both 0)
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_offsite_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x20"
+      - series: 'herd_backup_offsite_last_failure_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HerdOffsiteBackupFailing
+        exp_alerts: []
+
+  # HerdBackupNeverRan: no good backup for 26 hours of a worker exporting the gauge.
+
+  - name: HerdBackupNeverRan fires after 26 hours without a good backup
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x1700"
+      - series: 'herd_backup_last_failure_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x1700"
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: HerdBackupNeverRan
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: HerdBackupNeverRan
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: herd
+              job: herd-worker
+            exp_annotations:
+              summary: "herd/herd-worker has no good backup after 26 hours"
+              description: "Is the backup job there (backup.enabled; compose service backup) and does its schedule fire? python -m app.ops backup list shows the runs; python -m app.ops backup run makes one by hand."
+
+  - name: HerdBackupNeverRan stays quiet once a backup succeeded
+    interval: 1m
+    input_series:
+      - series: 'herd_backup_last_success_timestamp_seconds{namespace="herd", job="herd-worker", pod="herd-worker-a"}'
+        values: "0x60 3600x1640"
+    alert_rule_test:
+      - eval_time: 27h
+        alertname: HerdBackupNeverRan
+        exp_alerts: []

@@ -171,6 +171,48 @@ spec:
     {{- with .Values.networkPolicy.egress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+{{- if .Values.backup.enabled }}
+---
+# The backup job: nothing in; out only DNS, the database (the bundled PostgreSQL or,
+# through networkPolicy.egress, an external one) and the offsite storage
+# (backup.offsite.egress).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" . }}-backup
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backup
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    {{- if .Values.postgresql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "herd.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- end }}
+    {{- with .Values.networkPolicy.egress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.backup.offsite.egress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
 {{- with .Values.networkPolicy.aiEgress }}
 ---
 # AI providers (or the proxy in HERD_AI_EGRESS_PROXY): the API pods test connections
@@ -197,7 +239,8 @@ spec:
 {{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
-# The bundled PostgreSQL: reachable only from the app pods, no egress at all.
+# The bundled PostgreSQL: reachable only from the app pods (and the backup job), no
+# egress at all.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -219,7 +262,7 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/component
                 operator: In
-                values: [api, migrate, worker]
+                values: [api, migrate, worker, backup]
       ports:
         - port: 5432
           protocol: TCP

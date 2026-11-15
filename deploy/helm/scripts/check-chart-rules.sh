@@ -154,7 +154,7 @@ grep -q "port: 8080\|port: 1234\|component: api\|component: collab" <<<"$policy"
   && fail "the worker reaches or is reached by more than the database and the scrapes"
 grep -q "ingress: \[\]" <<<"$policy" || fail "the worker takes connections without internalFrom"
 postgres=$(doc NetworkPolicy t-to-herd-cats-ai-postgresql "$out")
-grep -q "values: \[api, migrate, worker\]" <<<"$postgres" || fail "the bundled PostgreSQL does not admit the worker"
+grep -q "values: \[api, migrate, worker, backup\]" <<<"$postgres" || fail "the bundled PostgreSQL does not admit the worker"
 out=$(render --set networkPolicy.enabled=true \
   --set "networkPolicy.internalFrom[0].namespaceSelector.matchLabels.team=monitoring")
 policy=$(doc NetworkPolicy t-to-herd-cats-ai-worker "$out")
@@ -266,6 +266,54 @@ grep -q "HERD_MCP_MAX_CALLS_PER_RUN" <<<"$(doc Deployment t-to-herd-cats-ai-api 
   && fail "the API gets the worker's cap on external calls"
 if render --set mcp.maxCallsPerRun=0 >/dev/null; then fail "mcp.maxCallsPerRun=0 rendered"; fi
 
+# Backups (plan M9 Task 3): a CronJob running `backup run` one at a time and never
+# retried, on a kept claim of its own, the files claim mounted read-only; the offsite
+# Secret reaches the backup job alone, the AI keys never; the worker gets the alert's
+# limit (it exports the gauges).
+out=$(render)
+cron=$(doc CronJob t-to-herd-cats-ai-backup "$out")
+[[ -n $cron ]] || fail "no backup CronJob by default"
+grep -q 'schedule: "30 2 \* \* \*"' <<<"$cron" || fail "the backup schedule is not the default"
+grep -q "timeZone: Etc/UTC" <<<"$cron" || fail "the backup schedule is not UTC"
+grep -q "concurrencyPolicy: Forbid" <<<"$cron" || fail "backups may run at once"
+grep -q "backoffLimit: 0" <<<"$cron" || fail "a failed backup is retried"
+grep -qF '"python", "-m", "app.ops", "backup", "run"]' <<<"$cron" || fail "the CronJob does not run backup run"
+grep -A2 -- "- name: data" <<<"$cron" | grep -q "readOnly: true" || fail "the files claim is mounted writable"
+grep -A2 -- "- name: backups" <<<"$cron" | grep -q "claimName: t-to-herd-cats-ai-backups" \
+  || fail "the archives are not on the chart's claim"
+grep -q "envFrom\|HERD_AI_" <<<"$cron" && fail "the backup job gets more than its own environment"
+claim=$(doc PersistentVolumeClaim t-to-herd-cats-ai-backups "$out")
+grep -q "helm.sh/resource-policy: keep" <<<"$claim" || fail "the backups claim is not kept"
+grep -A1 -- "- name: HERD_BACKUP_ALERT_AFTER_HOURS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "26"' || fail "the worker has no HERD_BACKUP_ALERT_AFTER_HOURS"
+out=$(render --set backup.alertAfterHours=30 --set backup.keepDaily=3 --set backup.offsite.existingSecret=herd-offsite \
+  --set ai.existingSecret=herd-ai --set backup.persistence.existingClaim=herd-archives)
+cron=$(doc CronJob t-to-herd-cats-ai-backup "$out")
+grep -A1 -- "- name: HERD_BACKUP_ALERT_AFTER_HOURS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  | grep -q 'value: "30"' || fail "backup.alertAfterHours does not reach the worker"
+grep -A1 -- "- name: HERD_BACKUP_KEEP_DAILY" <<<"$cron" | grep -q 'value: "3"' || fail "backup.keepDaily is not passed on"
+grep -A2 -- "envFrom:" <<<"$cron" | grep -q "name: herd-offsite" || fail "the offsite Secret does not reach the backup job"
+grep -A4 -- "- name: HERD_SECRET_KEY" <<<"$cron" | grep -q "key: HERD_SECRET_KEY" \
+  || fail "the backup job does not get HERD_SECRET_KEY alone from ai.existingSecret"
+grep -q "name: herd-ai$" <<<"$(grep -A2 -- "envFrom:" <<<"$cron")" && fail "the backup job gets every AI key"
+grep -q "herd-offsite" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  && fail "the offsite Secret reaches the app"
+grep -q "claimName: herd-archives" <<<"$cron" || fail "backup.persistence.existingClaim is not used"
+[[ -z $(doc PersistentVolumeClaim t-to-herd-cats-ai-backups "$out") ]] || fail "a backups claim despite existingClaim"
+out=$(render --set backup.enabled=false)
+grep -q "kind: CronJob\|t-to-herd-cats-ai-backups" <<<"$out" && fail "backup.enabled=false still renders the backup"
+if out=$(render --set persistence.enabled=false); then fail "backups without the files claim rendered"; fi
+grep -q "backup.enabled needs persistence.enabled" <<<"$out" || fail "unexpected error: $out"
+render --set persistence.enabled=false --set backup.enabled=false >/dev/null \
+  || fail "a trial without files and backups does not render"
+if render --set backup.schedule=daily >/dev/null; then fail "backup.schedule took a word"; fi
+out=$(render --set networkPolicy.enabled=true --set 'backup.offsite.egress[0].ports[0].port=443')
+policy=$(doc NetworkPolicy t-to-herd-cats-ai-backup "$out")
+grep -q "ingress: \[\]" <<<"$policy" || fail "the backup job accepts connections"
+grep -q "port: 443" <<<"$policy" || fail "backup.offsite.egress is not passed on"
+grep -q "values: \[api, migrate, worker, backup\]" <<<"$(doc NetworkPolicy t-to-herd-cats-ai-postgresql "$out")" \
+  || fail "the backup job cannot reach the bundled PostgreSQL"
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.
@@ -273,7 +321,8 @@ out=$(render --set metrics.prometheusRule.enabled=true --set metrics.serviceMoni
 rule=$(doc PrometheusRule t-to-herd-cats-ai "$out")
 for alert in HerdNotReady HerdOutboxBacklog HerdOutboxFailed HerdWorkerStalled HerdWorkerAbsent \
   HerdRunsStuck HerdRunsQueued HerdRunsFailing HerdAutomationsLagging HerdAutomationsFailing \
-  HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems; do
+  HerdExternalToolsFailing HerdOAuthRefreshFailing HerdMcpAuthFailures HerdMcpCatalogProblems \
+  HerdBackupTooOld HerdBackupFailing HerdOffsiteBackupFailing HerdBackupNeverRan; do
   grep -q -- "- alert: $alert$" <<<"$rule" || fail "the PrometheusRule lacks $alert"
 done
 grep -qF '"$1-internal", "job", "(.+)-worker"' <<<"$rule" \

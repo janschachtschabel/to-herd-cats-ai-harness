@@ -1,0 +1,105 @@
+{{- if .Values.backup.enabled }}
+{{- if not .Values.persistence.enabled }}
+{{- fail "backup.enabled needs persistence.enabled: the backup reads the attachments from the files claim (set backup.enabled=false for trials without one)" }}
+{{- end }}
+# Backups (plan M9, docs/SICHERUNG.md): `python -m app.ops backup run` writes an archive
+# of the database (pg_dump from one snapshot) and the attachments to /backups, reads it
+# back and checks it, applies the retention and, with backup.offsite.existingSecret,
+# copies it with restic. One at a time (Forbid); a failed run is not retried, its
+# backup_run row says why and HerdBackupFailing fires (the worker exports the gauges).
+# The files claim is mounted read-only; HERD_SECRET_KEY (ai.existingSecret) only names
+# its key id in the archive. restic's environment is built by the job: the offsite
+# Secret's storage credentials reach restic alone.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "herd.fullname" . }}-backup
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "herd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backup
+    spec:
+      backoffLimit: 0
+      # A backup longer than 6 hours is stopped: its backup_run row stays running and
+      # HerdBackupTooOld fires once the last good one is too old.
+      activeDeadlineSeconds: 21600
+      template:
+        metadata:
+          labels:
+            {{- include "herd.labels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- include "herd.podSecurityContext" . | nindent 12 }}
+          containers:
+            - name: backup
+              image: {{ include "herd.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/usr/bin/tini", "--", "python", "-m", "app.ops", "backup", "run"]
+              env:
+                - name: HERD_DATABASE_URL
+                  value: {{ include "herd.databaseUrl" . | quote }}
+                {{- if include "herd.databaseSecret" . }}
+                - name: HERD_DATABASE_PASSWORD_FILE
+                  value: /var/run/secrets/herd/database/password
+                {{- end }}
+                - name: HERD_BACKUP_DIR
+                  value: /backups
+                - name: HERD_BACKUP_KEEP_DAILY
+                  value: {{ .Values.backup.keepDaily | quote }}
+                - name: HERD_BACKUP_KEEP_WEEKLY
+                  value: {{ .Values.backup.keepWeekly | quote }}
+                - name: HERD_BACKUP_KEEP_MONTHLY
+                  value: {{ .Values.backup.keepMonthly | quote }}
+                {{- with .Values.ai.existingSecret }}
+                - name: HERD_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ . }}
+                      key: HERD_SECRET_KEY
+                      optional: true
+                {{- end }}
+              {{- with .Values.backup.offsite.existingSecret }}
+              # HERD_BACKUP_OFFSITE_REPOSITORY, HERD_BACKUP_OFFSITE_PASSWORD, AWS_*, B2_*, ...
+              envFrom:
+                - secretRef:
+                    name: {{ . }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              securityContext:
+                {{- include "herd.containerSecurityContext" . | nindent 16 }}
+              volumeMounts:
+                {{- include "herd.volumeMounts" . | nindent 16 }}
+                - name: data
+                  mountPath: /data
+                  readOnly: true
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            {{- include "herd.volumes" . | nindent 12 }}
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}
+                readOnly: true
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "herd.fullname" .)) }}
+{{- end }}

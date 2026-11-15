@@ -5,7 +5,8 @@
 # live stream (/api/stream: outbox, worker, NOTIFY, SSE), create a ticket and change its
 # status and find the worker's two system entries in its thread, let a one-off automation
 # come due (15 s) and find exactly one term, read the page through /mcp with an access
-# token (tools listed on node A, read_page called on node B), tear down. Runs as its own
+# token (tools listed on node A, read_page called on node B), back up in the service backup
+# and restore the archive into a second database, copy one with restic, tear down. Runs as its own
 # compose project on its own ports, with throwaway volumes, so a running installation
 # next to it is not touched. Ends with "SMOKE OK".
 #
@@ -294,5 +295,45 @@ done
   "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
   | grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' \
   || fail "$worker does not report exactly one fired term"
+
+# Backups (docs/SICHERUNG.md): one run in the service backup (as 10001, offsite off), the
+# worker's gauge of it, and the archive restored into a second, empty database with the
+# attachments into the container's /tmp; the restored page and its file are there.
+uid="$("${compose[@]}" exec -T backup id -u | tr -d '\r')"
+[[ $uid == 10001 ]] || fail "backup runs as uid $uid"
+made="$("${compose[@]}" exec -T backup python -m app.ops backup run | tr -d '\r' | tail -1)"
+[[ $made == *" offsite=off" ]] || fail "backup run printed: $made"
+archive="${made%% *}"
+"${compose[@]}" exec -T backup python -m app.ops backup list | grep -q $'\tok\t' \
+  || fail "backup list shows no good run"
+backed_up() {
+  "${compose[@]}" exec -T "$worker" python -c \
+    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
+    | grep -Eq '^herd_backup_last_success_timestamp_seconds [1-9]'
+}
+for _ in $(seq 1 30); do backed_up && break; sleep 1; done
+backed_up || fail "$worker does not export the backup's gauge"
+"${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore' >/dev/null
+"${compose[@]}" exec -T \
+  -e HERD_DATABASE_URL=postgresql+asyncpg://herd@db:5432/herd_restore \
+  -e HERD_DATA_DIR=/tmp/restore-data backup python -m app.ops restore apply "$archive" \
+  | tail -1 | grep -q "^restored " || fail "restore apply into herd_restore failed"
+pages="$("${compose[@]}" exec -T db psql -tA -U herd -d herd_restore \
+  -c "SELECT count(*) FROM page WHERE id = '$page_id'" | tr -d '\r')"
+[[ $pages == 1 ]] || fail "the restored database lacks the page"
+restored="$("${compose[@]}" exec -T backup find /tmp/restore-data -type f | wc -l)"
+(( restored >= 1 )) || fail "the restore wrote no attachment file"
+
+# restic, for real (the image's binary): a second run with a repository on the backup
+# container's /tmp (offsite=ok), its snapshot read back with the same password.
+offsite_password="$(openssl rand -hex 16)"
+made="$("${compose[@]}" exec -T -e HERD_BACKUP_OFFSITE_REPOSITORY=/tmp/offsite \
+  -e HERD_BACKUP_OFFSITE_PASSWORD="$offsite_password" backup python -m app.ops backup run \
+  | tr -d '\r' | tail -1)"
+[[ $made == *" offsite=ok" ]] || fail "backup run with restic printed: $made"
+"${compose[@]}" exec -T -e RESTIC_REPOSITORY=/tmp/offsite -e RESTIC_PASSWORD="$offsite_password" \
+  backup restic snapshots --tag herd --json \
+  | python3 -c "import json, sys; sys.exit(0 if len(json.load(sys.stdin)) == 1 else 1)" \
+  || fail "the restic repository holds no snapshot of the backup"
 
 echo "SMOKE OK"
