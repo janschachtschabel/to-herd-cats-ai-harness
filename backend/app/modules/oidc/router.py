@@ -155,5 +155,9 @@ async def my_identities(
 
 
 @router.delete("/auth/me/identities/{identity_id}", status_code=204)
-async def unlink_mine(identity_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
-    await IdentityService(session).unlink(actor, actor.principal.id, identity_id)
+async def unlink_mine(
+    identity_id: uuid.UUID, actor: ActorDep, ctx: AuthDep, session: SessionDep
+) -> None:
+    await IdentityService(session).unlink(
+        actor, actor.principal.id, identity_id, current_session=ctx.session_id
+    )

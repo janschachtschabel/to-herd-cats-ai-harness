@@ -271,3 +271,33 @@ async def test_deleting_a_provider_removes_its_links(
     gone = await owner.delete(f"{PROVIDERS}/{created['id']}", params={"version": 1})
     assert gone.status_code == 204
     assert (await member_client.get("/api/auth/me/identities")).json()["items"] == []
+
+
+async def test_unlinking_an_identity_ends_the_persons_other_sessions(
+    owner: AsyncClient,
+    member_client: AsyncClient,
+    member: User,
+    make_client: MakeClient,
+    oidc_stub: OidcStub,
+) -> None:
+    """ASVS 5.0 V7.4.3: removing a way to sign in ends every other session of the
+    person (a session someone opened with it included); one's own change keeps the
+    session it is made with, an administrator's ends them all."""
+    await make_provider(owner, oidc_stub, trust_email=True)
+    other = await make_client()
+    done = await sign_in(other, oidc_stub, email=member.email, sub="s-two")
+    assert done.headers["location"] == "/"
+    mine = (await member_client.get("/api/auth/me/identities")).json()["items"]
+    assert (
+        await member_client.delete(f"/api/auth/me/identities/{mine[0]['id']}")
+    ).status_code == 204
+    assert (await other.get("/api/auth/me")).status_code == 401
+    assert (await member_client.get("/api/auth/me")).status_code == 200
+
+    await sign_in(other, oidc_stub, email=member.email, sub="s-three")
+    linked = (await member_client.get("/api/auth/me/identities")).json()["items"]
+    path = f"/api/admin/users/{member.id}/identities/{linked[0]['id']}"
+    assert (await owner.delete(path)).status_code == 204
+    assert (await other.get("/api/auth/me")).status_code == 401
+    assert (await member_client.get("/api/auth/me")).status_code == 401
+    assert (await owner.get("/api/auth/me")).status_code == 200

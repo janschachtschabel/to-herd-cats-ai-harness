@@ -110,6 +110,9 @@ eines Admins; zu ändern an einer Stelle, `SIGNUP_GETS_NO_AI` in
 - **Verwaltung → Personen → Bearbeiten**: mit `user.manage` die Verknüpfungen jeder
   Person sehen und lösen (die eines Owners nur als Owner).
 - Ein Konto ohne Passwort behält seine letzte Verknüpfung (409 `oidc.last_identity`).
+- Eine Verknüpfung zu lösen beendet alle anderen Sitzungen der Person (auch eine, die
+  über diesen Anbieter begann); wer die eigene löst, bleibt in der laufenden Sitzung
+  angemeldet, löst ein Admin sie, endet jede Sitzung der Person.
 - Audit: `user.identity_linked` (Anbieter, `via` `email` oder `profile`),
   `user.identity_unlinked`; Anbieter: `oidc_provider.created|updated|deleted`. Nie
   das Subjekt, die E-Mail oder ein Secret.

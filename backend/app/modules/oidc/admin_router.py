@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.core.pagination import Page, PageParams
-from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.deps import ActorDep, AuthDep, SessionDep
 from app.modules.oidc.identities import IdentityService
 from app.modules.oidc.models import OidcProvider
 from app.modules.oidc.schemas import (
@@ -87,6 +87,8 @@ async def list_user_identities(
 
 @user_identities.delete("/{user_id}/identities/{identity_id}", status_code=204)
 async def unlink_user_identity(
-    user_id: uuid.UUID, identity_id: uuid.UUID, actor: ActorDep, session: SessionDep
+    user_id: uuid.UUID, identity_id: uuid.UUID, actor: ActorDep, ctx: AuthDep, session: SessionDep
 ) -> None:
-    await IdentityService(session).unlink(actor, user_id, identity_id, as_admin=True)
+    await IdentityService(session).unlink(
+        actor, user_id, identity_id, as_admin=True, current_session=ctx.session_id
+    )

@@ -15,6 +15,7 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.core.principal import SystemRole
 from app.modules.audit.recorder import record
+from app.modules.auth.repository import SessionRepository
 from app.modules.oidc.models import OidcProvider, UserIdentity
 from app.modules.oidc.repository import IdentityRepository, ProviderRepository
 from app.modules.users.models import User
@@ -44,7 +45,10 @@ class IdentityService:
         identity_id: uuid.UUID,
         *,
         as_admin: bool = False,
+        current_session: uuid.UUID | None = None,
     ) -> None:
+        """The way to sign in goes, and with it every session of the person but the one
+        their own change is made with (`current_session`; ASVS 5.0 V7.4.3)."""
         user = await self._target(actor, user_id, write=True, as_admin=as_admin)
         await UserRepository(self.session).lock_admin_writes(actor.org_id)
         identities = IdentityRepository(self.session, actor.org_id)
@@ -55,6 +59,8 @@ class IdentityService:
             raise Conflict(code="oidc.last_identity")
         provider = await ProviderRepository(self.session, actor.org_id).get(identity.provider_id)
         await identities.delete(identity)
+        keep = current_session if actor.principal.id == user_id else None
+        await SessionRepository(self.session).delete_for_user(actor.org_id, user_id, keep=keep)
         details = {"provider": provider.key if provider else None}
         await record(self.session, actor, "user.identity_unlinked", "user", user_id, details)
 
