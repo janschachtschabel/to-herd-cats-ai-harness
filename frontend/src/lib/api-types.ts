@@ -4995,6 +4995,8 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * DataLocation
@@ -5197,6 +5199,8 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /** EventIn */
         EventIn: {
@@ -5765,6 +5769,8 @@ export interface components {
          *     deleted message keeps its place with `deleted_at` set and an empty `body_md`.
          *     `reply_count` and `last_reply_at` belong to top-level messages (their thread).
          *     `run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).
+         *     `via_token`: a person's message written through an access token at `/mcp`, the
+         *     token's name (AI mark of an external AI client, plan M8).
          *     `mentions`: the people mentioned who may see the conversation; `reactions`: by
          *     emoji, the first reacted with first. `card`: set for a run's card (`kind`
          *     `approval` or `question`).
@@ -5809,6 +5815,8 @@ export interface components {
             /** Run Id */
             run_id?: string | null;
             system: components["schemas"]["SystemEntryOut"] | null;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * MessageUpdate
@@ -5874,6 +5882,8 @@ export interface components {
             /** Run Id */
             run_id?: string | null;
             system: components["schemas"]["SystemEntryOut"] | null;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * MoveCategory
@@ -5951,6 +5961,8 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /** MyCardPage */
         MyCardPage: {
@@ -6846,6 +6858,8 @@ export interface components {
             too_large: boolean;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * ProposalKind
@@ -6870,10 +6884,12 @@ export interface components {
          * @description A proposal without its content. `kind`: `change` of `page_id`, based on its
          *     version `base_version`; or `new`, a page `title` under `parent_id` (null: the top
          *     level), whose `page_id` is the page it became once accepted. `ai`: made by an agent
-         *     (`run_id`: its run). `decided_by`/`decided_at`: who accepted, rejected or (its
-         *     author's person) withdrew it, and when; `decision_reason`: a rejection's reason;
-         *     `result_version`: the page version an acceptance wrote (null if the page held
-         *     that content already). `version`: name it when deciding (stale → 409).
+         *     (`run_id`: its run) or by a person's AI client through an access token
+         *     (`via_token`: the token's name, plan M8). `decided_by`/`decided_at`: who
+         *     accepted, rejected or (its author's person) withdrew it, and when;
+         *     `decision_reason`: a rejection's reason; `result_version`: the page version an
+         *     acceptance wrote (null if the page held that content already). `version`: name
+         *     it when deciding (stale → 409).
          */
         ProposalOut: {
             /** Ai */
@@ -6917,6 +6933,8 @@ export interface components {
             title: string | null;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /** ProposalRejectIn */
         ProposalRejectIn: {
@@ -8224,6 +8242,8 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /** TicketPlaceIn */
         TicketPlaceIn: {
@@ -8253,7 +8273,9 @@ export interface components {
          * TicketSummaryOut
          * @description A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the
          *     number. `version` guards writes (send it back; stale → 409). `tags` by name.
-         *     `status_changed_at`: when its status last changed (or it was made).
+         *     `status_changed_at`: when its status last changed (or it was made). `via_token`:
+         *     made by its reporter's AI client through an access token at `/mcp` (the token's
+         *     name, the AI mark; plan M8).
          */
         TicketSummaryOut: {
             assignee: components["schemas"]["PersonOut"] | null;
@@ -8301,6 +8323,8 @@ export interface components {
             updated_at: string;
             /** Version */
             version: number;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * TicketTagsSet
@@ -8774,17 +8798,20 @@ export interface components {
             source: components["schemas"]["VersionSource"];
             /** Title */
             title: string;
+            /** Via Token */
+            via_token?: string | null;
         };
         /**
          * VersionSource
          * @enum {string}
          */
-        VersionSource: "human" | "import" | "restore" | "collab" | "agent";
+        VersionSource: "human" | "import" | "restore" | "collab" | "agent" | "mcp";
         /**
          * VersionSummaryOut
          * @description `change_summary` is free text, or `restore:<n>` for a version that brought
-         *     version n back (the client words it). `ai`: written for an agent (the AI mark,
-         *     spec 9: its author is an agent); `run_id`: the agent's run that wrote it.
+         *     version n back (the client words it). `ai`: the AI mark (spec 9): written for an
+         *     agent (`run_id`: its run), or a person's version through an access token
+         *     (`via_token`: the token's name; source `mcp`, plan M8).
          */
         VersionSummaryOut: {
             /** Ai */
@@ -8806,6 +8833,8 @@ export interface components {
             source: components["schemas"]["VersionSource"];
             /** Title */
             title: string;
+            /** Via Token */
+            via_token?: string | null;
         };
         /** ExpectedVersion */
         app__modules__messaging__schemas__ExpectedVersion: {

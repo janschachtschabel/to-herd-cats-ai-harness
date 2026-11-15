@@ -4154,6 +4154,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -4704,6 +4715,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -6007,7 +6029,7 @@
         "type": "string"
       },
       "MessageOut": {
-        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first. `card`: set for a run's card (`kind`\n`approval` or `question`).",
+        "description": "`author` is null for system messages; those carry `system` instead (null for\nall others) and an empty `body_md`: their stored body holds ids the reader may not\nbe allowed to see, `system` only what is named for the reader (review M4 P1). A\ndeleted message keeps its place with `deleted_at` set and an empty `body_md`.\n`reply_count` and `last_reply_at` belong to top-level messages (their thread).\n`run_id`: an agent's message names the run that wrote it (AI mark: `kind=agent`).\n`via_token`: a person's message written through an access token at `/mcp`, the\ntoken's name (AI mark of an external AI client, plan M8).\n`mentions`: the people mentioned who may see the conversation; `reactions`: by\nemoji, the first reacted with first. `card`: set for a run's card (`kind`\n`approval` or `question`).",
         "properties": {
           "author": {
             "anyOf": [
@@ -6151,6 +6173,17 @@
                 "type": "null"
               }
             ]
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -6371,6 +6404,17 @@
                 "type": "null"
               }
             ]
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -6548,6 +6592,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -9279,6 +9334,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -9353,7 +9419,7 @@
         "type": "object"
       },
       "ProposalOut": {
-        "description": "A proposal without its content. `kind`: `change` of `page_id`, based on its\nversion `base_version`; or `new`, a page `title` under `parent_id` (null: the top\nlevel), whose `page_id` is the page it became once accepted. `ai`: made by an agent\n(`run_id`: its run). `decided_by`/`decided_at`: who accepted, rejected or (its\nauthor's person) withdrew it, and when; `decision_reason`: a rejection's reason;\n`result_version`: the page version an acceptance wrote (null if the page held\nthat content already). `version`: name it when deciding (stale \u2192 409).",
+        "description": "A proposal without its content. `kind`: `change` of `page_id`, based on its\nversion `base_version`; or `new`, a page `title` under `parent_id` (null: the top\nlevel), whose `page_id` is the page it became once accepted. `ai`: made by an agent\n(`run_id`: its run) or by a person's AI client through an access token\n(`via_token`: the token's name, plan M8). `decided_by`/`decided_at`: who\naccepted, rejected or (its author's person) withdrew it, and when;\n`decision_reason`: a rejection's reason; `result_version`: the page version an\nacceptance wrote (null if the page held that content already). `version`: name\nit when deciding (stale \u2192 409).",
         "properties": {
           "ai": {
             "title": "Ai",
@@ -9492,6 +9558,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -12868,6 +12945,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -12941,7 +13029,7 @@
         "type": "object"
       },
       "TicketSummaryOut": {
-        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409). `tags` by name.\n`status_changed_at`: when its status last changed (or it was made).",
+        "description": "A ticket as a list row shows it. `key` is `HC-<number>`; addresses use the\nnumber. `version` guards writes (send it back; stale \u2192 409). `tags` by name.\n`status_changed_at`: when its status last changed (or it was made). `via_token`:\nmade by its reporter's AI client through an access token at `/mcp` (the token's\nname, the AI mark; plan M8).",
         "properties": {
           "assignee": {
             "anyOf": [
@@ -13046,6 +13134,17 @@
           "version": {
             "title": "Version",
             "type": "integer"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -14286,6 +14385,17 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
@@ -14309,13 +14419,14 @@
           "import",
           "restore",
           "collab",
-          "agent"
+          "agent",
+          "mcp"
         ],
         "title": "VersionSource",
         "type": "string"
       },
       "VersionSummaryOut": {
-        "description": "`change_summary` is free text, or `restore:<n>` for a version that brought\nversion n back (the client words it). `ai`: written for an agent (the AI mark,\nspec 9: its author is an agent); `run_id`: the agent's run that wrote it.",
+        "description": "`change_summary` is free text, or `restore:<n>` for a version that brought\nversion n back (the client words it). `ai`: the AI mark (spec 9): written for an\nagent (`run_id`: its run), or a person's version through an access token\n(`via_token`: the token's name; source `mcp`, plan M8).",
         "properties": {
           "ai": {
             "title": "Ai",
@@ -14373,6 +14484,17 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "via_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Token"
           }
         },
         "required": [
