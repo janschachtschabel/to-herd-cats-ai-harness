@@ -752,14 +752,17 @@ Recht 404 `ai.not_found`.
   geteilte Konnektor oder bei `personal` der eigene der fragenden Person. Ein Ergebnis
   über den **eigenen Konnektor** der fragenden Person markiert den Lauf wie ein
   gelesener Entwurf (`Reads.personal`, im Journal als `read.personal`, sodass auch ein
-  fortgesetzter Lauf es weiß): Danach schreibt er nichts mehr, was außer dieser Person
-  jemand lesen könnte. Allein mit ihr in der Direktnachricht geht alles weiter; ein
-  Beitrag in einen Kanal, ein Ticket, eine Seite, ein Vorschlag oder ein Gedächtnis
-  werden abgelehnt („Not allowed: you have read something through the asking person's
-  own connection …“), und in einem Kanal, Thread oder einer Direktnachricht mit
-  mehreren endet der Lauf statt mit seiner Antwort mit `policy_blocked`
+  fortgesetzter Lauf es weiß): Was er danach schreiben will, wo außer dieser Person
+  jemand lesen könnte (ein Kanal, ein Ticket, eine Seite, ein Vorschlag, ein
+  Gedächtnis), wartet auf ihre Freigabe genau dieses Inhalts (Freigabekarte mit
+  `personal: true`; im Lauf einer Automation oder Ereignisregel: der Eigentümerin);
+  freigegeben ist es nicht mehr markiert (Review M8 2, Befund G2). Allein mit ihr in
+  der Direktnachricht geht alles ohne Freigabe weiter. In einem Kanal, Thread oder
+  einer Direktnachricht mit mehreren bleiben seine Antwort und seine Rückfrage
+  zurückgehalten: Er endet statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`, auch im Hinweis des Gesprächs: `system.stop_detail`). Die
-  Marke folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
+  Marke beginnt also mit dem ersten persönlichen Inhalt im Kontext und endet, wenn
+  keiner mehr darin ist. Sie folgt dem Inhalt: Jede Nachricht eines markierten Laufs ist selbst markiert
   (`personal`), und ein späterer Lauf ist markiert, sobald eine markierte Nachricht in
   sein Verlaufsfenster, ein Treffer eines markierten Laufs aus `search_past_runs` oder
   eine markierte Nachricht aus `read_conversation` in seinen Kontext kommt; das steht

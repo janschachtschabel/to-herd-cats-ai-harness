@@ -15,6 +15,7 @@
       "hideDiff": "Änderung ausblenden",
       "diffTooLarge": "Die Texte sind zu groß für einen Vergleich.",
       "args": "Angaben des Aufrufs",
+      "personal": "Persönlich: Dieser Lauf hat gelesen, was nur du über deinen eigenen Zugang siehst, oder es steht in eurem Gespräch. Gibst du frei, wird genau der folgende Inhalt geschrieben, und andere können ihn lesen. Er ist danach nicht mehr als persönlich markiert.",
       "youDecide": "Du entscheidest.",
       "decides": "Entscheiden kann {{name}}.",
       "askerDecides": "Entscheiden kann die Person, die den Agenten gefragt hat.",

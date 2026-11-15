@@ -295,7 +295,9 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
     suggests. Write tools are level 4 and wait for the asker's release of the exact
     arguments; a lost worker never sends a call again (`external_outcome_unknown`).
   - A result through the asker's own connector marks the run (`Reads.personal`, like
-    the draft mark): it writes nothing others may read, and every call of an external
+    the draft mark): a write others may read waits for the asker's release of exactly
+    that content (`personal_mark.ReleaseFirst`; released, it is unmarked), its answer
+    and questions where others read stay held back, and every call of an external
     server it does not use with the asker's own connector (read tools included) waits
     for the asker's release of the exact arguments (automation runs: the owner). The
     mark follows the content and is persisted (`agents/personal_mark.py`): every

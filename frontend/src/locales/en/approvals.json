@@ -15,6 +15,7 @@
       "hideDiff": "Hide the change",
       "diffTooLarge": "The texts are too large to compare.",
       "args": "The call's details",
+      "personal": "Personal: this run read what only you see through your own access, or it is in your conversation. If you release it, exactly the content below is written, and others can read it. It is no longer marked personal after that.",
       "youDecide": "You decide.",
       "decides": "{{name}} decides.",
       "askerDecides": "The person who asked the agent decides.",

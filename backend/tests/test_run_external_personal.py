@@ -1,9 +1,9 @@
 """Follow-up to plan M8 task 7: what a run read through the asking person's own
-connector stays with that person. The result marks the run like a draft
-(`Reads.personal`): nothing it writes afterwards may reach anyone else, neither a
-tool's write into a shared channel nor its final answer in a channel; alone with the
-person it goes on. A shared connector's result carries no mark. The mark is journaled
-with the call, so a run taken up again keeps it."""
+connector stays with that person. The result marks the run (`Reads.personal`):
+nothing it writes afterwards reaches anyone else without her release of exactly that
+(module review M8 2, G2), and its final answer in a channel is held back; alone with
+the person it goes on. A shared connector's result carries no mark. The mark is
+journaled with the call, so a run taken up again keeps it."""
 
 from typing import Any
 
@@ -11,11 +11,11 @@ import pytest
 from sqlalchemy import select
 
 from app.modules.agents.run_models import EventKind, RunEvent, StopReason
-from app.modules.agents.toolbox.writing import PERSONAL
 from app.modules.messaging.models import Message
 from tests.factories_connectors import PERSONAL as MY_CONNECTORS
 from tests.factories_connectors import make_connector
 from tests.factories_external import Ext, call
+from tests.factories_personal import asks_release, decide
 from tests.factories_writing import Work, set_level
 from tests.test_run_replay import Crash, die_after, take_up_again
 
@@ -54,7 +54,9 @@ async def _stop(ext: Ext) -> dict[str, Any]:
     return dict(content)
 
 
-async def test_a_personal_result_is_not_posted_into_a_shared_channel(ext: Ext, work: Work) -> None:
+async def test_a_personal_result_goes_into_a_shared_channel_only_by_her_release(
+    ext: Ext, work: Work
+) -> None:
     name, channel = await _personal(ext), await _channel(work)
     ext.bench.stub.state.replies.extend(
         [
@@ -64,12 +66,17 @@ async def test_a_personal_result_is_not_posted_into_a_shared_channel(ext: Ext, w
         ]
     )
     await ext.bench.say("Such meine Issues und sag es dem Team")
-    assert await ext.bench.run_next() == StopReason.COMPLETED
+    approval = await asks_release(ext, await ext.bench.run_next())
+    assert approval["args"]["text"] == f"Gefunden: {SECRET}"  # exactly what would go
     assert ext.stub.state.calls == [("search_issues", {"q": "meine"})]
-    assert PERSONAL in ext.bench.stub.state.texts()
     assert not any(SECRET in body for body in await _bodies(ext))
-    *_, found, refused = await ext.tool_events()  # the call's result, the refused post
-    assert found["read"]["personal"] is True and refused["text"] == PERSONAL
+    *_, found = await ext.tool_events()  # the call's result; the post waits
+    assert found["name"] == name and found["read"]["personal"] is True
+    await decide(ext, approval, "reject")
+    assert await ext.bench.run_next() == StopReason.COMPLETED
+    assert not any(SECRET in body for body in await _bodies(ext))
+    *_, refused = await ext.tool_events()
+    assert refused["text"].startswith("approval_rejected")
 
 
 async def test_alone_with_the_person_the_run_goes_on(ext: Ext) -> None:
@@ -141,9 +148,8 @@ async def test_a_run_taken_up_again_keeps_the_mark(
     with pytest.raises(Crash):
         await ext.bench.run_next()
     monkeypatch.undo()
-    assert await take_up_again(ext.bench) == StopReason.COMPLETED  # a new worker's memory
+    await asks_release(ext, await take_up_again(ext.bench))  # a new worker's memory
     assert ext.stub.state.calls == [("search_issues", {"q": "meine"})]
-    assert PERSONAL in ext.bench.stub.state.texts()
     assert not any(SECRET in body for body in await _bodies(ext))
 
 
@@ -196,11 +202,9 @@ async def test_alone_with_the_agent_a_personal_runs_words_are_found_and_mark_the
         ]
     )
     await ext.bench.say("Was hattest du gefunden?")  # her DM alone with the agent
-    assert await ext.bench.run_next() == StopReason.COMPLETED
+    await asks_release(ext, await ext.bench.run_next())  # what she alone read: hers
     events = {e["name"]: e for e in await ext.tool_events()}
-    searched, posted = events["search_past_runs"], events["post_message"]
-    assert SECRET in searched["text"]
-    assert posted["text"] == PERSONAL  # what she alone read stays with her
+    assert SECRET in events["search_past_runs"]["text"] and "post_message" not in events
 
 
 async def test_a_later_run_in_her_dm_carries_the_mark_of_what_it_said_there(
@@ -220,7 +224,5 @@ async def test_a_later_run_in_her_dm_carries_the_mark_of_what_it_said_there(
         ]
     )
     await ext.bench.say("Schreib das dem Team")
-    assert await ext.bench.run_next() == StopReason.COMPLETED
-    (posted,) = [e for e in await ext.tool_events() if e["name"] == "post_message"]
-    assert posted["text"] == PERSONAL
+    await asks_release(ext, await ext.bench.run_next())
     assert f"Für alle: {SECRET}" not in await _bodies(ext)

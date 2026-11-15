@@ -43,7 +43,8 @@ function Decider({ approval, meId }: { approval: Approval; meId: string | undefi
  *  tool "server · tool" and, for the person asked, the exact arguments), who decides, its
  *  state (waiting, approved and run, stale because the object changed, rejected with
  *  its reason, expired), the decision for the person asked, and a link to the run.
- *  A rejection's reason is the asked person's to read (others: `redacted`). */
+ *  A rejection's reason is the asked person's to read (others: `redacted`). Under the
+ *  personal mark (`personal`) it says so: she releases exactly what is shown. */
 export function ApprovalCardView({ approval }: { approval: Approval }) {
   const { t, i18n } = useTranslation()
   const me = useMe()
@@ -74,6 +75,11 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
       >
         {approval.summary}
       </p>
+      {approval.personal && (
+        <p className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-100">
+          {t('approvals.card.personal')}
+        </p>
+      )}
       <ApprovalSubject approval={approval} />
       {view === 'pending' ? (
         <p className="text-xs text-muted-foreground">

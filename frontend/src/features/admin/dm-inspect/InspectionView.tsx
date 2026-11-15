@@ -99,6 +99,8 @@ export function InspectionView({
                   <p className="text-sm text-muted-foreground italic">
                     {t('messaging.message.deleted')}
                   </p>
+                ) : message.personal ? (
+                  <p className="text-sm text-muted-foreground italic">{t('dmInspect.withheld')}</p>
                 ) : (
                   <MessageMarkdown markdown={message.body_md} />
                 )}

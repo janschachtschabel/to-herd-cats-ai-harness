@@ -354,6 +354,11 @@
     "refused": {
       "start": "{{name}} konnte nicht beginnen: {{reason}}",
       "handover": "{{name}} konnte nicht weitergeben: {{reason}}"
+    },
+    "personalMark": {
+      "short": "Persönlich",
+      "title": "Persönlich: nur für dich",
+      "text": "Diese Nachricht enthält, was du über deinen eigenen Zugang gelesen hast, oder sie entstand in einem Gespräch, in dem das stand. Sie bleibt bei dir: Solange so eine Nachricht im Verlauf steht, den der Agent bekommt, legt er dir alles, was er anderswo schreiben will, vorher zur Freigabe vor."
     }
   },
   "errors": {

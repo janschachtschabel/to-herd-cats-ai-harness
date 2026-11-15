@@ -192,7 +192,7 @@ async def _before(
         held: ToolResult | Wait | None = None
         if grant == Grant.CONFIRM or remote.writes or marked:  # a write tool: always
             with caused_by(run.id):
-                held = await gate(ctx, spec, args)
+                held = await gate(ctx, spec, args, personal=marked)
         if isinstance(held, Wait):
             await steps.wait(run, held.until)
             return held

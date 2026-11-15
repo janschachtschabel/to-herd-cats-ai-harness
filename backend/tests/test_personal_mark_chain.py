@@ -13,9 +13,9 @@ from sqlalchemy import select
 
 from app.modules.agents.personal_mark import PRESENT
 from app.modules.agents.run_models import EventKind, Run, RunEvent, StopReason
-from app.modules.agents.toolbox.writing import PERSONAL
 from app.modules.messaging.models import Message
 from tests.factories_external import Ext, call
+from tests.factories_personal import asks_release
 from tests.factories_writing import Work
 from tests.test_questions import answer
 from tests.test_run_external_personal import SECRET, _channel, _personal
@@ -69,11 +69,10 @@ async def test_the_mark_survives_a_run_that_only_inherited_it(ext: Ext, work: Wo
         ]
     )
     await ext.bench.say("Schreib das dem Team")
-    assert await ext.bench.run_next() == StopReason.COMPLETED
+    await asks_release(ext, await ext.bench.run_next())
     assert SECRET in str(state.log[-1].body)  # the model did see it in the history
     assert PRESENT in str(state.log[-1].body)  # and was told it is hers
     assert f"Für alle: {SECRET}" not in await _bodies(ext)
-    assert (await _posted(ext))["text"] == PERSONAL
 
 
 async def test_a_run_marked_by_its_search_keeps_the_mark_when_taken_up_again(
@@ -99,9 +98,8 @@ async def test_a_run_marked_by_its_search_keeps_the_mark_when_taken_up_again(
     with pytest.raises(Crash):
         await ext.bench.run_next()
     monkeypatch.undo()
-    assert await take_up_again(ext.bench) == StopReason.COMPLETED
+    await asks_release(ext, await take_up_again(ext.bench))
     assert f"Für alle: {SECRET}" not in await _bodies(ext)
-    assert (await _posted(ext))["text"] == PERSONAL
 
 
 async def test_the_chain_holds_over_several_runs_in_her_dm(ext: Ext, work: Work) -> None:
@@ -119,11 +117,10 @@ async def test_the_chain_holds_over_several_runs_in_her_dm(ext: Ext, work: Work)
         ]
     )
     await ext.bench.say("Schreib das dem Team")
-    assert await ext.bench.run_next() == StopReason.COMPLETED
-    assert (await _posted(ext))["text"] == PERSONAL
+    await asks_release(ext, await ext.bench.run_next())
     assert f"Für alle: {SECRET}" not in await _bodies(ext)
     answers = [m for m in await ext.bench.messages() if m["kind"] == "agent"]
-    assert len(answers) == 5 and all(m["personal"] for m in answers)
+    assert len(answers) == 4 and all(m["personal"] for m in answers)
     asked = [m for m in await ext.bench.messages() if m["kind"] == "human"]
     assert not any(m["personal"] for m in asked)  # her own words are hers to share
     marks = await _marks(ext)  # one per run that the history marked, none for the first
@@ -149,8 +146,7 @@ async def test_a_resume_after_a_question_keeps_the_mark(ext: Ext, work: Work) ->
     question = (await ext.bench.people.alice.get(f"/api/questions/{card['card']['id']}")).json()
     r = await answer(ext.bench, question, "werkbank")
     assert r.status_code == 200, r.text
-    assert await ext.bench.run_next() == StopReason.COMPLETED  # a new take-up's memory
-    assert (await _posted(ext))["text"] == PERSONAL
+    await asks_release(ext, await ext.bench.run_next())  # a new take-up's memory
     assert f"Für alle: {SECRET}" not in await _bodies(ext)
     assert len(await _marks(ext)) == 1  # journaled once, replayed after the resume
 
@@ -172,8 +168,7 @@ async def test_a_run_marked_by_its_history_keeps_the_mark_when_taken_up_again(
         await ext.bench.run_next()
     monkeypatch.undo()
     assert len(await _marks(ext)) == 1  # journaled before the first model call
-    assert await take_up_again(ext.bench) == StopReason.COMPLETED
-    assert (await _posted(ext))["text"] == PERSONAL
+    await asks_release(ext, await take_up_again(ext.bench))
     assert len(await _marks(ext)) == 1  # the take-up replayed it, wrote none anew
 
 
@@ -192,12 +187,11 @@ async def test_read_conversation_marks_the_run_with_what_it_returns(ext: Ext, wo
     )
     for _ in range(3):
         await ext.bench.say(LONG)
-    assert await ext.bench.run_next() == StopReason.COMPLETED
-    assert SECRET not in str(state.log[-3].body)  # not in its window
+    await asks_release(ext, await ext.bench.run_next())
+    assert SECRET not in str(state.log[-2].body)  # not in its window
     run = (await ext.bench.session.scalars(select(Run).order_by(Run.created_at.desc()))).first()
     assert run is not None
     assert not [m for m in await _marks(ext) if m.run_id == run.id]
     read = [e for e in await ext.tool_events() if e["name"] == "read_conversation"][-1]
     assert read["read"]["personal"] is True and "(personal) id=" in read["text"]
-    assert (await _posted(ext))["text"] == PERSONAL
     assert f"Für alle: {SECRET}" not in await _bodies(ext)

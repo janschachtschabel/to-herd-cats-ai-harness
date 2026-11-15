@@ -140,7 +140,7 @@
         "error": "Das Werkzeug hat einen Fehler gemeldet.",
         "policy": "Nicht aufgerufen: Was der Lauf gelesen hat, darf laut KI-Richtlinie nicht an diesen Server gehen."
       },
-      "personalConnector": "Der Lauf hat mit dem persönlichen Zugang der fragenden Person zu einem externen Server gelesen. Was er so erfahren hat, bleibt bei ihr: Die Antwort wurde nicht dort gepostet, wo andere mitlesen. In einer Direktnachricht allein mit dem Agenten geht es."
+      "personalConnector": "Der Lauf hat mit dem persönlichen Zugang der fragenden Person zu einem externen Server gelesen. Was er dabei erfahren hat, ist nur für sie: Seine Antwort steht deshalb nicht hier, wo andere mitlesen. In ihrer Direktnachricht allein mit dem Agenten antwortet er ihr; was er von dort anderswo schreiben will, legt er ihr vorher zur Freigabe vor."
     }
   },
   "errors": {

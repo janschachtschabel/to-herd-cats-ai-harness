@@ -184,7 +184,8 @@
     "end": "End inspection",
     "messages": "Messages, newest first",
     "empty": "There is nothing in this conversation.",
-    "inThread": "Reply in a thread"
+    "inThread": "Reply in a thread",
+    "withheld": "Personal: this message of the agent holds what the person read through her own access. Its content is not shown in an inspection."
   },
   "audit": {
     "targets": {

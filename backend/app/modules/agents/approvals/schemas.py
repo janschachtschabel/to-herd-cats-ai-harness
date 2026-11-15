@@ -37,7 +37,9 @@ class ApprovalOut(BaseModel):
     `reason`: the person's reason for a rejection, and `args`, only for the person
     asked; for everyone else both are null and `redacted` is true (as in the run
     view, review M6 finding 6). `external`: for a call of an external tool (it sends
-    `args` to that server once released), else null."""
+    `args` to that server once released), else null. `personal`: asked because the
+    run carries the asker's personal mark: what is released is written (or sent)
+    where others read it (module review M8 2)."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -60,6 +62,7 @@ class ApprovalOut(BaseModel):
     expires_at: datetime
     created_at: datetime
     version: int
+    personal: bool = False
 
     @classmethod
     def of(cls, shown: Shown[Approval]) -> "ApprovalOut":
@@ -87,6 +90,7 @@ class ApprovalOut(BaseModel):
             expires_at=a.expires_at,
             created_at=a.created_at,
             version=a.version,
+            personal=a.personal,
         )
 
 

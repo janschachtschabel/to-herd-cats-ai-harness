@@ -17,12 +17,16 @@
   the final answer): its audience reads the answer anyway, and it is either the
   person alone with the agent, who read the draft, or a draft's thread in X, which
   only X's editors read.
-- **A person's own connector** (follow-up to plan M8 task 7): a run that holds a
-  result read through the asking person's own connector (`Reads.personal`, journaled
-  with the call) is held like one with a draft nobody else edits: every writing tool
-  refuses (`PERSONAL`, from `carries_draft`; the draft's exceptions do not apply),
-  and its own conversation (`post_message` there, a question, the final answer) is
-  open only while the person is alone with the agent (`into_own`).
+- **A person's own content** (the personal mark, `agents/personal_mark.py`; module
+  review M8 2, G2): a run that holds what the asking person read through her own
+  connector (`Reads.personal`, journaled) writes nothing others may read without her
+  release: once every other check passed, `release_first` raises `ReleaseFirst` and
+  the host asks her to release exactly this call (`step_host.py`); after the
+  release the call runs (`ToolContext.released`) and what it writes is not marked.
+  The draft's exceptions do not spare a release. Its own conversation is open
+  without a release only while the person is alone with the agent (`into_own`):
+  elsewhere `post_message` there asks for the release too, while a question and the
+  final answer are held back (`PERSONAL`).
 - **AI policy**: no tool writes into a space whose AI policy is `none`; every tool
   that names a space asks `closed_to_ai` first and answers "not found", as for a
   space it cannot see (review M6 finding 5). Tools that name a page or a ticket do
@@ -42,9 +46,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.authorship import Authorship
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.modules.agents.actor import Reads
+from app.modules.agents.personal_mark import ReleaseFirst
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.scope import PlaceKind, organisation_audience, place_of, space_audience
-from app.modules.agents.toolbox.base import NOT_FOUND, CallContext, WriteContext
+from app.modules.agents.toolbox.base import NOT_FOUND, CallContext, ToolContext, WriteContext
 from app.modules.ai.models import AiPolicy
 from app.runtime.loop import ToolResult
 
@@ -58,9 +63,9 @@ DRAFTS = (
     "draft's space instead, or answer here."
 )
 PERSONAL = (
-    "Not allowed: you have read something through the asking person's own connection in "
-    "this run, and it is for that person alone. Write nothing others may read; answer "
-    "only where you are alone with the person."
+    "Not allowed here: you have read something through the asking person's own "
+    "connection in this run, and it is for that person alone. Others read along here, "
+    "so you cannot ask or answer here; answer only where you are alone with the person."
 )
 
 
@@ -86,38 +91,54 @@ async def leaks_into(
     ctx: CallContext, space_id: uuid.UUID, *, editors_only: bool = False
 ) -> str | None:
     """Why writing into the space would show its audience what it may not see (None:
-    it would not): a draft read (`carries_draft`; `editors_only`: what is written
-    there is read only by the space's editors), or a space read so far (where it was
-    read, or where its page or ticket is now) outside the space's audience."""
-    if why := await carries_draft(ctx, space_id if editors_only else None):
+    it would not): a draft read (`editors_only`: what is written there is read only by
+    the space's editors), or a space read so far (where it was read, or where its page
+    or ticket is now) outside the space's audience. Then, under the personal mark, the
+    person's release (`release_first`)."""
+    if why := await _drafted(ctx, space_id if editors_only else None):
         return why
     read = await _read(ctx)
     if read and not read <= await space_audience(ctx.session, ctx.actor.org_id, space_id):
         return LEAKS
+    release_first(ctx)
     return None
 
 
 async def leaks_into_organisation(ctx: CallContext) -> str | None:
     """The same for what everyone of the organisation reads (an organisation-wide
-    skill): a draft, or anything read outside the open spaces."""
-    if why := await carries_draft(ctx):
+    skill): a draft, or anything read outside the open spaces; then the release."""
+    if why := await _drafted(ctx):
         return why
     read = await _read(ctx)
     if read and not read <= await organisation_audience(ctx.session, ctx.actor.org_id):
         return LEAKS
+    release_first(ctx)
     return None
 
 
 async def carries_draft(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str | None:
-    """`PERSONAL` while the run holds a result of the person's own connector; `DRAFTS`
-    while it holds a draft, unless every draft it read is of `editors_of`, the space
-    whose editors alone read what is written."""
-    if ctx.reads.personal:
-        return PERSONAL
+    """`DRAFTS` while the run holds a draft, unless every draft it read is of
+    `editors_of`, the space whose editors alone read what is written; then, under the
+    personal mark, the person's release (`release_first`)."""
+    if why := await _drafted(ctx, editors_of):
+        return why
+    release_first(ctx)
+    return None
+
+
+async def _drafted(ctx: CallContext, editors_of: uuid.UUID | None = None) -> str | None:
     drafts = await drafts_read(ctx)
     if drafts and not (editors_of is not None and drafts <= {editors_of}):
         return DRAFTS
     return None
+
+
+def release_first(ctx: CallContext) -> None:
+    """Under the personal mark, a write others could read needs the asking person's
+    release of this very call (`ReleaseFirst`, which the host turns into one); a
+    released call goes on. Outside a run (`/mcp`) there is no mark."""
+    if ctx.reads.personal and not (isinstance(ctx, ToolContext) and ctx.released):
+        raise ReleaseFirst
 
 
 async def into_own(

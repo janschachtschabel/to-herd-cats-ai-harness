@@ -7,8 +7,9 @@ participants it has: its audience is not the run's. Posted through `MessageServi
 with the run's actor (`channel.post` in the channel's space, which the write scope
 limits to the run's space), written for the agent (`kind=agent`, its run in
 `run_id`), after the audience check (`writing.leaks_into`; into its own conversation
-`writing.into_own_conversation`, for a result of the person's own connector; there,
-alone with the person, a marked run's message is marked personal too). An agent's
+`writing.into_own_conversation`: under the personal mark, where others read along,
+only with the person's release; alone with her, a marked run's message is marked
+personal too). An agent's
 message mentions nobody and starts no run (`MessageService.post`, `by`).
 """
 
@@ -28,6 +29,7 @@ from app.modules.agents.toolbox.writing import (
     key_for,
     leaks_into,
     refusal,
+    release_first,
 )
 from app.modules.messaging.models import MAX_BODY_CHARS, ConversationKind
 from app.modules.messaging.service import ConversationService, MessageService
@@ -51,8 +53,9 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
     except NotFound:
         return refusal("conversation", NOT_FOUND, attrs)
     own = ctx.answers_in(conversation.id)
-    if own and (why := await into_own_conversation(ctx, conversation.id)):
-        return refusal("conversation", why, attrs)
+    shared = own and bool(await into_own_conversation(ctx, conversation.id))
+    if shared:  # its own conversation, but others read along: her release first
+        release_first(ctx)
     if not own and (
         conversation.kind != ConversationKind.CHANNEL
         or conversation.space_id is None
@@ -76,7 +79,7 @@ async def post_message(ctx: WriteContext, args: PostMessageArgs) -> ToolResult:
             args.reply_to,
             client_id=key,
             by=by(ctx),
-            personal=own and ctx.reads.personal,  # only alone with the person (above)
+            personal=own and not shared and ctx.reads.personal,  # alone with the person
         )
         return ToolResult("conversation", f"Posted message id={posted.message.id}.", attrs)
 

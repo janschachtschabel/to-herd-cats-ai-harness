@@ -15,7 +15,8 @@ run's conversation. `outcome`: what became of an approved call, set in the trans
 where the run came back to it: `ran`, or `stale` (the fingerprint differed, so nothing
 ran), or `failed` (the call's step timed out and was rolled back, recorded with the
 timeout); null while it waits, when rejected or expired, and when the run stopped before
-(its rights were gone).
+(its rights were gone). `personal`: asked because the run carries the personal mark
+(module review M8 2, G2; `agents/personal_mark.py`).
 
 `run_question`: `ask_user`'s question to the same person, `answer`ed (bounded) or
 `expired` like an approval.
@@ -29,6 +30,7 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -37,6 +39,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -126,6 +129,11 @@ class Approval(_Waited, Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reason: Mapped[str | None] = mapped_column(Text)
     outcome: Mapped[ApprovalOutcome | None] = mapped_column(String(16))
+    # Asked because the run carries the personal mark (module review M8 2, G2): what is
+    # released is written where others read it, and is not marked afterwards.
+    personal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
 
 class RunQuestion(_Waited, Base):

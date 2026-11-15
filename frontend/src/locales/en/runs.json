@@ -140,7 +140,7 @@
         "error": "The tool reported an error.",
         "policy": "Not called: by the AI policy, what the run read may not go to this server."
       },
-      "personalConnector": "The run read with the asking person's personal access to an external server. What it learnt that way stays with that person: the answer was not posted where others read along. It works in a direct message alone with the agent."
+      "personalConnector": "The run read with the asking person's personal access to an external server. What it learnt that way is for that person alone, so its answer is not here, where others read along. In her direct message alone with the agent it answers her; anything it wants to write elsewhere from there it puts to her for release first."
     }
   },
   "errors": {

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { AgentBadge } from '@/features/agents/AgentBadge'
 import { AnswerSources } from '@/features/agents/AnswerSources'
 import { byAgent, isRunNotice } from '@/features/agents/display'
+import { PersonalBadge, PersonalNote } from '@/features/agents/PersonalMark'
 import { RunStoppedNotice } from '@/features/agents/RunStoppedNotice'
 import { usesAi } from '@/features/ai/display'
 import { isCard } from '@/features/approvals/display'
@@ -76,7 +77,8 @@ function SystemRow({ message }: { message: Message }) {
 }
 
 /** One message: who, when, the text, reactions, its thread, and what one may do. An
- *  agent's answer carries the AI mark; a stopped run leaves a notice with its reason. */
+ *  agent's answer carries the AI mark (and the personal mark, `message.personal`); a
+ *  stopped run leaves a notice with its reason. */
 export function MessageItem({ message }: { message: Message }) {
   if (isRunNotice(message)) return <RunStoppedNotice message={message} />
   if (message.kind === 'system') return <SystemRow message={message} />
@@ -91,6 +93,7 @@ function HumanMessage({ message }: { message: Message }) {
   const remove = useDeleteMessage(message)
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [explained, setExplained] = useState(false)
   const author = message.author?.name ?? t('messaging.message.unknownAuthor')
   const replies = !message.parent_id && openThread ? openThread : null
 
@@ -107,11 +110,19 @@ function HumanMessage({ message }: { message: Message }) {
         <span className="text-sm font-semibold">{author}</span>
         {(byAgent(message) || message.via_token) && <AgentBadge />}
         {message.via_token && <ViaToken name={message.via_token} />}
+        {message.personal && (
+          <PersonalBadge
+            open={explained}
+            onToggle={() => setExplained((open) => !open)}
+            noteId={`personal-${message.id}`}
+          />
+        )}
         <MessageTime iso={message.created_at} />
         {message.edited_at && !message.deleted_at && (
           <span className="text-xs text-muted-foreground">{t('messaging.message.edited')}</span>
         )}
       </header>
+      {message.personal && explained && <PersonalNote id={`personal-${message.id}`} />}
       {message.deleted_at ? (
         <p className="text-sm text-muted-foreground italic">{t('messaging.message.deleted')}</p>
       ) : editing ? (

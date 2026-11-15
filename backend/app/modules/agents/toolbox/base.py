@@ -150,6 +150,9 @@ class WriteContext(CallContext):
 class ToolContext(WriteContext):
     run: RunRef
     call: CallRef | None = None  # None only outside a run (a tool called directly)
+    # The asking person released this call (`approvals/gate.py`): under the personal
+    # mark it may write where others read (`writing.release_first`).
+    released: bool = False
 
     @property
     def by(self) -> Authorship:

@@ -17,9 +17,21 @@ content and is persisted, never only in a worker's memory.
   - a tool that hands it personal content (`search_past_runs` finding anything of a
     marked run, `read_conversation` returning a marked message): the tool sets
     `Reads.personal` and the host journals `read.personal` with its result.
+- **What it holds back** (finding G2): a write that anyone but the person could read
+  (a channel, a ticket, a page, a proposal, a memory page, a skill, her own
+  conversation where others read along) is not refused: it waits for the asking
+  person's release of exactly what would be written (`ReleaseFirst`, raised by
+  `toolbox/writing.release_first`, turned into a release by `step_host.py`; in an
+  automation's or an event rule's run the owner releases). What is written after a
+  release is not marked: she decided to publish it. Into her own conversation alone
+  with the agent no release is needed, and what is written there is marked. The
+  run's final answer where others read stays held back (`writing.into_own`), and so
+  does a question there; external calls follow `external_step.py`. The draft mark is
+  another matter and still refuses (`writing.DRAFTS`).
 - **When it ends**: a run whose window and tool results hold nothing personal starts
   and stays unmarked. A later run never inherits a mark from an earlier one as such,
-  only through content it is given.
+  only through content it is given. Since every answer of a marked run is marked, in
+  a DM that goes on the mark holds while marked answers are in the window.
 
 Content (`message.body_md`) never goes anywhere else through this: who reads a marked
 message is who reads the DM (the person; an admin's audited inspection sees it
@@ -38,7 +50,8 @@ PRESENT = (
     "Some earlier messages of this conversation are marked personal: they hold what the "
     "person read through her own connection, and they are for her alone. You have not "
     "read anything like it in this run unless a tool result says so. Answer her here as "
-    "usual; write nothing of it where others could read it."
+    "usual. Anything you write where others could read it first waits for her release "
+    "of exactly that text."
 )
 PERSONAL_LINE = "(personal) "  # before a marked message or hit in a tool's result
 
@@ -53,3 +66,8 @@ def mark_event() -> dict[str, object]:
     """The journal fact that the history gave the run personal content: the same
     `read.personal` a connector's result carries, on an event of its own."""
     return {"read": {"personal": True}, "source": CONVERSATION}
+
+
+class ReleaseFirst(Exception):
+    """A write others could read, by a run under the personal mark: the host asks the
+    person's release of the call and runs it again once she gave it."""

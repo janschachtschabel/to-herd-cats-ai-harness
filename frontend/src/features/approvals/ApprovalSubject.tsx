@@ -30,8 +30,9 @@ function ExternalArgs({ approval }: { approval: Approval }) {
 
 /** What a call would change: links to the page and the ticket it names, the page's
  *  diff (the page as it is now against the call's content; for the person asked,
- *  loaded when opened) and the call's other arguments, folded. An external call names
- *  nothing of ours: its arguments are shown as they go to the server. */
+ *  loaded when opened) and the call's other arguments, folded (open when the personal
+ *  mark asks: she releases exactly that). An external call names nothing of ours: its
+ *  arguments are shown as they go to the server. */
 export function ApprovalSubject({ approval }: { approval: Approval }) {
   if (approval.external) return <ExternalArgs approval={approval} />
   return <InternalSubject approval={approval} />
@@ -89,7 +90,7 @@ function InternalSubject({ approval }: { approval: Approval }) {
         </div>
       )}
       {args && Object.keys(args).length > 0 && (
-        <details className="rounded-md border bg-muted/30 text-xs">
+        <details className="rounded-md border bg-muted/30 text-xs" open={approval.personal}>
           <summary className="cursor-pointer px-2 py-1 font-medium select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none">
             {t('approvals.card.args')}
           </summary>

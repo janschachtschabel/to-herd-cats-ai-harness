@@ -30,6 +30,10 @@ sorted) and each object's kind, id, version and space. Objects without a version
 (plan M8 decision 8) names its server and its tool with their versions: a server or
 a tool that changed since the release makes it stale; its card names the server and
 the tool, never an argument (`toolbox/external.py`).
+
+Under the personal mark (`agents/personal_mark.py`) a write others could read asks
+the same way, whatever the tool's grant (`step_host.py`); such an approval is
+`personal` and its card says that what is released goes where others read it.
 """
 
 import hashlib
@@ -72,8 +76,11 @@ def fingerprint(tool: str, args: dict[str, Any], subjects: list[Subject]) -> str
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult | Wait | None:
-    """None: the tool may run now; else what the call gets instead of running."""
+async def gate(
+    ctx: ToolContext, spec: ToolSpec, args: BaseModel, *, personal: bool = False
+) -> ToolResult | Wait | None:
+    """None: the tool may run now; else what the call gets instead of running.
+    `personal`: asked because the run carries the personal mark (its card says so)."""
     assert ctx.call is not None
     repo = WaitedRepository(ctx.session, ctx.run.org_id)
     found = await repo.for_call(Approval, ctx.run.id, ctx.call.step, ctx.call.id)
@@ -82,7 +89,7 @@ async def gate(ctx: ToolContext, spec: ToolSpec, args: BaseModel) -> ToolResult 
     if found is None:
         if subjects is None:
             return None  # the call changes nothing (and finds what it may not, itself)
-        return Wait((await _ask(ctx, spec, canonical, subjects)).expires_at)
+        return Wait((await _ask(ctx, spec, canonical, subjects, personal)).expires_at)
     if found.state == ApprovalState.PENDING:
         if found.expires_at <= utcnow():
             raise Halt("approval_expired")
@@ -149,7 +156,11 @@ async def settle(
 
 
 async def _ask(
-    ctx: ToolContext, spec: ToolSpec, canonical: dict[str, Any], subjects: list[Subject]
+    ctx: ToolContext,
+    spec: ToolSpec,
+    canonical: dict[str, Any],
+    subjects: list[Subject],
+    personal: bool,
 ) -> Approval:
     assert ctx.call is not None
     approval = await WaitedRepository(ctx.session, ctx.run.org_id).add(
@@ -169,6 +180,7 @@ async def _ask(
             addressed_to=ctx.run.user_id,
             expires_at=cards.until(),
             created_at=utcnow(),
+            personal=personal,
         )
     )
     card = await cards.post(

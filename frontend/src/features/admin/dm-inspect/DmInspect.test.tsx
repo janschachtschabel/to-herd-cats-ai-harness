@@ -118,6 +118,12 @@ describe('direct message inspection', () => {
           body_md: 'Es gibt 30 Tage Urlaub.',
           author: { type: 'agent', id: 'agent-1', name: 'Hilda' },
         }),
+        makeMessage({
+          kind: 'agent',
+          body_md: '',
+          personal: true,
+          author: { type: 'agent', id: 'agent-1', name: 'Hilda' },
+        }),
       ]),
     })
     const { user } = await renderApp('/admin/dm-inspect')
@@ -134,6 +140,8 @@ describe('direct message inspection', () => {
       within(list).getByText(/Durch die KI-Richtlinie eines Bereichs gestoppt/),
     ).toBeInTheDocument()
     expect(within(list).queryByText('Unbekannt')).toBeNull()
+    // A personal message comes withheld (module review M8 2, G1), and says so.
+    expect(within(list).getByText(/Persönlich: Diese Nachricht des Agenten/)).toBeInTheDocument()
   })
 
   test('an expired inspection says so instead of showing messages', async () => {

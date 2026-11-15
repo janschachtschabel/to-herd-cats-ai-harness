@@ -10,8 +10,10 @@ that writes commits its effect together with its entry in the journal
 (`toolbox/base.py`). A tool that must wait for a person sets the run `waiting` in that
 transaction instead, and the host raises `Suspended` once it is committed. A tool the
 agent may use only with a person's release (`confirm`) passes `approvals/gate.py`
-first, in the same transaction. An external MCP server's tool (`ToolSpec.remote`)
-runs in two transactions around the remote call instead (`external_step.py`).
+first, in the same transaction; under the personal mark a write others could read
+asks that release too (`_run`, `personal_mark.py`), whatever the grant. An external
+MCP server's tool (`ToolSpec.remote`) runs in two transactions around the remote call
+instead (`external_step.py`).
 
 Bounds (module review M6, findings 3 and 14; review 2, finding 8):
 - Every step (the checks before a model call, the record after it, a tool's step,
@@ -36,6 +38,7 @@ Bounds (module review M6, findings 3 and 14; review 2, finding 8):
 import asyncio
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +48,7 @@ from app.core.outbox import caused_by
 from app.modules.agents.approvals.gate import gate, settle_timed_out
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_step import call_external
+from app.modules.agents.personal_mark import ReleaseFirst
 from app.modules.agents.read_repository import ReadRepository
 from app.modules.agents.run_models import (
     STEP_LOCK_TIMEOUT_SECONDS,
@@ -188,8 +192,11 @@ class RunHost:
             ctx = ToolContext(session, actor, location, reads, self.ref(), CallRef(step, call.id))
             started = time.perf_counter()
             with caused_by(run.id):  # what the tool emits names the run (plan M7)
-                held = await gate(ctx, spec, args) if grant == Grant.CONFIRM else None
-                result = held if held is not None else await spec.run(ctx, args)
+                held = None
+                if grant == Grant.CONFIRM:
+                    held = await gate(ctx, spec, args, personal=marked)
+                released = grant == Grant.CONFIRM  # a release covers the mark too
+                result = held if held is not None else await _run(ctx, spec, args, released)
             duration_ms = round((time.perf_counter() - started) * 1000)
             if isinstance(result, Wait):
                 await steps.wait(run, result.until)
@@ -250,3 +257,19 @@ class RunHost:
     def next_seq(self) -> int:
         self.run.seq += 1
         return self.run.seq
+
+
+async def _run(ctx: ToolContext, spec: ToolSpec, args: Any, released: bool) -> ToolResult | Wait:
+    """The tool; under the personal mark a write others could read stops before its
+    effect (`ReleaseFirst`, its savepoint undone) and asks the person's release of the
+    call first (`personal_mark.py`); released, it runs again and writes."""
+    if released or not ctx.reads.personal:
+        return await spec.run(replace(ctx, released=released), args)
+    try:
+        async with ctx.session.begin_nested():
+            return await spec.run(ctx, args)
+    except ReleaseFirst:
+        held = await gate(ctx, spec, args, personal=True)
+        if held is not None:
+            return held
+    return await spec.run(replace(ctx, released=True), args)

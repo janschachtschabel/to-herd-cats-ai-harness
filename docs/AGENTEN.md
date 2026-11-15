@@ -499,16 +499,25 @@ wer in dessen Bereich Seiten bearbeiten darf.
 
 **Was über den eigenen Konnektor kam, bleibt bei der Person** (seit M8). Liefert ein
 externes Werkzeug ein Ergebnis über den persönlichen Konnektor der fragenden Person
-(Server mit `connector_scope` `personal`), setzt das dieselbe Marke, strenger
-(`Reads.personal`, im Journal unter `read.personal`): Jedes Werkzeug der Tabelle, das
-schreibt, wird abgelehnt („Not allowed: you have read something through the asking
-person's own connection …“), auch `propose_page_change` und `update_page` in X. Das
-eigene Gespräch ist nur ausgenommen, solange die Person allein mit dem Agenten ist:
-`post_message` dorthin, `ask_user` und die Antwort sind sonst (Kanal, Thread einer
-Seite oder eines Tickets, Direktnachricht mit mehreren) ebenfalls abgelehnt; der Lauf
-endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, im
-Halt-Ereignis und im Hinweis des Gesprächs, `system.stop_detail`: die Person liest dort,
-dass sie in einer Direktnachricht allein mit dem Agenten fragen kann).
+(Server mit `connector_scope` `personal`), trägt der Lauf die persönliche Marke
+(`Reads.personal`, im Journal unter `read.personal`). Seit Review M8 2 (Befund G2) wird
+ein Schreiben, das andere als die Person lesen könnten, nicht mehr abgelehnt: Jedes
+schreibende Werkzeug der Tabelle (ein Kanal, ein Ticket, eine Seite, ein Vorschlag,
+eine Gedächtnisseite, ein Skill, auch `post_message` ins eigene Gespräch, wo andere
+mitlesen) wartet auf die **Freigabe der fragenden Person**, die genau den Inhalt zeigt,
+der geschrieben würde (die Freigabekarte trägt `personal: true`, ihre Angaben stehen
+offen; im Lauf einer Automatisierung oder Ereignisregel gibt die Eigentümerin frei).
+Gibt sie frei, läuft genau dieser Aufruf, und was so geschrieben wird, ist nicht
+markiert: Sie hat entschieden, es zu veröffentlichen. Lehnt sie ab, sieht das Modell
+die Ablehnung. Ins eigene Gespräch allein mit dem Agenten braucht es keine Freigabe;
+was dort steht, ist markiert. Zurückgehalten bleiben die eigene Antwort des Laufs und
+`ask_user`, wo andere mitlesen (Kanal, Thread einer Seite oder eines Tickets,
+Direktnachricht mit mehreren): Der Lauf endet dann statt mit seiner Antwort mit
+`policy_blocked` (`personal_connector`, im Halt-Ereignis und im Hinweis des Gesprächs,
+`system.stop_detail`: die Person liest dort, dass er ihr in ihrer Direktnachricht allein
+mit dem Agenten antwortet und ihr vorlegt, was er von dort anderswo schreiben will).
+Externe Aufrufe folgen der Regel unten (Freigabe je Aufruf, an einen anderen Server
+ebenso). Die Entwurfsmarke lehnt weiter ab, auch unter der persönlichen Marke.
 
 Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Workers
 (Review M8 2, Befund G1; `agents/personal_mark.py`):
@@ -528,6 +537,16 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   zurückgibt (beide mit `read.personal` am Aufruf, die Zeile beginnt mit
   `(personal)`). Fortsetzung nach Verlust des Workers, nach einer Rückfrage oder einer
   Freigabe liest die Marke aus dem Journal.
+- **Was das Modell erfährt**: Ein Lauf, den sein Verlauf markiert, bekommt in seinen
+  Anweisungen, dass frühere Nachrichten persönlich sind und dass er selbst in diesem
+  Lauf nichts dergleichen gelesen hat, außer ein Werkzeugergebnis sagt es; was er
+  anderswo schreiben will, wartet auf ihre Freigabe genau dieses Textes. Ein
+  abgelehnter Rückfrage- oder Antwortversuch nennt den Grund („others read along
+  here“).
+- **Was die Person sieht**: In ihrer Direktnachricht trägt eine markierte Nachricht das
+  Abzeichen „Persönlich“; ein Klick erklärt, was es heißt und wann der Agent vorher
+  fragt. Die Freigabekarte unter der Marke sagt, dass genau der gezeigte Inhalt
+  geschrieben wird und danach nicht mehr markiert ist.
 - **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
   Verlaufsfenster und Werkzeugergebnisse nichts Markiertes enthalten, beginnt und
   bleibt ohne Marke. Weil jede Antwort eines markierten Laufs selbst markiert ist,

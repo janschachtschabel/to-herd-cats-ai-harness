@@ -2,8 +2,9 @@
 // OpenAI stub as the model and the MCP stub (https, localhost) as the external server:
 // a level-4 agent reads with an external read tool and calls an external write tool,
 // which waits for the asking person's release of its exact arguments; the run view
-// shows one entry per call. A result read through the asker's own connector keeps the
-// agent from answering in a shared channel. A worker lost while an external call is in
+// shows one entry per call. Under the mark of a result read through the asker's own
+// connector, a post where others read waits for her release, and the agent's answer
+// in the shared channel stays held back. A worker lost while an external call is in
 // flight leaves its outcome unknown, and the call is never sent again.
 import { expect, test } from "@playwright/test";
 import { OWNER, call, signIn } from "./helpers.mjs";
@@ -127,7 +128,9 @@ test("an external write call runs only after the asker releases it; the run view
   }
 });
 
-test("a result through the asker's own connector keeps the agent from answering in a shared channel", async () => {
+test("under the mark of the asker's own connector a post where others read waits for her release, and the answer stays held back", async () => {
+  // Module review M8 2, G2: no refusal any more; the release card shows exactly what
+  // would be written, and the run's own answer in the shared channel stays held back.
   const server = await stubServer(anna, "Mein Tracker", { connector_scope: "personal" });
   await approveTool(anna, server.id, "search_issues");
   const own = await externalToolName(anna, theo.id, "Mein Tracker", "search_issues");
@@ -141,10 +144,16 @@ test("a result through the asker's own connector keeps the agent from answering 
   const hall = await call(anna, "POST", "/api/spaces", { name: "Werkhalle", kind: "team" });
   await member(anna, hall.id, { type: "agent", id: theo.id }, "editor");
   const room = await channel(anna, hall.id, "halle");
+  const released = "Abnahme der Pumpe: Termin steht.";
   await scriptMcp({ results: { search_issues: { text: "Annas Termin: Freitag, 9 Uhr." } } });
   await scriptStub(anna.request, {
     replies: [
       { tool_calls: [{ name: own, arguments: { q: "Termin" } }] },
+      {
+        tool_calls: [
+          { name: "post_message", arguments: { conversation_id: room.id, text: released } },
+        ],
+      },
       { content: "Laut Tracker: Freitag, 9 Uhr." },
     ],
   });
@@ -161,13 +170,29 @@ test("a result through the asker's own connector keeps the agent from answering 
   await box.press("Enter");
   await expect(message(page, "anna", "wann ist mein Termin?")).toBeVisible();
 
+  // The post waits for Anna's release: the card says why and shows the text, open.
+  await expect
+    .poll(async () => (await call(anna, "GET", "/api/approvals?state=pending")).items.length, {
+      timeout: 30_000,
+    })
+    .toBe(1);
+  await page.goto("/approvals");
+  const card = page.getByRole("region", { name: "Freigabe" }).last();
+  await expect(card.getByText(/^Persönlich:/)).toBeVisible();
+  await expect(card.getByText(released)).toBeVisible();
+  expect(JSON.stringify(await messages(anna, room.id))).not.toContain(released);
+  await card.getByRole("button", { name: "Freigeben" }).click();
+
   const run = await finishedRun(anna, theo.id, before?.id);
-  expect(run.stop_reason).toBe("policy_blocked");
-  // The call went out with Anna's own credential; its result was posted nowhere.
+  expect(run.stop_reason).toBe("policy_blocked"); // its answer stays held back
+  // The call went out with Anna's own credential; only the released text was posted.
   const log = await mcpStubLog();
   const called = log.find((r) => r.body.includes('"tools/call"'));
   expect(called.headers.authorization).toBe("Bearer annas-eigenes-tracker-token");
   const top = await messages(anna, room.id);
+  const posted = top.filter((m) => m.body_md === released);
+  expect(posted).toHaveLength(1);
+  expect(posted[0].personal).toBe(false); // she decided to publish it
   expect(JSON.stringify(top)).not.toContain("Freitag");
   for (const asked of top.filter((m) => m.reply_count > 0)) {
     const replies = await call(anna, "GET", `/api/messages/${asked.id}/replies?limit=100`);

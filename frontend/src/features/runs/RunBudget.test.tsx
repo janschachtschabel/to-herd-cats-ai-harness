@@ -95,6 +95,10 @@ describe('a run stopped by a daily budget', () => {
         <RunStoppedNotice message={message} />
       </Providers>,
     )
-    expect(screen.getByText(/mit dem persönlichen Zugang der fragenden Person/)).toBeInTheDocument()
+    const notice = screen.getByText(/mit dem persönlichen Zugang der fragenden Person/)
+    // What happens instead (module review M8 2, G2): she reads it in her DM, and what
+    // the agent would write elsewhere from there waits for her release.
+    expect(notice).toHaveTextContent(/allein mit dem Agenten/)
+    expect(notice).toHaveTextContent(/vorher zur Freigabe vor/)
   })
 })

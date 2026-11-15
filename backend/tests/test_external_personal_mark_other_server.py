@@ -74,6 +74,7 @@ async def test_the_person_releases_exactly_what_goes_on_to_another_server(ext: E
     assert await ext.bench.run_next() is None  # waits for Alice
     (approval,) = await _pending(ext)
     assert approval["tool"] == names["Teamtracker"] and approval["args"] == onward
+    assert approval["personal"] is True  # its card says why (module review M8 2)
     body = {"decision": "approve", "version": approval["version"]}
     r = await ext.bench.people.alice.post(f"/api/approvals/{approval['id']}/decide", json=body)
     assert r.status_code == 200, r.text

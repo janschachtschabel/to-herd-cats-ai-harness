@@ -4129,7 +4129,9 @@ export interface components {
          *     `reason`: the person's reason for a rejection, and `args`, only for the person
          *     asked; for everyone else both are null and `redacted` is true (as in the run
          *     view, review M6 finding 6). `external`: for a call of an external tool (it sends
-         *     `args` to that server once released), else null.
+         *     `args` to that server once released), else null. `personal`: asked because the
+         *     run carries the asker's personal mark: what is released is written (or sent)
+         *     where others read it (module review M8 2).
          */
         ApprovalOut: {
             /**
@@ -4173,6 +4175,11 @@ export interface components {
             /** Message Id */
             message_id: string | null;
             outcome: components["schemas"]["ApprovalOutcome"] | null;
+            /**
+             * Personal
+             * @default false
+             */
+            personal?: boolean;
             /** Reason */
             reason: string | null;
             /** Redacted */

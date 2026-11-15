@@ -1,17 +1,21 @@
-"""Follow-up to plan M8 task 7: a result read through the asking person's own
-connector marks the run like a draft (`Reads.personal`, `writing.carries_draft`):
-from then on every tool that writes what others may read refuses (`PERSONAL`), the
-draft's exceptions (a proposal or `update_page` in the draft's space) included. The
-run's own conversation stays open only while the person is alone with the agent."""
+"""The personal mark and every writing tool (follow-up to plan M8 task 7; module
+review M8 2, finding G2): a run that holds what the asking person read through her
+own connector (`Reads.personal`) writes nothing others may read without her release.
+Every such tool stops before its effect (`ReleaseFirst`, which the host turns into a
+release of the call); released, it goes on and writes, the draft's exceptions (a
+proposal or `update_page` in the draft's space) included. Into its own conversation
+alone with the person no release is needed; where others read along, a message there
+asks for the release too, and a question stays refused (`PERSONAL`)."""
 
 from dataclasses import replace
 
 import pytest
 
 from app.core.permissions import SpaceRole
+from app.modules.agents.personal_mark import ReleaseFirst
 from app.modules.agents.toolbox import message_tools, questions
 from app.modules.agents.toolbox.base import CallRef, ToolContext, Wait
-from app.modules.agents.toolbox.writing import PERSONAL
+from app.modules.agents.toolbox.writing import DRAFTS, LEAKS, PERSONAL
 from app.modules.spaces.models import AgentWritePolicy
 from tests.factories_tools import tool_context
 from tests.factories_writing import Work
@@ -36,9 +40,17 @@ async def _marked(work: Work, conversation_id: object | None = None) -> ToolCont
 
 
 @pytest.mark.parametrize("name", sorted(EVERY))
-async def test_a_write_others_read_is_refused(work: Work, name: str) -> None:
+async def test_a_write_others_read_waits_for_her_release(work: Work, name: str) -> None:
     ctx = await _marked(work)
-    assert await EVERY[name](work, ctx) == PERSONAL
+    with pytest.raises(ReleaseFirst):
+        await EVERY[name](work, ctx)
+
+
+@pytest.mark.parametrize("name", sorted(EVERY))
+async def test_once_released_it_writes(work: Work, name: str) -> None:
+    ctx = replace(await _marked(work), released=True)
+    text = await EVERY[name](work, ctx)
+    assert text not in (PERSONAL, DRAFTS, LEAKS) and not text.startswith("Not allowed"), text
 
 
 async def test_alone_with_the_person_the_run_still_answers(work: Work) -> None:
@@ -47,11 +59,16 @@ async def test_alone_with_the_person_the_run_still_answers(work: Work) -> None:
     assert (await message_tools.post_message(ctx, args)).text.startswith("Posted message")
 
 
-async def test_in_a_channel_its_own_conversation_is_refused_too(work: Work) -> None:
+async def test_in_a_channel_its_own_conversation_asks_and_its_question_is_refused(
+    work: Work,
+) -> None:
     channel = await channel_in(work.bench, work.space)
     ctx = await _marked(work, channel.id)
     args = message_tools.PostMessageArgs(conversation_id=channel.id, text="t")
-    assert (await message_tools.post_message(ctx, args)).text == PERSONAL
+    with pytest.raises(ReleaseFirst):
+        await message_tools.post_message(ctx, args)
+    released = await message_tools.post_message(replace(ctx, released=True), args)
+    assert released.text.startswith("Posted message")
     asked = await questions.ask_user(ctx, questions.AskUserArgs(question="Welches?"))
     assert not isinstance(asked, Wait) and asked.text == PERSONAL
 

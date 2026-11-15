@@ -184,7 +184,8 @@
     "end": "Einsicht beenden",
     "messages": "Nachrichten, neueste zuerst",
     "empty": "In diesem Gespräch steht nichts.",
-    "inThread": "Antwort im Thread"
+    "inThread": "Antwort im Thread",
+    "withheld": "Persönlich: Diese Nachricht des Agenten enthält, was die Person über ihren eigenen Zugang gelesen hat. Ihr Inhalt wird in der Einsicht nicht gezeigt."
   },
   "audit": {
     "targets": {

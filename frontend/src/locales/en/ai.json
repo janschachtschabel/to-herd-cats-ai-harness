@@ -354,6 +354,11 @@
     "refused": {
       "start": "{{name}} could not start: {{reason}}",
       "handover": "{{name}} could not hand over: {{reason}}"
+    },
+    "personalMark": {
+      "short": "Personal",
+      "title": "Personal: for you alone",
+      "text": "This message holds what you read through your own access, or it came about in a conversation that held it. It stays with you: while such a message is in the history the agent is given, it puts anything it wants to write elsewhere to you for release first."
     }
   },
   "errors": {
