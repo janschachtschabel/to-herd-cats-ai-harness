@@ -421,7 +421,9 @@ neuen fortgesetzt; eine offene Freigabe unter altem Namen wird beim Fortsetzen
   dessen Schema sich so nicht anbieten lässt (`schema_problem`), ist nicht brauchbar
   ([`MCP.md`](MCP.md#externe-mcp-server); Review M8 1, Befund 2).
 - **Höchstens `HERD_MCP_MAX_CALLS_PER_RUN` Aufrufe je Lauf** (Standard 20, seit Task 13
-  von M8). Gezählt werden die gesendeten Aufrufe (ihr erster Eintrag im Journal); was
+  von M8). Gezählt werden die gesendeten Aufrufe (ihr erster Eintrag im Journal, an
+  seinem Feld `sent`, nie am Text: ein Server, der genau den Platzhalter antwortet,
+  zählt nicht doppelt; Einträge von vor diesem Feld zählen am Platzhalter); was
   die Richtlinie, eine Freigabe oder ein fehlender Zugang zurückhielt, zählt nicht. Der
   nächste Aufruf wird nicht gesendet, das Modell liest `external_tool_limit: …` und kann
   ohne das Werkzeug weitermachen. Externe Aufrufe kosten keine Modell-Tokens; kein

@@ -57,7 +57,7 @@ from app.mcp.client import Refused
 from app.modules.agents.approvals.gate import gate
 from app.modules.agents.executor_repository import RunSteps
 from app.modules.agents.external_metrics import CallOutcome, count, outcome_of
-from app.modules.agents.external_repository import sent_calls
+from app.modules.agents.external_repository import SENT, sent_calls
 from app.modules.agents.run_models import STEP_STATEMENT_TIMEOUT_SECONDS, EventKind, Run
 from app.modules.agents.step_checks import (
     granted,
@@ -189,7 +189,7 @@ async def _before(
         if held is not None:  # the release was rejected or is stale
             return _Ended(await _record(host, steps, run, step, call, args, held), refused)
         placeholder = external.unknown_outcome(remote)
-        await _record(host, steps, run, step, call, args, placeholder)
+        await _record(host, steps, run, step, call, args, placeholder, sent=True)
         return _Sending(prepared, args.model_dump(mode="json"), placeholder, personal)
 
 
@@ -246,8 +246,12 @@ async def _record(
     duration_ms: int = 0,
     *,
     personal: bool = False,
+    sent: bool = False,
 ) -> ToolResult:
+    """`sent`: the entry recorded before the call went out (`SENT`, what the per-run
+    cap counts); every entry of an external call says whether it is that one."""
     content = tool_content(step, call, args, result, duration_ms, personal=personal)
+    content[SENT] = sent
     await steps.event(host.next_seq(), EventKind.TOOL_CALL, content)
     steps.keep(run)
     return result

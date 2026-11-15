@@ -8,11 +8,13 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.core.config import Settings, get_settings
 from app.core.metrics import REGISTRY
 from app.modules.agents import external_step
-from app.modules.agents.run_models import StopReason
+from app.modules.agents.external_repository import sent_calls
+from app.modules.agents.run_models import EventKind, RunEvent, StopReason
 from app.modules.agents.toolbox.external import CALL_LIMIT, OUTCOME_UNKNOWN, POLICY_REFUSED
 from app.modules.mcp_servers import calls
 from tests.factories_external import Ext, call
@@ -102,6 +104,35 @@ async def test_the_run_sends_at_most_the_cap(ext: Ext, monkeypatch: pytest.Monke
     # A new run has its own count.
     assert await ask(ext, call(name, q="d")) == StopReason.COMPLETED
     assert ext.stub.state.calls[-1] == ("search_issues", {"q": "d"})
+
+
+async def test_the_cap_counts_by_the_journal_mark_not_by_text(
+    ext: Ext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Module review M8 1, finding 14: a server answering exactly the placeholder's text
+    does not count twice; an entry recorded before the mark still counts."""
+    monkeypatch.setattr(get_settings(), "mcp_max_calls_per_run", 2)
+    await ext.grant(search_issues="allow")
+    name = await ext.name("search_issues")
+    ext.stub.state.results["search_issues"] = {"text": OUTCOME_UNKNOWN}
+    assert await ask(ext, call(name, q="a"), call(name, q="b")) == StopReason.COMPLETED
+    assert [args for _, args in ext.stub.state.calls] == [{"q": "a"}, {"q": "b"}]
+    run_id = (await ext.bench.session.scalars(select(RunEvent.run_id))).first()
+    assert run_id is not None
+    org_id = ext.bench.people.users["alice"].org_id
+    assert await sent_calls(ext.bench.session, org_id, run_id) == 2
+    ext.bench.session.add(  # as the release before the mark wrote it
+        RunEvent(
+            org_id=org_id,
+            run_id=run_id,
+            attempt=1,
+            seq=999,
+            kind=EventKind.TOOL_CALL,
+            content={"name": name, "text": OUTCOME_UNKNOWN, "source": "external"},
+        )
+    )
+    await ext.bench.session.flush()
+    assert await sent_calls(ext.bench.session, org_id, run_id) == 3
 
 
 async def test_policy_refusals_do_not_use_up_the_cap(
