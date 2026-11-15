@@ -11,6 +11,9 @@
   a trusted proxy whose `X-Forwarded-Proto` uvicorn applied to the scope); over plain
   http the header means nothing and would pin a local trial to https. It covers
   subdomains (ASVS 5.0 V3.4.1, level 2): the app's own host name, and below it.
+- `Cache-Control: no-store` on answers under `/api` and `/mcp` (ASVS 5.0 V14.3.2):
+  a person's data stays out of browser and proxy caches. Downloads and the SPA's
+  files set their own caching.
 
 A header the response already set is left as it is.
 """
@@ -24,6 +27,7 @@ ALWAYS = {
     "Referrer-Policy": "same-origin",
 }
 HSTS = "max-age=31536000; includeSubDomains"
+NOT_STORED = ("/api", "/mcp")
 API_POLICY = "; ".join(
     [
         "default-src 'none'",
@@ -45,7 +49,9 @@ class SecurityHeadersMiddleware:
             await self.app(scope, receive, send)
             return
         https = scope.get("scheme") == "https"
-        policy = not str(scope.get("path", "")).startswith(self.exempt) if self.exempt else True
+        path = str(scope.get("path", ""))
+        policy = not path.startswith(self.exempt) if self.exempt else True
+        not_stored = path.startswith(NOT_STORED)
 
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -55,6 +61,8 @@ class SecurityHeadersMiddleware:
                         headers[name] = value
                 if policy and "Content-Security-Policy" not in headers:
                     headers["Content-Security-Policy"] = API_POLICY
+                if not_stored and "Cache-Control" not in headers:
+                    headers["Cache-Control"] = "no-store"
                 if https and "Strict-Transport-Security" not in headers:
                     headers["Strict-Transport-Security"] = HSTS
             await send(message)

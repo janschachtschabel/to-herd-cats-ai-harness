@@ -93,3 +93,18 @@ async def test_swagger_ui_outside_production_keeps_working(client: AsyncClient) 
     assert response.status_code == 200
     assert "content-security-policy" not in response.headers
     assert _has_headers(response)
+
+
+async def test_api_answers_are_not_stored_by_browsers(make_client) -> None:
+    """ASVS 5.0 V14.3.2: what the API answers (a person's data, errors) is never kept
+    in a browser's or proxy's cache; downloads say their own (private, revalidated)."""
+    me = await make_client()
+    for method, path in (
+        ("GET", "/api/_test/ok"),
+        ("GET", "/api/auth/me"),
+        ("GET", "/api/_test/boom"),
+        ("GET", "/api/openapi.json"),
+        ("POST", "/mcp"),
+    ):
+        response = await me.request(method, path)
+        assert response.headers.get("cache-control") == "no-store", (path, response.status_code)
