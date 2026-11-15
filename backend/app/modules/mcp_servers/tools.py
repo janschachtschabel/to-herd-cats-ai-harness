@@ -4,9 +4,9 @@ approved, blocked and classified one by one (`ai.manage`).
 - Reading the list (on create, on "refresh") and "test connection" talk to the server
   with no transaction open; the credential is the shared connector, or for a personal
   server the admin's own connector for it if there is one.
-- A refresh adds what is new as `pending` (classification proposed from the server's
-  read-only annotation, or `write` where the server's catalogue entry suggests it:
-  a suggestion only tightens and never approves), updates what is there (an approved
+- A refresh adds what is new as `pending` (classification proposed `write`, or `read`
+  where the server annotates it read-only and its catalogue entry suggests `read`:
+  neither alone loosens, and a suggestion never approves), updates what is there (an approved
   tool whose fingerprint is no longer the approved one becomes `changed`) and marks
   what vanished `missing`.
 - An approval stores the fingerprint it approved; only that exact tool is callable.

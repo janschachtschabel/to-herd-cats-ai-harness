@@ -127,6 +127,15 @@ describe('a server’s tools', () => {
     expect(within(row).getByText('Der Server kennzeichnet es nicht als nur lesend.')).toBeVisible()
   })
 
+  test('the server’s read-only mark is shown as its own unbinding word', async () => {
+    setup([fresh])
+    await renderApp(`/admin/ai/mcp-servers/${SRV}`)
+    const row = await screen.findByRole('article', { name: 'get_project' })
+    expect(within(row).getByText(/kennzeichnet es als nur lesend/)).toHaveTextContent(
+      /unverbindlich/,
+    )
+  })
+
   test('loosening to read a tool not marked read-only is asked once more', async () => {
     const api = setup([writer], {
       [`PATCH /api/ai/mcp-servers/${SRV}/tools/t-write`]: { ...writer, classification: 'read' },

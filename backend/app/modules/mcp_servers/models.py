@@ -13,7 +13,8 @@ name, description and input schema as last read; `approved_fingerprint` the one 
 admin approved. Only `state = approved` with both equal and the tool still listed may
 be called; a refresh that reads another fingerprint sets an approved tool `changed`.
 `classification` (`read`/`write`) is the admin's; the proposal is `read` only when the
-server annotates the tool read-only (`read_only_hint`).
+server annotates the tool read-only (`read_only_hint`) and its catalogue entry
+suggests `read` (module review M8 1, finding 7).
 """
 
 import uuid

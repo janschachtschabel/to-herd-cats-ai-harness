@@ -425,6 +425,8 @@ Eine Stufe über 2 darf nur ein Admin vergeben.
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Im Lauf einer Ereignisregel wartet auch jeder Aufruf eines **lesenden** externen Werkzeugs (Stufe 2) auf die Freigabe der Eigentümerin über genau diese Argumente, wie ein direkt schreibendes Werkzeug der Stufe 3 (Review M7, Befund 8): Seine Argumente verlassen das System, und der Text der Person, die das Ereignis ausgelöst hat, kann sie bestimmen. Review M8 1, Befund 5.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Ein neues Werkzeug wird nur dann als lesend vorgeschlagen, wenn der Server es als nur lesend kennzeichnet und die Vorlage des Katalogs lesend vorschlägt; die Kennzeichnung des Servers allein ist eine unverbindliche Angabe und schlägt nichts vor. Review M8 1, Befund 7.*
+
 ### 8.3 Lauf
 
 1. **Auslöser** (8.4) legt `run` an (`queued`) → DBOS-Workflow `run_agent(run_id)`.

@@ -3,10 +3,16 @@ one by one and classified `read` or `write`; a fingerprint over name, descriptio
 schema keeps an approval to exactly what was approved. A changed tool is `changed`
 until approved again, a vanished one is marked missing, a new one is `pending`."""
 
+import uuid
+
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.mcp.client import ListedTool
 from app.modules.audit.models import AuditLog
+from app.modules.mcp_servers.listing import new_tool
+from app.modules.mcp_servers.models import Classification
 from tests.factories_dms import People
 from tests.factories_mcp import SERVERS, approve, make_server, tools_of
 from tests.support.mcp_stub import McpStub
@@ -25,7 +31,8 @@ async def test_new_tools_arrive_pending_with_a_proposed_classification(
     made = await make_server(ai_people.admin, mcp_egress)
     tools = await tools_of(ai_people.admin, made["id"])
     search, create = tools["search_issues"], tools["create_issue"]
-    assert search["classification"] == "read" and search["read_only_hint"] is True
+    # the server's read-only annotation alone proposes nothing (module review M8 1, F7)
+    assert search["classification"] == "write" and search["read_only_hint"] is True
     assert create["classification"] == "write" and create["read_only_hint"] is False
     assert create["description"] == "Create an issue."
     assert create["input_schema"]["properties"] == {"title": {"type": "string"}}
@@ -187,3 +194,22 @@ async def test_odd_tool_names_are_skipped_and_long_descriptions_cut(
     tools = await tools_of(ai_people.admin, made["id"])
     assert list(tools) == ["ok_tool"]
     assert len(tools["ok_tool"]["description"]) == 10_000
+
+
+@pytest.mark.parametrize(
+    ("read_only", "suggested", "proposed"),
+    [
+        (True, None, Classification.WRITE),
+        (False, Classification.READ, Classification.WRITE),
+        (True, Classification.READ, Classification.READ),
+        (True, Classification.WRITE, Classification.WRITE),
+    ],
+)
+def test_read_is_proposed_only_where_the_annotation_and_the_catalogue_agree(
+    read_only: bool, suggested: Classification | None, proposed: Classification
+) -> None:
+    """Module review M8 1, finding 7: a server's annotation is an untrusted hint (a
+    hostile server marks a destructive tool read-only); a catalogue's suggestion alone
+    never loosens."""
+    listed = ListedTool("drop_all", "Reads.", {"type": "object"}, read_only)
+    assert new_tool(uuid.uuid4(), uuid.uuid4(), listed, suggested).classification == proposed

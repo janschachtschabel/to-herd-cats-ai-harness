@@ -135,7 +135,7 @@
         "read": "Reading: from level 2, no release per call.",
         "write": "Writing (acts outside): level 4, every call only after the asking person releases exactly these arguments."
       },
-      "hintReadOnly": "The server marks it as read-only.",
+      "hintReadOnly": "The server marks it as read-only. That is the server’s own unbinding word: check for yourself that it only reads.",
       "hintNone": "The server does not mark it as read-only.",
       "suggested": "Catalogue suggests: {{classification}}.",
       "suggestedDiffers": "Differs from the classification.",

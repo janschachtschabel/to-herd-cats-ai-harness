@@ -135,7 +135,7 @@
         "read": "Lesend: ab Stufe 2, ohne Freigabe je Aufruf.",
         "write": "Schreibend (handelt nach außen): Stufe 4, jeder Aufruf erst nach Freigabe der fragenden Person über genau diese Argumente."
       },
-      "hintReadOnly": "Der Server kennzeichnet es als nur lesend.",
+      "hintReadOnly": "Der Server kennzeichnet es als nur lesend. Das ist eine unverbindliche Angabe des Servers: Prüfe selbst, ob es nur liest.",
       "hintNone": "Der Server kennzeichnet es nicht als nur lesend.",
       "suggested": "Vorschlag des Katalogs: {{classification}}.",
       "suggestedDiffers": "Weicht von der Einstufung ab.",

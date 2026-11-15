@@ -74,3 +74,24 @@ async def approve(admin: AsyncClient, server_id: object, tool: dict[str, Any]) -
     assert response.status_code == 200, response.text
     approved: dict[str, Any] = response.json()
     return approved
+
+
+async def classify(
+    admin: AsyncClient, server_id: object, tool: dict[str, Any], classification: str
+) -> dict[str, Any]:
+    """The admin's class for a tool (a new one is proposed `write` unless its server
+    annotates it read-only and the catalogue suggests `read`; module review M8 1,
+    finding 7). Loosening a tool the server does not annotate read-only is confirmed."""
+    body = {"classification": classification, "version": tool["version"], "confirm_loosen": True}
+    response = await admin.patch(f"{SERVERS}/{server_id}/tools/{tool['id']}", json=body)
+    assert response.status_code == 200, response.text
+    classified: dict[str, Any] = response.json()
+    return classified
+
+
+async def approve_as_listed(admin: AsyncClient, server_id: object) -> None:
+    """Approve every tool of the server, those it annotates read-only as `read`."""
+    for tool in (await tools_of(admin, server_id)).values():
+        if tool["read_only_hint"] and tool["classification"] != "read":
+            tool = await classify(admin, server_id, tool, "read")
+        await approve(admin, server_id, tool)

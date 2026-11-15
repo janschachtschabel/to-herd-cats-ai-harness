@@ -39,10 +39,12 @@ def new_tool(
     listed: ListedTool,
     suggested: Classification | None = None,
 ) -> McpServerTool:
-    """A tool seen for the first time: pending, proposed `read` only if annotated
-    read-only by the server and not suggested `write` by the server's catalogue entry
-    (a suggestion only tightens)."""
-    read = listed.read_only and suggested != Classification.WRITE
+    """A tool seen for the first time: pending, proposed `read` only where the server
+    annotates it read-only and its catalogue entry suggests `read` too, else `write`.
+    The annotation alone is an untrusted hint (MCP says so: a hostile server marks a
+    destructive tool read-only), and a suggestion alone never loosens (module review
+    M8 1, finding 7)."""
+    read = listed.read_only and suggested == Classification.READ
     return McpServerTool(
         org_id=org_id,
         server_id=server_id,

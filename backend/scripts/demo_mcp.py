@@ -140,6 +140,9 @@ async def stub_server(admin: httpx.AsyncClient, url: str, seeded: SeededMcp) -> 
     search = tools.get("search_issues")
     if search is None:
         raise DemoFailed(f"{SERVER} lists no tool search_issues")
+    if search["classification"] != "read":  # proposed `write` unless the catalogue agrees
+        body = {"classification": "read", "version": search["version"], "confirm_loosen": True}
+        search = await call(admin, "PATCH", f"{tools_path}/{search['id']}", body)
     approve = {"version": search["version"]}
     await call(admin, "POST", f"{tools_path}/{search['id']}/approve", approve)
     tools = {t["name"]: t for t in (await call(admin, "GET", f"{tools_path}?limit=100"))["items"]}

@@ -177,9 +177,17 @@ export async function serverTools(admin, serverId) {
   return Object.fromEntries(page.items.map((t) => [t.name, t]));
 }
 
-/** Approves a server's tool by name (at the version it has now). */
+/** Approves a server's tool by name (at the version it has now). A tool the server
+ * annotates read-only is classified `read` first: the system proposes `write` unless
+ * the catalogue agrees (module review M8 1, finding 7). */
 export async function approveTool(admin, serverId, name) {
-  const tool = (await serverTools(admin, serverId))[name];
+  let tool = (await serverTools(admin, serverId))[name];
+  if (tool.read_only_hint && tool.classification !== "read") {
+    tool = await call(admin, "PATCH", `/api/ai/mcp-servers/${serverId}/tools/${tool.id}`, {
+      classification: "read",
+      version: tool.version,
+    });
+  }
   return call(admin, "POST", `/api/ai/mcp-servers/${serverId}/tools/${tool.id}/approve`, {
     version: tool.version,
   });

@@ -658,12 +658,14 @@ Recht 404 `ai.not_found`.
   nicht freizugeben (409 `mcp_tool.missing`). Eine neue Adresse des Servers zieht alle
   Freigaben zurück.
 - **Einstufung** `read`/`write`: Vorschlag `read` nur, wenn der Server das Werkzeug als
-  nur lesend kennzeichnet (`readOnlyHint`), sonst `write`. Ein nicht so gekennzeichnetes
-  Werkzeug auf `read` zu setzen, verlangt `confirm_loosen: true` (422
-  `mcp_tool.loosen_unconfirmed`); das Audit vermerkt `loosened`. Bei einem Server aus
-  dem Katalog schlägt die Vorlage zusätzlich vor (`suggested_classification`); ein
-  Vorschlag `write` verschärft den Vorschlag des Servers, ein Vorschlag `read` lockert
-  nie von selbst (siehe „Katalog“).
+  nur lesend kennzeichnet (`readOnlyHint`) **und** die Vorlage des Katalogs `read`
+  vorschlägt, sonst `write`. Die Kennzeichnung allein ist eine unverbindliche Angabe
+  des Servers (MCP nennt sie so; ein feindlicher Server kennzeichnet ein zerstörendes
+  Werkzeug als lesend) und schlägt nichts vor; die Oberfläche zeigt sie als solche
+  (Review M8 1, Befund 7). Ein nicht so gekennzeichnetes Werkzeug auf `read` zu setzen,
+  verlangt `confirm_loosen: true` (422 `mcp_tool.loosen_unconfirmed`); das Audit
+  vermerkt `loosened`. Ein Vorschlag der Vorlage (`suggested_classification`) `write`
+  verschärft immer, `read` lockert nie von selbst (siehe „Katalog“).
 - **Aufruf** (`backend/app/modules/mcp_servers/calls.py`): nur ein freigegebenes, noch
   gelistetes Werkzeug mit dem freigegebenen Fingerabdruck eines eingeschalteten Servers. Im selben
   Gespräch mit dem Server wird zuerst die Werkzeugliste gelesen; nennt der Server das
@@ -825,8 +827,8 @@ Werkzeug einzeln: Eine Vorlage schlägt nur vor.
   eine nicht freigegebene private Adresse).
 - **Vorschläge**: Liest ein Refresh bei einem Server aus dem Katalog ein Werkzeug zum
   ersten Mal, wird es `write` vorgeschlagen, wenn die Vorlage das sagt, auch wenn der
-  Server es als nur lesend kennzeichnet. Ein Vorschlag `read` für ein nicht so
-  gekennzeichnetes Werkzeug ändert nichts; `read` setzt nur die Verwaltung, mit
+  Server es als nur lesend kennzeichnet, und `read` nur, wenn beide es sagen. Ein
+  Vorschlag `read` für ein nicht so gekennzeichnetes Werkzeug ändert nichts; `read` setzt nur die Verwaltung, mit
   `confirm_loosen`. `GET …/mcp-servers/{id}/tools` nennt je Werkzeug
   `suggested_classification` (oder `null`). Alle Werkzeuge kommen als `pending`.
 

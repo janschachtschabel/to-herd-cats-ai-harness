@@ -14,7 +14,13 @@ from sqlalchemy import select
 from app.core import egress
 from app.modules.agents.run_models import EventKind, RunEvent
 from tests.factories_agents import Bench
-from tests.factories_mcp import SERVERS, approve, make_server, mcp_network, tools_of
+from tests.factories_mcp import (
+    SERVERS,
+    approve_as_listed,
+    make_server,
+    mcp_network,
+    tools_of,
+)
 from tests.support.mcp_stub import McpStub
 
 
@@ -102,6 +108,5 @@ async def ext(
 ) -> Ext:
     monkeypatch.setattr(egress, "_network", mcp_network(mcp_stub, _resolve))
     server = await make_server(bench.people.admin, mcp_stub)
-    for tool in (await tools_of(bench.people.admin, server["id"])).values():
-        await approve(bench.people.admin, server["id"], tool)
+    await approve_as_listed(bench.people.admin, server["id"])
     return Ext(bench, mcp_stub, server)

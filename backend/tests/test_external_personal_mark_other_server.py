@@ -11,7 +11,7 @@ from app.modules.agents.run_models import StopReason
 from tests.factories_connectors import PERSONAL as MY_CONNECTORS
 from tests.factories_connectors import make_connector
 from tests.factories_external import Ext, call
-from tests.factories_mcp import approve, make_server, tools_of
+from tests.factories_mcp import approve_as_listed, make_server
 
 SECRET = "PRIVAT-Gnu-4"
 
@@ -20,8 +20,7 @@ async def _two_servers(ext: Ext) -> dict[str, str]:
     """`Tracker` takes Alice's own connector, `Teamtracker` none; the agent may call
     `search_issues` of both. The run names by server."""
     shared = await make_server(ext.admin, ext.stub, name="Teamtracker")
-    for tool in (await tools_of(ext.admin, shared["id"])).values():
-        await approve(ext.admin, shared["id"], tool)
+    await approve_as_listed(ext.admin, shared["id"])
     await ext.patch_server(connector_scope="personal")
     await make_connector(ext.bench.people.alice, MY_CONNECTORS, mcp_server_id=ext.server["id"])
     names: dict[str, str] = {}
