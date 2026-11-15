@@ -1427,6 +1427,7 @@ erst nach der Freigabe einer Person:
 | `HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS` | – | API, Worker | Schlüssel für `enc:`-Geheimnisse ([`KI.md`](KI.md#schlüssel)) |
 | `HERD_AI_EGRESS_PROXY` | – | API, Worker | Proxy für Anbieteraufrufe ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)) |
 | `HERD_AI_CHECK_TIMEOUT_SECONDS` | 20 | API | Zeitlimit für Verbindungstest und Modellliste |
+| `HERD_MCP_ALLOWED_HOSTS` | leer | API, Worker | private Hosts, auf denen externe MCP-Server laufen dürfen (Hostnamen oder private Netze, kommagetrennt; [`MCP.md`](MCP.md#externe-mcp-server)) |
 | `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
 
 **Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage
@@ -1434,7 +1435,7 @@ erst nach der Freigabe einer Person:
 **Helm:** `ai.existingSecret` (ein Secret, dessen Schlüssel diese Variablen sind; geht an
 API und Worker, nie an den Migrations-Job), `ai.checkTimeoutSeconds`,
 `ai.personalAgentsMax`, `ai.automationsMax` (API), `ai.approvalHours`, `ai.runConcurrency`,
-`ai.runLeaseSeconds` (Worker). Mit `networkPolicy.enabled` erreichen API und Worker
+`ai.runLeaseSeconds` (Worker), `mcp.allowedHosts` (API und Worker). Mit `networkPolicy.enabled` erreichen API und Worker
 **keinen Anbieter**, bis `networkPolicy.aiEgress` Regeln nennt (zum Anbieter, oder nur
 zum Proxy aus `HERD_AI_EGRESS_PROXY`); das Chart legt dafür eine eigene NetworkPolicy
 nur für API und Worker an. Ohne sie antworten Verbindungstests `timeout` oder

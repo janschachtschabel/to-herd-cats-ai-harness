@@ -4,14 +4,18 @@ of the rows (no session is held while the server answers).
 The credential is the server's shared connector, or, for a server that acts with each
 person's own connector, the connector of the person the call is made for. Its secret
 is resolved here, at the moment of the call, into the endpoint's headers and nowhere
-else.
+else. A server on a host the operator lists as private (`HERD_MCP_ALLOWED_HOSTS`) is
+dialled directly, past an egress proxy meant for the outside.
 """
 
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.mcp.client import Endpoint
+from app.core.config import get_settings
+from app.core.egress import EgressRules
+from app.core.egress_allowance import PrivateAllowance, parse_allowance
+from app.mcp.client import RULES, Endpoint
 from app.modules.ai.provider import egress_proxy
 from app.modules.connectors import credentials
 from app.modules.connectors.models import Connector
@@ -48,4 +52,17 @@ async def endpoint_for(
             headers = credentials.headers_for(connector)
         except credentials.CredentialUnavailable:
             raise CredentialUnavailable() from None
-    return Endpoint(server.url, headers, egress_proxy())
+    allowance = private_allowance()
+    proxy = None if allowance.covers(server.url) else egress_proxy()  # in-house: direct
+    return Endpoint(server.url, headers, proxy, allowance.rules(RULES))
+
+
+def private_allowance() -> PrivateAllowance:
+    """The operator's private hosts for MCP servers (`HERD_MCP_ALLOWED_HOSTS`)."""
+    return parse_allowance(get_settings().mcp_allowed_hosts)
+
+
+def server_rules() -> EgressRules:
+    """The egress rules of a server's URL and calls: https, public addresses, and the
+    private hosts the operator lists."""
+    return private_allowance().rules(RULES)

@@ -100,6 +100,7 @@ Bei **jedem Aufruf** wird das Token neu aufgelöst, nichts wird zwischengespeich
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `HERD_MCP_RATE_PER_MINUTE` | `120` | Aufrufe je Token und Minute (API; Chart `mcp.ratePerMinute`) |
+| `HERD_MCP_ALLOWED_HOSTS` | leer | private Hosts externer MCP-Server: Hostnamen oder private Netze (CIDR), kommagetrennt (API und Worker; Chart `mcp.allowedHosts`; siehe „Externe MCP-Server“) |
 
 ### Für die folgenden Tasks
 
@@ -165,10 +166,10 @@ Recht 404 `ai.not_found`.
   Verbindungsaufbau aufgelöst, jede Antwort geprüft und nur die geprüfte Adresse
   gewählt (DNS-Wechsel greift nicht), wie bei KI-Verbindungen
   ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)); mit `HERD_AI_EGRESS_PROXY` geht der
-  Aufruf durch den Proxy. Private Adressen sind für MCP-Server nicht vorgesehen, auch
-  nicht für selbst betriebene im eigenen Netz. Umleitungen folgt der Client nur
-  innerhalb derselben Herkunft (Schema, Host, Port); jede andere endet mit dem Zustand
-  `redirect`.
+  Aufruf durch den Proxy. Private Adressen erreicht ein MCP-Server nur, wenn der
+  Betrieb sie freigibt (siehe „Selbst betriebene Server im eigenen Netz“).
+  Umleitungen folgt der Client nur innerhalb derselben Herkunft (Schema, Host, Port);
+  jede andere endet mit dem Zustand `redirect`.
 - **Felder**: Name (je Organisation eindeutig), `url`, `data_location`
   (`local`/`eu`/`external`, wie bei einer Verbindung; die KI-Richtlinie nutzt es mit
   Task 7), `connector_scope` (`none`, `shared` mit `connector_id` eines geteilten
@@ -215,6 +216,25 @@ Recht 404 `ai.not_found`.
   `unreachable`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`,
   `redirect`, `server_error`, `too_large`, `protocol_error`, `secret_unavailable` (das
   Geheimnis des Konnektors lässt sich nicht auflösen; es wurde nichts gesendet).
+- **Selbst betriebene Server im eigenen Netz** (etwa ein GitLab im Firmennetz):
+  `HERD_MCP_ALLOWED_HOSTS` nennt die privaten Ziele, kommagetrennt, als exakte
+  Hostnamen (ohne Platzhalter und Port; Groß-/Kleinschreibung und ein Punkt am Ende
+  zählen nicht) oder als private Netze in CIDR-Form (eine einzelne Adresse zählt als
+  ein Host; Netze nur innerhalb von `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `100.64.0.0/10`, `127.0.0.0/8`, `fc00::/7`, `::1`). Leer (Standard) gilt das oben
+  Gesagte: nur öffentliche Adressen. Die Einstellung gibt es nur in der Umgebung, nie
+  über die API; ein ungültiger Eintrag verhindert den Start. Ein gelisteter Name darf
+  auf private Adressen auflösen; jede Antwort wird trotzdem bei jedem
+  Verbindungsaufbau geprüft, Link-Local- und Metadaten-Adressen bleiben immer gesperrt
+  (ein gelisteter Name, der plötzlich auf `169.254.169.254` zeigt, wird abgewiesen). Ein
+  nicht gelisteter Name, der auf eine private Adresse auflöst, bleibt gesperrt. Ein
+  gelistetes Netz erlaubt jede Adresse darin, gleich über welchen Namen; deshalb sind
+  exakte Hostnamen die engere Wahl. Es bleibt bei https. Ein gelisteter Host wird direkt
+  gewählt, nicht über `HERD_AI_EGRESS_PROXY` (der Proxy ist für draußen gedacht); mit
+  `networkPolicy.enabled` im Chart muss `networkPolicy.aiEgress` den Weg zu ihm
+  zusätzlich öffnen. Gelesen wird die Einstellung von der API (Werkzeuglisten, Test)
+  und vom Worker (Aufrufe in Läufen); Compose `HERD_MCP_ALLOWED_HOSTS`, Chart
+  `mcp.allowedHosts` (Liste).
 - **Tests** laufen gegen einen echten MCP-Server aus dem SDK
   (`backend/tests/support/mcp_stub.py`, https für `mcp.test` auf 127.0.0.1, skriptbar:
   Werkzeugliste, Ergebnisse, Verzögerung, Umleitung, Fehlerstatus, verlangter Kopf),

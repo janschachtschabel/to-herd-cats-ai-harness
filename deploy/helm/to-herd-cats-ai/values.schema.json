@@ -130,9 +130,15 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "ratePerMinute": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "HERD_MCP_RATE_PER_MINUTE (API)"}
+        "ratePerMinute": {"type": "integer", "minimum": 1, "maximum": 10000, "description": "HERD_MCP_RATE_PER_MINUTE (API)"},
+        "allowedHosts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9.:/-]+$", "minLength": 1, "maxLength": 253},
+          "description": "HERD_MCP_ALLOWED_HOSTS (API and worker): host names or private networks (CIDR)"
+        }
       },
-      "required": ["ratePerMinute"],
+      "required": ["ratePerMinute", "allowedHosts"],
       "description": "The MCP endpoint and its access tokens"
     },
     "collab": {

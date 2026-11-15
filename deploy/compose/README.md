@@ -161,6 +161,7 @@ backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 | `HERD_RUN_CONCURRENCY` | no | `4` | Agent runs one process works on at once, 1 to 64 (`app`, `worker`) |
 | `HERD_RUN_LEASE_SECONDS` | no | `30` | A running run's lease (s), at least 3; after a crash another process takes the run up after it (`app`, `worker`) |
 | `HERD_MCP_RATE_PER_MINUTE` | no | `120` | Calls one access token may make to `/mcp` per minute, 1 to 10,000, counted across all nodes (`app`, API nodes) |
+| `HERD_MCP_ALLOWED_HOSTS` | no | empty | Private hosts external MCP servers may run on: exact host names or private networks (CIDR), comma separated; empty: public addresses only (`app`, API nodes, `worker`) |
 
 The AI keys (`HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS`, `HERD_AI_EGRESS_PROXY`,
 `HERD_AI_<NAME>`) belong in `ai.env`, not in `.env`: they are passed to the containers

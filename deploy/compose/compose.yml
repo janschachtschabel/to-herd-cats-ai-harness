@@ -59,8 +59,10 @@ services:
       HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
       HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
-      # MCP (docs/MCP.md): calls per access token and minute.
+      # MCP (docs/MCP.md): calls per access token and minute; private hosts (names or
+      # CIDR, comma separated) external MCP servers may run on (empty: none).
       HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
+      HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
     # HERD_SECRET_KEY, HERD_SECRET_KEY_PREVIOUS, HERD_AI_EGRESS_PROXY and the provider
     # keys (env:HERD_AI_<NAME>); never listed under environment, where an empty
     # default would hide them.

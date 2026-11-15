@@ -3,7 +3,8 @@ else gets 404 `ai.not_found`, as for the other AI administration.
 
 - The URL is Streamable HTTP over https and passes the egress rules when written
   (`egress.check_base_url`: no credentials, query or fragment, no private or metadata
-  address written as such) and again at every connection (the guard in the client).
+  address written as such, unless the operator lists it: `HERD_MCP_ALLOWED_HOSTS`) and
+  again at every connection (the guard in the client).
 - Creating a server reads its tool list (`ToolService.refresh`); the server is kept
   when that fails, with the state in the answer.
 - A shared connector is named by id and must be one of the organisation's shared
@@ -22,10 +23,10 @@ from app.core import egress
 from app.core.access import Action, Actor
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
-from app.mcp.client import RULES
 from app.modules.ai.access import require_ai
 from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.connectors.repository import ConnectorRepository
+from app.modules.mcp_servers.endpoints import server_rules
 from app.modules.mcp_servers.models import ConnectorUse, McpServer
 from app.modules.mcp_servers.repository import ServerRepository, ToolRepository
 from app.modules.mcp_servers.schemas import (
@@ -164,7 +165,7 @@ def _url(url: str) -> str:
     """The URL as written (a trailing slash may matter to a server), if the egress
     rules allow it."""
     try:
-        egress.check_base_url(url, RULES)
+        egress.check_base_url(url, server_rules())
     except egress.EgressBlocked as blocked:
         details = {"reason": blocked.reason}
         raise ValidationFailed(code="mcp_server.url_not_allowed", details=details) from None

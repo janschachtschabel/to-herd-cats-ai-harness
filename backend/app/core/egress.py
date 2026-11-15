@@ -5,8 +5,9 @@ a URL someone configured goes through it).
 - A base URL carries no credentials, query or fragment (`check_base_url`, at write).
 - Addresses: link-local, metadata, unspecified, multicast and reserved addresses are
   never dialled; other non-global addresses (private, loopback, CGNAT, ULA) only where
-  the rules allow private targets. IPv6 forms that embed an IPv4 address (mapped,
-  compatible, 6to4, NAT64) are judged by that address.
+  the rules allow private targets, or the operator listed the name or the network
+  for MCP servers (`HERD_MCP_ALLOWED_HOSTS`, `egress_allowance.py`). IPv6 forms that
+  embed an IPv4 address (mapped, compatible, 6to4, NAT64) are judged by that address.
 - The name is resolved when the connection is made, inside the HTTP client
   (`GuardedBackend`), and the connection goes to exactly the address checked: a DNS
   answer that changes between a check and the call (rebinding) cannot slip through,
@@ -30,7 +31,7 @@ import ipaddress
 import socket
 import ssl
 from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -72,8 +73,14 @@ class EgressBlocked(Exception):  # noqa: N818 (a verdict, not an error class nam
 
 @dataclass(frozen=True, slots=True)
 class EgressRules:
+    """`private_hosts`/`private_networks`: the operator's allowance for private MCP
+    servers (`egress_allowance.py`): names that may resolve to private addresses,
+    private networks that may be dialled; never `_NEVER`."""
+
     allow_private: bool
     allow_http: bool
+    private_hosts: frozenset[str] = frozenset()
+    private_networks: tuple[IPNetwork, ...] = ()
 
 
 async def _system_resolver(host: str, port: int) -> list[str]:
@@ -115,7 +122,8 @@ def check_address(
     for candidate in {address, judged}:
         if any(candidate.version == n.version and candidate in n for n in _NEVER):
             raise EgressBlocked("blocked_address")
-    if any(judged.version == n.version and judged in n for n in extra_allowed):
+    allowed = (*extra_allowed, *rules.private_networks)
+    if any(judged.version == n.version and judged in n for n in allowed):
         return
     if not judged.is_global and not rules.allow_private:
         raise EgressBlocked("private_address")
@@ -137,9 +145,9 @@ def check_base_url(url: str, rules: EgressRules) -> str:
     host = parts.hostname
     if not host or "@" in parts.netloc or parts.query or parts.fragment or "?" in url:
         raise EgressBlocked("url")
-    bare = host.rstrip(".")
+    bare = host.rstrip(".").lower()
     if bare == "localhost" or bare.endswith(".localhost"):
-        if not rules.allow_private:
+        if not rules.allow_private and bare not in rules.private_hosts:
             raise EgressBlocked("private_address")
     elif (literal := _literal(host)) is not None:
         check_address(literal, rules)
@@ -172,7 +180,10 @@ async def checked_addresses(
     connect_error: type[Exception],
 ) -> list[IPAddress]:
     """`host` resolved, every answer checked (one forbidden answer blocks the name). The
-    two error types are the HTTP core's own, so its client maps them as usual."""
+    two error types are the HTTP core's own, so its client maps them as usual. A name
+    the operator listed may resolve to private addresses (`rules.private_hosts`)."""
+    if host.rstrip(".").lower() in rules.private_hosts:
+        rules = replace(rules, allow_private=True)
     try:
         async with asyncio.timeout(seconds):
             answers = await network.resolver(host, port)

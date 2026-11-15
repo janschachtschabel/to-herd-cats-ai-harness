@@ -47,6 +47,7 @@ spec:
               value: {{ . | quote }}
             {{- end }}
             {{- include "herd.aiWorkerEnv" . | nindent 12 }}
+            {{- include "herd.mcpServersEnv" . | nindent 12 }}
             {{- range $name, $value := .Values.worker.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}

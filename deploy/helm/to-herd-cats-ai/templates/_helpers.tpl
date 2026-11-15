@@ -182,6 +182,13 @@ seccompProfile:
 {{- define "herd.mcpApiEnv" -}}
 - name: HERD_MCP_RATE_PER_MINUTE
   value: {{ .Values.mcp.ratePerMinute | quote }}
+{{ include "herd.mcpServersEnv" . }}
+{{- end -}}
+
+{{/* Where external MCP servers may run (API pods: their tool lists; worker pods: runs). */}}
+{{- define "herd.mcpServersEnv" -}}
+- name: HERD_MCP_ALLOWED_HOSTS
+  value: {{ join "," .Values.mcp.allowedHosts | quote }}
 {{- end -}}
 
 {{/* AI settings of the worker pods (agent runs). */}}

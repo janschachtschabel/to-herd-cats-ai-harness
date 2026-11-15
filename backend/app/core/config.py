@@ -115,6 +115,10 @@ class Settings(BaseSettings):
     # Calls one access token may make to `/mcp` per minute, counted in Postgres across
     # every API node (plan M8 decision 6).
     mcp_rate_per_minute: int = Field(default=120, ge=1, le=10_000)
+    # External MCP servers inside the company network (an in-house GitLab): host names
+    # or private networks (CIDR), comma separated, that the egress guard lets their
+    # calls reach (`core/egress_allowance.py`); empty: public addresses only.
+    mcp_allowed_hosts: str = ""
 
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: SecretStr = SecretStr("")
@@ -165,6 +169,13 @@ class Settings(BaseSettings):
     def _empty_egress_proxy_is_none(self) -> Self:
         if self.ai_egress_proxy is not None and not self.ai_egress_proxy.get_secret_value():
             self.ai_egress_proxy = None  # compose: `${HERD_AI_EGRESS_PROXY:-}`
+        return self
+
+    @model_validator(mode="after")
+    def _mcp_allowed_hosts_parse(self) -> Self:
+        from app.core.egress_allowance import parse_allowance  # noqa: PLC0415 (light start)
+
+        parse_allowance(self.mcp_allowed_hosts)
         return self
 
     @model_validator(mode="after")

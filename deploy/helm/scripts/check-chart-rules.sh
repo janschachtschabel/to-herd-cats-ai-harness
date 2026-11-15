@@ -218,6 +218,21 @@ grep -q "HERD_MCP_RATE_PER_MINUTE" <<<"$(doc Deployment t-to-herd-cats-ai-worker
   && fail "the worker gets the API's MCP settings"
 if render --set mcp.ratePerMinute=0 >/dev/null; then fail "mcp.ratePerMinute=0 rendered"; fi
 
+# MCP (M8 Task 7): private hosts of external MCP servers reach the API (tool lists) and
+# the worker (runs), empty by default; nothing but names and networks renders.
+out=$(render)
+for workload in t-to-herd-cats-ai-api t-to-herd-cats-ai-worker; do
+  grep -A1 -- "- name: HERD_MCP_ALLOWED_HOSTS" <<<"$(doc Deployment "$workload" "$out")" \
+    | grep -q 'value: ""' || fail "$workload has no empty HERD_MCP_ALLOWED_HOSTS by default"
+done
+out=$(render --set 'mcp.allowedHosts={gitlab.corp.example,10.20.0.0/16}')
+for workload in t-to-herd-cats-ai-api t-to-herd-cats-ai-worker; do
+  grep -A1 -- "- name: HERD_MCP_ALLOWED_HOSTS" <<<"$(doc Deployment "$workload" "$out")" \
+    | grep -q 'value: "gitlab.corp.example,10.20.0.0/16"' \
+    || fail "mcp.allowedHosts does not reach $workload"
+done
+if render --set 'mcp.allowedHosts={a b}' >/dev/null; then fail "mcp.allowedHosts took a space"; fi
+
 # The outbox and worker alerts (review M3 N3, N4). HerdWorkerAbsent pairs a release's
 # API scrape job "<fullname>-internal" with its worker job "<fullname>-worker": the jobs
 # are the names of the Services the ServiceMonitor selects, so both must keep them.

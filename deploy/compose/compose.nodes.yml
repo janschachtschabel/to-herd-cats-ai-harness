@@ -44,6 +44,7 @@ x-api-env: &api-env
   HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
   HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}
   HERD_MCP_RATE_PER_MINUTE: ${HERD_MCP_RATE_PER_MINUTE:-120}
+  HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.
@@ -109,6 +110,7 @@ services:
       HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
       HERD_RUN_LEASE_SECONDS: ${HERD_RUN_LEASE_SECONDS:-30}
+      HERD_MCP_ALLOWED_HOSTS: ${HERD_MCP_ALLOWED_HOSTS:-}
     env_file: *ai-keys
     depends_on: *after-migrate
     stop_grace_period: 30s

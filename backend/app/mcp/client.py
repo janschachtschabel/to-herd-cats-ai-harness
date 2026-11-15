@@ -3,8 +3,9 @@ the egress guard, never stdio. The only module that uses the SDK's client; servi
 call `list_tools` and `call_tool` and get plain data back.
 
 - Every connection goes through `egress_x2.client` (the SDK's HTTP library is httpx2):
-  https only, the name resolved and checked when connecting, no private or metadata
-  addresses, the operator's proxy if one is set. The SDK follows a redirect only within
+  https only, the name resolved and checked when connecting, no private (unless the
+  operator lists the host, `Endpoint.rules`) or metadata addresses, the operator's
+  proxy if one is set. The SDK follows a redirect only within
   the endpoint's origin; anything else fails (`redirect`).
 - The whole operation has one deadline (`seconds`), each response body a size cap.
 - The credential travels only in the headers of the endpoint, set on the HTTP client;
@@ -28,7 +29,8 @@ from mcp.types import CallToolResult, TextContent, Tool
 from app.core import egress_x2
 from app.core.egress import EgressBlocked, EgressRules
 
-# Remote MCP servers: https and public addresses only (no `local` kind as for AI).
+# Remote MCP servers: https and public addresses only (no `local` kind as for AI);
+# private hosts only as the operator lists them (`Endpoint.rules`).
 RULES = EgressRules(allow_private=False, allow_http=False)
 MAX_PAGES = 20
 
@@ -60,6 +62,7 @@ class Endpoint:
     url: str
     headers: Mapping[str, str] = field(default_factory=dict, repr=False)
     proxy: str | None = field(default=None, repr=False)
+    rules: EgressRules = RULES
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +127,7 @@ async def _run[T](
         statuses.append(response.status_code)
 
     http = egress_x2.client(
-        RULES, timeout=seconds, proxy=endpoint.proxy, max_response_bytes=max_bytes
+        endpoint.rules, timeout=seconds, proxy=endpoint.proxy, max_response_bytes=max_bytes
     )
     http.headers.update(endpoint.headers)
     http.event_hooks = {"response": [note]}
