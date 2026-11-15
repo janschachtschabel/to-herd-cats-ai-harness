@@ -38,6 +38,7 @@ MAX_VALUE_CHARS = 4096
 # Visible ASCII only: the value goes into an HTTP header.
 _VALUE = re.compile(r"[\x21-\x7e]+")
 _KDF_INFO = b"to-herd-cats-ai:secret-ref:v1"
+_KEY_ID_INFO = b"herd-key-id"
 
 
 class SecretKind(StrEnum):
@@ -106,6 +107,24 @@ def _resolve(ref: str) -> str | None:
         except (InvalidToken, ValueError):
             return None
     return None
+
+
+def key_id(material: str) -> str:
+    """A name for a secret key (plan M9 decision 5): the first 16 hex characters of
+    HKDF-SHA256 with its own `info`; it tells two keys apart and says nothing about
+    the key (a backup's manifest carries it, never the key)."""
+    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=_KEY_ID_INFO)
+    return hkdf.derive(material.encode()).hex()[:16]
+
+
+def current_key_ids() -> tuple[str | None, str | None]:
+    """The key ids of HERD_SECRET_KEY and HERD_SECRET_KEY_PREVIOUS (None when unset)."""
+    settings = get_settings()
+    current, previous = settings.secret_key, settings.secret_key_previous
+    return (
+        key_id(current.get_secret_value()) if current is not None else None,
+        key_id(previous.get_secret_value()) if previous is not None else None,
+    )
 
 
 def _keys() -> MultiFernet | None:

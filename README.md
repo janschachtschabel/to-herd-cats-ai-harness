@@ -388,6 +388,11 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M8. Wer betreibt, sollte sie
 kennen.
 
+- **Sicherung** (M9): `python -m app.ops backup create|verify|list` schreibt und prüft
+  Archive des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) nach
+  `HERD_BACKUP_DIR`; Format, Schlüssel und Fehlercodes in
+  [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das Volume
+  schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort

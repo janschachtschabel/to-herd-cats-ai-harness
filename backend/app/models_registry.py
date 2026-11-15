@@ -21,6 +21,7 @@ from app.modules.audit.models import AuditLog
 from app.modules.auth.models import UserSession
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import Automation, AutomationFiring
+from app.modules.backups.models import BackupRun
 from app.modules.connectors.models import Connector
 from app.modules.groups.models import Group, GroupMember
 from app.modules.mcp_servers.models import McpServer, McpServerTool
@@ -53,6 +54,7 @@ from app.modules.wiki.collab_models import PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
+    "BackupRun",
     "StorageTombstone",
     "AccessToken",
     "McpSetting",

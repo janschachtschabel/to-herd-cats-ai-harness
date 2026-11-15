@@ -34,6 +34,33 @@ async def record(
     await AuditRepository(session).add(entry)
 
 
+SYSTEM_ACTOR_TYPE = "system"
+SYSTEM_ACTOR_ID = uuid.UUID(int=0)
+
+
+async def record_system(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    action: str,
+    target_type: str,
+    target_id: uuid.UUID,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """An entry of the installation itself (a backup from the command line or the
+    scheduled job): actor `system`, no person, no address."""
+    entry = AuditLog(
+        org_id=org_id,
+        actor_type=SYSTEM_ACTOR_TYPE,
+        actor_id=SYSTEM_ACTOR_ID,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        details=details,
+        ip=None,
+    )
+    await AuditRepository(session).add(entry)
+
+
 async def record_admin_access(
     session: AsyncSession, actor: Actor, space_id: uuid.UUID, kind: str
 ) -> None:

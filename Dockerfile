@@ -6,8 +6,9 @@
 # binary of the node stage (nothing else of node: no npm, no corepack). Base images
 # are pinned by digest; Renovate keeps them current.
 #
-# Runs as 10001, works with a read-only root filesystem (writable: /tmp and the files
-# volume on /data), tini as PID 1 forwards SIGTERM to the launcher, which stops both
+# Runs as 10001, works with a read-only root filesystem (writable: /tmp, the files
+# volume on /data and the backups volume on /backups), tini as PID 1 forwards SIGTERM
+# to the launcher, which stops both
 # servers (and the collab child) in order.
 
 ARG PYTHON_IMAGE=python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
@@ -77,9 +78,12 @@ ENV PATH=/app/.venv/bin:$PATH \
 # The app runs from /app/.venv. The base image's own pip (with its vendored libraries)
 # and setuptools are never used at runtime, so they are removed instead of patched.
 RUN rm -rf /usr/local/lib/python3.13/site-packages/* /usr/local/bin/pip*
-# Debian security updates published after the pinned base image was built.
+# Debian security updates published after the pinned base image was built, and
+# PostgreSQL's client tools for backups (`python -m app.ops backup`, plan M9 decision
+# 2: pg_dump/pg_restore 17 serve servers 16 and 17; PostgreSQL licence).
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends postgresql-client-17 \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/apt /var/log/dpkg.log
 WORKDIR /app
 COPY --from=tini --chmod=0755 /tini-${TARGETARCH} /usr/bin/tini
@@ -89,7 +93,8 @@ COPY --from=collab /usr/local/bin/node /usr/local/bin/node
 COPY --from=collab /src/collab /app/collab
 # The files volume (attachments): owned by the app user, so that a fresh named volume
 # mounted here (docker copies the directory's owner into it) is writable.
-RUN mkdir /data && chown 10001:10001 /data
+RUN mkdir /data && chown 10001:10001 /data \
+    && mkdir -m 0700 /backups && chown 10001:10001 /backups
 USER 10001:10001
 EXPOSE 8080 9090
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \

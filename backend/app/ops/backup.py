@@ -1,0 +1,192 @@
+"""Making one backup (plan M9 decisions 2 to 5 and 11).
+
+1. A `backup_run` row (`running`) is committed first, so a backup that dies midway is
+   visible (a restore later marks such rows `interrupted`).
+2. In one exported snapshot: the figures (`snapshot.py`) and `pg_dump -Fc --snapshot`.
+3. The snapshot's attachment files are copied from the storage (a deleted file stays
+   for its tombstone's grace, `core/storage_tombstones.py`), then the manifest.
+4. The archive is read back (`verify_archive`); only a good one makes the run `ok`.
+
+Any failure removes what was written and makes the run `failed` with a code
+(`backup.no_organization`, `backup.no_schema`, `backup.tool_missing`,
+`backup.tools_too_old`, `backup.dump_failed`, `backup.file_missing`, `backup.io`,
+`backup.verify_failed`, `backup.failed`). Nothing of the content is logged; a success
+is audited as `backup.created` by `system` with the trigger as `via`.
+"""
+
+import logging
+import tempfile
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+from app.core.clock import Clock
+from app.core.config import Settings
+from app.core.db import make_engine
+from app.core.secrets import key_id
+from app.core.storage import LocalStorage, Storage, StoredFileMissing
+from app.modules.audit.recorder import record_system
+from app.modules.backups.models import BackupState, BackupTrigger
+from app.modules.backups.repository import BackupRunRepository
+from app.ops.archive import (
+    DUMP_MEMBER,
+    FILES_PREFIX,
+    ArchiveError,
+    ArchiveWriter,
+    private_dir,
+    sidecar_of,
+    verify_archive,
+)
+from app.ops.manifest import FORMAT, Manifest
+from app.ops.pgtools import ToolFailed, dump, tool_version
+from app.ops.snapshot import NoSchema, Snapshot, open_snapshot
+from app.version import app_version
+
+logger = logging.getLogger(__name__)
+
+ARCHIVE_PREFIX = "herd-"
+
+
+class BackupFailed(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class BackupOutcome:
+    run_id: uuid.UUID | None
+    archive: Path | None
+    state: BackupState
+    error_code: str | None
+
+
+def archive_name(at: datetime, version: str) -> str:
+    return f"{ARCHIVE_PREFIX}{at.astimezone(UTC):%Y%m%dT%H%M%SZ}-{version}.tar"
+
+
+async def create_backup(
+    settings: Settings, *, trigger: BackupTrigger, clock: Clock
+) -> BackupOutcome:
+    engine = make_engine(settings.database())
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        return await _create(settings, engine, sessions, trigger, clock)
+    finally:
+        await engine.dispose()
+
+
+async def _create(
+    settings: Settings,
+    engine: AsyncEngine,
+    sessions: async_sessionmaker[AsyncSession],
+    trigger: BackupTrigger,
+    clock: Clock,
+) -> BackupOutcome:
+    started = clock.now()
+    async with sessions() as session, session.begin():
+        runs = BackupRunRepository(session)
+        org_id = await runs.installation_org()
+        if org_id is None:
+            return BackupOutcome(None, None, BackupState.FAILED, "backup.no_organization")
+        run_id = (await runs.start(org_id, trigger, started)).id
+    path = settings.backup_dir / archive_name(started, app_version())
+    written = False
+    try:
+        archive_sha256 = await _write(settings, engine, path, started)
+        written = True
+        if verify_archive(path):
+            raise BackupFailed("backup.verify_failed")
+    except Exception as exc:
+        code = _code_of(exc)
+        logger.warning("backup.failed", extra={"code": code, "error": type(exc).__name__})
+        if written:  # never an archive of the same name that was there before
+            _remove(path)
+        async with sessions() as session, session.begin():
+            await BackupRunRepository(session).finish(
+                run_id, state=BackupState.FAILED, at=clock.now(), error_code=code
+            )
+        return BackupOutcome(run_id, None, BackupState.FAILED, code)
+    size = path.stat().st_size
+    async with sessions() as session, session.begin():
+        await BackupRunRepository(session).finish(
+            run_id,
+            state=BackupState.OK,
+            at=clock.now(),
+            archive=path.name,
+            size=size,
+            archive_sha256=archive_sha256,
+        )
+        details = {"archive": path.name, "bytes": size, "via": trigger.value}
+        await record_system(session, org_id, "backup.created", "backup_run", run_id, details)
+    logger.info("backup.created", extra={"run_id": str(run_id), "bytes": size})
+    return BackupOutcome(run_id, path, BackupState.OK, None)
+
+
+async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: datetime) -> str:
+    private_dir(path.parent)
+    pg_dump_version = tool_version("pg_dump")
+    storage = LocalStorage(settings.data_dir)
+    with tempfile.TemporaryDirectory(prefix="herd-backup-") as scratch:
+        dump_file = Path(scratch) / DUMP_MEMBER
+        async with open_snapshot(engine) as snapshot:
+            if int(pg_dump_version.split(".")[0]) < snapshot.server_major:
+                raise BackupFailed("backup.tools_too_old")
+            await dump(settings, snapshot.snapshot_id, dump_file)
+        writer = ArchiveWriter(path)
+        try:
+            await writer.add_file(DUMP_MEMBER, dump_file)
+            dump_file.unlink()
+            await _add_files(writer, storage, snapshot)
+            return await writer.finish(_manifest(settings, snapshot, pg_dump_version, at))
+        except BaseException:
+            writer.abort()
+            raise
+
+
+async def _add_files(writer: ArchiveWriter, storage: Storage, snapshot: Snapshot) -> None:
+    for file in snapshot.files:
+        try:
+            chunks = await storage.open(file.key)
+        except StoredFileMissing:
+            raise BackupFailed("backup.file_missing") from None
+        await writer.add_stream(FILES_PREFIX + file.key, file.size, chunks)
+
+
+def _manifest(
+    settings: Settings, snapshot: Snapshot, pg_dump_version: str, at: datetime
+) -> Manifest:
+    secret = settings.secret_key
+    return Manifest(
+        format=FORMAT,
+        app_version=app_version(),
+        alembic_revision=snapshot.alembic_revision,
+        created_at=at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        server_major=snapshot.server_major,
+        pg_dump_version=pg_dump_version,
+        storage="local",
+        tables=snapshot.tables,
+        files={"count": len(snapshot.files), "bytes": sum(f.size for f in snapshot.files)},
+        members={},
+        key_id=key_id(secret.get_secret_value()) if secret is not None else None,
+        enc_values=snapshot.enc_values,
+        env_refs=snapshot.env_refs,
+    )
+
+
+def _code_of(exc: Exception) -> str:
+    if isinstance(exc, BackupFailed | ToolFailed | ArchiveError):
+        return exc.code
+    if isinstance(exc, NoSchema):
+        return "backup.no_schema"
+    if isinstance(exc, OSError):
+        return "backup.io"
+    return "backup.failed"
+
+
+def _remove(path: Path) -> None:
+    path.unlink(missing_ok=True)
+    sidecar_of(path).unlink(missing_ok=True)
