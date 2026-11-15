@@ -594,15 +594,20 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
 - **„Neu beginnen“**: In ihrer Direktnachricht allein mit dem Agenten (eine Person, ein
   Agent) steht oben im Gespräch „Neu beginnen“. Nach einer Rückfrage, die sagt, was es
   bewirkt, setzt es einen Schnitt (`conversation.fresh_start_at`): Läufe danach bekommen
-  keinen Verlauf von vor dem Schnitt, weder im Verlaufsfenster noch über
-  `read_conversation`; ohne Markiertes im Kontext beginnen sie ohne Marke. Offene Läufe
+  nichts von vor dem Schnitt, weder im Verlaufsfenster noch über `read_conversation`
+  (auch keinen Thread unter einer Nachricht von davor), und `search_past_runs` findet
+  dort nichts aus Läufen, die vor dem Schnitt entstanden, gleich in welchem Gespräch
+  (Review M8 4, Befund K3). Was bleibt, ist das Gedächtnis des Agenten: Es steht in
+  jedem Lauf, und unter der Marke wird nur Gedächtnis, was sie freigegeben hat (siehe
+  oben). Ohne Markiertes im Kontext beginnen die Läufe ohne Marke. Offene Läufe
   des Gesprächs (wartend, laufend, auf Freigabe oder Antwort wartend; nicht die einer
   Automation) werden vorher abgebrochen, damit keiner, der mit dem alten Verlauf
   begonnen hat, nach dem Schnitt antwortet. Die Nachrichten davor bleiben, wie sie sind,
   markierte auch, und sie sieht sie weiter; im Gespräch zeigt eine Linie „Neu begonnen am
   …“, wo der Schnitt liegt. Das Abzeichen „Persönlich“ und die Freigabekarte unter der
-  Marke nennen diesen Weg. Frühere markierte Läufe bleiben markiert: Ein Treffer von
-  `search_past_runs` aus einem von ihnen markiert auch nach dem Schnitt.
+  Marke nennen diesen Weg; die Rückfrage sagt genau, was der Schnitt abschneidet und
+  dass freigegebenes Gedächtnis bleibt. Frühere markierte Läufe bleiben markiert
+  (anderswo, etwa in einem Kanal, findet `search_past_runs` sie ohnehin nie).
   API: `POST /api/conversations/{id}/fresh-start` mit `{"version": n}` (die gelesene
   Version des Gesprächs) → das Gespräch mit `fresh_start_at` und neuer Version. Wer das
   Gespräch nicht sieht, bekommt 404 `conversation.not_found`; in jedem anderen Gespräch

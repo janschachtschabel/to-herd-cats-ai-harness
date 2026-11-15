@@ -780,8 +780,10 @@ Recht 404 `ai.not_found`.
   sofort in seinem Journal. Ohne markierten Inhalt im Kontext beginnt ein Lauf ohne
   Marke (siehe [`AGENTEN.md`](AGENTEN.md)). Von selbst nimmt nichts die Marke ab; mit
   „Neu beginnen“ in ihrer Direktnachricht allein mit dem Agenten setzt die Person einen
-  Schnitt, nach dem Läufe nichts von davor bekommen (`POST
-  /api/conversations/{id}/fresh-start`; Review M8 3, Befund H2). Ergebnisse über einen geteilten
+  Schnitt, nach dem Läufe dort nichts von davor bekommen: keinen Verlauf, nichts über
+  `read_conversation` und keinen Treffer von `search_past_runs` aus früheren Läufen;
+  was sie zum Merken freigegeben hat, bleibt (`POST /api/conversations/{id}/fresh-start`;
+  Review M8 3, Befund H2; Review M8 4, Befund K3). Ergebnisse über einen geteilten
   Konnektor, Fehler und `external_outcome_unknown` markieren nicht. Trägt der Lauf die Marke, wartet jeder
   Aufruf eines externen Servers, den er nicht mit dem eigenen Konnektor der fragenden
   Person nutzt (geteilter Konnektor oder keiner), auch eines **lesenden** Werkzeugs, auf

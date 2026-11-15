@@ -9,13 +9,15 @@
   space as the source (policy and rights checks of the run cover it); a DM counts as
   the person's own content, as the history does. A message marked personal is shown
   as such and marks the run (`personal_mark.py`; the host journals it with the
-  result). Nothing from before the conversation's fresh start (`fresh_start.py`).
+  result). Nothing from before the conversation's fresh start (`fresh_start.py`), nor
+  the thread of a message from before it (module review M8 4, K3).
 - `submit_result`: the run's result. It ends the run (`completed`) with its text as
   the answer; no call after it runs. Recorded like any tool call, so a run taken up
   again after it answers with it once, without a model call.
 """
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator, model_validator
@@ -68,7 +70,11 @@ async def read_conversation(ctx: ToolContext, args: ReadConversationArgs) -> Too
         )
         if args.replies_to is not None:
             parent, where = await messages.readable(ctx.actor, args.replies_to)
-            if where.id != conversation.id or parent.parent_id is not None:
+            if (
+                where.id != conversation.id
+                or parent.parent_id is not None
+                or _before(parent, conversation.fresh_start_at)
+            ):  # a thread under a message from before a fresh start is from before
                 return ToolResult("conversation", NOT_FOUND)
             rows = (await messages.replies(ctx.actor, parent.id, params)).items
         else:
@@ -80,8 +86,7 @@ async def read_conversation(ctx: ToolContext, args: ReadConversationArgs) -> Too
     shown = [
         m
         for m in rows
-        if m.kind in (MessageKind.HUMAN, MessageKind.AGENT)
-        and (fresh is None or m.created_at > fresh)
+        if m.kind in (MessageKind.HUMAN, MessageKind.AGENT) and not _before(m, fresh)
     ]
     views = await message_views(ctx.session, ctx.actor, shown)
     lines = [_line(v.message, v.author_name) for v in views]
@@ -92,6 +97,11 @@ async def read_conversation(ctx: ToolContext, args: ReadConversationArgs) -> Too
         ctx.reads.spaces.add(conversation.space_id)
         spaces = frozenset({conversation.space_id})
     return ToolResult("conversation", "\n".join(lines) or NOT_FOUND, {}, spaces)
+
+
+def _before(message: Message, fresh: datetime | None) -> bool:
+    """Whether the message is from before the conversation's fresh start."""
+    return fresh is not None and message.created_at <= fresh
 
 
 def _line(message: Message, author: str | None) -> str:

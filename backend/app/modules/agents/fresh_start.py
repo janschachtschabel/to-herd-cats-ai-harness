@@ -3,9 +3,12 @@
 The personal mark (`personal_mark.py`) lasts while marked messages are in a run's
 history window, since a marked answer can carry what the person read through her own
 connector. Nothing unflags them; instead she can end it knowingly: a boundary on her
-DM (`conversation.fresh_start_at`). Runs after it get no history from before it (the
-window, `read_repository.said`; `read_conversation`), so with nothing marked in their
-context they start unmarked. Earlier messages stay as they are, marked ones too.
+DM (`conversation.fresh_start_at`). Runs there after it reach nothing from before it:
+not the window (`read_repository.said`), not `read_conversation` (nor a thread under a
+message from before), not `search_past_runs` (no run created before it, whatever its
+conversation; module review M8 4, K3). So with nothing marked in their context they
+start unmarked. What stays is the agent's memory, which under the mark holds only what
+she released. Earlier messages stay as they are, marked ones too.
 
 - Only the person in her DM alone with the agent (one person, one agent) may set it:
   someone who cannot see the DM gets 404 `conversation.not_found`, anywhere else 403

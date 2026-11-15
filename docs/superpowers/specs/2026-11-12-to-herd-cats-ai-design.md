@@ -236,6 +236,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Die persönliche Marke hält, solange markierte Nachrichten im Verlaufsfenster stehen; nichts nimmt sie heuristisch ab. Der Ausweg ist „Neu beginnen“: Nur die Person in ihrer Direktnachricht allein mit dem Agenten kann einen Schnitt setzen (gespeichert, auditiert ohne Inhalt); Läufe danach bekommen keinen Verlauf von davor, offene Läufe des Gesprächs werden vorher abgebrochen. Das Abzeichen, die Freigabekarte und die Dokumentation erklären es. Review M8 3, Befund H2.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: „Neu beginnen“ schneidet alles ab, was die Läufe dieses Gesprächs von davor erreichen könnten: das Verlaufsfenster, `read_conversation` (auch Threads unter Nachrichten von davor) und `search_past_runs` (nichts aus Läufen von vor dem Schnitt, gleich aus welchem Gespräch). Es bleibt das Gedächtnis des Agenten, das unter der Marke nur Freigegebenes enthält; die Texte sagen genau das. Review M8 4, Befund K3.*
+
 *Geändert nach Review M8 [Claude, 15.11.2026]: Was die externen Werkzeuge eines Agenten zu jedem Modellaufruf beitragen (Name, Beschreibung, Argumentschema), ist zusammen auf 100.000 Zeichen begrenzt. Die Werkzeuge werden in der Reihenfolge genommen, in der sie zuerst gelistet wurden, jedes, solange die Summe passt; die Auswahl ist bei jedem Schritt, jeder Fortsetzung und beim Wiederholen dieselbe. Die Werkzeugliste des Agenten zeigt, was wegbleibt, und eine Metrik zählt es ohne Namen. Review M8 2, Befund G5.*
 
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]

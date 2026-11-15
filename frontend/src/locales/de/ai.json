@@ -358,14 +358,14 @@
     "personalMark": {
       "short": "Persönlich",
       "title": "Persönlich: nur für dich",
-      "text": "Diese Nachricht enthält, was du über deinen eigenen Zugang gelesen hast, oder sie entstand in einem Gespräch, in dem das stand. Sie bleibt bei dir: Solange so eine Nachricht im Verlauf steht, den der Agent bekommt, legt er dir alles, was er anderswo schreiben will, vorher zur Freigabe vor. Mit „Neu beginnen“ oben in deinem Gespräch allein mit dem Agenten setzt du einen Schnitt: Danach bekommt er nichts mehr von davor, und die Markierung endet für neue Läufe."
+      "text": "Diese Nachricht enthält, was du über deinen eigenen Zugang gelesen hast, oder sie entstand in einem Gespräch, in dem das stand. Sie bleibt bei dir: Solange so eine Nachricht im Verlauf steht, den der Agent bekommt, legt er dir alles, was er anderswo schreiben will, vorher zur Freigabe vor. Mit „Neu beginnen“ oben in deinem Gespräch allein mit dem Agenten setzt du einen Schnitt: Danach bekommt er nichts mehr von davor (weder Verlauf noch Treffer aus früheren Läufen), und die Markierung endet für neue Läufe. Was du ihm zum Merken freigegeben hast, bleibt."
     },
     "freshStart": {
       "action": "Neu beginnen",
       "title": "Neu beginnen?",
-      "text": "Ab jetzt sieht {{agent}} nichts mehr von dem, was davor steht: Neue Läufe bekommen keinen Verlauf von vor diesem Punkt. Die Markierung „Persönlich“ endet damit für neue Läufe, denn sie hängt an dem, was der Agent im Verlauf liest. Laufende Arbeit von {{agent}} in diesem Gespräch wird abgebrochen. Die Nachrichten bleiben für dich sichtbar.",
+      "text": "Ab jetzt bekommt {{agent}} in diesem Gespräch nichts mehr von dem, was davor war: keinen Verlauf von vor diesem Punkt, und weder das Nachlesen des Gesprächs noch die Suche in seinen früheren Läufen (auch aus anderen Gesprächen) findet etwas von davor. Was du ihm zum Merken freigegeben hast, bleibt in seinem Gedächtnis. Die Markierung „Persönlich“ endet damit für neue Läufe. Laufende Arbeit von {{agent}} in diesem Gespräch wird abgebrochen; ein Hinweis zeigt es. Die Nachrichten bleiben für dich sichtbar.",
       "marker": "Neu begonnen am {{when}}",
-      "markerText": "{{agent}} sieht nichts von dem, was darüber steht."
+      "markerText": "Von dem, was darüber steht, bekommt {{agent}} nichts mehr: weder im Verlauf noch beim Nachlesen oder in der Suche in früheren Läufen. Was du ihm zum Merken freigegeben hast, bleibt."
     }
   },
   "errors": {

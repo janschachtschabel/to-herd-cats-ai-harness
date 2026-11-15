@@ -55,6 +55,13 @@ class ReadRepository:
         self.session = session
         self.org_id = org_id
 
+    async def fresh_start(self, conversation_id: uuid.UUID) -> datetime | None:
+        """Where the conversation was started afresh (`fresh_start.py`; None: never)."""
+        stmt = select(Conversation.fresh_start_at).where(
+            Conversation.org_id == self.org_id, Conversation.id == conversation_id
+        )
+        return await self.session.scalar(stmt)
+
     async def said(self, conversation_id: uuid.UUID, until: datetime) -> list[Said]:
         """The conversation as a run answers it: the person's and the agent's top-level
         messages written up to `until` (the run's start), oldest first, and after the

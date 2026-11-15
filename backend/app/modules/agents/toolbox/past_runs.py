@@ -24,6 +24,8 @@ result, a tool or its history: `personal_mark.py`), its words and its results al
 is found only alone with the agent, and marks the run that finds it, journaled with
 this call's result (module review M8 1 and 2: a later run in the same channel found
 it before and could post it there; a run that found it kept the mark only in memory).
+In a DM started afresh ("Neu beginnen", `fresh_start.py`), nothing of a run created
+before the cut, whatever its conversation (module review M8 4, K3).
 """
 
 import uuid
@@ -79,6 +81,7 @@ async def search_past_runs(ctx: ToolContext, args: SearchPastRunsArgs) -> ToolRe
         text=args.query,
         readable=readable,
         conversation_id=None if place.kind == PlaceKind.ALONE else run.conversation_id,
+        after=await ReadRepository(ctx.session, run.org_id).fresh_start(run.conversation_id),
         limit=CANDIDATES,
     )
     of_runs = await repo.reads(h.run_id for h in hits)
