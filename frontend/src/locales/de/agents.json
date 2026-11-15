@@ -11,14 +11,16 @@
       "names": {
         "1": "Stufe 1: nur lesen",
         "2": "Stufe 2: vorschlagen",
-        "3": "Stufe 3: intern schreiben"
+        "3": "Stufe 3: intern schreiben",
+        "4": "Stufe 4: nach außen handeln"
       },
       "explain": {
         "1": "Liest Seiten, Tickets und das Gespräch und antwortet. Ändert nichts.",
         "2": "Liest wie Stufe 1, schlägt Änderungen an Seiten vor, kommentiert und legt Tickets an. Vorschläge nimmt ein Mensch an.",
-        "3": "Wie Stufe 2, schreibt Seiten direkt (nur in Bereichen, die das erlauben), übergibt Tickets und schreibt Nachrichten in Gespräche, in denen er Mitglied ist."
+        "3": "Wie Stufe 2, schreibt Seiten direkt (nur in Bereichen, die das erlauben), übergibt Tickets und schreibt Nachrichten in Gespräche, in denen er Mitglied ist.",
+        "4": "Wie Stufe 3, darf zusätzlich schreibende Werkzeuge externer Server nutzen. Jeder solche Aufruf wartet auf die Freigabe der fragenden Person über genau diese Argumente."
       },
-      "withheld": "Stufe 3 vergibt nur ein Admin.",
+      "withheld": "Höhere Stufen vergibt nur ein Admin.",
       "save": "Stufe speichern"
     },
     "tools": {
@@ -70,6 +72,18 @@
         "update_page": "Seite direkt ändern",
         "assign_ticket": "Ticket übergeben",
         "post_message": "Nachricht schreiben"
+      },
+      "external": {
+        "group": "Externe Werkzeuge · {{server}}",
+        "groupHint": "Nur zugeteilte Werkzeuge bekommt der Agent; jeder Aufruf schickt Daten an diesen Server.",
+        "unusable": "Nicht nutzbar: nicht (mehr) freigegeben oder Server aus",
+        "alwaysReleased": "Handelt nach außen: jeder Aufruf nach Freigabe",
+        "needsLevel": "Wirkt erst ab Stufe {{level}}",
+        "choices": {
+          "off": "Nicht zugeteilt",
+          "allow": "Erlaubt",
+          "confirm": "Nur nach Freigabe"
+        }
       }
     },
     "spaces": {
@@ -114,7 +128,7 @@
   },
   "errors": {
     "agent": {
-      "level_denied": "Stufe 3 vergibt nur ein Admin.",
+      "level_denied": "Stufe 3 und 4 vergibt nur ein Admin.",
       "tool_unknown": "Dieses Werkzeug gibt es nicht (mehr). Bitte neu laden.",
       "skill_not_assignable": "Mindestens ein Skill lässt sich diesem Agenten nicht zuweisen (unbekannt oder außerhalb seiner Bereiche).",
       "skill_names_clash": "Zwei der Skills heißen gleich; ein Agent kann nur einen davon haben.",

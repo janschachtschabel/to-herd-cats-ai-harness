@@ -11,14 +11,16 @@
       "names": {
         "1": "Level 1: read only",
         "2": "Level 2: propose",
-        "3": "Level 3: write internally"
+        "3": "Level 3: write internally",
+        "4": "Level 4: act outside"
       },
       "explain": {
         "1": "Reads pages, tickets and the conversation, and answers. Changes nothing.",
         "2": "Reads like level 1, proposes changes to pages, comments and creates tickets. A person accepts proposals.",
-        "3": "Like level 2, writes pages directly (only in spaces that allow it), hands tickets on and writes messages in conversations it is a member of."
+        "3": "Like level 2, writes pages directly (only in spaces that allow it), hands tickets on and writes messages in conversations it is a member of.",
+        "4": "Like level 3, and may also use writing tools of external servers. Every such call waits for the asking person to release exactly these arguments."
       },
-      "withheld": "Only an admin gives level 3.",
+      "withheld": "Only an admin gives higher levels.",
       "save": "Save level"
     },
     "tools": {
@@ -70,6 +72,18 @@
         "update_page": "Change a page directly",
         "assign_ticket": "Hand a ticket on",
         "post_message": "Write a message"
+      },
+      "external": {
+        "group": "External tools · {{server}}",
+        "groupHint": "The agent gets granted tools only; every call sends data to this server.",
+        "unusable": "Not usable: not (or no longer) approved, or server off",
+        "alwaysReleased": "Acts outside: every call after release",
+        "needsLevel": "Takes effect from level {{level}}",
+        "choices": {
+          "off": "Not granted",
+          "allow": "Allowed",
+          "confirm": "Only after release"
+        }
       }
     },
     "spaces": {
@@ -114,7 +128,7 @@
   },
   "errors": {
     "agent": {
-      "level_denied": "Only an admin gives level 3.",
+      "level_denied": "Only an admin gives levels 3 and 4.",
       "tool_unknown": "This tool does not exist (any more). Please reload.",
       "skill_not_assignable": "At least one skill cannot be given to this agent (unknown, or outside its spaces).",
       "skill_names_clash": "Two of the skills have the same name; an agent can have only one of them.",

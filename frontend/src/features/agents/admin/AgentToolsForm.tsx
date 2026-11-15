@@ -1,19 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { NativeSelect } from '@/components/ui/native-select'
 import { SaveError } from '@/features/shared/forms'
 import type { Schemas } from '@/lib/api'
 import { useSetAgentTools } from '../adminQueries'
-import { choiceOf, entryChoices, toolEntries, type AgentTool, type EntryChoice } from '../levels'
-
-const GRANT_VARIANT = { allow: 'secondary', confirm: 'outline', block: 'destructive' } as const
+import { splitTools, toolEntries, type AnyChoice } from '../levels'
+import { BuiltInToolRow, ExternalToolRow } from './ToolRows'
 
 /** Every tool of the catalog with its effective grant: the level's default, tightened
  *  per tool to "only after approval" or "blocked" (never loosened). A tool the level
- *  does not reach is not available. Saves all entries at once with the agent's
- *  version: after a 409 the fresh version is loaded and the choices made are kept. */
+ *  does not reach is not available. After the catalog, the external servers' tools,
+ *  grouped by server: each granted only with an entry. Saves all entries at once with
+ *  the agent's version: after a 409 the fresh version is loaded and the choices made
+ *  are kept. */
 export function AgentToolsForm({
   shown,
   onReload,
@@ -23,9 +22,14 @@ export function AgentToolsForm({
 }) {
   const { t } = useTranslation()
   const save = useSetAgentTools(shown.agent_id)
-  const [draft, setDraft] = useState<Record<string, EntryChoice>>({})
-  const toolName = (tool: AgentTool) =>
-    t(`agents.tools.names.${tool.name}`, { defaultValue: tool.name })
+  const [draft, setDraft] = useState<Record<string, AnyChoice>>({})
+  const { builtIn, servers } = splitTools(shown.tools)
+  const row = (tool: Schemas['AgentToolOut']) => ({
+    tool,
+    level: shown.level,
+    choice: draft[tool.name],
+    onChoose: (choice: AnyChoice) => setDraft((d) => ({ ...d, [tool.name]: choice })),
+  })
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -46,51 +50,29 @@ export function AgentToolsForm({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {shown.tools.map((tool) => {
-              const choices = entryChoices(tool)
-              const name = toolName(tool)
-              return (
-                <tr key={tool.name} className="align-top">
-                  <th scope="row" className="py-2 pr-3 text-left font-normal">
-                    <span className="font-medium">{name}</span>
-                    <span className="mt-0.5 flex flex-wrap gap-1">
-                      <Badge variant="outline">{t(`agents.tools.effects.${tool.effect}`)}</Badge>
-                      <Badge variant="outline">
-                        {t('agents.tools.fromLevel', { level: tool.level })}
-                      </Badge>
-                    </span>
-                  </th>
-                  <td className="py-2 pr-3">
-                    <Badge variant={GRANT_VARIANT[tool.effective]}>
-                      {t(`agents.tools.grants.${tool.effective}`)}
-                    </Badge>
-                  </td>
-                  <td className="py-2">
-                    {choices.length === 0 ? (
-                      <span className="text-xs text-muted-foreground">
-                        {t('agents.tools.unavailable', { level: tool.level })}
-                      </span>
-                    ) : (
-                      <NativeSelect
-                        aria-label={t('agents.tools.entryFor', { name })}
-                        className="min-w-44"
-                        value={draft[tool.name] ?? choiceOf(tool.entry)}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, [tool.name]: e.target.value as EntryChoice }))
-                        }
-                      >
-                        {choices.map((choice) => (
-                          <option key={choice} value={choice}>
-                            {t(`agents.tools.choices.${choice}`)}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
+            {builtIn.map((tool) => (
+              <BuiltInToolRow key={tool.name} {...row(tool)} />
+            ))}
           </tbody>
+          {servers.map((server) => (
+            <tbody key={server.id} className="divide-y border-t-2">
+              <tr>
+                <th
+                  scope="colgroup"
+                  colSpan={3}
+                  className="pt-4 pb-1 text-left text-sm font-semibold"
+                >
+                  {t('agents.tools.external.group', { server: server.name })}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {t('agents.tools.external.groupHint')}
+                  </span>
+                </th>
+              </tr>
+              {server.tools.map((tool) => (
+                <ExternalToolRow key={tool.name} {...row(tool)} />
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
       <SaveError error={save.error} onReload={onReload} />

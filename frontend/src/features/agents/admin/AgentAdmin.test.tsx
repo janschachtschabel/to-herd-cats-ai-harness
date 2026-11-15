@@ -99,7 +99,9 @@ describe('agent administration: level, tools, spaces, skills', () => {
         version: 4,
       }),
     )
-    expect(await within(levels).findByText(/Stufe 3 vergibt nur ein Admin\./)).toBeInTheDocument()
+    expect(
+      await within(levels).findByText(/Stufe 3 und 4 vergibt nur ein Admin\./),
+    ).toBeInTheDocument()
   })
 
   test('without the right to give level 3 it is not offered, and says why', async () => {
@@ -107,7 +109,7 @@ describe('agent administration: level, tools, spaces, skills', () => {
     await renderApp(`/admin/agents/${AGENT_ID}`)
     const levels = await screen.findByRole('group', { name: 'Autonomiestufe' })
     expect(within(levels).queryByRole('radio', { name: /Stufe 3/ })).not.toBeInTheDocument()
-    expect(within(levels).getByText(/Stufe 3 vergibt nur/)).toBeInTheDocument()
+    expect(within(levels).getByText('Höhere Stufen vergibt nur ein Admin.')).toBeInTheDocument()
   })
 
   test('tools: the effective grant, tightening only, a tool above the level not available', async () => {
