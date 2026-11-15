@@ -203,6 +203,11 @@ Werkzeugname ist ein Protokollfehler (`-32602`).
   und an der Seitenversion (Quelle `mcp`; auch wenn ein Vorschlag angenommen wird).
   Vorschläge und Versionen mit `via_token` haben `ai: true`. Nachrichten über ein Token
   erwähnen niemanden und starten keinen Lauf eines Agenten.
+- Auch die **Systemeinträge der Zeitleiste**, die ein Aufruf auslöst (Ticket angelegt,
+  Status geändert, Seite verknüpft, Seitenvorschlag gemacht), tragen den Namen des
+  Tokens in `via_token`. Die Ereignisse der Outbox nennen dafür nur die ID des Tokens
+  (`token_id` in der Nutzlast, gesetzt um jeden Werkzeugaufruf herum,
+  `outbox.through_token`); den Namen liest der Handler beim Schreiben des Eintrags.
 - Eine Ablehnung (nicht gefunden, nicht erlaubt, Status „erledigt“) und ein Konflikt
   mit einer zwischenzeitlichen Änderung („Changed meanwhile (…): read it again.“) sind
   **Werkzeugfehler** (`isError: true`); das Werkzeug hat dann nichts geschrieben.

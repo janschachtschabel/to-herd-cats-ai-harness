@@ -16,6 +16,11 @@ the handlers registered for its type (`app.worker`).
 - An event that an agent's run caused in one of its steps names the run (`run_id`,
   plan M7 decision 9): the step host runs the step's tool inside `caused_by(run_id)`,
   and `emit` takes the run from there, so no service has to pass it on.
+- An event written by a tool call through an access token at `/mcp` names the token
+  (payload `token_id`, plan M8 decision 3): the call runs inside
+  `through_token(token_id)`. The timeline handlers mark their entries with the
+  token's name, as the token's own writes are marked (`via_token`); the payload holds
+  only the id.
 """
 
 import uuid
@@ -171,6 +176,12 @@ class Event:
     run_id: uuid.UUID | None = None  # the run whose step caused it
 
     @property
+    def token_id(self) -> uuid.UUID | None:
+        """The access token whose `/mcp` call wrote it (`through_token`)."""
+        found = self.payload.get(TOKEN_KEY)
+        return uuid.UUID(found) if isinstance(found, str) else None
+
+    @property
     def acting(self) -> EventActor:
         """The event's cause, for events a handler emits in turn."""
         return EventActor(self.org_id, self.actor)
@@ -195,6 +206,9 @@ class Event:
 _deferred: ContextVar[list[bool] | None] = ContextVar("herd_outbox_deferred", default=None)
 # Set inside `caused_by`: the run whose step is writing (the events name it).
 _causing_run: ContextVar[uuid.UUID | None] = ContextVar("herd_outbox_run", default=None)
+# Set inside `through_token`: the access token whose `/mcp` call is writing.
+_writing_token: ContextVar[uuid.UUID | None] = ContextVar("herd_outbox_token", default=None)
+TOKEN_KEY = "token_id"  # noqa: S105 -- a payload key, no secret
 
 
 @contextmanager
@@ -205,6 +219,17 @@ def caused_by(run_id: uuid.UUID) -> Iterator[None]:
         yield
     finally:
         _causing_run.reset(token)
+
+
+@contextmanager
+def through_token(token_id: uuid.UUID) -> Iterator[None]:
+    """Within the block (one `/mcp` tool call, in one task), every event names the
+    access token in its payload (`token_id`)."""
+    token = _writing_token.set(token_id)
+    try:
+        yield
+    finally:
+        _writing_token.reset(token)
 
 
 async def _notify(session: AsyncSession) -> None:
@@ -263,6 +288,8 @@ async def emit_many(
     if not events:
         return []
     run_id = _causing_run.get()
+    token_id = _writing_token.get()
+    marked = {TOKEN_KEY: str(token_id)} if token_id is not None else {}
     rows = [
         EventOutbox(
             org_id=actor.org_id,
@@ -272,7 +299,7 @@ async def emit_many(
             space_id=new.space_id,
             subject_type=new.subject_type,
             subject_id=new.subject_id,
-            payload=new.payload,
+            payload={**new.payload, **marked},
             run_id=run_id,
         )
         for new in events

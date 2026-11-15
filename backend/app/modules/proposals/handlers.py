@@ -42,6 +42,7 @@ from app.modules.proposals.events import (
     PROPOSAL_REJECTED,
 )
 from app.modules.proposals.repository import ProposalFacts
+from app.modules.tokens.marks import via_token
 from app.worker.registry import handler
 
 
@@ -59,7 +60,8 @@ async def write_entry(session: AsyncSession, event: Event) -> Message | None:
         return None
     thread = await repo.thread_for(page)
     body = json.dumps({"key": event.type, "actor": str(event.actor.id)})
-    message = await repo.add_system(thread, event.id, body, event.created_at)
+    marked = await via_token(session, event)
+    message = await repo.add_system(thread, event.id, body, event.created_at, via_token=marked)
     if message is None:
         return await repo.system_message(event.id)
     await emit(

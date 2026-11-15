@@ -32,6 +32,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
+from app.core.outbox import through_token
 from app.modules.agents.actor import Reads
 from app.modules.audit.recorder import record
 from app.modules.mcp_tools.context import TokenContext
@@ -111,7 +112,8 @@ class McpToolService:
         )
         try:
             async with self.session.begin_nested():
-                result = await tool.run(ctx, args)
+                with through_token(token.token_id):  # its events name the token
+                    result = await tool.run(ctx, args)
         except Exception as exc:
             logger.error("mcp.tool_failed", extra={"tool": tool.name, "error": type(exc).__name__})
             return Answer(FAILED, True, Outcome.FAILED)

@@ -45,10 +45,12 @@ class ThreadRepository:
         at: datetime,
         offset: int = 0,
         parent: Message | None = None,
+        via_token: str | None = None,
     ) -> Message | None:
         """The system message `client_id` (an event's, or one entry of it); None if it
         exists already. With `parent`: a reply in its thread (a run's notice where it
-        answers a mention; the caller counts the reply)."""
+        answers a mention; the caller counts the reply). `via_token`: the name of the
+        access token whose `/mcp` call caused it (the AI mark, plan M8)."""
         stmt = (
             insert(Message)
             .values(
@@ -61,6 +63,7 @@ class ThreadRepository:
                 kind=MessageKind.SYSTEM,
                 body_md=body_md,
                 client_id=client_id,
+                via_token=via_token,
                 created_at=at,
             )
             .on_conflict_do_nothing(

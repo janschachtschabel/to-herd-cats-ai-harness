@@ -30,6 +30,7 @@ from app.modules.messaging.notifications import announce
 from app.modules.messaging.repository import readers_of
 from app.modules.tickets.events import TICKET_CREATED, TICKET_EVENTS, Field
 from app.modules.tickets.thread_repository import TicketThreadRepository
+from app.modules.tokens.marks import via_token
 from app.worker.registry import handler
 
 ORDER = (
@@ -101,11 +102,12 @@ async def write_timeline(session: AsyncSession, event: Event) -> dict[str, Messa
     if found is None:
         return {}
     ticket, thread = found
+    marked = await via_token(session, event)
     written: dict[str, Message] = {}
     for offset, (name, body) in enumerate(entries(event)):
         client_id = uuid.uuid5(event.id, name)
         message = await repo.add_system(
-            thread, client_id, json.dumps(body), event.created_at, offset
+            thread, client_id, json.dumps(body), event.created_at, offset, via_token=marked
         )
         if message is not None:
             await emit(
