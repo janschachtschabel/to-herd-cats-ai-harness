@@ -1,14 +1,15 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 7 (Automatisierung) auf M6 (Agenten als Mitarbeiter) und M5 Tasks 1
-bis 7 (KI-Grundlage), 14.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+Stand: Meilenstein 8 (Öffnung: MCP) auf M7 (Automatisierung), M6 (Agenten als
+Mitarbeiter) und M5 Tasks 1 bis 7 (KI-Grundlage), 15.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
 (Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
 stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
-M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6 und die
-Automatisierung aus M7 (Abschnitte
+M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6, die
+Automatisierung aus M7 und der Endpunkt `/mcp` aus M8 (Abschnitte
 [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
 [Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b),
-[Agenten (M6)](#agenten-m6) und [Automatisierung (M7)](#automatisierung-m7)). Was nicht gemessen ist, steht unter
+[Agenten (M6)](#agenten-m6), [Automatisierung (M7)](#automatisierung-m7) und
+[MCP (M8)](#mcp-m8)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -43,8 +44,14 @@ Aufgaben der Agenten ohne Anstoß im Gespräch: einmal, wiederkehrend (Cron mit
 Zeitzone), als Heartbeat mit Checkliste und aktiven Stunden und als Ereignis-Regel eines
 Bereichs (mit Ruhezeit und Tiefengrenze); jede gehört einer Person und hat einen Ort;
 Tagesbudgets in Tokens und Euro je Organisation, Person und Agent; Prüffrist für
-Wiki-Seiten mit täglichem Durchlauf. Hybride Suche und Embeddings (M5 Tasks 8 bis 11)
-und externe Werkzeuge (M8) folgen.
+Wiki-Seiten mit täglichem Durchlauf. **Vorhanden (M8):** der Endpunkt `/mcp` für
+externe KI-Clients (Claude Code, Codex) mit persönlichen Zugangstoken (Umfang, Ablauf,
+nur gehasht gespeichert), lesenden und schreibenden Werkzeugen im Rahmen der Rechte der
+Person und der KI-Richtlinie; externe Agenten mit Agenten-Token und Ticket-Abholung;
+externe MCP-Server als Werkzeugquelle der eigenen Agenten mit Freigabe je Werkzeug und
+Fingerabdruck (schreibende Werkzeuge auf Stufe 4, immer mit Freigabe der fragenden
+Person), Konnektoren (Token oder OAuth mit PKCE, geteilt oder persönlich) und ein
+Katalog mit GitHub und GitLab. Hybride Suche und Embeddings (M5 Tasks 8 bis 11) folgen.
 
 | | |
 |---|---|
@@ -52,7 +59,7 @@ und externe Werkzeuge (M8) folgen.
 | Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|worker\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
 | Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
-| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
+| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
 | Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export |
 | Lizenz | Apache-2.0 |
 
@@ -488,6 +495,59 @@ Debian mit (Paket `tzdata` 2026f, geprüft am 14.11.2026); das Python-Paket `tzd
 (Laufzeitabhängigkeit, Apache-2.0) ist der Rückfall, wo ein System keine hat. Das Image
 braucht nichts weiter; neue Zonenregeln kommen mit einem neuen Basis-Digest.
 
+### MCP (M8)
+
+**Lokale Messung** ohne Docker, 15.11.2026: ein Prozess `HERD_ROLE=all` (API und
+Worker in einem Prozess, ohne Collab-Prozess) aus dem Stand von Commit `df90369` (der
+Code von `/mcp` ist seit Task 4 von M8 unverändert) an einer Wegwerf-Datenbank auf dem
+lokalen PostgreSQL 16.15 (Port 5433), `HERD_MCP_RATE_PER_MINUTE=10000`, damit die
+Ratenbegrenzung nicht bremst (Standard 120 je Token und Minute). Angelegt über die API:
+ein Team-Bereich mit 100 veröffentlichten Seiten (je rund 2 KB Text) und 50 Tickets,
+der MCP-Schalter an, ein `read`-Token für „alle meine Bereiche“ (drei Bereiche).
+Gemessen hat ein Python-Skript (httpx, ein Prozess, auf derselben Maschine; nicht
+eingecheckt): je Fall 20 Aufrufe zum Aufwärmen, dann 500 Aufrufe nacheinander
+(1 Client) bzw. 2.000 mit 10 gleichzeitigen Clients auf einem Token, jeder ein
+`POST /mcp` mit einer JSON-RPC-Nachricht ohne `initialize` (zustandslos); `read_page`
+reihum über die 100 Seiten, `search` reihum über 12 Wörter, die in vielen Seiten stehen.
+CPU und RSS des App-Prozesses aus `/proc/<pid>/stat` und `/proc/<pid>/status`. Die
+Maschine (4 vCPU Intel Xeon @ 2,10 GHz, 16 GB RAM) war von anderen Prozessen
+mitbenutzt; das Lastmittel steht bei jedem Lauf. Zwei Läufe.
+
+| Fall | Lauf 1 (Lastmittel 4–6): P50 / P95 / max | je s | CPU | Lauf 2 (Lastmittel 6–9): P50 / P95 / max | je s |
+|---|---|---|---|---|---|
+| `tools/list`, 1 Client | 22,6 / 35,9 / 57 ms | 42 | 68 % | 25,9 / 41,6 / 338 ms | 35 |
+| `read_page`, 1 Client | 24,4 / 38,4 / 57 ms | 38 | 69 % | 31,5 / 47,6 / 68 ms | 30 |
+| `search`, 1 Client | 33,2 / 46,0 / 345 ms | 28 | 64 % | 44,5 / 63,6 / 114 ms | 22 |
+| `tools/list`, 10 Clients | 139 / 182 / 406 ms | 69 | 98 % | 176 / 244 / 622 ms | 54 |
+| `read_page`, 10 Clients | 174 / 234 / 622 ms | 55 | 92 % | 177 / 241 / 485 ms | 54 |
+| `search`, 10 Clients | 225 / 309 / 708 ms | 43 | 86 % | 205 / 287 / 505 ms | 46 |
+
+100 % CPU = ein Kern (Lauf 2 ähnlich: 50–98 %). Zum Vergleich im selben Prozess:
+`GET /api/spaces` mit Sitzung, nacheinander, P50 9,2 ms / P95 15,0 ms.
+
+- **Wohin die Zeit geht:** Jeder Aufruf löst das Token neu auf (Suche nach dem Hash,
+  Rechte und Umfang), zählt die Ratenbegrenzung in PostgreSQL (eine Schreibtransaktion
+  mit Commit), baut einen Server des MCP-SDK für diese eine Anfrage, ruft das Werkzeug
+  über dieselben Dienste wie die REST-API und schreibt die Zeile `mcp_call`. Ein Aufruf
+  kostet so rund das 2,5-Fache eines gewöhnlichen lesenden REST-Aufrufs.
+- **Mit 10 Clients ist der Prozess an einem Kern** (eine Event-Loop): Der Durchsatz
+  liegt bei 45–70 Aufrufen je Sekunde, die Latenz wächst mit der Warteschlange.
+  `/mcp` hält nichts im Prozess, mehr API-Pods teilen sich die Last also ohne
+  Abstimmung; die Ratenbegrenzung zählt über alle Pods in PostgreSQL.
+- **Ein Client wie Claude Code** ruft Werkzeuge nacheinander und selten (Sekunden
+  zwischen den Aufrufen, während das Modell denkt); bei 120 Aufrufen je Token und
+  Minute (2 je Sekunde) kostet ein solcher Client einen Bruchteil eines Kerns.
+- **Speicher:** RSS des Prozesses 225–237 MiB vor den Läufen (nach dem Anlegen der
+  Daten), höchstens 238 MiB unter Last: Die Aufrufe halten nichts fest.
+- **Platz:** je Werkzeugaufruf eine Zeile `mcp_call` (nur IDs, Werkzeug, Ergebnisart,
+  Dauer); nach beiden Läufen 10.164 Zeilen. Sie werden nicht automatisch gelöscht
+  (wie das Audit); bei dauerhaft vielen Aufrufen wächst die Tabelle um eine kleine
+  Zeile je Aufruf.
+- **Externe MCP-Server** (die eigenen Agenten als Client) sind nicht gemessen: Ihre
+  Dauer bestimmt der fremde Server (Zeitlimit 60 s je Aufruf); jeder Aufruf öffnet
+  eine neue Verbindung, liest die Werkzeugliste und ruft dann auf (drei bis vier
+  Anfragen je Aufruf, Task 6).
+
 ## Abhängigkeiten
 
 | Dienst | Pflicht | Hinweis |
@@ -500,9 +560,12 @@ braucht nichts weiter; neue Zonenregeln kommen mit einem neuen Basis-Digest.
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
 | KI-Anbieter (OpenAI-Protokoll) | nein (nur für KI) | ausgehend von API (Verbindungstest, Modellliste) und Worker (Läufe), nur zu Verbindungen, die ein Admin anlegt, über die SSRF-Sperre oder `HERD_AI_EGRESS_PROXY`; Chart: `networkPolicy.aiEgress`. Ohne Anbieter läuft alles außer KI |
+| Externe MCP-Server und OAuth-Anbieter (seit M8) | nein | ausgehend von API (Werkzeuglisten, Test, OAuth-Code und -Erneuerung) und Worker (Werkzeugaufrufe in Läufen, Erneuerung), nur zu Servern und OAuth-Clients, die ein Admin anlegt, nur https, über die SSRF-Sperre oder `HERD_AI_EGRESS_PROXY`; private Hosts nur aus `HERD_MCP_ALLOWED_HOSTS` (direkt, nicht über den Proxy); Chart: `networkPolicy.aiEgress`. Ohne sie läuft alles außer den externen Werkzeugen |
+| MCP-Clients (seit M8) | nein | eingehend auf `/mcp` (Port 8080, Bearer-Token); nichts davon nötig für den Betrieb |
 
 Keine ausgehenden Verbindungen zu Dritten außer zu angelegten KI-Verbindungen (siehe
-[`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)), keine Drittanbieter-Anfragen im Browser.
+[`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)) und seit M8 zu angelegten MCP-Servern
+und OAuth-Anbietern ([`MCP.md`](MCP.md#betrieb)), keine Drittanbieter-Anfragen im Browser.
 Die API-Dokumentation `/api/docs` (Swagger UI, lädt ihre Skripte von einem CDN) gibt
 es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
 `production`. Das OpenAPI-Dokument `/api/openapi.json` bleibt immer erreichbar.
@@ -547,6 +610,11 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Läufe, keiner doppelt ([Automatisierung (M7)](#automatisierung-m7)). Der tägliche
   Prüfdurchlauf der Wiki-Seiten beansprucht Bereiche ebenso. Kein DBOS, kein
   Leader-Prozess.
+- **MCP (M8):** `/mcp` ist zustandslos (keine Sitzungen, keine Streams, je `POST` eine
+  Antwort); jeder API-Knoten beantwortet jede Anfrage, Sticky Sessions sind nicht
+  nötig. Token, Ratenbegrenzung, OAuth-`state` und PKCE-Prüfwerte liegen in
+  PostgreSQL; die Erneuerung eines OAuth-Tokens sperrt die Zeile des Konnektors, sodass
+  von zwei Workern nur einer den Anbieter fragt (geprüft mit echten Commits).
 - **Erststart:** Das Anlegen der Organisation und der ersten Person ist über eine
   Advisory-Sperre gegen gleichzeitig startende Replikas geschützt.
 - **Migrationen:** Im Cluster ein Job (`HERD_ROLE=migrate`); mit externer Datenbank als
@@ -811,6 +879,12 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   Worker und Datenbank; die Budgetprüfung unter gleichzeitigen Läufen (gemessen im
   Prozess, nacheinander); die Löschung alter Protokollzeilen bei großen Mengen; der
   Prüfdurchlauf mit mehreren Workern unter Last (geprüft als Test).
+- **MCP (M8):** `/mcp` mit mehreren API-Prozessen, hinter einem Proxy und mit vielen
+  Token zugleich (gemessen: ein Prozess, ein Token); schreibende Werkzeuge über `/mcp`
+  unter Last; echte Clients (Claude Code, Codex) gegen die Installation; Aufrufe
+  externer MCP-Server und OAuth-Erneuerungen unter Last (nur als Tests gegen Stubs);
+  CPU und Speicher der Datenbank; das Image mit dem MCP-SDK (keine Image-Größe von M8:
+  `docker build` geht in dieser Sandbox nicht, der Docker-Dienst läuft nicht).
 
 ### Empfehlung Request und Limit
 
@@ -908,7 +982,9 @@ Anhängen und Importen) stehen im README unter
 [Betriebshinweise](../README.md#betriebshinweise), die Bedienung und der Betrieb des
 Wikis in [`WIKI.md`](WIKI.md), der Nachrichten (Worker, Outbox, SSE hinter einem Proxy)
 in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der Agenten
-(Worker, Läufe, Alarme, Rolling Update) in [`AGENTEN.md`](AGENTEN.md).
+(Worker, Läufe, Alarme, Rolling Update) in [`AGENTEN.md`](AGENTEN.md), von MCP
+(`/mcp` hinter einem Proxy, Token, externe Server, Konnektoren, Katalog) in
+[`MCP.md`](MCP.md#betrieb).
 
 ## Metriken und Alarme (seit M3)
 
@@ -937,6 +1013,10 @@ in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der
 | `herd_budget_stops_total{scope}` | Zähler (nur mit Worker) | Läufe, die ein Tagesbudget beendet hat, je Geltung: `user`, `agent`, `organisation` |
 | `herd_wiki_review_reminders_total` | Zähler (nur mit Worker) | Seiten, deren Prüffrist der Durchlauf gemeldet hat |
 | `herd_wiki_review_spaces_unchecked` | Gauge (nur mit Worker) | Bereiche mit Prüffrist, die der Durchlauf heute (UTC) noch nicht gesehen hat |
+| `herd_mcp_calls_total{tool,outcome}` | Zähler (API) | Werkzeugaufrufe über `/mcp` je eingebautem Werkzeug und Ergebnis (`ok`, `refused`, `invalid`, `failed`) |
+| `herd_external_tool_calls_total{outcome,effect}` | Zähler (nur mit Worker) | Aufrufe externer MCP-Werkzeuge in Läufen: `ok`, `error`, `refused`, `limited`, `failed`, `timeout`, `unknown`; `read` oder `write` |
+| `herd_oauth_refreshes_total{status}` | Zähler (API und Worker) | Erneuerungen von OAuth-Token je Antwort des Anbieters |
+| `herd_mcp_catalog_problems` | Gauge (API) | übersprungene Katalog-Dateien |
 
 Alarme in der PrometheusRule des Charts: `HerdOutboxBacklog` (ältestes offenes
 Ereignis älter als 5 Minuten, kritisch), `HerdOutboxFailed` (Zahl der aufgegebenen
@@ -949,8 +1029,15 @@ Worker-Pods mit ab). Seit M6 für die Läufe der Agenten, je als Warnung: `HerdR
 endete mit `provider_refused` oder `error`, 5 Minuten lang). Seit M7 für die Aufgaben,
 je als Warnung: `HerdAutomationsLagging` (ältester fälliger Termin über 3 Minuten,
 5 Minuten lang) und `HerdAutomationsFailing` (mindestens 5 Aufgaben mehr binnen einer
-Stunde wegen Fehlschlägen angehalten). Bedeutung und Abhilfe in
-[`AGENTEN.md`](AGENTEN.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
+Stunde wegen Fehlschlägen angehalten). Seit M8, je als Warnung:
+`HerdExternalToolsFailing` (mehr als die Hälfte der gesendeten externen Aufrufe von
+15 Minuten, mindestens 3, gescheitert oder im Zeitlimit, 5 Minuten lang),
+`HerdOAuthRefreshFailing` (mindestens 3 gescheiterte Erneuerungen in 30 Minuten außer
+`invalid_grant`), `HerdMcpAuthFailures` (mehr als 50 Antworten 401 an `/mcp` in
+5 Minuten, 10 Minuten lang; aus `herd_http_requests_total{route="/mcp"}`) und
+`HerdMcpCatalogProblems` (übersprungene Katalog-Dateien, 15 Minuten). Bedeutung und
+Abhilfe in [`AGENTEN.md`](AGENTEN.md#metriken-und-alarme) und
+[`MCP.md`](MCP.md#metriken-und-alarme). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
 ## Tests (Backend Stand M7, sonst M6)
