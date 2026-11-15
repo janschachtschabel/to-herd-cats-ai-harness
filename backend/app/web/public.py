@@ -15,6 +15,7 @@ from app.core.request_context import RequestContextMiddleware
 from app.core.request_log import RequestLogMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.telemetry import configure_tracing
+from app.mcp.endpoint import router as mcp_endpoint
 from app.modules.agents import router as agents_router
 from app.modules.agents import run_router
 from app.modules.agents import spaces_router as agent_spaces
@@ -183,6 +184,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     app.state.live = LiveHub(max_lag_seconds=settings.live_max_lag_seconds)
     app.include_router(api_router())
     app.include_router(collab_relay)  # WebSocket /collab/{page_id}
+    app.include_router(mcp_endpoint)  # /mcp: bearer tokens, no CSRF, no cookies
 
     if settings.environment == "test":
         from app.web.test_routes import router as test_router

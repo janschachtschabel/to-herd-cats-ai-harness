@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.core.access import Action, space_ids_with
 from app.core.errors import NotFound
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, CallContext
 from app.modules.ai.policy_filters import ai_space_ids
 from app.modules.search.service import SearchHit, SearchService
 from app.modules.spaces.models import Space
@@ -51,7 +51,7 @@ class ReadTicketArgs(BaseModel):
     key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
 
 
-async def search(ctx: ToolContext, args: SearchArgs) -> ToolResult:
+async def search(ctx: CallContext, args: SearchArgs) -> ToolResult:
     hits = await SearchService(ctx.session).for_ai(
         ctx.actor, args.query, location=ctx.location, limit=SEARCH_HITS
     )
@@ -74,7 +74,7 @@ async def search(ctx: ToolContext, args: SearchArgs) -> ToolResult:
     return ToolResult("search", "\n".join(lines) or NOT_FOUND, {"query": args.query}, found)
 
 
-async def read_page(ctx: ToolContext, args: ReadPageArgs) -> ToolResult:
+async def read_page(ctx: CallContext, args: ReadPageArgs) -> ToolResult:
     try:
         page = await PageReader(ctx.session).for_ai(ctx.actor, args.page_id)
     except NotFound:
@@ -85,7 +85,7 @@ async def read_page(ctx: ToolContext, args: ReadPageArgs) -> ToolResult:
     return ToolResult("wiki", text, {"id": str(page.id)}, frozenset({page.space_id}))
 
 
-async def read_ticket(ctx: ToolContext, args: ReadTicketArgs) -> ToolResult:
+async def read_ticket(ctx: CallContext, args: ReadTicketArgs) -> ToolResult:
     number = key_number(args.key)
     if number is None:
         return ToolResult("ticket", NOT_FOUND, {"key": args.key})
@@ -114,7 +114,7 @@ async def read_ticket(ctx: ToolContext, args: ReadTicketArgs) -> ToolResult:
     return ToolResult("ticket", text, attrs, frozenset({ticket.space_id}))
 
 
-def ticket_scope(ctx: ToolContext, *, located: bool = False) -> TicketScope:
+def ticket_scope(ctx: CallContext, *, located: bool = False) -> TicketScope:
     """The spaces where the run may read tickets, without those AI may not read; if
     `located`, also without those the run's connection may not receive."""
     location = ctx.location if located else None

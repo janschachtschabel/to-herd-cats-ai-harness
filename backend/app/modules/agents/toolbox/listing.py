@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from app.core.errors import Forbidden, NotFound, ValidationFailed
 from app.core.pagination import PageParams
-from app.modules.agents.toolbox.base import NOT_FOUND, ToolContext
+from app.modules.agents.toolbox.base import NOT_FOUND, CallContext
 from app.modules.agents.toolbox.reading import ticket_scope
 from app.modules.ai.policy_filters import ai_page_ids, ai_space_ids
 from app.modules.spaces.service import SpaceService
@@ -69,7 +69,7 @@ class SearchTicketsArgs(BaseModel):
         return self
 
 
-async def list_tree(ctx: ToolContext, args: ListTreeArgs) -> ToolResult:
+async def list_tree(ctx: CallContext, args: ListTreeArgs) -> ToolResult:
     if args.space_id is None:
         return await _spaces(ctx)
     attrs = {"space": str(args.space_id)}
@@ -97,7 +97,7 @@ async def list_tree(ctx: ToolContext, args: ListTreeArgs) -> ToolResult:
     return ToolResult("wiki", "\n".join(lines), attrs, frozenset({args.space_id}))
 
 
-async def _spaces(ctx: ToolContext) -> ToolResult:
+async def _spaces(ctx: CallContext) -> ToolResult:
     """The spaces the run may read whose policy lets its connection receive them."""
     listed = await SpaceService(ctx.session).list_visible(
         ctx.actor,
@@ -111,7 +111,7 @@ async def _spaces(ctx: ToolContext) -> ToolResult:
     return ToolResult("wiki", "\n".join(lines) or NOT_FOUND)
 
 
-async def list_versions(ctx: ToolContext, args: ListVersionsArgs) -> ToolResult:
+async def list_versions(ctx: CallContext, args: ListVersionsArgs) -> ToolResult:
     """The page's versions, newest first, without their content (the history needs
     the right to edit, as for a person: spec 9, review R16)."""
     attrs = {"id": str(args.page_id)}
@@ -142,7 +142,7 @@ async def list_versions(ctx: ToolContext, args: ListVersionsArgs) -> ToolResult:
     return ToolResult("wiki", text, attrs, frozenset({page.space_id}))
 
 
-async def search_tickets(ctx: ToolContext, args: SearchTicketsArgs) -> ToolResult:
+async def search_tickets(ctx: CallContext, args: SearchTicketsArgs) -> ToolResult:
     """Tickets by text and filters, last changed first."""
     filters = Filters(
         space_id=args.space_id,

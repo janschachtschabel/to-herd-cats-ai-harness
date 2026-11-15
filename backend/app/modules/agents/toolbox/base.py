@@ -89,11 +89,20 @@ class CallRef:
 
 
 @dataclass(frozen=True, slots=True)
-class ToolContext:
+class CallContext:
+    """What a tool needs that does not belong to a run: the transaction, the actor
+    whose rights it uses, the data location the AI policy treats the reader as, and
+    what was read. A reading tool that takes only this can also serve a caller from
+    outside a run (`/mcp`, plan M8 task 2); mypy keeps it from reaching for a run."""
+
     session: AsyncSession
     actor: Actor
     location: DataLocation
     reads: Reads
+
+
+@dataclass(frozen=True, slots=True)
+class ToolContext(CallContext):
     run: RunRef
     call: CallRef | None = None  # None only outside a run (a tool called directly)
 
