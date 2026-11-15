@@ -12,7 +12,9 @@ one bound to a skill proposal (plan M6 task 9) while the person sees the proposa
 paused, plan M7) is seen while the automation exists and the person may still see
 it (`automations/sight.py`: its owner, its agent's responsible person, a manager of
 its place's space, `agent.manage`): it names only the automation, its agent and why
-it is paused now.
+it is paused now. One bound to an account awaiting approval (plan M9 task 5b) is
+seen while the person holds `user.manage`; the account is its author, and whether
+it still waits comes with it.
 """
 
 import uuid
@@ -33,6 +35,7 @@ from sqlalchemy import (
     or_,
     select,
     table,
+    true,
     update,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -97,6 +100,7 @@ class ActivityEntry:
     snippet: str  # the start of the message's Markdown; empty for a timeline entry
     author_type: str | None = None  # `user` or `agent` (as the message or proposal says)
     automation_paused: str | None = None  # an automation's: why it is paused now
+    account_awaiting: bool | None = None  # an account's: whether it still awaits approval
 
 
 class ActivityRepository:
@@ -106,11 +110,14 @@ class ActivityRepository:
         scope: ConversationScope,
         skills: SkillProposalSight,
         automations: AutomationSight,
+        *,
+        manages_users: bool = False,
     ) -> None:
         self.session = session
         self.scope = scope
         self.skills = skills
         self.automations = automations
+        self.manages_users = manages_users
 
     def _mine(self) -> ColumnElement[bool]:
         # Self-contained subqueries: the list joins `conversation` and `message` too.
@@ -159,10 +166,13 @@ class ActivityRepository:
                 .correlate_except(automation, agent, place)
             )
         about_automation = and_(Notification.automation_id.is_not(None), sees_automation)
+        about_account = and_(
+            Notification.account_id.is_not(None), true() if self.manages_users else false()
+        )
         return and_(
             Notification.org_id == self.scope.org_id,
             Notification.user_id == self.scope.principal.id,
-            or_(bound, about_proposal, about_skill, about_automation),
+            or_(bound, about_proposal, about_skill, about_automation, about_account),
         )
 
     async def page(
@@ -177,7 +187,9 @@ class ActivityRepository:
         unbound = Notification.message_id.is_(None)
         about_skill = Notification.skill_proposal_id.is_not(None)
         about_automation = Notification.automation_id.is_not(None)
+        about_account = Notification.account_id.is_not(None)
         author_id = case(
+            (about_account, Notification.account_id),
             (about_automation, AUTOMATION.c.agent_id),
             (about_skill, SKILL_PROPOSAL.c.author_id),
             (unbound, PROPOSAL.c.author_id),
@@ -185,6 +197,7 @@ class ActivityRepository:
             else_=Message.author_id,
         )
         author_type = case(
+            (about_account, literal("user", String)),
             (about_automation, literal("agent", String)),
             (about_skill, SKILL_PROPOSAL.c.author_type),
             (unbound, PROPOSAL.c.author_type),
@@ -209,6 +222,7 @@ class ActivityRepository:
                 snippet,
                 author_type,
                 AUTOMATION.c.paused_reason,
+                case((about_account, User.awaiting_approval_since.is_not(None)), else_=None),
             )
             .outerjoin(Conversation, Conversation.id == Notification.conversation_id)
             .outerjoin(Message, Message.id == Notification.message_id)

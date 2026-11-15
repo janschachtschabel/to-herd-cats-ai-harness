@@ -7,4 +7,5 @@ import app.modules.messaging.handlers  # noqa: F401 -- notify_on_message, publis
 import app.modules.proposals.handlers  # noqa: F401 -- proposal_timeline, notify_on_proposal
 import app.modules.skills.proposal_handlers  # noqa: F401 -- notify_on_skill_proposal
 import app.modules.tickets.handlers  # noqa: F401 -- ticket_timeline, notify_on_ticket
+import app.modules.users.handlers  # noqa: F401 -- notify_on_signup
 import app.modules.wiki.review_handlers  # noqa: F401 -- notify_on_review_due

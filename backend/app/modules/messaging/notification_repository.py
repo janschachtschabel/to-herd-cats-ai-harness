@@ -155,3 +155,25 @@ class NotificationRepository:
         ]
         stmt = insert(Notification).values(rows).returning(Notification)
         return list((await self.session.scalars(stmt)).all())
+
+    async def add_for_account(
+        self, account_id: uuid.UUID, wanted: Sequence[tuple[uuid.UUID, NotificationReason]]
+    ) -> list[Notification]:
+        """Notifications about an account awaiting approval (plan M9 task 5b), those
+        that did not exist yet."""
+        if not wanted:
+            return []
+        rows = [
+            {"org_id": self.org_id, "user_id": user_id, "reason": reason, "account_id": account_id}
+            for user_id, reason in wanted
+        ]
+        stmt = (
+            insert(Notification)
+            .values(rows)
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "account_id", "reason"],
+                index_where=Notification.account_id.is_not(None),
+            )
+            .returning(Notification)
+        )
+        return list((await self.session.scalars(stmt)).all())

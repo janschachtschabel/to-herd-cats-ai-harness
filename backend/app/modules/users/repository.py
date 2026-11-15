@@ -60,6 +60,17 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User.id).where(User.org_id == org_id, User.is_active.is_(True))
         return list(await self.session.scalars(stmt.order_by(User.id)))
 
+    async def active_ids_with_roles(
+        self, org_id: uuid.UUID, roles: Collection[SystemRole]
+    ) -> list[uuid.UUID]:
+        """The active people of the organisation holding one of these system roles."""
+        stmt = select(User.id).where(
+            User.org_id == org_id,
+            User.is_active.is_(True),
+            User.system_role.in_([r.value for r in roles]),
+        )
+        return list(await self.session.scalars(stmt.order_by(User.id)))
+
     async def exists_any(self) -> bool:
         return bool(await self.session.scalar(select(select(User.id).exists())))
 
