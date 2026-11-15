@@ -105,6 +105,16 @@ async def test_a_response_larger_than_the_cap_ends_the_call(
             await client.get(openai_stub.base_url + "/models")
 
 
+async def test_a_caller_may_set_a_smaller_cap(openai_stub: OpenAIStub) -> None:
+    """MCP tool results (plan M8 task 6) have a cap of their own."""
+    openai_stub.state.models = [f"model-{i:06d}" for i in range(400)]
+    async with egress_x2.client(LOCAL, timeout=5, max_response_bytes=1000) as client:
+        with pytest.raises(egress_x2.ResponseTooLarge):
+            await client.get(openai_stub.base_url + "/models")
+    async with egress_x2.client(LOCAL, timeout=5) as client:
+        assert (await client.get(openai_stub.base_url + "/models")).status_code == 200
+
+
 class _ConnectProxy:
     """A CONNECT proxy on 127.0.0.1 that records its targets and tunnels `*.test` names
     to 127.0.0.1, as a proxy with its own DNS would."""

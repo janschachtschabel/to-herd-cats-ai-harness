@@ -5,8 +5,9 @@ addresses dialled (`checked_addresses`); the scheme and literal addresses checke
 request (`check_request_target`); no redirects, nothing from the environment; the
 operator's proxy (`HERD_AI_EGRESS_PROXY`) only for connections that are not `local`.
 
-A response body larger than MAX_RESPONSE_BYTES ends the call (`ResponseTooLarge`):
-a provider cannot fill the worker's memory.
+A response body larger than MAX_RESPONSE_BYTES (or the smaller cap a caller names,
+such as an MCP tool result's) ends the call (`ResponseTooLarge`): a provider cannot
+fill the worker's memory.
 """
 
 from collections.abc import AsyncIterator, Iterable
@@ -88,14 +89,16 @@ class GuardedBackend(httpcore2.AsyncNetworkBackend):
 
 
 class _Limited(httpx2.AsyncByteStream):
-    def __init__(self, inner: httpx2.AsyncByteStream) -> None:
+    def __init__(self, inner: httpx2.AsyncByteStream, limit: int | None) -> None:
         self.inner = inner
+        self.limit = limit
 
     async def __aiter__(self) -> AsyncIterator[bytes]:
         size = 0
+        limit = self.limit or MAX_RESPONSE_BYTES
         async for chunk in self.inner:
             size += len(chunk)
-            if size > MAX_RESPONSE_BYTES:
+            if size > limit:
                 raise ResponseTooLarge("response too large")
             yield chunk
 
@@ -104,7 +107,9 @@ class _Limited(httpx2.AsyncByteStream):
 
 
 class _GuardedTransport(httpx2.AsyncHTTPTransport):
-    def __init__(self, rules: EgressRules, network: Network, proxy: str | None) -> None:
+    def __init__(
+        self, rules: EgressRules, network: Network, proxy: str | None, limit: int | None
+    ) -> None:
         context = network.ssl_context or httpx2.create_ssl_context(trust_env=True)
         super().__init__(verify=context, trust_env=False)
         target = proxy_for(rules, proxy)
@@ -126,12 +131,13 @@ class _GuardedTransport(httpx2.AsyncHTTPTransport):
             )
         )
         self.rules = rules
+        self.limit = limit
 
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         check_request_target(request.url.scheme, request.url.host, self.rules)
         response = await super().handle_async_request(request)
         assert isinstance(response.stream, httpx2.AsyncByteStream)
-        response.stream = _Limited(response.stream)
+        response.stream = _Limited(response.stream, self.limit)
         return response
 
 
@@ -141,11 +147,13 @@ def client(
     timeout: float,
     network: Network | None = None,
     proxy: str | None = None,
+    max_response_bytes: int | None = None,
 ) -> httpx2.AsyncClient:
     """An httpx2 client whose every connection goes through the guard (or the
-    operator's proxy, see the module docstring)."""
+    operator's proxy, see the module docstring); `max_response_bytes` caps each body
+    below MAX_RESPONSE_BYTES."""
     return httpx2.AsyncClient(
-        transport=_GuardedTransport(rules, network or egress._network, proxy),
+        transport=_GuardedTransport(rules, network or egress._network, proxy, max_response_bytes),
         timeout=timeout,
         follow_redirects=False,
         trust_env=False,

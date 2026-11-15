@@ -819,6 +819,157 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/mcp-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Servers */
+        get: operations["list_servers_api_ai_mcp_servers_get"];
+        put?: never;
+        /**
+         * Create Server
+         * @description Saves the server, then reads its tool list; `refresh` says how that went.
+         */
+        post: operations["create_server_api_ai_mcp_servers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Server */
+        get: operations["get_server_api_ai_mcp_servers__server_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Server */
+        delete: operations["delete_server_api_ai_mcp_servers__server_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Server */
+        patch: operations["update_server_api_ai_mcp_servers__server_id__patch"];
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Tools
+         * @description Read the tool list again; a failure is a state, never the server's answer.
+         */
+        post: operations["refresh_tools_api_ai_mcp_servers__server_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Server
+         * @description Connect and list the tools; nothing is stored.
+         */
+        post: operations["test_server_api_ai_mcp_servers__server_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tools */
+        get: operations["list_tools_api_ai_mcp_servers__server_id__tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Classify Tool */
+        patch: operations["classify_tool_api_ai_mcp_servers__server_id__tools__tool_id__patch"];
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Tool
+         * @description Approve exactly the tool as last read (its fingerprint).
+         */
+        post: operations["approve_tool_api_ai_mcp_servers__server_id__tools__tool_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Block Tool */
+        post: operations["block_tool_api_ai_mcp_servers__server_id__tools__tool_id__block_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/mcp/tokens": {
         parameters: {
             query?: never;
@@ -891,6 +1042,23 @@ export interface paths {
         head?: never;
         /** Update Connector */
         patch: operations["update_connector_api_ai_my_connectors__connector_id__patch"];
+        trace?: never;
+    };
+    "/api/ai/my-mcp-servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Personal Servers */
+        get: operations["list_personal_servers_api_ai_my_mcp_servers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/ai/usage": {
@@ -4018,6 +4186,11 @@ export interface components {
             review: number;
         };
         /**
+         * Classification
+         * @enum {string}
+         */
+        Classification: "read" | "write";
+        /**
          * ConnectionCreate
          * @description Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else
          *     empty; `param_family` is `max_completion_tokens` for `openai`, else `max_tokens`;
@@ -4165,6 +4338,8 @@ export interface components {
             auth_kind: components["schemas"]["AuthKind"];
             /** Header Name */
             header_name?: string | null;
+            /** Mcp Server Id */
+            mcp_server_id?: string | null;
             /** Name */
             name: string;
             secret: components["schemas"]["SecretIn"];
@@ -4186,6 +4361,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Mcp Server Id */
+            mcp_server_id: string | null;
             /** Name */
             name: string;
             scope: components["schemas"]["ConnectorScope"];
@@ -4217,6 +4394,11 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ConnectorUse
+         * @enum {string}
+         */
+        ConnectorUse: "none" | "shared" | "personal";
         /**
          * ConversationKind
          * @enum {string}
@@ -4260,6 +4442,37 @@ export interface components {
             space_id: string | null;
             /** Topic */
             topic: string | null;
+            /** Version */
+            version: number;
+        };
+        /** CreatedServerOut */
+        CreatedServerOut: {
+            /** Connector Id */
+            connector_id: string | null;
+            connector_scope: components["schemas"]["ConnectorUse"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            data_location: components["schemas"]["DataLocation"];
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            refresh: components["schemas"]["RefreshOut"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Url */
+            url: string;
             /** Version */
             version: number;
         };
@@ -5562,6 +5775,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[PersonalServerOut] */
+        Page_PersonalServerOut_: {
+            /** Items */
+            items: components["schemas"]["PersonalServerOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[ProposalOut] */
         Page_ProposalOut_: {
             /** Items */
@@ -5580,6 +5800,13 @@ export interface components {
         Page_RunOut_: {
             /** Items */
             items: components["schemas"]["RunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ServerOut] */
+        Page_ServerOut_: {
+            /** Items */
+            items: components["schemas"]["ServerOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -5650,6 +5877,13 @@ export interface components {
         Page_TokenOut_: {
             /** Items */
             items: components["schemas"]["TokenOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[ToolOut] */
+        Page_ToolOut_: {
+            /** Items */
+            items: components["schemas"]["ToolOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -5794,6 +6028,22 @@ export interface components {
             enabled: boolean;
             /** Version */
             version: number;
+        };
+        /**
+         * PersonalServerOut
+         * @description A server that acts with each person's own connector, and whether the caller
+         *     has connected theirs.
+         */
+        PersonalServerOut: {
+            /** Connected */
+            connected: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** PlaceOut */
         PlaceOut: {
@@ -6173,6 +6423,34 @@ export interface components {
             time_zone: string;
         };
         /**
+         * RefreshOut
+         * @description How reading the tool list went: counts of tools new, with another fingerprint
+         *     and no longer listed; all 0 unless `status` is `ok`.
+         */
+        RefreshOut: {
+            /**
+             * Changed
+             * @default 0
+             */
+            changed?: number;
+            /**
+             * Missing
+             * @default 0
+             */
+            missing?: number;
+            /**
+             * New
+             * @default 0
+             */
+            new?: number;
+            status: components["schemas"]["RemoteStatus"];
+        };
+        /**
+         * RemoteStatus
+         * @enum {string}
+         */
+        RemoteStatus: "ok" | "blocked" | "timeout" | "unreachable" | "unauthorized" | "forbidden" | "not_found" | "rate_limited" | "redirect" | "server_error" | "too_large" | "protocol_error" | "secret_unavailable";
+        /**
          * RunEventOut
          * @description One step of a run (model call: usage and the answer's parts; tool call: name,
          *     arguments, result, the spaces it came from; stop: the reason). `redacted`: parts
@@ -6348,6 +6626,72 @@ export interface components {
             kind: components["schemas"]["SecretKind"] | null;
             /** Set */
             set: boolean;
+        };
+        /** ServerCreate */
+        ServerCreate: {
+            /** Connector Id */
+            connector_id?: string | null;
+            /** @default none */
+            connector_scope?: components["schemas"]["ConnectorUse"];
+            /** @default external */
+            data_location?: components["schemas"]["DataLocation"];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled?: boolean;
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+        };
+        /** ServerOut */
+        ServerOut: {
+            /** Connector Id */
+            connector_id: string | null;
+            connector_scope: components["schemas"]["ConnectorUse"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            data_location: components["schemas"]["DataLocation"];
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Url */
+            url: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ServerUpdate
+         * @description Only the fields sent change. A new URL withdraws every approval.
+         */
+        ServerUpdate: {
+            /** Connector Id */
+            connector_id?: string | null;
+            connector_scope?: components["schemas"]["ConnectorUse"] | null;
+            data_location?: components["schemas"]["DataLocation"] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Version */
+            version: number;
         };
         /**
          * SkillAuthorOut
@@ -7101,6 +7445,14 @@ export interface components {
             /** Model */
             model: string;
         };
+        /** TestOut */
+        TestOut: {
+            /** Duration Ms */
+            duration_ms: number;
+            status: components["schemas"]["RemoteStatus"];
+            /** Tools */
+            tools: number | null;
+        };
         /**
          * TicketCountsOut
          * @description For the sidebar: the caller's tickets that are open, active or in review.
@@ -7465,6 +7817,69 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * ToolClassify
+         * @description `read` for a tool the server does not annotate read-only loosens what the admin
+         *     was offered: it needs `confirm_loosen`.
+         */
+        ToolClassify: {
+            classification: components["schemas"]["Classification"];
+            /**
+             * Confirm Loosen
+             * @default false
+             */
+            confirm_loosen?: boolean;
+            /** Version */
+            version: number;
+        };
+        /** ToolOut */
+        ToolOut: {
+            /** Approved Fingerprint */
+            approved_fingerprint: string | null;
+            classification: components["schemas"]["Classification"];
+            /** Description */
+            description: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Schema */
+            input_schema: {
+                [key: string]: unknown;
+            };
+            /** Missing */
+            missing: boolean;
+            /** Name */
+            name: string;
+            /** Read Only Hint */
+            read_only_hint: boolean;
+            /**
+             * Server Id
+             * Format: uuid
+             */
+            server_id: string;
+            state: components["schemas"]["ToolState"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ToolState
+         * @enum {string}
+         */
+        ToolState: "pending" | "approved" | "blocked" | "changed";
+        /** ToolVersionIn */
+        ToolVersionIn: {
+            /** Version */
+            version: number;
         };
         /**
          * TrashedPageOut
@@ -9773,6 +10188,372 @@ export interface operations {
             };
         };
     };
+    list_servers_api_ai_mcp_servers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ServerOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_server_api_ai_mcp_servers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_server_api_ai_mcp_servers__server_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_server_api_ai_mcp_servers__server_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_server_api_ai_mcp_servers__server_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_tools_api_ai_mcp_servers__server_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_server_api_ai_mcp_servers__server_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tools_api_ai_mcp_servers__server_id__tools_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                server_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ToolOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    classify_tool_api_ai_mcp_servers__server_id__tools__tool_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolClassify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_tool_api_ai_mcp_servers__server_id__tools__tool_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolVersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    block_tool_api_ai_mcp_servers__server_id__tools__tool_id__block_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                server_id: string;
+                tool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolVersionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_all_tokens_api_ai_mcp_tokens_get: {
         parameters: {
             query?: {
@@ -9983,6 +10764,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_personal_servers_api_ai_my_mcp_servers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PersonalServerOut_"];
                 };
             };
             /** @description Validation Error */

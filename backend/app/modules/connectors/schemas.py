@@ -71,6 +71,8 @@ class ConnectorCreate(BaseModel):
     auth_kind: AuthKind
     header_name: HeaderName | None = None
     secret: SecretIn
+    # Personal connectors only: the external MCP server it serves (plan M8 task 6).
+    mcp_server_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _shape(self) -> Self:
@@ -105,6 +107,7 @@ class ConnectorOut(BaseModel):
     scope: ConnectorScope
     auth_kind: AuthKind
     header_name: str | None
+    mcp_server_id: uuid.UUID | None
     has_secret: bool
     secret_kind: SecretKind
     version: int
@@ -119,6 +122,7 @@ class ConnectorOut(BaseModel):
             scope=connector.scope,
             auth_kind=connector.auth_kind,
             header_name=connector.header_name,
+            mcp_server_id=connector.mcp_server_id,
             has_secret=True,
             secret_kind=kind_of(connector.secret_ref),
             version=connector.version,

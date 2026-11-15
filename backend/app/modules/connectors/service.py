@@ -8,6 +8,9 @@
 - A secret arrives as a value (stored as `enc:`) or, for a shared connector only, as an
   `env:HERD_AI_*` name. It is never in an answer, an audit entry or a log line: audit
   details name the changed fields and, for the secret, only its kind.
+- A personal connector may serve one external MCP server that acts with each
+  person's own connector (`mcp_server_id`; one per person and server). A shared
+  connector a server names is not deleted (409 `connector.in_use`).
 - Every write names the version it read (409 `connector.version_conflict`).
 """
 
@@ -27,6 +30,8 @@ from app.modules.audit.recorder import record
 from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
 from app.modules.connectors.repository import ConnectorRepository
 from app.modules.connectors.schemas import ConnectorCreate, ConnectorUpdate, check_auth
+from app.modules.mcp_servers.models import ConnectorUse
+from app.modules.mcp_servers.repository import ServerRepository
 
 _FIELDS = ("name", "auth_kind", "header_name")
 
@@ -66,6 +71,8 @@ class ConnectorService:
         await repo.lock_names()
         if await repo.name_taken(data.name):
             raise Conflict(code="connector.name_taken")
+        if data.mcp_server_id is not None:
+            await self._check_server(actor, scope, repo, data.mcp_server_id)
         connector = await repo.add(
             Connector(
                 org_id=actor.org_id,
@@ -75,6 +82,7 @@ class ConnectorService:
                 auth_kind=data.auth_kind,
                 header_name=data.header_name,
                 secret_ref=_secret_ref(data.secret, scope),
+                mcp_server_id=data.mcp_server_id,
             )
         )
         details = {
@@ -125,8 +133,24 @@ class ConnectorService:
     ) -> None:
         repo = await self.repo(actor, scope)
         connector = await self._current(repo, connector_id, version)
+        if await ServerRepository(self.session, actor.org_id).uses_connector(connector.id):
+            raise Conflict(code="connector.in_use")
         await repo.delete(connector)
         await self._audit(actor, "connector.deleted", connector, {"scope": scope.value})
+
+    async def _check_server(
+        self,
+        actor: Actor,
+        scope: ConnectorScope,
+        repo: ConnectorRepository,
+        server_id: uuid.UUID,
+    ) -> None:
+        server = await ServerRepository(self.session, actor.org_id).get(server_id)
+        personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
+        if scope != ConnectorScope.PERSONAL or not personal:
+            raise ValidationFailed(code="connector.server_invalid")
+        if await repo.for_server(server_id) is not None:
+            raise Conflict(code="connector.server_taken")
 
     async def _current(
         self, repo: ConnectorRepository, connector_id: uuid.UUID, version: int

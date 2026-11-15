@@ -1,0 +1,176 @@
+"""External MCP servers and their tools as the API takes and shows them."""
+
+import uuid
+from datetime import datetime
+from typing import Annotated, Any, Self
+
+from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+
+from app.mcp.client import RemoteStatus
+from app.modules.ai.models import DataLocation
+from app.modules.mcp_servers.models import (
+    MAX_NAME_CHARS,
+    MAX_URL_CHARS,
+    Classification,
+    ConnectorUse,
+    McpServer,
+    McpServerTool,
+    ToolState,
+)
+
+Name = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_NAME_CHARS)
+]
+Url = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_URL_CHARS)
+]
+
+
+def check_connector(scope: ConnectorUse | None, connector_id: uuid.UUID | None) -> None:
+    if (scope == ConnectorUse.SHARED) != (connector_id is not None):
+        raise ValueError("connector_id is needed for connector_scope shared, and only for it")
+
+
+class ServerCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Name
+    url: Url
+    data_location: DataLocation = DataLocation.EXTERNAL
+    connector_scope: ConnectorUse = ConnectorUse.NONE
+    connector_id: uuid.UUID | None = None
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def _shape(self) -> Self:
+        check_connector(self.connector_scope, self.connector_id)
+        return self
+
+
+class ServerUpdate(BaseModel):
+    """Only the fields sent change. A new URL withdraws every approval."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    name: Name | None = None
+    url: Url | None = None
+    data_location: DataLocation | None = None
+    connector_scope: ConnectorUse | None = None
+    connector_id: uuid.UUID | None = None
+    enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def _shape(self) -> Self:
+        for field in ("name", "url", "data_location", "connector_scope", "enabled"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be removed")
+        return self
+
+
+class RefreshOut(BaseModel):
+    """How reading the tool list went: counts of tools new, with another fingerprint
+    and no longer listed; all 0 unless `status` is `ok`."""
+
+    status: RemoteStatus
+    new: int = 0
+    changed: int = 0
+    missing: int = 0
+
+
+class ServerOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    url: str
+    data_location: DataLocation
+    connector_scope: ConnectorUse
+    connector_id: uuid.UUID | None
+    enabled: bool
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def of(cls, server: McpServer) -> "ServerOut":
+        return cls(
+            id=server.id,
+            name=server.name,
+            url=server.url,
+            data_location=server.data_location,
+            connector_scope=server.connector_scope,
+            connector_id=server.connector_id,
+            enabled=server.enabled,
+            version=server.version,
+            created_at=server.created_at,
+            updated_at=server.updated_at,
+        )
+
+
+class CreatedServerOut(ServerOut):
+    refresh: RefreshOut
+
+
+class TestOut(BaseModel):
+    status: RemoteStatus
+    tools: int | None
+    duration_ms: int
+
+
+class PersonalServerOut(BaseModel):
+    """A server that acts with each person's own connector, and whether the caller
+    has connected theirs."""
+
+    id: uuid.UUID
+    name: str
+    connected: bool
+
+
+class ToolOut(BaseModel):
+    id: uuid.UUID
+    server_id: uuid.UUID
+    name: str
+    description: str
+    input_schema: dict[str, Any]
+    read_only_hint: bool
+    fingerprint: str
+    approved_fingerprint: str | None
+    classification: Classification
+    state: ToolState
+    missing: bool
+    version: int
+    updated_at: datetime
+
+    @classmethod
+    def of(cls, tool: McpServerTool) -> "ToolOut":
+        return cls(
+            id=tool.id,
+            server_id=tool.server_id,
+            name=tool.name,
+            description=tool.description,
+            input_schema=tool.input_schema,
+            read_only_hint=tool.read_only_hint,
+            fingerprint=tool.fingerprint,
+            approved_fingerprint=tool.approved_fingerprint,
+            classification=tool.classification,
+            state=tool.state,
+            missing=tool.missing,
+            version=tool.version,
+            updated_at=tool.updated_at,
+        )
+
+
+class ToolVersionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+
+
+class ToolClassify(BaseModel):
+    """`read` for a tool the server does not annotate read-only loosens what the admin
+    was offered: it needs `confirm_loosen`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    classification: Classification
+    confirm_loosen: bool = False

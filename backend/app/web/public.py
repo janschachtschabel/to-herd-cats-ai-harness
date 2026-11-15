@@ -30,6 +30,7 @@ from app.modules.automations import router as automations_router
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
+from app.modules.mcp_servers import router as mcp_servers
 from app.modules.messaging import router as messaging
 from app.modules.messaging import router_activity as messaging_activity
 from app.modules.messaging import router_dms as messaging_dms
@@ -110,6 +111,8 @@ def api_router() -> APIRouter:
     api.include_router(ai.connections)
     api.include_router(connectors.shared)
     api.include_router(connectors.personal)
+    api.include_router(mcp_servers.servers)
+    api.include_router(mcp_servers.personal)
     api.include_router(ai_assignments.assignments)
     api.include_router(ai_usage.usage)
     api.include_router(ai_budgets.budgets)

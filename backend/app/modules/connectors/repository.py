@@ -49,6 +49,22 @@ class ConnectorRepository:
             stmt = stmt.where(Connector.id != other_than)
         return bool(await self.session.scalar(stmt))
 
+    async def get_shared_lock(self, connector_id: uuid.UUID) -> Connector | None:
+        """The connector, locked shared until the transaction ends: a server that names
+        it holds it against a concurrent deletion (which locks it exclusively)."""
+        stmt = (
+            select(Connector)
+            .where(self._mine(), Connector.id == connector_id)
+            .with_for_update(read=True)
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
+    async def for_server(self, server_id: uuid.UUID) -> Connector | None:
+        """The owner's connector bound to the external MCP server `server_id`."""
+        stmt = select(Connector).where(self._mine(), Connector.mcp_server_id == server_id)
+        return await self.session.scalar(stmt)
+
     async def add(self, connector: Connector) -> Connector:
         self.session.add(connector)
         await self.session.flush()

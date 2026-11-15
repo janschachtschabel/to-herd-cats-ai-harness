@@ -78,6 +78,7 @@ def _fields(record: logging.LogRecord) -> dict[str, Any]:
 
 # Loggers held at WARNING whatever the level (see `configure_logging`).
 QUIET_LOGGERS = ("httpx", "httpcore", "hpack", "httpx2", "httpcore2", "openai")
+SILENT_LOGGERS = ("mcp",)
 
 # Exceptions of these packages quote data in their message: SQLAlchemy appends the bound
 # parameters, PostgreSQL and asyncpg quote the value they rejected.
@@ -181,3 +182,7 @@ def configure_logging(settings: Settings) -> None:
     # to AI providers carry a key in a header. Their warnings still pass.
     for name in QUIET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
+    # The MCP SDK (plan M8): its error lines may quote what a server answered (a
+    # tool's result, which is content) or a redirect target; nothing of it is logged.
+    for name in SILENT_LOGGERS:
+        logging.getLogger(name).setLevel(logging.CRITICAL + 1)

@@ -15,6 +15,9 @@ from app.modules.groups.models import Group
 from app.modules.users.models import User
 from app.web.public import create_public_app
 from tests.factories_agents import Bench
+from tests.factories_dms import People
+from tests.factories_mcp import make_server
+from tests.support.mcp_stub import McpStub
 
 UUID = "0190f0f0-0000-7000-8000-000000000000"
 
@@ -89,7 +92,10 @@ NEED_A_RUN = {
     "/api/agents/{agent_id}/automations",
     "/api/automations/{automation_id}/firings",
     "/api/ai/my-connectors",  # needs `ai.use`
+    "/api/ai/my-mcp-servers",  # needs `ai.use`
 }
+
+SERVER_TOOLS = "/api/ai/mcp-servers/{server_id}/tools"
 
 
 @pytest.mark.parametrize("name", sorted(HOSTILE))
@@ -126,6 +132,8 @@ async def test_hostile_cursors_answer_422_everywhere(
     for template in _list_endpoints():
         if template in NEED_A_RUN:
             continue  # test_hostile_cursors_on_a_runs_events
+        if template == SERVER_TOOLS:
+            continue  # test_hostile_cursors_on_a_servers_tools
         path = template
         for placeholder, value in ids.items():
             path = path.replace(placeholder, value)
@@ -175,3 +183,16 @@ async def test_hostile_cursors_on_a_runs_events(bench: Bench) -> None:
                 continue
             assert response.status_code == 422, (name, response.text)
             assert response.json()["error"]["code"] == "validation_failed"
+
+
+async def test_hostile_cursors_on_a_servers_tools(ai_people: People, mcp_egress: McpStub) -> None:
+    """The tool list of an external MCP server (one is read from the MCP stub)."""
+    server = await make_server(ai_people.admin, mcp_egress)
+    path = SERVER_TOOLS.replace("{server_id}", server["id"])
+    for name, cursor in HOSTILE.items():
+        response = await ai_people.admin.get(path, params={"cursor": cursor})
+        if name == "empty":
+            assert response.status_code == 200, (name, response.text)
+            continue
+        assert response.status_code == 422, (name, response.text)
+        assert response.json()["error"]["code"] == "validation_failed"

@@ -2567,6 +2567,14 @@
         "title": "ChildCounts",
         "type": "object"
       },
+      "Classification": {
+        "enum": [
+          "read",
+          "write"
+        ],
+        "title": "Classification",
+        "type": "string"
+      },
       "ConnectionCreate": {
         "additionalProperties": false,
         "description": "Left out: `base_url` is OpenAI's; `models` is `gpt-6-luna` for `openai`, else\nempty; `param_family` is `max_completion_tokens` for `openai`, else `max_tokens`;\n`data_location` is `local` for `local`, else `external`. The first model is the\nconnection's standard model.",
@@ -3018,6 +3026,18 @@
             ],
             "title": "Header Name"
           },
+          "mcp_server_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Server Id"
+          },
           "name": {
             "maxLength": 120,
             "minLength": 1,
@@ -3066,6 +3086,18 @@
             "title": "Id",
             "type": "string"
           },
+          "mcp_server_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Server Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -3092,6 +3124,7 @@
           "scope",
           "auth_kind",
           "header_name",
+          "mcp_server_id",
           "has_secret",
           "secret_kind",
           "version",
@@ -3169,6 +3202,15 @@
         ],
         "title": "ConnectorUpdate",
         "type": "object"
+      },
+      "ConnectorUse": {
+        "enum": [
+          "none",
+          "shared",
+          "personal"
+        ],
+        "title": "ConnectorUse",
+        "type": "string"
       },
       "ConversationKind": {
         "enum": [
@@ -3301,6 +3343,77 @@
           "can_post"
         ],
         "title": "ConversationOut",
+        "type": "object"
+      },
+      "CreatedServerOut": {
+        "properties": {
+          "connector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector Id"
+          },
+          "connector_scope": {
+            "$ref": "#/components/schemas/ConnectorUse"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh": {
+            "$ref": "#/components/schemas/RefreshOut"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "data_location",
+          "connector_scope",
+          "connector_id",
+          "enabled",
+          "version",
+          "created_at",
+          "updated_at",
+          "refresh"
+        ],
+        "title": "CreatedServerOut",
         "type": "object"
       },
       "DailyCardOut": {
@@ -6679,6 +6792,33 @@
         "title": "Page[MessageOut]",
         "type": "object"
       },
+      "Page_PersonalServerOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PersonalServerOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[PersonalServerOut]",
+        "type": "object"
+      },
       "Page_ProposalOut_": {
         "properties": {
           "items": {
@@ -6758,6 +6898,33 @@
           "items"
         ],
         "title": "Page[RunOut]",
+        "type": "object"
+      },
+      "Page_ServerOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ServerOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ServerOut]",
         "type": "object"
       },
       "Page_SkillOut_": {
@@ -7028,6 +7195,33 @@
           "items"
         ],
         "title": "Page[TokenOut]",
+        "type": "object"
+      },
+      "Page_ToolOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ToolOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ToolOut]",
         "type": "object"
       },
       "Page_TrashedPageOut_": {
@@ -7395,6 +7589,31 @@
           "version"
         ],
         "title": "PersonalAgentsIn",
+        "type": "object"
+      },
+      "PersonalServerOut": {
+        "description": "A server that acts with each person's own connector, and whether the caller\nhas connected theirs.",
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "connected"
+        ],
+        "title": "PersonalServerOut",
         "type": "object"
       },
       "PlaceOut": {
@@ -8455,6 +8674,53 @@
         "title": "RecurringIn",
         "type": "object"
       },
+      "RefreshOut": {
+        "description": "How reading the tool list went: counts of tools new, with another fingerprint\nand no longer listed; all 0 unless `status` is `ok`.",
+        "properties": {
+          "changed": {
+            "default": 0,
+            "title": "Changed",
+            "type": "integer"
+          },
+          "missing": {
+            "default": 0,
+            "title": "Missing",
+            "type": "integer"
+          },
+          "new": {
+            "default": 0,
+            "title": "New",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RemoteStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RefreshOut",
+        "type": "object"
+      },
+      "RemoteStatus": {
+        "enum": [
+          "ok",
+          "blocked",
+          "timeout",
+          "unreachable",
+          "unauthorized",
+          "forbidden",
+          "not_found",
+          "rate_limited",
+          "redirect",
+          "server_error",
+          "too_large",
+          "protocol_error",
+          "secret_unavailable"
+        ],
+        "title": "RemoteStatus",
+        "type": "string"
+      },
       "RunEventOut": {
         "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything. `tokens_*`, `cost` (model calls with a price) and `duration_ms`\n(model and tool calls) where the step recorded them, null otherwise.",
         "properties": {
@@ -8927,6 +9193,205 @@
           "kind"
         ],
         "title": "SecretOut",
+        "type": "object"
+      },
+      "ServerCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "connector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector Id"
+          },
+          "connector_scope": {
+            "$ref": "#/components/schemas/ConnectorUse",
+            "default": "none"
+          },
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation",
+            "default": "external"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "ServerCreate",
+        "type": "object"
+      },
+      "ServerOut": {
+        "properties": {
+          "connector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector Id"
+          },
+          "connector_scope": {
+            "$ref": "#/components/schemas/ConnectorUse"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_location": {
+            "$ref": "#/components/schemas/DataLocation"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "data_location",
+          "connector_scope",
+          "connector_id",
+          "enabled",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ServerOut",
+        "type": "object"
+      },
+      "ServerUpdate": {
+        "additionalProperties": false,
+        "description": "Only the fields sent change. A new URL withdraws every approval.",
+        "properties": {
+          "connector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connector Id"
+          },
+          "connector_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectorUse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ServerUpdate",
         "type": "object"
       },
       "SkillAuthorOut": {
@@ -10882,6 +11347,35 @@
         "title": "TargetOut",
         "type": "object"
       },
+      "TestOut": {
+        "properties": {
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RemoteStatus"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          }
+        },
+        "required": [
+          "status",
+          "tools",
+          "duration_ms"
+        ],
+        "title": "TestOut",
+        "type": "object"
+      },
       "TicketCountsOut": {
         "description": "For the sidebar: the caller's tickets that are open, active or in review.",
         "properties": {
@@ -11806,6 +12300,136 @@
           "name"
         ],
         "title": "TokenUserOut",
+        "type": "object"
+      },
+      "ToolClassify": {
+        "additionalProperties": false,
+        "description": "`read` for a tool the server does not annotate read-only loosens what the admin\nwas offered: it needs `confirm_loosen`.",
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "confirm_loosen": {
+            "default": false,
+            "title": "Confirm Loosen",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "classification"
+        ],
+        "title": "ToolClassify",
+        "type": "object"
+      },
+      "ToolOut": {
+        "properties": {
+          "approved_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Fingerprint"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "title": "Input Schema",
+            "type": "object"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "read_only_hint": {
+            "title": "Read Only Hint",
+            "type": "boolean"
+          },
+          "server_id": {
+            "format": "uuid",
+            "title": "Server Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ToolState"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "server_id",
+          "name",
+          "description",
+          "input_schema",
+          "read_only_hint",
+          "fingerprint",
+          "approved_fingerprint",
+          "classification",
+          "state",
+          "missing",
+          "version",
+          "updated_at"
+        ],
+        "title": "ToolOut",
+        "type": "object"
+      },
+      "ToolState": {
+        "enum": [
+          "pending",
+          "approved",
+          "blocked",
+          "changed"
+        ],
+        "title": "ToolState",
+        "type": "string"
+      },
+      "ToolVersionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "ToolVersionIn",
         "type": "object"
       },
       "TrashedPageOut": {
@@ -15744,6 +16368,593 @@
         ]
       }
     },
+    "/api/ai/mcp-servers": {
+      "get": {
+        "operationId": "list_servers_api_ai_mcp_servers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ServerOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Servers",
+        "tags": [
+          "mcp"
+        ]
+      },
+      "post": {
+        "description": "Saves the server, then reads its tool list; `refresh` says how that went.",
+        "operationId": "create_server_api_ai_mcp_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedServerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}": {
+      "delete": {
+        "operationId": "delete_server_api_ai_mcp_servers__server_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Server",
+        "tags": [
+          "mcp"
+        ]
+      },
+      "get": {
+        "operationId": "get_server_api_ai_mcp_servers__server_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Server",
+        "tags": [
+          "mcp"
+        ]
+      },
+      "patch": {
+        "operationId": "update_server_api_ai_mcp_servers__server_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/refresh": {
+      "post": {
+        "description": "Read the tool list again; a failure is a state, never the server's answer.",
+        "operationId": "refresh_tools_api_ai_mcp_servers__server_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Tools",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/test": {
+      "post": {
+        "description": "Connect and list the tools; nothing is stored.",
+        "operationId": "test_server_api_ai_mcp_servers__server_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Server",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/tools": {
+      "get": {
+        "operationId": "list_tools_api_ai_mcp_servers__server_id__tools_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ToolOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tools",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}": {
+      "patch": {
+        "operationId": "classify_tool_api_ai_mcp_servers__server_id__tools__tool_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolClassify"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Classify Tool",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}/approve": {
+      "post": {
+        "description": "Approve exactly the tool as last read (its fingerprint).",
+        "operationId": "approve_tool_api_ai_mcp_servers__server_id__tools__tool_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Tool",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api/ai/mcp-servers/{server_id}/tools/{tool_id}/block": {
+      "post": {
+        "operationId": "block_tool_api_ai_mcp_servers__server_id__tools__tool_id__block_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Block Tool",
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
     "/api/ai/mcp/tokens": {
       "get": {
         "description": "Every token of the organisation, newest first: metadata only.",
@@ -16076,6 +17287,67 @@
         "summary": "Update Connector",
         "tags": [
           "connectors"
+        ]
+      }
+    },
+    "/api/ai/my-mcp-servers": {
+      "get": {
+        "operationId": "list_personal_servers_api_ai_my_mcp_servers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PersonalServerOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Personal Servers",
+        "tags": [
+          "mcp"
         ]
       }
     },

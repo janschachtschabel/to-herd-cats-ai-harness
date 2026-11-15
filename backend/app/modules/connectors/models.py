@@ -7,6 +7,8 @@
 - `secret_ref` is a reference (`core/secrets.py`), never the secret: `enc:` or, for a
   shared connector, `env:HERD_AI_*`; a personal one is `enc:` only (a person cannot
   name the server's environment).
+- `mcp_server_id` (personal only, task 6): the external MCP server a personal
+  connector serves, at most one per person and server; it goes with the server.
 """
 
 import uuid
@@ -62,6 +64,14 @@ class Connector(UuidPk, OrgScoped, Timestamps, Base):
             unique=True,
             postgresql_where=text("owner_id IS NOT NULL"),
         ),
+        CheckConstraint("mcp_server_id IS NULL OR scope = 'personal'", name="server"),
+        Index(
+            "uq_connector_server_owner",
+            "mcp_server_id",
+            "owner_id",
+            unique=True,
+            postgresql_where=text("mcp_server_id IS NOT NULL"),
+        ),
     )
 
     scope: Mapped[ConnectorScope] = mapped_column(String(16), nullable=False)
@@ -72,5 +82,9 @@ class Connector(UuidPk, OrgScoped, Timestamps, Base):
     auth_kind: Mapped[AuthKind] = mapped_column(String(16), nullable=False)
     header_name: Mapped[str | None] = mapped_column(String(MAX_HEADER_CHARS))
     secret_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    mcp_server_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("mcp_server.id", ondelete="CASCADE", use_alter=True),
+    )
     # Bumped by every write; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

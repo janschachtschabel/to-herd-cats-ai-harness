@@ -26,6 +26,7 @@ from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import Automation, AutomationFiring
 from app.modules.connectors.models import Connector
 from app.modules.groups.models import Group, GroupMember
+from app.modules.mcp_servers.models import McpServer, McpServerTool
 from app.modules.messaging.models import (
     Conversation,
     ConversationParticipant,
@@ -86,6 +87,8 @@ __all__ = [
     "EventOutbox",
     "Group",
     "GroupMember",
+    "McpServer",
+    "McpServerTool",
     "Message",
     "MessageMention",
     "Notification",

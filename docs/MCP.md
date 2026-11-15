@@ -1,8 +1,9 @@
 # MCP: das System als MCP-Server und als MCP-Client
 
 Dieses Dokument wächst mit M8. Bisher beschrieben: **Zugangstoken und das Recht
-`mcp.use`** (Plan M8, Task 1) und **Konnektoren** (Task 5). Der Endpunkt `/mcp`
-selbst, externe Agenten, externe MCP-Server und der Katalog folgen.
+`mcp.use`** (Plan M8, Task 1), **Konnektoren** (Task 5) und **externe MCP-Server**
+mit Werkzeugfreigabe (Task 6). Der Endpunkt `/mcp` selbst, externe Agenten, externe
+Werkzeuge im Lauf und der Katalog folgen.
 
 ## Zugangstoken
 
@@ -142,3 +143,80 @@ im Log.
   nur seiner Art, nie mit Werten.
 - **Schlüsselwechsel**: `scripts/rotate_secrets.py` schlüsselt die `enc:`-Werte aller
   Konnektoren mit um (siehe [`KI.md`](KI.md#schlüssel)).
+- **Persönlicher Zugang zu einem Server**: Ein persönlicher Konnektor kann beim Anlegen
+  einen externen MCP-Server nennen (`mcp_server_id`), der mit dem Zugang jeder Person
+  arbeitet; je Person und Server einer (409 `connector.server_taken`), andere Server
+  422 `connector.server_invalid`. `GET /api/ai/my-mcp-servers` (`ai.use`) listet diese
+  Server mit `connected`. Wird der Server gelöscht, gehen die daran gebundenen
+  persönlichen Konnektoren mit.
+- **In Gebrauch**: Ein geteilter Konnektor, den ein Server nennt, wird nicht gelöscht
+  (409 `connector.in_use`).
+
+## Externe MCP-Server
+
+Externe MCP-Server sind eine Werkzeugquelle für die eigenen Agenten (Plan M8,
+Entscheidung 7). Verwaltung unter `/api/ai/mcp-servers` mit `ai.manage`; ohne das
+Recht 404 `ai.not_found`.
+
+- **Nur Streamable HTTP über https**, nie stdio. Die Adresse wird beim Speichern
+  geprüft (kein `http`, keine Zugangsdaten, keine Query, kein Fragment, keine private,
+  Loopback-, Link-Local- oder Metadaten-Adresse als Literal; 422
+  `mcp_server.url_not_allowed`) und bei jeder Verbindung erneut: Der Name wird beim
+  Verbindungsaufbau aufgelöst, jede Antwort geprüft und nur die geprüfte Adresse
+  gewählt (DNS-Wechsel greift nicht), wie bei KI-Verbindungen
+  ([`KI.md`](KI.md#ausgehende-aufrufe-ssrf-sperre)); mit `HERD_AI_EGRESS_PROXY` geht der
+  Aufruf durch den Proxy. Private Adressen sind für MCP-Server nicht vorgesehen, auch
+  nicht für selbst betriebene im eigenen Netz. Umleitungen folgt der Client nur
+  innerhalb derselben Herkunft (Schema, Host, Port); jede andere endet mit dem Zustand
+  `redirect`.
+- **Felder**: Name (je Organisation eindeutig), `url`, `data_location`
+  (`local`/`eu`/`external`, wie bei einer Verbindung; die KI-Richtlinie nutzt es mit
+  Task 7), `connector_scope` (`none`, `shared` mit `connector_id` eines geteilten
+  Konnektors, `personal`: der Zugang der Person, in deren Auftrag aufgerufen wird),
+  `enabled`, `version` (409 `mcp_server.version_conflict`).
+- **Werkzeugliste**: wird beim Anlegen und mit `POST …/{id}/refresh` eingelesen, ohne
+  offene Transaktion, mit Zeitlimit (20 s) und Größenlimit (2 MiB); höchstens 500
+  Werkzeuge, Namen nur aus `A-Z a-z 0-9 _ - .` (1–128 Zeichen), Beschreibungen
+  gespeichert bis 10.000 Zeichen. Das Ergebnis ist ein Zustand mit Zahlen
+  (`{"status", "new", "changed", "missing"}`), nie die Antwort des Servers. Gelesen wird
+  mit dem geteilten Konnektor bzw. bei `personal` mit dem eigenen Konnektor der Admin-
+  Person, falls vorhanden. `POST …/{id}/test` verbindet und zählt die Werkzeuge, ohne
+  etwas zu speichern.
+- **Freigabe je Werkzeug** (`GET …/{id}/tools`, `POST …/tools/{tool_id}/approve`,
+  `…/block`, `PATCH …/tools/{tool_id}`, jeweils mit `version`, 409
+  `mcp_tool.version_conflict`): Neue Werkzeuge kommen als `pending`. Gespeichert wird
+  ein Fingerabdruck (SHA-256 über Name, vollständige Beschreibung und Eingabeschema);
+  eine Freigabe merkt sich genau diesen (`approved_fingerprint`). Liest ein Refresh
+  einen anderen, wird ein freigegebenes Werkzeug `changed` und ist gesperrt, bis es
+  erneut freigegeben wird (kehrt der Server zum freigegebenen Stand zurück, ist es
+  wieder `approved`). Werkzeuge, die der Server nicht mehr nennt, sind `missing` und
+  nicht freizugeben (409 `mcp_tool.missing`). Eine neue Adresse des Servers zieht alle
+  Freigaben zurück.
+- **Einstufung** `read`/`write`: Vorschlag `read` nur, wenn der Server das Werkzeug als
+  nur lesend kennzeichnet (`readOnlyHint`), sonst `write`. Ein nicht so gekennzeichnetes
+  Werkzeug auf `read` zu setzen, verlangt `confirm_loosen: true` (422
+  `mcp_tool.loosen_unconfirmed`); das Audit vermerkt `loosened`.
+- **Aufruf** (für Läufe, Task 7: `ToolCaller.call_tool` in
+  `backend/app/modules/mcp_servers/calls.py`): nur ein freigegebenes, noch gelistetes
+  Werkzeug mit dem freigegebenen Fingerabdruck eines eingeschalteten Servers. Im selben
+  Gespräch mit dem Server wird zuerst die Werkzeugliste gelesen; nennt der Server das
+  Werkzeug anders als freigegeben, unterbleibt der Aufruf, das Werkzeug wird `changed`
+  (bzw. `missing`). Der Zugang wird serverseitig eingesetzt; fehlt bei `personal` der
+  Konnektor der Person, ist das ein Fehler `mcp_tool.not_connected`. Zeitlimit 60 s,
+  Antworten höchstens 512 KiB (`too_large`). Das Ergebnis ist nicht vertrauenswürdig
+  und wird vom Aufrufer gerahmt.
+- **Was nie ins Log oder Audit geht**: Argumente, Ergebnisse, Beschreibungen,
+  Zugänge, Fehlertexte des Servers. Logzeilen `mcp.list_tools` und `mcp.tool_call`
+  nennen nur IDs, Zustand, Dauer und Größe; die eigenen Logzeilen des MCP-SDK sind
+  abgeschaltet (sie können Antworten zitieren). Audit: `mcp_server.created`,
+  `.updated` (Feldnamen), `.deleted`, `.refreshed` (Zustand und Zahlen),
+  `mcp_tool.approved`, `.blocked`, `.classified`.
+- **Zustände** eines Aufrufs oder Einlesens: `ok`, `blocked` (SSRF-Sperre), `timeout`,
+  `unreachable`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`,
+  `redirect`, `server_error`, `too_large`, `protocol_error`, `secret_unavailable` (das
+  Geheimnis des Konnektors lässt sich nicht auflösen; es wurde nichts gesendet).
+- **Tests** laufen gegen einen echten MCP-Server aus dem SDK
+  (`backend/tests/support/mcp_stub.py`, https für `mcp.test` auf 127.0.0.1, skriptbar:
+  Werkzeugliste, Ergebnisse, Verzögerung, Umleitung, Fehlerstatus, verlangter Kopf),
+  nie gegen das Netz. Das SDK (`mcp`) wird nur unter `backend/app/mcp/` importiert
+  (`tests/test_mcp_imports.py`).
