@@ -4,6 +4,7 @@ import { hasPermission } from '@/features/auth/queries'
 import type { Me } from '@/lib/api'
 import { ticketKey } from '@/features/tickets/refs'
 import type { RunState } from './queries'
+import { externalToolName } from './timeline'
 
 export const RUN_STATES: readonly RunState[] = ['queued', 'running', 'waiting', 'done']
 
@@ -72,8 +73,11 @@ export function mayCancel(run: Run): boolean {
   return run.state !== 'done' && !run.cancel_requested
 }
 
-/** A tool's name in words (unknown tools by their name). */
+/** A tool's name in words (unknown tools by their name; an external server's tool by
+ *  its own name, marked as external). */
 export function toolText(t: TFunction, name: string): string {
+  const external = externalToolName(name)
+  if (external) return t('runs.external.named', { name: external })
   return t(`agents.tools.names.${name}`, { defaultValue: name })
 }
 

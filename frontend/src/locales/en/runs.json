@@ -121,6 +121,22 @@
       "text": "The agent stops before its next step. What it already wrote stays; it will not write an answer.",
       "confirm": "Yes, cancel the run",
       "requested": "Cancellation requested: the run ends before its next step."
+    },
+    "external": {
+      "title": "{{server}} · {{tool}}",
+      "badge": "External tool",
+      "named": "{{name}} (external)",
+      "outcomes": {
+        "sending": "Being sent to the external server …",
+        "unknown": "Outcome unknown: the call went to the server, but its answer was never recorded (the work was interrupted). It was not sent again; the external system shows whether it took effect.",
+        "not_connected": "Not called: the asking person has not connected their access to this server (under \"My connections\").",
+        "unavailable": "Not called: the tool is not approved right now, or its server is off.",
+        "credential_unavailable": "Not called: the server's access cannot be used right now.",
+        "failed": "The server did not answer as expected.",
+        "error": "The tool reported an error.",
+        "policy": "Not called: by the AI policy, what the run read may not go to this server."
+      },
+      "personalConnector": "The run read with the asking person's personal access to an external server. What it learnt that way stays with that person: the answer was not posted where others read along. It works in a direct message alone with the agent."
     }
   },
   "errors": {

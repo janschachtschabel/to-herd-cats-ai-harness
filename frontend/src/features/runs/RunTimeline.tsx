@@ -6,6 +6,7 @@ import type { Run } from '@/features/agents/queries'
 import { formatCost } from '@/features/ai/usage/period'
 import { EmptyState, ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import { formatDuration, toolText } from './display'
+import { ExternalOutcomeNote, ExternalTitle } from './ExternalCall'
 import { useRunTimeline } from './queries'
 import { approvalOutcome, buildTimeline, readable, type TimelineItem } from './timeline'
 
@@ -97,12 +98,15 @@ function ToolStep({ item }: { item: Extract<TimelineItem, { kind: 'tool' }> }) {
   const { t } = useTranslation()
   const outcome = item.source === 'approval' ? approvalOutcome(item.result) : null
   const e = item.event
+  // A call journaled before its answer came has no duration worth naming.
+  const timed = e.duration_ms !== null && item.outcome !== 'unknown' && item.outcome !== 'sending'
   return (
     <Row
       icon={<Wrench className="size-3.5" />}
-      title={toolText(t, item.name)}
-      meta={e.duration_ms !== null ? formatDuration(t, e.duration_ms) : undefined}
+      title={item.external ? <ExternalTitle external={item.external} /> : toolText(t, item.name)}
+      meta={timed ? formatDuration(t, e.duration_ms ?? 0) : undefined}
     >
+      <ExternalOutcomeNote outcome={item.outcome} />
       {outcome && (
         <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
           {t(`runs.timeline.approval.${outcome}`)}
@@ -169,6 +173,11 @@ export function RunTimeline({
               title={t('runs.timeline.stop')}
             >
               <p className="mt-1 text-sm">{stopText(t, item.reason)}</p>
+              {item.reason === 'policy_blocked' && item.detail === 'personal_connector' && (
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {t('runs.external.personalConnector')}
+                </p>
+              )}
               {item.reason === 'budget' && budgetScopeText(t, item.detail) && (
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   {t('agents.stop.budgetReached', { scope: budgetScopeText(t, item.detail) })}

@@ -21,7 +21,11 @@
       "until": "Offen bis {{when}}.",
       "reason": "Begründung: {{reason}}",
       "reasonRedacted": "Eine Begründung sieht nur die Person, die gefragt wurde.",
-      "notYours": "Entscheiden kann nur die Person, die den Agenten gefragt hat. Die Einzelheiten sieht, wer den Lauf sehen darf."
+      "notYours": "Entscheiden kann nur die Person, die den Agenten gefragt hat. Die Einzelheiten sieht, wer den Lauf sehen darf.",
+      "titleExternal": "Freigabe erbeten: externes Werkzeug {{tool}}",
+      "externalArgs": "Diese Argumente gehen genau so an den externen Server:",
+      "externalArgsLabel": "Argumente für den externen Server",
+      "externalArgsHidden": "Die Argumente sieht nur die gefragte Person."
     },
     "state": {
       "pending": "Wartet auf Entscheidung",

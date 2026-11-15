@@ -121,6 +121,22 @@
       "text": "Der Agent hört vor seinem nächsten Schritt auf. Was er schon geschrieben hat, bleibt; eine Antwort schreibt er nicht mehr.",
       "confirm": "Ja, Lauf abbrechen",
       "requested": "Abbruch angefordert: Der Lauf endet vor seinem nächsten Schritt."
+    },
+    "external": {
+      "title": "{{server}} · {{tool}}",
+      "badge": "Externes Werkzeug",
+      "named": "{{name}} (extern)",
+      "outcomes": {
+        "sending": "Wird an den externen Server gesendet …",
+        "unknown": "Ausgang unbekannt: Der Aufruf ging an den Server, seine Antwort wurde aber nie festgehalten (die Arbeit wurde unterbrochen). Er wurde nicht noch einmal gesendet; ob er gewirkt hat, zeigt das externe System.",
+        "not_connected": "Nicht aufgerufen: Die fragende Person hat ihren Zugang zu diesem Server nicht verbunden (unter „Meine Verbindungen“).",
+        "unavailable": "Nicht aufgerufen: Das Werkzeug ist gerade nicht freigegeben, oder sein Server ist aus.",
+        "credential_unavailable": "Nicht aufgerufen: Der Zugang des Servers lässt sich gerade nicht verwenden.",
+        "failed": "Der Server hat nicht wie erwartet geantwortet.",
+        "error": "Das Werkzeug hat einen Fehler gemeldet.",
+        "policy": "Nicht aufgerufen: Was der Lauf gelesen hat, darf laut KI-Richtlinie nicht an diesen Server gehen."
+      },
+      "personalConnector": "Der Lauf hat mit dem persönlichen Zugang der fragenden Person zu einem externen Server gelesen. Was er so erfahren hat, bleibt bei ihr: Die Antwort wurde nicht dort gepostet, wo andere mitlesen. In einer Direktnachricht allein mit dem Agenten geht es."
     }
   },
   "errors": {

@@ -21,7 +21,11 @@
       "until": "Open until {{when}}.",
       "reason": "Reason: {{reason}}",
       "reasonRedacted": "Only the person who was asked sees a reason.",
-      "notYours": "Only the person who asked the agent decides. Whoever may see the run sees the details."
+      "notYours": "Only the person who asked the agent decides. Whoever may see the run sees the details.",
+      "titleExternal": "Release asked: external tool {{tool}}",
+      "externalArgs": "These arguments go to the external server exactly as shown:",
+      "externalArgsLabel": "Arguments for the external server",
+      "externalArgsHidden": "Only the person asked sees the arguments."
     },
     "state": {
       "pending": "Waiting for a decision",

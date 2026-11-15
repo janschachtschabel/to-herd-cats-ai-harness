@@ -11,7 +11,7 @@ import { useNow } from '@/lib/useNow'
 import { ApprovalDecision } from './ApprovalDecision'
 import { ApprovalSubject } from './ApprovalSubject'
 import { CardFrame, CardState, type Tone } from './CardFrame'
-import { approvalView, mayDecide, type ApprovalView } from './display'
+import { approvalView, externalToolOf, mayDecide, type ApprovalView } from './display'
 import { useApproval, useDecideApproval, type Approval } from './queries'
 
 const TONE: Record<ApprovalView, Tone> = {
@@ -39,7 +39,8 @@ function Decider({ approval, meId }: { approval: Approval; meId: string | undefi
 }
 
 /** A release card that the API showed: what the agent wants to do (the tool in words,
- *  the server's summary, links to what it would change, the diff), who decides, its
+ *  the server's summary, links to what it would change, the diff; for an external
+ *  tool "server · tool" and, for the person asked, the exact arguments), who decides, its
  *  state (waiting, approved and run, stale because the object changed, rejected with
  *  its reason, expired), the decision for the person asked, and a link to the run.
  *  A rejection's reason is the asked person's to read (others: `redacted`). */
@@ -52,14 +53,27 @@ export function ApprovalCardView({ approval }: { approval: Approval }) {
   // After an approval the API tells whether the call ran or was stale.
   const view = approvalView(approval, now)
   const when = (iso: string | null) => (iso ? formatDateTime(iso, i18n.language) : '')
+  const external = externalToolOf(approval)
   return (
     <CardFrame
       icon={<ShieldCheck className="size-4" />}
       label={t('approvals.card.label')}
-      title={t('approvals.card.title', { tool: toolText(t, approval.tool) })}
+      title={
+        external !== null
+          ? t('approvals.card.titleExternal', { tool: external })
+          : t('approvals.card.title', { tool: toolText(t, approval.tool) })
+      }
       state={<CardState tone={TONE[view]}>{t(`approvals.state.${view}`)}</CardState>}
     >
-      <p className="font-mono text-xs break-words text-muted-foreground">{approval.summary}</p>
+      <p
+        className={
+          external !== null
+            ? 'text-sm font-medium break-words'
+            : 'font-mono text-xs break-words text-muted-foreground'
+        }
+      >
+        {approval.summary}
+      </p>
       <ApprovalSubject approval={approval} />
       {view === 'pending' ? (
         <p className="text-xs text-muted-foreground">

@@ -26,11 +26,56 @@ export type TimelineItem =
       result: string | null
       source: string | null
       final: boolean
+      /** An external server's tool (`source` mcp): its server and its own name. */
+      external: { server: string; tool: string } | null
+      /** An external call's state when its result says so: still being sent, its
+       *  answer never recorded (`unknown`), or why it was not made or failed. */
+      outcome: ExternalOutcome | 'sending' | null
       event: RunEvent
     }
   /** A call that has no result yet while the run waits: for a release or an answer. */
   | { kind: 'waiting'; key: string; step: number; call: AskedCall }
   | { kind: 'stop'; key: string; reason: string | null; detail: string | null; event: RunEvent }
+
+/** What an external call's result says (the host's fixed words, never the server's). */
+export type ExternalOutcome =
+  | 'unknown'
+  | 'not_connected'
+  | 'unavailable'
+  | 'credential_unavailable'
+  | 'failed'
+  | 'error'
+  | 'policy'
+
+const OUTCOME_PREFIXES: readonly [string, ExternalOutcome][] = [
+  ['external_outcome_unknown', 'unknown'],
+  ['external_tool_not_connected', 'not_connected'],
+  ['external_tool_unavailable', 'unavailable'],
+  ['external_tool_credential_unavailable', 'credential_unavailable'],
+  ['external_tool_failed', 'failed'],
+  ['external_tool_error', 'error'],
+  ['policy_blocked', 'policy'],
+]
+
+export function externalOutcome(result: string | null): ExternalOutcome | null {
+  if (!result) return null
+  return OUTCOME_PREFIXES.find(([prefix]) => result.startsWith(`${prefix}:`))?.[1] ?? null
+}
+
+const EXTERNAL_NAME = /^ext_[0-9a-f]{12}_(.+)$/
+
+/** An external tool's own name from the name a run gives it (`ext_<id>_<name>`). */
+export function externalToolName(name: string): string | null {
+  return EXTERNAL_NAME.exec(name)?.[1] ?? null
+}
+
+function attrsOf(value: unknown): { server: string; tool: string } | null {
+  if (typeof value !== 'object' || value === null) return null
+  const a = value as Record<string, unknown>
+  return typeof a.server === 'string' && typeof a.tool === 'string'
+    ? { server: a.server, tool: a.tool }
+    : null
+}
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null
@@ -52,13 +97,17 @@ function calls(value: unknown): AskedCall[] {
 
 /**
  * The rows of a run's timeline in the order they happened: each model step with the
- * calls it asked for, each call's result, the stop. While the run waits, the calls of
- * its last step that have no result yet are shown as waiting (for a release or an
- * answer). A redacted event keeps only its step and name; its rows say so.
+ * calls it asked for, each call's result, the stop. An external call is journaled
+ * twice under one call id (once when sent, "outcome unknown", then with its result):
+ * it is one row, where it was sent, with its latest entry; an unknown outcome that is
+ * the run's last entry while it still runs is "being sent". While the run waits, the
+ * calls of its last step that have no result yet are shown as waiting (for a release
+ * or an answer). A redacted event keeps only its step and name; its rows say so.
  */
 export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineItem[] {
   const items: TimelineItem[] = []
   const answered = new Set<string>()
+  const toolAt = new Map<string, number>()
   let last: { step: number; calls: AskedCall[] } | null = null
   for (const event of events) {
     const content = event.content as Record<string, unknown>
@@ -75,18 +124,30 @@ export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineIt
         event,
       })
     } else if (event.kind === 'tool_call') {
-      answered.add(`${step}:${text(content.call_id) ?? ''}`)
-      items.push({
+      const callKey = `${step}:${text(content.call_id) ?? ''}`
+      answered.add(callKey)
+      const source = text(content.source)
+      const result = text(content.text)
+      const item: TimelineItem = {
         kind: 'tool',
         key: event.id,
         step,
         name: text(content.name) ?? '',
         args: content.args,
-        result: text(content.text),
-        source: text(content.source),
+        result,
+        source,
         final: content.final === true,
+        external: source === 'mcp' ? attrsOf(content.attrs) : null,
+        outcome: source === 'mcp' ? externalOutcome(result) : null,
         event,
-      })
+      }
+      const at = text(content.call_id) ? toolAt.get(callKey) : undefined
+      if (at === undefined) {
+        toolAt.set(callKey, items.length)
+        items.push(item)
+      } else {
+        items[at] = { ...item, key: items[at]!.key }
+      }
     } else {
       items.push({
         kind: 'stop',
@@ -96,6 +157,15 @@ export function buildTimeline(events: readonly RunEvent[], run: Run): TimelineIt
         event,
       })
     }
+  }
+  const lastItem = items.at(-1)
+  if (
+    run.state !== 'done' &&
+    lastItem?.kind === 'tool' &&
+    lastItem.outcome === 'unknown' &&
+    lastItem.event === events.at(-1)
+  ) {
+    items[items.length - 1] = { ...lastItem, outcome: 'sending' }
   }
   if (run.state === 'waiting' && last) {
     for (const call of last.calls) {

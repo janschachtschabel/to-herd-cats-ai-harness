@@ -8,10 +8,36 @@ import { errorMessage } from '@/lib/errors'
 import { shownArgs, subjectsOf } from './display'
 import { useApprovalDiff, type Approval } from './queries'
 
+/** An external call's arguments: exactly what goes to the server, open, for the person
+ *  asked (the API sends them to no one else). */
+function ExternalArgs({ approval }: { approval: Approval }) {
+  const { t } = useTranslation()
+  if (!approval.args) {
+    return <p className="text-xs text-muted-foreground">{t('approvals.card.externalArgsHidden')}</p>
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs">{t('approvals.card.externalArgs')}</p>
+      <pre
+        aria-label={t('approvals.card.externalArgsLabel')}
+        className="max-h-60 overflow-auto rounded-md border bg-muted/30 p-2 font-mono text-xs break-words whitespace-pre-wrap"
+      >
+        {JSON.stringify(approval.args, null, 2)}
+      </pre>
+    </div>
+  )
+}
+
 /** What a call would change: links to the page and the ticket it names, the page's
  *  diff (the page as it is now against the call's content; for the person asked,
- *  loaded when opened) and the call's other arguments, folded. */
+ *  loaded when opened) and the call's other arguments, folded. An external call names
+ *  nothing of ours: its arguments are shown as they go to the server. */
 export function ApprovalSubject({ approval }: { approval: Approval }) {
+  if (approval.external) return <ExternalArgs approval={approval} />
+  return <InternalSubject approval={approval} />
+}
+
+function InternalSubject({ approval }: { approval: Approval }) {
   const { t } = useTranslation()
   const [diffOpen, setDiffOpen] = useState(false)
   const diff = useApprovalDiff(approval.id, diffOpen && approval.diff_url !== null)

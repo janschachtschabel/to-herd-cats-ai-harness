@@ -74,6 +74,14 @@ export function shownArgs(approval: Approval): Record<string, unknown> | null {
   return approval.diff_url ? rest : approval.args
 }
 
+/** An external tool's own name on a release card: the server names it in the summary
+ *  ("<server> · <tool>"). Null for the catalog's tools. */
+export function externalToolOf(approval: Pick<Approval, 'external' | 'summary'>): string | null {
+  if (!approval.external) return null
+  const at = approval.summary.indexOf(' · ')
+  return at >= 0 ? approval.summary.slice(at + 3) : approval.summary
+}
+
 /** Whether a message is shown as a run's card. */
 export function isCard(message: Message): boolean {
   return (
