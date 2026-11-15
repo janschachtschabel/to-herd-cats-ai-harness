@@ -2,7 +2,9 @@
 it here). No transaction is open while the remote server answers.
 
 1. The step's first transaction, the run's row locked as in every step: the run is
-   still this take-up's and not asked to stop, the tool still granted, the person and
+   still this take-up's and not asked to stop, the tool still granted as it is now (its
+   class read afresh: a tool turned `write` since the take-up needs level 4 and a
+   release; module review M8 1, finding 6), the person and
    the agent still allowed together (`step_checks.py`). What the run has read may go
    to the server's data location (the strictest current policy of every space read,
    as before a model call); if not, the call is refused with `POLICY_REFUSED` as its
@@ -41,10 +43,12 @@ Every call counts once in `herd_external_tool_calls_total` after its step commit
 """
 
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db_errors import is_timeout
@@ -68,10 +72,11 @@ from app.modules.agents.toolbox.base import CallRef, RunRef, ToolContext, ToolSp
 from app.modules.agents.toolbox.policy import Grant
 from app.modules.agents.working import Unit, Working, once_more
 from app.modules.ai.models import DataLocation
+from app.modules.mcp_servers import schema_view
 from app.modules.mcp_servers.calls import PreparedCall, ToolCaller, UntrustedResult, execute
 from app.modules.mcp_servers.errors import ExternalToolError, ToolUnavailable
-from app.modules.mcp_servers.models import ConnectorUse
-from app.modules.mcp_servers.repository import ServerRepository
+from app.modules.mcp_servers.models import ConnectorUse, McpServer
+from app.modules.mcp_servers.repository import ServerRepository, ToolRepository
 from app.runtime.loop import ToolCall, ToolResult
 
 type Outcome = UntrustedResult | Refused | ExternalToolError
@@ -137,15 +142,17 @@ async def call_external(
 async def _before(
     host: Host, step: int, call: ToolCall, args: BaseModel, spec: ToolSpec
 ) -> _Ended | Wait | _Sending:
-    remote = spec.remote
-    assert remote is not None
+    assert spec.remote is not None
     async with host.unit() as session:
         statement = min(STEP_STATEMENT_TIMEOUT_SECONDS, host.seconds_left())
         steps, run, agent = await owned(session, host.run, statement)
+        claimed = host.run.claimed
+        server = await ServerRepository(session, claimed.org_id).get(spec.remote.server_id)
+        spec = await _as_now(session, claimed.org_id, spec, server)
+        remote = spec.remote
+        assert remote is not None
         grant = await granted(session, host.run, agent, spec)
         actor = await run_actor_now(session, host.run, agent)
-        claimed = host.run.claimed
-        server = await ServerRepository(session, claimed.org_id).get(remote.server_id)
         refused = CallOutcome.REFUSED
         if server is not None and not await policy_allows(
             session, host.run, DataLocation(server.data_location)
@@ -184,6 +191,18 @@ async def _before(
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder)
         return _Sending(prepared, args.model_dump(mode="json"), placeholder, personal)
+
+
+async def _as_now(
+    session: AsyncSession, org_id: uuid.UUID, spec: ToolSpec, server: McpServer | None
+) -> ToolSpec:
+    """The tool as it is now (its class may have changed since the take-up, module
+    review M8 1, finding 6): judged, released and called as that."""
+    assert spec.remote is not None
+    tool = await ToolRepository(session, org_id).get(spec.remote.server_id, spec.remote.tool_id)
+    if tool is None or server is None:
+        return spec  # `ToolCaller.prepare` finds it gone
+    return external.spec_of(tool, server, schema_view.view(tool.input_schema))
 
 
 async def _after(

@@ -409,7 +409,10 @@ neuen fortgesetzt; eine offene Freigabe unter altem Namen wird beim Fortsetzen
   eingeschalteten Server sind. Ein Eintrag für ein Werkzeug, das das nicht mehr ist
   (gesperrt, geändert, Server aus), bleibt gelistet mit `usable: false` und wirksam
   `block`. Ein `ext_…`-Name, der kein Werkzeug der Organisation ist, ist 422
-  `agent.tool_unknown`.
+  `agent.tool_unknown`. Jeder Aufruf beurteilt das Werkzeug, wie es jetzt ist: Stuft
+  der Admin es während eines Laufs auf `write` um, braucht schon der nächste Aufruf
+  Stufe 4 und die Freigabe (sonst endet der Lauf mit `rights_revoked`; Review M8 1,
+  Befund 6).
 - **Beschreibung** für das Modell: Werkzeug, Server, ob es liest oder nach außen
   handelt; die Beschreibung des Servers folgt gerahmt als nicht vertrauenswürdig und
   auf 1.000 Zeichen gekürzt, ebenso gerahmt und gekürzt, was er über die Argumente
