@@ -694,8 +694,13 @@ Recht 404 `ai.not_found`.
   own connection …“), und in einem Kanal, Thread oder einer Direktnachricht mit
   mehreren endet der Lauf statt mit seiner Antwort mit `policy_blocked`
   (`personal_connector`). Ergebnisse über einen geteilten Konnektor, Fehler und
-  `external_outcome_unknown` markieren nicht; schreibende externe Werkzeuge prüft die
-  Marke nicht (sie warten ohnehin auf die Freigabe dieser Person). Ein Lauf sendet
+  `external_outcome_unknown` markieren nicht. Trägt der Lauf die Marke, wartet jeder
+  Aufruf eines externen Servers, den er nicht mit dem eigenen Konnektor der fragenden
+  Person nutzt (geteilter Konnektor oder keiner), auch eines **lesenden** Werkzeugs, auf
+  die Freigabe dieser Person über genau diese Argumente (in Läufen von Automationen und
+  Ereignisregeln: der Eigentümerin); denn was er sendet, kann tragen, was nur sie lesen
+  darf (Review M8 1, Befund 3). Über ihren eigenen Konnektor geht es ohne Freigabe
+  weiter; schreibende externe Werkzeuge warten ohnehin immer. Ein Lauf sendet
   höchstens `HERD_MCP_MAX_CALLS_PER_RUN` Aufrufe (Standard 20); der nächste wird nicht
   gesendet (`external_tool_limit`), was zurückgehalten wurde, zählt nicht. Das Ergebnis
   geht gerahmt als `<untrusted source="mcp" server=… tool=…>` und auf 8.000 Zeichen

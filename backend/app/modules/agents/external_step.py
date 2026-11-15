@@ -10,7 +10,12 @@ it here). No transaction is open while the remote server answers.
    (`ToolCaller.prepare`: the server's shared connector, or the asking person's own;
    the secret lives only in the endpoint's headers, never in the journal). A write
    tool passes the release of the asking person (`approvals/gate.py`: waiting,
-   rejected and stale end the step as for any tool). A run that has sent
+   rejected and stale end the step as for any tool). Once the run carries the
+   personal mark (`Reads.personal`), so does a read tool of any server it does not
+   use with the asking person's own connector (a shared connector, or none): what it
+   sends may carry what only that person may read, so that person releases the exact
+   arguments (in an automation's or an event rule's run: its owner, `run.user_id`;
+   module review M8 1, finding 3). A run that has sent
    `HERD_MCP_MAX_CALLS_PER_RUN` calls sends no more (`CALL_LIMIT` as the result).
    Then, before anything is sent, the call's `run_event` with `OUTCOME_UNKNOWN` as its
    result, committed.
@@ -165,8 +170,10 @@ async def _before(
         ctx = ToolContext(
             session, actor, location, host.run.reads, host.ref(), CallRef(step, call.id)
         )
+        personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
+        marked = host.run.reads.personal and not personal  # leaves the person's hands
         held: ToolResult | Wait | None = None
-        if grant == Grant.CONFIRM or remote.writes:  # a write tool: always (its floor)
+        if grant == Grant.CONFIRM or remote.writes or marked:  # a write tool: always
             with caused_by(run.id):
                 held = await gate(ctx, spec, args)
         if isinstance(held, Wait):
@@ -176,7 +183,6 @@ async def _before(
             return _Ended(await _record(host, steps, run, step, call, args, held), refused)
         placeholder = external.unknown_outcome(remote)
         await _record(host, steps, run, step, call, args, placeholder)
-        personal = server is not None and server.connector_scope == ConnectorUse.PERSONAL
         return _Sending(prepared, args.model_dump(mode="json"), placeholder, personal)
 
 

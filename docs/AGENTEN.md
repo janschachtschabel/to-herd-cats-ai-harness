@@ -495,7 +495,11 @@ endet dann statt mit seiner Antwort mit `policy_blocked` (`personal_connector`, 
 Halt-Ereignis). Ergebnisse über einen geteilten Konnektor, Fehler und ein Aufruf mit
 unbekanntem Ausgang setzen keine Marke. Schreibende externe Werkzeuge prüft weder diese
 noch die Entwurfsmarke: Sie warten immer auf die Freigabe der fragenden Person über
-genau diese Argumente.
+genau diese Argumente. Mit der Marke gilt das auch für jedes **lesende** externe
+Werkzeug eines Servers, den der Lauf nicht über den eigenen Konnektor dieser Person
+nutzt (geteilter Konnektor oder keiner): Seine Argumente verlassen das System und
+können tragen, was nur sie lesen darf; sie gibt genau diese Argumente frei (in Läufen
+von Automationen und Ereignisregeln die Eigentümerin). Review M8 1, Befund 3.
 
 Beispiele:
 
