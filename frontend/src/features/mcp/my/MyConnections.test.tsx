@@ -46,6 +46,10 @@ describe('my connections', () => {
       oauth_client_id: CLIENT,
       mcp_server_id: GITLAB,
     })
+    // Once made, the new connector is listed: its row turns into the connector's card
+    // while the sign-in address is still on its way, and the browser must go there all
+    // the same.
+    let mineNow = [mine]
     const api = mockApi({
       ...shell(['ai.use']),
       'GET /api/ai/my-mcp-servers': page([
@@ -53,10 +57,14 @@ describe('my connections', () => {
         makePersonalServer({ id: WIKI, name: 'Wiki', connected: true }),
         makePersonalServer({ id: JIRA, name: 'Jira' }),
       ]),
-      'GET /api/ai/my-connectors': page([mine]),
-      'POST /api/ai/my-connectors': { status: 201, body: made },
-      [`POST /api/ai/my-connectors/${made.id}/authorize`]: {
-        authorization_url: 'https://gitlab.com/oauth/authorize?state=abc',
+      'GET /api/ai/my-connectors': () => page(mineNow),
+      'POST /api/ai/my-connectors': () => {
+        mineNow = [mine, made]
+        return { status: 201, body: made }
+      },
+      [`POST /api/ai/my-connectors/${made.id}/authorize`]: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return { authorization_url: 'https://gitlab.com/oauth/authorize?state=abc' }
       },
     })
     const { user } = await renderApp('/my-connections')

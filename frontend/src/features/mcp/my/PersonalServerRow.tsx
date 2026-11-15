@@ -29,17 +29,17 @@ function NotConnected({ server }: { server: PersonalServer }) {
           <Button
             size="sm"
             disabled={create.isPending || oauth.pending}
-            onClick={() =>
-              create.mutate(
-                {
+            onClick={async () => {
+              const made = await create
+                .mutateAsync({
                   name: server.name,
                   auth_kind: 'oauth',
                   oauth_client_id: clientId,
                   mcp_server_id: server.id,
-                },
-                { onSuccess: (made) => oauth.connect(made.id) },
-              )
-            }
+                })
+                .catch(() => null) // shown through `create.error`
+              if (made) await oauth.connect(made.id)
+            }}
           >
             <Link2 aria-hidden />
             {t('mcp.my.connectNamed', { name: server.name })}

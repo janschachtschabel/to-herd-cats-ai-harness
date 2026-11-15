@@ -103,11 +103,12 @@ function CreateForm({
   const isOAuth = form.watch('auth_kind') === 'oauth'
   return (
     <form
-      onSubmit={form.handleSubmit((values) =>
-        create.mutate(toBody(values), {
-          onSuccess: (made) => (made.auth_kind === 'oauth' ? oauth.connect(made.id) : onDone()),
-        }),
-      )}
+      onSubmit={form.handleSubmit(async (values) => {
+        const made = await create.mutateAsync(toBody(values)).catch(() => null)
+        if (!made) return // shown through `create.error`
+        if (made.auth_kind === 'oauth') await oauth.connect(made.id)
+        else onDone()
+      })}
       noValidate
       className="flex flex-col gap-4"
     >
