@@ -8,7 +8,8 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `…-m2-wiki.md`, `2026-11-13-m3-nachrichten.md`, `2026-11-13-m4-tickets.md`,
 `2026-11-13-m4b-boards-sprints.md`, `2026-11-13-m5-ki-grundlage.md`,
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
-`2026-11-15-m8-oeffnung.md`) are built; next are M5 Tasks 8–12 and M9 (spec 14). Present: identity, groups, spaces, roles,
+`2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
+are built; next are the M9a module review, M9b (Tasks 12–18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -39,15 +40,25 @@ catalog's tools within the person's rights, the token's spaces and the AI policy
 external agents with ticket pick-up, external MCP servers with per-tool approval and
 fingerprints (write tools level 4, always released), connectors (bearer/header, OAuth
 with PKCE; shared or personal), the catalogue (GitHub, GitLab, operator files), a cap
-on external calls per run (M8). Planned, not present: embeddings, hybrid search,
-Docling conversion (M5 Tasks 8–11), S3, collab with Redis, OIDC (M9). Operations: `README.md` (Betriebshinweise),
+on external calls per run (M8); production (M9a): backup archives (database and files
+from one snapshot) with verify, schedule, grandfather-father-son retention, restic
+offsite and alerts, restore into an empty installation with a rehearsal; OIDC sign-in
+(Google preset, generic providers, linking) with self-registration only into an
+account that waits for an admin's approval; collab grants instead of the session
+cookie; a retention rule for every table; the full chart (HPA, PDB, backup CronJob);
+the ASVS 5.0 L2 check; the 200-person load test. Planned, not present: embeddings,
+hybrid search, Docling conversion (M5 Tasks 8–11), maintenance mode and restore into a
+running installation, backups in the admin UI, S3, several collab instances (page
+ownership in Postgres, no Redis), optional TOTP, ASVS gaps J7–J14 (M9b). Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
 boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the stub),
 `docs/AGENTEN.md` (agents and automations: use, admin, worker runs and the due loop,
 limits, metrics and alerts), `docs/MCP.md` (tokens, `/mcp` with Claude Code and Codex,
-external agents, servers, connectors, catalogue, operation, metrics and alerts).
+external agents, servers, connectors, catalogue, operation, metrics and alerts),
+`docs/SICHERUNG.md` (backup, restore, retention), `docs/ANMELDUNG.md` (password and
+OIDC sign-in, approval), `docs/SICHERHEIT.md` (ASVS rows; `tests/test_security_doc.py`).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -120,8 +131,28 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   agents, skill proposals (`sight.py` is the one visibility rule for routes and
   activity). Frontend `features/{ai,agents,runs,approvals,proposals,skills}`.
 - Collab (`collab/`, Node 22, ESM): Hocuspocus server, talks only to the API's
-  `/internal/collab/*` (token); `collab/schema.mjs` is the one editor schema shared with
-  the frontend.
+  `/internal/collab/*` (internal token plus, per connection, a grant `herd_cg_…` bound
+  to one page and generation, `wiki/collab_grants.py`; the session cookie never leaves
+  the API); `collab/schema.mjs` is the one editor schema shared with the frontend.
+- Operations (M9, `app/ops/`): `python -m app.ops backup create|verify|list|run|schedule`
+  and `restore check|apply` (dispatcher `ops/cli.py`, `run(argv, settings, clock)`);
+  archive format 1 (`archive.py`, `manifest.py`), `pg_dump`/`pg_restore` only through
+  `pgtools.py` (password in `PGPASSWORD` of a built environment), retention and restic
+  (`retention.py`, `offsite.py`), advisory locks `herd.backup` and `herd.schema`. State
+  in `modules/backups` (`backup_run`, gauges read by the worker). Settings in
+  `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
+  (`core/storage_tombstones.py`). Rehearsal `deploy/scripts/restore-rehearsal.sh` with
+  `scripts/compare_databases.py`.
+- Retention (M9): `core/retention.py` holds a rule for every table (`Keep`, `Upkeep`,
+  `Cleans`; `tests/test_retention.py` fails for a table without one); the due loop's
+  `worker/upkeep.py` deletes expired rows.
+- Sign-in (M9): `modules/oidc` (providers, flow with PKCE/state/nonce and a binding
+  cookie, ID token check with PyJWT, `admission.py` decides login/link/signup/refuse,
+  Google preset in `providers.py`); settings in `core/config_auth.py`
+  (`HERD_OIDC_*`). Self-registration creates an inactive account waiting for approval
+  (`app_user.awaiting_approval_since`; `users` approve/reject, audit, admin
+  notification); nothing else creates accounts without an admin. Stub
+  `tests/support/oidc_stub.py`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
   messaging, tickets, agents, automations and MCP in the real app (role all, worker
   included) on a throwaway database, with the OpenAI stub
@@ -160,7 +191,8 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ```bash
 cd backend && uv sync
-cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy app scripts
+cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy app scripts \
+  && uv run python -m scripts.check_migrations
 cd backend && uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/runtime.txt \
   && uv run python scripts/check_licenses.py python /tmp/runtime.txt \
   && uv run python scripts/check_licenses.py npm ../frontend/package-lock.json \
@@ -199,12 +231,18 @@ SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api
                                                         # (both modes also: a ticket's system entries from the worker
                                                         # and a one-off automation fired exactly once by the due loop)
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
+# 200-person load test without Docker: deploy/compose/{loadsetup,loadmix,loadreport}.py,
+# deploy/scripts/measure-processes.sh (RSS/CPU per role from /proc); README of compose
+bash deploy/scripts/restore-rehearsal.sh                # backup A → restore into empty B → compare (PGHOST/PGPORT)
 ```
 
 ```bash
 bash deploy/helm/scripts/check-chart-version.sh         # chart version = appVersion = pyproject version
-bash deploy/helm/scripts/check-chart-rules.sh           # chart behaviour (HELM="docker run ... alpine/helm" works too)
+bash deploy/helm/scripts/check-chart-rules.sh           # chart behaviour (HELM="docker run ... alpine/helm" works too;
+                                                        # sources chart-rules-scaling.sh and chart-rules-placement.sh)
+cd backend && uv run python ../deploy/helm/scripts/check_values.py   # values files vs schema, @param vs schema
 helm lint --strict deploy/helm/to-herd-cats-ai          # also with -f deploy/helm/to-herd-cats-ai/ci/*-values.yaml
+                                                        # (ci/full-values.yaml switches everything on)
 helm template t deploy/helm/to-herd-cats-ai | kubeconform -strict -summary
 promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
 ```
@@ -238,7 +276,10 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   `Ported-from: to-herd-cats-ai@<sha>:<path>`.
 - Alembic: one migration per slice, never edited after merge.
 - Alembic: migrations must stay backward compatible with the previous release (expand
-  first, contract in a later release). `/ready` stays ready when the database is at a
+  first, contract in a later release). `backend/alembic/RELEASED` names the last
+  released revision (set by hand to the head when tagging); `scripts/check_migrations.py`
+  refuses drops, renames and type changes after it unless `contract_of` names a
+  released revision, and demands one head. `/ready` stays ready when the database is at a
   revision this code does not know (a newer release migrated before its pods rolled
   out); it is not ready only with no revision or a known older one.
 - Outbox handlers: register with `@handler(...)` from `app.worker.registry` in the
@@ -256,8 +297,9 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   sprints before tickets.
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
   `demo_messaging.py`, `demo_ai.py`, `demo_ai_model.py`, `demo_automations.py`,
-  `demo_mcp.py`, shared API helpers in `demo_api.py`) goes through the public API only;
-  extend it and its test with each milestone.
+  `demo_mcp.py`, `demo_oidc.py` (only with `--oidc-stub`), shared API helpers in
+  `demo_api.py`) goes through the public API only; extend it and its test with each
+  milestone.
 - AI and agents:
   - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
     else does.
