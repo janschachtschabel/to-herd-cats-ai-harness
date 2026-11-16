@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useTotpStatus } from '@/features/profile/totp/queries'
 import { Field, FormActions, SaveError } from '@/features/shared/forms'
 import { bodyResolver } from '@/lib/formResolver'
 import { bodySchema } from '@/lib/schemas'
@@ -74,6 +75,8 @@ function CreateForm({
 }) {
   const { t } = useTranslation()
   const create = useCreateToken(agentId)
+  // A person with TOTP gives a current code for every new token (the server asks).
+  const withTotp = Boolean(useTotpStatus().data?.enabled_at)
   const form = useForm<TokenValues>({ resolver, defaultValues: EMPTY_TOKEN })
   const errors = form.formState.errors
   return (
@@ -114,6 +117,19 @@ function CreateForm({
           />
         )}
       </Field>
+      {withTotp && (
+        <Field label={t('totp.token.code')} hint={t('totp.token.codeHint')}>
+          {(props) => (
+            <Input
+              {...props}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              className="w-40 font-mono tracking-widest"
+              {...form.register('second_factor_code')}
+            />
+          )}
+        </Field>
+      )}
       <SaveError error={create.error} />
       <FormActions>
         <Button type="button" variant="outline" onClick={onCancel}>

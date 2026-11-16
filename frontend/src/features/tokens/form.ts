@@ -9,6 +9,8 @@ export interface TokenValues {
   scope: 'all' | 'chosen'
   space_ids: string[]
   expires_in_days: number
+  /** A person with TOTP: a current code (empty otherwise, then not sent). */
+  second_factor_code: string
 }
 
 export const EMPTY_TOKEN: TokenValues = {
@@ -17,13 +19,16 @@ export const EMPTY_TOKEN: TokenValues = {
   scope: 'all',
   space_ids: [],
   expires_in_days: DEFAULT_EXPIRY_DAYS,
+  second_factor_code: '',
 }
 
 export function tokenBody(values: TokenValues): Schemas['TokenIn'] {
+  const code = values.second_factor_code.trim()
   return {
     name: values.name.trim(),
     mode: values.mode,
     expires_in_days: values.expires_in_days,
     space_ids: values.scope === 'all' ? null : values.space_ids,
+    ...(code ? { second_factor_code: code } : {}),
   }
 }
