@@ -53,7 +53,12 @@ from app.modules.tickets.models import (
 from app.modules.tokens.models import AccessToken, McpSetting
 from app.modules.totp.models import SignInChallenge, TotpRecoveryCode, UserTotp
 from app.modules.users.models import User
-from app.modules.wiki.collab_models import CollabGrant, PageCollabState
+from app.modules.wiki.collab_models import (
+    CollabGrant,
+    CollabInstance,
+    CollabPageOwner,
+    PageCollabState,
+)
 from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
@@ -85,6 +90,8 @@ __all__ = [
     "AutomationFiring",
     "Base",
     "CollabGrant",
+    "CollabInstance",
+    "CollabPageOwner",
     "Connector",
     "Conversation",
     "ConversationRead",

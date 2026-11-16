@@ -58,17 +58,35 @@ async def grant_of(
     return await CollabService(session).admit(token_of(client), UUID(page["id"]), generation)
 
 
+def _owner(instance: UUID | None, epoch: int | None = None) -> dict[str, Any]:
+    """The instance (and epoch) a call names; nothing for a collab process of 1.0.0."""
+    named: dict[str, Any] = {} if instance is None else {"instance_id": str(instance)}
+    return named if epoch is None else {**named, "epoch": epoch}
+
+
 async def collab_auth(
-    collab: AsyncClient, grant: str, page: dict[str, Any], generation: int = 0
+    collab: AsyncClient,
+    grant: str,
+    page: dict[str, Any],
+    generation: int = 0,
+    *,
+    instance: UUID | None = None,
 ) -> Any:
-    body = {"grant": grant, "page_id": page["id"], "generation": generation}
+    body = {"grant": grant, "page_id": page["id"], "generation": generation, **_owner(instance)}
     return await collab.post("/internal/collab/auth", json=body)
 
 
-async def load(collab: AsyncClient, grant: str, page: dict[str, Any], generation: int = 0) -> Any:
+async def load(
+    collab: AsyncClient,
+    grant: str,
+    page: dict[str, Any],
+    generation: int = 0,
+    *,
+    instance: UUID | None = None,
+) -> Any:
     return await collab.get(
         f"/internal/collab/pages/{page['id']}",
-        params={"generation": generation},
+        params={"generation": generation, **_owner(instance)},
         headers={"X-Herd-Grant": grant},
     )
 
@@ -80,8 +98,11 @@ async def check(
     *,
     unsaved: list[str] | None = None,
     generation: int = 0,
+    instance: UUID | None = None,
+    epoch: int | None = None,
 ) -> Any:
     body = {"grants": grants, "unsaved_grants": unsaved or [], "generation": generation}
+    body |= _owner(instance, epoch)
     return await collab.post(f"/internal/collab/pages/{page['id']}/check", json=body)
 
 
@@ -98,6 +119,8 @@ async def put_live(
     content_md: str = "live",
     ydoc_b64: str | None = None,
     session_key: str = "doc-1",
+    instance: UUID | None = None,
+    epoch: int | None = None,
 ) -> Any:
     return await collab.put(
         f"/internal/collab/pages/{page['id']}",
@@ -107,6 +130,7 @@ async def put_live(
             "content_md": content_md,
             "editor_grants": grants,
             "session_key": session_key,
+            **_owner(instance, epoch),
         },
     )
 
@@ -121,3 +145,21 @@ def expect_error(r: Any, status: int, code: str) -> Any:
     assert r.status_code == status, r.text
     assert r.json()["error"]["code"] == code
     return r.json()["error"]
+
+
+def instance_id(n: int) -> UUID:
+    """A collab instance's id (the process picks its own at start)."""
+    return UUID(int=n)
+
+
+async def announce(
+    collab: AsyncClient, instance: UUID, url: str | None = None, *, draining: bool = False
+) -> Any:
+    """A collab instance's heartbeat (`POST /internal/collab/instances`)."""
+    body = {"id": str(instance), "url": url or f"ws://collab-{instance.int}:1234"}
+    return await collab.post("/internal/collab/instances", json={**body, "draining": draining})
+
+
+async def route(session: AsyncSession, page: dict[str, Any]) -> Any:
+    """Where the relay sends the next connection of the page (`CollabService.route`)."""
+    return await CollabService(session).route(UUID(page["id"]))

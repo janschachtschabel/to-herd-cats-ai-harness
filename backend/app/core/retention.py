@@ -73,6 +73,12 @@ RETENTION: Mapping[str, Retention] = {
     "tag": Keep(_CONTENT),
     "tagging": Keep("goes with its tag or the tagged page or ticket"),
     "collab_grant": Upkeep("expires_at", timedelta(hours=1), EXPIRY),
+    # A collab process that stopped beating an hour ago is gone for good (a running
+    # one announces itself every 5 s and comes back by itself after a restore).
+    "collab_instance": Upkeep("heartbeat_at", timedelta(hours=1), EXPIRY),
+    "collab_page_owner": Keep(
+        "one binding per page; goes with its page; kept so that its epoch only rises"
+    ),
     "storage_tombstone": Upkeep(
         "buried_at", timedelta(hours=48), "app.core.storage_tombstones:remove_buried"
     ),

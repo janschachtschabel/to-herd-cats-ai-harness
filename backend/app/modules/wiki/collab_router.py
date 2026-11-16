@@ -1,7 +1,9 @@
 """The internal collab API on the internal port (`/internal/collab/*`, behind the
 internal token, see `web/internal.py`). Only the collab process calls it, and only
 with the grants the relay handed it (plan M9 decision 16): a load names its grant in
-the header `X-Herd-Grant` (never in the URL)."""
+the header `X-Herd-Grant` (never in the URL). Collab instances announce themselves
+here, and every call for a page names the asking instance (plan M9 decision 17,
+`collab_instances.py`)."""
 
 import base64
 import binascii
@@ -11,16 +13,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.core.errors import ValidationFailed
+from app.core.models_base import utcnow
 from app.modules.auth.deps import SessionDep
 from app.modules.maintenance.cache import in_maintenance
 from app.modules.maintenance.middleware import refuse_in_maintenance
+from app.modules.wiki import collab_instances
 from app.modules.wiki.collab_grants import MAX_GRANT_CHARS
+from app.modules.wiki.collab_instances import Owner
 from app.modules.wiki.collab_schemas import (
     AuthIn,
     AuthOut,
     CheckIn,
     CheckOut,
     CollabUserOut,
+    InstanceIn,
     LiveDocumentOut,
     SaveIn,
     SaveOut,
@@ -34,14 +40,33 @@ router = APIRouter(prefix="/collab", tags=["internal"])
 CLOSED_IN_MAINTENANCE = [Depends(refuse_in_maintenance)]
 
 
+@router.post("/instances", status_code=204)
+async def announce(body: InstanceIn, session: SessionDep) -> Response:
+    """A collab instance's heartbeat (every 5 s): it is alive, here, maybe draining."""
+    await collab_instances.announce(
+        session, instance_id=body.id, url=body.url, draining=body.draining, now=utcnow()
+    )
+    return Response(status_code=204)
+
+
+@router.delete("/instances/{instance_id}", status_code=204)
+async def release(instance_id: uuid.UUID, session: SessionDep) -> Response:
+    """A draining instance has saved everything: its pages are free for others."""
+    await collab_instances.release(session, instance_id)
+    return Response(status_code=204)
+
+
 @router.post("/auth", response_model=AuthOut, dependencies=CLOSED_IN_MAINTENANCE)
 async def authenticate(body: AuthIn, session: SessionDep) -> AuthOut:
-    joined = await CollabService(session).join(body.grant, body.page_id, body.generation)
+    joined = await CollabService(session).join(
+        body.grant, body.page_id, body.generation, body.instance_id
+    )
     return AuthOut(
         user=CollabUserOut(id=joined.user.id, name=joined.user.name),
         session_ref=joined.session_ref,
         generation=joined.generation,
         can_edit=True,
+        epoch=joined.epoch,
     )
 
 
@@ -51,11 +76,16 @@ async def load(
     session: SessionDep,
     generation: Annotated[int, Query(ge=0)],
     grant: Annotated[str, Header(alias="X-Herd-Grant", max_length=MAX_GRANT_CHARS)],
+    instance_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> LiveDocumentOut:
-    doc = await CollabService(session).load(page_id, grant, generation)
+    doc = await CollabService(session).load(page_id, grant, generation, instance_id)
     ydoc_b64 = base64.b64encode(doc.ydoc).decode("ascii") if doc.ydoc is not None else None
     return LiveDocumentOut(
-        generation=doc.generation, ydoc_b64=ydoc_b64, content_md=doc.content_md, title=doc.title
+        generation=doc.generation,
+        ydoc_b64=ydoc_b64,
+        content_md=doc.content_md,
+        title=doc.title,
+        epoch=doc.epoch,
     )
 
 
@@ -72,6 +102,7 @@ async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut
         content_md=body.content_md,
         grants=body.editor_grants,
         session_key=body.session_key,
+        owner=Owner(body.instance_id, body.epoch),
     )
     return SaveOut(generation=page.collab_generation, version=page.version)
 
@@ -87,7 +118,11 @@ async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> Check
             maintenance=True,
         )
     result = await CollabService(session).check(
-        page_id, body.grants, body.generation, unsaved=body.unsaved_grants
+        page_id,
+        body.grants,
+        body.generation,
+        unsaved=body.unsaved_grants,
+        owner=Owner(body.instance_id, body.epoch),
     )
     return CheckOut(
         generation_ok=result.generation_ok,

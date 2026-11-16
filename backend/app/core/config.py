@@ -48,10 +48,11 @@ class Settings(SecretFileSettings, OpsSettings, AuthSettings, StorageSettings, B
     # The address browsers use (scheme://host[:port]); WebSocket Origins must match it.
     # Unset, an Origin must match the host the request came to.
     public_url: str | None = None
-    # Live editing: where the API relays /collab to (the collab process), the port the
-    # collab process listens on, how it reaches the internal API (default: this
-    # process's internal port), and its script (`node <collab_script>`).
-    collab_url: str = "ws://127.0.0.1:1234"
+    # Live editing: the port the collab process listens on, how it reaches the internal
+    # API (default: this process's internal port), and its script (`node
+    # <collab_script>`). Where the API relays /collab to, each collab instance announces
+    # itself (HERD_COLLAB_ADVERTISE_URL, read by the collab process; role all: its child
+    # at 127.0.0.1, `launch.collab_env`).
     collab_port: int = 1234
     collab_api_url: str | None = None
     collab_script: Path = _REPO_ROOT / "collab" / "server.mjs"

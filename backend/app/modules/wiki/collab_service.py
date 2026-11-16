@@ -18,6 +18,10 @@ document; a grant no one issued for them never ends one. A save or a load for an
 older generation is refused (409 `collab.generation_ended`), and the stored Yjs state
 of an older generation is never handed out again: the collab process then builds the
 document from the Markdown.
+
+Instances (plan M9 decision 17, `collab_instances.py`): the relay asks `route` where a
+page's connections go; joining, loading, saving and checking name the asking instance
+(and saving and checking its epoch), and only the page's owner is served.
 """
 
 import uuid
@@ -32,8 +36,9 @@ from app.core.metrics import COLLAB_LOAD_MUTATIONS, COLLAB_SAVES
 from app.core.models_base import utcnow
 from app.modules.auth.service import AuthService
 from app.modules.users.models import User
-from app.modules.wiki import collab_grants
+from app.modules.wiki import collab_grants, collab_instances
 from app.modules.wiki.collab_editors import Editor, EditorResolver
+from app.modules.wiki.collab_instances import LEGACY, Owner
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
 from app.modules.wiki.collab_repository import CollabRepository, page_by_id
 from app.modules.wiki.models import MAX_CONTENT_CHARS, Page
@@ -71,6 +76,7 @@ class Joined:
     user: User
     session_ref: str
     generation: int
+    epoch: int | None  # the asking instance's binding (None: it named none)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +85,7 @@ class LiveDocument:
     ydoc: bytes | None  # only a state of the current generation
     content_md: str
     title: str
+    epoch: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,22 +124,42 @@ class CollabService:
             now=utcnow(),
         )
 
-    async def join(self, grant: str, page_id: uuid.UUID, generation: int) -> Joined:
+    async def route(self, page_id: uuid.UUID) -> collab_instances.Route:
+        """Where the relay sends a connection of the page it has just admitted."""
+        page = await page_by_id(self.session, page_id)
+        if page is None:
+            raise page_not_found()
+        return await collab_instances.route(
+            self.session, org_id=page.org_id, page_id=page.id, now=utcnow()
+        )
+
+    async def join(
+        self, grant: str, page_id: uuid.UUID, generation: int, instance_id: uuid.UUID | None = None
+    ) -> Joined:
         """The collab process admits a connection: its grant is live for this page and
-        generation, and its person (session active) may still edit the page."""
+        generation, its person (session active) may still edit the page, and the asking
+        instance owns the page."""
         editor = await self._active(grant, page_id, generation)
         page = await self._editable(editor.actor, page_id)
+        epoch = await self._fence(page, Owner(instance_id))
         session_ref = collab_grants.session_ref(editor.session_id)
-        return Joined(editor.user, session_ref, page.collab_generation)
+        return Joined(editor.user, session_ref, page.collab_generation, epoch)
 
-    async def load(self, page_id: uuid.UUID, grant: str, generation: int) -> LiveDocument:
+    async def load(
+        self,
+        page_id: uuid.UUID,
+        grant: str,
+        generation: int,
+        instance_id: uuid.UUID | None = None,
+    ) -> LiveDocument:
         editor = await self._active(grant, page_id, generation)
         page = await self._editable(editor.actor, page_id)
         if generation != page.collab_generation:
             raise generation_ended(page)
+        epoch = await self._fence(page, Owner(instance_id))
         state = await CollabRepository(self.session, page.org_id).state(page.id)
         ydoc = state.ydoc if state and state.generation == page.collab_generation else None
-        return LiveDocument(page.collab_generation, ydoc, page.content_md, page.title)
+        return LiveDocument(page.collab_generation, ydoc, page.content_md, page.title, epoch)
 
     async def save(
         self,
@@ -143,9 +170,12 @@ class CollabService:
         content_md: str,
         grants: list[str],
         session_key: str,
+        owner: Owner = LEGACY,
     ) -> Page:
         try:
-            page = await self._save(page_id, generation, ydoc, content_md, grants, session_key)
+            page = await self._save(
+                page_id, generation, ydoc, content_md, grants, session_key, owner
+            )
         except AppError as error:
             COLLAB_SAVES.labels(result=_result(error)).inc()
             raise
@@ -171,6 +201,7 @@ class CollabService:
         generation: int,
         *,
         unsaved: list[str] | None = None,
+        owner: Owner = LEGACY,
     ) -> Check:
         """Whether the connections of these grants may stay: the generation still
         holds, and which grants may no longer edit. The live ones are extended.
@@ -183,6 +214,7 @@ class CollabService:
         page = await page_by_id(self.session, page_id, lock=bool(unsaved))
         if page is None:
             return Check(False, generation, sorted({*grants, *unsaved}), [])
+        await self._fence(page, owner)
         now = utcnow()
         editors = await self.editors.resolve(
             [*grants, *unsaved], page_id=page.id, generation=generation, now=now, org_id=page.org_id
@@ -207,6 +239,7 @@ class CollabService:
         content_md: str,
         grants: list[str],
         session_key: str,
+        owner: Owner,
     ) -> Page:
         if len(ydoc) > MAX_YDOC_BYTES or len(content_md) > MAX_CONTENT_CHARS:
             raise StateTooLarge()
@@ -219,6 +252,7 @@ class CollabService:
         page = await live.page(page_id, lock=True)
         if page is None:
             raise page_not_found()
+        await self._fence(page, owner, lock=True)
         if page.trashed_at is not None or page.collab_generation != generation:
             raise generation_ended(page)
         if editors.powerless or editors.unknown or await self.editors.lost(editors.valid, page):
@@ -240,6 +274,10 @@ class CollabService:
             raise grant_invalid()
         return editor
 
+    async def _fence(self, page: Page, owner: Owner, *, lock: bool = False) -> int | None:
+        """409 `collab.not_owner` unless the calling instance owns the page."""
+        return await collab_instances.fence(self.session, page, owner, now=utcnow(), lock=lock)
+
     async def _editable(self, actor: Actor, page_id: uuid.UUID) -> Page:
         page = await self.reader.readable(actor, page_id)
         await self.reader.require_in_space(actor, Action.PAGE_EDIT, page)
@@ -251,4 +289,5 @@ def _result(error: AppError) -> str:
         "collab.generation_ended": "generation_ended",
         "collab.editors_revoked": "revoked",
         "collab.state_too_large": "too_large",
+        "collab.not_owner": "not_owner",
     }.get(error.code, "refused")

@@ -5,8 +5,10 @@
 - `migrate`: `alembic upgrade head`, then exit (the cluster's one-off job).
 - `all`: migrate first, then as `api` (single container, docker compose), and, when
   HERD_INTERNAL_TOKEN is set, the collab process (`node collab/server.mjs`) as a child
-  on 127.0.0.1:HERD_COLLAB_PORT. If the child ends, the launcher stops and exits 3.
-- `collab`: the collab process alone, in place of the launcher (its own deployment).
+  on 127.0.0.1:HERD_COLLAB_PORT, the one collab instance, announced at that address.
+  If the child ends, the launcher stops and exits 3.
+- `collab`: the collab process alone, in place of the launcher (its own deployment;
+  it announces itself at HERD_COLLAB_ADVERTISE_URL, plan M9 decision 17).
 - `worker`: the outbox dispatcher (`app.worker`) and the internal port only (probes,
   metrics); `all` runs the worker next to the API, in the same event loop.
 
@@ -227,6 +229,9 @@ def collab_env(settings: Settings, *, host: str) -> dict[str, str]:
         HERD_COLLAB_PORT=str(settings.collab_port),
         HERD_COLLAB_API_URL=settings.collab_api_url or f"http://127.0.0.1:{settings.internal_port}",
     )
+    if settings.role == "all":
+        # The one instance, as its child: reached on loopback only.
+        env["HERD_COLLAB_ADVERTISE_URL"] = f"ws://127.0.0.1:{settings.collab_port}"
     if settings.internal_token is not None:
         env["HERD_INTERNAL_TOKEN"] = settings.internal_token.get_secret_value()
     if settings.public_url:

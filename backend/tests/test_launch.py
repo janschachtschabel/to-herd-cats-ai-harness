@@ -239,10 +239,20 @@ def test_the_collab_process_gets_only_what_it_needs(monkeypatch):
         "HERD_COLLAB_HOST",
         "HERD_COLLAB_PORT",
         "HERD_COLLAB_API_URL",
+        "HERD_COLLAB_ADVERTISE_URL",
         "HERD_INTERNAL_TOKEN",
         "HERD_PUBLIC_URL",
     }
     assert not any("secret" in value for value in env.values())
+
+
+def test_role_all_announces_its_one_collab_child_on_loopback(monkeypatch):
+    """Plan M9 task 15: role all runs exactly one collab instance, at 127.0.0.1; an
+    address from the environment does not move it."""
+    monkeypatch.setenv("HERD_COLLAB_ADVERTISE_URL", "ws://elsewhere:1234")
+    settings = Settings(role="all", internal_token=TOKEN, collab_port=1300)
+    env = launch.collab_env(settings, host="127.0.0.1")
+    assert env["HERD_COLLAB_ADVERTISE_URL"] == "ws://127.0.0.1:1300"
 
 
 async def test_collab_process_is_stopped_with_the_servers():
@@ -269,6 +279,7 @@ async def test_missing_node_ends_the_launcher_with_3():
 
 def test_role_collab_runs_node_in_place(monkeypatch):
     calls = []
+    monkeypatch.setenv("HERD_COLLAB_ADVERTISE_URL", "ws://10.1.2.3:1234")
     settings = Settings(role="collab", internal_token=TOKEN, collab_api_url="http://api:9090")
     monkeypatch.setattr(launch, "get_settings", lambda: settings)
     monkeypatch.setattr(launch.os, "execvpe", lambda *args: calls.append(args))
@@ -277,6 +288,7 @@ def test_role_collab_runs_node_in_place(monkeypatch):
     assert file == "node" and argv[1].endswith("collab/server.mjs")
     assert env["HERD_COLLAB_HOST"] == "0.0.0.0"
     assert env["HERD_COLLAB_API_URL"] == "http://api:9090"
+    assert env["HERD_COLLAB_ADVERTISE_URL"] == "ws://10.1.2.3:1234"  # its own pod's address
 
 
 def test_role_all_shows_the_collab_childs_metrics_on_the_internal_port():

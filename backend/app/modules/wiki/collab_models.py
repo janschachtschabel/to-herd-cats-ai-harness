@@ -1,12 +1,14 @@
 """The state of a page's live-editing session (spec 9): the Yjs document as the collab
 process last saved it, for the generation it belongs to. Session state only: the page's
 content is its Markdown; a state of an older generation is never handed out again.
-And the grants the collab process acts under (`CollabGrant`, `collab_grants.py`)."""
+And the grants the collab process acts under (`CollabGrant`, `collab_grants.py`), the
+collab instances and which of them owns a page (`CollabInstance`, `CollabPageOwner`,
+`collab_instances.py`)."""
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,3 +49,39 @@ class CollabGrant(UuidPk, OrgScoped, Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, nullable=False
     )
+
+
+class CollabInstance(Base):
+    """A collab process that announced itself (plan M9 decision 17): where the relay
+    reaches it (`url`, from HERD_COLLAB_ADVERTISE_URL), when it last did (every 5 s;
+    silent for INSTANCE_TTL it counts as gone) and whether it is draining (stopping: it
+    gets no new pages). Infrastructure shared by every organisation, so no `org_id`
+    (an explicit decision of the plan); the process picks its own `id` at start."""
+
+    __tablename__ = "collab_instance"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    url: Mapped[str] = mapped_column(String(256), nullable=False)
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=False
+    )
+    draining: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class CollabPageOwner(OrgScoped, Base):
+    """The one collab instance that holds a page's live document (plan M9 decision 17).
+    The binding lasts OWNER_TTL from the owner's last call (its checks come every 5 s);
+    whoever takes the page over raises `epoch`, and only the owner with the current
+    epoch may save or check. The row stays with its page, so the epoch only rises; an
+    instance that is gone leaves `instance_id` NULL."""
+
+    __tablename__ = "collab_page_owner"
+
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("page.id", ondelete="CASCADE"), primary_key=True
+    )
+    instance_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("collab_instance.id", ondelete="SET NULL"), index=True
+    )
+    epoch: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -106,7 +106,13 @@ async def test_get_returns_content_and_ydoc_of_the_current_generation_only(
     sid = await grant_of(session, wiki.editor, page)
     r = await load(collab, sid, page)
     assert r.status_code == 200, r.text
-    assert r.json() == {"generation": 0, "ydoc_b64": None, "content_md": "# Start", "title": "Live"}
+    assert r.json() == {
+        "generation": 0,
+        "ydoc_b64": None,
+        "content_md": "# Start",
+        "title": "Live",
+        "epoch": None,  # no instance named: a collab process of 1.0.0
+    }
     assert (await put_live(collab, page, [sid], ydoc_b64=ydoc(b"yjs"))).status_code == 200
     r = await load(collab, sid, page)
     assert r.json()["ydoc_b64"] == ydoc(b"yjs") and r.json()["content_md"] == "live"
@@ -122,6 +128,7 @@ async def test_get_returns_content_and_ydoc_of_the_current_generation_only(
         "ydoc_b64": None,
         "content_md": "markdown",
         "title": "Live",
+        "epoch": None,
     }
     expect_error(await load(collab, sid, page), 409, "collab.generation_ended")
     # A grant loads only while its person may edit the page.

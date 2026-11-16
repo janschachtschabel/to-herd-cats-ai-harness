@@ -29,7 +29,7 @@ from app.modules.spaces.models import Space
 from app.modules.spaces.service import SpaceService
 from app.modules.totp.models import SignInChallenge
 from app.modules.users.models import User
-from app.modules.wiki.collab_models import CollabGrant
+from app.modules.wiki.collab_models import CollabGrant, CollabInstance
 from app.modules.wiki.models import Page
 from app.worker.due import DueLoop
 from app.worker.upkeep import EXPIRING, remove_expired
@@ -89,6 +89,11 @@ async def _grant(session: AsyncSession, org: Organization, user: User, at: datet
     return CollabGrant(
         org_id=org.id, token_hash=_hex(), page_id=page.id, generation=0, expires_at=at
     )
+
+
+async def _instance(session: AsyncSession, org: Organization, user: User, at: datetime) -> Base:
+    """A collab instance whose last heartbeat was `at` (no organisation: infrastructure)."""
+    return CollabInstance(id=uuid.uuid4(), url="ws://collab:1234", heartbeat_at=at)
 
 
 async def _oauth(session: AsyncSession, org: Organization, user: User, at: datetime) -> Base:
@@ -158,6 +163,7 @@ MAKERS: dict[str, Make] = {
     "rate_limit_hit": _hit,
     "ai_rate_window": _window,
     "collab_grant": _grant,
+    "collab_instance": _instance,
     "oauth_flow": _oauth,
     "oidc_flow": _oidc,
     "sign_in_challenge": _challenge,
