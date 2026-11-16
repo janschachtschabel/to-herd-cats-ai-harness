@@ -2024,6 +2024,12 @@ ein älteres folgt. Alle Migrationen sind nur erweiternd, aber:
   (nullbar, ohne Umschreiben). Ein Worker des vorigen Releases liest sie nicht und gibt
   Läufen weiter den ganzen Verlauf (die Marke hält dann wie zuvor), bis er ersetzt ist;
   den Schnitt setzt nur ein API-Pod dieses Releases.
+- M8, Text der Freigabekarten (Migration `9e4b6d2f8a17`, nur Daten): Jede schon
+  geschriebene Freigabekarte im Gespräch trägt danach nur noch den Namen ihres
+  Werkzeugs, wie neue Karten (Review M8 5, Befund L1); die alten Texte werden nicht
+  aufbewahrt, ein Downgrade stellt sie nicht wieder her. Wiederholbar. Ein Worker des
+  vorigen Releases schreibt neue Karten noch mit der alten Zusammenfassung, bis er
+  ersetzt ist.
 
 ### Woran man Probleme erkennt
 
