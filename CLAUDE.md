@@ -43,8 +43,9 @@ with PKCE; shared or personal), the catalogue (GitHub, GitLab, operator files), 
 on external calls per run (M8); production (M9a): backup archives (database and files
 from one snapshot) with verify, schedule, grandfather-father-son retention, restic
 offsite and alerts, restore into an empty installation with a rehearsal; OIDC sign-in
-(Google preset, generic providers, linking) with self-registration only into an
-account that waits for an admin's approval; collab grants instead of the session
+(Google preset, generic providers, linking) with self-registration only through a
+provider that vouches for the address and only into an account that waits for an
+admin's approval; collab grants instead of the session
 cookie; a retention rule for every table; the full chart (HPA, PDB, backup CronJob);
 the ASVS 5.0 L2 check; the 200-person load test. Planned, not present: embeddings,
 hybrid search, Docling conversion (M5 Tasks 8–11), maintenance mode and restore into a
@@ -137,8 +138,11 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 - Operations (M9, `app/ops/`): `python -m app.ops backup create|verify|list|run|schedule`
   and `restore check|apply` (dispatcher `ops/cli.py`, `run(argv, settings, clock)`);
   archive format 1 (`archive.py`, `manifest.py`), `pg_dump`/`pg_restore` only through
-  `pgtools.py` (password in `PGPASSWORD` of a built environment), retention and restic
-  (`retention.py`, `offsite.py`), advisory locks `herd.backup` and `herd.schema`. State
+  `pgtools.py` (password in `PGPASSWORD` of a built environment; `pg_restore` reads
+  the archive's dump as a stream, no scratch file), retention and restic (`retention.py`,
+  `offsite.py`, `forget --group-by host,tags`), advisory locks `herd.backup` and
+  `herd.schema`. A backup writes only into the backup directory (`.part` files, removed
+  under the lock by the next run; a killed run counts as failed). State
   in `modules/backups` (`backup_run`, gauges read by the worker). Settings in
   `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
   (`core/storage_tombstones.py`). Rehearsal `deploy/scripts/restore-rehearsal.sh` with
@@ -149,9 +153,13 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 - Sign-in (M9): `modules/oidc` (providers, flow with PKCE/state/nonce and a binding
   cookie, ID token check with PyJWT, `admission.py` decides login/link/signup/refuse,
   Google preset in `providers.py`); settings in `core/config_auth.py`
-  (`HERD_OIDC_*`). Self-registration creates an inactive account waiting for approval
+  (`HERD_OIDC_*`). Self-registration (Google, or a generic provider with
+  `trust_email`) creates an inactive account waiting for approval
   (`app_user.awaiting_approval_since`; `users` approve/reject, audit, admin
-  notification); nothing else creates accounts without an admin. Stub
+  notification); rejecting deletes the never-active account and what signup created
+  (`users/removal_repository.py`; the audit keeps ids only); deleting a provider ends
+  its people's sessions. Nothing else creates accounts without an admin; the first
+  owner's `HERD_BOOTSTRAP_ADMIN_PASSWORD` passes the password checks (exit 4 if not). Stub
   `tests/support/oidc_stub.py`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
   messaging, tickets, agents, automations and MCP in the real app (role all, worker
@@ -277,7 +285,8 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
 - Alembic: one migration per slice, never edited after merge.
 - Alembic: migrations must stay backward compatible with the previous release (expand
   first, contract in a later release). `backend/alembic/RELEASED` names the last
-  released revision (set by hand to the head when tagging); `scripts/check_migrations.py`
+  released revision (set by hand to the head when tagging; `release.yml` refuses a tag
+  where it is not, `check_migrations.py --require-released-head`); `scripts/check_migrations.py`
   refuses drops, renames and type changes after it unless `contract_of` names a
   released revision, and demands one head. `/ready` stays ready when the database is at a
   revision this code does not know (a newer release migrated before its pods rolled
