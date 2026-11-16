@@ -1,6 +1,7 @@
 """Login, logout and session resolution."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,8 @@ from app.modules.auth.repository import SessionRepository
 from app.modules.auth.sign_in_log import log_sign_in, log_sign_out
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
+from app.modules.totp.challenges import open_challenge
+from app.modules.totp.repository import TotpRepository
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
 
@@ -35,6 +38,21 @@ EXPIRED_SESSION_BATCH = 500
 # Ended sessions (logout, expiry) are kept this long, so live editing can still save
 # the last edits of a person whose session ended mid-session (review M2 R2).
 ENDED_SESSION_KEEP = upkeep_after("user_session")
+
+
+@dataclass(frozen=True, slots=True)
+class SessionOpened:
+    user: User
+    token: str  # for the session cookie, nowhere else
+
+
+@dataclass(frozen=True, slots=True)
+class SecondFactorNeeded:
+    challenge_token: str  # for the waiting sign-in's cookie, nowhere else
+    expires_at: datetime
+
+
+type Login = SessionOpened | SecondFactorNeeded
 
 
 class AuthService:
@@ -45,18 +63,25 @@ class AuthService:
         self.orgs = OrganizationRepository(session)
         self.settings = settings
 
-    async def login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
+    async def login(self, email: str, password: str, ip: str | None) -> Login:
+        """A new session, or, for a person with TOTP, a sign-in waiting for the second
+        factor (`totp/sign_in.py`): the password alone opens no session then."""
         try:
             async with password_work():  # refused at once, before any query, when full
-                user, token = await self._login(email, password, ip)
+                user = await self._login(email, password, ip)
         except (Unauthorized, RateLimited) as refused:
             log_sign_in("password", refused.code.removeprefix("auth."), client=ip)
             raise
+        if await TotpRepository(self.session, user.org_id).active(user.id) is not None:
+            challenge = await open_challenge(self.session, user, "password")
+            log_sign_in("password", "second_factor", client=ip, user_id=user.id)
+            return SecondFactorNeeded(challenge.token, challenge.expires_at)
+        token = await self.open_session(user, utcnow())
         log_sign_in("password", "ok", client=ip, user_id=user.id)
-        return user, token
+        return SessionOpened(user, token)
 
-    async def _login(self, email: str, password: str, ip: str | None) -> tuple[User, str]:
-        """A new session for the person; the token goes into the cookie and nowhere else.
+    async def _login(self, email: str, password: str, ip: str | None) -> User:
+        """The person whose password this is; the caller opens the session.
 
         Two limits, both checked before any password is hashed: attempts per client
         address, whatever the email (bounds the hashing one client can cause), and
@@ -98,7 +123,7 @@ class AuthService:
             raise Unauthorized(code="auth.invalid_credentials")
         if rehashed is not None:
             user.password_hash = rehashed
-        return user, await self.open_session(user, utcnow())
+        return user
 
     async def open_session(self, user: User, now: datetime) -> str:
         """A new login session for an active person whose sign-in was checked (password

@@ -29,6 +29,7 @@ CLEARED_AFTER_RESTORE: tuple[str, ...] = (
     "collab_grant",
     "oidc_flow",
     "user_session",
+    "sign_in_challenge",
     "oauth_flow",
 )
 

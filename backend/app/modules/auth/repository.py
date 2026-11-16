@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import locked_batch
 from app.modules.auth.models import UserSession
+from app.modules.totp.repository import ChallengeRepository
 
 
 class SessionRepository:
@@ -65,9 +66,11 @@ class SessionRepository:
     async def delete_for_users(
         self, org_id: uuid.UUID, user_ids: Sequence[uuid.UUID], *, keep: uuid.UUID | None = None
     ) -> None:
-        """All of these people's sessions, except `keep` if given."""
+        """All of these people's sessions, except `keep` if given, and every sign-in of
+        theirs that waits for the second factor."""
         if not user_ids:
             return
+        await ChallengeRepository(self.session).delete_for_users(org_id, user_ids)
         stmt = delete(UserSession).where(
             UserSession.org_id == org_id, UserSession.user_id.in_(user_ids)
         )

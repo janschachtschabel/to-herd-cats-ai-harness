@@ -1,5 +1,7 @@
 """The security log of signing in and out (ASVS 5.0 V16.3.1): one line per attempt,
-`auth.sign_in` with the way (`password`, `oidc`), the outcome as a fixed word (`ok`,
+`auth.sign_in` with the way (`password`, `oidc`; the second step `second_factor`, and
+once it passed `password+totp`, `oidc+recovery_code`, ...), the outcome as a fixed word
+(`ok`, `second_factor` when the first step passed and the second waits,
 OIDC's `login`/`link`/`signup`/`profile_link`, or the refusal's code), the client's
 address, the provider's key and, on success, the person's id; `auth.sign_out` with the
 person's id. Refusals are warnings. Never an email, a password, a token, a subject or
@@ -10,7 +12,7 @@ import uuid
 
 logger = logging.getLogger("app.auth")
 
-SUCCESSES = frozenset({"ok", "login", "link", "signup", "profile_link"})
+SUCCESSES = frozenset({"ok", "second_factor", "login", "link", "signup", "profile_link"})
 
 
 def log_sign_in(

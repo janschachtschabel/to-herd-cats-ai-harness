@@ -51,6 +51,7 @@ from app.modules.tickets.models import (
     WorkItem,
 )
 from app.modules.tokens.models import AccessToken, McpSetting
+from app.modules.totp.models import SignInChallenge, TotpRecoveryCode, UserTotp
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import CollabGrant, PageCollabState
 from app.modules.wiki.models import Attachment, Page, PageVersion
@@ -123,6 +124,9 @@ __all__ = [
     "TicketStatus",
     "User",
     "UserIdentity",
+    "UserTotp",
+    "TotpRecoveryCode",
+    "SignInChallenge",
     "UserSession",
     "WorkItem",
 ]

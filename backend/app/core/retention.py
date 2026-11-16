@@ -58,6 +58,13 @@ RETENTION: Mapping[str, Retention] = {
     "audit_log": Keep(_PROOF),
     "user_session": Upkeep("expires_at", timedelta(hours=1), EXPIRY),
     "rate_limit_hit": Upkeep("hit_at", timedelta(seconds=60), EXPIRY),
+    # Second factor (M9 task 16)
+    "user_totp": Keep("the person's own second factor; gone when they or an admin turn it off"),
+    "totp_recovery_code": Cleans(
+        "app.modules.totp.repository:TotpRepository",
+        "each code is deleted by the statement that accepts it; all go with a new set or TOTP",
+    ),
+    "sign_in_challenge": Upkeep("expires_at", timedelta(0), EXPIRY),
     # Wiki (M2, M9)
     "page": Keep(_CONTENT),
     "page_version": Keep("a page's history; goes with its page"),
