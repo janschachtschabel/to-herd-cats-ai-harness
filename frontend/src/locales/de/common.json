@@ -54,6 +54,12 @@
     "server": {
       "busy": "Der Server ist gerade ausgelastet. Bitte versuche es gleich noch einmal."
     },
+    "storage": {
+      "unavailable": "Der Dateispeicher antwortet gerade nicht. Bitte versuche es gleich noch einmal."
+    },
+    "maintenance": {
+      "active": "Die Installation wird gerade gewartet (eine Sicherung wird eingespielt). Bitte versuche es in einer Minute noch einmal."
+    },
     "users": {
       "email_taken": "Diese E-Mail-Adresse ist schon vergeben.",
       "owner_only": "Das darf nur ein Eigentümer.",
