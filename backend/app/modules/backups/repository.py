@@ -23,12 +23,18 @@ IN_RESTORED_ARCHIVE = "backup.in_restored_archive"
 
 
 async def hold_backup_lock(connection: AsyncConnection) -> bool:
-    """Take the backup lock for the connection's session; False if a backup holds it."""
-    return bool(await connection.scalar(select(func.pg_try_advisory_lock(_KEY))))
+    """Take the backup lock for the connection's session; False if a backup holds it.
+    Commits: the lock is the session's, and no transaction stays open while it is held
+    (a server's `idle_in_transaction_session_timeout` would end the session, and the
+    lock with it, while the backup goes on)."""
+    taken = bool(await connection.scalar(select(func.pg_try_advisory_lock(_KEY))))
+    await connection.commit()
+    return taken
 
 
 async def release_backup_lock(connection: AsyncConnection) -> None:
     await connection.scalar(select(func.pg_advisory_unlock(_KEY)))
+    await connection.commit()
 
 
 @dataclass(frozen=True)

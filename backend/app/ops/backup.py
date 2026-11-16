@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -125,7 +125,19 @@ async def _create(
         try:
             return await _locked(settings, engine, sessions, trigger, clock)
         finally:
-            await release_backup_lock(holder)
+            await _release(holder)
+
+
+async def _release(holder: AsyncConnection) -> None:
+    """Release the backup lock. A holder whose connection is gone lost its session
+    lock with it: logged with a code, and the backup's outcome stands."""
+    try:
+        await release_backup_lock(holder)
+    except (OSError, SQLAlchemyError) as exc:
+        logger.warning(
+            "backup.lock_release_failed",
+            extra={"code": "backup.lock_lost", "error": type(exc).__name__},
+        )
 
 
 async def _locked(
