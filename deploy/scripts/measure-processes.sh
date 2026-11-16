@@ -27,8 +27,8 @@ port_hex="$(printf '%04X' "$pg_port")"
 cpu_ticks() {  # pid…: summed utime+stime in clock ticks
   local total=0 pid fields
   for pid in "$@"; do
-    [[ -r /proc/$pid/stat ]] || continue
-    fields="$(sed 's/^.*) //' "/proc/$pid/stat")"  # after the command name
+    # after the command name; a backend may end between listing and reading
+    fields="$(sed 's/^.*) //' "/proc/$pid/stat" 2>/dev/null)" || continue
     total=$((total + $(awk '{print $12 + $13}' <<<"$fields")))
   done
   echo "$total"
