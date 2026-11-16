@@ -1,7 +1,9 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: Meilenstein 8 (Öffnung: MCP) auf M7 (Automatisierung), M6 (Agenten als
-Mitarbeiter) und M5 Tasks 1 bis 7 (KI-Grundlage), 15.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+Stand: M9a (Produktion, erster Teil: Sicherung und Wiederherstellung, Anmeldung über
+OIDC mit Freigabe, Collab-Berechtigungen, volles Chart, ASVS-Prüfung, Lasttest) auf
+Meilenstein 8 (Öffnung: MCP), M7 (Automatisierung), M6 (Agenten als Mitarbeiter) und
+M5 Tasks 1 bis 7 (KI-Grundlage), 16.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
 (Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
 stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
 M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6, die
@@ -56,7 +58,17 @@ Person und der KI-Richtlinie; externe Agenten mit Agenten-Token und Ticket-Abhol
 externe MCP-Server als Werkzeugquelle der eigenen Agenten mit Freigabe je Werkzeug und
 Fingerabdruck (schreibende Werkzeuge auf Stufe 4, immer mit Freigabe der fragenden
 Person), Konnektoren (Token oder OAuth mit PKCE, geteilt oder persönlich) und ein
-Katalog mit GitHub und GitLab. Hybride Suche und Embeddings (M5 Tasks 8 bis 11) folgen.
+Katalog mit GitHub und GitLab. **Vorhanden (M9a):** Sicherung des ganzen Datenstands
+(Datenbank und Anhänge aus einem Snapshot) über die Kommandozeile, nach Zeitplan mit
+Aufbewahrung, Offsite-Kopie mit restic und Alarmen; Wiederherstellung in eine leere
+Installation mit Probe ([`SICHERUNG.md`](SICHERUNG.md)); Anmeldung über OpenID Connect
+(Google als Vorlage, jeder andere Anbieter mit Discovery), Selbstregistrierung für
+erlaubte Domains nur mit Freigabe durch einen Admin ([`ANMELDUNG.md`](ANMELDUNG.md));
+der Collab-Prozess bekommt kurzlebige, seitengebundene Berechtigungen statt des
+Sitzungs-Cookies; Autoskalierung und PodDisruptionBudgets im Chart; Aufbewahrungsregel
+für jede Tabelle; Prüfung gegen OWASP ASVS 5.0 Stufe 2 ([`SICHERHEIT.md`](SICHERHEIT.md)).
+Hybride Suche und Embeddings (M5 Tasks 8 bis 11) und M9b (Einspielen im Betrieb und in
+der Verwaltung, S3, mehrere Collab-Instanzen, TOTP, ASVS-Lücken J7–J14) folgen.
 
 | | |
 |---|---|
@@ -65,7 +77,7 @@ Katalog mit GitHub und GitLab. Hybride Suche und Embeddings (M5 Tasks 8 bis 11) 
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
 | Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
 | Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
-| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export |
+| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export; seit M9 ein Volume für Sicherungsarchive (`HERD_BACKUP_DIR`, Standard `/backups`) |
 | Lizenz | Apache-2.0 |
 
 ## Funktionen mit Laufzeit und Kosten
@@ -560,7 +572,10 @@ mitbenutzt; das Lastmittel steht bei jedem Lauf. Zwei Läufe.
 | PostgreSQL ≥ 16 | ja | Zustandsablage (Daten, Sitzungen, Ratenlimits, Sperren, Volltextindex, Yjs-Stände der Live-Bearbeitung). Compose und Chart nutzen `pgvector/pgvector:pg17` per Digest; M2 braucht pgvector noch nicht |
 | Volume für `/data` | ja (mit Anhängen) | Anhänge und temporäre Dateien von Upload, Import und Export. Compose: Volume `app-data`; Chart: PVC `<release>-data`, voreingestellt **ReadWriteMany** (alle API-Replikas schreiben); ohne RWX-Speicherklasse `api.replicas=1` und `persistence.accessModes={ReadWriteOnce}` |
 | Worker | für Live-Zustellung, Benachrichtigungen, Systemmeldungen | im selben Image (`HERD_ROLE=worker`, in `all` enthalten); nur Datenbank, keine eingehenden Anfragen außer 9090. Ohne Worker gehen keine Nachrichten verloren, aber nichts kommt live an, bis einer läuft |
-| Collab-Prozess | für Live-Bearbeitung | im selben Image (Node 22, Hocuspocus); spricht nur mit der API (`/internal/collab/*` auf 9090, Token `HERD_INTERNAL_TOKEN`), speichert nie selbst in die Datenbank. Ohne Token ist die Live-Bearbeitung aus, der Markdown-Editor geht weiter |
+| Collab-Prozess | für Live-Bearbeitung | im selben Image (Node 22, Hocuspocus); spricht nur mit der API (`/internal/collab/*` auf 9090, Token `HERD_INTERNAL_TOKEN` und seit M9 je Verbindung eine kurzlebige Berechtigung `herd_cg_…` für genau eine Seite und Generation statt des Sitzungs-Cookies), speichert nie selbst in die Datenbank. Ohne Token ist die Live-Bearbeitung aus, der Markdown-Editor geht weiter |
+| Volume für Sicherungen (seit M9) | für Sicherungen | Archive von `python -m app.ops backup …`; Compose: Volume `backups` des Dienstes `backup`; Chart: PVC `<release>-backups` des CronJobs (`backup.persistence.*`, bleibt beim Deinstallieren). Archive sind unverschlüsselt: wie die Datenbank schützen |
+| restic-Repository (seit M9) | nein | Offsite-Kopie der Archive (`HERD_BACKUP_OFFSITE_REPOSITORY`, S3, B2, SFTP …), clientseitig verschlüsselt; ausgehend nur vom Sicherungsdienst bzw. -Job; Chart: `backup.offsite.egress` |
+| OIDC-Anbieter (seit M9) | nein | Anmeldung über Google oder einen eigenen Anbieter (Keycloak, Entra ID …); ausgehend nur von der API (Discovery, Token-Endpunkt, JWKS) über die SSRF-Sperre, nie über den KI-Proxy; private Hosts nur aus `HERD_OIDC_ALLOWED_HOSTS`; Chart: `oidc.egress`. Ohne Anbieter gilt die Anmeldung mit Passwort |
 | OTLP-Collector | nein | Tracing nur, wenn `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist (Chart: `tracing.otlpEndpoint`) |
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
@@ -609,8 +624,10 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   die API in PostgreSQL gespeichert (spätestens 10 s nach einer Änderung und beim
   Beenden); nach einem Neustart verbinden sich die Browser selbst neu. Ungespeicherte
   Änderungen der letzten Sekunden (höchstens 10 s) im Speicher des Prozesses gehen dabei
-  verloren, sofern kein Browser sie wieder einspielt. Mehrere Collab-Replikas
-  (Spezifikation 12.4, Stufe 2 mit Redis/Valkey) kommen mit M9.
+  verloren, sofern kein Browser sie wieder einspielt. Mehrere Collab-Instanzen
+  (Spezifikation 12.4, Stufe 2) kommen mit M9b Task 15, ohne Redis/Valkey: Jede Seite
+  wird in PostgreSQL an eine Instanz gebunden (Plan M9, Entscheidung 17; Abweichung von
+  12.4).
 - **Mehrere API-Knoten und Live-Zustellung (M3):** Eine Nachricht, die an einem Knoten
   geschrieben wird, kommt an den SSE-Verbindungen jedes Knotens an (`NOTIFY herd_live`,
   jeder API-Prozess lauscht mit einer eigenen Datenbankverbindung außerhalb des Pools);
@@ -675,7 +692,12 @@ prüft alle 5 s für jedes offene Dokument Generation und Rechte über die API (
 Zeitplan, nur solange jemand live bearbeitet). Beim Start entfernt die API liegen
 gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene und beendete Sitzungen (jeder
 Person), die seit mehr als einer Stunde abgelaufen sind, löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
-Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal.
+Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Seit M9 räumt die
+Fälligkeits-Schleife einmal je Minute außerdem alles Abgelaufene nach dem
+Aufbewahrungskatalog (`backend/app/core/retention.py`) auf: Sitzungen, OAuth- und
+OIDC-Abläufe, Collab-Berechtigungen, Ratenlimit-Einträge, KI-Ratenfenster, Grabsteine
+gelöschter Dateien (nach 48 h) und Sicherungsläufe, deren Prozess starb
+([`SICHERUNG.md`](SICHERUNG.md#aufbewahrung-je-tabelle)).
 
 ## Ressourcen
 
@@ -1142,14 +1164,16 @@ auflösen kann. Die Größe mit Updates steht im Build-Protokoll der CI.
 
 | | |
 |---|---|
-| Ansprechperson | Jan (Projektverantwortung, hat die Spezifikation freigegeben) |
-| Vertretung | noch nicht benannt |
+| Ansprechperson | T4 (Jans Antwort J5, 15.11.2026) |
+| Vertretung | nicht benannt |
 
 ## Sicherheitshinweise
 
 Die Sicherheitshinweise (Vertrauensbereich des Collab-Prozesses, Anmeldung, Sitzungen,
 Kryptografie, Verbindungen, Datenklassen, Protokolle) und die Prüfung gegen OWASP ASVS
-5.0 Stufe 2 mit offenen Lücken und Fragen stehen in [`SICHERHEIT.md`](SICHERHEIT.md).
+5.0 Stufe 2 mit den offenen Lücken, ihrer Planung (M9b Tasks 16 und 18) und den
+dokumentierten Abweichungen (MFA für lokale Passwortkonten, TLS zwischen API und
+Collab-Prozess) stehen in [`SICHERHEIT.md`](SICHERHEIT.md).
 
 ## Betriebshinweise
 
@@ -1163,7 +1187,9 @@ Wikis in [`WIKI.md`](WIKI.md), der Nachrichten (Worker, Outbox, SSE hinter einem
 in [`NACHRICHTEN.md`](NACHRICHTEN.md), der KI-Anbindung in [`KI.md`](KI.md), der Agenten
 (Worker, Läufe, Alarme, Rolling Update) in [`AGENTEN.md`](AGENTEN.md), von MCP
 (`/mcp` hinter einem Proxy, Token, externe Server, Konnektoren, Katalog) in
-[`MCP.md`](MCP.md#betrieb).
+[`MCP.md`](MCP.md#betrieb), seit M9 Sicherung, Wiederherstellung und Aufbewahrung in
+[`SICHERUNG.md`](SICHERUNG.md) und die Anmeldung über OIDC mit Freigabe in
+[`ANMELDUNG.md`](ANMELDUNG.md).
 
 ## Metriken und Alarme (seit M3)
 
