@@ -4,22 +4,25 @@
 The Hostinger stack's `init` service writes the secrets into a volume, so that none is
 an env value (`docker inspect` shows env values). A file's content replaces the value
 before any rule of the value applies, so a too short key from a file is refused like
-one from the environment. Errors name the variable, never the content.
+one from the environment. An empty value beside its file counts as unset. Errors name
+the variable, never the content.
 """
 
 from pathlib import Path
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 # The secrets that may come from a file, and whether an empty file means "not set":
 # an empty bootstrap password means no bootstrap, like an empty
-# HERD_BOOTSTRAP_ADMIN_PASSWORD; an empty key or token is a broken file.
+# HERD_BOOTSTRAP_ADMIN_PASSWORD; an empty key or token is a broken file. The S3 secret
+# key (`config_storage.py`, plan M9 task 14) comes from a mounted Secret in the chart.
 FILE_SECRETS: dict[str, bool] = {
     "secret_key": False,
     "internal_token": False,
     "bootstrap_admin_password": True,
+    "s3_secret_access_key": False,
 }
 
 
@@ -41,6 +44,7 @@ class SecretFileSettings(BaseSettings):
     secret_key_file: Path | None = None
     internal_token_file: Path | None = None
     bootstrap_admin_password_file: Path | None = None
+    s3_secret_access_key_file: Path | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -52,8 +56,18 @@ class SecretFileSettings(BaseSettings):
             if path is None or path == "":
                 continue
             variable = f"HERD_{field.upper()}"
-            if data.get(field) is not None:
+            if not _unset(data.get(field)):
                 raise ValueError(f"set {variable} or {variable}_FILE, not both")
             content = read_secret_file(Path(path), f"{variable}_FILE", empty_ok=empty_ok)
-            data = {**data, field: content}
+            # The value only: a copy of the settings (`model_dump`, then validated again,
+            # as `ops/cli_storage.py` does) holds no value beside its file.
+            data = {**data, field: content, f"{field}_file": None}
         return data
+
+
+def _unset(value: object) -> bool:
+    """No value: none, or an empty one (compose passes an unset variable as
+    `${HERD_X:-}`), so that it is no second value beside the file."""
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    return value is None or value == ""

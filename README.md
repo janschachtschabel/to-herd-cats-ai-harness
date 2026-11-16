@@ -515,11 +515,12 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
 - **Geheimnisse als Dateien:** Ebenso lesen `HERD_SECRET_KEY_FILE`,
-  `HERD_INTERNAL_TOKEN_FILE` und `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` den Wert aus einer
-  Datei (ein Zeilenende am Schluss zählt nicht). Wert und Datei zugleich, eine
-  unlesbare oder (bei Schlüssel und Token) leere Datei sind Startfehler, die die
-  Variable nennen, nie den Inhalt; eine leere Passwortdatei heißt „keine erste
-  Person“. Die Regeln des Werts (Mindestlänge) gelten auch für die Datei. Der
+  `HERD_INTERNAL_TOKEN_FILE`, `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` und
+  `HERD_S3_SECRET_ACCESS_KEY_FILE` den Wert aus einer Datei (ein Zeilenende am Schluss
+  zählt nicht). Wert und Datei zugleich, eine unlesbare oder (bei Schlüsseln und
+  Token) leere Datei sind Startfehler, die die Variable nennen, nie den Inhalt; ein
+  leerer Wert neben der Datei (Compose: `${HERD_…:-}`) zählt als nicht gesetzt; eine
+  leere Passwortdatei heißt „keine erste Person“. Die Regeln des Werts (Mindestlänge) gelten auch für die Datei. Der
   Hostinger-Stack ([`docs/HOSTINGER.md`](docs/HOSTINGER.md)) übergibt so jedes
   Geheimnis.
 - **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,

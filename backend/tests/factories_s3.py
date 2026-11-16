@@ -55,7 +55,4 @@ def s3_storage(
     for name in ("storage", "s3_endpoint", "s3_bucket", "s3_access_key_id"):
         monkeypatch.setattr(settings, name, getattr(configured, name))
     monkeypatch.setattr(settings, "s3_secret_access_key", configured.s3_secret_access_key)
-    private = settings.__pydantic_private__
-    assert private is not None
-    monkeypatch.setitem(private, "_s3_secret", configured.s3_secret_access_key)
     yield s3_stub

@@ -3,16 +3,15 @@ S3-compatible object store. A part of `Settings` (`config.py` inherits it);
 `get_settings()` stays the one source.
 
 The S3 secret key comes from `HERD_S3_SECRET_ACCESS_KEY` or, for mounted secrets,
-`HERD_S3_SECRET_ACCESS_KEY_FILE`; `s3_credentials()` is the one reader. Errors name
-the setting, never a value.
+`HERD_S3_SECRET_ACCESS_KEY_FILE` (read like every secret file, `config_files.py`);
+`s3_credentials()` is the one reader. Errors name the setting, never a value.
 """
 
 import re
-from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import PrivateAttr, SecretStr, field_validator, model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 from app.core.s3_signing import Credentials
@@ -34,20 +33,13 @@ class StorageSettings(BaseSettings):
     # The region the store signs for (SeaweedFS and most others accept us-east-1).
     s3_region: str = "us-east-1"
     s3_bucket: str = ""
-    # The bucket's access key; the secret key as a value or a file (not both).
+    # The bucket's access key; the secret key as a value or a file (not both:
+    # HERD_S3_SECRET_ACCESS_KEY_FILE, `config_files.py`).
     s3_access_key_id: str = ""
     s3_secret_access_key: SecretStr | None = None
-    s3_secret_access_key_file: Path | None = None
     # Keys go under this prefix inside the bucket (lower-case segments, `/` between);
     # empty: the bucket's top level.
     s3_prefix: str = ""
-
-    _s3_secret: SecretStr | None = PrivateAttr(default=None)
-
-    @field_validator("s3_secret_access_key_file", mode="before")
-    @classmethod
-    def _empty_file_is_none(cls, value: object) -> object:
-        return None if value == "" else value  # compose: `${...:-}`
 
     @model_validator(mode="after")
     def _s3_settings_fit(self) -> Self:
@@ -59,7 +51,6 @@ class StorageSettings(BaseSettings):
         self.s3_prefix = self.s3_prefix.strip("/")
         if self.s3_prefix and not _PREFIX.fullmatch(self.s3_prefix):
             raise ValueError("HERD_S3_PREFIX must be lower-case segments separated by /")
-        self._s3_secret = _secret(self.s3_secret_access_key, self.s3_secret_access_key_file)
         if self.storage != "s3":
             return self
         _check_endpoint(self.s3_endpoint)
@@ -67,7 +58,7 @@ class StorageSettings(BaseSettings):
             raise ValueError("HERD_S3_BUCKET must be a bucket name (3 to 63 of a-z 0-9 . -)")
         if not _REGION.fullmatch(self.s3_region):
             raise ValueError("HERD_S3_REGION must be a region name like us-east-1")
-        if not self.s3_access_key_id or self._s3_secret is None:
+        if not self.s3_access_key_id or self.s3_secret_access_key is None:
             raise ValueError(
                 "HERD_STORAGE=s3 needs HERD_S3_ACCESS_KEY_ID and "
                 "HERD_S3_SECRET_ACCESS_KEY (or HERD_S3_SECRET_ACCESS_KEY_FILE)"
@@ -75,25 +66,9 @@ class StorageSettings(BaseSettings):
         return self
 
     def s3_credentials(self) -> Credentials:
-        if self._s3_secret is None:
+        if self.s3_secret_access_key is None:
             raise ValueError("HERD_S3_SECRET_ACCESS_KEY is not set")
-        return Credentials(self.s3_access_key_id, self._s3_secret.get_secret_value())
-
-
-def _secret(value: SecretStr | None, file: Path | None) -> SecretStr | None:
-    if value is not None and file is not None:
-        raise ValueError(
-            "set HERD_S3_SECRET_ACCESS_KEY or HERD_S3_SECRET_ACCESS_KEY_FILE, not both"
-        )
-    if file is None:
-        return value
-    try:
-        content = file.read_text(encoding="utf-8").rstrip("\r\n")
-    except OSError as exc:
-        raise ValueError(f"HERD_S3_SECRET_ACCESS_KEY_FILE cannot be read: {exc.strerror}") from None
-    if not content:
-        raise ValueError("HERD_S3_SECRET_ACCESS_KEY_FILE is empty")
-    return SecretStr(content)
+        return Credentials(self.s3_access_key_id, self.s3_secret_access_key.get_secret_value())
 
 
 def _check_endpoint(endpoint: str) -> None:
