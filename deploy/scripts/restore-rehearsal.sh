@@ -35,7 +35,8 @@ work="$(mktemp -d)"
 pids=()
 admin_email="admin@rehearsal.example"
 admin_password="rehearsal-admin-$RANDOM-$RANDOM"
-demo_password="rehearsal-demo-$RANDOM-$RANDOM"
+# No context word of the demo people (their domain demo.example makes "demo" one).
+demo_password="rehearsal-people-$RANDOM-$RANDOM"
 # The backend's interpreter itself (not `uv run`), so that stopping an app reaches it.
 py="$(uv run --quiet python -c 'import sys; print(sys.executable)')"
 secret_key="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"

@@ -365,7 +365,7 @@ drei Sprints: „Sprint 45“ abgeschlossen mit Bilanz, „Sprint 46“ laufend,
 geplant, und ein Vorrat; der Worker muss laufen):
 
 ```bash
-cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=demo-password-123 \
+cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=seed-people-pw-123 \
   uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
 ```
 
