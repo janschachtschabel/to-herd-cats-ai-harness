@@ -10,7 +10,8 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
 `2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
-release note `docs/RELEASE-1.0.0.md`); next are M9b (Tasks 12–18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
+release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 are built after it; next are
+M9b (Tasks 17 and 18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -48,10 +49,15 @@ offsite and alerts, restore into an empty installation with a rehearsal; OIDC si
 provider that vouches for the address and only into an account that waits for an
 admin's approval; collab grants instead of the session
 cookie; a retention rule for every table; the full chart (HPA, PDB, backup CronJob);
-the ASVS 5.0 L2 check; the 200-person load test. Planned, not present: embeddings,
-hybrid search, Docling conversion (M5 Tasks 8–11), maintenance mode and restore into a
-running installation, backups in the admin UI, S3, several collab instances (page
-ownership in Postgres, no Redis), optional TOTP, ASVS gaps J7–J14 (M9b). Operations: `README.md` (Betriebshinweise),
+the ASVS 5.0 L2 check; the 200-person load test. Built after v1.0.0 (M9b): maintenance
+mode and restore into a running installation from the command line (Task 12); backups
+in the administration with the maintenance page (Task 13); attachments in
+S3-compatible storage (Task 14: own SigV4 client, copy between storages, backups
+through the store); several collab instances, each page bound to one in Postgres, no
+Redis (Task 15); optional TOTP for every password account (Task 16: profile setup,
+two-step sign-in, recovery codes, admin reset, second factor for new access tokens).
+Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11),
+ASVS gaps J7–J14 (M9b). Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
@@ -138,8 +144,19 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `/internal/collab/*` (internal token plus, per connection, a grant `herd_cg_…` bound
   to one page and generation, `wiki/collab_grants.py`; the session cookie never leaves
   the API); `collab/schema.mjs` is the one editor schema shared with the frontend.
+  Several instances (M9b Task 15, `wiki/collab_instances.py`,
+  `collab_owner_repository.py`): each process announces itself every 5 s
+  (`collab/instance.mjs`, `HERD_COLLAB_ADVERTISE_URL`, required; role all:
+  `ws://127.0.0.1:<collab port>`; the chart: the pod IP) and counts as alive for 15 s;
+  the relay binds each page to one live, non-draining instance (`collab_page_owner`,
+  epoch rising with each new binding; least busy = fewest unexpired bindings) and dials
+  it, with none 4502. Auth/load return the epoch; save and check name instance and
+  epoch (409 `collab.not_owner` → 4409; the save locks the binding after the page).
+  SIGTERM drains: draining, save, close 1012, release (`DELETE
+  /internal/collab/instances/{id}`). There is no `HERD_COLLAB_URL` any more.
 - Operations (M9, `app/ops/`): `python -m app.ops backup create|verify|list|run|schedule`
-  and `restore check|apply` (dispatcher `ops/cli.py`, `run(argv, settings, clock)`);
+  and `restore check|apply [--replace --confirm NAME]`, `maintenance status|off`
+  (dispatcher `ops/cli.py`, `run(argv, settings, clock)`);
   archive format 1 (`archive.py`, `manifest.py`), `pg_dump`/`pg_restore` only through
   `pgtools.py` (password in `PGPASSWORD` of a built environment; `pg_restore` reads
   the archive's dump as a stream, no scratch file), retention and restic (`retention.py`,
@@ -151,7 +168,58 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   in `modules/backups` (`backup_run`, gauges read by the worker). Settings in
   `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
   (`core/storage_tombstones.py`). Rehearsal `deploy/scripts/restore-rehearsal.sh` with
-  `scripts/compare_databases.py`.
+  `scripts/compare_databases.py` (on S3 with `HERD_STORAGE=s3` in its environment).
+  Replacing a running installation (M9b, `replace.py`): safety archive (`pre_restore`),
+  maintenance on, the archive's files into the configured storage, one `psql`
+  transaction (`swap.py`: explicit `BEGIN`/`COMMIT`, COMMIT only after `pg_restore`
+  ended well), migrate, `finish_restore`, maintenance off; a failed swap leaves the old
+  state and audits `backup.restore_failed`. `backup.manage` is owner-only (`OWNER_ONLY_ACTIONS`;
+  `modules/backups/guard.py` answers 404 `backup.not_found`).
+- Backups in the administration (M9b Task 13, `modules/backups`: `router.py`,
+  `service.py`, `archives.py`, `checking.py`, `jobs.py`, `replacing.py`, `live.py`):
+  "Jetzt sichern" is a `backup_run` row (`trigger=admin`, `running`) that the worker's
+  `BackupJobLoop` takes up with `run_backup(..., run_id=)`; `REQUEST_GRACE` (10 min)
+  spares a young request from upkeep and other backups (`spare_requests_since`), a
+  restore spares none. Replacing from the UI runs in the API process that took the
+  request (`ReplaceRunner`, `replace_running(via="admin", wait=False)`), at most once;
+  never queue it (an archive would bring the request back). `backup.changed` goes as a
+  direct `pg_notify` to each active owner (ops act as system, maybe without a worker),
+  payload ids only. Archive names must match `archives.NAME`, regular files only;
+  uploads stream to a `.part` (0600), are verified and refused on any problem, and are
+  never touched by retention. The API and worker need `HERD_BACKUP_DIR` mounted (the
+  chart only on a shareable claim: ReadWriteMany or `backup.persistence.existingClaim`,
+  `chart-rules-admin.sh`); `HERD_BACKUP_UPLOAD_MAX_BYTES` (`backup.uploadMaxBytes`, API
+  only). Frontend `features/backup`; a 503 `maintenance.active` on any request shows
+  `features/shared/MaintenancePage.tsx` (`onMaintenance` in `lib/api.ts`), which polls
+  `GET /api/maintenance` and reloads `/` once a fresh answer says it ended.
+- Maintenance (M9b, `modules/maintenance`): one row per org (`maintenance`); each
+  process holds the state in `cache.py` (`maintenance_cache()`, `in_maintenance()`;
+  NOTIFY `herd_maintenance` and a 5 s poll; a failed read keeps the last state), started
+  by the public app's lifespan and the worker. Never ask the database whether it is in
+  maintenance on a request path (tables are locked during the swap). While active:
+  `/api/*` and `/mcp` answer 503 `maintenance.active` with `Retry-After: 30` except
+  `GET /api/maintenance` (`middleware.py`), the relay and the internal collab API
+  close/refuse (4503; instance heartbeats and releases too), live streams end, the
+  worker's dispatcher, run loop and due loop pause (a new loop takes
+  `paused=in_maintenance`).
+- Storage (M9b): `core/storage.py` is the one `Storage` protocol (`put` with size and
+  SHA-256, checked: `StoredContentMismatch`; `stat`, `entries`); `get_storage()` picks
+  `LocalStorage` or `S3Storage` (`core/storage_s3.py`) from `HERD_STORAGE`; backup,
+  restore and replace go through it. S3 is our own client, no SDK:
+  `core/s3_signing.py` (SigV4, AWS test vectors in `tests/test_s3_signing.py`),
+  `core/s3_client.py` (path-style, `x-amz-content-sha256`, fixed `s3.*` codes); requests
+  go through `core/egress.py` with the endpoint's host as the one private allowance.
+  Settings `core/config_storage.py` (`HERD_STORAGE`, `HERD_S3_*`; the secret key as a
+  value or `HERD_S3_SECRET_ACCESS_KEY_FILE`, read like every secret file by
+  `core/config_files.py`, never in a repr, log, error or URL). A failing store answers
+  503 `storage.unavailable`. The worker's due loop removes tombstoned files, so the
+  worker mounts the files where they are local (`compose.nodes.yml`; the chart beside an
+  API pod on ReadWriteOnce). `python -m app.ops storage copy --to s3|local`
+  (idempotent, `ops/storage_copy.py`) and `storage check`. Tests run against
+  `tests/support/s3_stub.py` (checks signatures itself; fixtures in
+  `tests/factories_s3.py`); `tests/test_s3_compatible_store.py` runs against a real
+  store when `HERD_TEST_S3_ENDPOINT`, `HERD_TEST_S3_ACCESS_KEY_ID` and
+  `HERD_TEST_S3_SECRET_ACCESS_KEY` are set (SeaweedFS, Apache-2.0, a test binary only).
 - Hostinger stack (M9b Task 19, Jan's rules `vorgaben/hostinger-docker.md`): the root
   `docker-compose.yml` with `.env.example` (every variable empty, German comments) for
   the Docker Manager's "Compose from URL": GHCR image, no build, no ports, no bind
@@ -180,8 +248,21 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   its people's sessions. Nothing else creates accounts without an admin; the first
   owner's `HERD_BOOTSTRAP_ADMIN_PASSWORD` passes the password checks (exit 4 if not). Stub
   `tests/support/oidc_stub.py`.
+- Second factor (M9b Task 16, `modules/totp`): RFC 6238 on `hmac` only (`codes.py`),
+  the secret `enc:` under `HERD_SECRET_KEY` (rotated by `rotate_secrets`), recovery
+  codes as SHA-256 (`recovery.py`); a used time step or recovery code is spent in one
+  statement (`repository.py`). Checking (`factor.py`) counts wrong codes per person
+  (`second-factor-fail:<id>`, the login limit); `begin` commits, so call it before any
+  lock. A password or OIDC sign-in of a person with TOTP opens no session: login
+  answers 202 and leaves a `sign_in_challenge` (hash only, 5 min, 5 wrong codes) bound
+  to the cookie `herd_sign_in` (`cookies.py`); `sign_in.py` is the second step.
+  Whatever ends a person's sessions ends her waiting sign-ins too. Codes are judged at
+  the wall time (`timing.TOTP_CLOCK`, not the e2e clock; tests swap in a
+  `SettableClock` through the fixture `totp_time`). New access tokens of a person with
+  TOTP need a code (`gate.py`). Frontend `features/profile/totp`, the QR code with
+  `uqr`; e2e `tests/totp.spec.mjs` with an authenticator in `totp-helpers.mjs`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
-  messaging, tickets, agents, automations and MCP in the real app (role all, worker
+  messaging, tickets, agents, automations, MCP, backups and TOTP in the real app (role all, worker
   included) on a throwaway database, with the OpenAI stub
   (`backend/tests/support/openai_stub.py`) and the MCP and OAuth stubs (over https)
   started by `global-setup.mjs`; a CI job of its own. Helpers per area
@@ -237,7 +318,8 @@ cd frontend && npm run dev            # proxies /api and /collab to http://local
 
 ```bash
 cd collab && npm ci && npm run lint && npm test   # live-editing process (Hocuspocus, node 22)
-cd collab && npm run test:integration             # real API on a throwaway database (psql, uv)
+cd collab && npm run test:integration             # real API on a throwaway database (psql, uv),
+                                                  # one instance and two (integration-instances)
 ```
 
 ```bash
@@ -254,13 +336,17 @@ cd e2e && npm ci && npx playwright install chromium && npx playwright test
 ```bash
 docker build -t to-herd-cats-ai:local .                 # the image (SPA + API + collab, uid 10001)
 bash deploy/compose/smoke.sh                            # compose reference: build, start, check, tear down
-SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api-a, api-b, worker; message A → SSE B
+SMOKE_NODES=1 bash deploy/compose/smoke.sh              # compose.nodes.yml: api-a, api-b, worker, collab-a, collab-b;
+                                                        # message A → SSE B; two collab instances, a page bound
                                                         # (both modes also: a ticket's system entries from the worker
                                                         # and a one-off automation fired exactly once by the due loop)
+SMOKE_S3=1 bash deploy/compose/smoke.sh                 # compose.s3.yml (SeaweedFS): attachments in S3, restore, copy back
 bash deploy/compose/load.sh                             # docker stats idle/warm/load + latency (Steckbrief)
 # 200-person load test without Docker: deploy/compose/{loadsetup,loadmix,loadreport}.py,
 # deploy/scripts/measure-processes.sh (RSS/CPU per role from /proc); README of compose
-bash deploy/scripts/restore-rehearsal.sh                # backup A → restore into empty B → compare (PGHOST/PGPORT)
+# Live editing under load (Steckbrief, M9b): collab/scripts/live-load.mjs BASE STATE [SECONDS] [TYPE_MS] [STOP_PID]
+bash deploy/scripts/restore-rehearsal.sh                # backup A → restore into empty B → compare → replace
+                                                        # running B (--replace) (PGHOST/PGPORT, REHEARSAL_PORT)
 bash deploy/scripts/hostinger-smoke.sh                  # root docker-compose.yml: config, empty first deploy,
                                                         # values, host-network Traefik (image ghcr.io/…:$HOSTINGER_SMOKE_TAG)
 ```
@@ -268,7 +354,8 @@ bash deploy/scripts/hostinger-smoke.sh                  # root docker-compose.ym
 ```bash
 bash deploy/helm/scripts/check-chart-version.sh         # chart version = appVersion = pyproject version
 bash deploy/helm/scripts/check-chart-rules.sh           # chart behaviour (HELM="docker run ... alpine/helm" works too;
-                                                        # sources chart-rules-scaling.sh and chart-rules-placement.sh)
+                                                        # sources chart-rules-scaling.sh, chart-rules-placement.sh,
+                                                        # chart-rules-storage.sh and chart-rules-admin.sh)
 cd backend && uv run python ../deploy/helm/scripts/check_values.py   # values files vs schema, @param vs schema
 helm lint --strict deploy/helm/to-herd-cats-ai          # also with -f deploy/helm/to-herd-cats-ai/ci/*-values.yaml
                                                         # (ci/full-values.yaml switches everything on)
@@ -278,7 +365,7 @@ promtool test rules deploy/helm/to-herd-cats-ai/tests/rules-test.yaml
 
 CI (`.github/workflows/ci.yml`, pull requests and pushes to `main`; tags through
 `release.yml`) runs all of the above plus `pip-audit`, `npm audit --audit-level=high`,
-the image build, `smoke.sh` (single and `SMOKE_NODES=1`) and Trivy. A tag `vX.Y.Z`
+the image build, `smoke.sh` (single, `SMOKE_NODES=1` and `SMOKE_S3=1`) and Trivy. A tag `vX.Y.Z`
 (`release.yml`) publishes `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z`/`:X.Y` and the chart
 as OCI under `ghcr.io/<owner>/charts`; tag, pyproject and chart versions must match.
 
