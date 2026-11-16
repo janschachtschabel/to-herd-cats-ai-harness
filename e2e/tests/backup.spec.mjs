@@ -10,9 +10,7 @@ import { openLive } from "./messaging-helpers.mjs";
 
 const BACKUP_DIR = process.env.HERD_E2E_BACKUP_DIR;
 
-test("the owner makes a backup, and a manipulated archive fails the check", async ({
-  context,
-}) => {
+test("the owner makes a backup, and a manipulated archive fails the check", async ({ context }) => {
   test.setTimeout(180_000);
   await signIn(context, OWNER);
   // Listening before asking: the worker's note (backup.changed) must reach the page.
