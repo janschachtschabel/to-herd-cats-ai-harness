@@ -1,6 +1,7 @@
 # Sicherheit: Prüfung gegen OWASP ASVS 5.0, Stufe 2
 
-Stand 15.11.2026 (M9, Task 9). Geprüft wurde to-herd-cats-ai gegen den **OWASP
+Stand 16.11.2026 (M9, Task 9; Jans Antworten und die Planung der Lücken mit Task 11
+nachgetragen). Geprüft wurde to-herd-cats-ai gegen den **OWASP
 Application Security Verification Standard 5.0.0** (Mai 2025), Stufe 2 (L2). Jede
 Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht geprüft.
 
@@ -13,12 +14,15 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
 - Ergebnis: **182 erfüllt**, **59 nicht anwendbar**, **12 Lücke** (L1: 60 erfüllt,
   10 nicht anwendbar, 0 Lücke; L2: 122 erfüllt, 49 nicht anwendbar, 12 Lücke).
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
-  enthält, nur die drei Status nutzt und jede Lücke einer Frage oder Task 16 zuordnet.
+  enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
+  entweder der Aufgabe, die sie schließt (Task 16, Task 18), oder einer dokumentierten
+  Abweichung zuordnet.
 
 Status: **erfüllt** heißt, die Anforderung ist umgesetzt und der Beleg zeigt wo (Datei,
 meist auch der Test). **Nicht anwendbar** heißt, es gibt die Funktion nicht (kein LDAP,
 kein GraphQL) oder sie liegt beim Betrieb (dann mit Betriebsvoraussetzung B1 bis B3).
-**Lücke** heißt, es fehlt etwas; jede Lücke hat eine Frage an Jan mit Vorschlag.
+**Lücke** heißt, es fehlt etwas; jede Lücke hat eine Frage an Jan und ist entweder für
+M9b geplant (Task 16, Task 18) oder eine dokumentierte Abweichung (unten).
 
 Pfade in den Belegen sind gekürzt: `core/`, `web/`, `ops/`, `mcp/`, `worker/` liegen unter
 `backend/app/`, Modulnamen wie `auth/`, `oidc/`, `users/` unter `backend/app/modules/`,
@@ -47,81 +51,77 @@ mit einem Test und in einem eigenen Commit:
 | V7.4.5 | Admins melden eine Person überall ab | `security: let administrators sign a person out everywhere` |
 | V13.4.4 | Test: TRACE wird nicht unterstützt | mit diesem Dokument |
 
-## Offene Lücken: Fragen an Jan
+## Offene Lücken: Entscheidungen und Planung
 
-Diese Lücken sind größer als ein halber Tag oder brauchen eine Entscheidung. Nichts davon
-ist gebaut.
+Diese Lücken sind größer als ein halber Tag oder brauchten eine Entscheidung. Nichts davon
+ist in M9a gebaut. J3 hat Jan am 15.11.2026 beantwortet; J7 bis J14 sind Fragen der
+Sicherheitstechnik, nicht des Produkts: Claude hat sie entschieden (Jan kann
+widersprechen), gebaut werden sie in **M9b Task 18** (Plan
+`docs/superpowers/plans/2026-11-15-m9-produktion.md`). Zwei Teile bleiben dokumentierte
+Abweichungen: MFA für lokale Passwortkonten (J3) und TLS zwischen API und
+Collab-Prozess (J12 b).
 
-**J3 – Mehr-Faktor-Anmeldung (V6.3.3).** Lokale Passwortkonten haben keinen zweiten
-Faktor. *Stand:* offen; Standard ist Option A, TOTP für lokale Konten, **geplant als
-Task 16 (M9b)**. Task 16 muss V6.4.4 und V6.5.1 bis V6.5.5 mit erfüllen (Wiederherstellung
-bei Verlust, Codes nur einmal, Wiederherstellungscodes gehasht, Seeds aus CSPRNG,
-Lebensdauer) und das Anlegen von Zugangstoken an den zweiten Faktor binden (V6.3.4).
+**J3 – Mehr-Faktor-Anmeldung (V6.3.3). Abweichung.** Jans Antwort: TOTP vorerst **nur
+optional**, auch für Owner und Admins, ohne Pflicht. Task 16 (M9b) baut TOTP für lokale
+Konten als freiwilligen zweiten Faktor und muss dabei V6.4.4 und V6.5.1 bis V6.5.5
+erfüllen (Wiederherstellung bei Verlust, Codes nur einmal, Wiederherstellungscodes
+gehasht, Seeds aus CSPRNG, Lebensdauer) und für Personen mit TOTP das Anlegen von
+Zugangstoken an den zweiten Faktor binden (V6.3.4). Weil niemand ihn einrichten muss,
+bleibt V6.3.3 eine **dokumentierte Abweichung von ASVS L2** für lokale Passwortkonten.
+Konten, die sich über OIDC anmelden, bekommen den zweiten Faktor vom Anbieter (Google
+Workspace, Entra ID, Keycloak …); wer ASVS L2 ohne Abweichung braucht, meldet sich nur
+über einen Anbieter mit Pflicht-MFA an und vergibt keine Passwörter.
 
-**J7 – Inaktivitätsgrenze (V7.3.1).** Eine Sitzung gilt 7 Tage, auch wenn niemand sie
-nutzt. *Vorschlag:* Spalte `last_seen_at` an `session`, bei der Auflösung höchstens
-einmal je Minute fortgeschrieben; Einstellung `HERD_SESSION_IDLE_HOURS` (Standard 24,
-0 = aus), danach 401 `auth.session_invalid`. Die offene Live-Verbindung (SSE) zählt nicht
-als Aktivität. Aufwand etwa ein Tag (Migration, Einstellung in Compose und Chart, Tests).
+**J7 – Inaktivitätsgrenze (V7.3.1). Geplant, M9b Task 18.** Eine Sitzung gilt 7 Tage,
+auch wenn niemand sie nutzt. *Entscheidung:* bauen. `HERD_SESSION_IDLE_HOURS` (Standard
+24, 0 = aus); die Sitzung merkt `last_used_at`, bei der Auflösung höchstens einmal je
+Minute geschrieben; danach 401 `auth.session_invalid`. Die offene Live-Verbindung (SSE)
+zählt nicht als Nutzung. Einstellung in Compose, Chart und Doku.
 
-**J8 – Eigene Sitzungen sehen und beenden (V7.5.2).** Es gibt keine Liste der eigenen
-Sitzungen. *Vorschlag:* beim Anmelden Gerätehinweis (gekürzter User-Agent) und Zeit
-speichern; im Profil eine Liste mit „Abmelden“ je Sitzung und „Alle anderen abmelden“
-(`GET/DELETE /api/auth/me/sessions`, paginiert, mit Audit). Aufwand etwa ein Tag; setzt
-sinnvoll auf J7 auf (letzte Nutzung).
+**J8 – Eigene Sitzungen sehen und beenden (V7.5.2). Geplant, M9b Task 18.**
+*Entscheidung:* bauen, im Profil: Liste der eigenen Sitzungen (Gerätehinweis aus dem
+gekürzten User-Agent, Anmeldezeit, letzte Nutzung aus J7) mit „Abmelden“ je Sitzung und
+„Alle anderen abmelden“; `GET/DELETE /api/auth/me/sessions` (paginiert, Audit).
 
-**J9 – Erneute Anmeldung vor sensiblen Änderungen (V7.5.1).** Eine neue
-OIDC-Verknüpfung im Profil (ein zusätzlicher Anmeldeweg) braucht nur die laufende
-Sitzung; wer ein entsperrtes Gerät kurz nutzt, könnte sein eigenes Google-Konto
-verknüpfen. *Vorschlag:* vor „Verknüpfen“ das Passwort abfragen (Personen ohne Passwort:
-eine frische Anmeldung über einen bereits verknüpften Anbieter, höchstens 10 Minuten
-alt, gemerkt an der Sitzung). Später auch für das Anlegen von Zugangstoken. Aufwand etwa
-ein Tag.
+**J9 – Erneute Anmeldung vor sensiblen Änderungen (V7.5.1). Geplant, M9b Task 18.**
+*Entscheidung:* bauen. Vor dem Verknüpfen einer neuen OIDC-Identität im Profil fragt die
+App das Passwort ab; Personen ohne Passwort brauchen eine Anmeldung über einen schon
+verknüpften Anbieter, die höchstens 10 Minuten alt ist (an der Sitzung gemerkt).
 
-**J10 – Anti-Automatisierung für gewöhnliche Schreibvorgänge (V2.4.1).** Begrenzt sind
-Anmeldung, OIDC, `/mcp` je Token, KI-Kosten und Größen, aber nicht, wie viele
-Nachrichten, Seiten, Tickets oder Uploads eine Person je Minute anlegt. *Vorschlag:*
-eine Grenze je Person und Bereich der Aktion in PostgreSQL (wie `core/ratelimit.py`),
-großzügig (etwa 120 Schreibvorgänge und 30 Uploads je Minute), 429 `server.rate_limited`
-mit `Retry-After`, Metrik je Bereich; Agenten zählen wie Personen. Aufwand etwa ein Tag,
-dazu Messung, dass der Lastlauf (`deploy/compose/load.sh`) nicht anschlägt.
+**J10 – Anti-Automatisierung für gewöhnliche Schreibvorgänge (V2.4.1). Geplant, M9b
+Task 18.** *Entscheidung:* bauen. Eine Grenze je Person in PostgreSQL (wie
+`core/ratelimit.py`) für Nachrichten, Seiten, Tickets und Uploads, großzügige Standards
+(etwa 120 Schreibvorgänge und 30 Uploads je Minute), 429 `rate.limited` mit
+`Retry-After`; Agenten zählen wie Personen. Der Lasttest (Task 10) darf nicht anschlagen.
 
-**J11 – Virenscan (V5.4.3).** Anhänge und Importe werden auf Typ und Größe geprüft, aber
-nicht auf Schadcode. *Vorschlag:* optionaler Scan über ClamAV (`clamd`, GPL; als
-eigener Dienst über TCP angesprochen, nicht gelinkt, also lizenzrechtlich wie ein
-externer Dienst), `HERD_CLAMAV_URL`; ohne Einstellung wie heute. Ein Fund lehnt mit 422
-`attachment.infected` ab, ein nicht erreichbarer Scanner mit 503 (fail closed). Frage:
-ist ein solcher Zusatzdienst für die Zielbetriebe zumutbar, oder reicht der Scan auf den
-Endgeräten? Aufwand etwa ein Tag plus Chart und Compose.
+**J11 – Virenscan (V5.4.3). Geplant, M9b Task 18 (optional).** *Entscheidung:* optional
+bauen. ClamAV (`clamd`, als eigener Dienst über TCP angesprochen, nicht gelinkt) über
+`HERD_CLAMAV_ADDRESS`, Standard aus (dann wie heute). Ist er eingestellt, werden Anhänge
+und Importe vor dem Speichern geprüft; ein Fund lehnt mit 422 ab, ein nicht erreichbarer
+oder scheiternder Scanner ebenfalls (fail closed). Ohne Scanner bleibt V5.4.3 offen;
+das ist eine Entscheidung des Betriebs.
 
 **J12 – Verschlüsselung und Authentisierung im Cluster (V12.3.1, V12.3.3, V12.3.4,
-V13.2.1).** Die Datenbankverbindung nutzt TLS nur, wenn der Betrieb es in der URL
-verlangt; API und Collab-Prozess sprechen unverschlüsselt miteinander und der
-Collab-Prozess trägt zusätzlich das statische `HERD_INTERNAL_TOKEN`. *Vorschlag:* (a)
-`HERD_DATABASE_SSLMODE` (Standard `prefer`, im Chart für eine externe Datenbank
-`verify-full` mit CA aus einem Secret); (b) für API ↔ Collab entweder ein Service-Mesh mit
-mTLS als Betriebsvoraussetzung dokumentieren oder TLS mit einem vom Chart erzeugten
-Zertifikat; (c) das interne Token rotierbar machen (zwei gültige Werte, wie
-`HERD_SECRET_KEY_PREVIOUS`). Frage: soll die App TLS im Cluster selbst leisten, oder
-reicht die Betriebsvoraussetzung (Mesh, NetworkPolicy)? Aufwand je nach Antwort ein bis
-drei Tage.
+V13.2.1). Teils geplant (M9b Task 18), teils Abweichung.** *Entscheidung:* (a) TLS zur
+Datenbank: `sslmode` und CA als Einstellungen und im Chart (CA aus einem Secret);
+empfohlen ist `verify-full` (Task 18, V12.3.1). (b) API ↔ Collab-Prozess: **dokumentierte
+Abweichung**; die App leistet kein TLS im Cluster, Betriebsvoraussetzung ist ein
+Service-Mesh mit mTLS oder die NetworkPolicy des Charts (V12.3.3, V12.3.4). (c) Das
+interne Token wird rotierbar: zwei gültige Werte zugleich, wie `HERD_SECRET_KEY_PREVIOUS`
+(Task 18, V13.2.1).
 
-**J13 – Mix-up-Schutz für den OAuth-Client der Konnektoren (V10.2.2).** OIDC ist
-geschützt (eigene Rückruf-Adresse je Anbieter, `iss` im ID-Token exakt). Der OAuth-Client
-der MCP-Konnektoren hat eine gemeinsame Rückruf-Adresse und prüft den Parameter `iss`
-(RFC 9207) nicht; ein bösartiger Autorisierungsserver könnte einen Code für einen
-anderen Client erschleichen. *Vorschlag:* `iss` aus der Antwort prüfen, wenn die
-Metadaten `authorization_response_iss_parameter_supported` melden, und die Rückruf-Adresse
-je OAuth-Client unterscheiden (`/api/ai/oauth/<client_id>/callback` statt `/api/ai/oauth/callback`). Aufwand etwa ein
-halber bis ein Tag; nicht gebaut, weil die Rückruf-Adresse bei bestehenden
-Registrierungen geändert werden müsste (Frage: Umstellung mit Übergangszeit?).
+**J13 – Mix-up-Schutz für den OAuth-Client der Konnektoren (V10.2.2). Geplant, M9b
+Task 18.** OIDC ist schon geschützt (eigene Rückruf-Adresse je Anbieter, `iss` im
+ID-Token exakt). *Entscheidung:* bauen. Eine Rückruf-Adresse je OAuth-Client
+(`/api/ai/oauth/<client_id>/callback`) und die Prüfung von `iss` in der
+Autorisierungsantwort (RFC 9207), wenn der Server ihn schickt. Bestehende Registrierungen
+brauchen die neue Rückruf-Adresse (Hinweis in `docs/MCP.md`).
 
-**J14 – Getrennte Datenbankrollen (V13.2.2).** App und Migration nutzen dieselbe Rolle,
-die das Schema besitzt; eine SQL-Injektion (keine bekannt) könnte also Tabellen ändern
-oder löschen. *Vorschlag:* Rolle `herd_migrate` (besitzt das Schema, nur der
-Migrations-Job) und `herd_app` (nur DML auf den Tabellen, `GRANT` in einer Migration);
-Einstellung `HERD_MIGRATE_DATABASE_URL`. Aufwand etwa ein bis zwei Tage, betrifft
-Compose, Chart, Sicherung und Wiederherstellung (`pg_restore` braucht die Besitzerrolle).
+**J14 – Getrennte Datenbankrollen (V13.2.2). Geplant, M9b Task 18.** *Entscheidung:*
+bauen, als Option. Eine Migrationsrolle besitzt das Schema, die Laufzeitrolle bekommt nur
+DML-Rechte (`GRANT` in einer Migration); Compose und Chart können zwei Rollen nutzen. Der
+Standard bleibt eine Rolle für kleine Installationen (dokumentiert); Sicherung und
+Wiederherstellung laufen mit der Migrationsrolle.
 
 ## Betriebsvoraussetzungen und Hinweise
 
@@ -339,7 +339,7 @@ das Image aus. Stand 15.11.2026 (lokal ausgeführt, die CI startet derzeit konto
 keine Jobs): `pip-audit` für die Laufzeitabhängigkeiten ohne Befund, `npm audit` in
 allen drei Paketen 0 Schwachstellen.
 
-**Fristen (Vorschlag, zur Bestätigung durch Jan):** eine bekannte Schwachstelle in einer
+**Fristen (von Jan bestätigt, 16.11.2026):** eine bekannte Schwachstelle in einer
 Laufzeitabhängigkeit oder dem Image wird behoben – kritisch (CVSS ≥ 9) binnen 7 Tagen,
 hoch (≥ 7) binnen 30 Tagen, mittel binnen 90 Tagen, niedrig mit dem nächsten
 regulären Update. Werkzeuge nur für Entwicklung und Tests (dev-Abhängigkeiten, e2e)
@@ -418,7 +418,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V2.3 | V2.3.2 | L2 | Grenzen umgesetzt | erfüllt | Budgets je Organisation/Person/Agent (`ai/budgets.py`), Höchstzahlen (persönliche Agenten, Automatisierungen, externe Aufrufe je Lauf), Größen (`HERD_MAX_BODY_BYTES`, Anhänge, Importe). `tests/test_ai_budgets.py`, `tests/test_body_limit.py`. |
 | V2.3 | V2.3.3 | L2 | Transaktionen | erfüllt | Eine Transaktion je Anfrage (`core/db.py`, `auth/deps.py` SessionDep), je Termin, je Ereignis-Charge; Fehler rollen ganz zurück. `tests/test_errors.py::test_a_deadlock_or_serialization_failure_asks_to_try_again`. |
 | V2.3 | V2.3.4 | L2 | Sperren gegen Doppelbuchung | erfüllt | `version`-Spalten mit 409, Zeilensperren (`FOR UPDATE`, `SKIP LOCKED`), eindeutige Schlüssel (z. B. `(automation_id, due_at)`, Ticketnummern). `tests/test_concurrency.py`, `tests/test_budget_races.py`. |
-| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | Lücke | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen. Es fehlt eine Grenze je Person für gewöhnliche Schreibvorgänge (Nachrichten, Seiten, Tickets, Hochladen). Frage J10. |
+| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | Lücke | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen. Es fehlt eine Grenze je Person für gewöhnliche Schreibvorgänge (Nachrichten, Seiten, Tickets, Hochladen). J10, geplant M9b Task 18. |
 
 ### V3 Web Frontend Security
 
@@ -471,7 +471,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V5.3 | V5.3.2 | L1 | Pfade nicht aus Dateinamen | erfüllt | Speicherschlüssel `attachments/<org_id>/<sha256>` (`core/storage.py`); der Name ist nur Metadatum. SPA-Pfade ohne `..`/Symlinks (`web/spa.py`, `tests/test_spa.py`). |
 | V5.4 | V5.4.1 | L2 | Dateiname im Content-Disposition | erfüllt | Immer `Content-Disposition` mit dem gespeicherten Namen (`core/downloads.content_disposition`); Namen aus der Anfrage werden ignoriert. |
 | V5.4 | V5.4.2 | L2 | Dateinamen kodiert (RFC 6266) | erfüllt | ASCII-Ersatz ohne Anführungszeichen und Steuerzeichen plus `filename*=UTF-8''…` (`core/downloads.py`). |
-| V5.4 | V5.4.3 | L2 | Virenscan | Lücke | Kein Virenscanner. Frage J11. |
+| V5.4 | V5.4.3 | L2 | Virenscan | Lücke | Kein Virenscanner. J11, optional geplant M9b Task 18 (ClamAV, Standard aus). |
 
 ### V6 Authentication
 
@@ -494,8 +494,8 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V6.2 | V6.2.12 | L2 | Gegen geleakte Passwörter prüfen | erfüllt | Die Liste aus V6.2.4 stammt aus Leak-Sammlungen (Top-Million von Pwdb-Public). Nicht abgefragt wird ein vollständiger Leak-Bestand (etwa Have I Been Pwned per k-Anonymität): das wäre ein Aufruf nach außen bei jedem Passwortwechsel (Hinweis H1). |
 | V6.3 | V6.3.1 | L1 | Schutz gegen Credential Stuffing umgesetzt | erfüllt | `auth/service.py` (Grenzen je Adresse und je Adresse+Konto, Dummy-Hash bei unbekannten Konten), OIDC je Adresse. `tests/test_login_limits.py`, `tests/test_auth.py::test_login_is_rate_limited`. |
 | V6.3 | V6.3.2 | L1 | Keine Standardkonten | erfüllt | Das erste Konto entsteht nur aus `HERD_BOOTSTRAP_ADMIN_EMAIL`/`_PASSWORD` (Compose verlangt beide, kein Standardwert). `tests/test_auth.py::test_bootstrap_without_credentials_creates_nothing`. |
-| V6.3 | V6.3.3 | L2 | Mehr-Faktor-Anmeldung | Lücke | Lokale Passwortkonten haben keinen zweiten Faktor; über OIDC leistet ihn der Anbieter. Lücke, geplant Task 16 (TOTP, Frage J3, Option A). |
-| V6.3 | V6.3.4 | L2 | Keine undokumentierten Wege, gleiche Stärke | erfüllt | Abschnitt „Anmeldung“ nennt alle Wege; `/mcp` nimmt nur Zugangstoken, `/internal` nur das interne Token, alles andere nur die Sitzung. Hinweis: mit TOTP (Task 16) muss das Anlegen von Zugangstoken den zweiten Faktor voraussetzen. |
+| V6.3 | V6.3.3 | L2 | Mehr-Faktor-Anmeldung | Lücke | Lokale Passwortkonten haben keinen zweiten Faktor; über OIDC leistet ihn der Anbieter. Abweichung (J3: TOTP nur optional, auch für Owner und Admins; Task 16). |
+| V6.3 | V6.3.4 | L2 | Keine undokumentierten Wege, gleiche Stärke | erfüllt | Abschnitt „Anmeldung“ nennt alle Wege; `/mcp` nimmt nur Zugangstoken, `/internal` nur das interne Token, alles andere nur die Sitzung. Hinweis: mit TOTP (Task 16) muss das Anlegen von Zugangstoken für Personen mit TOTP den zweiten Faktor voraussetzen. |
 | V6.4 | V6.4.1 | L1 | Erstpasswörter | nicht anwendbar | Das System erzeugt keine Erstpasswörter oder Aktivierungscodes (Admins setzen ein Passwort, oder die Person meldet sich über OIDC an). |
 | V6.4 | V6.4.2 | L1 | Keine Passworthinweise/Sicherheitsfragen | erfüllt | Gibt es nicht. |
 | V6.4 | V6.4.3 | L2 | Sicheres Zurücksetzen | erfüllt | Kein Selbstbedienungs-Reset; ein Admin (`user.manage`, das Passwort eines Owners nur ein Owner) setzt ein neues, alle Sitzungen enden, Audit `user.password_changed` (`users/service.py`). `tests/test_users.py`. |
@@ -524,15 +524,15 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V7.2 | V7.2.2 | L1 | Dynamische Token | erfüllt | Zufällige Referenztoken je Anmeldung (`core/security.new_session_token`). |
 | V7.2 | V7.2.3 | L1 | 128 Bit aus CSPRNG | erfüllt | 256 Bit aus `secrets.token_urlsafe(32)`, nur SHA-256 gespeichert. `tests/test_auth.py::test_session_token_is_stored_hashed`. |
 | V7.2 | V7.2.4 | L1 | Neues Token bei Anmeldung, altes endet | erfüllt | Jede Anmeldung (Passwort, OIDC) erzeugt ein neues Token und beendet das mitgebrachte (`auth/service.end_replaced`). `tests/test_cookie_security.py::test_signing_in_again_ends_the_session_it_replaces`, `test_an_oidc_sign_in_ends_the_session_it_replaces`. |
-| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | Lücke | Es gibt keine; eine Sitzung gilt bis zu ihrem Ablauf. Frage J7. |
+| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | Lücke | Es gibt keine; eine Sitzung gilt bis zu ihrem Ablauf. J7, geplant M9b Task 18 (`HERD_SESSION_IDLE_HOURS`, Standard 24). |
 | V7.3 | V7.3.2 | L2 | Absolute Höchstdauer | erfüllt | `HERD_SESSION_TTL_HOURS` (Standard 168), nie verlängert (`auth/service.open_session`). `tests/test_auth.py::test_expired_session_is_rejected`. |
 | V7.4 | V7.4.1 | L1 | Abmelden beendet die Sitzung im Backend | erfüllt | `end_by_hash` setzt den Ablauf auf jetzt (`auth/repository.py`). `tests/test_auth.py::test_logout_invalidates_session`. Bewusste Ausnahme (Review M2 R2): eine bereits offene Live-Bearbeitung speichert ihre letzten Änderungen noch bis zu einer Stunde, lässt aber niemanden neu zu. |
 | V7.4 | V7.4.2 | L1 | Deaktivieren beendet alle Sitzungen | erfüllt | `users/service.deactivate` löscht sie. `tests/test_users.py::test_deactivate_deletes_sessions_and_blocks_login`. |
 | V7.4 | V7.4.3 | L2 | Andere Sitzungen enden nach Änderung eines Faktors | erfüllt | Passwortwechsel (eigener oder durch Admins) und das Lösen einer OIDC-Verknüpfung beenden alle anderen Sitzungen. `tests/test_profile.py`, `tests/test_oidc_admin.py::test_unlinking_an_identity_ends_the_persons_other_sessions`. |
 | V7.4 | V7.4.4 | L2 | Abmelden überall erreichbar | erfüllt | Personenmenü in der Kopfleiste jeder angemeldeten Seite (`frontend/src/app/shell/UserMenu.tsx`). |
 | V7.4 | V7.4.5 | L2 | Admins beenden Sitzungen | erfüllt | `POST /api/admin/users/{id}/sign-out` und Knopf „Abmelden“ in der Personenverwaltung (`users/service.sign_out`, `UsersPage.tsx`). `tests/test_users.py::test_an_administrator_signs_a_person_out_everywhere`, `AdminPages.test.tsx`. |
-| V7.5 | V7.5.1 | L2 | Erneute Anmeldung vor sensiblen Änderungen | Lücke | E-Mail kann niemand selbst ändern, das Passwort nur mit dem alten. Aber eine neue OIDC-Verknüpfung (ein neuer Anmeldeweg) braucht nur die laufende Sitzung. Frage J9. |
-| V7.5 | V7.5.2 | L2 | Eigene Sitzungen sehen und beenden | Lücke | Es gibt keine Liste der eigenen Sitzungen (nur „alle anderen enden“ beim Passwortwechsel). Frage J8. |
+| V7.5 | V7.5.1 | L2 | Erneute Anmeldung vor sensiblen Änderungen | Lücke | E-Mail kann niemand selbst ändern, das Passwort nur mit dem alten. Aber eine neue OIDC-Verknüpfung (ein neuer Anmeldeweg) braucht nur die laufende Sitzung. J9, geplant M9b Task 18. |
+| V7.5 | V7.5.2 | L2 | Eigene Sitzungen sehen und beenden | Lücke | Es gibt keine Liste der eigenen Sitzungen (nur „alle anderen enden“ beim Passwortwechsel). J8, geplant M9b Task 18. |
 | V7.6 | V7.6.1 | L2 | Föderierte Lebensdauer wie dokumentiert | erfüllt | Abschnitt „Sitzungen“: höchstens `HERD_SESSION_TTL_HOURS` nach der IdP-Anmeldung, dann neu über den IdP. |
 | V7.6 | V7.6.2 | L2 | Sitzung nur mit Zutun | erfüllt | Eine OIDC-Sitzung entsteht nur nach dem Klick auf den Anbieter und mit gebundenem Ablauf (`oidc/flow.py`, Bindungs-Cookie gegen Login-CSRF). `tests/test_oidc_flow.py`. |
 
@@ -567,7 +567,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V10.1 | V10.1.1 | L2 | Token nur dorthin, wo nötig | erfüllt | OAuth-Token der Konnektoren bleiben im Backend (`enc:`), Klartext nur in `connectors/credentials.headers_for` für ihren Ursprung (`connectors/moving.py`); der Browser sieht sie nie. `tests/test_oauth_secrecy.py`. |
 | V10.1 | V10.1.2 | L2 | Werte nur aus eigenem Ablauf | erfüllt | OIDC: `state`, `nonce`, PKCE je 256 Bit, an den Browser gebunden (Bindungs-Cookie) und einmalig; OAuth der Konnektoren: `state` an die Sitzung gebunden (`oauth/flow.py`). `tests/test_oidc_flow.py`, `tests/test_oauth_flow.py`. |
 | V10.2 | V10.2.1 | L2 | CSRF beim Code-Flow | erfüllt | PKCE S256 und `state` in beiden Clients. `tests/test_oidc_flow.py::test_the_authorization_request_carries_pkce_nonce_and_the_public_callback`. |
-| V10.2 | V10.2.2 | L2 | Mix-up-Schutz | Lücke | OIDC ja (eigene Rückruf-URL je Anbieter, `iss` im ID-Token exakt). Der OAuth-Client der Konnektoren hat eine gemeinsame Rückruf-URL und prüft `iss` (RFC 9207) nicht. Frage J13. |
+| V10.2 | V10.2.2 | L2 | Mix-up-Schutz | Lücke | OIDC ja (eigene Rückruf-URL je Anbieter, `iss` im ID-Token exakt). Der OAuth-Client der Konnektoren hat eine gemeinsame Rückruf-URL und prüft `iss` (RFC 9207) nicht. J13, geplant M9b Task 18. |
 | V10.3 | V10.3.1 | L2 | Resource Server: Zielgruppe | erfüllt | `/mcp` nimmt nur eigene Referenztoken (`herd_pat_`/`herd_agt_`), gültig nur dort (`modules/tokens`). `tests/test_token_resolve.py`. |
 | V10.3 | V10.3.2 | L2 | Resource Server: Entscheidung nach Claims | erfüllt | Bei jedem Aufruf: Rechte der Person, Bereiche des Tokens, KI-Richtlinie (`mcp_tools`, `tokens`). `tests/test_token_reach.py`, `tests/test_token_no_ai.py`. |
 | V10.3 | V10.3.3 | L2 | Resource Server: Person eindeutig | erfüllt | Das Token verweist auf genau eine Person oder einen Agenten (`tokens/models.py`). |
@@ -622,18 +622,18 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V12.1 | V12.1.3 | L2 | mTLS-Clientzertifikate | nicht anwendbar | Keine Anmeldung mit Clientzertifikaten. |
 | V12.2 | V12.2.1 | L1 | TLS zu allen externen Diensten | nicht anwendbar | Wie V12.1.1, liegt beim Betrieb (B1). Die App setzt HSTS und verlangt für OIDC eine https-Adresse. |
 | V12.2 | V12.2.2 | L1 | Öffentlich vertraute Zertifikate | nicht anwendbar | Wie V12.1.1, liegt beim Betrieb (B1). |
-| V12.3 | V12.3.1 | L2 | Verschlüsselt zu Datenbank und Diensten | Lücke | Ausgehende Aufrufe der App (KI, MCP, OIDC, OAuth, restic) nur über https; die Datenbankverbindung nutzt TLS nur, wenn der Betrieb es in der URL verlangt (Standard: ohne). Frage J12. |
+| V12.3 | V12.3.1 | L2 | Verschlüsselt zu Datenbank und Diensten | Lücke | Ausgehende Aufrufe der App (KI, MCP, OIDC, OAuth, restic) nur über https; die Datenbankverbindung nutzt TLS nur, wenn der Betrieb es in der URL verlangt (Standard: ohne). J12 (a), geplant M9b Task 18 (`sslmode` und CA). |
 | V12.3 | V12.3.2 | L2 | TLS-Clients prüfen Zertifikate | erfüllt | httpx mit Zertifikatsprüfung, auch bei gepinnter Adresse (`core/egress.py`). `tests/test_egress.py::test_tls_to_a_pinned_address_still_verifies_the_name`. |
-| V12.3 | V12.3.3 | L2 | TLS zwischen internen HTTP-Diensten | Lücke | API ↔ Collab-Prozess (WebSocket und interne API, Port 9090) laufen im Cluster unverschlüsselt; geschützt nur durch NetworkPolicy und das interne Token. Frage J12. |
-| V12.3 | V12.3.4 | L2 | Vertraute Zertifikate intern | Lücke | Folgt aus V12.3.3. Frage J12. |
+| V12.3 | V12.3.3 | L2 | TLS zwischen internen HTTP-Diensten | Lücke | API ↔ Collab-Prozess (WebSocket und interne API, Port 9090) laufen im Cluster unverschlüsselt; geschützt nur durch NetworkPolicy und das interne Token. J12 (b): Abweichung, Betriebsvoraussetzung Mesh mit mTLS oder NetworkPolicy. |
+| V12.3 | V12.3.4 | L2 | Vertraute Zertifikate intern | Lücke | Folgt aus V12.3.3. J12 (b): Abweichung. |
 
 ### V13 Configuration
 
 | Kapitel | Nummer | Stufe | Thema | Status | Beleg |
 |---|---|---|---|---|---|
 | V13.1 | V13.1.1 | L2 | Kommunikation dokumentiert | erfüllt | Abschnitt „Verbindungen“. |
-| V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | Lücke | Collab → API trägt je Aufruf eine kurzlebige Berechtigung, zusätzlich aber das statische, geteilte `HERD_INTERNAL_TOKEN` (keine Rotation ohne Ausfall). Datenbank: eigenes Dienstkonto mit Passwort. Frage J12. |
-| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | Lücke | Container laufen ohne root (uid 10001); aber App und Migration nutzen dieselbe Datenbankrolle, die das Schema besitzt. Frage J14. |
+| V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | Lücke | Collab → API trägt je Aufruf eine kurzlebige Berechtigung, zusätzlich aber das statische, geteilte `HERD_INTERNAL_TOKEN` (keine Rotation ohne Ausfall). Datenbank: eigenes Dienstkonto mit Passwort. J12 (c), geplant M9b Task 18 (zwei gültige Token zum Rotieren). |
+| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | Lücke | Container laufen ohne root (uid 10001); aber App und Migration nutzen dieselbe Datenbankrolle, die das Schema besitzt. J14, geplant M9b Task 18 (Migrations- und Laufzeitrolle als Option). |
 | V13.2 | V13.2.3 | L2 | Keine Standard-Zugangsdaten | erfüllt | Compose verlangt `POSTGRES_PASSWORD` und das Bootstrap-Passwort ohne Standardwert (`deploy/compose/compose.yml`); `HERD_INTERNAL_TOKEN` mindestens 32 Zeichen (`tests/test_config.py`). |
 | V13.2 | V13.2.4 | L2 | Allowlist für Ziele nach außen | erfüllt | Nach außen nur zu Zielen, die Admins eintragen (KI-Verbindungen, MCP-Server, OIDC-Anbieter, OAuth-Clients) und nur an öffentliche Adressen (private nur per Allowlist): `core/egress.py`, `core/egress_allowance.py`; im Chart zusätzlich NetworkPolicy-Egress. |
 | V13.2 | V13.2.5 | L2 | Server mit Allowlist | erfüllt | Wie V13.2.4; Dateien nur unter `HERD_DATA_DIR`, SPA nur aus `HERD_STATIC_DIR`. |

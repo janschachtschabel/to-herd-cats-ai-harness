@@ -33,11 +33,14 @@ def test_every_row_has_a_known_status_and_evidence() -> None:
         assert len(evidence.strip()) >= 5, number
 
 
-def test_every_gap_names_its_question_and_the_counts_agree() -> None:
+def test_every_gap_names_its_question_and_its_plan_and_the_counts_agree() -> None:
+    """Every gap names Jan's question (J3, J7 to J14) and either the task that closes
+    it (Task 16, M9b Task 18) or that it stays a documented deviation (Abweichung)."""
     rows = _rows()
     for _, number, _, status, evidence in rows:
         if status.strip() == "Lücke":
-            assert re.search(r"Frage J\d+|Task 16", evidence), number
+            assert re.search(r"\bJ\d+\b", evidence), number
+            assert re.search(r"Task 1[68]\b|Abweichung", evidence), number
     counts = Counter(row[3].strip() for row in rows)
     text = DOC.read_text(encoding="utf-8")
     for status, count in counts.items():
