@@ -60,6 +60,24 @@ describe('a release card under the personal mark (module review M8 2, G2)', () =
     expect(args).toHaveTextContent('Für alle: HC-1 ist erledigt.')
   })
 
+  test('a read says it reads, not that others can read what is released', async () => {
+    const read = release({
+      tool: 'read_ticket',
+      summary: 'read_ticket: key=HC-1',
+      args: { key: 'HC-1' },
+      reads: true,
+    })
+    const dm = dmWith(read)
+    await renderApp(`/c/${dm.id}`)
+    const shown = await screen.findByRole('region', { name: 'Freigabe' })
+    const said = within(shown).getByText(/^Persönlich:/)
+    expect(said).toHaveTextContent(/möchte unter deiner persönlichen Markierung lesen/)
+    expect(said).not.toHaveTextContent(/von anderen gelesen werden/)
+    expect(within(shown).getByRole('figure', { name: 'Angaben des Aufrufs' })).toHaveTextContent(
+      'HC-1',
+    )
+  })
+
   test('a page change shows its whole diff at once, no button to open it (review M8 3, H5)', async () => {
     const page = release({
       tool: 'update_page',

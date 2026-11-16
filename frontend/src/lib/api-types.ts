@@ -4473,7 +4473,9 @@ export interface components {
          *     `args` to that server once released), else null. `personal`: asked because the
          *     run carries the asker's personal mark (every release then but a message into its
          *     DM alone with her): what is released is written (or sent) where others can read
-         *     it now or later (module review M8 2; M8 5, L2).
+         *     it now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a
+         *     catalog tool that writes nothing); under the mark its card says so instead of
+         *     that others can read what is released.
          */
         ApprovalOut: {
             /**
@@ -4522,6 +4524,11 @@ export interface components {
              * @default false
              */
             personal?: boolean;
+            /**
+             * Reads
+             * @default false
+             */
+            reads?: boolean;
             /** Reason */
             reason: string | null;
             /** Redacted */

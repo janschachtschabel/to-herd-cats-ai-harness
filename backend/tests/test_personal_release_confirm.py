@@ -59,6 +59,20 @@ async def test_a_ticket_under_the_mark_asks_a_personal_release(ext: Ext, work: W
     ticket = call("create_ticket", space_id=str(work.space.id), title=f"Fund {SECRET}")
     approval = await _asked(ext, name, ticket)
     assert approval["tool"] == "create_ticket" and approval["personal"] is True
+    assert approval["reads"] is False  # a write: its card says others can read it
+
+
+async def test_a_read_tool_under_the_mark_asks_a_personal_release_that_reads(
+    ext: Ext, work: Work
+) -> None:
+    """A read on `confirm` asks personally too, and says it reads (its card words it
+    as a read, not as something others can read; fix wave 5 follow-up)."""
+    ticket = await work.ticket()
+    name = await _personal(ext)
+    await _confirm(ext, "read_ticket", name)
+    approval = await _asked(ext, name, call("read_ticket", key=ticket["key"]))
+    assert approval["tool"] == "read_ticket" and approval["personal"] is True
+    assert approval["reads"] is True
 
 
 async def test_a_call_refused_when_asked_still_asks_a_personal_release(

@@ -18,6 +18,7 @@
       "personalTooLarge": "This change is too large to show you in full. What you cannot see in full you cannot release; you can only reject it.",
       "args": "The call's details",
       "personal": "Personal: this run read what only you see through your own access, or it is in your conversation. If you release it, exactly the content below is written, and it can be read by others now or later. It is no longer marked personal after that. If the agent should no longer see what came before, choose “Start afresh” in your conversation alone with it.",
+      "personalRead": "Personal: this run read what only you see through your own access, or it is in your conversation. The agent wants to read under your personal mark, with exactly the details below. Nothing is written, and what it reads stays under the mark like everything in this run. If the agent should no longer see what came before, choose “Start afresh” in your conversation alone with it.",
       "youDecide": "You decide.",
       "decides": "{{name}} decides.",
       "askerDecides": "The person who asked the agent decides.",

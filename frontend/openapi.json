@@ -1437,7 +1437,7 @@
         "type": "object"
       },
       "ApprovalOut": {
-        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nwhat the system resolved of the call's arguments (a ticket's key, a status's name,\nthe ids of what it changes; never a text the model chose), or for an external\ntool its server and tool; only for the person asked (null for others, module\nreview M8 5, L1). `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6). `external`: for a call of an external tool (it sends\n`args` to that server once released), else null. `personal`: asked because the\nrun carries the asker's personal mark (every release then but a message into its\nDM alone with her): what is released is written (or sent) where others can read\nit now or later (module review M8 2; M8 5, L2).",
+        "description": "A tool call waiting for (or given) a person's release. `summary`: the tool and\nwhat the system resolved of the call's arguments (a ticket's key, a status's name,\nthe ids of what it changes; never a text the model chose), or for an external\ntool its server and tool; only for the person asked (null for others, module\nreview M8 5, L1). `args`: the call's arguments, only for the person asked\n(null for others). `diff_url`: for a page's new content, where that person reads\nthe diff against the page as it is now (`GET`), instead of the text. `step` and\n`call_id`: the call it waits for, as the run's journal names it (the step a run\nlink points at). `outcome`: what became of the call once released: `ran`, or\n`stale` (what it would change had changed, so nothing ran); null before.\n`reason`: the person's reason for a rejection, and `args`, only for the person\nasked; for everyone else both are null and `redacted` is true (as in the run\nview, review M6 finding 6). `external`: for a call of an external tool (it sends\n`args` to that server once released), else null. `personal`: asked because the\nrun carries the asker's personal mark (every release then but a message into its\nDM alone with her): what is released is written (or sent) where others can read\nit now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a\ncatalog tool that writes nothing); under the mark its card says so instead of\nthat others can read what is released.",
         "properties": {
           "addressed_to": {
             "format": "uuid",
@@ -1550,6 +1550,11 @@
           "personal": {
             "default": false,
             "title": "Personal",
+            "type": "boolean"
+          },
+          "reads": {
+            "default": false,
+            "title": "Reads",
             "type": "boolean"
           },
           "reason": {

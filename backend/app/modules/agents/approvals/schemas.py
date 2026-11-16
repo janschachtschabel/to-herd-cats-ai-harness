@@ -17,6 +17,8 @@ from app.modules.agents.approvals.models import (
 )
 from app.modules.agents.approvals.service import Shown
 from app.modules.agents.approvals.shown import PAGE_TOOLS
+from app.modules.agents.toolbox.base import Effect
+from app.modules.agents.toolbox.catalog import CATALOG
 
 
 class ApprovalExternalOut(BaseModel):
@@ -44,7 +46,9 @@ class ApprovalOut(BaseModel):
     `args` to that server once released), else null. `personal`: asked because the
     run carries the asker's personal mark (every release then but a message into its
     DM alone with her): what is released is written (or sent) where others can read
-    it now or later (module review M8 2; M8 5, L2)."""
+    it now or later (module review M8 2; M8 5, L2). `reads`: the call only reads (a
+    catalog tool that writes nothing); under the mark its card says so instead of
+    that others can read what is released."""
 
     id: uuid.UUID
     run_id: uuid.UUID
@@ -68,6 +72,7 @@ class ApprovalOut(BaseModel):
     created_at: datetime
     version: int
     personal: bool = False
+    reads: bool = False
 
     @classmethod
     def of(cls, shown: Shown[Approval]) -> "ApprovalOut":
@@ -96,7 +101,14 @@ class ApprovalOut(BaseModel):
             created_at=a.created_at,
             version=a.version,
             personal=a.personal,
+            reads=_reads(a.tool),
         )
+
+
+def _reads(tool: str) -> bool:
+    """A catalog tool that only reads (an external tool sends what it is given)."""
+    spec = CATALOG.get(tool)
+    return spec is not None and spec.effect == Effect.READ
 
 
 def _external(subjects: list[dict[str, Any]]) -> ApprovalExternalOut | None:
