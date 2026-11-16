@@ -9,7 +9,8 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `2026-11-13-m4b-boards-sprints.md`, `2026-11-13-m5-ki-grundlage.md`,
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
 `2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
-are built; next are the M9a module review, M9b (Tasks 12–18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
+are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
+release note `docs/RELEASE-1.0.0.md`); next are M9b (Tasks 12–18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -59,7 +60,8 @@ boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the
 limits, metrics and alerts), `docs/MCP.md` (tokens, `/mcp` with Claude Code and Codex,
 external agents, servers, connectors, catalogue, operation, metrics and alerts),
 `docs/SICHERUNG.md` (backup, restore, retention), `docs/ANMELDUNG.md` (password and
-OIDC sign-in, approval), `docs/SICHERHEIT.md` (ASVS rows; `tests/test_security_doc.py`).
+OIDC sign-in, approval), `docs/SICHERHEIT.md` (ASVS rows; `tests/test_security_doc.py`),
+`docs/RELEASE-<version>.md` (release notes, linked from the README).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -141,7 +143,9 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `pgtools.py` (password in `PGPASSWORD` of a built environment; `pg_restore` reads
   the archive's dump as a stream, no scratch file), retention and restic (`retention.py`,
   `offsite.py`, `forget --group-by host,tags`), advisory locks `herd.backup` and
-  `herd.schema`. A backup writes only into the backup directory (`.part` files, removed
+  `herd.schema` (session locks: commit right after taking one, never hold a
+  transaction open; a restore holds both and marks only runs started by the archive's
+  `created_at`). A backup writes only into the backup directory (`.part` files, removed
   under the lock by the next run; a killed run counts as failed). State
   in `modules/backups` (`backup_run`, gauges read by the worker). Settings in
   `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
