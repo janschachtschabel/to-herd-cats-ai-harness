@@ -105,10 +105,15 @@ class ApprovalOut(BaseModel):
         )
 
 
+# READ in the catalog, but released they write a message: the question card, the answer.
+_SPEAKS = frozenset({"ask_user", "submit_result"})
+
+
 def _reads(tool: str) -> bool:
-    """A catalog tool that only reads (an external tool sends what it is given)."""
+    """A catalog tool that writes nothing at all (an external tool sends what it is
+    given; `ask_user` and `submit_result` write a message once released)."""
     spec = CATALOG.get(tool)
-    return spec is not None and spec.effect == Effect.READ
+    return spec is not None and spec.effect == Effect.READ and tool not in _SPEAKS
 
 
 def _external(subjects: list[dict[str, Any]]) -> ApprovalExternalOut | None:

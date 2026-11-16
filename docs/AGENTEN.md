@@ -601,7 +601,8 @@ Die Marke folgt dem Inhalt und ist gespeichert, nie nur im Gedächtnis eines Wor
   M8 5, Befund L2; ersetzt Review M8 4, Befund K5). Ist das Werkzeug ein lesendes
   (etwa `read_ticket`), sagt die persönliche Karte stattdessen, dass der Agent unter
   ihrer persönlichen Markierung lesen möchte, dabei nichts geschrieben wird und das
-  Gelesene unter der Markierung bleibt (`reads` an der Freigabe). Eine Freigabe, die die Marke
+  Gelesene unter der Markierung bleibt (`reads` an der Freigabe; nicht für `ask_user`
+  und `submit_result`, die freigegeben eine Nachricht schreiben, Review M8 6, Befund M1). Eine Freigabe, die die Marke
   verlangt, aber nicht als persönliche gestellt wurde, gilt als veraltet
   (`approval_stale`): Das Modell muss neu fragen.
 - **Sie endet**, wenn kein persönlicher Inhalt im Kontext ist: Ein Lauf, dessen
