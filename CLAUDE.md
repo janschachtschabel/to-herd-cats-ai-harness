@@ -158,9 +158,12 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   mounts, default network `${TRAEFIK_NETWORK:-herd-web}` (never `external`), Traefik
   labels (router/service `herd-app`), no anchors, tabs, nested variables or `$$`.
   `python -m app.stack init` (`app/stack/init.py`) generates the secrets once into the
-  volumes `secrets`/`db-secret`, checks `DOMAIN` (bare host name, exit 2) and the
-  one-time admin with the app's password rules, skips missing values (exit 0); the
-  app reads every secret through `HERD_*_FILE` (`core/config_files.py`). Rules are
+  volumes `secrets`/`db-secret`, checks `DOMAIN` (bare lower-case host name with a dot,
+  no IP address; exit 2, never corrected) and the one-time admin with the app's password
+  rules, skips missing values (exit 0); `python -m app.stack set-secret-key`
+  (`app/stack/secret_key.py`) puts a saved key back from stdin. The app reads every
+  secret through `HERD_*_FILE` (`core/config_files.py`); the image's services pull on
+  every deploy (`pull_policy: always`) and none but init disables its check. Rules are
   enforced by `tests/test_hostinger_compose.py`; CI runs
   `deploy/scripts/hostinger-smoke.sh`. `deploy/compose/` stays the build/reference variant.
 - Retention (M9): `core/retention.py` holds a rule for every table (`Keep`, `Upkeep`,
