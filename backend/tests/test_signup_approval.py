@@ -1,6 +1,7 @@
 """Self-registration waits for an admin's approval (plan M9 task 5b, Jan's answer J2):
 the account is created inactive and awaiting approval, nobody is signed in, and only
-"Freigeben" lets the person in; "Ablehnen" leaves a deactivated account."""
+"Freigeben" lets the person in ("Ablehnen" deletes the account:
+`test_signup_rejection.py`)."""
 
 from typing import Any
 
@@ -24,7 +25,9 @@ NINA = {"email": "nina@neu.example", "name": "Nina Neu", "sub": "n1"}
 
 
 async def _signup(owner: AsyncClient, stub: OidcStub, make_client: MakeClient) -> AsyncClient:
-    await make_provider(owner, stub, allow_signup=True, allowed_domains=["neu.example"])
+    await make_provider(
+        owner, stub, trust_email=True, allow_signup=True, allowed_domains=["neu.example"]
+    )
     browser = await make_client()
     done = await sign_in(browser, stub, **NINA)
     assert error_of(done) == "oidc.account_pending", done.headers
@@ -117,24 +120,6 @@ async def test_approving_lets_the_person_in_as_a_member(
     me = (await browser.get("/api/auth/me")).json()
     assert me["user"]["email"] == NINA["email"] and me["user"]["system_role"] == "member"
     assert "user.manage" not in me["permissions"]
-
-
-async def test_rejecting_leaves_a_deactivated_account_that_can_be_reactivated_later(
-    owner: AsyncClient, make_client: MakeClient, oidc_stub: OidcStub, session: AsyncSession
-) -> None:
-    await _signup(owner, oidc_stub, make_client)
-    user = await _nina(session)
-    response = await _decide(owner, user.id, "reject", user.version)
-    assert response.status_code == 200, response.text
-    assert response.json()["is_active"] is False
-    assert response.json()["awaiting_approval_since"] is None
-    audit = await session.scalar(select(AuditLog).where(AuditLog.action == "user.signup_rejected"))
-    assert audit is not None and audit.target_id == user.id
-    done = await sign_in(await make_client(), oidc_stub, **NINA)
-    assert error_of(done) == "oidc.account_inactive"
-    assert (await owner.post(f"{USERS}/{user.id}/reactivate")).status_code == 204
-    done = await sign_in(await make_client(), oidc_stub, **NINA)
-    assert done.headers["location"] == "/"
 
 
 async def test_deciding_races_answer_409(

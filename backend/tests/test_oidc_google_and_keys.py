@@ -173,7 +173,9 @@ async def test_no_email_or_claims_in_logs(
     caplog: pytest.LogCaptureFixture,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    await make_provider(owner, oidc_stub, allow_signup=True, allowed_domains=["geheim.example"])
+    await make_provider(
+        owner, oidc_stub, trust_email=True, allow_signup=True, allowed_domains=["geheim.example"]
+    )
     caplog.set_level(logging.DEBUG)
     secret_bits = ("lena@geheim.example", "Lena Leise", "sub-lena-77", "geheim.example")
     browser = await make_client()

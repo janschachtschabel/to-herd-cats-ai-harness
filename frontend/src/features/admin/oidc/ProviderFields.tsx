@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
@@ -132,6 +133,7 @@ export function ProviderFields({
       <Check
         label={t('oidcAdmin.form.allowSignup')}
         hint={t('oidcAdmin.form.allowSignupHint')}
+        error={errors.allow_signup?.message}
         {...form.register('allow_signup')}
       />
       <Field
@@ -153,19 +155,36 @@ export function ProviderFields({
   )
 }
 
-/** A checkbox with its label and an optional hint below. */
+/** A checkbox with its label, an optional hint and an error below. */
 function Check({
   label,
   hint,
+  error,
   ...input
-}: { label: string; hint?: string } & React.ComponentProps<'input'>) {
+}: { label: string; hint?: string; error?: string } & React.ComponentProps<'input'>) {
+  const id = useId()
+  const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ')
   return (
     <div className="flex flex-col gap-1">
       <label className="inline-flex items-center gap-2 text-sm">
-        <input type="checkbox" {...input} />
+        <input
+          type="checkbox"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy || undefined}
+          {...input}
+        />
         {label}
       </label>
-      {hint && <p className="ps-6 text-xs text-muted-foreground">{hint}</p>}
+      {hint && (
+        <p id={`${id}-hint`} className="ps-6 text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={`${id}-error`} className="ps-6 text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

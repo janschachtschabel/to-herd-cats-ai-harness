@@ -25,7 +25,9 @@ NINA = {"email": "nina@neu.example", "name": "Nina Neu", "sub": "n1"}
 
 
 async def _signup(people: People, stub: OidcStub, make_client: MakeClient) -> None:
-    await make_provider(people.admin, stub, allow_signup=True, allowed_domains=["neu.example"])
+    await make_provider(
+        people.admin, stub, trust_email=True, allow_signup=True, allowed_domains=["neu.example"]
+    )
     done = await sign_in(await make_client(), stub, **NINA)
     assert error_of(done) == "oidc.account_pending"
 
@@ -131,6 +133,6 @@ async def test_an_account_decided_before_delivery_tells_nobody(
     rejected = await people.admin.post(
         f"/api/admin/users/{nina.id}/reject", json={"version": nina.version}
     )
-    assert rejected.status_code == 200, rejected.text
+    assert rejected.status_code == 204, rejected.text
     await _deliver(session)
     assert await _activity(people.admin) == []

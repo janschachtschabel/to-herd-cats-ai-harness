@@ -9,7 +9,8 @@ export interface SignupDecision {
 }
 
 /** Asks before approving (the person may sign in, as a member) or rejecting (the
- *  account stays deactivated) a self-registered account. */
+ *  account, never active, is deleted and its address free again) a self-registered
+ *  account. */
 export function SignupDecisionDialog({
   decision,
   onClose,

@@ -251,7 +251,10 @@ export interface paths {
         get: operations["get_provider_api_admin_oidc_providers__provider_id__get"];
         put?: never;
         post?: never;
-        /** Delete Provider */
+        /**
+         * Delete Provider
+         * @description Also ends the sessions of the people linked through it, but the caller's own.
+         */
         delete: operations["delete_provider_api_admin_oidc_providers__provider_id__delete"];
         options?: never;
         head?: never;
@@ -433,7 +436,8 @@ export interface paths {
         put?: never;
         /**
          * Reject Signup
-         * @description Refuse a self-registered account: it stays deactivated.
+         * @description Refuse a self-registered account: it is deleted (it never was active), with
+         *     what signing up created; its address is free again.
          */
         post: operations["reject_signup_api_admin_users__user_id__reject_post"];
         delete?: never;
@@ -10625,13 +10629,11 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["UserOut"];
-                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

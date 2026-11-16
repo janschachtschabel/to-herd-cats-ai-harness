@@ -79,7 +79,11 @@ async def test_signup_creates_a_member_without_password_and_without_ai(
     an own "no AI" assignment instead (J2), and once approved signs in without it."""
     assert "ai.use" in (await _me(ai_people.alice))["permissions"]  # type: ignore[operator]
     await make_provider(
-        ai_people.admin, oidc_stub, allow_signup=True, allowed_domains=["Neu.Example"]
+        ai_people.admin,
+        oidc_stub,
+        trust_email=True,
+        allow_signup=True,
+        allowed_domains=["Neu.Example"],
     )
     identity = {"email": "nina@neu.example", "name": "Nina Neu", "sub": "n1"}
     done = await sign_in(await make_client(), oidc_stub, **identity)
@@ -109,7 +113,9 @@ async def test_signup_creates_a_member_without_password_and_without_ai(
 async def test_signup_outside_the_domains_is_refused(
     owner: AsyncClient, make_client: MakeClient, oidc_stub: OidcStub, session: AsyncSession
 ) -> None:
-    await make_provider(owner, oidc_stub, allow_signup=True, allowed_domains=["example.org"])
+    await make_provider(
+        owner, oidc_stub, trust_email=True, allow_signup=True, allowed_domains=["example.org"]
+    )
     for email, code in (
         ("x@sub.example.org", "oidc.domain_not_allowed"),
         ("x@other.test", "oidc.domain_not_allowed"),

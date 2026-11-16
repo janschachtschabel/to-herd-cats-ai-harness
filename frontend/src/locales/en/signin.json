@@ -102,12 +102,13 @@
       "secretEnv": "Name of the environment variable",
       "scopes": "Scopes",
       "trustEmail": "Trust this provider's email addresses",
-      "trustEmailHint": "Only switch it on if the provider is authoritative for every verified address; the first sign-in then links an existing account with the same address.",
+      "trustEmailHint": "Only switch it on if the provider is authoritative for every verified address (your own company directory, say, where nobody changes their own address); the first sign-in then links an existing account with the same address. Self-registration needs this setting.",
       "allowSignup": "Allow self-registration",
-      "allowSignupHint": "New people from the allowed domains can register. Their account waits for approval under People → Awaiting approval; only then can they sign in, as members without AI.",
+      "allowSignupHint": "New people from the allowed domains can register. Their account waits for approval under People → Awaiting approval; only then can they sign in, as members without AI. With a generic provider only together with “Trust this provider's email addresses”.",
       "domains": "Allowed domains",
       "domainsHint": "One domain per line, exactly (no subdomains).",
       "domainsRequired": "Self-registration needs at least one domain.",
+      "signupNeedsTrust": "Self-registration is only possible if you trust this provider's email addresses.",
       "enabled": "On (button on the sign-in page)",
       "submitCreate": "Add the provider",
       "issuerPlaceholder": "https://login.example.com/realms/company",
@@ -146,6 +147,7 @@
       "url_not_allowed": "This address is not allowed (https only, no private addresses unless allowed).",
       "scopes_invalid": "The scopes must include openid.",
       "domains_required": "Self-registration needs at least one domain.",
+      "signup_needs_trust": "Self-registration through a generic provider is only possible if you trust its email addresses.",
       "domain_invalid": "A domain is not valid (no wildcards, no trailing dot).",
       "public_url_missing": "HERD_PUBLIC_URL is not set; no provider can be switched on without it.",
       "key_taken": "This key is taken already.",
@@ -187,7 +189,7 @@
         "action": "Reject",
         "openNamed": "Reject {{name}}",
         "title": "Reject account?",
-        "text": "The account of {{name}} stays deactivated; signing in is not possible. You can reactivate it later like any deactivated person."
+        "text": "The account of {{name}} is deleted, with everything registering created. The address is free again: the person can register anew, or you add them yourself."
       }
     }
   },

@@ -59,9 +59,13 @@ async def delete_provider(
     provider_id: uuid.UUID,
     version: Annotated[int, Query()],
     actor: ActorDep,
+    ctx: AuthDep,
     session: SessionDep,
 ) -> None:
-    await ProviderService(session).delete(actor, provider_id, version)
+    """Also ends the sessions of the people linked through it, but the caller's own."""
+    await ProviderService(session).delete(
+        actor, provider_id, version, current_session=ctx.session_id
+    )
 
 
 @providers.post("/{provider_id}/check", response_model=ProviderCheckOut)

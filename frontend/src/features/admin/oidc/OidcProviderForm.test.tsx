@@ -89,6 +89,45 @@ describe('sign-in administration', () => {
     expect(screen.queryByRole('button', { name: 'Google hinzufügen' })).not.toBeInTheDocument()
   })
 
+  test('a generic provider signs people up only when its addresses are trusted', async () => {
+    const api = mockApi({
+      ...shell(ADMIN),
+      'GET /api/admin/oidc-providers': page([]),
+      'GET /api/auth/providers': page([]),
+      'POST /api/admin/oidc-providers': () => ({
+        status: 201,
+        body: makeProvider({ kind: 'generic', key: 'firma', name: 'Firma', trust_email: true }),
+      }),
+    })
+    const { user } = await renderApp('/admin/sign-in')
+    await user.click(await screen.findByRole('button', { name: 'Anderen Anbieter hinzufügen' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Anbieter einrichten' })
+    await user.type(within(dialog).getByLabelText('Schlüssel'), 'firma')
+    await user.type(within(dialog).getByLabelText('Name'), 'Firma')
+    await user.type(within(dialog).getByLabelText('Issuer'), 'https://login.firma.example')
+    await user.type(within(dialog).getByLabelText('Client-ID'), 'herd')
+    await user.type(within(dialog).getByLabelText('Secret'), 'f-SECRET-1')
+    await user.type(within(dialog).getByLabelText('Erlaubte Domains'), 'firma.example')
+    const signup = within(dialog).getByLabelText('Selbstregistrierung erlauben')
+    await user.click(signup)
+    await user.click(within(dialog).getByRole('button', { name: 'Anbieter anlegen' }))
+    const refusal =
+      'Selbstregistrierung geht nur, wenn du den E-Mail-Adressen dieses Anbieters vertraust.'
+    expect(await within(dialog).findByText(refusal)).toBeInTheDocument()
+    expect(signup).toHaveAttribute('aria-invalid', 'true')
+    expect(api.find('POST', '/api/admin/oidc-providers')).toHaveLength(0)
+
+    await user.click(within(dialog).getByLabelText('E-Mail-Adressen dieses Anbieters vertrauen'))
+    await user.click(within(dialog).getByRole('button', { name: 'Anbieter anlegen' }))
+    await waitFor(() => expect(api.find('POST', '/api/admin/oidc-providers')).toHaveLength(1))
+    expect(api.find('POST', '/api/admin/oidc-providers')[0]?.body).toMatchObject({
+      kind: 'generic',
+      trust_email: true,
+      allow_signup: true,
+      allowed_domains: ['firma.example'],
+    })
+  })
+
   test('editing keeps the secret field empty and unsent; a stale version offers a reload', async () => {
     const provider = makeProvider()
     const api = mockApi({

@@ -74,16 +74,14 @@ async def approve_signup(
     user_id: uuid.UUID, body: SignupDecisionIn, actor: ActorDep, session: SessionDep
 ) -> UserOut:
     """Let a self-registered account in (409 `users.not_pending` once decided)."""
-    service = UserService(session)
-    user = await service.decide_signup(actor, user_id, body.version, approve=True)
+    user = await UserService(session).approve_signup(actor, user_id, body.version)
     return UserOut.model_validate(user)
 
 
-@router.post("/{user_id}/reject", response_model=UserOut)
+@router.post("/{user_id}/reject", status_code=204)
 async def reject_signup(
     user_id: uuid.UUID, body: SignupDecisionIn, actor: ActorDep, session: SessionDep
-) -> UserOut:
-    """Refuse a self-registered account: it stays deactivated."""
-    service = UserService(session)
-    user = await service.decide_signup(actor, user_id, body.version, approve=False)
-    return UserOut.model_validate(user)
+) -> None:
+    """Refuse a self-registered account: it is deleted (it never was active), with
+    what signing up created; its address is free again."""
+    await UserService(session).reject_signup(actor, user_id, body.version)

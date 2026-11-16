@@ -42,6 +42,7 @@ async def stub_provider(admin: httpx.AsyncClient, url: str) -> str:
             "issuer": url.rstrip("/"),
             "client_id": CLIENT_ID,
             "client_secret": {"env": SECRET_ENV},
+            "trust_email": True,  # a generic provider signs up only when trusted
             "allow_signup": True,
             "allowed_domains": [DOMAIN],
             "enabled": True,

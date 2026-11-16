@@ -138,6 +138,13 @@ class IdentityRepository:
         await self.session.delete(identity)
         await self.session.flush()
 
+    async def user_ids_of_provider(self, provider_id: uuid.UUID) -> list[uuid.UUID]:
+        """The people linked through the provider."""
+        stmt = select(UserIdentity.user_id).where(
+            UserIdentity.org_id == self.org_id, UserIdentity.provider_id == provider_id
+        )
+        return sorted(set(await self.session.scalars(stmt)))
+
 
 async def encrypted_providers(session: AsyncSession) -> list[OidcProvider]:
     """Every provider with an `enc:` client secret, in every organisation, locked: for

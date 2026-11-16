@@ -78,7 +78,8 @@ describe('self-registered accounts awaiting approval (plan M9 task 5b)', () => {
     const { user } = await renderApp('/admin/users?filter=pending')
     await user.click(await screen.findByRole('button', { name: 'Nina Neu ablehnen' }))
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent('bleibt deaktiviert')
+    expect(dialog).toHaveTextContent('wird gelöscht')
+    expect(dialog).toHaveTextContent('Die Adresse ist danach wieder frei')
     await user.click(within(dialog).getByRole('button', { name: 'Ablehnen' }))
     expect(
       await within(dialog).findByText('Über dieses Konto wurde inzwischen schon entschieden.'),

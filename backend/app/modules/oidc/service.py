@@ -7,14 +7,18 @@
   clients only). `generic`: issuer (https, through the egress rules, 422
   `oidc.url_not_allowed`), scopes with `openid`, an optional secret.
 - Self-registration needs at least one domain (422 `oidc.domains_required`); domains
-  are kept lower case and exact (422 `oidc.domain_invalid`).
+  are kept lower case and exact (422 `oidc.domain_invalid`). At a generic provider it
+  also needs `trust_email` (422 `oidc.signup_needs_trust`): a provider not trusted for
+  addresses may not create accounts under them either (module review M9a, N4).
 - A provider is switched on only with `HERD_PUBLIC_URL` (422
   `oidc.public_url_missing`): the redirect URI is derived from it.
 - The secret arrives as a value (stored `enc:`) or an `env:HERD_OIDC_*` name; it is
   in no answer, audit entry or log line. A new issuer forgets the discovered
   endpoints and keys.
 - Every write names the version it read (409 `oidc.version_conflict`); deleting a
-  provider removes the accounts linked through it and its open flows.
+  provider removes the accounts linked through it and its open flows, and ends every
+  session of the people linked through it (as unlinking would, ASVS 5.0 V7.4.3; module
+  review M9a, N5) but the one the deleting administrator acts with.
 - `check` runs discovery and fetches the JWKS now, and reports a fixed code.
 """
 
@@ -30,6 +34,7 @@ from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import Page, PageParams, decode_id_cursor, id_page
 from app.modules.audit.recorder import record
+from app.modules.auth.repository import SessionRepository
 from app.modules.oidc import protocol
 from app.modules.oidc.flow import callback_path, public_base
 from app.modules.oidc.keys import ProviderKeys
@@ -40,7 +45,7 @@ from app.modules.oidc.providers import (
     GOOGLE_SCOPES,
     normalize_domain,
 )
-from app.modules.oidc.repository import ProviderRepository
+from app.modules.oidc.repository import IdentityRepository, ProviderRepository
 from app.modules.oidc.schemas import OidcSecretIn, ProviderCheckOut, ProviderCreate, ProviderUpdate
 
 _AUDITED = ("name", "issuer", "client_id", "scopes", "trust_email", "allow_signup", "enabled")
@@ -152,13 +157,26 @@ class ProviderService:
         )
         return provider
 
-    async def delete(self, actor: Actor, provider_id: uuid.UUID, version: int) -> None:
+    async def delete(
+        self,
+        actor: Actor,
+        provider_id: uuid.UUID,
+        version: int,
+        *,
+        current_session: uuid.UUID | None = None,
+    ) -> None:
         repo = await self._repo(actor)
         provider = _found(await repo.get(provider_id, lock=True))
         if provider.version != version:
             raise Conflict(code="oidc.version_conflict")
-        details = {"key": provider.key}
+        people = await IdentityRepository(self.session, actor.org_id).user_ids_of_provider(
+            provider.id
+        )
+        details = {"key": provider.key, "people": len(people)}
         await repo.delete(provider)
+        await SessionRepository(self.session).delete_for_users(
+            actor.org_id, people, keep=current_session
+        )
         await record(
             self.session, actor, "oidc_provider.deleted", "oidc_provider", provider_id, details
         )
@@ -210,6 +228,8 @@ def _domains(raw: list[str]) -> list[str]:
 def _consistent(provider: OidcProvider) -> None:
     if provider.allow_signup and not provider.allowed_domains:
         raise ValidationFailed(code="oidc.domains_required")
+    if provider.allow_signup and provider.kind == ProviderKind.GENERIC and not provider.trust_email:
+        raise ValidationFailed(code="oidc.signup_needs_trust")
     if provider.enabled:
         public_base(get_settings())
 

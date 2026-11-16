@@ -102,12 +102,13 @@
       "secretEnv": "Name der Umgebungsvariable",
       "scopes": "Scopes",
       "trustEmail": "E-Mail-Adressen dieses Anbieters vertrauen",
-      "trustEmailHint": "Nur einschalten, wenn der Anbieter für jede bestätigte Adresse maßgeblich ist; dann verknüpft die erste Anmeldung ein bestehendes Konto mit derselben Adresse.",
+      "trustEmailHint": "Nur einschalten, wenn der Anbieter für jede bestätigte Adresse maßgeblich ist (etwa das eigene Firmenverzeichnis, in dem niemand seine Adresse selbst ändern kann); dann verknüpft die erste Anmeldung ein bestehendes Konto mit derselben Adresse. Selbstregistrierung braucht diese Einstellung.",
       "allowSignup": "Selbstregistrierung erlauben",
-      "allowSignupHint": "Neue Personen aus den erlaubten Domains können sich registrieren. Ihr Konto wartet auf Freigabe unter Personen → Wartet auf Freigabe; erst danach können sie sich anmelden, als Mitglied ohne KI.",
+      "allowSignupHint": "Neue Personen aus den erlaubten Domains können sich registrieren. Ihr Konto wartet auf Freigabe unter Personen → Wartet auf Freigabe; erst danach können sie sich anmelden, als Mitglied ohne KI. Bei einem allgemeinen Anbieter nur zusammen mit „E-Mail-Adressen dieses Anbieters vertrauen“.",
       "domains": "Erlaubte Domains",
       "domainsHint": "Eine Domain je Zeile, genau so (keine Subdomains).",
       "domainsRequired": "Mit Selbstregistrierung ist mindestens eine Domain nötig.",
+      "signupNeedsTrust": "Selbstregistrierung geht nur, wenn du den E-Mail-Adressen dieses Anbieters vertraust.",
       "enabled": "Eingeschaltet (Knopf auf der Anmeldeseite)",
       "submitCreate": "Anbieter anlegen",
       "issuerPlaceholder": "https://login.example.com/realms/firma",
@@ -146,6 +147,7 @@
       "url_not_allowed": "Diese Adresse ist nicht erlaubt (nur https, keine privaten Adressen ohne Freigabe).",
       "scopes_invalid": "Die Scopes müssen openid enthalten.",
       "domains_required": "Mit Selbstregistrierung ist mindestens eine Domain nötig.",
+      "signup_needs_trust": "Selbstregistrierung über einen allgemeinen Anbieter geht nur, wenn du seinen E-Mail-Adressen vertraust.",
       "domain_invalid": "Eine Domain ist ungültig (keine Platzhalter, kein Punkt am Ende).",
       "public_url_missing": "HERD_PUBLIC_URL ist nicht gesetzt; ohne sie lässt sich kein Anbieter einschalten.",
       "key_taken": "Diesen Schlüssel gibt es schon.",
@@ -187,7 +189,7 @@
         "action": "Ablehnen",
         "openNamed": "{{name}} ablehnen",
         "title": "Konto ablehnen?",
-        "text": "Das Konto von {{name}} bleibt deaktiviert; eine Anmeldung ist nicht möglich. Du kannst es später wie jede deaktivierte Person reaktivieren."
+        "text": "Das Konto von {{name}} wird gelöscht, mit allem, was die Registrierung angelegt hat. Die Adresse ist danach wieder frei: Die Person kann sich erneut registrieren oder du legst sie selbst an."
       }
     }
   },

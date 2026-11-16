@@ -11,7 +11,9 @@ flow looks up the person by subject and by email, this decides.
    `oidc.link_refused` (sign in with the password, then link in the profile). An
    account awaiting approval or deactivated is refused as in 1, and not linked.
 4. Without an account: self-registration if the provider allows it and lists
-   domains (`oidc.signup_closed` otherwise), for an address whose domain is listed
+   domains, and a generic provider is trusted for addresses (`trust_email`, as for
+   linking: module review M9a, N4); `oidc.signup_closed` otherwise. For an address
+   whose domain is listed
    exactly (no subdomains, no trailing dot); at Google a domain other than
    `gmail.com` also needs `hd` equal to it (`oidc.domain_not_allowed`). The new
    account waits for an admin's approval (Jan's answer J2: nobody gets in without
@@ -110,6 +112,8 @@ def decide(
         return _usable(by_email) or Link(by_email.id)
     if not rules.allow_signup or not rules.allowed_domains:
         return Refuse("oidc.signup_closed")
+    if rules.kind == ProviderKind.GENERIC and not rules.trust_email:
+        return Refuse("oidc.signup_closed")  # it does not vouch for the address
     domain = domain_of(email)
     if domain not in rules.allowed_domains:
         return Refuse("oidc.domain_not_allowed")

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import delete, select, update
@@ -59,8 +60,16 @@ class SessionRepository:
         self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None
     ) -> None:
         """All of the person's sessions, except `keep` if given."""
+        await self.delete_for_users(org_id, [user_id], keep=keep)
+
+    async def delete_for_users(
+        self, org_id: uuid.UUID, user_ids: Sequence[uuid.UUID], *, keep: uuid.UUID | None = None
+    ) -> None:
+        """All of these people's sessions, except `keep` if given."""
+        if not user_ids:
+            return
         stmt = delete(UserSession).where(
-            UserSession.org_id == org_id, UserSession.user_id == user_id
+            UserSession.org_id == org_id, UserSession.user_id.in_(user_ids)
         )
         if keep is not None:
             stmt = stmt.where(UserSession.id != keep)

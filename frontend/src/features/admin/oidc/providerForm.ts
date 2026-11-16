@@ -136,7 +136,8 @@ export function fieldOf(path: string): string {
 }
 
 /** What the body's schema cannot say: required fields of the kind, a secret typed as
- *  chosen, and domains whenever self-registration is on. */
+ *  chosen, domains whenever self-registration is on, and (at a generic provider)
+ *  trusted addresses for it. */
 export function missing(values: ProviderValues, creating: boolean): Record<string, string> {
   const out: Record<string, string> = {}
   const required = i18n.t('validation.required')
@@ -150,6 +151,9 @@ export function missing(values: ProviderValues, creating: boolean): Record<strin
   if (values.secretMode === 'env' && values.secretEnv.trim() === '') out.secretEnv = required
   if (values.allow_signup && domainsOf(values.domains).length === 0) {
     out.domains = i18n.t('oidcAdmin.form.domainsRequired')
+  }
+  if (values.kind === 'generic' && values.allow_signup && !values.trust_email) {
+    out.allow_signup = i18n.t('oidcAdmin.form.signupNeedsTrust')
   }
   return out
 }

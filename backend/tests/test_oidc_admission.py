@@ -27,7 +27,11 @@ GOOGLE = ProviderRules(
 )
 GENERIC = replace(GOOGLE, kind=ProviderKind.GENERIC)
 GOOGLE_SIGNUP = replace(GOOGLE, allow_signup=True, allowed_domains=frozenset({"example.com"}))
-GENERIC_SIGNUP = replace(GENERIC, allow_signup=True, allowed_domains=frozenset({"example.com"}))
+# A generic provider signs people up only when trusted for addresses (module review
+# M9a, N4: an untrusted one would take any verified address of a listed domain).
+GENERIC_SIGNUP = replace(
+    GENERIC, trust_email=True, allow_signup=True, allowed_domains=frozenset({"example.com"})
+)
 
 
 def claims(
@@ -201,6 +205,14 @@ MATRIX = [
         None,
         None,
         Signup("anna@example.com", "Anna"),
+    ),
+    (
+        "generic signup without trusting its addresses",
+        replace(GENERIC_SIGNUP, trust_email=False),
+        claims(),
+        None,
+        None,
+        Refuse("oidc.signup_closed"),
     ),
     (
         "generic signup other domain",

@@ -11,6 +11,7 @@ from app.modules.audit.models import AuditLog
 from app.modules.oidc.models import OidcProvider
 from app.modules.users.models import User
 from tests.conftest import MakeClient
+from tests.factories import login
 from tests.factories_oidc import PROVIDERS, error_of, make_provider, sign_in
 from tests.support.oidc_stub import OidcStub
 
@@ -260,7 +261,7 @@ async def test_others_identities_need_user_manage_and_unlink_is_audited(
 
 
 async def test_deleting_a_provider_removes_its_links(
-    owner: AsyncClient, member_client: AsyncClient, oidc_stub: OidcStub
+    owner: AsyncClient, member_client: AsyncClient, member: User, oidc_stub: OidcStub
 ) -> None:
     created = await make_provider(owner, oidc_stub)
     started = await member_client.post("/api/auth/me/identities/stub/link")
@@ -270,6 +271,7 @@ async def test_deleting_a_provider_removes_its_links(
     assert len((await member_client.get("/api/auth/me/identities")).json()["items"]) == 1
     gone = await owner.delete(f"{PROVIDERS}/{created['id']}", params={"version": 1})
     assert gone.status_code == 204
+    await login(member_client, member.email)  # her sessions ended with it (N5)
     assert (await member_client.get("/api/auth/me/identities")).json()["items"] == []
 
 

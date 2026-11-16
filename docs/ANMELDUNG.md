@@ -107,14 +107,20 @@ diesen Issuer nennen), Client-ID, optional Client-Secret (ohne: öffentlicher Cl
 nur PKCE), Scopes (mit `openid`). Der Client meldet sich am Token-Endpunkt mit HTTP
 Basic an. **E-Mail vertrauen** (`trust_email`, Standard aus): nur einschalten, wenn
 der Anbieter für jede bestätigte Adresse, die er meldet, maßgeblich ist (eigenes
-Firmenverzeichnis); dann verknüpft die erste Anmeldung ein bestehendes Konto mit
-derselben Adresse.
+Firmenverzeichnis, in dem niemand seine Adresse selbst ändern kann); dann verknüpft die
+erste Anmeldung ein bestehendes Konto mit derselben Adresse. **Selbstregistrierung**
+über einen allgemeinen Anbieter geht nur zusammen mit „E-Mail vertrauen“ (sonst 422
+`oidc.signup_needs_trust`): Ein Anbieter, der für die Adressen nicht bürgt, darf
+auch keine neuen Konten unter ihnen anlegen. Sonst bekäme, wer dort `email_verified`
+für `chefin@firma.example` erreicht (ein Verzeichnis, in dem Personen ihr Profil selbst
+pflegen, ein Verzeichnis mit mehreren Mandanten), ein wartendes Konto unter dieser
+Adresse, das ein Admin für das der Chefin halten könnte.
 
 ## Wie eine Anmeldung entschieden wird
 
 1. Ist das Konto beim Anbieter (`sub`) schon verknüpft, meldet es seine Person an
-   (wartet noch auf Freigabe: `oidc.account_pending`; deaktiviert oder abgelehnt:
-   `oidc.account_inactive`).
+   (wartet noch auf Freigabe: `oidc.account_pending`; deaktiviert:
+   `oidc.account_inactive`; ein abgelehntes Konto gibt es nicht mehr).
 2. Sonst muss die E-Mail vorhanden und bestätigt sein (`email_verified`), sonst
    `oidc.email_unverified`.
 3. Gibt es ein aktives Konto mit dieser E-Mail, wird es nur verknüpft, wenn der
@@ -123,7 +129,8 @@ derselben Adresse.
    Profil unter **Verknüpfte Konten** verknüpfen. Ein Konto, das auf Freigabe wartet
    oder deaktiviert ist, wird nicht verknüpft (Codes wie in 1).
 4. Ohne Konto: Selbstregistrierung, wenn der Anbieter sie erlaubt **und** Domains
-   nennt (`oidc.signup_closed` sonst). Die Domain der bestätigten E-Mail muss genau
+   nennt und, bei einem allgemeinen Anbieter, „E-Mail vertrauen“ an ist
+   (`oidc.signup_closed` sonst). Die Domain der bestätigten E-Mail muss genau
    gelistet sein (klein geschrieben, ohne Subdomains, ohne Punkt am Ende); bei Google
    muss außerdem `hd` gleich dieser Domain sein (für `gmail.com` nur, wenn
    ausdrücklich gelistet). Sonst `oidc.domain_not_allowed`.
@@ -152,11 +159,18 @@ Erwähnungen oder Auswahllisten. Audit: `user.self_registered` (durch die neue P
     Konto wird aktiv, als `member`, weiterhin ohne KI; die Person meldet sich wieder
     über den Anbieter an. Offene Bereiche sieht sie ohne Mitgliedschaft. Audit
     `user.signup_approved`.
-  - **Ablehnen** (`POST /api/admin/users/{id}/reject`, gleicher Body): das Konto bleibt
-    deaktiviert (`oidc.account_inactive` bei der nächsten Anmeldung). Später lässt es
-    sich wie jede deaktivierte Person reaktivieren. Audit `user.signup_rejected`.
+  - **Ablehnen** (`POST /api/admin/users/{id}/reject`, gleicher Body, Antwort 204):
+    das Konto wird **gelöscht**, denn es war nie aktiv, mit allem, was die
+    Registrierung angelegt hat (Verknüpfung beim Anbieter, persönlicher Bereich,
+    eigene KI-Zuordnung, die Benachrichtigungen der Admins) und den Mitgliedschaften,
+    die ein Admin ihm in der Wartezeit gab. Die Adresse ist danach wieder frei: Ein
+    Admin kann die Person anlegen, oder sie registriert sich erneut (dann wartet sie
+    wieder). Audit `user.signup_rejected` nur mit der ID des Kontos, nie Adresse oder
+    Name. Wer schon einmal aktiv war, wird nie gelöscht, nur deaktiviert.
   - Beides nennt die gelesene Version; hat jemand anderes inzwischen entschieden oder
     geändert, antwortet die API 409 (`users.version_conflict`, `users.not_pending`).
+  - Hat ein Owner ein wartendes Konto inzwischen zum Owner gemacht, entscheidet nur ein
+    Owner darüber (403 `users.owner_only`), wie beim Reaktivieren.
   - Ein wartendes Konto wird freigegeben, nicht reaktiviert
     (`…/reactivate` antwortet 409 `users.awaiting_approval`), damit jeder Weg hinein
     einen Freigabe-Eintrag im Protokoll hat.
@@ -182,7 +196,12 @@ Erwähnungen oder Auswahllisten. Audit: `user.self_registered` (durch die neue P
 - Audit: `user.identity_linked` (Anbieter, `via` `email` oder `profile`),
   `user.identity_unlinked`; Anbieter: `oidc_provider.created|updated|deleted`. Nie
   das Subjekt, die E-Mail oder ein Secret.
-- Einen Anbieter zu löschen löst alle seine Verknüpfungen.
+- Einen Anbieter zu löschen löst alle seine Verknüpfungen und beendet, wie das Lösen,
+  jede Sitzung der Personen, die mit ihm verknüpft waren (etwa wenn der Anbieter als
+  kompromittiert gilt); nur die Sitzung des löschenden Admins bleibt. Audit
+  `oidc_provider.deleted` mit Schlüssel und Zahl der Personen. Ausschalten beendet
+  keine Sitzung: Wer angemeldet ist, bleibt es, bis die Sitzung abläuft; neue
+  Anmeldungen über den Anbieter gehen nicht mehr.
 
 ## Sicherheit des Ablaufs
 
@@ -209,11 +228,11 @@ Auf der Anmeldeseite (`/login?error=<code>`) bzw. im Profil (`/profile?link_erro
 | Code | Bedeutung |
 |---|---|
 | `oidc.link_refused` | Es gibt ein Konto mit dieser E-Mail, der Anbieter ist für sie nicht maßgeblich. Mit Passwort anmelden, im Profil verknüpfen. |
-| `oidc.signup_closed` | Kein Konto, Selbstregistrierung aus. |
+| `oidc.signup_closed` | Kein Konto, Selbstregistrierung aus (oder ein allgemeiner Anbieter ohne „E-Mail vertrauen“). |
 | `oidc.domain_not_allowed` | Die Domain ist nicht freigegeben (bei Google: oder `hd` passt nicht). |
 | `oidc.email_unverified` | Der Anbieter meldet keine bestätigte E-Mail. |
 | `oidc.account_pending` | Das Konto (selbst registriert) wartet auf Freigabe durch einen Admin. |
-| `oidc.account_inactive` | Das Konto ist deaktiviert oder die Registrierung wurde abgelehnt. |
+| `oidc.account_inactive` | Das Konto ist deaktiviert. |
 | `oidc.identity_taken` | Das Konto beim Anbieter gehört schon einer anderen Person. |
 | `oidc.flow_invalid` | Abgelaufen, schon benutzt, aus einem anderen Browser oder für einen anderen Anbieter. |
 | `oidc.denied` | Beim Anbieter abgebrochen. |

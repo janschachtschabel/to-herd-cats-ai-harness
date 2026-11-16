@@ -1,8 +1,10 @@
 """People administration: create, change, deactivate, reactivate, list, and the
 decision on a self-registered account awaiting approval (plan M9 task 5b: approve lets
-the person in as the member they registered as, reject leaves a deactivated account;
-either needs the version read, 409 otherwise). A waiting account is approved, never
-reactivated (`users.awaiting_approval`), so every way in leaves its audit entry.
+the person in as the member they registered as; reject deletes the account, which was
+never active, with what signing up created, so its address is free again (module
+review M9a, N4); either needs the version read, 409 otherwise, and an owner for a
+waiting account made owner). A waiting account is approved, never reactivated
+(`users.awaiting_approval`), so every way in leaves its audit entry.
 
 Every change is audited in the transaction that makes it. Writes for one organisation
 are serialised (`lock_admin_writes`), so the version check, the email check and the
@@ -29,6 +31,7 @@ from app.modules.auth.repository import SessionRepository
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
 from app.modules.users.models import User
+from app.modules.users.removal_repository import AccountRemoval
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import UserCreate, UserUpdate
 
@@ -150,24 +153,33 @@ class UserService:
             await self.session.flush()
             await self._audit(actor, "user.reactivated", user)
 
-    async def decide_signup(
-        self, actor: Actor, user_id: uuid.UUID, version: int, *, approve: bool
-    ) -> User:
-        """Approve (active from now on) or reject (stays deactivated; reactivating it
-        later is the same as for anyone deactivated) a self-registered account. The
-        role stays what signing up gave (member)."""
-        await require(self.session, actor, Action.USER_MANAGE)
-        user = await self._current(actor, user_id)
+    async def approve_signup(self, actor: Actor, user_id: uuid.UUID, version: int) -> User:
+        """A self-registered account is active from now on, as the role it has
+        (signing up gave member)."""
+        user = await self._waiting(actor, user_id, version)
+        user.awaiting_approval_since = None
+        user.is_active = True
+        user.version += 1
+        await self.session.flush()
+        await self._audit(actor, "user.signup_approved", user)
+        return user
+
+    async def reject_signup(self, actor: Actor, user_id: uuid.UUID, version: int) -> None:
+        """A self-registered account is deleted: it never was active. The audit entry
+        `user.signup_rejected` keeps its id only."""
+        user = await self._waiting(actor, user_id, version)
+        await self._audit(actor, "user.signup_rejected", user)
+        await AccountRemoval(self.session).delete_never_active(actor.org_id, user.id)
+        self.session.expunge(user)
+
+    async def _waiting(self, actor: Actor, user_id: uuid.UUID, version: int) -> User:
+        """The account awaiting approval, at the version read; an owner's to decide
+        when it was made owner meanwhile."""
+        user = await self._activity_target(actor, user_id)
         if user.version != version:
             raise Conflict(code="users.version_conflict")
         if user.awaiting_approval_since is None:
             raise Conflict(code="users.not_pending")
-        user.awaiting_approval_since = None
-        user.is_active = approve
-        user.version += 1
-        await self.session.flush()
-        action = "user.signup_approved" if approve else "user.signup_rejected"
-        await self._audit(actor, action, user)
         return user
 
     async def list(self, actor: Actor, params: PageParams, *, pending: bool = False) -> Page[User]:

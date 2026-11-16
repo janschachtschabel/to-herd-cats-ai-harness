@@ -16477,6 +16477,7 @@
     },
     "/api/admin/oidc-providers/{provider_id}": {
       "delete": {
+        "description": "Also ends the sessions of the people linked through it, but the caller's own.",
         "operationId": "delete_provider_api_admin_oidc_providers__provider_id__delete",
         "parameters": [
           {
@@ -17088,7 +17089,7 @@
     },
     "/api/admin/users/{user_id}/reject": {
       "post": {
-        "description": "Refuse a self-registered account: it stays deactivated.",
+        "description": "Refuse a self-registered account: it is deleted (it never was active), with\nwhat signing up created; its address is free again.",
         "operationId": "reject_signup_api_admin_users__user_id__reject_post",
         "parameters": [
           {
@@ -17113,14 +17114,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserOut"
-                }
-              }
-            },
+          "204": {
             "description": "Successful Response"
           },
           "422": {
