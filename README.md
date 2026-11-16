@@ -5,9 +5,9 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
-**Stand: Meilenstein 8 (Öffnung: MCP) ist gebaut, dazu M7, M6 und aus M5 die
-KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5 Tasks 8 bis 11) fehlen
-noch.** Aus M1:
+**Stand: M9a (Produktion, erster Teil) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
+M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5
+Tasks 8 bis 11) und M9b fehlen noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -130,18 +130,43 @@ Aus M8 die Öffnung über MCP:
   fragenden Person; **Konnektoren** (Token oder OAuth, geteilt oder persönlich) und ein
   **Katalog** mit GitHub und GitLab, erweiterbar ohne Codeänderung.
 
+Aus M9a der Betrieb in Produktion:
+
+- **Sicherung** des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) als
+  geprüftes Archiv, über die Kommandozeile (`python -m app.ops backup …`) und nach
+  Zeitplan (Compose-Dienst `backup`, CronJob im Chart) mit Aufbewahrung
+  (Großvater-Vater-Sohn), verschlüsselter Offsite-Kopie mit restic und Alarmen;
+  **Wiederherstellung** in eine leere Installation (`python -m app.ops restore …`), als
+  Probe durchgespielt.
+- **Anmeldung über OpenID Connect**: Google als Vorlage (nur Client-ID und Secret
+  eintragen), jeder andere Anbieter mit Discovery (Keycloak, Entra ID …); Konten
+  verknüpfen im Profil. **Selbstregistrierung** für erlaubte Domains: das neue Konto
+  wartet, bis ein Admin es freigibt („ohne Freigabe kommt niemand ins System“), und hat
+  keine KI, bis ein Admin sie zuordnet.
+- **Härtung**: Der Collab-Prozess bekommt kurzlebige, an eine Seite gebundene
+  Berechtigungen statt des Sitzungs-Cookies; häufige und geleakte Passwörter werden
+  abgelehnt; Cookies unter https mit `__Host-`; Admins melden eine Person überall ab;
+  jede Tabelle hat eine Aufbewahrungsregel. Geprüft gegen OWASP ASVS 5.0 Stufe 2
+  ([`docs/SICHERHEIT.md`](docs/SICHERHEIT.md)).
+- **Chart** mit Autoskalierung (HPA) für API und Worker, PodDisruptionBudgets,
+  Sicherungs-CronJob und gemessenen Requests; **Lasttest** mit 200 Personen
+  ([Steckbrief](docs/STECKBRIEF.md#gemessen-lasttest-mit-200-personen-m9)).
+
 Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
 [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
 [`docs/TICKETS.md`](docs/TICKETS.md), der KI-Anbindung (Verbindungen, Schlüssel,
 Zuordnung, Verbrauch, Richtlinie): [`docs/KI.md`](docs/KI.md), der Agenten (Bedienung,
 Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN.md), von
 MCP (Token, `/mcp` mit Claude Code und Codex, externe Agenten, Server, Konnektoren,
-Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md).
+Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md), von Sicherung und Wiederherstellung:
+[`docs/SICHERUNG.md`](docs/SICHERUNG.md), der Anmeldung (Passwort, OIDC, Freigabe):
+[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md), die Sicherheitsprüfung:
+[`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
 Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
 [Demo M3](docs/demo/m3.md), [Demo M4](docs/demo/m4.md), [Demo M6](docs/demo/m6.md),
-[Demo M7](docs/demo/m7.md),
+[Demo M7](docs/demo/m7.md), [Demo M8](docs/demo/m8.md), [Demo M9](docs/demo/m9.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
 
@@ -349,7 +374,13 @@ Mit einem Modell legt dasselbe Skript auch Agenten bei der Arbeit an (Hilda und 
 Gedächtnisseite und eine wartende Freigabe): `HERD_DEMO_AI_KIND` schaltet das ein
 (`local`, `openai` oder `openai_compatible`, dazu `HERD_DEMO_AI_URL`; mit dem Stub
 außerdem `HERD_DEMO_AI_STUB`, damit die Demo seine Antworten vorgibt). Einzelheiten in
-`backend/scripts/demo_ai.py` (das Modell: `demo_ai_model.py`).
+`backend/scripts/demo_ai.py` (das Modell: `demo_ai_model.py`). Mit `--mcp-stub <URL>`
+kommt ein MCP-Server auf dem MCP-Stub dazu, mit `--oidc-stub <Issuer>` ein
+Anmeldeanbieter „Demo-Anmeldung“ auf dem OIDC-Stub (`backend/tests/support/oidc_stub.py`;
+Selbstregistrierung für `demo.example`, Konten warten auf Freigabe). Dafür braucht die
+App `HERD_PUBLIC_URL`, den Host des Stubs in `HERD_OIDC_ALLOWED_HOSTS`, das Secret des
+Stubs als `HERD_OIDC_STUB_SECRET` und sein Zertifikat in `SSL_CERT_FILE`
+([Demo M9](docs/demo/m9.md)). Ohne diese Schalter erreicht die Demo kein fremdes Netz.
 
 ### KI ausprobieren
 
@@ -411,8 +442,9 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M8. Wer betreibt, sollte sie
-kennen.
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M9a. Wer betreibt, sollte sie
+kennen. Was beim Update auf eine neue Version zu beachten ist, steht unter
+[Freigaben und Updates](#freigaben-und-updates).
 
 Die Prüfung gegen OWASP ASVS 5.0 Stufe 2, die Betriebsvoraussetzungen der Sicherheit
 (TLS am Ingress, eigener Hostname, Schutz der Protokolle) und die offenen Lücken stehen
@@ -797,6 +829,55 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 - **Nachrichteninhalte** und Titel oder Beschreibungen von Tickets stehen nie im Log, in
   `NOTIFY`-Nutzlasten, in Ereignissen der Outbox oder in Metrik-Labels; Live-Ereignisse
   tragen nur IDs.
+
+## Freigaben und Updates
+
+Eine Freigabe ist ein Tag `vX.Y.Z` (`.github/workflows/release.yml`); er veröffentlicht
+das Image `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y` und das Chart als OCI unter
+`ghcr.io/<owner>/charts`. Tag, Version in `backend/pyproject.toml` und `version` und
+`appVersion` des Charts müssen gleich sein (`deploy/helm/scripts/check-chart-version.sh`).
+Getaggt wird nur auf Jans Wort; die erste Freigabe ist `v1.0.0` nach dem Modul-Review
+von M9a und seiner Fix-Welle (Antwort J1).
+
+**Vor dem Taggen, von Hand:**
+
+1. `backend/alembic/RELEASED` auf die Head-Revision setzen
+   (`cd backend && uv run alembic heads`); `release.yml` tut das nicht und prüft es nicht.
+2. Versionen anheben (pyproject, `Chart.yaml` `version` und `appVersion`), alle
+   Prüfbefehle grün, dann taggen.
+
+**Migrationsregel:** Ab einer Freigabe sind Migrationen nur erweiternd, damit ein Pod
+der vorigen Version mit dem neuen Schema weiterläuft (`/ready` bleibt bereit, wenn die
+Datenbank auf einer neueren, unbekannten Revision steht). `scripts/check_migrations.py`
+lehnt in jeder Revision nach `RELEASED` Löschen, Umbenennen und Typwechsel ab
+(`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute` mit
+`DROP`/`RENAME`). Zurückbauen geht frühestens eine Freigabe später, in einer Revision mit
+`contract_of = "<Revision>"`, und nur für eine Revision, die schon zur Freigabe gehört.
+Genau ein Head.
+
+**Update einer Installation:**
+
+1. Vorher sichern: `python -m app.ops backup run` (Compose:
+   `docker compose exec backup python -m app.ops backup run`; Kubernetes: einen Job aus
+   dem CronJob erzeugen, `kubectl create job --from=cronjob/<release>-backup …`).
+2. Image bzw. Chart-Version wechseln. Compose: `docker compose pull && docker compose up
+   -d --wait` (der App-Container migriert beim Start). Helm: `helm upgrade` (der
+   Migrations-Job läuft vor den Pods bzw. als Job der Revision, siehe
+   [Betriebshinweise](#betriebshinweise)). Worker zuerst ersetzen, wenn sie getrennt
+   laufen.
+3. Zurück zur vorigen Version nur mit dem Archiv aus Schritt 1, in eine leere Datenbank
+   ([`docs/SICHERUNG.md`](docs/SICHERUNG.md#wiederherstellen-in-eine-leere-installation));
+   eine neuere Revision spielt die alte Version nicht ein (`restore.archive_newer`).
+
+**Einmal abgemeldet nach dem Update auf M9:** Über https heißen die Cookies seit M9
+`__Host-herd_session` und `__Host-herd_oidc` (ASVS V3.3.3). Das alte Cookie
+`herd_session` zählt dort nicht mehr; wer über https angemeldet war, wird nach dem
+Update einmal abgemeldet und meldet sich neu an. Über reines http (zum Ausprobieren)
+ändert sich nichts. Laufende Live-Bearbeitungen verbinden sich nach der neuen Anmeldung
+neu; ungespeicherte Änderungen der letzten Sekunden können dabei verloren gehen, also
+das Update nicht mitten in der Arbeitszeit einspielen. Ebenso neu seit M9: Ein Collab-
+Prozess der vorigen Version lehnt jede Verbindung der neuen API ab (keine
+Übergangsschicht); API und Collab-Prozess gehören zur selben Version.
 
 ## Lizenz
 
