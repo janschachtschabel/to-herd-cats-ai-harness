@@ -34,13 +34,14 @@ from app.modules.wiki.collab_schemas import (
 from app.modules.wiki.collab_service import CollabService
 
 router = APIRouter(prefix="/collab", tags=["internal"])
-# In maintenance (plan M9 decision 9) nothing is admitted, loaded or stored (503), and
-# a check tells the collab process to close every connection (4503) without saving:
-# whatever it holds belongs to the state a restore is replacing.
+# In maintenance (plan M9 decision 9) nothing is admitted, loaded or stored (503), no
+# instance announces or releases itself (a heartbeat is a write, too), and a check
+# tells the collab process to close every connection (4503) without saving: whatever
+# it holds belongs to the state a restore is replacing.
 CLOSED_IN_MAINTENANCE = [Depends(refuse_in_maintenance)]
 
 
-@router.post("/instances", status_code=204)
+@router.post("/instances", status_code=204, dependencies=CLOSED_IN_MAINTENANCE)
 async def announce(body: InstanceIn, session: SessionDep) -> Response:
     """A collab instance's heartbeat (every 5 s): it is alive, here, maybe draining."""
     await collab_instances.announce(
@@ -49,7 +50,7 @@ async def announce(body: InstanceIn, session: SessionDep) -> Response:
     return Response(status_code=204)
 
 
-@router.delete("/instances/{instance_id}", status_code=204)
+@router.delete("/instances/{instance_id}", status_code=204, dependencies=CLOSED_IN_MAINTENANCE)
 async def release(instance_id: uuid.UUID, session: SessionDep) -> Response:
     """A draining instance has saved everything: its pages are free for others."""
     await collab_instances.release(session, instance_id)

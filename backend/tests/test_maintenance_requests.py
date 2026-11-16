@@ -4,6 +4,7 @@ the probes, the metrics, `GET /api/maintenance` and the SPA with 503
 during a restore the tables are locked); the internal collab API tells the collab
 process to close its connections (4503) and stores nothing."""
 
+import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from app.core.config import get_settings
 from app.modules.maintenance.cache import INACTIVE, MaintenanceCache, maintenance_cache
 from app.modules.maintenance.models import MaintenanceReason
 from app.modules.maintenance.state import MaintenanceState
+from app.modules.wiki.collab_models import CollabInstance
 from app.web.public import create_public_app
 from tests.factories import login
 from tests.factories_collab import check, grant_of, put_live
@@ -124,3 +126,19 @@ async def test_collab_closes_and_stores_nothing_in_maintenance(
         headers={"X-Herd-Grant": grant},
     )
     _is_maintenance(load)
+
+
+async def test_collab_instances_neither_announce_nor_release_in_maintenance(
+    maintenance: MaintenanceCache, session: AsyncSession, collab: AsyncClient
+) -> None:
+    """A heartbeat writes too: during a replace it would wait on the swap's locks or
+    land in the state being replaced. The collab process tolerates the 503 and
+    announces itself again once maintenance ends (`collab/instance.mjs`)."""
+    instance = uuid.uuid4()
+    body = {"id": str(instance), "url": "ws://collab-a:1234", "draining": False}
+    maintenance.state = ON
+    _is_maintenance(await collab.post("/internal/collab/instances", json=body))
+    _is_maintenance(await collab.delete(f"/internal/collab/instances/{instance}"))
+    assert await session.get(CollabInstance, instance) is None
+    maintenance.state = INACTIVE
+    assert (await collab.post("/internal/collab/instances", json=body)).status_code == 204
