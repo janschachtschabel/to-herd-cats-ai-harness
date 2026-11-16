@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
 from app.core.config_auth import AuthSettings
+from app.core.config_files import SecretFileSettings, read_secret_file
 from app.core.config_ops import OpsSettings
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
@@ -18,7 +19,7 @@ SECRET_KEY_MIN_LENGTH = 32
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -> repo
 
 
-class Settings(OpsSettings, AuthSettings, BaseSettings):
+class Settings(SecretFileSettings, OpsSettings, AuthSettings, BaseSettings):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
     model_config = SettingsConfigDict(
         env_prefix="HERD_", env_file=".env", extra="ignore", hide_input_in_errors=True
@@ -40,6 +41,8 @@ class Settings(OpsSettings, AuthSettings, BaseSettings):
     internal_port: int = 9090
     # Guards /internal/* (header X-Herd-Internal-Token); unset, /internal/* answers 503.
     # Shared with the collab process. At least 32 characters (`openssl rand -hex 32`).
+    # It, HERD_SECRET_KEY and HERD_BOOTSTRAP_ADMIN_PASSWORD may come from a file instead
+    # (HERD_<NAME>_FILE, `config_files.py`).
     internal_token: SecretStr | None = None
     # The address browsers use (scheme://host[:port]); WebSocket Origins must match it.
     # Unset, an Origin must match the host the request came to.
@@ -194,8 +197,10 @@ class Settings(OpsSettings, AuthSettings, BaseSettings):
 
     @model_validator(mode="after")
     def _public_url_is_an_origin(self) -> Self:
-        if self.public_url == "":
-            self.public_url = None  # compose: `${HERD_PUBLIC_URL:-}`
+        # compose: `${HERD_PUBLIC_URL:-}`, and the Hostinger stack's
+        # `https://${DOMAIN:-}` without a domain (a scheme alone): not set.
+        if self.public_url in ("", "https://"):
+            self.public_url = None
         if self.public_url is not None:
             url = urlsplit(self.public_url)
             if url.scheme not in ("http", "https") or not url.netloc:
@@ -216,15 +221,7 @@ class Settings(OpsSettings, AuthSettings, BaseSettings):
         if self.database_password is not None and self.database_password_file is not None:
             raise ValueError("set HERD_DATABASE_PASSWORD or HERD_DATABASE_PASSWORD_FILE, not both")
         if self.database_password_file is not None:
-            try:
-                content = self.database_password_file.read_text(encoding="utf-8")
-            except OSError as exc:
-                raise ValueError(
-                    f"HERD_DATABASE_PASSWORD_FILE cannot be read: {exc.strerror}"
-                ) from None
-            content = content.rstrip("\r\n")  # mounted secrets often end with a newline
-            if not content:
-                raise ValueError("HERD_DATABASE_PASSWORD_FILE is empty")
+            content = read_secret_file(self.database_password_file, "HERD_DATABASE_PASSWORD_FILE")
             self._database_password = SecretStr(content)
         else:
             self._database_password = self.database_password
