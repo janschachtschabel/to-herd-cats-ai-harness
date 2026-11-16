@@ -8,8 +8,11 @@ docs/HOSTINGER.md). Every other service waits until it has ended with exit 0.
   an empty one is a broken volume (exit 1), since a new database password would lock
   the app out of its own database.
 - Checks DOMAIN: a bare host name (the Traefik labels take it unchanged, and
-  `Host(`https://…`)` only gives Traefik's 404). Anything else stops the start with a
-  clear message (exit 2) instead of a silent correction.
+  `Host(`https://…`)` only gives Traefik's 404), in lower case (a browser sends the
+  Origin lower-cased and the live editing compares it with https://DOMAIN exactly),
+  with a dot and not an IP address (Traefik's HTTP challenge gets no certificate for
+  either). Anything else stops the start with a clear message (exit 2) instead of a
+  silent correction; an umlaut domain is named in its ACE form (xn--…).
 - The one-time admin (ADMIN_EMAIL, ADMIN_PASSWORD): checked with the app's own rules
   (length, breached list, context words), so that the app never refuses it at its
   start; the password goes into `--secrets` for HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE,
@@ -78,14 +81,49 @@ async def run_init(
 
 
 def _domain(value: str) -> str:
-    if not value or (len(value) <= 253 and _HOST.fullmatch(value)):
+    if not value:
         return value
+    if not (len(value) <= 253 and _HOST.fullmatch(value)):
+        raise Refused(_not_a_host_name(value))
+    if value != value.lower():
+        raise Refused(
+            f"DOMAIN must be written in lower case: {value.lower()} instead of {value!r} "
+            "(browsers send it so, and live editing compares it exactly). / DOMAIN klein "
+            f"schreiben: {value.lower()}. Fix it in .env and deploy again."
+        )
+    if "." not in value:
+        raise Refused(
+            f"DOMAIN must be a full name with a dot like {_EXAMPLE}; got {value!r}, which "
+            "gets no certificate. / DOMAIN braucht einen vollständigen Namen mit Punkt, "
+            f"z. B. {_EXAMPLE} oder srvNNNNNN.hstgr.cloud. Fix it in .env and deploy again."
+        )
+    if value.rsplit(".", 1)[1].isdigit():
+        raise Refused(
+            f"DOMAIN must be a name, not an IP address ({value}): Traefik gets no "
+            "certificate for an IP address. Use the VPS's host name srvNNNNNN.hstgr.cloud "
+            "or your own domain. / DOMAIN muss ein Name sein, keine IP-Adresse. "
+            "Fix it in .env and deploy again."
+        )
+    return value
+
+
+def _not_a_host_name(value: str) -> str:
     shown = value if len(value) <= 80 else value[:80] + "…"
-    raise Refused(
+    message = (
         f"DOMAIN must be a bare host name like {_EXAMPLE}, without https://, path or "
         f"port; got {shown!r}. / DOMAIN muss der reine Hostname sein, z. B. {_EXAMPLE} "
         "(ohne https://, ohne Pfad, ohne Port). Fix it in .env and deploy again."
     )
+    if not value.isascii():
+        try:
+            ace = value.lower().encode("idna").decode("ascii")
+        except UnicodeError:
+            ace = "xn--…"
+        message += (
+            f" A name with umlauts goes in its ACE form (xn--…): {ace}. / Umlaute in der "
+            f"xn--Form eintragen: {ace}."
+        )
+    return message
 
 
 async def _admin(email: str, password: str) -> str:

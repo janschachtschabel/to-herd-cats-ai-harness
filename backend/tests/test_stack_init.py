@@ -102,12 +102,42 @@ async def test_a_domain_that_is_not_a_bare_host_name_stops_the_start(
 
 
 @pytest.mark.parametrize(
-    "domain", ["wiki.example.org", "srv123456.hstgr.cloud", "Wiki.Example.ORG"]
+    "domain", ["wiki.example.org", "srv123456.hstgr.cloud", "xn--mller-kva.de", "a-1.b2.io"]
 )
 async def test_a_bare_host_name_is_taken(dirs: tuple[Path, Path], domain: str) -> None:
     code, out = await _init(dirs, DOMAIN=domain)
     assert code == 0
     assert domain in out
+
+
+async def test_a_domain_with_capitals_is_refused_not_lowered(dirs: tuple[Path, Path]) -> None:
+    """A browser sends the Origin in lower case, and the live editing compares it with
+    https://DOMAIN exactly: Wiki.Example.org would route but never connect live."""
+    code, out = await _init(dirs, DOMAIN="Wiki.Example.ORG")
+    assert code == 2
+    assert "'Wiki.Example.ORG'" in out and "wiki.example.org" in out  # names the fix
+    assert "klein" in out
+
+
+@pytest.mark.parametrize("domain", ["203.0.113.5", "10.0.0.1"])
+async def test_an_ip_address_is_refused(dirs: tuple[Path, Path], domain: str) -> None:
+    """Traefik's HTTP challenge gets no certificate for an IP address."""
+    code, out = await _init(dirs, DOMAIN=domain)
+    assert code == 2
+    assert domain in out and "IP" in out and "hstgr.cloud" in out
+
+
+@pytest.mark.parametrize("domain", ["localhost", "wiki"])
+async def test_a_name_without_a_dot_is_refused(dirs: tuple[Path, Path], domain: str) -> None:
+    code, out = await _init(dirs, DOMAIN=domain)
+    assert code == 2
+    assert repr(domain) in out and "wiki.example.org" in out
+
+
+async def test_an_umlaut_domain_is_refused_with_its_ace_form(dirs: tuple[Path, Path]) -> None:
+    code, out = await _init(dirs, DOMAIN="wiki.müller.de")
+    assert code == 2
+    assert "xn--" in out and "wiki.xn--mller-kva.de" in out
 
 
 async def test_the_admin_password_is_written_for_the_app_and_emptied_once_cleared(
