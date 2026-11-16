@@ -73,6 +73,20 @@ export function useUpdateUser(userId: string) {
   })
 }
 
+/** Turns the person's TOTP off (a lost device); audited by the server. */
+export function useResetTotp() {
+  const invalidate = useInvalidateUsers()
+  return useMutation({
+    mutationFn: async (userId: string) =>
+      unwrap(
+        await api.POST('/api/admin/users/{user_id}/totp/reset', {
+          params: { path: { user_id: userId } },
+        }),
+      ),
+    onSuccess: () => invalidate(),
+  })
+}
+
 /** Ends every session of the person (they stay active). */
 export function useSignUserOut() {
   const invalidate = useInvalidateUsers()

@@ -32,6 +32,7 @@ import {
   useUsers,
 } from './queries'
 import { SignupDecisionDialog, type SignupDecision } from './SignupDecisionDialog'
+import { TotpResetDialog } from './TotpResetDialog'
 import { UsersViewTabs, type UsersFilter } from './UsersViewTabs'
 
 function StatusBadge({ user }: { user: User }) {
@@ -58,6 +59,7 @@ export function UsersPage({ filter = 'all' }: { filter?: UsersFilter }) {
   const [toggling, setToggling] = useState<User | null>(null)
   const signOut = useSignUserOut()
   const [signingOut, setSigningOut] = useState<User | null>(null)
+  const [resetting, setResetting] = useState<User | null>(null)
 
   const confirmToggle = () => {
     if (!toggling) return
@@ -113,7 +115,14 @@ export function UsersPage({ filter = 'all' }: { filter?: UsersFilter }) {
                 </TableCell>
                 <TableCell>{t(`systemRoles.${user.system_role}`)}</TableCell>
                 <TableCell>
-                  <StatusBadge user={user} />
+                  <div className="flex flex-wrap gap-1">
+                    <StatusBadge user={user} />
+                    {user.totp_enabled && (
+                      <Badge variant="outline" aria-label={t('totp.admin.badgeLabel')}>
+                        {t('totp.admin.badge')}
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {user.last_login_at
@@ -151,6 +160,16 @@ export function UsersPage({ filter = 'all' }: { filter?: UsersFilter }) {
                       </>
                     ) : (
                       <>
+                        {user.totp_enabled && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={t('totp.admin.resetNamed', { name: user.name })}
+                            onClick={() => setResetting(user)}
+                          >
+                            {t('totp.admin.reset')}
+                          </Button>
+                        )}
                         {user.is_active && (
                           <Button
                             variant="ghost"
@@ -195,6 +214,7 @@ export function UsersPage({ filter = 'all' }: { filter?: UsersFilter }) {
       <CreateUserDialog open={creating} onOpenChange={setCreating} />
       <EditUserDialog user={editing} onClose={() => setEditing(null)} />
       <SignupDecisionDialog decision={deciding} onClose={() => setDeciding(null)} />
+      <TotpResetDialog person={resetting} onClose={() => setResetting(null)} />
       <ConfirmDialog
         open={toggling !== null}
         title={toggling?.is_active ? t('users.deactivate.title') : t('users.reactivate.title')}
