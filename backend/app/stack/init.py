@@ -64,10 +64,13 @@ async def run_init(
     try:
         created = _ensure_secret(db_secret_dir / DB_PASSWORD)
         created += sum(_ensure_secret(secrets_dir / name) for name in GENERATED)
+        write_secret(secrets_dir / PASSWORD_FILE, password)
     except Refused as refused:
         say(str(refused))
         return BROKEN
-    _write(secrets_dir / PASSWORD_FILE, password)
+    except OSError as failed:
+        say(unusable(failed))
+        return BROKEN
     say(f"secrets ready ({created} created, {3 - created} kept)")
     if domain:
         say(f"DOMAIN {domain}: Traefik serves https://{domain}")
@@ -161,11 +164,20 @@ def _ensure_secret(path: Path) -> int:
                 "or remove the stack's volumes to start afresh (all data is lost)"
             )
         return 0
-    _write(path, secrets.token_hex(32))
+    write_secret(path, secrets.token_hex(32))
     return 1
 
 
-def _write(path: Path, content: str) -> None:
+def unusable(failed: OSError) -> str:
+    """One clear line for a secret file the stack cannot read or write (no traceback)."""
+    return (
+        f"{failed.filename}: {failed.strerror}. The stack's secret files must be files "
+        "of user 10001 (mode 0400); put a saved key back with `python -m app.stack "
+        "set-secret-key` (docs/HOSTINGER.md), never by hand."
+    )
+
+
+def write_secret(path: Path, content: str) -> None:
     """Write `path` (mode 0400) in one step: a crash leaves the old file or the new one."""
     temporary = path.with_name(f".{path.name}.new")
     temporary.unlink(missing_ok=True)

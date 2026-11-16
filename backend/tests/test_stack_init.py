@@ -188,6 +188,16 @@ async def test_an_empty_secret_file_is_a_broken_volume_not_regenerated(
     assert path.read_text() == ""
 
 
+async def test_a_secret_file_it_cannot_read_is_a_clear_line_not_a_traceback(
+    dirs: tuple[Path, Path],
+) -> None:
+    """E.g. a key copied in by hand as root with mode 0600: init runs as 10001."""
+    (dirs[0] / "secret_key").mkdir()  # unreadable as a file, also for root
+    code, out = await _init(dirs)
+    assert code == 1
+    assert "secret_key" in out and "10001" in out and "set-secret-key" in out
+
+
 def test_the_command_line_runs_it_with_the_environment(
     dirs: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
