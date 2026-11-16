@@ -84,12 +84,3 @@ def test_an_error_never_echoes_the_file_content(
     with pytest.raises(ValidationError) as caught:
         Settings()
     assert "secret-17x" not in str(caught.value)
-
-
-def test_a_bare_scheme_public_url_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The Hostinger stack passes `HERD_PUBLIC_URL: https://${DOMAIN:-}`; without a
-    domain that is a scheme alone, which means "not set" like an empty value."""
-    monkeypatch.setenv("HERD_PUBLIC_URL", "https://")
-    assert Settings().public_url is None
-    monkeypatch.setenv("HERD_PUBLIC_URL", "https://wiki.example")
-    assert Settings().public_url == "https://wiki.example"

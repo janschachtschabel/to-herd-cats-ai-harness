@@ -197,10 +197,8 @@ class Settings(SecretFileSettings, OpsSettings, AuthSettings, BaseSettings):
 
     @model_validator(mode="after")
     def _public_url_is_an_origin(self) -> Self:
-        # compose: `${HERD_PUBLIC_URL:-}`, and the Hostinger stack's
-        # `https://${DOMAIN:-}` without a domain (a scheme alone): not set.
-        if self.public_url in ("", "https://"):
-            self.public_url = None
+        if self.public_url == "":
+            self.public_url = None  # compose: `${HERD_PUBLIC_URL:-}`
         if self.public_url is not None:
             url = urlsplit(self.public_url)
             if url.scheme not in ("http", "https") or not url.netloc:

@@ -76,8 +76,8 @@ services:
       # empties the password file once ADMIN_PASSWORD is cleared in .env.
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE: /secrets/bootstrap_admin_password
-      # Without DOMAIN this is "https://" alone, which the app takes as not set.
-      HERD_PUBLIC_URL: https://${DOMAIN:-}
+      # Without DOMAIN nobody reaches the app; localhost keeps the setting a valid origin.
+      HERD_PUBLIC_URL: https://${DOMAIN:-localhost}
       HERD_COOKIE_SECURE: "true"
       # Hostinger's Traefik runs in the host's network: requests come from the Docker
       # network's gateway, a private address.
