@@ -7,7 +7,8 @@
 # are pinned by digest; Renovate keeps them current.
 #
 # Runs as 10001, works with a read-only root filesystem (writable: /tmp, the files
-# volume on /data and the backups volume on /backups), tini as PID 1 forwards SIGTERM
+# volume on /data, the backups volume on /backups and the Hostinger stack's secret
+# volumes on /secrets and /db-secret), tini as PID 1 forwards SIGTERM
 # to the launcher, which stops both
 # servers (and the collab child) in order.
 
@@ -106,8 +107,11 @@ COPY --from=collab /usr/local/bin/node /usr/local/bin/node
 COPY --from=collab /src/collab /app/collab
 # The files volume (attachments): owned by the app user, so that a fresh named volume
 # mounted here (docker copies the directory's owner into it) is writable.
+# The same for the Hostinger stack's secret volumes (docker-compose.yml in the repo's
+# root, `python -m app.stack init` writes them).
 RUN mkdir /data && chown 10001:10001 /data \
-    && mkdir -m 0700 /backups && chown 10001:10001 /backups
+    && mkdir -m 0700 /backups && chown 10001:10001 /backups \
+    && mkdir -m 0700 /secrets /db-secret && chown 10001:10001 /secrets /db-secret
 USER 10001:10001
 EXPOSE 8080 9090
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \
