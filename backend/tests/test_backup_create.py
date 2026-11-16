@@ -31,6 +31,7 @@ from app.ops import backup as backup_module
 from app.ops.archive import read_sidecar, verify_archive
 from app.ops.backup import create_backup
 from app.ops.snapshot import secret_figures
+from app.version import app_version
 from tests.factories import login
 from tests.real_db import MakeRealClient, RealDb
 from tests.support.clock import SettableClock
@@ -130,7 +131,7 @@ async def test_create_backup_writes_dump_files_and_manifest(
     assert outcome.state == BackupState.OK and outcome.error_code is None
     archive = outcome.archive
     assert archive is not None and archive.parent == settings.backup_dir
-    assert archive.name == "herd-20261115T023007Z-0.1.0.tar"
+    assert archive.name == f"herd-20261115T023007Z-{app_version()}.tar"
     assert stat.S_IMODE(archive.stat().st_mode) == 0o600
     assert verify_archive(archive) == []
     manifest, archive_sha256 = read_sidecar(archive)

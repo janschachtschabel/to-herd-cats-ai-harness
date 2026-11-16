@@ -5,7 +5,7 @@
 # providers' egress, backups with an offsite copy, NetworkPolicy, ServiceMonitor,
 # PrometheusRule, tracing and a digest-pinned image.
 image:
-  tag: "0.1.0"
+  tag: "1.0.0"
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 imagePullSecrets:
   - name: regcred

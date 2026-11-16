@@ -72,7 +72,7 @@ RUN python -c "import bz2, shutil, sys; shutil.copyfileobj(bz2.open(sys.argv[1])
 # --- runtime -------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE}
 ARG TARGETARCH
-ARG VERSION=0.1.0
+ARG VERSION=1.0.0
 LABEL org.opencontainers.image.title="to-herd-cats-ai" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.licenses="Apache-2.0"

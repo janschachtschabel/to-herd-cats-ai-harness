@@ -1,6 +1,6 @@
 [project]
 name = "to-herd-cats-ai"
-version = "0.1.0"
+version = "1.0.0"
 description = "to-herd-cats-ai control API"
 requires-python = ">=3.13"
 license = "Apache-2.0"

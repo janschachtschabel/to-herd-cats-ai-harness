@@ -4,7 +4,7 @@
 # offsite copy and its egress, sign-in through OIDC with its egress, the MCP catalogue,
 # existing claims, Ingress with TLS, NetworkPolicy, monitoring and tracing.
 image:
-  tag: "0.1.0"
+  tag: "1.0.0"
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 imagePullSecrets:
   - name: regcred

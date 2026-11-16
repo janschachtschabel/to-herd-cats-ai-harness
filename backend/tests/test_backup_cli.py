@@ -10,6 +10,7 @@ from pydantic import SecretStr
 
 from app.core.config import Settings, get_settings
 from app.ops.cli import run
+from app.version import app_version
 from tests.real_db import RealDb
 from tests.support.clock import SettableClock
 
@@ -42,7 +43,7 @@ async def test_create_verify_and_list(
     clock = SettableClock(AT)
     assert await run(["backup", "create"], settings, clock) == 0
     archive = Path(capsys.readouterr().out.strip().splitlines()[-1])
-    assert archive == settings.backup_dir / "herd-20261115T023007Z-0.1.0.tar"
+    assert archive == settings.backup_dir / f"herd-20261115T023007Z-{app_version()}.tar"
 
     assert await run(["backup", "verify", str(archive)], settings, clock) == 0
     assert capsys.readouterr().out.strip() == "ok"
@@ -96,4 +97,5 @@ async def test_backup_run_from_the_command_line(
 ) -> None:
     assert await run(["backup", "run"], settings, SettableClock(AT)) == 0
     last = capsys.readouterr().out.strip().splitlines()[-1]
-    assert last == f"{settings.backup_dir / 'herd-20261115T023007Z-0.1.0.tar'} offsite=off"
+    name = f"herd-20261115T023007Z-{app_version()}.tar"
+    assert last == f"{settings.backup_dir / name} offsite=off"

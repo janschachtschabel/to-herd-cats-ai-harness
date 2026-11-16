@@ -20,6 +20,7 @@ from app.ops.archive import sidecar_of
 from app.ops.cli_run import run_backup
 from app.ops.offsite import restic_env
 from app.ops.schedule import next_due, run_schedule
+from app.version import app_version
 from tests.real_db import RealDb
 from tests.support.clock import SettableClock
 from tests.support.fake_restic import calls, install_fake_restic
@@ -126,7 +127,8 @@ async def test_a_run_keeps_what_the_rule_keeps_and_a_failed_run_deletes_nothing(
         assert (await run_backup(plain, clock, trigger=BackupTrigger.SCHEDULE)).state == "ok"
         clock.advance(timedelta(days=1))
     names = sorted(p.name for p in plain.backup_dir.glob("*.tar"))
-    assert names == ["herd-20261203T023000Z-0.1.0.tar", "herd-20261204T023000Z-0.1.0.tar"]
+    v = app_version()
+    assert names == [f"herd-20261203T023000Z-{v}.tar", f"herd-20261204T023000Z-{v}.tar"]
     monkeypatch.setenv("PATH", "/nonexistent")  # pg_dump missing: the next run fails
     failed = await run_backup(plain, clock, trigger=BackupTrigger.SCHEDULE)
     assert failed.state == BackupState.FAILED
