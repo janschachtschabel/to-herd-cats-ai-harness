@@ -66,6 +66,7 @@
           "ai.manage",
           "agent.manage",
           "skill.manage",
+          "backup.manage",
           "ai.use",
           "agent.create_personal",
           "mcp.use"
@@ -5983,6 +5984,50 @@
         ],
         "title": "LoginRequest",
         "type": "object"
+      },
+      "MaintenanceOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MaintenanceReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "active",
+          "reason",
+          "started_at"
+        ],
+        "title": "MaintenanceOut",
+        "type": "object"
+      },
+      "MaintenanceReason": {
+        "enum": [
+          "restore"
+        ],
+        "title": "MaintenanceReason",
+        "type": "string"
       },
       "McpCallOut": {
         "properties": {
@@ -23827,6 +23872,27 @@
         "summary": "Open Dm",
         "tags": [
           "messaging"
+        ]
+      }
+    },
+    "/api/maintenance": {
+      "get": {
+        "operationId": "maintenance_state_api_maintenance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Maintenance State",
+        "tags": [
+          "maintenance"
         ]
       }
     },

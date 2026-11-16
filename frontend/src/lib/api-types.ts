@@ -2262,6 +2262,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Maintenance State */
+        get: operations["maintenance_state_api_maintenance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/messages/{message_id}": {
         parameters: {
             query?: never;
@@ -3859,7 +3876,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "backup.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
         /**
          * ActivityAccount
          * @description The self-registered account a `signup` notification is about (plan M9 task 5b;
@@ -6137,6 +6154,19 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MaintenanceOut */
+        MaintenanceOut: {
+            /** Active */
+            active: boolean;
+            reason: components["schemas"]["MaintenanceReason"] | null;
+            /** Started At */
+            started_at: string | null;
+        };
+        /**
+         * MaintenanceReason
+         * @enum {string}
+         */
+        MaintenanceReason: "restore";
         /** McpCallOut */
         McpCallOut: {
             /**
@@ -14757,6 +14787,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    maintenance_state_api_maintenance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceOut"];
                 };
             };
         };
