@@ -13,6 +13,10 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
   const state = {
     generation,
     markdown,
+    epoch: 1, // the asking instance's binding to the page (plan M9 decision 17)
+    announcements: [], // each instance heartbeat: { id, url, draining }
+    releases: [], // the ids of instances that let go of their pages
+    sequence: [], // "announce" | "announce:draining" | "save" | "release", in order
     // grant -> [opaque login session, person, name]. The relay issues a grant per
     // connection; here connections of one person and login share theirs.
     users: {
@@ -50,6 +54,18 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
       response.writeHead(status, { "Content-Type": "application/json" });
       response.end(JSON.stringify(payload));
     };
+    if (url.pathname === "/internal/collab/instances" && request.method === "POST") {
+      state.announcements.push(json);
+      state.sequence.push(json.draining ? "announce:draining" : "announce");
+      response.writeHead(204);
+      return response.end();
+    }
+    if (url.pathname.startsWith("/internal/collab/instances/") && request.method === "DELETE") {
+      state.releases.push(url.pathname.split("/").pop());
+      state.sequence.push("release");
+      response.writeHead(204);
+      return response.end();
+    }
     if (url.pathname === "/internal/collab/auth") {
       state.authCalls++;
       if (state.authDelayMs) await new Promise((resolve) => setTimeout(resolve, state.authDelayMs));
@@ -63,6 +79,7 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
           session_ref: user[0],
           generation: state.generation,
           can_edit: true,
+          epoch: state.epoch,
         },
       ]);
     }
@@ -78,6 +95,7 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
     }
     if (request.method === "GET") {
       state.loadGrants.push(request.headers["x-herd-grant"]);
+      state.loadInstances = [...(state.loadInstances ?? []), url.searchParams.get("instance_id")];
       const pageId = url.pathname.split("/")[4];
       return reply([
         200,
@@ -86,11 +104,13 @@ export async function fakeApi({ markdown = "# Start", generation = 0 } = {}) {
           ydoc_b64: state.ydoc ?? null,
           content_md: state.pages[pageId] ?? state.markdown,
           title: "T",
+          epoch: state.epoch,
         },
       ]);
     }
     if (request.method === "PUT") {
       state.saves.push(json);
+      state.sequence.push("save");
       return reply(state.saveAnswer(json));
     }
     state.checks.push(json);

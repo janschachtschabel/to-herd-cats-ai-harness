@@ -44,7 +44,13 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     const grants = [...new Set([...connected, ...state.seen].filter(Boolean))].slice(0, 200);
     const unsaved = [...state.dirty.keys()];
     if (grants.length === 0 && unsaved.length === 0) return false;
-    const answer = await api.check(state.pageId, grants, state.generation, unsaved);
+    const answer = await api.check(state.pageId, grants, state.generation, unsaved, state.epoch);
+    // Another instance owns the page now (plan M9 decision 17): the browsers reconnect
+    // through the relay to it.
+    if (answer.status === 409) {
+      discard(document, state, CLOSE.generationEnded);
+      return true;
+    }
     if (answer.status !== 200) return false;
     if (answer.body.maintenance) {
       discard(document, state, CLOSE.maintenance);
@@ -157,6 +163,7 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
         contentMd,
         editorGrants: editors,
         sessionKey: state.sessionKey,
+        epoch: state.epoch,
       });
     } catch (error) {
       for (const grant of editors) state.dirty.set(grant, true);
@@ -168,6 +175,8 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
       state.unrepresentable = false;
       return;
     }
+    // 409: the generation ended, or another instance owns the page now (its content
+    // stays; what was typed here since the last save is lost, plan M9 decision 17).
     if (answer.status === 409) return discard(document, state, CLOSE.generationEnded);
     if (answer.status === 403) {
       for (const grant of editors) state.dirty.set(grant, true); // still unsaved

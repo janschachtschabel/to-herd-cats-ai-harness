@@ -24,8 +24,9 @@ export function openRules({ api, log, checks, size, live, memory }) {
     const answer = await api.load(context.pageId, context.grant, context.generation);
     if (answer.status === 409) throw deny(context, CLOSE.generationEnded);
     if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
-    const { generation, ydoc_b64: stored, content_md: contentMd } = answer.body;
-    const state = { pageId: context.pageId, generation, sessionKey: randomUUID() };
+    const { generation, ydoc_b64: stored, content_md: contentMd, epoch = null } = answer.body;
+    // `epoch`: this instance's binding to the page; its saves and checks name it.
+    const state = { pageId: context.pageId, generation, epoch, sessionKey: randomUUID() };
     Object.assign(state, { dirty: new Map(), seen: new Set(), discarded: false, holding: false });
     // Tables of more cells than the cap are too large for live editing: refused before
     // a check worker is asked (review M2 U2).
@@ -87,6 +88,7 @@ export function openRules({ api, log, checks, size, live, memory }) {
         contentMd,
         editorGrants: [context.grant],
         sessionKey: state.sessionKey,
+        epoch,
       });
       if (saved.status === 409) throw deny(context, CLOSE.generationEnded);
       if (saved.status !== 200) throw deny(context, DENIAL[saved.status] ?? CLOSE.forbidden);

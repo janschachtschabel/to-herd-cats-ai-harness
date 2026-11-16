@@ -56,6 +56,11 @@ import {
 
 export { CLOSE, colorFor, readGrant } from "./protocol.mjs";
 
+/** The connection was admitted under a newer binding than the document was loaded with. */
+function outbound(admitted, loaded) {
+  return Number.isInteger(admitted) && Number.isInteger(loaded) && admitted > loaded;
+}
+
 /** `person(context, {userId, sessionRef})`: false when the person or their login
  * session holds too many connections. `checks`: where the heavy checks run
  * (`checks.mjs`). */
@@ -112,7 +117,8 @@ export function liveExtension({
       if (answer.status === 409) throw deny(context, CLOSE.generationEnded);
       if (answer.status !== 200) throw deny(context, DENIAL[answer.status] ?? CLOSE.forbidden);
       if (answer.body.generation !== context.generation) throw deny(context, CLOSE.generationEnded);
-      const { user, session_ref: sessionRef } = answer.body;
+      const { user, session_ref: sessionRef, epoch = null } = answer.body;
+      context.epoch = epoch; // this instance's binding to the page, as of now
       if (!person(context, { userId: user.id, sessionRef })) throw deny(context, CLOSE.tooMany);
       return { user };
     },
@@ -135,8 +141,9 @@ export function liveExtension({
       state.seen.add(context.grant);
       if (state.unrepresentable) connection.sendStateless(state.unrepresentable);
       if (context.generation < state.generation) return closeSocket(context, CLOSE.generationEnded);
-      if (context.generation > state.generation) {
-        // A newer generation is about: the document in memory is outdated.
+      if (context.generation > state.generation || outbound(context.epoch, state.epoch)) {
+        // A newer generation is about, or the page was bound to this instance anew
+        // (another may have saved it meanwhile): the document in memory is outdated.
         const document = instance.documents.get(documentName);
         if (document) discard(document, state, CLOSE.generationEnded);
         return closeSocket(context, CLOSE.retry);

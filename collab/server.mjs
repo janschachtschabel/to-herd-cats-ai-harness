@@ -28,13 +28,19 @@
 // HERD_COLLAB_CHECK_TIMEOUT_SECONDS (10: the time limit of one check; past it the
 // worker is replaced, an open is "too large", a save is not stored),
 // HERD_COLLAB_MEMORY_BUDGET_MB (400: what the loaded documents may hold by the estimate
-// of `memory.mjs`; past it a page is refused with 4507 "busy").
+// of `memory.mjs`; past it a page is refused with 4507 "busy"),
+// HERD_COLLAB_ADVERTISE_URL (required: where the API's relay reaches this instance,
+// ws://host:port; role all sets ws://127.0.0.1:<port>, the chart the pod's IP). The
+// process announces itself under it as one of several instances and drains on SIGTERM
+// (`instance.mjs`, plan M9 decision 17).
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { Hocuspocus } from "@hocuspocus/server";
 import { WebSocketServer } from "ws";
 import { InternalApi } from "./api.mjs";
 import { CHECK_TIMEOUT_MS, createChecks, inlineChecks } from "./checks.mjs";
+import { HEARTBEAT_MS, announcer } from "./instance.mjs";
 import { liveExtension } from "./live.mjs";
 import { DEFAULT_BUDGET_MB, memoryBudget, metricsText } from "./memory.mjs";
 import { counter, logger, originAllowed, refuse } from "./admission.mjs";
@@ -68,8 +74,16 @@ export function createCollabServer({
   checkTimeoutMs = CHECK_TIMEOUT_MS,
   memoryBudgetBytes = DEFAULT_BUDGET_MB * 1024 * 1024,
   checks: givenChecks = null,
+  advertiseUrl = null,
+  instanceId = null,
+  heartbeatMs = HEARTBEAT_MS,
 }) {
-  const api = new InternalApi({ baseUrl: apiUrl, token });
+  // Without an address the process is no announced instance (tests; as 1.0.0 was).
+  const id = advertiseUrl ? (instanceId ?? randomUUID()) : null;
+  const api = new InternalApi({ baseUrl: apiUrl, token, instanceId: id });
+  const instance = id
+    ? announcer({ api, id, url: advertiseUrl, intervalMs: heartbeatMs, log })
+    : null;
   // Opening and saving a large page takes seconds of work: on worker threads, so that
   // every other live document goes on meanwhile (review M2 T9), each with a capped heap
   // (a page too heavy to check is too large for live editing). 0: on this thread.
@@ -206,16 +220,22 @@ export function createCollabServer({
     hocuspocus,
     extension,
     connections: () => sockets.size,
+    instanceId: id,
     listen(port, host) {
       return new Promise((resolve) =>
-        httpServer.listen(port, host, () => resolve(httpServer.address())),
+        httpServer.listen(port, host, () => {
+          instance?.start();
+          resolve(httpServer.address());
+        }),
       );
     },
-    /** Stop accepting, save what is unsaved, close every connection. */
+    /** Stop accepting and take no new pages, save what is unsaved, close every
+     * connection (1012: the browsers reconnect), then let go of this instance's pages. */
     close() {
       closing ??= (async () => {
         clearInterval(timer);
         httpServer.close();
+        await instance?.drain();
         hocuspocus.flushPendingStores();
         for (const ws of sockets) ws.close(1012, "restart");
         const deadline = Date.now() + 10_000;
@@ -223,6 +243,7 @@ export function createCollabServer({
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
         for (const ws of sockets) ws.terminate();
+        await instance?.release();
         await checks.close();
       })();
       return closing;
@@ -240,6 +261,10 @@ async function main(env) {
     console.error("HERD_INTERNAL_TOKEN is not set: live editing needs it");
     process.exit(2);
   }
+  if (!/^wss?:\/\/[A-Za-z0-9.\-[\]:]+$/.test(env.HERD_COLLAB_ADVERTISE_URL ?? "")) {
+    console.error("HERD_COLLAB_ADVERTISE_URL (ws://host:port of this process) is not set");
+    process.exit(2);
+  }
   const server = createCollabServer({
     apiUrl: env.HERD_COLLAB_API_URL || `http://127.0.0.1:${env.HERD_INTERNAL_PORT || 9090}`,
     token: env.HERD_INTERNAL_TOKEN,
@@ -251,11 +276,20 @@ async function main(env) {
     checkTimeoutMs: positive(env.HERD_COLLAB_CHECK_TIMEOUT_SECONDS, 10) * 1000,
     memoryBudgetBytes: positive(env.HERD_COLLAB_MEMORY_BUDGET_MB, DEFAULT_BUDGET_MB) * 1024 * 1024,
     idleTimeoutMs: positive(env.HERD_COLLAB_IDLE_MINUTES, 15) * 60_000,
+    advertiseUrl: env.HERD_COLLAB_ADVERTISE_URL,
   });
   const host =
     env.HERD_COLLAB_HOST || ((env.HERD_ROLE || "all") === "all" ? "127.0.0.1" : "0.0.0.0");
   const address = await server.listen(Number(env.HERD_COLLAB_PORT || 1234), host);
-  console.log(JSON.stringify({ message: "collab listening", port: address.port, host }));
+  const instance = server.instanceId;
+  console.log(
+    JSON.stringify({
+      message: "collab listening",
+      port: address.port,
+      host,
+      instance_id: instance,
+    }),
+  );
   for (const signal of ["SIGTERM", "SIGINT"]) {
     process.on(signal, () => server.close().then(() => process.exit(0)));
   }
