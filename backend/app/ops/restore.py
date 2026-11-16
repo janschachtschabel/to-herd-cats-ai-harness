@@ -144,15 +144,23 @@ async def _restore_files(storage: LocalStorage, archive: Path, manifest: Manifes
 
 async def _restore_database(settings: Settings, archive: Path) -> None:
     """The archive's dump straight from the tar member into pg_restore: no scratch
-    file (no /tmp, no second copy on disk)."""
-    with tarfile.open(archive, "r:") as tar:
-        handle = tar.extractfile(PREFIX + DUMP_MEMBER)
-        if handle is None:
-            raise RestoreFailed("archive.member_missing")
-        try:
+    file (no /tmp, no second copy on disk). An archive that changed after the checks
+    (a member cut off, the file gone) fails with an `archive.*` code; pg_restore
+    never commits half of a dump."""
+    try:
+        with tarfile.open(archive, "r:") as tar:
+            handle = tar.extractfile(PREFIX + DUMP_MEMBER)
+            if handle is None:
+                raise RestoreFailed("archive.member_missing")
             await restore(settings, _read(handle))
-        except ToolFailed as failed:
-            raise RestoreFailed(failed.code) from None
+    except ToolFailed as failed:
+        raise RestoreFailed(failed.code) from None
+    except KeyError:
+        raise RestoreFailed("archive.member_missing") from None
+    except (tarfile.TarError, EOFError):
+        raise RestoreFailed("archive.truncated") from None
+    except OSError:
+        raise RestoreFailed("archive.unreadable") from None
 
 
 async def _read(handle: IO[bytes]) -> AsyncIterator[bytes]:
