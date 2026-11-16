@@ -281,6 +281,22 @@ async def test_live_editing_off_without_internal_token(
     assert closed == (4503, "collab.disabled")
 
 
+async def test_live_editing_closes_in_maintenance(
+    public_url: str, setup: Setup, upstream: Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan M9 decision 9: no new live connection while a restore may run."""
+    from app.modules.maintenance.cache import maintenance_cache
+    from app.modules.maintenance.models import MaintenanceReason
+    from app.modules.maintenance.state import MaintenanceState
+
+    on = MaintenanceState(True, MaintenanceReason.RESTORE, utcnow())
+    monkeypatch.setattr(maintenance_cache(), "state", on)
+    url = _url(public_url, setup.page)
+    closed = await _closed(url, Origin="http://wiki.example", Cookie=setup.cookie)
+    assert closed == (4503, "maintenance.active")
+    assert upstream.requests == []
+
+
 async def test_collab_process_down_is_502(
     public_url: str, setup: Setup, monkeypatch: pytest.MonkeyPatch
 ) -> None:

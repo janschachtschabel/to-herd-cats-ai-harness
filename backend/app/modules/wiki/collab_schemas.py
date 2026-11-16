@@ -74,9 +74,11 @@ class CheckOut(BaseModel):
     """`revoked_grants`: connections to close (no right any more, or no grant of this
     page and generation); `ended_grants`: login sessions that ended (logout, expiry) of
     people who may still edit: their edits may be saved, then their connections close
-    (4401)."""
+    (4401). `maintenance`: the installation is in maintenance (plan M9 decision 9):
+    close every connection (4503) and drop the document unsaved."""
 
     generation_ok: bool
     generation: int
     revoked_grants: list[str]
     ended_grants: list[str]
+    maintenance: bool = False

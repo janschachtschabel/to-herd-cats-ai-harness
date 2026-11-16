@@ -24,6 +24,7 @@ from app.modules.automations.models import Automation, AutomationFiring
 from app.modules.backups.models import BackupRun
 from app.modules.connectors.models import Connector
 from app.modules.groups.models import Group, GroupMember
+from app.modules.maintenance.models import Maintenance
 from app.modules.mcp_servers.models import McpServer, McpServerTool
 from app.modules.mcp_tools.models import McpCall
 from app.modules.messaging.models import (
@@ -56,6 +57,7 @@ from app.modules.wiki.models import Attachment, Page, PageVersion
 
 __all__ = [
     "BackupRun",
+    "Maintenance",
     "StorageTombstone",
     "AccessToken",
     "McpSetting",

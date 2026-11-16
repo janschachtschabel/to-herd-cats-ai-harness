@@ -18,7 +18,8 @@ API, which runs the same checks as the REST API before a single frame passes.
    connection to it. Frames pass both ways unchanged; a close code (4409, 4403, ...)
    is passed on.
 
-Without HERD_INTERNAL_TOKEN live editing is off (4503); a collab process that cannot
+Without HERD_INTERNAL_TOKEN live editing is off (4503 `collab.disabled`), and so it is
+in maintenance (4503 `maintenance.active`, plan M9 decision 9); a collab process that cannot
 be reached is 4502. A refusal after the Origin check accepts the socket and closes it
 at once with `4000 + HTTP status` and the error code as the reason, before a frame
 passes: a browser cannot read the status of a refused handshake, but it can read a
@@ -42,6 +43,7 @@ from app.core.db import get_database
 from app.core.errors import AppError
 from app.core.metrics import COLLAB_CONNECTIONS
 from app.modules.auth.cookies import session_token
+from app.modules.maintenance.cache import in_maintenance
 from app.modules.wiki.collab_models import MAX_YDOC_BYTES
 from app.modules.wiki.collab_service import CollabService
 
@@ -104,6 +106,8 @@ async def collab_relay(websocket: WebSocket, page_id: uuid.UUID) -> None:
         return await _refuse_origin(websocket)
     if settings.internal_token is None:
         return await _deny(websocket, 503, "collab.disabled")
+    if in_maintenance():
+        return await _deny(websocket, 503, "maintenance.active")
     raw_generation = websocket.query_params.get("generation", "")
     if not raw_generation.isdigit() or len(raw_generation) > 9:
         return await _deny(websocket, 400, "collab.generation_invalid")

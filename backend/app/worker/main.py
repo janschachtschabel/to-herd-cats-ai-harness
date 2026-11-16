@@ -26,6 +26,10 @@ outbox's NOTIFY wakes it too (a new message to an agent commits with an event). 
 adds up to `HERD_RUN_CONCURRENCY` + 3 database connections. Automations that come
 due fire in the due loop (`due.py`), also outside `ready`, with up to two connections
 (firing, gauges).
+
+In maintenance (plan M9 decision 9) the loops pause: the process's maintenance cache
+(`modules/maintenance/cache.py`), which the worker runs, tells them; a paused pass
+counts as progress, so the worker stays ready.
 """
 
 import asyncio
@@ -40,6 +44,7 @@ from app.core.db import Database
 from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL
 from app.modules.backups.metrics import update_backup_metrics
+from app.modules.maintenance.cache import maintenance_cache
 from app.worker.dispatcher import Dispatcher
 from app.worker.due import DueLoop
 from app.worker.metrics import worker_metrics
@@ -103,6 +108,14 @@ class Worker:
                 loop.wake.set()
 
     async def serve(self) -> None:
+        cache = maintenance_cache()  # the loops pause while it says maintenance
+        await cache.start(self.dispatcher.database)
+        try:
+            await self._serve()
+        finally:
+            await cache.stop()
+
+    async def _serve(self) -> None:
         listener = Listener(
             self.dispatcher.database.engine.url,
             OUTBOX_CHANNEL,

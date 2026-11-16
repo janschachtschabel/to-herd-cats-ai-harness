@@ -34,9 +34,7 @@ async def test_backup_manage_is_owner_only(
         assert refused.value.message == unknown.message
 
 
-async def test_only_the_owner_is_shown_backup_manage(
-    make_user: MakeUser, make_client
-) -> None:  # type: ignore[no-untyped-def]
+async def test_only_the_owner_is_shown_backup_manage(make_user: MakeUser, make_client) -> None:  # type: ignore[no-untyped-def]
     shown = {}
     for role in (SystemRole.OWNER, SystemRole.ADMIN):
         user = await make_user(role)

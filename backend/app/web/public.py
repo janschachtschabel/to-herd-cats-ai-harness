@@ -31,6 +31,9 @@ from app.modules.automations import router as automations_router
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
+from app.modules.maintenance.cache import maintenance_cache
+from app.modules.maintenance.middleware import MaintenanceMiddleware
+from app.modules.maintenance.router import router as maintenance_router
 from app.modules.mcp_catalog import router as mcp_catalog
 from app.modules.mcp_servers import router as mcp_servers
 from app.modules.messaging import router as messaging
@@ -71,6 +74,7 @@ from app.web.spa import mount_spa
 def api_router() -> APIRouter:
     """Everything under /api; unsafe methods need the CSRF header."""
     api = APIRouter(prefix="/api", dependencies=[Depends(csrf_guard)])
+    api.include_router(maintenance_router)
     api.include_router(auth_router)
     api.include_router(oidc_router)
     api.include_router(oidc_admin.providers)
@@ -161,14 +165,20 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """The live hub (`app.state.live`) listens while the app serves. Uvicorn runs
-    this; apps driven without a lifespan (ASGI tests) have a hub that is not running,
-    and `/api/stream` answers 503 there."""
+    """The live hub (`app.state.live`) listens while the app serves, and so does the
+    process's maintenance cache, which ends the live streams when maintenance begins.
+    Uvicorn runs this; apps driven without a lifespan (ASGI tests) have a hub that is
+    not running, and `/api/stream` answers 503 there."""
     hub: LiveHub = app.state.live
+    cache = maintenance_cache()
     await hub.start(get_database())
+    await cache.start(get_database())
+    cache.on_start.append(hub.close_all)
     try:
         yield
     finally:
+        cache.on_start.remove(hub.close_all)
+        await cache.stop()
         await hub.stop()
 
 
@@ -190,6 +200,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
         BodyLimitMiddleware, max_bytes=settings.max_body_bytes, routes=body_limits(settings)
     )
     app.add_middleware(UnhandledErrorMiddleware)
+    app.add_middleware(MaintenanceMiddleware)  # 503 in maintenance, from the cache alone
     # Swagger UI (outside production only) loads its scripts from a CDN: no API policy.
     docs = () if app.docs_url is None else (app.docs_url,)
     app.add_middleware(SecurityHeadersMiddleware, exempt=docs)

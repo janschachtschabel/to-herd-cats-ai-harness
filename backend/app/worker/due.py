@@ -32,6 +32,9 @@ out (`upkeep.py`: sessions, flows, grants, rate limits; and backups whose proces
 died). The periods are the
 retention catalogue's (`core/retention.py`).
 
+In maintenance (plan M9 decision 9: the process's cache, `paused`) a round does
+nothing: no term fires, no review step, no cleanup.
+
 The time comes from a `Clock` (`app.core.clock`); tests set theirs. Only the expiry
 upkeep judges at the wall time, as the modules that write those rows do. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
@@ -59,6 +62,7 @@ from app.core.storage_tombstones import remove_buried
 from app.modules.automations.firing import Fired, fire_next, set_aside
 from app.modules.automations.metrics import automation_metrics
 from app.modules.automations.upkeep_repository import UpkeepRepository
+from app.modules.maintenance.cache import in_maintenance
 from app.modules.mcp_tools.repository import delete_calls_before
 from app.modules.wiki.attachment_files import blob_in_use
 from app.modules.wiki.review_pass import Step, review_next
@@ -86,9 +90,11 @@ class DueLoop:
         *,
         clock: Clock = SYSTEM_CLOCK,
         cleanup_batch: int = CLEANUP_BATCH,
+        paused: Callable[[], bool] = in_maintenance,
     ) -> None:
         self.database = database
         self.clock = clock
+        self.paused = paused
         self.cleanup_batch = cleanup_batch
         self._last_cleanup: float | None = None
         self.metrics = automation_metrics()  # only processes with a worker export these
@@ -121,7 +127,9 @@ class DueLoop:
     async def round(self) -> bool:
         """Fire due automations, then review steps, then the cleanup if due, each
         whatever the others did; whether more may be due. The first error is raised
-        once all three had their turn."""
+        once all three had their turn. Nothing in maintenance."""
+        if self.paused():
+            return False
         errors: list[Exception] = []
         fired = await _guarded(self.pass_once(), errors, 0)
         steps = await _guarded(self.review_once(), errors, 0)

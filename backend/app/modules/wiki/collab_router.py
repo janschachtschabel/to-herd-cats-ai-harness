@@ -8,10 +8,12 @@ import binascii
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.core.errors import ValidationFailed
 from app.modules.auth.deps import SessionDep
+from app.modules.maintenance.cache import in_maintenance
+from app.modules.maintenance.middleware import refuse_in_maintenance
 from app.modules.wiki.collab_grants import MAX_GRANT_CHARS
 from app.modules.wiki.collab_schemas import (
     AuthIn,
@@ -26,9 +28,13 @@ from app.modules.wiki.collab_schemas import (
 from app.modules.wiki.collab_service import CollabService
 
 router = APIRouter(prefix="/collab", tags=["internal"])
+# In maintenance (plan M9 decision 9) nothing is admitted, loaded or stored (503), and
+# a check tells the collab process to close every connection (4503) without saving:
+# whatever it holds belongs to the state a restore is replacing.
+CLOSED_IN_MAINTENANCE = [Depends(refuse_in_maintenance)]
 
 
-@router.post("/auth", response_model=AuthOut)
+@router.post("/auth", response_model=AuthOut, dependencies=CLOSED_IN_MAINTENANCE)
 async def authenticate(body: AuthIn, session: SessionDep) -> AuthOut:
     joined = await CollabService(session).join(body.grant, body.page_id, body.generation)
     return AuthOut(
@@ -39,7 +45,7 @@ async def authenticate(body: AuthIn, session: SessionDep) -> AuthOut:
     )
 
 
-@router.get("/pages/{page_id}", response_model=LiveDocumentOut)
+@router.get("/pages/{page_id}", response_model=LiveDocumentOut, dependencies=CLOSED_IN_MAINTENANCE)
 async def load(
     page_id: uuid.UUID,
     session: SessionDep,
@@ -53,7 +59,7 @@ async def load(
     )
 
 
-@router.put("/pages/{page_id}", response_model=SaveOut)
+@router.put("/pages/{page_id}", response_model=SaveOut, dependencies=CLOSED_IN_MAINTENANCE)
 async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut:
     try:
         ydoc = base64.b64decode(body.ydoc_b64, validate=True)
@@ -72,6 +78,14 @@ async def save(page_id: uuid.UUID, body: SaveIn, session: SessionDep) -> SaveOut
 
 @router.post("/pages/{page_id}/check", response_model=CheckOut)
 async def check(page_id: uuid.UUID, body: CheckIn, session: SessionDep) -> CheckOut:
+    if in_maintenance():  # answered without the database (locked during a restore)
+        return CheckOut(
+            generation_ok=False,
+            generation=body.generation,
+            revoked_grants=[],
+            ended_grants=[],
+            maintenance=True,
+        )
     result = await CollabService(session).check(
         page_id, body.grants, body.generation, unsaved=body.unsaved_grants
     )

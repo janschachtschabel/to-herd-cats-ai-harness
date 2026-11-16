@@ -146,6 +146,7 @@ RETENTION: Mapping[str, Retention] = {
     "oauth_flow": Upkeep("expires_at", timedelta(0), EXPIRY),
     # Operations and sign-in (M9)
     "backup_run": Keep("a row per backup: the history the backup gauges read, ~1 a day"),
+    "maintenance": Keep("one row per organisation: whether it is in maintenance (M9b)"),
     "oidc_provider": Keep(_SETTING),
     "oidc_flow": Upkeep("expires_at", timedelta(0), EXPIRY),
     "user_identity": Keep("a person's link to a sign-in provider; she or an admin unlinks"),

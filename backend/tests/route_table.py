@@ -4,7 +4,7 @@ complete and the session and CSRF guards, `test_route_hiding.py` the hiding ones
 A new route that is not listed fails `test_every_api_route_is_listed`, so it cannot
 ship without a decision on who may call it. Guards:
 - `public`: no session needed (login; logout, which only ends the session it is sent
-  with and answers 204 without one).
+  with and answers 204 without one; whether the installation is in maintenance).
 - `session`: any logged-in person; anonymous → 401.
 - `admin`: an administration right; members and guests → 403
   (`test_route_guards.py` checks every one of these).
@@ -58,6 +58,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/auth/me", "session"),
     ("POST", "/api/auth/me/password", "session"),
     ("GET", "/api/auth/providers", "public"),
+    ("GET", "/api/maintenance", "public"),  # also in maintenance (plan M9 decision 9)
     ("GET", "/api/auth/oidc/{key}/start", "public"),
     ("GET", "/api/auth/oidc/{key}/callback", "public"),
     ("GET", "/api/auth/me/identities", "session"),
