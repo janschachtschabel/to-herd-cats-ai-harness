@@ -1,8 +1,8 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
 a space, page, conversation, message, ticket status, ticket or sprint without a role
 answers 404 exactly like something that does not exist; so does a page proposal, a
-skill proposal one may not decide, a skill for people without AI, and one's access
-tokens without `mcp.use`."""
+skill proposal one may not decide, a skill for people without AI, one's access
+tokens without `mcp.use`, and the backups for anyone but an owner."""
 
 from datetime import date
 
@@ -48,6 +48,7 @@ async def test_agent_and_run_routes_do_not_exist_for_people_without_the_right(
         "approval": "approval.not_found",
         "question": "question.not_found",
         "automation": "automation.not_found",
+        "backup": "backup.not_found",
     }
     for client in (member_client, guest_client):
         for method, template, guard in ROUTES:

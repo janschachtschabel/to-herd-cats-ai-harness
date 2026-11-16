@@ -43,6 +43,8 @@ ship without a decision on who may call it. Guards:
 - `token`: `mcp.use` (the organisation's MCP switch on; no guest); everyone else gets
   404 `token.not_found`, as for an unknown id (plan M8 task 1). The admins' list of
   every token and the MCP settings are `ai`.
+- `backup`: `backup.manage` (owners only); everyone else, admins included, gets 404
+  `backup.not_found`, as for an unknown archive (plan M9 task 13).
 Every unsafe method also needs the CSRF header (→ 403 `auth.csrf`).
 """
 
@@ -314,6 +316,14 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/automations/{automation_id}", "automation"),
     ("POST", "/api/automations/{automation_id}/run", "automation"),
     ("POST", "/api/automations/{automation_id}/take-over", "automation"),
+    ("GET", "/api/backups", "backup"),
+    ("POST", "/api/backups", "backup"),
+    ("GET", "/api/backups/restore", "backup"),
+    ("GET", "/api/backups/archives", "backup"),
+    ("POST", "/api/backups/archives", "backup"),
+    ("GET", "/api/backups/archives/{name}", "backup"),
+    ("POST", "/api/backups/archives/{name}/check", "backup"),
+    ("POST", "/api/backups/archives/{name}/replace", "backup"),
 ]
 
 
@@ -375,6 +385,7 @@ def concrete(
         "{key}": "google",
         "{identity_id}": str(uuid7()),
         "{provider_id}": str(uuid7()),
+        "{name}": "herd-20261116T080000Z-1.0.0.tar",
     }
     for name, value in ids.items():
         template = template.replace(name, value)
@@ -392,6 +403,7 @@ def concrete(
 # A valid body for every route that takes one, so the guard is what answers.
 BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("PATCH", "/api/spaces/{space_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/backups/archives/{name}/replace"): {"confirm": "X"},
     ("PUT", "/api/spaces/{space_id}/members"): {
         "member_type": "user",
         "member_id": str(uuid7()),
