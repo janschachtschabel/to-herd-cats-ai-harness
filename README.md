@@ -263,7 +263,10 @@ gegen `values.schema.json` und jede `@param` gegen das Schema (auch als Test
 > Claim `Pending` und die API-Pods starten nicht. Dann
 > `--set api.replicas=1 --set 'persistence.accessModes={ReadWriteOnce}'` setzen (mehr
 > Replikas mit ReadWriteOnce lehnt das Chart ab) oder mit `persistence.existingClaim`
-> einen eigenen Claim nutzen. Der Claim bleibt bei `helm uninstall` erhalten.
+> einen eigenen Claim nutzen. Der Claim bleibt bei `helm uninstall` erhalten. Oder die
+> Anhänge in einen S3-kompatiblen Speicher legen (`s3.enabled`, siehe
+> [`docs/SICHERUNG.md`](docs/SICHERUNG.md#anhänge-in-s3)); dann genügt
+> `persistence.enabled=false`.
 
 Das Chart legt außerdem an: den Collab-Prozess (`<release>-collab`, Live-Bearbeitung)
 mit genau einer Replika und `strategy: Recreate` (die Dokumente einer Live-Sitzung
@@ -762,7 +765,10 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 - **Anhänge**: Dateien liegen unter `HERD_DATA_DIR` (Standard `/data`; für die lokale
   Entwicklung auf ein beschreibbares Verzeichnis setzen), je Organisation und Inhalt
   einmal (`attachments/<org_id>/<sha256>`). Mehrere API-Replikas brauchen dasselbe
-  Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Das Image legt
+  Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Mit
+  `HERD_STORAGE=s3` liegen sie stattdessen in einem S3-kompatiblen Bucket
+  (`HERD_S3_*`; Compose `compose.s3.yml`, Helm `s3.*`; Umzug mit `python -m app.ops
+  storage copy --to s3`, siehe [`docs/SICHERUNG.md`](docs/SICHERUNG.md#anhänge-in-s3)). Das Image legt
   `/data` mit dem Besitzer 10001 an, damit ein neues benanntes Volume dort beschreibbar
   ist; das Wurzeldateisystem bleibt nur lesbar. Ein Anhang hat
   höchstens `HERD_ATTACHMENT_MAX_BYTES` (Standard 26214400, 25 MiB); nur die

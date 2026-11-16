@@ -313,6 +313,12 @@ jobs:
         env:
           SMOKE_NODES: "1"
           SMOKE_SKIP_BUILD: "1"
+      # Attachments in SeaweedFS (compose.s3.yml): none reaches /data, `storage check`,
+      # a restore into the store under another prefix and the copy back to the volume.
+      - run: bash deploy/compose/smoke.sh
+        env:
+          SMOKE_S3: "1"
+          SMOKE_SKIP_BUILD: "1"
       # The Hostinger stack (root docker-compose.yml, docs/HOSTINGER.md) with the image
       # built above: `docker compose config -q` without .env and with .env.example, a
       # first deploy with that empty .env, a refused https:// DOMAIN, then DOMAIN and the

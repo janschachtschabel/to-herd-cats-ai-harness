@@ -110,6 +110,38 @@ it). A one-off `docker compose run -v` mounts the backups as
 mount a new, empty volume of that name. The worker (`app`; `worker` in `compose.nodes.yml`) exports the backups' gauges,
 `HerdBackupTooOld` fires after `HERD_BACKUP_ALERT_AFTER_HOURS`.
 
+## Attachments in S3
+
+By default the attachments live on the volume `app-data` (`/data`). With
+`HERD_STORAGE=s3` they live in an S3-compatible store instead (AWS S3, SeaweedFS, Ceph,
+Garage, ...); `/data` then holds temporary files of uploads, imports and exports only.
+`compose.s3.yml` runs SeaweedFS (Apache-2.0) next to the app, creates the bucket
+(`HERD_S3_BUCKET`, default `herd`) and switches `app` and `backup` to it; it needs
+only `HERD_S3_ACCESS_KEY_ID` and `HERD_S3_SECRET_ACCESS_KEY` in `.env` (`openssl rand
+-hex 24` each), which SeaweedFS takes as its one identity:
+
+```bash
+docker compose -f compose.yml -f compose.s3.yml up -d --build --wait
+docker compose -f compose.yml -f compose.s3.yml exec app python -m app.ops storage check   # "ok s3"
+```
+
+For an external store set `HERD_STORAGE=s3`, `HERD_S3_ENDPOINT` (`scheme://host[:port]`,
+https outside a private network), `HERD_S3_BUCKET` (it must exist), `HERD_S3_REGION`
+and the two keys in `.env`, and optionally `HERD_S3_PREFIX` (several installations in
+one bucket). Moving an installation's files from the volume into the store, without
+stopping it first (the copy skips what is already there):
+
+```bash
+docker compose exec app python -m app.ops storage copy --to s3   # copied N, present M, ...
+# set HERD_STORAGE=s3 (and the rest) in .env, then
+docker compose up -d                                             # app and backup restart on S3
+docker compose exec app python -m app.ops storage copy --to s3   # once more: what came meanwhile
+```
+
+`storage copy --to local` moves them back. Backups take the files from the store and a
+restore writes them there (docs/SICHERUNG.md, "Anhänge in S3"); `SMOKE_S3=1 bash
+smoke.sh` runs the smoke test on `compose.s3.yml`.
+
 ## Two API nodes and a worker
 
 `compose.nodes.yml` replaces `app` with the roles one by one, as the Helm chart runs
@@ -154,7 +186,10 @@ in the container's `/tmp` (`offsite=ok`, one snapshot), and tears everything dow
 beforehand. `SMOKE_NODES=1` runs the same on `compose.nodes.yml` (project
 `to-herd-cats-ai-smoke-nodes`, ports `SMOKE_PORT`/`SMOKE_PORT_B`, default 18080/18081):
 `/ready` of both API nodes and the worker, the message posted on node A and received on
-a stream of node B.
+a stream of node B. `SMOKE_S3=1` runs it on `compose.s3.yml` (project
+`to-herd-cats-ai-smoke-s3`, role `all` only): the attachment must not reach `/data`,
+`storage check` answers `ok s3`, the restore writes the files under the prefix
+`restored` and `storage copy --to local` reads them back.
 
 ## Load measurement
 
@@ -214,6 +249,12 @@ live P95 ≤ 2 s, no 5xx).
 | `HERD_BACKUP_KEEP_MONTHLY` | no | `6` | Older months whose newest good archive stays, 0 to 1000 (`backup`) |
 | `HERD_BACKUP_ALERT_AFTER_HOURS` | no | `26` | Age (h) of the last good backup at which `HerdBackupTooOld` fires, exported by the worker (`app`, `worker`) |
 | `HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` | no | empty | restic repository and its password, in `backup.env` (`backup`); empty: no offsite copy |
+| `HERD_STORAGE` | no | `local` | Where attachments live: `local` (the volume `app-data`) or `s3` (`app`, API nodes, `worker`, `backup`; `compose.s3.yml` sets it) |
+| `HERD_S3_ENDPOINT` | with `s3` | empty | The store's address, `scheme://host[:port]` without a path; requests are path-style and pass the egress guard with this host as the one private target (`compose.s3.yml`: `http://s3:8333`) |
+| `HERD_S3_REGION` | no | `us-east-1` | The region the store signs for; most S3-compatible stores accept `us-east-1` |
+| `HERD_S3_BUCKET` | with `s3` | empty | The bucket, 3 to 63 of `a-z 0-9 . -`; it must exist (`compose.s3.yml` creates `herd`) |
+| `HERD_S3_ACCESS_KEY_ID`, `HERD_S3_SECRET_ACCESS_KEY` | with `s3` | empty | The bucket's keys; the secret key never appears in logs, errors or URLs (only its signature travels). Outside compose `HERD_S3_SECRET_ACCESS_KEY_FILE` can name a file with it instead |
+| `HERD_S3_PREFIX` | no | empty | Keys go under this prefix inside the bucket (lower-case segments separated by `/`) |
 
 The AI keys (`HERD_SECRET_KEY`, `HERD_SECRET_KEY_PREVIOUS`, `HERD_AI_EGRESS_PROXY`,
 `HERD_AI_<NAME>`) belong in `ai.env`, not in `.env`: they are passed to the containers

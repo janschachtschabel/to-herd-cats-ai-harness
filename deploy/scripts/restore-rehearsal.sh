@@ -24,6 +24,11 @@
 #
 # Prints "REHEARSAL OK" and exits 0 only if every step holds.
 #
+# With HERD_STORAGE=s3 and HERD_S3_ENDPOINT, HERD_S3_BUCKET, HERD_S3_ACCESS_KEY_ID and
+# HERD_S3_SECRET_ACCESS_KEY in the environment (an S3-compatible store, e.g. a local
+# SeaweedFS), the attachments of A and B live in that bucket, each installation under a
+# prefix of its own (rehearsal/<database>), and no attachment may reach a data directory.
+#
 #   bash deploy/scripts/restore-rehearsal.sh
 #   REHEARSAL_PORT=18480 PGHOST=localhost PGPORT=5433 PGUSER=herd PGPASSWORD=herd \
 #     bash deploy/scripts/restore-rehearsal.sh
@@ -65,6 +70,15 @@ app_vars() {
     HERD_DATABASE_PASSWORD="$PGPASSWORD" HERD_DATA_DIR="$2" HERD_SECRET_KEY="$secret_key"
     HERD_BACKUP_DIR="$work/backups" HERD_LOG_FORMAT=text HERD_LOG_LEVEL=WARNING
     HERD_ENVIRONMENT=development)
+  if [[ $s3 == 1 ]]; then vars+=(HERD_S3_PREFIX="rehearsal/$1"); fi
+}
+s3=0
+[[ ${HERD_STORAGE:-local} == s3 ]] && s3=1
+# No attachment in data directory $1 (with S3 they live in the store).
+no_local_files() {
+  if [[ $s3 == 1 && -n $(find "$1" -path '*/attachments/*' -type f 2>/dev/null) ]]; then
+    fail "an attachment reached $1 with HERD_STORAGE=s3"
+  fi
 }
 app_env() { app_vars "$1" "$2"; env "${vars[@]}" "${@:3}"; }
 
@@ -90,7 +104,7 @@ login() {  # base, cookie jar: the HTTP status of the admin's login
     --data "{\"email\": \"$admin_email\", \"password\": \"$admin_password\"}"
 }
 
-say "database A ($db_a), app A"
+say "database A ($db_a), app A, storage ${HERD_STORAGE:-local}"
 createdb "$db_a"
 createdb "$db_b"
 base_a="http://127.0.0.1:${port}"
@@ -111,6 +125,7 @@ attachment_url="$(api_a -H 'Content-Type: application/octet-stream' --data-binar
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["url"])')"
 sha_a="$(api_a "$base_a$attachment_url" | sha256sum | cut -d' ' -f1)"
 [[ $sha_a == "$(sha256sum <"$work/attachment.txt" | cut -d' ' -f1)" ]] || fail "download from A"
+no_local_files "$work/data-a"
 
 say "backup of A while it runs"
 archive="$(app_env "$db_a" "$work/data-a" "$py" -m app.ops backup create | tail -1)"
@@ -129,6 +144,7 @@ app_env "$db_b" "$work/data-b" "$py" -m app.ops restore check "$archive" \
 app_env "$db_b" "$work/data-b" "$py" -m app.ops restore apply "$archive" \
   | tail -1 | tee "$work/apply.out"
 grep -q '^restored ' "$work/apply.out" || fail "restore apply"
+no_local_files "$work/data-b"
 
 say "compare A and B"
 url() { echo "postgresql+asyncpg://${PGUSER}@${PGHOST}:${PGPORT}/$1"; }

@@ -75,7 +75,9 @@ für den Betrieb, verschlüsselter Datenträger).
 ## Kommandozeile
 
 Im Image (oder im Entwicklungs-Checkout unter `backend/` mit `uv run`), mit denselben
-`HERD_*`-Einstellungen wie die App (Datenbank, `HERD_DATA_DIR`, `HERD_SECRET_KEY`):
+`HERD_*`-Einstellungen wie die App (Datenbank, `HERD_DATA_DIR`, `HERD_SECRET_KEY`;
+mit Anhängen in S3 auch `HERD_STORAGE` und `HERD_S3_*`, siehe
+[Anhänge in S3](#anhänge-in-s3)):
 
 ```bash
 python -m app.ops backup create [--dir DIR]   # schreibt ein Archiv, gibt seinen Pfad aus
@@ -426,10 +428,73 @@ eine ReadWriteOnce-PVC der Anhänge verlangt denselben Knoten). Die App nicht an
 und den CronJob nicht aussetzen (das Einspielen hält die Sperre `herd.backup`; ein
 CronJob, der gerade dann startet, endet mit `backup.already_running`).
 
+## Anhänge in S3
+
+Statt im Verzeichnis `HERD_DATA_DIR` können die Anhänge in einem S3-kompatiblen
+Speicher liegen (AWS S3, SeaweedFS, Ceph, Garage, MinIO …): `HERD_STORAGE=s3`. Dann
+braucht Kubernetes kein Volume mit ReadWriteMany für sie; `HERD_DATA_DIR` hält nur noch
+temporäre Dateien (Uploads, Import, Export, Kopieren).
+
+| Einstellung | Bedeutung |
+| --- | --- |
+| `HERD_STORAGE` | `local` (Standard) oder `s3` |
+| `HERD_S3_ENDPOINT` | Adresse des Speichers, `scheme://host[:port]` ohne Pfad (Anfragen im Pfadstil, `/<bucket>/<key>`) |
+| `HERD_S3_REGION` | Region der Signatur, Standard `us-east-1` |
+| `HERD_S3_BUCKET` | der Bucket; er muss bestehen |
+| `HERD_S3_ACCESS_KEY_ID` | Zugangsschlüssel |
+| `HERD_S3_SECRET_ACCESS_KEY` oder `HERD_S3_SECRET_ACCESS_KEY_FILE` | geheimer Schlüssel, als Wert oder als Datei (eines von beiden) |
+| `HERD_S3_PREFIX` | optional: alle Schlüssel unter diesem Präfix (mehrere Installationen in einem Bucket) |
+
+Die App spricht S3 selbst (Signatur AWS SigV4 über httpx, kein SDK). Jede Anfrage geht
+durch die Egress-Prüfung (`core/egress.py`): erlaubt ist genau der Host des Endpunkts,
+auch wenn er privat ist; Metadaten- und Link-Local-Adressen bleiben gesperrt,
+Weiterleitungen werden nicht verfolgt, ein Proxy aus der Umgebung nicht genutzt. Der
+geheime Schlüssel steht nie in Logs, Fehlern oder URLs; Logs nennen bei einem Fehler nur
+Vorgang, Code (`s3.denied`, `s3.unreachable`, `s3.no_bucket` …) und HTTP-Status. Ist der
+Speicher nicht erreichbar, antworten Uploads und Downloads mit 503
+`storage.unavailable`. Jede Datei wird mit ihrer SHA-256 hochgeladen
+(`x-amz-content-sha256`, der Speicher prüft sie, die App ebenfalls vor dem letzten
+Teil); die Prüfsumme liegt zusätzlich als Metadatum `x-amz-meta-sha256` am Objekt.
+Gelöschte Anhänge entfernt der Worker nach der Frist von 48 Stunden wie im Verzeichnis.
+
+```bash
+python -m app.ops storage check            # "ok s3" oder "failed <code>": Probe schreiben, lesen, löschen
+python -m app.ops storage copy --to s3     # Anhänge aus HERD_DATA_DIR in den Bucket
+python -m app.ops storage copy --to local  # und zurück
+```
+
+**Umzug** einer bestehenden Installation: `storage copy --to s3` bei laufender App
+(liest `HERD_S3_*`, auch solange `HERD_STORAGE` noch `local` ist), dann `HERD_STORAGE=s3`
+setzen und neu starten, danach `storage copy --to s3` noch einmal für das, was
+inzwischen hochgeladen wurde. Das Kopieren ist wiederholbar: Schlüssel sind
+inhaltsadressiert, was am Ziel mit gleicher Größe liegt, wird übersprungen
+(`copied N, present M, gone G, B bytes`; `gone` sind Dateien, deren Löschfrist während
+des Kopierens ablief). Jede Datei wird am Ziel gegen ihre Größe und SHA-256 geprüft.
+
+**Sicherung und Wiederherstellung** lesen und schreiben über denselben Speicher: Die
+Sicherung holt die Dateien aus dem Bucket ins Archiv (Archivformat unverändert, das
+Manifest nennt `storage`), `restore check` prüft die Ziel-Ablage im Bucket auf Schlüssel
+mit anderem Inhalt, `restore apply` schreibt die Dateien dorthin (nach Größe und SHA-256
+des Archivs; weicht eine ab, `archive.member_checksum`, nicht erreichbar:
+`restore.storage_unavailable`). Ein Archiv aus einer Installation mit Verzeichnis lässt
+sich in eine mit S3 einspielen und umgekehrt. Das Archiv enthält wie bisher genau die
+Dateien, auf die der Snapshot der Datenbank zeigt; Versionierung oder Replikation des
+Buckets ersetzen keine Sicherung.
+
+**Compose**: `compose.s3.yml` startet SeaweedFS (Apache-2.0) neben der App, legt den
+Bucket an und stellt `app` und `backup` um ([`deploy/compose/README.md`](../deploy/compose/README.md#attachments-in-s3)).
+**Helm**: `s3.enabled` mit `s3.endpoint`, `s3.bucket`, `s3.region`, `s3.prefix` und
+`s3.existingSecret` (Schlüssel `access-key-id` und `secret-access-key`; der geheime
+Schlüssel wird als Datei eingehängt); die Einstellungen erreichen nur API, Worker und
+Backup-Job. Mit `s3.enabled` hängt der Backup-Job keine Anhänge-PVC ein und braucht
+keine Pod-Affinität; `persistence.enabled=false` ist dann möglich. Mit
+`networkPolicy.enabled` öffnet `s3.egress` den Weg zum Speicher für genau diese Pods.
+
 ## Wiederherstellen (in eine leere Installation)
 
 Eingespielt wird über die Kommandozeile, mit den `HERD_*`-Einstellungen der
-**Ziel**-Installation (Datenbank, `HERD_DATA_DIR`, `HERD_SECRET_KEY`):
+**Ziel**-Installation (Datenbank, `HERD_DATA_DIR`, `HERD_SECRET_KEY`; mit S3
+`HERD_STORAGE` und `HERD_S3_*`):
 
 ```bash
 python -m app.ops restore check ARCHIV                       # "ok" oder Problemcodes, dazu Warnungen
@@ -646,3 +711,10 @@ manipuliertes Archiv abgelehnt. Ohne Docker, gegen einen
 PostgreSQL-Server über `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` (Standard
 `localhost:5433`, `herd`); Ausgabe der letzten Probe in
 [`demo/m9.md`](demo/m9.md). In der CI läuft sie als Job `restore` gegen PostgreSQL 17.
+Mit `HERD_STORAGE=s3` und `HERD_S3_*` in der Umgebung (etwa ein lokales SeaweedFS,
+`weed server -s3`) liegen die Anhänge von A und B im Bucket, jede Datenbank unter einem
+eigenen Präfix (`rehearsal/<datenbank>`), und kein Anhang darf in ein Datenverzeichnis
+gelangen. Dasselbe SeaweedFS dient `tests/test_s3_compatible_store.py`
+(`HERD_TEST_S3_ENDPOINT`, `HERD_TEST_S3_ACCESS_KEY_ID`, `HERD_TEST_S3_SECRET_ACCESS_KEY`);
+sonst prüfen die Tests gegen einen Stub (`tests/support/s3_stub.py`), der Signaturen
+selbst nachrechnet.
