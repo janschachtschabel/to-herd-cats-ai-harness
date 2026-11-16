@@ -155,6 +155,25 @@ tears everything down. It uses `hey`, else `oha`, else `loadgen.py` (run with th
 backend's environment); `LOAD_TOOL`, `LOAD_CONCURRENCY`, `LOAD_DURATION` and
 `LOAD_SETTLE` override the defaults. The results go into `docs/STECKBRIEF.md`.
 
+The reference scenario of the Steckbrief (plan M9, decision 20: 200 people at once)
+runs against any installation, without Docker, with the backend's environment:
+
+```bash
+# people, teams, pages, channels and tickets through the public API (login limits raised)
+LOAD_ADMIN_PASSWORD=… LOAD_PASSWORD=… uv run --project ../../backend python loadsetup.py \
+  http://127.0.0.1:8080 admin@example.com /tmp/load-state.json
+# 200 people with an open stream each and the mix of reads and writes, for 180 s
+LOAD_PASSWORD=… uv run --project ../../backend python loadmix.py /tmp/load-state.json 180 \
+  --bases http://127.0.0.1:8080,http://127.0.0.1:8081
+# CPU, RSS and database connections per process from /proc, while it runs
+bash ../scripts/measure-processes.sh sample /tmp/m.tsv load 170 2 api-a=PID api-b=PID worker=PID
+bash ../scripts/measure-processes.sh summary /tmp/m.tsv
+```
+
+`loadmix.py` prints each endpoint's percentiles, the live delivery delay and the
+verdicts against the targets (`loadreport.py`: reads P95 ≤ 300 ms, writes ≤ 500 ms,
+live P95 ≤ 2 s, no 5xx).
+
 ## Environment
 
 | Variable | Required | Default | Meaning |

@@ -11,6 +11,8 @@ installed) and the summary of `docker stats` samples.
         stats --format); prints CPU and memory (avg, max) per phase and container.
 
 Run it with the backend's environment, which has httpx: `uv run --project backend`.
+The reference scenario of the Steckbrief (200 people, a mix of reads and writes, live
+delivery, targets) is loadsetup.py and loadmix.py, judged by loadreport.py.
 """
 
 import asyncio
