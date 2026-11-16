@@ -322,6 +322,8 @@ Geändert in M9 (Task 12) [Claude, 16.11.2026]: Der Tausch ist eine `psql`-Sitzu
 **Abnahme:** **Hier:** alles gegen den Stub. **Nur CI:** `smoke.sh` mit `compose.s3.yml` (SeaweedFS).
 **Commit:** `storage: keep attachments in S3-compatible storage`.
 
+Geändert in M9 (Task 14) [Claude, 16.11.2026]: Die S3-Anfragen gehen doch durch `core/egress.py` (mit dem Host des Endpunkts als einzigem erlaubten privaten Ziel; Metadaten-Adressen bleiben gesperrt), entgegen Entscheidung 18. Der geheime Schlüssel kommt auch als Datei (`HERD_S3_SECRET_ACCESS_KEY_FILE`; das Chart legt ihn aus `s3.existingSecret` als Datei ein). `put` nimmt Größe und SHA-256 und lehnt abweichenden Inhalt ab (`StoredContentMismatch`), dazu `stat` und `entries`; zusätzlich `storage check` und `storage copy --to local`. Mit `s3.enabled` hängt der Backup-Job keine Anhänge-PVC ein und braucht keine Pod-Affinität. Bei der Integration nach v1.0.0 (Zweig `m9b-integrate`): Der Schlüssel aus der Datei geht durch denselben Weg wie alle Geheimnisse aus Dateien (`FILE_SECRETS` in `core/config_files.py`, Task 19), ein leerer Wert neben einer Datei zählt dort als nicht gesetzt; das Einspielen in eine laufende Installation (Task 12) schreibt die Dateien in die eingestellte Ablage; der Worker hängt die Anhänge ein, damit die Fälligkeits-Schleife Dateien mit abgelaufenem Grabstein löschen kann (`compose.nodes.yml`; im Chart neben einem API-Pod bei ReadWriteOnce, bei ReadWriteOncePod nicht, mit S3 nie); der Hostinger-Stack bietet S3 nicht an.
+
 ### Task 15: Collab Stufe 2 — Seitenbindung (M9b)
 
 **Ziel:** Entscheidung 17.
