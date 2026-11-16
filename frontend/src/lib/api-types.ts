@@ -466,6 +466,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users/{user_id}/totp/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Totp
+         * @description Turns the person's TOTP off (a lost device); they sign in with the password
+         *     alone until they set it up again. Idempotent.
+         */
+        post: operations["reset_totp_api_admin_users__user_id__totp_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -1713,8 +1734,34 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description Signed in (200, the session cookie), or, for a person with TOTP, 202: the
+         *     password was right and the sign-in waits for the second factor
+         *     (`/auth/login/second-factor`, with the cookie set here); no session yet.
+         */
         post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login/second-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second Factor
+         * @description The second step of a sign-in: the browser's waiting sign-in (cookie) and a code
+         *     or a recovery code; the login session opens only now.
+         */
+        post: operations["second_factor_api_auth_login_second_factor_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1828,6 +1875,101 @@ export interface paths {
          * @description The caller's own password; this session stays, every other one ends.
          */
         post: operations["change_my_password_api_auth_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Totp */
+        get: operations["my_totp_api_auth_me_totp_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Totp
+         * @description The first code turns TOTP on; every other session of the person ends.
+         */
+        post: operations["confirm_totp_api_auth_me_totp_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Totp */
+        post: operations["disable_totp_api_auth_me_totp_disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renew Recovery Codes
+         * @description A new set in place of the old one (a current code proves the device).
+         */
+        post: operations["renew_recovery_codes_api_auth_me_totp_recovery_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/totp/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Up Totp
+         * @description A new secret (the current password proves it is the person); it protects
+         *     nothing until `/me/totp/confirm`. Shown this once.
+         */
+        post: operations["set_up_totp_api_auth_me_totp_setup_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4185,6 +4327,34 @@ export interface components {
             /** Space Ids */
             space_ids: string[] | null;
             user: components["schemas"]["TokenUserOut"];
+        };
+        /**
+         * AdminUserOut
+         * @description A person as the people administration lists them: with whether TOTP is on.
+         */
+        AdminUserOut: {
+            /** Awaiting Approval Since */
+            awaiting_approval_since: string | null;
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Login At */
+            last_login_at: string | null;
+            /** Locale */
+            locale: string;
+            /** Name */
+            name: string;
+            system_role: components["schemas"]["SystemRole"];
+            /** Totp Enabled */
+            totp_enabled: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * AgentCreate
@@ -7024,6 +7194,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[AdminUserOut] */
+        Page_AdminUserOut_: {
+            /** Items */
+            items: components["schemas"]["AdminUserOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AgentOut] */
         Page_AgentOut_: {
             /** Items */
@@ -7378,13 +7555,6 @@ export interface components {
         Page_UserAssignmentOut_: {
             /** Items */
             items: components["schemas"]["UserAssignmentOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
-        /** Page[UserOut] */
-        Page_UserOut_: {
-            /** Items */
-            items: components["schemas"]["UserOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -8027,6 +8197,14 @@ export interface components {
             /** Last Read Message Id */
             last_read_message_id: string | null;
         };
+        /**
+         * RecoveryCodesOut
+         * @description Ten recovery codes, shown this once; each signs in once instead of a code.
+         */
+        RecoveryCodesOut: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
         /** RecurringIn */
         RecurringIn: {
             /** Cron */
@@ -8264,6 +8442,34 @@ export interface components {
             items: (components["schemas"]["PageHitOut"] | components["schemas"]["MessageHitOut"] | components["schemas"]["TicketHitOut"])[];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * SecondFactorIn
+         * @description Exactly one of `code` (six digits from the authenticator) and `recovery_code`.
+         */
+        SecondFactorIn: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
+        };
+        /**
+         * SecondFactorNeededOut
+         * @description The password (or the provider) was right; the sign-in waits for the second
+         *     factor until `expires_at` (`POST /api/auth/login/second-factor`).
+         */
+        SecondFactorNeededOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Second Factor
+             * @default totp
+             * @constant
+             */
+            second_factor?: "totp";
         };
         /**
          * SecretIn
@@ -9501,6 +9707,8 @@ export interface components {
             mode: components["schemas"]["TokenMode"];
             /** Name */
             name: string;
+            /** Second Factor Code */
+            second_factor_code?: string | null;
             /** Space Ids */
             space_ids?: string[] | null;
         };
@@ -9627,6 +9835,41 @@ export interface components {
         ToolVersionIn: {
             /** Version */
             version: number;
+        };
+        /** TotpCodeIn */
+        TotpCodeIn: {
+            /** Code */
+            code: string;
+        };
+        /** TotpSetupIn */
+        TotpSetupIn: {
+            /** Password */
+            password: string;
+        };
+        /**
+         * TotpSetupOut
+         * @description The secret in base32 and as an `otpauth://` URI (for a QR code), shown this once.
+         */
+        TotpSetupOut: {
+            /** Secret */
+            secret: string;
+            /** Uri */
+            uri: string;
+        };
+        /**
+         * TotpStatusOut
+         * @description `enabled_at`: when TOTP was turned on (null: off). `unavailable`: why it cannot
+         *     be set up (`no_password`: an account without a password signs in through its
+         *     provider, whose MFA applies; `no_secret_key`: the operator set no
+         *     `HERD_SECRET_KEY`); null when it can.
+         */
+        TotpStatusOut: {
+            /** Enabled At */
+            enabled_at: string | null;
+            /** Recovery Codes Left */
+            recovery_codes_left: number;
+            /** Unavailable */
+            unavailable: ("no_password" | "no_secret_key") | null;
         };
         /**
          * TrashedPageOut
@@ -10672,7 +10915,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_UserOut_"];
+                    "application/json": components["schemas"]["Page_AdminUserOut_"];
                 };
             };
             /** @description Validation Error */
@@ -10965,6 +11208,35 @@ export interface operations {
         };
     };
     sign_out_user_api_admin_users__user_id__sign_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_totp_api_admin_users__user_id__totp_reset_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -13920,6 +14192,48 @@ export interface operations {
                     "application/json": components["schemas"]["MeOut"];
                 };
             };
+            /** @description Second factor needed */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecondFactorNeededOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    second_factor_api_auth_login_second_factor_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecondFactorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -14113,6 +14427,156 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_totp_api_auth_me_totp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpStatusOut"];
+                };
+            };
+        };
+    };
+    confirm_totp_api_auth_me_totp_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_totp_api_auth_me_totp_disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecondFactorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_recovery_codes_api_auth_me_totp_recovery_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_up_totp_api_auth_me_totp_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpSetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpSetupOut"];
+                };
             };
             /** @description Validation Error */
             422: {

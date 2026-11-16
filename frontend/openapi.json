@@ -533,6 +533,81 @@
         "title": "AdminTokenOut",
         "type": "object"
       },
+      "AdminUserOut": {
+        "description": "A person as the people administration lists them: with whether TOTP is on.",
+        "properties": {
+          "awaiting_approval_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awaiting Approval Since"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "locale": {
+            "title": "Locale",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole"
+          },
+          "totp_enabled": {
+            "title": "Totp Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "system_role",
+          "is_active",
+          "locale",
+          "last_login_at",
+          "awaiting_approval_since",
+          "version",
+          "totp_enabled"
+        ],
+        "title": "AdminUserOut",
+        "type": "object"
+      },
       "AgentCreate": {
         "additionalProperties": false,
         "description": "`connection_id`/`model`: a chat connection of the organisation and one of its\nmodels. `responsible_user_id`: an active person (no guest) who answers for it.\nBoth are needed for the organisation's agents (`agent.manage`). `personal`: the\ncaller's own agent (`agent.create_personal`), which takes the caller's connection\nand model and has the caller as responsible person (given, they must be those).\n`kind: external` (plan M8 decision 11, `agent.manage`): an agent that works from\noutside through `/mcp`; no connection, no model, not personal, level at most 2\n(else 422 `agent.external_invalid`), a responsible person required.",
@@ -7910,6 +7985,33 @@
         "title": "Page[AdminTokenOut]",
         "type": "object"
       },
+      "Page_AdminUserOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[AdminUserOut]",
+        "type": "object"
+      },
       "Page_AgentOut_": {
         "properties": {
           "items": {
@@ -9285,33 +9387,6 @@
           "items"
         ],
         "title": "Page[UserAssignmentOut]",
-        "type": "object"
-      },
-      "Page_UserOut_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/UserOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "Page[UserOut]",
         "type": "object"
       },
       "Page_VersionSummaryOut_": {
@@ -11068,6 +11143,23 @@
         "title": "ReadPositionOut",
         "type": "object"
       },
+      "RecoveryCodesOut": {
+        "description": "Ten recovery codes, shown this once; each signs in once instead of a code.",
+        "properties": {
+          "recovery_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recovery Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recovery_codes"
+        ],
+        "title": "RecoveryCodesOut",
+        "type": "object"
+      },
       "RecurringIn": {
         "additionalProperties": false,
         "properties": {
@@ -11655,6 +11747,61 @@
           "items"
         ],
         "title": "SearchResults",
+        "type": "object"
+      },
+      "SecondFactorIn": {
+        "additionalProperties": false,
+        "description": "Exactly one of `code` (six digits from the authenticator) and `recovery_code`.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "recovery_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Code"
+          }
+        },
+        "title": "SecondFactorIn",
+        "type": "object"
+      },
+      "SecondFactorNeededOut": {
+        "description": "The password (or the provider) was right; the sign-in waits for the second\nfactor until `expires_at` (`POST /api/auth/login/second-factor`).",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "second_factor": {
+            "const": "totp",
+            "default": "totp",
+            "title": "Second Factor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expires_at"
+        ],
+        "title": "SecondFactorNeededOut",
         "type": "object"
       },
       "SecretIn": {
@@ -14872,6 +15019,19 @@
             "title": "Name",
             "type": "string"
           },
+          "second_factor_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Factor Code"
+          },
           "space_ids": {
             "anyOf": [
               {
@@ -15202,6 +15362,100 @@
           "version"
         ],
         "title": "ToolVersionIn",
+        "type": "object"
+      },
+      "TotpCodeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TotpCodeIn",
+        "type": "object"
+      },
+      "TotpSetupIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "TotpSetupIn",
+        "type": "object"
+      },
+      "TotpSetupOut": {
+        "description": "The secret in base32 and as an `otpauth://` URI (for a QR code), shown this once.",
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "title": "TotpSetupOut",
+        "type": "object"
+      },
+      "TotpStatusOut": {
+        "description": "`enabled_at`: when TOTP was turned on (null: off). `unavailable`: why it cannot\nbe set up (`no_password`: an account without a password signs in through its\nprovider, whose MFA applies; `no_secret_key`: the operator set no\n`HERD_SECRET_KEY`); null when it can.",
+        "properties": {
+          "enabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled At"
+          },
+          "recovery_codes_left": {
+            "title": "Recovery Codes Left",
+            "type": "integer"
+          },
+          "unavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_password",
+                  "no_secret_key"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable"
+          }
+        },
+        "required": [
+          "enabled_at",
+          "recovery_codes_left",
+          "unavailable"
+        ],
+        "title": "TotpStatusOut",
         "type": "object"
       },
       "TrashedPageOut": {
@@ -17204,7 +17458,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_UserOut_"
+                  "$ref": "#/components/schemas/Page_AdminUserOut_"
                 }
               }
             },
@@ -17663,6 +17917,43 @@
           }
         },
         "summary": "Sign Out User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/totp/reset": {
+      "post": {
+        "description": "Turns the person's TOTP off (a lost device); they sign in with the password\nalone until they set it up again. Idempotent.",
+        "operationId": "reset_totp_api_admin_users__user_id__totp_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Totp",
         "tags": [
           "users"
         ]
@@ -22408,12 +22699,65 @@
     },
     "/api/auth/login": {
       "post": {
+        "description": "Signed in (200, the session cookie), or, for a person with TOTP, 202: the\npassword was right and the sign-in waits for the second factor\n(`/auth/login/second-factor`, with the cookie set here); no session yet.",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecondFactorNeededOut"
+                }
+              }
+            },
+            "description": "Second factor needed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/login/second-factor": {
+      "post": {
+        "description": "The second step of a sign-in: the browser's waiting sign-in (cookie) and a code\nor a recovery code; the login session opens only now.",
+        "operationId": "second_factor_api_auth_login_second_factor_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactorIn"
               }
             }
           },
@@ -22441,7 +22785,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Login",
+        "summary": "Second Factor",
         "tags": [
           "auth"
         ]
@@ -22692,6 +23036,187 @@
           }
         },
         "summary": "Change My Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp": {
+      "get": {
+        "operationId": "my_totp_api_auth_me_totp_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/confirm": {
+      "post": {
+        "description": "The first code turns TOTP on; every other session of the person ends.",
+        "operationId": "confirm_totp_api_auth_me_totp_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/disable": {
+      "post": {
+        "operationId": "disable_totp_api_auth_me_totp_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecondFactorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Totp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/recovery-codes": {
+      "post": {
+        "description": "A new set in place of the old one (a current code proves the device).",
+        "operationId": "renew_recovery_codes_api_auth_me_totp_recovery_codes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Recovery Codes",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/totp/setup": {
+      "post": {
+        "description": "A new secret (the current password proves it is the person); it protects\nnothing until `/me/totp/confirm`. Shown this once.",
+        "operationId": "set_up_totp_api_auth_me_totp_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Up Totp",
         "tags": [
           "auth"
         ]

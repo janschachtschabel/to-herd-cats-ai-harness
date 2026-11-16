@@ -51,6 +51,11 @@ function api(locale: Locale) {
   mockApi({
     // The interface speaks the person's stored language.
     'GET /api/auth/me': { ...me, user: { ...me.user, locale } },
+    'GET /api/auth/me/totp': {
+      enabled_at: '2026-11-16T12:00:00Z',
+      recovery_codes_left: 3,
+      unavailable: null,
+    },
     'GET /api/spaces': page([
       makeSpace({ kind: 'open', name: 'Handbuch', my_role: 'viewer' }),
       team,

@@ -1,0 +1,89 @@
+{
+  "errors": {
+    "auth": {
+      "second_factor_invalid": "The code is wrong or was used already.",
+      "second_factor_expired": "The sign-in has expired. Please sign in with your password again.",
+      "second_factor_required": "Please enter a current code from your authenticator app."
+    },
+    "totp": {
+      "already_enabled": "Two-factor sign-in is already on.",
+      "no_setup": "Please start the setup again.",
+      "not_enabled": "Two-factor sign-in is not on.",
+      "no_password": "Two-factor sign-in is only for accounts with a password.",
+      "no_secret_key": "Two-factor sign-in is not available on this installation (no secret key set)."
+    }
+  },
+  "totp": {
+    "signIn": {
+      "title": "Second factor",
+      "hint": "Enter the six-digit code from your authenticator app.",
+      "code": "Code from the authenticator app",
+      "codeHint": "The code changes every 30 seconds.",
+      "recoveryCode": "Recovery code",
+      "recoveryHint": "Each recovery code works once.",
+      "useRecovery": "Use a recovery code",
+      "useCode": "Use a code from the app",
+      "submit": "Confirm",
+      "submitting": "Checking …",
+      "restart": "Back to sign-in"
+    },
+    "profile": {
+      "title": "Two-factor sign-in",
+      "description": "With a second factor, signing in also needs a code from an authenticator app (TOTP). Optional.",
+      "off": "Off.",
+      "on": "On since {{date}}.",
+      "codesLeft_one": "{{count}} recovery code left.",
+      "codesLeft_other": "{{count}} recovery codes left.",
+      "noPassword": "Your account signs in through a provider; its two-factor sign-in applies there.",
+      "noSecretKey": "Not available on this installation: the operators set no secret key.",
+      "setUp": "Set up",
+      "disable": "Turn off",
+      "renew": "New recovery codes"
+    },
+    "setup": {
+      "title": "Set up two-factor sign-in",
+      "passwordHint": "First confirm with your password.",
+      "password": "Current password",
+      "next": "Next",
+      "scan": "Scan the QR code with your authenticator app or type the key by hand. It is shown only now.",
+      "qr": "QR code for the authenticator app",
+      "secret": "Key",
+      "code": "Code from the app",
+      "codeHint": "Enter the code the app shows now; only then is the second factor on.",
+      "confirm": "Turn on",
+      "done": "Two-factor sign-in is on. Your other sessions were ended."
+    },
+    "codes": {
+      "title": "Recovery codes",
+      "hint": "Keep these codes safe (in your password manager, say). Each works once when you do not have your device. They are shown only now.",
+      "list": "Your recovery codes",
+      "copy": "Copy",
+      "close": "Saved, close"
+    },
+    "disable": {
+      "title": "Turn two-factor sign-in off?",
+      "hint": "Confirm with a current code or a recovery code. Afterwards you sign in with the password alone.",
+      "code": "Code or recovery code",
+      "submit": "Turn off"
+    },
+    "renew": {
+      "title": "New recovery codes",
+      "hint": "The previous codes stop working. Confirm with a current code from the app.",
+      "code": "Code from the app",
+      "submit": "Make new codes"
+    },
+    "admin": {
+      "badge": "2FA",
+      "badgeLabel": "Two-factor sign-in on",
+      "reset": "Reset two-factor",
+      "resetTitle": "Reset the two-factor sign-in of {{name}}?",
+      "resetText": "Only when you are sure it really is {{name}} asking (in person, say, or through a known call-back). Afterwards the person signs in with the password alone until they set up the second factor again. This is audited.",
+      "resetConfirm": "Reset",
+      "resetNamed": "Reset two-factor of {{name}}"
+    },
+    "token": {
+      "code": "Code from the authenticator app",
+      "codeHint": "A new token needs your second factor."
+    }
+  }
+}

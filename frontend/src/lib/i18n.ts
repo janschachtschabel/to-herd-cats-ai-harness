@@ -14,6 +14,7 @@ import deRuns from '@/locales/de/runs.json'
 import deSkills from '@/locales/de/skills.json'
 import deTickets from '@/locales/de/tickets.json'
 import deTokens from '@/locales/de/tokens.json'
+import deTotp from '@/locales/de/totp.json'
 import deExternal from '@/locales/de/external.json'
 import deWiki from '@/locales/de/wiki.json'
 import enAgents from '@/locales/en/agents.json'
@@ -30,6 +31,7 @@ import enRuns from '@/locales/en/runs.json'
 import enSkills from '@/locales/en/skills.json'
 import enTickets from '@/locales/en/tickets.json'
 import enTokens from '@/locales/en/tokens.json'
+import enTotp from '@/locales/en/totp.json'
 import enExternal from '@/locales/en/external.json'
 import enWiki from '@/locales/en/wiki.json'
 
@@ -53,7 +55,7 @@ type Tree = { [key: string]: string | Tree }
 /** One namespace from several files (`common.json`, `wiki.json`, `messaging.json`,
  *  `tickets.json`, `ai.json`, `agents.json`, `skills.json`, `proposals.json`,
  *  `runs.json`, `approvals.json`, `automations.json`, `mcp.json`, `tokens.json`, `external.json`,
- *  `signin.json`, `backup.json`): groups such as
+ *  `signin.json`, `backup.json`, `totp.json`): groups such as
  *  `errors` are merged key by key. */
 export function mergeResources(...trees: Tree[]): Tree {
   const out: Tree = {}
@@ -87,6 +89,7 @@ void i18n.use(initReactI18next).init({
         deExternal,
         deSignin,
         deBackup,
+        deTotp,
       ),
     },
     en: {
@@ -107,6 +110,7 @@ void i18n.use(initReactI18next).init({
         enExternal,
         enSignin,
         enBackup,
+        enTotp,
       ),
     },
   },
