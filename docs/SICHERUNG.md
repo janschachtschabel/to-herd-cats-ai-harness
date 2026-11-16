@@ -303,7 +303,8 @@ siehe `Dockerfile`), weil die veröffentlichten Binärdateien mit älterem Go ge
 
 Ersetzt den ganzen Stand einer **laufenden** Installation durch ein Archiv, ohne die App
 anzuhalten. Mit den `HERD_*`-Einstellungen der Installation (Datenbank,
-`HERD_DATA_DIR`, `HERD_SECRET_KEY`, `HERD_BACKUP_DIR`):
+`HERD_DATA_DIR` bzw. `HERD_STORAGE` und `HERD_S3_*`, `HERD_SECRET_KEY`,
+`HERD_BACKUP_DIR`):
 
 ```bash
 python -m app.ops restore check ARCHIV         # erwartet: restore.target_not_empty, sonst nichts
@@ -330,7 +331,8 @@ keine zweite Wiederherstellung dazwischen):
 3. **Wartungsmodus an** (Audit `maintenance.started`); 10 Sekunden Auslauf, in denen
    jeder Prozess davon erfährt (sofort über `NOTIFY herd_maintenance`, spätestens nach
    5 Sekunden) und laufende Anfragen enden;
-4. die Dateien des Archivs, die noch nicht in der Ablage liegen, dann die Datenbank in
+4. die Dateien des Archivs, die noch nicht in der Ablage liegen (lokal oder in S3, wie
+   `HERD_STORAGE` sagt; [unten](#anhänge-in-s3)), dann die Datenbank in
    **einer** Transaktion (`psql`): `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`,
    der Dump des Archivs (aus `pg_restore --file=-`, ohne Zwischendatei), der
    Wartungsmodus im eingespielten Stand, `COMMIT`. Das `COMMIT` geht erst hinaus, wenn
@@ -424,7 +426,9 @@ Nicht in einem Cluster ausgeführt. Einen Job aus dem CronJob ableiten wie in Sc
 "-m", "app.ops", "restore", "apply", "/backups/<archiv>.tar", "--replace", "--confirm",
 "<Name der Organisation>"]`; beim Volume und beim Einhängen `data` jedes
 `readOnly: true` entfernen, den `affinity`-Block **behalten** (die API-Pods laufen, und
-eine ReadWriteOnce-PVC der Anhänge verlangt denselben Knoten). Die App nicht anhalten
+eine ReadWriteOnce-PVC der Anhänge verlangt denselben Knoten). Mit `s3.enabled` hat der
+CronJob kein Volume der Anhänge und keine `affinity`; der Job schreibt die Dateien dann
+in den Bucket. Die App nicht anhalten
 und den CronJob nicht aussetzen (das Einspielen hält die Sperre `herd.backup`; ein
 CronJob, der gerade dann startet, endet mit `backup.already_running`).
 

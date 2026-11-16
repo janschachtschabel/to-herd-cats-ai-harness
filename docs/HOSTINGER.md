@@ -360,6 +360,11 @@ Häufige Fälle:
 - Ein zweites Exemplar dieses Stacks auf demselben VPS bräuchte andere Namen für den
   Traefik-Router (`herd-app` ist fest); dafür die Referenz unter `deploy/compose/`
   nehmen.
+- Anhänge liegen im Volume `app-data`; einen S3-Speicher (`HERD_STORAGE=s3`,
+  [`SICHERUNG.md`](SICHERUNG.md), „Anhänge in S3“) bietet dieser Stack nicht an: Sein
+  Schlüssel wäre ein Wert in der `.env`, und der Dienst `backup` hat keinen Weg nach
+  draußen. Dafür die Referenz unter `deploy/compose/` (`compose.s3.yml`) oder das
+  Chart nehmen.
 - Sehr große Uploads (bis 25 MB je Anhang, 100 MB je Import) über eine langsame
   Leitung können an Zeitgrenzen von Hostingers Traefik scheitern; dessen Einstellungen
   gehören zu `/docker/traefik`, nicht zu diesem Stack.
