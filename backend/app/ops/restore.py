@@ -132,7 +132,9 @@ async def restore_files(storage: Storage, archive: Path, manifest: Manifest) -> 
                 if handle is None:
                     raise RestoreFailed("archive.member_missing")
                 added.append(key)
-                await storage.put(key, read_chunks(handle), size=member["size"], sha256=member["sha256"])
+                await storage.put(
+                    key, read_chunks(handle), size=member["size"], sha256=member["sha256"]
+                )
     except StoredContentMismatch:
         await remove_files(storage, added)
         raise RestoreFailed("archive.member_checksum") from None

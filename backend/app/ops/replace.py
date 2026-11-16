@@ -11,9 +11,10 @@ restore in between):
 3. Maintenance on (`maintenance.started`): the API answers 503 and the worker's loops
    pause, in every process within POLL_SECONDS (`modules/maintenance/cache.py`); then
    DRAIN_SECONDS for requests and steps under way to end.
-4. The archive's files that are not here yet (content-addressed: present keys hold the
-   same content), then the database in one transaction (`swap.py`), which also leaves
-   maintenance on in the restored state.
+4. The archive's files that are not here yet, in the configured storage (local or S3,
+   `HERD_STORAGE`; content-addressed: present keys hold the same content), then the
+   database in one transaction (`swap.py`), which also leaves maintenance on in the
+   restored state.
    If anything here fails, the old state is whole: the files written are removed,
    maintenance ends, `backup.restore_failed` is audited (the safety run stays `ok`:
    its archive is good) and `RestoreFailed` carries the code.
@@ -39,7 +40,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import upgrade_head
-from app.core.storage import LocalStorage
+from app.core.storage import get_storage
 from app.core.storage_tombstones import bury
 from app.modules.audit.recorder import record_system
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger
@@ -61,6 +62,7 @@ from app.ops.restore import (
     RestoreReport,
     heads,
     read_chunks,
+    remove_files,
     restore_files,
 )
 from app.ops.restore_after import finish_restore
@@ -149,14 +151,13 @@ async def _replace(
         )
         await session.commit()
     await asyncio.sleep(drain)  # requests and steps under way end; the caches follow
-    storage = LocalStorage(plan.settings.data_dir)
+    storage = get_storage(plan.settings)  # local or S3 (`HERD_STORAGE`)
     added: list[str] = []
     try:
         added = await restore_files(storage, plan.archive, plan.manifest)
         await _swap(plan)
     except BaseException as exc:  # the swap rolled back (or never began): the old state
-        for key in added:
-            await storage.delete(key)
+        await remove_files(storage, added)
         code = exc.code if isinstance(exc, RestoreFailed) else "restore.failed"
         await _failed(conn, plan, code)
         if isinstance(exc, RestoreFailed) or not isinstance(exc, Exception):
