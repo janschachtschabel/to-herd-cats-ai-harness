@@ -10,8 +10,8 @@ Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)).
 
 **Stand: M9a (Produktion, erster Teil) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
 M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7), dazu aus M9b der Wartungsmodus mit
-dem Einspielen in eine laufende Installation; hybride Suche und Embeddings (M5 Tasks 8
-bis 11) und der Rest von M9b fehlen noch.** Aus M1:
+dem Einspielen in eine laufende Installation und Anhänge in S3; hybride Suche und
+Embeddings (M5 Tasks 8 bis 11) und der Rest von M9b fehlen noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -520,9 +520,9 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   zählt nicht). Wert und Datei zugleich, eine unlesbare oder (bei Schlüsseln und
   Token) leere Datei sind Startfehler, die die Variable nennen, nie den Inhalt; ein
   leerer Wert neben der Datei (Compose: `${HERD_…:-}`) zählt als nicht gesetzt; eine
-  leere Passwortdatei heißt „keine erste Person“. Die Regeln des Werts (Mindestlänge) gelten auch für die Datei. Der
-  Hostinger-Stack ([`docs/HOSTINGER.md`](docs/HOSTINGER.md)) übergibt so jedes
-  Geheimnis.
+  leere Passwortdatei heißt „keine erste Person“. Die Regeln des Werts (Mindestlänge)
+  gelten auch für die Datei. Der Hostinger-Stack
+  ([`docs/HOSTINGER.md`](docs/HOSTINGER.md)) übergibt so jedes Geheimnis.
 - **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,
   sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix; die
   eigenen Einstellungen mit dem Präfix wie `HERD_AI_EGRESS_PROXY` sind ausgenommen) oder
