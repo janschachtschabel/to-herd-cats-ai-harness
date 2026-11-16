@@ -13,9 +13,9 @@ job's time limit does not stay `running`.
 `DueLoop.cleanup_if_due` runs it (`run_upkeep`), one transaction per batch and table.
 The expiry is judged at the wall time (`wall`), the time the modules write and check
 those columns against (a login is valid while `expires_at > utcnow()`), never at the
-clock that schedules, which runs ahead in the browser tests (`tests/support/
-e2e_clock.py`) and would end logins still valid; the backups at the clock's `now`,
-which their runs are written with (`app/ops`)."""
+clock that schedules, which can run ahead of the wall time (the browser tests move it)
+and would end logins still valid; the backups at the clock's `now`, which their runs
+are written with (`app/ops`)."""
 
 from datetime import datetime
 
