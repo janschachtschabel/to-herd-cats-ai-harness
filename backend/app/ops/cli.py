@@ -12,6 +12,8 @@
                                                   # in place of the running installation
                                                   # (safety archive, maintenance meanwhile)
     python -m app.ops maintenance status|off      # whether in maintenance; end it
+    python -m app.ops storage copy --to s3|local  # move attachments (again: what is missing)
+    python -m app.ops storage check               # probe the configured storage
 
 The settings come from the environment like the app's (`HERD_*`); the command line
 acts as `system` (audit `via=cli`). Exit status 0 when it worked, 1 when not, 2 for a
@@ -23,7 +25,7 @@ from collections.abc import Sequence
 
 from app.core.clock import Clock
 from app.core.config import Settings
-from app.ops import cli_backup, cli_maintenance, cli_restore
+from app.ops import cli_backup, cli_maintenance, cli_restore, cli_storage
 
 
 def parser() -> argparse.ArgumentParser:
@@ -32,6 +34,7 @@ def parser() -> argparse.ArgumentParser:
     cli_backup.add_commands(areas)
     cli_restore.add_commands(areas)
     cli_maintenance.add_commands(areas)
+    cli_storage.add_commands(areas)
     return top
 
 
