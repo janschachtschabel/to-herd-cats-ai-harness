@@ -1,13 +1,15 @@
 """Released migrations only expand (plan M9 decision 22): `scripts/check_migrations.py`
 refuses, in every revision after the one `alembic/RELEASED` names, what removes or
 renames schema, unless the revision declares `contract_of` a revision the release
-already had. Before the first release (RELEASED empty) nothing is refused."""
+already had. Before the first release (RELEASED empty) nothing is refused. At a release
+tag (`--require-released-head`, `release.yml`) RELEASED must name the single head, so
+the rule guards the next release (module review M9a, N8)."""
 
 from pathlib import Path
 
 import pytest
 
-from scripts.check_migrations import check, released_revision
+from scripts.check_migrations import check, main, released_revision
 
 HEADER = '''"""{doc}"""
 import sqlalchemy as sa
@@ -109,6 +111,24 @@ def test_an_unknown_release_and_two_heads_are_refused(versions: Path) -> None:
     assert any("RELEASED" in p for p in check(versions, "zz"))
     _write(versions, "c3", "a1", 'op.add_column("t", sa.Column("y", sa.Integer()))')
     assert any("head" in p for p in check(versions, ""))
+
+
+def test_a_release_needs_released_to_name_the_head(versions: Path) -> None:
+    assert check(versions, "b2", require_released_head=True) == []
+    for released in ("", "a1"):
+        problems = check(versions, released, require_released_head=True)
+        assert problems == [f"RELEASED must name the head b2 at a release, not {released!r}"]
+
+
+def test_the_command_line_requires_the_released_head_on_request(
+    versions: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "RELEASED").write_text("a1\n")
+    assert main([], alembic=tmp_path) == 0
+    assert main(["--require-released-head"], alembic=tmp_path) == 1
+    assert "RELEASED must name the head b2" in capsys.readouterr().out
+    (tmp_path / "RELEASED").write_text("b2\n")
+    assert main(["--require-released-head"], alembic=tmp_path) == 0
 
 
 def test_the_repository_passes_and_names_no_release_yet() -> None:

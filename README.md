@@ -560,7 +560,7 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   bekannten älteren. Deshalb müssen Migrationen mit der vorherigen Version verträglich
   sein: erst erweitern, frühestens eine Version später zurückbauen.
   `backend/alembic/RELEASED` nennt die Revision der letzten Freigabe (leer bis zum
-  ersten Tag; beim Taggen auf den Head setzen). `scripts/check_migrations.py` (CI-Job
+  ersten Tag; beim Taggen auf den Head setzen, `release.yml` prüft es). `scripts/check_migrations.py` (CI-Job
   `backend`) lehnt in jeder späteren Revision Löschen, Umbenennen und Typwechsel ab
   (`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute`
   mit `DROP`/`RENAME`), außer die Revision erklärt `contract_of = "<Revision>"` und
@@ -846,7 +846,10 @@ von M9a und seiner Fix-Welle (Antwort J1).
 **Vor dem Taggen, von Hand:**
 
 1. `backend/alembic/RELEASED` auf die Head-Revision setzen
-   (`cd backend && uv run alembic heads`); `release.yml` tut das nicht und prüft es nicht.
+   (`cd backend && uv run alembic heads`) und mit in den Commit nehmen, den der Tag
+   trägt. `release.yml` setzt es nicht, prüft es aber: Nennt die Datei am Tag nicht den
+   einen Head (`python -m scripts.check_migrations --require-released-head`), bricht die
+   Freigabe ab, bevor etwas veröffentlicht wird.
 2. Versionen anheben (pyproject, `Chart.yaml` `version` und `appVersion`), alle
    Prüfbefehle grün, dann taggen.
 

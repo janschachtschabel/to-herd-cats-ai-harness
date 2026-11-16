@@ -1,8 +1,11 @@
 """Check that migrations after the last release only expand (plan M9 decision 22):
 
     uv run python -m scripts.check_migrations
+    python3 -m scripts.check_migrations --require-released-head   # release.yml, at a tag
 
 `alembic/RELEASED` names the revision of the last release (empty until the first tag).
+At a release tag it must name the single head (`--require-released-head`): the tag is
+the release, and the next one's revisions are checked against it.
 In every revision after it, `upgrade()` may not drop a table, column, index or
 constraint, change a column's type, rename a table or column, or `op.execute` SQL with
 `DROP` or `RENAME`, unless the revision declares `contract_of = "<revision>"` and that
@@ -111,13 +114,15 @@ def contractions(tree: ast.Module) -> list[str]:
     return found
 
 
-def check(versions: Path, released: str) -> list[str]:
+def check(versions: Path, released: str, *, require_released_head: bool = False) -> list[str]:
     revisions = load(versions)
     problems: list[str] = []
     downs = {d for r in revisions.values() for d in r.down}
     heads = sorted(set(revisions) - downs)
     if len(heads) != 1:
         problems.append(f"expected exactly one head, found {len(heads)}: {', '.join(heads)}")
+    elif require_released_head and released != heads[0]:
+        problems.append(f"RELEASED must name the head {heads[0]} at a release, not {released!r}")
     if not released:
         return problems
     if released not in revisions:
@@ -138,12 +143,14 @@ def check(versions: Path, released: str) -> list[str]:
     return problems
 
 
-def main() -> int:
-    problems = check(ALEMBIC / "versions", released_revision(ALEMBIC / "RELEASED"))
+def main(argv: list[str], *, alembic: Path = ALEMBIC) -> int:
+    require = "--require-released-head" in argv
+    released = released_revision(alembic / "RELEASED")
+    problems = check(alembic / "versions", released, require_released_head=require)
     for problem in problems:
         print(problem)
     return 1 if problems else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

@@ -1,5 +1,5 @@
-# Release on a tag vX.Y.Z: the tag must equal the pyproject and chart versions, all
-# CI checks must pass, then the image (ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z and
+# Release on a tag vX.Y.Z: the tag must equal the pyproject and chart versions,
+# backend/alembic/RELEASED must name the migrations' head, all CI checks must pass, then the image (ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z and
 # :X.Y) and the chart (oci://ghcr.io/<owner>/charts/to-herd-cats-ai) are published
 # with the default GITHUB_TOKEN. Finally both are pulled without credentials; new
 # GHCR packages are private until made public, so a failure there only warns.
@@ -23,6 +23,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Tag = pyproject version = chart version = appVersion
         run: bash deploy/helm/scripts/check-chart-version.sh "$GITHUB_REF_NAME"
+      # The tag is the release: RELEASED must name the single head, or the expand-only
+      # rule (scripts/check_migrations.py) guards nothing in the next release. Standard
+      # library only, so the runner's python3 does.
+      - name: alembic/RELEASED names the head
+        working-directory: backend
+        run: python3 -m scripts.check_migrations --require-released-head
       - id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
