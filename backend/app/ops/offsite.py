@@ -2,7 +2,9 @@
 
 On when HERD_BACKUP_OFFSITE_REPOSITORY is set. After a good backup: `restic cat
 config` (`init` when there is no repository yet, exit status 10), `restic backup` of
-the archive and its sidecar, `restic forget --prune` with the rule of the volume, and
+the archive and its sidecar (host and tag `herd`), `restic forget --prune` with the rule
+of the volume over all of them (`--group-by host,tags`: grouped by paths, every archive's
+new name would be a group of its own and keep-last would keep it), and
 on the first day of a month (UTC) `restic check --read-data-subset=5%`. restic
 encrypts on the client; the archives on the volume are not encrypted.
 
@@ -74,6 +76,10 @@ async def push_offsite(
             "forget",
             "--tag",
             TAG,
+            # restic groups by host and paths by default; every archive has a new name,
+            # so each snapshot would be a group of its own and nothing would ever go.
+            "--group-by",
+            "host,tags",
             "--prune",
             "--keep-last=1",
             f"--keep-daily={rule.daily}",

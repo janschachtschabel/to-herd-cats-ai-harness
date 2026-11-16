@@ -165,10 +165,14 @@ Standardwerten 17 Archive). Archive ohne lesbare Begleitdatei (von Hand abgelegt
 die Aufbewahrung nicht an.
 
 **Offsite** (eingeschaltet mit `HERD_BACKUP_OFFSITE_REPOSITORY`): nach jeder gelungenen
-Sicherung `restic backup` von Archiv und Begleitdatei (Tag `herd`), dann `restic forget
---prune --keep-last=1 --keep-daily/--keep-weekly/--keep-monthly` mit denselben Zahlen
-(restic zählt Zeiträume überlappend, offsite bleibt also mindestens so viel wie im
-Volume) und am Ersten jedes Monats `restic check --read-data-subset=5%`. Ein noch nicht
+Sicherung `restic backup` von Archiv und Begleitdatei (Host und Tag `herd`), dann
+`restic forget --group-by host,tags --prune --keep-last=1
+--keep-daily/--keep-weekly/--keep-monthly` mit denselben Zahlen über alle Stände des
+Repositorys und am Ersten jedes Monats `restic check --read-data-subset=5%`. restic zählt
+die Zeiträume überlappend (die 4 Wochen schließen die 7 Tage ein, die 6 Monate die
+Wochen): offsite reicht deshalb **weniger weit zurück** als das Volume, mit den
+Standardwerten 15 Stände bis rund 5 Monate statt 17 bis rund 6½ Monate. Wer offsite
+länger braucht, setzt die Zahlen höher (sie gelten für beide). Ein noch nicht
 angelegtes Repository legt der erste Lauf an (`restic init`). restic verschlüsselt auf
 dem Client mit dem Repository-Passwort: **ohne dieses Passwort ist die Offsite-Kopie
 wertlos**, es gehört wie `HERD_SECRET_KEY` getrennt verwahrt.

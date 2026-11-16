@@ -71,6 +71,7 @@ async def test_offsite_passes_only_its_own_environment(
     assert str(outcome.archive) in backup and str(sidecar_of(outcome.archive)) in backup
     forget = made[3]["argv"]
     assert {"--prune", "--keep-daily=7", "--keep-weekly=4", "--keep-monthly=6"} <= set(forget)
+    assert forget[forget.index("--group-by") + 1] == "host,tags"
     assert "--read-data-subset=5%" in made[4]["argv"]
     for call in made:
         env = call["env"]

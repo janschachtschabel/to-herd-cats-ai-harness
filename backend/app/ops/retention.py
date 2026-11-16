@@ -10,7 +10,7 @@ failed archive never counts (and `create_backup` has removed it already).
 (with their sidecars) outside the set. It runs only after a new good archive, so a
 run of failures never thins out what is there. restic gets the same counts
 (`restic forget --keep-daily/--keep-weekly/--keep-monthly`, its own reading of them:
-overlapping periods, so offsite keeps at least as much history as the volume).
+the periods overlap, so offsite reaches back less far than the volume).
 """
 
 import os
