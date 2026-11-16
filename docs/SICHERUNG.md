@@ -389,9 +389,16 @@ neu eintragen; `HERD_SECRET_KEY_PREVIOUS` braucht es nicht.
 
 ### Ablauf in Compose
 
-Nicht in dieser Umgebung ausgeführt (kein Docker); die Befehle folgen `compose.yml`. Im
-Verzeichnis `deploy/compose`, mit derselben `.env` und `ai.env` (gleicher
-`HERD_SECRET_KEY`) wie die gesicherte Installation:
+Die Befehle folgen `compose.yml`; dieselben Schritte für den Hostinger-Stack (mit dessen
+Volume- und Projektnamen) stehen in [`HOSTINGER.md`](HOSTINGER.md#wiederherstellen) und
+wurden dort mit Docker durchgespielt. Im Verzeichnis `deploy/compose`, mit derselben
+`.env` und `ai.env` (gleicher `HERD_SECRET_KEY`) wie die gesicherte Installation.
+
+Das Sicherungs-Volume heißt **`to-herd-cats-ai_backups`** (Projektname `to-herd-cats-ai`
+aus `compose.yml`, mit `-p <name>` entsprechend `<name>_backups`; `docker volume ls`
+zeigt es). Bei `docker compose run -v` muss genau dieser Name vor dem Doppelpunkt
+stehen: Ein bloßes `backups` hängt ein neues, leeres Volume ein, und die Prüfung meldet
+`archive.format_unknown`.
 
 Erst prüfen, dann sichern, erst danach etwas löschen: Lehnt die Prüfung ab
 (`restore.secret_key_mismatch`, `restore.tools_too_old`, `archive.*`), ist noch nichts
@@ -403,8 +410,8 @@ docker compose exec backup python -m app.ops backup verify /backups/<archiv>.tar
 # Prüfen, solange die alte Datenbank noch da ist: ein Einmal-Container des App-Dienstes
 # mit dem Sicherungs-Volume. Erwartet wird genau ein Problem, restore.target_not_empty
 # (die Datenbank ist ja noch voll); jedes andere zuerst beheben.
-docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
-  app restore check /backups/<archiv>.tar
+docker compose run --rm --no-deps -v to-herd-cats-ai_backups:/backups \
+  --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
 # Ein Weg zurück: der jetzige Stand als eigene Sicherung (bleibt im Volume)
 docker compose exec backup python -m app.ops backup run
 docker compose stop app backup             # mit compose.nodes.yml: api-a api-b worker collab backup
@@ -412,10 +419,10 @@ docker compose stop app backup             # mit compose.nodes.yml: api-a api-b 
 docker compose exec db psql -U herd -d postgres \
   -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
 # noch einmal prüfen (jetzt: ok), dann einspielen
-docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
-  app restore check /backups/<archiv>.tar
-docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
-  app restore apply /backups/<archiv>.tar
+docker compose run --rm --no-deps -v to-herd-cats-ai_backups:/backups \
+  --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
+docker compose run --rm --no-deps -v to-herd-cats-ai_backups:/backups \
+  --entrypoint "python -m app.ops" app restore apply /backups/<archiv>.tar
 docker compose up -d --wait                # die App startet auf dem eingespielten Stand
 ```
 
@@ -428,13 +435,14 @@ Der App-Dienst hat die Anhänge (`app-data`) beschreibbar eingehängt und liest
 deshalb nicht zum Einspielen. Kommt das Archiv aus der Offsite-Kopie, zuerst mit restic
 zurückholen (`restic -r <Repository> restore latest --tag herd --target /tmp/r`, Passwort
 aus `RESTIC_PASSWORD`/`--password-file`) und die `.tar`-Datei samt `.manifest.json` ins
-Volume `backups` kopieren (`docker compose cp`).
+Volume `to-herd-cats-ai_backups` kopieren (`docker compose cp <datei> backup:/backups/`).
 
 Auf eine **neue Maschine**: `.env`, `ai.env` (Schlüssel!) und `backup.env` mitnehmen,
-`docker compose up -d db` (nur die Datenbank, sie ist dann leer), das Archiv ins Volume
-`backups` kopieren, dann ab „prüfen, dann einspielen“ wie oben. Nicht `docker compose up`
-vor dem Einspielen: der App-Dienst (Rolle `all`) migriert beim Start, die Datenbank ist
-dann nicht mehr leer (`restore.target_not_empty`).
+`docker compose up -d db` (nur die Datenbank, sie ist dann leer), das Archiv samt
+`.manifest.json` ins Volume `to-herd-cats-ai_backups` kopieren, dann ab „prüfen, dann
+einspielen“ wie oben. Nicht `docker compose up` vor dem Einspielen: der App-Dienst
+(Rolle `all`) migriert beim Start, die Datenbank ist dann nicht mehr leer
+(`restore.target_not_empty`).
 
 ### Ablauf in Kubernetes
 

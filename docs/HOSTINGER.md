@@ -45,12 +45,23 @@ Im Docker Manager beim Projekt **Bearbeiten** → `.env`:
 ```
 DOMAIN=wiki.meine-firma.de
 ADMIN_EMAIL=chefin@meine-firma.de
-ADMIN_PASSWORD=ein-langes-eigenes-passwort
+ADMIN_PASSWORD='ein langes eigenes Passwort'
 ```
+
+- `DOMAIN` klein geschrieben, ohne `https://`.
+- Das Passwort **in einfachen Anführungszeichen** `'…'`. Nur so kommt es genau so an,
+  wie du es getippt hast. Ohne Anführungszeichen schneidet Docker Compose es still ab:
+  ab ` #` (Leerzeichen und Raute) gilt der Rest als Kommentar, und ein `$` wird als
+  Variable gelesen. Aus `Gruene Wiese #7` würde `Gruene Wiese`, und mit diesem
+  verkürzten Passwort entstünde die erste Person. Ein `'` darf im Passwort selbst
+  nicht vorkommen.
 
 Dann **erneut bereitstellen**. `init` prüft die Werte zuerst. Ist etwas falsch,
 schlägt die Bereitstellung fehl und das Protokoll von `init` sagt, was (siehe
-[Diagnose](#diagnose)). Alle Felder: [Die Felder der `.env`](#die-felder-der-env).
+[Diagnose](#diagnose)). **Wichtig:** Docker hält dabei zuerst `app`, `db` und
+`backup` an. Sie bleiben gestoppt, bis der Wert korrigiert und erneut bereitgestellt
+ist; die App ist so lange nicht erreichbar. Daten gehen dabei nicht verloren. Alle
+Felder: [Die Felder der `.env`](#die-felder-der-env).
 
 ### 3. DNS: der Name zeigt auf den VPS
 
@@ -77,28 +88,64 @@ Danach:
 
 Weitere Personen legst du in der App an (Verwaltung → Personen → „Person anlegen“).
 
+**Ausgesperrt, gleich nach der Installation?** Klappt die Anmeldung mit dem Passwort
+nicht (z. B. weil es ohne Anführungszeichen abgeschnitten wurde), hilft ein neues
+`ADMIN_PASSWORD` nicht mehr: Die erste Person gibt es dann schon. Solange die
+Installation noch **keine Daten** hat, fängst du in der Webkonsole einfach neu an:
+
+```bash
+cd /docker/<projekt>
+docker compose down -v      # löscht ALLE Daten dieses Projekts: Datenbank, Anhänge, Sicherungen, Schlüssel
+```
+
+Dann die `.env` richtig ausfüllen (Passwort in `'…'`) und im Docker Manager erneut
+bereitstellen (oder `docker compose up -d`). Hat die Installation schon Inhalte,
+**nicht** so vorgehen: `down -v` würde sie löschen.
+
 ## Die Felder der `.env`
 
-Alle Felder dürfen leer sein; leer gilt der genannte Standard. Werte ohne
-Anführungszeichen eintragen und **kein `$`** verwenden (Compose würde es als Variable
-lesen).
+Alle Felder dürfen leer sein; leer gilt der genannte Standard. Die Werte stehen ohne
+Anführungszeichen, **außer `ADMIN_PASSWORD`**: das in einfache Anführungszeichen
+setzen (`ADMIN_PASSWORD='…'`), sonst schneidet Compose es bei ` #` ab und liest `$` als
+Variable (siehe Schritt 2).
 
 | Feld | Bedeutung | Leer |
 |---|---|---|
-| `DOMAIN` | Der Name der App, **nur der Hostname**: `wiki.meine-firma.de`, nicht `https://wiki.meine-firma.de`, ohne `/` am Ende, ohne Port. Daraus werden die Traefik-Regel und die öffentliche Adresse der App (`https://<DOMAIN>`, nötig für Anmeldung über OIDC und für OAuth-Konnektoren). | App läuft, ist von außen nicht erreichbar |
+| `DOMAIN` | Der Name der App, **nur der Hostname** und **klein geschrieben**: `wiki.meine-firma.de`, nicht `https://wiki.meine-firma.de` oder `Wiki.Meine-Firma.de`, ohne `/` am Ende, ohne Port. Keine IP-Adresse und kein Name ohne Punkt (dafür gibt es kein Zertifikat). Ein Name mit Umlauten steht in der `xn--`-Form (aus `müller.de` wird `xn--mller-kva.de`; `init` nennt sie dir). Daraus werden die Traefik-Regel und die öffentliche Adresse der App (`https://<DOMAIN>`, nötig für die Live-Bearbeitung, die Anmeldung über OIDC und OAuth-Konnektoren). | App läuft, ist von außen nicht erreichbar |
 | `ADMIN_EMAIL` | E-Mail der ersten Person (Inhaberin, alle Rechte). | keine erste Person |
-| `ADMIN_PASSWORD` | Ihr erstes Passwort: 10 bis 200 Zeichen, nicht auf der Liste geleakter Passwörter, ohne Wörter aus der E-Mail-Adresse oder dem Produktnamen. Nach der ersten Anmeldung leeren. | keine erste Person |
+| `ADMIN_PASSWORD` | Ihr erstes Passwort, **in einfachen Anführungszeichen** (`'…'`, ohne `'` darin): 10 bis 200 Zeichen, nicht auf der Liste geleakter Passwörter, ohne Wörter aus der E-Mail-Adresse oder dem Produktnamen. Nach der ersten Anmeldung leeren. | keine erste Person |
 | `TRAEFIK_NETWORK` | Docker-Netz, über das Traefik die App erreicht; wird angelegt, wenn es fehlt. | `herd-web` |
 | `TRAEFIK_ENTRYPOINT` | Name des HTTPS-Entrypoints von Hostingers Traefik. | `websecure` |
 | `TRAEFIK_CERTRESOLVER` | Name des Zertifikat-Resolvers von Hostingers Traefik. | `letsencrypt` |
-| `HERD_IMAGE_TAG` | Version des Images (`ghcr.io/janschachtschabel/to-herd-cats-ai`): `1.0` folgt jeder `1.0.x`, `1.0.3` bleibt genau dort. | `1.0` |
+| `HERD_IMAGE_TAG` | Version des Images (`ghcr.io/janschachtschabel/to-herd-cats-ai`): `1.0` folgt jeder `1.0.x` (jede Bereitstellung holt die neueste), `1.0.3` bleibt genau dort. | `1.0` |
 | `HERD_BACKUP_SCHEDULE` | Wann gesichert wird, Cron mit fünf Feldern in UTC. | `30 2 * * *` (täglich 02:30 UTC) |
 | `HERD_BACKUP_KEEP_DAILY`, `…_WEEKLY`, `…_MONTHLY` | Wie viele Sicherungen bleiben (die neueste je Tag, Woche, Monat). | 7, 4, 6 |
-| `HERD_BACKUP_ALERT_AFTER_HOURS` | Ab wie vielen Stunden ohne gute Sicherung die Metrik `HerdBackupTooOld` anschlägt. | 26 |
+| `HERD_BACKUP_ALERT_AFTER_HOURS` | Ab wie vielen Stunden ohne gute Sicherung der Alarm `HerdBackupTooOld` anschlägt. **Nur mit einem eigenen Prometheus sichtbar**, den dieser Stack nicht mitbringt; ob die Sicherungen gelingen, zeigt hier `backup list` (siehe [Sicherungen](#sicherungen)). | 26 |
 | `HERD_COLLAB_MEMORY_BUDGET_MB` | Speicher für Seiten in der Live-Bearbeitung; auf 2 GB RAM z. B. `200`. | 400 |
 | `HERD_RUN_CONCURRENCY` | KI-Agenten-Läufe gleichzeitig. | 4 |
 | `HERD_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING` oder `ERROR`. | `INFO` |
-| `HERD_FORWARDED_ALLOW_IPS` | Wessen `X-Forwarded-For` die App glaubt (der Proxy davor). Hostingers Traefik läuft im Netz des Hosts und kommt aus dem Docker-Netz. | `172.16.0.0/12,10.0.0.0/8,192.168.0.0/16` |
+| `HERD_FORWARDED_ALLOW_IPS` | Wessen Angabe zur Absender-Adresse (`X-Forwarded-For`) die App glaubt: die des Proxys davor. Besser enger setzen, siehe [unten](#absender-adressen-enger-fassen). | `172.16.0.0/12,10.0.0.0/8,192.168.0.0/16` |
+
+### Absender-Adressen enger fassen
+
+Die App merkt sich zu Anmeldungen und Änderungen die Adresse des Absenders (Protokoll,
+Grenzen für Anmeldeversuche je Adresse). Hostingers Traefik reicht sie weiter. Der
+Standard glaubt diese Angabe aber **jedem Container im Netz `herd-web`**, nicht nur
+Traefik. Teilen sich andere Anwendungen auf dem VPS dieses Netz, könnte eine von ihnen
+eine falsche Adresse vorgeben. Enger geht es so: In der Webkonsole die Adresse des
+Netzes nachsehen, über die Traefik kommt (das „Gateway“),
+
+```bash
+docker network inspect herd-web --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}'
+```
+
+und genau sie eintragen, z. B. `HERD_FORWARDED_ALLOW_IPS=172.18.0.1`, dann neu
+bereitstellen. Diese Adresse bleibt gleich, solange es das Netz gibt. Wird es gelöscht
+und neu angelegt (z. B. nach `docker compose down`), kann sie sich ändern; dann glaubt
+die App keiner Angabe mehr und protokolliert die Adresse von Traefik. Also danach kurz
+wieder nachsehen.
+
+### Was nicht in die `.env` gehört
 
 **Nicht in die `.env`:** Datenbankpasswort, `HERD_SECRET_KEY` und das interne Token der
 Live-Bearbeitung. Sie erzeugt `init` beim ersten Start (je 256 Zufallsbits) und legt
@@ -124,9 +171,12 @@ Kein Dienst belegt einen Port des VPS; Traefik erreicht die App über das Netz
 
 1. Vorher sichern (siehe unten): `docker compose exec backup python -m app.ops backup run`.
 2. Mit `HERD_IMAGE_TAG=1.0` (Standard): im Docker Manager beim Projekt neu bereitstellen
-   bzw. in der Webkonsole `cd /docker/<projekt> && docker compose pull && docker
-   compose up -d`. Für eine neue Hauptversion (z. B. `1.1`) den Wert in der `.env`
-   ändern und neu bereitstellen.
+   (oder in der Webkonsole `cd /docker/<projekt> && docker compose up -d`). Jede
+   Bereitstellung holt das Image neu (`pull_policy: always`), also die neueste `1.0.x`.
+   Für eine neue Hauptversion (z. B. `1.1`) den Wert in der `.env` ändern und neu
+   bereitstellen. Ist die Registry (GHCR) gerade nicht erreichbar, schlägt die
+   Bereitstellung fehl; die laufende App bleibt dabei, wie sie ist. Später erneut
+   versuchen.
 3. Die App migriert beim Start selbst. Zurück auf eine ältere Version nur mit der
    Sicherung aus Schritt 1 (README, „Freigaben und Updates“).
 
@@ -134,31 +184,121 @@ Kein Dienst belegt einen Port des VPS; Traefik erreicht die App über das Netz
 
 Der Dienst `backup` sichert Datenbank und Anhänge nach `HERD_BACKUP_SCHEDULE` als
 geprüftes Archiv in das Volume **`<projekt>_backups`**, auf dem VPS unter
-`/var/lib/docker/volumes/<projekt>_backups/_data/`. Alte Archive räumt er nach den
+`/var/lib/docker/volumes/<projekt>_backups/_data/`. Zu jeder Sicherung gehören **zwei
+Dateien**: das Archiv `herd-<zeit>-<version>.tar` und seine Beschreibung
+`herd-<zeit>-<version>.manifest.json`. Alte Sicherungen räumt er nach den
 `HERD_BACKUP_KEEP_*`-Werten ab. In der Webkonsole:
 
 ```bash
 cd /docker/<projekt>
 docker compose exec backup python -m app.ops backup run    # jetzt sichern
-docker compose exec backup python -m app.ops backup list   # was es gibt
-ls -l /var/lib/docker/volumes/<projekt>_backups/_data/     # die Archive
+docker compose exec backup python -m app.ops backup list   # die letzten Sicherungen
+ls -l /var/lib/docker/volumes/<projekt>_backups/_data/     # die Dateien
 ```
 
-**Wichtig:** Die Archive liegen auf demselben VPS. Geht der VPS verloren, sind sie mit
-weg. Kopiere sie regelmäßig woandershin (z. B. `scp` von deinem Rechner) – und einmal
-den Schlüssel `HERD_SECRET_KEY`: Ohne ihn sind nach einer Wiederherstellung auf einem
-neuen Server die gespeicherten KI-Schlüssel und Client-Secrets unlesbar.
+**Gelingen die Sicherungen?** Einen Alarm, der dich benachrichtigt, bringt dieser Stack
+nicht mit. Schau deshalb ab und zu mit `backup list` nach: In der Spalte `state` muss
+bei der neuesten Zeile `ok` stehen, und ihr Datum (`started`, UTC) darf nicht älter
+als einen Tag sein. `failed` heißt: Die Sicherung ist gescheitert; den Grund nennen die
+Spalte `error` und `docker compose logs --tail 50 backup`.
+
+### Sicherungen und Schlüssel außer Haus
+
+Die Archive liegen auf demselben VPS. Geht der VPS verloren, sind sie mit weg. Kopiere
+sie deshalb regelmäßig auf deinen eigenen Rechner, **immer beide Dateien** jeder
+Sicherung (`.tar` und `.manifest.json`; ohne die Beschreibung lässt sich das Archiv
+nicht einspielen). Auf deinem Rechner (Linux, macOS oder Windows mit PowerShell), mit
+der IP-Adresse des VPS aus dem hPanel:
+
+```bash
+mkdir herd-sicherungen
+scp 'root@<VPS-IP>:/var/lib/docker/volumes/<projekt>_backups/_data/herd-*' herd-sicherungen/
+```
+
+Bewahre außerdem **einmal** den Schlüssel `HERD_SECRET_KEY` auf, getrennt von den
+Archiven (z. B. im Passwort-Manager). Ohne ihn sind nach einer Wiederherstellung auf
+einem neuen Server die gespeicherten KI-Schlüssel und Client-Secrets unlesbar. In der
+Webkonsole anzeigen:
 
 ```bash
 docker compose exec app cat /secrets/secret_key   # sicher aufbewahren, nicht weitergeben
 ```
 
-Die Archive sind nicht verschlüsselt; das Volume ist nur für root lesbar. Sicherungen
-außer Haus mit restic bietet dieser Stack nicht; dafür die Referenz unter
-`deploy/compose/` nehmen. Wiederherstellen (nur in eine leere Installation) beschreibt
-[`SICHERUNG.md`](SICHERUNG.md); die Volumes heißen hier `<projekt>_backups`,
-`<projekt>_app-data` usw. (`docker volume ls`), und die App liest `HERD_SECRET_KEY`
-selbst aus ihrem Volume.
+Die Archive sind nicht verschlüsselt und enthalten alle Inhalte; das Volume ist nur für
+root lesbar. Behandle die Kopien entsprechend. Sicherungen außer Haus mit restic bietet
+dieser Stack nicht; dafür die Referenz unter `deploy/compose/` nehmen.
+
+### Wiederherstellen
+
+Eingespielt wird nur in eine **leere** Datenbank; die Schritte unten leeren sie. Die
+Einzelheiten und alle Meldungen stehen in [`SICHERUNG.md`](SICHERUNG.md)
+(„Wiederherstellen“). In der Webkonsole, `<projekt>` ist der Projektname,
+`<archiv>` der Dateiname der Sicherung (z. B. `herd-20261116T023000Z-1.0.2`):
+
+1. **Auf einem neuen VPS:** zuerst den Stack wie oben in Schritt 1 bereitstellen (ohne
+   Werte). Dann von deinem Rechner aus beide Dateien der Sicherung ins Volume kopieren
+   und sie dem Benutzer der App (10001) geben:
+
+   ```bash
+   scp herd-sicherungen/<archiv>.tar herd-sicherungen/<archiv>.manifest.json \
+     'root@<VPS-IP>:/var/lib/docker/volumes/<projekt>_backups/_data/'
+   ```
+
+   ```bash
+   chown 10001:10001 /var/lib/docker/volumes/<projekt>_backups/_data/herd-*
+   ```
+
+   **Auf demselben VPS** liegen die Archive schon dort; dann vorher noch den jetzigen
+   Stand sichern, als Weg zurück:
+   `docker compose exec backup python -m app.ops backup run`.
+
+2. App und Sicherung anhalten (die Datenbank läuft weiter):
+
+   ```bash
+   cd /docker/<projekt>
+   docker compose stop app backup
+   ```
+
+3. **Nur auf einem neuen VPS:** den aufbewahrten Schlüssel zurückspielen. Der Befehl
+   fragt nach ihm; einfügen und Enter drücken (die Eingabe bleibt unsichtbar):
+
+   ```bash
+   docker compose run --rm --no-deps init set-secret-key
+   ```
+
+   Er antwortet mit `HERD_SECRET_KEY written (key id …)`. Ein Schlüssel kürzer als 32
+   Zeichen oder mit Leerzeichen wird abgelehnt, und nichts ändert sich.
+
+4. Prüfen. Erwartet wird jetzt genau eine Meldung, `restore.target_not_empty` (die
+   Datenbank ist noch nicht leer). Steht dort auch `restore.secret_key_mismatch`, passt
+   der Schlüssel nicht: Schritt 3 mit dem richtigen Schlüssel wiederholen.
+
+   ```bash
+   docker compose run --rm --no-deps -v <projekt>_backups:/backups \
+     --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
+   ```
+
+   Wichtig ist `<projekt>_backups` vor dem Doppelpunkt, mit dem Projektnamen davor.
+   Mit nur `backups` hängt Docker ein neues, leeres Volume ein, und die Prüfung meldet
+   `archive.format_unknown`.
+
+5. Datenbank leeren, noch einmal prüfen (jetzt: `ok`), dann einspielen:
+
+   ```bash
+   docker compose exec db psql -U herd -d postgres \
+     -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
+   docker compose run --rm --no-deps -v <projekt>_backups:/backups \
+     --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
+   docker compose run --rm --no-deps -v <projekt>_backups:/backups \
+     --entrypoint "python -m app.ops" app restore apply /backups/<archiv>.tar
+   ```
+
+6. Wieder starten: `docker compose up -d` (oder im Docker Manager neu bereitstellen).
+   Alle melden sich neu an, mit ihren Passwörtern aus der Sicherung.
+
+Scheitert das Einspielen (`failed <code>`), bleibt die Datenbank leer. Dann mit einer
+anderen Sicherung ab Schritt 4 wiederholen (auf demselben VPS z. B. mit der aus
+Schritt 1).
 
 ## Diagnose
 
@@ -176,17 +316,24 @@ cat /docker/traefik/docker-compose.yml               # Namen von Entrypoint und 
 docker logs $(docker ps -q --filter name=traefik) --tail 40 2>&1   # Router- und Zertifikatsfehler
 ```
 
-Meldungen von `init` (Exit 2: Bereitstellung bricht ab, nichts wird geändert):
+Meldungen von `init`. Bei Exit 2 bricht die Bereitstellung ab. Docker hat `app`, `db`
+und `backup` dann schon angehalten, und sie bleiben gestoppt, bis der Wert in der
+`.env` korrigiert und erneut bereitgestellt ist. Die Daten bleiben erhalten. Was
+`init` gemeldet hat, zeigt `docker compose logs init`.
 
 | Meldung | Bedeutung, Abhilfe |
 |---|---|
-| `DOMAIN must be a bare host name …` | In `DOMAIN` steht eine Adresse statt eines Namens (`https://…`, `/` am Ende, Port, Leerzeichen). Nur den Hostnamen eintragen. |
+| `DOMAIN must be a bare host name …` | In `DOMAIN` steht eine Adresse statt eines Namens (`https://…`, `/` am Ende, Port, Leerzeichen). Nur den Hostnamen eintragen. Bei Umlauten nennt die Meldung die `xn--`-Form, die stattdessen hineingehört. |
+| `DOMAIN must be written in lower case …` | Großbuchstaben im Namen. Klein schreiben, wie die Meldung es vorschlägt; sonst verbindet die Live-Bearbeitung nie. |
+| `DOMAIN must be a full name with a dot …` | Ein Name ohne Punkt (z. B. `localhost`). Den vollen Namen eintragen, z. B. `srvNNNNNN.hstgr.cloud`. |
+| `DOMAIN must be a name, not an IP address …` | Für eine IP-Adresse gibt es kein Zertifikat. Den Hostnamen des VPS oder die eigene Domain eintragen. |
 | `ADMIN_PASSWORD is set but ADMIN_EMAIL is empty` | Beide zusammen setzen (oder beide leer lassen). |
 | `ADMIN_EMAIL must be an e-mail address …` | Tippfehler in der Adresse. |
 | `ADMIN_PASSWORD must be 10 to 200 characters long` | Längeres Passwort wählen. |
 | `ADMIN_PASSWORD is easy to guess (auth.password_common)` | Das Passwort steht auf einer Liste geleakter Passwörter: ein anderes wählen. |
 | `ADMIN_PASSWORD is easy to guess (auth.password_context)` | Es enthält ein Wort aus der E-Mail-Adresse oder dem Produktnamen: ein anderes wählen. |
 | `… is empty: the volume is broken` (Exit 1) | Eine Geheimnis-Datei im Volume ist leer. Aus einer Kopie zurückholen; ein neues Datenbankpasswort würde die App aus ihrer Datenbank aussperren. |
+| `/secrets/secret_key: Permission denied. The stack's secret files must be files of user 10001 …` (Exit 1) | Die Schlüsseldatei wurde von Hand (als root) ins Volume gelegt. Mit `docker compose run --rm --no-deps init set-secret-key` neu schreiben (siehe [Wiederherstellen](#wiederherstellen)), dann neu bereitstellen. |
 
 Hinweise (Exit 0): `DOMAIN is empty: skipped` und `ADMIN_PASSWORD is empty: no one-time
 admin (skipped)` sind beim ersten Start richtig.
@@ -200,8 +347,13 @@ Häufige Fälle:
 - **Anmeldung klappt nicht:** `docker compose logs app | grep bootstrap`.
   `bootstrap.skipped` heißt: Beim Start fehlten E-Mail oder Passwort; `.env` ausfüllen
   und neu bereitstellen. Gibt es schon eine Person, legt der Start niemanden mehr an.
+  Stand das Passwort ohne Anführungszeichen in der `.env`, wurde es womöglich
+  abgeschnitten: siehe „Ausgesperrt, gleich nach der Installation?“ in Schritt 4.
 - **Live-Bearbeitung verbindet nicht:** `DOMAIN` muss genau der Name sein, unter dem
-  die App im Browser geöffnet wird.
+  die App im Browser geöffnet wird (klein geschrieben).
+- **Die App ist nach einer Änderung der `.env` weg:** `docker compose ps -a` zeigt
+  `init` mit Exit 2 und die anderen gestoppt. `docker compose logs init` nennt den
+  Wert; korrigieren und neu bereitstellen.
 
 ## Grenzen
 

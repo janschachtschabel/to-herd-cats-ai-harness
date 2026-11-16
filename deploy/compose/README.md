@@ -105,7 +105,9 @@ The archives are not encrypted: protect the volume, or rely on the offsite copy
 (restic encrypts). Restore only into an empty installation, with the app stopped:
 `python -m app.ops restore check <archive>`, then `restore apply <archive>`
 (docs/SICHERUNG.md, "Wiederherstellen"; `deploy/scripts/restore-rehearsal.sh` rehearses
-it). The worker (`app`; `worker` in `compose.nodes.yml`) exports the backups' gauges,
+it). A one-off `docker compose run -v` mounts the backups as
+`-v to-herd-cats-ai_backups:/backups` (the project's volume); a bare `backups` would
+mount a new, empty volume of that name. The worker (`app`; `worker` in `compose.nodes.yml`) exports the backups' gauges,
 `HerdBackupTooOld` fires after `HERD_BACKUP_ALERT_AFTER_HOURS`.
 
 ## Two API nodes and a worker
