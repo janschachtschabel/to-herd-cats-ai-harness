@@ -37,9 +37,7 @@ async def test_an_oidc_sign_in_waits_for_the_second_factor(
     assert (await browser.get("/api/auth/me")).status_code == 401
     challenge = (await session.scalars(select(SignInChallenge))).one()
     assert (challenge.user_id, challenge.method) == (member.id, "oidc")
-    done = await browser.post(
-        "/api/auth/login/second-factor", json={"code": enrolled.next_code()}
-    )
+    done = await browser.post("/api/auth/login/second-factor", json={"code": enrolled.next_code()})
     assert done.status_code == 200, done.text
     assert (await browser.get("/api/auth/me")).json()["user"]["id"] == str(member.id)
 

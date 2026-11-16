@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.modules.auth.models import UserSession
-from app.modules.totp.models import SignInChallenge
 from app.modules.totp.challenges import CHALLENGE_MINUTES, MAX_CHALLENGE_FAILURES
+from app.modules.totp.models import SignInChallenge
 from app.modules.users.models import User
 from tests.conftest import MakeClient, json_lines
 from tests.factories import CSRF, PASSWORD
-from tests.factories_totp import TOTP, Enrolled, enroll
+from tests.factories_totp import Enrolled, enroll
 from tests.support.clock import SettableClock
 
 LOGIN = "/api/auth/login"
