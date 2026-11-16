@@ -1,8 +1,24 @@
 # Sicherung und Wiederherstellung
 
-Stand: M9 Tasks 1 bis 3 (Archiv und Sicherung über die Kommandozeile, Wiederherstellung
-in eine leere Installation mit Probe, Zeitplan, Aufbewahrung, Offsite mit restic und
-Alarme).
+Stand: M9a (Archiv und Sicherung über die Kommandozeile, Wiederherstellung in eine leere
+Installation mit Probe, Zeitplan, Aufbewahrung, Offsite mit restic, Alarme, Aufbewahrung
+je Tabelle). Einspielen in eine laufende Installation (Wartungsmodus) und Sicherung in
+der Verwaltung folgen in M9b.
+
+**Kurz für den Betrieb:**
+
+1. Die Sicherung läuft von selbst: jede Nacht um 02:30 UTC (Compose-Dienst `backup`,
+   im Chart der CronJob). Prüfen: `python -m app.ops backup list` (unten).
+2. `HERD_SECRET_KEY` und, mit Offsite, das restic-Passwort **getrennt** von den
+   Archiven aufbewahren (Passwortsafe). Ohne den Schlüssel bleiben gespeicherte
+   KI-Schlüssel und Client-Secrets nach einer Wiederherstellung unlesbar.
+3. Für eine Kopie außer Haus `HERD_BACKUP_OFFSITE_REPOSITORY` und
+   `HERD_BACKUP_OFFSITE_PASSWORD` setzen (restic, verschlüsselt).
+4. Alarme `HerdBackupTooOld`, `HerdBackupFailing` und `HerdOffsiteBackupFailing`
+   beobachten (Prometheus, Chart).
+5. Wiederherstellen: in eine **leere** Datenbank, mit gestoppter App (Ablauf für
+   [Compose](#ablauf-in-compose) und [Kubernetes](#ablauf-in-kubernetes)); einmal im
+   Jahr proben.
 
 ## Was gesichert wird
 
@@ -295,6 +311,114 @@ ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migri
 Danach die App normal starten. `restore apply` gibt Revisionen, Tabellen und Dateien
 aus; scheitert ein Schritt, endet es mit `failed <code>` (`restore.pg_restore_failed`,
 `restore.tool_missing`, `archive.member_checksum`).
+
+Was Schritt 5 leert, steht in `CLEARED_AFTER_RESTORE` (`backend/app/ops/restore_after.py`):
+`collab_grant`, `oidc_flow`, `user_session`, `oauth_flow`. Jede Person meldet sich also
+neu an, offene Anmeldungen bei einem OIDC-Anbieter oder OAuth-Server beginnen neu, und
+offene Live-Bearbeitungen verbinden sich neu.
+
+### Ohne den Schlüssel
+
+Das Archiv hat `enc:`-Werte in diesen Spalten (das Manifest zählt sie je Spalte):
+`ai_connection.secret_ref` (KI-Verbindungen), `connector.secret_ref` und
+`connector.refresh_token_ref` (Konnektoren der MCP-Server), `oauth_client.client_secret_ref`
+(OAuth-Clients), `oidc_provider.client_secret_ref` (Anmeldeanbieter). Ohne passenden
+`HERD_SECRET_KEY` lehnt `restore check` mit `restore.secret_key_mismatch` bzw.
+`restore.secret_key_missing` ab und listet
+`restore.secrets_unreadable:<tabelle.spalte>=<Anzahl>`. Mit `--without-secrets` spielt
+`restore apply` trotzdem ein; dann gilt:
+
+- alle übrigen Daten (Seiten, Nachrichten, Tickets, Anhänge, Personen, Rechte) sind
+  vollständig da, die Anmeldung mit Passwort geht;
+- KI-Verbindungen, Konnektoren, OAuth-Clients und Anmeldeanbieter mit gespeichertem
+  Secret melden „Geheimnis nicht verfügbar“ (`SecretUnavailable`): Läufe der Agenten
+  über diese Verbindungen scheitern, die Anmeldung über diese Anbieter geht nicht;
+- ein Admin trägt jedes Secret in der Verwaltung neu ein (KI-Verbindung, Konnektor,
+  OAuth-Client, Anbieter unter Verwaltung → Anmeldung); persönliche Konnektoren
+  verbinden die Personen neu;
+- `env:`-Verweise sind davon nicht betroffen, sie brauchen nur die Variable am Ziel
+  (`restore.env_missing:<NAME>` warnt, wenn sie fehlt).
+
+Ein neuer Schlüssel am Ziel ist dann richtig: `HERD_SECRET_KEY` neu setzen, die Secrets
+neu eintragen; `HERD_SECRET_KEY_PREVIOUS` braucht es nicht.
+
+### Ablauf in Compose
+
+Nicht in dieser Umgebung ausgeführt (kein Docker); die Befehle folgen `compose.yml`. Im
+Verzeichnis `deploy/compose`, mit derselben `.env` und `ai.env` (gleicher
+`HERD_SECRET_KEY`) wie die gesicherte Installation:
+
+```bash
+docker compose exec backup python -m app.ops backup list   # das Archiv wählen (Name)
+docker compose stop app backup             # mit compose.nodes.yml: api-a api-b worker collab backup
+# Datenbank leeren (das Volume bleibt; nur die Datenbank herd wird neu angelegt)
+docker compose exec db psql -U herd -d postgres \
+  -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
+# prüfen, dann einspielen: ein Einmal-Container des App-Dienstes mit dem Sicherungs-Volume
+docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
+  app restore check /backups/<archiv>.tar
+docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
+  app restore apply /backups/<archiv>.tar
+docker compose up -d --wait                # die App startet auf dem eingespielten Stand
+```
+
+Der App-Dienst hat die Anhänge (`app-data`) beschreibbar eingehängt und liest
+`HERD_SECRET_KEY` aus `ai.env`; der Dienst `backup` hängt sie nur lesend ein und taugt
+deshalb nicht zum Einspielen. Kommt das Archiv aus der Offsite-Kopie, zuerst mit restic
+zurückholen (`restic -r <Repository> restore latest --tag herd --target /tmp/r`, Passwort
+aus `RESTIC_PASSWORD`/`--password-file`) und die `.tar`-Datei samt `.manifest.json` ins
+Volume `backups` kopieren (`docker compose cp`).
+
+Auf eine **neue Maschine**: `.env`, `ai.env` (Schlüssel!) und `backup.env` mitnehmen,
+`docker compose up -d db` (nur die Datenbank, sie ist dann leer), das Archiv ins Volume
+`backups` kopieren, dann ab „prüfen, dann einspielen“ wie oben. Nicht `docker compose up`
+vor dem Einspielen: der App-Dienst (Rolle `all`) migriert beim Start, die Datenbank ist
+dann nicht mehr leer (`restore.target_not_empty`).
+
+### Ablauf in Kubernetes
+
+Nicht in einem Cluster ausgeführt; die Namen folgen dem Chart (`<f>` ist der
+vollständige Name, etwa `herd-to-herd-cats-ai`). Mit dem Release, dessen Image zur
+Revision des Archivs passt oder neuer ist:
+
+1. Die App anhalten (mit Autoscaler genügt `scale` auch: ein HPA skaliert nicht von 0)
+   und die nächtliche Sicherung aussetzen:
+   ```bash
+   kubectl scale deployment/<f>-api deployment/<f>-worker deployment/<f>-collab --replicas=0
+   kubectl patch cronjob/<f>-backup -p '{"spec":{"suspend":true}}'
+   ```
+2. Die Datenbank leeren. Mitgeliefertes PostgreSQL:
+   `kubectl exec <f>-postgresql-0 -- psql -U herd -d postgres -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd'`;
+   eine externe Datenbank leert ihr Betrieb (neu anlegen, Besitzer die Rolle aus
+   `database.url`).
+3. Einen Job aus dem CronJob ableiten, der einspielt statt sichert:
+   ```bash
+   kubectl create job <f>-restore --from=cronjob/<f>-backup --dry-run=client -o yaml > restore.yaml
+   ```
+   In `restore.yaml`: `command` auf `["/usr/bin/tini", "--", "python", "-m", "app.ops",
+   "restore", "apply", "/backups/<archiv>.tar"]` setzen (zuerst gern mit `"check"`),
+   beim Volume und beim Einhängen `data` jedes `readOnly: true` entfernen (das Einspielen
+   schreibt die Anhänge) und einen `affinity`-Block löschen (er bindet den Job an einen
+   API-Pod, und es läuft keiner). `HERD_SECRET_KEY` bekommt der Job wie der CronJob aus
+   `ai.existingSecret`; ohne passenden Schlüssel `"--without-secrets"` anhängen (oben).
+   Dann `kubectl apply -f restore.yaml` und `kubectl logs -f job/<f>-restore`.
+4. Die App wieder starten: `helm upgrade` mit denselben Werten (setzt die Replikas und
+   lässt den Migrations-Job laufen; die Datenbank steht nach dem Einspielen auf dem
+   Head) oder `kubectl scale` auf die vorigen Zahlen; den CronJob mit
+   `{"spec":{"suspend":false}}` wieder einschalten und `kubectl delete job <f>-restore`.
+
+Das Archiv liegt auf der PVC `<f>-backups`. Eines von außen (Offsite, andere
+Installation) kommt mit einem Hilfs-Pod, der diese PVC einhängt, und `kubectl cp` dorthin
+(Archiv und `.manifest.json`).
+
+## Ergänzung: Export je Bereich
+
+Unabhängig von der Sicherung exportiert jede Person mit Leserecht einen Bereich als
+Markdown-ZIP (Kopf des Bereichs → „Import/Export“, [`WIKI.md`](WIKI.md)): alle Seiten
+als `.md` mit Anhängen, wieder importierbar in einen Bereich derselben oder einer
+anderen Installation. Das ist kein Ersatz für die Sicherung: Nachrichten, Tickets,
+Versionen, Rechte, Agenten und Einstellungen fehlen darin. Es taugt für einzelne
+Bereiche, für die Weitergabe von Wissen und als lesbare Kopie ohne die App.
 
 ### Probe
 
