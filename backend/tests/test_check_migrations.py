@@ -131,7 +131,8 @@ def test_the_command_line_requires_the_released_head_on_request(
     assert main(["--require-released-head"], alembic=tmp_path) == 0
 
 
-def test_the_repository_passes_and_names_no_release_yet() -> None:
+def test_the_repository_passes_and_names_the_last_release() -> None:
     root = Path(__file__).resolve().parents[1] / "alembic"
-    assert released_revision(root / "RELEASED") == ""
-    assert check(root / "versions", released_revision(root / "RELEASED")) == []
+    released = released_revision(root / "RELEASED")
+    assert released == "9e4b6d2f8a17"  # the head at v1.0.0
+    assert check(root / "versions", released) == []
