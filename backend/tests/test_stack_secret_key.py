@@ -71,3 +71,12 @@ def test_the_command_line_reads_the_key_from_standard_input(
     assert main(["set-secret-key", "--secrets", str(tmp_path)]) == 0
     assert (tmp_path / KEY_FILE).read_text() == SAVED
     assert key_id(SAVED) in capsys.readouterr().out
+
+
+def test_a_key_file_it_cannot_read_is_replaced(tmp_path: Path) -> None:
+    """init's line for an unusable key file points here (e.g. one copied in by hand)."""
+    (tmp_path / KEY_FILE).write_bytes(b"\xff\xfe not text")
+    code, out = _set(SAVED, tmp_path)
+    assert code == 0
+    assert (tmp_path / KEY_FILE).read_text() == SAVED
+    assert "unreadable" in out
