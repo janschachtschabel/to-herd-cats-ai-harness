@@ -146,6 +146,10 @@ export default async function globalSetup() {
   // For what the tests make through the backend itself (`seedProposal`): the workers
   // inherit this process's environment.
   process.env.HERD_E2E_DATABASE_URL = databaseUrl;
+  // The backups (Verwaltung → Sicherung): the spec `backup` reads and changes the
+  // archives the app's worker writes there.
+  const backupDir = mkdtempSync(join(tmpdir(), "herd-e2e-backups-"));
+  process.env.HERD_E2E_BACKUP_DIR = backupDir;
   const appEnv = {
     ...process.env,
     HERD_ROLE: "all",
@@ -160,6 +164,7 @@ export default async function globalSetup() {
     HERD_BOOTSTRAP_ADMIN_PASSWORD: OWNER.password,
     HERD_STATIC_DIR: DIST,
     HERD_DATA_DIR: dataDir,
+    HERD_BACKUP_DIR: backupDir,
     HERD_LOG_FORMAT: "text",
     HERD_SECRET_KEY: SECRET_KEY,
     HERD_RUN_LEASE_SECONDS: "5",
@@ -285,6 +290,7 @@ export default async function globalSetup() {
     process.removeListener("exit", orphanGuard);
     psql(adminUrl, `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     rmSync(dataDir, { recursive: true, force: true });
+    rmSync(backupDir, { recursive: true, force: true });
   };
   try {
     await appReady();
