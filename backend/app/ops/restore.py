@@ -84,7 +84,7 @@ async def _apply(
     conn: AsyncConnection, settings: Settings, archive: Path, manifest: Manifest, clock: Clock
 ) -> RestoreReport:
     storage = LocalStorage(settings.data_dir)
-    added = await _restore_files(storage, archive, manifest)
+    added = await restore_files(storage, archive, manifest)
     try:
         await _restore_database(settings, archive)
     except BaseException:
@@ -93,7 +93,7 @@ async def _apply(
         raise
     await conn.run_sync(upgrade_head)
     await conn.commit()
-    revision_to = ",".join(sorted(await _heads(conn)))
+    revision_to = ",".join(sorted(await heads(conn)))
     async with AsyncSession(bind=conn, expire_on_commit=False) as session:
         await finish_restore(
             session,
@@ -110,14 +110,15 @@ async def _apply(
     return RestoreReport(manifest.alembic_revision, revision_to, tables, files)
 
 
-async def _heads(conn: AsyncConnection) -> list[str]:
+async def heads(conn: AsyncConnection) -> list[str]:
     from sqlalchemy import text  # noqa: PLC0415
 
     return list((await conn.scalars(text("SELECT version_num FROM alembic_version"))).all())
 
 
-async def _restore_files(storage: LocalStorage, archive: Path, manifest: Manifest) -> list[str]:
-    """Write the archive's files that are not here yet; the keys written."""
+async def restore_files(storage: LocalStorage, archive: Path, manifest: Manifest) -> list[str]:
+    """Write the archive's files that are not here yet; the keys written (none of them
+    stays when one fails)."""
     added: list[str] = []
     try:
         with tarfile.open(archive, "r:") as tar:
@@ -152,7 +153,7 @@ async def _restore_database(settings: Settings, archive: Path) -> None:
             handle = tar.extractfile(PREFIX + DUMP_MEMBER)
             if handle is None:
                 raise RestoreFailed("archive.member_missing")
-            await restore(settings, _read(handle))
+            await restore(settings, read_chunks(handle))
     except ToolFailed as failed:
         raise RestoreFailed(failed.code) from None
     except KeyError:
@@ -163,7 +164,7 @@ async def _restore_database(settings: Settings, archive: Path) -> None:
         raise RestoreFailed("archive.unreadable") from None
 
 
-async def _read(handle: IO[bytes]) -> AsyncIterator[bytes]:
+async def read_chunks(handle: IO[bytes]) -> AsyncIterator[bytes]:
     while chunk := await asyncio.to_thread(handle.read, CHUNK):
         yield chunk
 

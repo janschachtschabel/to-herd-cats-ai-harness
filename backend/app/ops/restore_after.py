@@ -12,6 +12,7 @@ flows, collab grants) adds its table here, and a test checks that each exists.
 """
 
 from datetime import datetime, timedelta
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +41,9 @@ async def finish_restore(
     revision_from: str,
     revision_to: str,
     clock: Clock,
+    replaced: dict[str, Any] | None = None,
 ) -> None:
+    """`replaced`: the replace's own details for the audit entry (`ops/replace.py`)."""
     await clear_tables(session, CLEARED_AFTER_RESTORE)
     runs = BackupRunRepository(session)
     await runs.interrupt_running(
@@ -52,4 +55,5 @@ async def finish_restore(
     if org_id is None:
         return
     details = {"archive": archive_name, "revision_from": revision_from, "revision_to": revision_to}
+    details |= replaced or {}
     await record_system(session, org_id, "backup.restored", "organization", org_id, details)

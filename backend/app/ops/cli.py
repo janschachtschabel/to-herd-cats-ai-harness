@@ -8,6 +8,10 @@
     python -m app.ops backup schedule             # `run` at every HERD_BACKUP_SCHEDULE term
     python -m app.ops restore check ARCHIVE       # problem codes and warnings, or "ok"
     python -m app.ops restore apply ARCHIVE [--without-secrets]   # empty installation
+    python -m app.ops restore apply ARCHIVE --replace --confirm "<organisation name>"
+                                                  # in place of the running installation
+                                                  # (safety archive, maintenance meanwhile)
+    python -m app.ops maintenance status|off      # whether in maintenance; end it
 
 The settings come from the environment like the app's (`HERD_*`); the command line
 acts as `system` (audit `via=cli`). Exit status 0 when it worked, 1 when not, 2 for a
@@ -19,7 +23,7 @@ from collections.abc import Sequence
 
 from app.core.clock import Clock
 from app.core.config import Settings
-from app.ops import cli_backup, cli_restore
+from app.ops import cli_backup, cli_maintenance, cli_restore
 
 
 def parser() -> argparse.ArgumentParser:
@@ -27,6 +31,7 @@ def parser() -> argparse.ArgumentParser:
     areas = top.add_subparsers(dest="area", required=True)
     cli_backup.add_commands(areas)
     cli_restore.add_commands(areas)
+    cli_maintenance.add_commands(areas)
     return top
 
 

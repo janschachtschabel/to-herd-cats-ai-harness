@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.modules.maintenance.models import Maintenance, MaintenanceReason
 from app.modules.maintenance.state import INACTIVE, MaintenanceState
@@ -36,6 +36,11 @@ def stay_on_sql(at: datetime) -> str:
         "  END IF;\n"
         "END $herd$;\n"
     )
+
+
+async def stay_on(connection: AsyncConnection, at: datetime) -> None:
+    """`stay_on_sql` in the connection's transaction (a restore's migration)."""
+    await connection.execute(text(stay_on_sql(at)))
 
 
 class MaintenanceRepository:
@@ -92,9 +97,19 @@ class MaintenanceRepository:
             await self.notify()
         return changed
 
+    async def turn_off_all(self) -> list[uuid.UUID]:
+        """Every organisation inactive (after a restore: the archive's organisations);
+        the ones that were active."""
+        result = await self.session.execute(
+            update(Maintenance)
+            .where(Maintenance.active)
+            .values(active=False, reason=None, started_at=None, version=Maintenance.version + 1)
+            .returning(Maintenance.org_id)
+        )
+        ended = list(result.scalars().all())
+        if ended:
+            await self.notify()
+        return ended
+
     async def notify(self) -> None:
         await self.session.execute(select(func.pg_notify(CHANNEL, "")))
-
-    async def stay_on(self, at: datetime) -> None:
-        """`stay_on_sql` in this session's transaction (after a restore's migration)."""
-        await self.session.execute(text(stay_on_sql(at)))

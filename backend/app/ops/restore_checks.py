@@ -51,7 +51,11 @@ async def check_restore(settings: Settings, archive: Path) -> RestoreCheck:
         await engine.dispose()
 
 
-async def check_on(conn: AsyncConnection, settings: Settings, archive: Path) -> RestoreCheck:
+async def check_on(
+    conn: AsyncConnection, settings: Settings, archive: Path, *, into_empty: bool = True
+) -> RestoreCheck:
+    """With `into_empty` false (replacing a running installation, `replace.py`) a
+    database with tables is no problem."""
     problems = verify_archive(archive)
     if problems:
         return RestoreCheck(problems=problems)
@@ -61,7 +65,7 @@ async def check_on(conn: AsyncConnection, settings: Settings, archive: Path) -> 
     if not heads <= known_revisions()[1]:
         check.problems.append("restore.archive_newer")
     tables = await conn.scalar(text("SELECT count(*) FROM pg_tables WHERE schemaname = 'public'"))
-    if tables:
+    if tables and into_empty:
         check.problems.append("restore.target_not_empty")
     try:
         if await _file_conflict(settings, manifest):

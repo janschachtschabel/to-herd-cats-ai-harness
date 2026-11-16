@@ -54,6 +54,37 @@ class BackupRunRepository:
         """The installation's organisation (the oldest, should there be several)."""
         return await self.session.scalar(select(Organization.id).order_by(Organization.id).limit(1))
 
+    async def installation(self) -> tuple[uuid.UUID, str] | None:
+        """The installation's organisation and its name (the replace's confirmation)."""
+        row = (
+            await self.session.execute(
+                select(Organization.id, Organization.name).order_by(Organization.id).limit(1)
+            )
+        ).first()
+        return (row.id, row.name) if row is not None else None
+
+    async def get(self, run_id: uuid.UUID) -> BackupRun | None:
+        return await self.session.get(BackupRun, run_id)
+
+    async def copy_finished(self, org_id: uuid.UUID, run: BackupRun) -> None:
+        """A finished run of another database (a replace's safety archive) recorded
+        here too, under this database's organisation."""
+        self.session.add(
+            BackupRun(
+                org_id=org_id,
+                trigger=run.trigger,
+                state=run.state,
+                started_at=run.started_at,
+                finished_at=run.finished_at,
+                archive=run.archive,
+                bytes=run.bytes,
+                archive_sha256=run.archive_sha256,
+                error_code=run.error_code,
+                offsite_state=run.offsite_state,
+            )
+        )
+        await self.session.flush()
+
     async def start(self, org_id: uuid.UUID, trigger: BackupTrigger, at: datetime) -> BackupRun:
         run = BackupRun(org_id=org_id, trigger=trigger, state=BackupState.RUNNING, started_at=at)
         self.session.add(run)

@@ -50,3 +50,13 @@ class MaintenanceService:
             self.session, org_id, "maintenance.ended", "organization", org_id, {"via": via}
         )
         return True
+
+    async def end_all(self, *, via: str = "cli") -> bool:
+        """Off for every organisation (after a restore, whose archive brings its own);
+        False when none was on."""
+        ended = await self.repo.turn_off_all()
+        for org_id in ended:
+            await record_system(
+                self.session, org_id, "maintenance.ended", "organization", org_id, {"via": via}
+            )
+        return bool(ended)
