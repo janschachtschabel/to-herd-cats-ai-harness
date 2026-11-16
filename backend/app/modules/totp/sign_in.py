@@ -28,6 +28,7 @@ from app.modules.totp.models import SignInChallenge
 from app.modules.totp.repository import ChallengeRepository, TotpRepository
 from app.modules.totp.timing import totp_clock
 from app.modules.users.models import User
+from app.modules.users.repository import UserRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,8 +93,8 @@ class SecondStep:
         """The challenge's person, if still active (deactivated meanwhile: no entry)."""
         if challenge is None:
             return None
-        user = await self.session.get(User, challenge.user_id, populate_existing=True)
-        if user is None or not user.is_active or user.org_id != challenge.org_id:
+        user = await UserRepository(self.session).get_current(challenge.org_id, challenge.user_id)
+        if user is None or not user.is_active:
             await self.challenges.drop(challenge)
             return None
         return user
