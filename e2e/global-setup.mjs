@@ -173,6 +173,13 @@ export default async function globalSetup() {
     HERD_MCP_CATALOG_DIR: catalogDir,
     HERD_OIDC_ALLOWED_HOSTS: "localhost",
     HERD_OIDC_STUB_SECRET: "oidc-SECRET-value-7",
+    // Every person of every spec signs in from the one address 127.0.0.1, and the
+    // limit per client address (30 attempts a minute, the second step of a TOTP
+    // sign-in included) counts them all: the whole suite is one client to it. How
+    // many fall into a minute depends on the runner's speed (25 locally, over 30 on
+    // CI before totp.spec), so it is raised here, as in deploy/compose/load.sh. The
+    // limit on failures per address and email stays as in production.
+    HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE: "1000",
     SSL_CERT_FILE: tls.cert,
   };
   const startApp = () => {
