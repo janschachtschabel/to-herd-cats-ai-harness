@@ -449,6 +449,66 @@ die API für jede Live-Verbindung eine eigene, kurzlebige Berechtigung aus
   kommen aus demselben Image und werden zusammen ausgerollt; ein Collab-Prozess, der
   noch Cookies erwartet, lehnt jede Verbindung mit 4401 ab, bis er ersetzt ist.
 
+## Mehrere Collab-Instanzen (seit M9b)
+
+Der Collab-Prozess hält das Live-Dokument einer Seite im Speicher. Damit mehrere
+Collab-Prozesse nebeneinander laufen können (Chart `collab.replicas`, Compose
+`compose.nodes.yml` mit `collab-a` und `collab-b`), wird **jede Seite in PostgreSQL an
+genau eine Instanz gebunden** (Plan M9, Entscheidung 17; ohne Redis):
+
+- **Anmelden:** Jede Instanz wählt beim Start eine eigene Kennung und meldet sich alle
+  5 s bei der internen API (`POST /internal/collab/instances`) mit der Adresse, unter der
+  die API sie erreicht: `HERD_COLLAB_ADVERTISE_URL` (`ws://host:port`, ohne Pfad; Pflicht,
+  ohne sie startet der Prozess nicht). In Rolle `all` setzt die App selbst
+  `ws://127.0.0.1:<HERD_COLLAB_PORT>` (eine Instanz, der Kindprozess); das Chart nimmt
+  die Pod-IP (`ws://$(HERD_COLLAB_POD_IP):1234`, Downward-API); in Compose der Name des
+  Containers. Eine Instanz, die 15 s schweigt, gilt als weg; nach einer Stunde Schweigen
+  räumt die Fälligkeits-Schleife ihre Zeile auf (`collab_instance`).
+- **Binden:** Das Relay der API schickt jede Verbindung einer Seite an ihre Besitzerin
+  (`collab_page_owner`). Hat die Seite keine gültige Besitzerin (Bindung abgelaufen oder
+  Instanz weg), bindet es sie an die lebende, nicht auslaufende Instanz mit den
+  wenigsten Seiten und erhöht dabei die `epoch` der Seite atomar. Die Bindung gilt 30 s
+  und wird mit jedem Aufruf der Besitzerin verlängert (die Prüfung jedes offenen
+  Dokuments alle 5 s). So landen alle Bearbeitenden einer Seite in einer Instanz, und die
+  Speicherlogik (Generationen, Rechte je Sitzung, Zusammenfassen der Versionen) bleibt,
+  wie sie ist.
+- **Schutz vor zwei Schreibenden:** Laden, Speichern und Prüfen nennen die Instanz,
+  Speichern und Prüfen dazu die `epoch`, mit der sie die Seite geladen hat. Wer nicht
+  (mehr) Besitzerin ist, bekommt 409 `collab.not_owner`, verwirft das Dokument und
+  schließt seine Verbindungen mit 4409; die Browser holen die Seite neu und verbinden sich
+  über das Relay mit der neuen Besitzerin. Der gespeicherte Inhalt der neuen Besitzerin
+  bleibt; was in der alten Instanz seit ihrer letzten Speicherung getippt wurde (höchstens
+  etwa 10 s), geht verloren. Das passiert nur, wenn eine Instanz 30 s lang die API nicht
+  erreicht hat oder 15 s lang als tot galt, während sie noch lief.
+- **Auslaufen (SIGTERM):** Eine Instanz, die beendet wird (Rollout, Knoten leeren,
+  `docker compose stop`), meldet sich als auslaufend (keine neuen Seiten mehr), speichert
+  alle offenen Dokumente, schließt die Verbindungen mit 1012 und gibt dann ihre Seiten
+  frei (`DELETE /internal/collab/instances/<id>`). Die Browser verbinden sich von selbst
+  neu und landen auf einer anderen Instanz, ohne Verlust; bis zur Freigabe (meist unter
+  einer Sekunde) bekommen sie 4502 und versuchen es weiter. Das Chart rollt bei
+  `collab.replicas` ≥ 2 je einen Pod (`maxSurge` 1, `maxUnavailable` 0) und legt ein
+  PodDisruptionBudget an; mit einer Replika bleibt es bei `Recreate`. Wird eine Instanz
+  hart beendet (SIGKILL, Absturz), sind ihre Seiten nach 15 s frei; was sie nicht mehr
+  speichern konnte, ist verloren (wie bisher beim einen Collab-Prozess).
+- **Keine Instanz:** Meldet sich keine lebende Instanz (etwa kurz nach dem Start, bevor
+  der Collab-Prozess sich angemeldet hat), schließt das Relay mit 4502
+  `collab.unavailable`; der Editor versucht es weiter.
+- **Bemessung:** Jede Instanz hat ihr eigenes Speicherbudget
+  (`HERD_COLLAB_MEMORY_BUDGET_MB`) und Limit (Faustregel oben). Die Instanzen teilen sich
+  die Seiten, nicht die Bearbeitenden einer Seite: Eine einzelne sehr gefragte Seite
+  liegt immer in einer Instanz.
+- **Aktualisieren von 1.0.0:** Ein Collab-Prozess von 1.0.0 nennt keine Instanz. Die
+  API bedient ihn wie bisher, solange keine Instanz die Seite besitzt (so gehen seine
+  letzten Speicherungen beim Beenden nicht verloren); sobald eine neue Instanz die Seite
+  besitzt, gilt er als veraltete Besitzerin (409). Er meldet sich nicht an, also leitet
+  das Relay keine neuen Verbindungen zu ihm: Bis der neue Collab-Prozess läuft, sehen
+  Browser kurz „Getrennt – neuer Versuch …“.
+- **Nur über IPv4 geprüft:** Die Adresse aus der Pod-IP ist eine IPv4-Adresse; ein
+  reiner IPv6-Cluster braucht eine Adresse in eckigen Klammern, die das Chart heute
+  nicht bildet.
+- Metrik: `herd_collab_saves_total{result="not_owner"}` zählt abgewiesene Speicherungen
+  einer veralteten Besitzerin; `herd_collab_documents` je Instanz zeigt die Verteilung.
+
 ## Betrieb hinter einem Reverse Proxy
 
 Die Live-Bearbeitung ist ein WebSocket auf `/collab/<seiten-id>?generation=<n>` am
@@ -552,13 +612,15 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
   mehr als ein Viertel aller), 4507 Live-Editor ausgelastet (Speicherbudget des
   Collab-Prozesses, siehe oben), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
   nichts gesendet (der Browser verbindet sich neu),
-  4502/4503 Collab-Prozess nicht erreichbar bzw. aus; 4503 mit Grund `maintenance` bzw.
-  `maintenance.active`: die Installation ist im Wartungsmodus (Einspielen eines Archivs,
+  4502/4503 keine Collab-Instanz erreichbar (der Browser versucht es weiter) bzw.
+  Live-Bearbeitung aus; 4503 mit Grund `maintenance` bzw. `maintenance.active`: die
+  Installation ist im Wartungsmodus (Einspielen eines Archivs,
   [`SICHERUNG.md`](SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)),
-  das Dokument wird ungespeichert verworfen.
+  das Dokument wird ungespeichert verworfen. 4409 kommt auch, wenn eine andere
+  Collab-Instanz die Seite übernommen hat (siehe „Mehrere Collab-Instanzen“).
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
-  `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
+  `revoked`, `too_large`, `not_owner`, `refused`, `unrepresentable`: ein Stand, der sich nicht als
   Markdown speichern ließ), `herd_collab_load_mutations_total` (Editoren im Browser,
   die ein gerade geladenes Dokument von selbst geändert hätten und deshalb beendet
   wurden; jeder Wert über 0 ist ein Fehler im Editor). Am Port 1234 des

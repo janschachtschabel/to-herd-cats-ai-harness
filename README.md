@@ -395,6 +395,7 @@ zu ändern sind:
 | `HERD_SESSION_COOKIE_NAME` | `herd_session` | Name des Sitzungs-Cookies; über https mit dem Präfix `__Host-` ([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)) |
 | `HERD_COLLAB_API_URL` | `http://127.0.0.1:<HERD_INTERNAL_PORT>` | Wo der Collab-Prozess die API erreicht (ihren internen Port); nur für die Rolle `collab` in einem eigenen Container oder Pod nötig (Compose und Chart setzen sie) |
 | `HERD_COLLAB_SCRIPT` | `collab/server.mjs` des Quellstands (im Image `/app/collab/server.mjs`) | Das Skript, das `node` als Collab-Prozess startet; nur für eigene Pfade |
+| `HERD_COLLAB_ADVERTISE_URL` | in Rolle `all` `ws://127.0.0.1:<HERD_COLLAB_PORT>` | Wo die API eine Collab-Instanz erreicht (`ws://host:port`); Pflicht für die Rolle `collab` (ohne startet sie nicht; Chart: Pod-IP, Compose: Containername); in Rolle `all` setzt die App sie selbst ([`docs/WIKI.md`](docs/WIKI.md), „Mehrere Collab-Instanzen“) |
 
 Nach Änderungen an der API `npm run generate:api` im Frontend ausführen.
 
@@ -627,8 +628,10 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `/collab/<seiten-id>?generation=<collab_generation>` am öffentlichen Port; die API
   prüft Origin (gleich dem von `HERD_PUBLIC_URL`, ohne diese gleich dem angefragten
   Host; sonst HTTP 403), Sitzungs-Cookie, Sichtbarkeit, `page.edit` und die Generation
-  wie die REST-API und reicht erst dann Frames an den Collab-Prozess
-  (`HERD_COLLAB_URL`, Standard `ws://127.0.0.1:1234`) weiter. Abgelehnt wird mit
+  wie die REST-API und reicht erst dann Frames an die Collab-Instanz weiter, an die die
+  Seite gebunden ist (jede meldet ihre Adresse `HERD_COLLAB_ADVERTISE_URL`; in Rolle
+  `all` der Kindprozess auf `127.0.0.1`; mehrere Instanzen: `docs/WIKI.md`, „Mehrere
+  Collab-Instanzen“). Abgelehnt wird mit
   Schließcodes, die der Browser lesen kann: 4401 (keine gültige Sitzung), 4403 (kein
   Recht, oder Recht entzogen), 4404 (Seite nicht sichtbar), 4409 (die Generation ist
   beendet: Seite neu laden), 4413 (Zustand oder Markdown zu groß für die
@@ -642,7 +645,7 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `HERD_COLLAB_MAX_PER_SESSION` und `HERD_COLLAB_MAX_PER_PERSON`), 4507 (der
   Collab-Prozess hält sein Speicherbudget: später erneut oder im Markdown-Editor; der
   Browser verbindet sich nicht selbst neu), 4502/4503
-  (Collab-Prozess nicht erreichbar bzw. aus), 4504 (Prüfen und Verbinden dauerten
+  (keine Collab-Instanz erreichbar, der Browser versucht es weiter, bzw. aus), 4504 (Prüfen und Verbinden dauerten
   länger als 10 s), 4408 (der Browser ist dem Dokument nicht binnen 10 s
   beigetreten, oder die Verbindung hat 15 Minuten lang nichts gesendet,
   `HERD_COLLAB_IDLE_MINUTES`; ein offener Editor meldet seine Anwesenheit alle 15 s), 1013 (später erneut versuchen); bei 4408, 4504 und 1013 verbindet
