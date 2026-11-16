@@ -1,9 +1,41 @@
 # Anmeldung: Passwort und OIDC (Google und andere)
 
-Stand M9 (Task 4 und 5). Neben der Anmeldung mit E-Mail und Passwort kann sich eine
-Person über einen OpenID-Connect-Anbieter (OIDC) anmelden: Google als fertige Vorlage,
-jeder andere Anbieter mit Discovery (Keycloak, Entra ID, Authentik …) als „allgemein“.
-Optional legen sich Personen aus erlaubten Domains dabei selbst ein Konto an.
+Stand M9a (Tasks 4, 5, 5b und 9). Neben der Anmeldung mit E-Mail und Passwort kann sich
+eine Person über einen OpenID-Connect-Anbieter (OIDC) anmelden: Google als fertige
+Vorlage, jeder andere Anbieter mit Discovery (Keycloak, Entra ID, Authentik …) als
+„allgemein“. Optional legen sich Personen aus erlaubten Domains dabei selbst ein Konto
+an; es wartet, bis ein Admin es freigibt.
+
+## Anmeldung mit Passwort
+
+Das erste Konto (Inhaberin) entsteht beim allerersten Start aus
+`HERD_BOOTSTRAP_ADMIN_EMAIL` und `HERD_BOOTSTRAP_ADMIN_PASSWORD`; weitere legen Admins
+unter **Verwaltung → Personen** an. Es gibt keinen Selbstbedienungs-Reset: ein Admin
+setzt ein neues Passwort, dann enden alle Sitzungen der Person. Jede Person ändert ihr
+eigenes Passwort im Profil (mit dem alten).
+
+- **Regeln:** 10 bis 200 Zeichen, keine Regeln zur Zusammensetzung. Abgelehnt wird ein
+  Passwort aus der Liste häufiger und geleakter Passwörter (`auth.password_common`) und
+  eines, das ein Wort aus dem Kontext enthält: Produktname, Name der Organisation,
+  Teile der E-Mail-Adresse oder des Namens, je ab 4 Zeichen (`auth.password_context`).
+  Einzelheiten in [`SICHERHEIT.md`](SICHERHEIT.md#anmeldung).
+- **Raten bremsen:** je Client-Adresse höchstens `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE`
+  (30) Versuche je Minute, je Adresse und E-Mail `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (5)
+  Fehlversuche; gezählt in PostgreSQL über alle API-Knoten. Keine Kontosperre.
+- **Sitzung:** ein Cookie, gültig `HERD_SESSION_TTL_HOURS` (168, also 7 Tage) ab der
+  Anmeldung, durch Nutzung nicht verlängert; eine Grenze für Untätigkeit kommt mit M9b
+  Task 18 ([`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)). Abmelden beendet sie; ein
+  Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
+  beenden alle Sitzungen einer Person.
+- **Cookie-Name:** über https (oder mit `HERD_COOKIE_SECURE=true`) `__Host-herd_session`
+  (Secure, HttpOnly, SameSite=Lax, Pfad `/`), über reines http `herd_session`. Hinter
+  einem Reverse Proxy muss die App https erkennen (`HERD_FORWARDED_ALLOW_IPS`), sonst
+  fehlt das Präfix. **Nach dem Update auf M9 wird jede über https angemeldete Person
+  einmal abgemeldet**, weil das alte Cookie ohne Präfix dort nicht mehr zählt
+  ([README](../README.md#freigaben-und-updates)).
+- **Zweiter Faktor:** lokale Passwortkonten haben keinen; TOTP kommt in M9b (Task 16)
+  als freiwillige Wahl, auch für Owner und Admins (Jans Antwort J3). Wer MFA für alle
+  braucht, lässt die Personen nur über einen Anbieter mit Pflicht-MFA anmelden.
 
 ## Voraussetzungen (Betrieb)
 
