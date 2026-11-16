@@ -122,13 +122,17 @@ class BackupRunRepository:
             last_ok, last_failed, size, offsite[OffsiteState.OK], offsite[OffsiteState.FAILED]
         )
 
-    async def interrupt_running(self, at: datetime, *, code: str = INTERRUPTED) -> int:
+    async def interrupt_running(
+        self, at: datetime, *, code: str = INTERRUPTED, started_before: datetime | None = None
+    ) -> int:
         """Runs still `running` whose process is gone (after a restore, or seen by
-        whoever holds the backup lock), with `code`; how many."""
+        whoever holds the backup lock), with `code`; with `started_before`, only runs
+        that started before that time; how many."""
+        stmt = update(BackupRun).where(BackupRun.state == BackupState.RUNNING)
+        if started_before is not None:
+            stmt = stmt.where(BackupRun.started_at < started_before)
         result = await self.session.execute(
-            update(BackupRun)
-            .where(BackupRun.state == BackupState.RUNNING)
-            .values(state=BackupState.INTERRUPTED, finished_at=at, error_code=code)
+            stmt.values(state=BackupState.INTERRUPTED, finished_at=at, error_code=code)
         )
         return int(result.rowcount)  # type: ignore[attr-defined]
 

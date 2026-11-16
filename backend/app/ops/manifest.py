@@ -8,12 +8,14 @@ SHA-256 and size of every other member) and as a sidecar next to the archive
 """
 
 import json
+from datetime import UTC, datetime
 from typing import TypedDict
 
 from pydantic import ConfigDict, TypeAdapter, ValidationError
 from pydantic.dataclasses import dataclass
 
 FORMAT = 1
+CREATED_AT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 class ManifestInvalid(ValueError):  # noqa: N818 (a state of the input)
@@ -40,6 +42,10 @@ class Manifest:
     key_id: str | None  # of HERD_SECRET_KEY (`core.secrets.key_id`), never the key
     enc_values: dict[str, int]  # "table.column" -> how many `enc:` values
     env_refs: list[str]  # names of the `env:` references, sorted
+
+    def created(self) -> datetime:
+        """`created_at` as a time (whole seconds; ValueError if it is not one)."""
+        return datetime.strptime(self.created_at, CREATED_AT_FORMAT).replace(tzinfo=UTC)
 
     def to_json(self) -> bytes:
         data = _ADAPTER.dump_python(self, mode="json")

@@ -56,7 +56,7 @@ from app.ops.archive import (
     sidecar_of,
     verify_archive,
 )
-from app.ops.manifest import FORMAT, Manifest
+from app.ops.manifest import CREATED_AT_FORMAT, FORMAT, Manifest
 from app.ops.pgtools import ToolFailed, dump, tool_version
 from app.ops.snapshot import NoSchema, Snapshot, open_snapshot
 from app.version import app_version
@@ -256,7 +256,7 @@ def _manifest(
         format=FORMAT,
         app_version=app_version(),
         alembic_revision=snapshot.alembic_revision,
-        created_at=at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        created_at=at.astimezone(UTC).strftime(CREATED_AT_FORMAT),
         server_major=snapshot.server_major,
         pg_dump_version=pg_dump_version,
         storage="local",

@@ -73,8 +73,7 @@ def list_archives(directory: Path) -> list[ArchiveInfo]:
     for path in sorted(directory.glob(f"{ARCHIVE_PREFIX}*.tar")):
         try:
             manifest, _ = read_sidecar(path)
-            at = datetime.strptime(manifest.created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
-            found.append(ArchiveInfo(path.name, at, ok=True))
+            found.append(ArchiveInfo(path.name, manifest.created(), ok=True))
         except (ManifestInvalid, OSError, ValueError):
             found.append(ArchiveInfo(path.name, _mtime(path), ok=False))
     return found

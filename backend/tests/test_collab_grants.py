@@ -235,6 +235,7 @@ async def test_no_grant_is_left_after_a_restore(wiki: Wiki, session: AsyncSessio
     await finish_restore(
         session,
         archive_name="herd-test.tar",
+        archive_created_at=utcnow(),
         revision_from="x",
         revision_to="x",
         clock=SettableClock(utcnow()),

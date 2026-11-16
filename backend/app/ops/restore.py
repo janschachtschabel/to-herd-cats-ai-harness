@@ -1,6 +1,8 @@
 """Restoring an archive into an empty installation (plan M9 decision 6).
 
-Under the schema lock (`schema_lock.py`, held from the check to the end): the checks
+Under the schema lock (`schema_lock.py`, held from the check to the end) and the
+backup lock (refused with `restore.backup_running` while a backup runs; no backup
+starts until the restore is over): the checks
 (`restore_checks.py`; with `without_secrets` the key problems are let pass), the files
 (each checked against the manifest while written; keys already here have the same
 content), the database with `pg_restore --single-transaction` (files added for it are
@@ -25,6 +27,7 @@ from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import upgrade_head
 from app.core.storage import LocalStorage
+from app.modules.backups.repository import hold_backup_lock, release_backup_lock
 from app.ops.archive import CHUNK, DUMP_MEMBER, FILES_PREFIX, PREFIX
 from app.ops.manifest import Manifest
 from app.ops.pgtools import ToolFailed, restore
@@ -60,12 +63,19 @@ async def restore_into_empty(
     engine = make_engine(settings.database())
     try:
         async with engine.connect() as conn, schema_lock(conn):
-            check = await check_on(conn, settings, archive)
-            await conn.commit()
-            problems = [p for p in check.problems if not (without_secrets and p in KEY_PROBLEMS)]
-            if problems or check.manifest is None:
-                raise RestoreRefused(problems)
-            return await _apply(conn, settings, archive, check.manifest, clock)
+            if not await hold_backup_lock(conn):
+                raise RestoreRefused(["restore.backup_running"])
+            try:
+                check = await check_on(conn, settings, archive)
+                await conn.commit()
+                problems = [
+                    p for p in check.problems if not (without_secrets and p in KEY_PROBLEMS)
+                ]
+                if problems or check.manifest is None:
+                    raise RestoreRefused(problems)
+                return await _apply(conn, settings, archive, check.manifest, clock)
+            finally:
+                await release_backup_lock(conn)
     finally:
         await engine.dispose()
 
@@ -88,6 +98,7 @@ async def _apply(
         await finish_restore(
             session,
             archive_name=archive.name,
+            archive_created_at=manifest.created(),
             revision_from=manifest.alembic_revision,
             revision_to=revision_to,
             clock=clock,
