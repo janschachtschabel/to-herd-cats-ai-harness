@@ -24,6 +24,16 @@ class UserOut(BaseModel):
     version: int
 
 
+class AdminUserOut(UserOut):
+    """A person as the people administration lists them: with whether TOTP is on."""
+
+    totp_enabled: bool
+
+    @classmethod
+    def of(cls, user: object, *, totp_enabled: bool) -> "AdminUserOut":
+        return cls(**UserOut.model_validate(user).model_dump(), totp_enabled=totp_enabled)
+
+
 class SignupDecisionIn(BaseModel):
     """Approve or reject a waiting account: the version the client read (409)."""
 

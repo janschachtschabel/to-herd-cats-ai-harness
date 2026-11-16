@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep
 from app.modules.users.schemas import (
+    AdminUserOut,
     PendingCountOut,
     SignupDecisionIn,
     UserCreate,
@@ -17,16 +18,17 @@ from app.modules.users.service import UserService
 router = APIRouter(prefix="/admin/users", tags=["users"])
 
 
-@router.get("", response_model=Page[UserOut])
+@router.get("", response_model=Page[AdminUserOut])
 async def list_users(
     params: Annotated[PageParams, Query()],
     actor: ActorDep,
     session: SessionDep,
     pending: Annotated[bool, Query(description="true: only accounts awaiting approval")] = False,
-) -> Page[UserOut]:
-    page = await UserService(session).list(actor, params, pending=pending)
-    return Page[UserOut](
-        items=[UserOut.model_validate(u) for u in page.items], next_cursor=page.next_cursor
+) -> Page[AdminUserOut]:
+    page, with_totp = await UserService(session).list(actor, params, pending=pending)
+    return Page[AdminUserOut](
+        items=[AdminUserOut.of(u, totp_enabled=u.id in with_totp) for u in page.items],
+        next_cursor=page.next_cursor,
     )
 
 
@@ -57,6 +59,13 @@ async def sign_out_user(
 ) -> None:
     """Ends every session of the person; they stay active and may sign in again."""
     await UserService(session).sign_out(actor, user_id, current_session=ctx.session_id)
+
+
+@router.post("/{user_id}/totp/reset", status_code=204)
+async def reset_totp(user_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> None:
+    """Turns the person's TOTP off (a lost device); they sign in with the password
+    alone until they set it up again. Idempotent."""
+    await UserService(session).reset_totp(actor, user_id)
 
 
 @router.post("/{user_id}/deactivate", status_code=204)

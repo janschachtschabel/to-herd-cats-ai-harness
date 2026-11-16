@@ -30,6 +30,7 @@ from app.modules.audit.recorder import changes, record, snapshot
 from app.modules.auth.repository import SessionRepository
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.spaces.service import SpaceService
+from app.modules.totp.repository import ChallengeRepository, TotpRepository
 from app.modules.users.models import User
 from app.modules.users.removal_repository import AccountRemoval
 from app.modules.users.repository import UserRepository
@@ -142,6 +143,16 @@ class UserService:
             await self.session.flush()
             await self._audit(actor, "user.deactivated", user)
 
+    async def reset_totp(self, actor: Actor, user_id: uuid.UUID) -> None:
+        """The person's TOTP and recovery codes are gone (a lost device, ASVS 5.0
+        V6.4.4: the admin makes sure who asks, as when the account was made), and so
+        are their sign-ins waiting for a code; they sign in with the password alone
+        until they set it up again. Audited when there was something to reset."""
+        user = await self._activity_target(actor, user_id)
+        if await TotpRepository(self.session, actor.org_id).remove(user.id):
+            await ChallengeRepository(self.session).delete_for_users(actor.org_id, [user.id])
+            await self._audit(actor, "user.totp_reset", user)
+
     async def reactivate(self, actor: Actor, user_id: uuid.UUID) -> None:
         """The person can log in again; idempotent."""
         user = await self._activity_target(actor, user_id)
@@ -182,11 +193,16 @@ class UserService:
             raise Conflict(code="users.not_pending")
         return user
 
-    async def list(self, actor: Actor, params: PageParams, *, pending: bool = False) -> Page[User]:
+    async def list(
+        self, actor: Actor, params: PageParams, *, pending: bool = False
+    ) -> tuple[Page[User], set[uuid.UUID]]:
+        """A page of people, and which of them have TOTP on."""
         await require(self.session, actor, Action.USER_MANAGE)
         after = decode_id_cursor(params.cursor) if params.cursor else None
         rows = await self.users.page(actor.org_id, after, params.limit + 1, pending=pending)
-        return id_page(rows, params.limit, lambda u: u.id)
+        page = id_page(rows, params.limit, lambda u: u.id)
+        totps = TotpRepository(self.session, actor.org_id)
+        return page, await totps.enabled_among([u.id for u in page.items])
 
     async def count_pending(self, actor: Actor) -> int:
         await require(self.session, actor, Action.USER_MANAGE)
