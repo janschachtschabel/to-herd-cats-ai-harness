@@ -105,7 +105,15 @@ Traceback):
 | `backup.no_organization` | die Datenbank hat noch keine Organisation |
 | `backup.schema_behind` | die Datenbank steht auf einer älteren Revision als der Code: erst migrieren |
 | `backup.schema_ahead` | die Datenbank steht auf einer Revision, die der Code nicht kennt (eine neuere Version hat migriert): mit dem Image dieser Version sichern |
-| `backup.already_running` | eine andere Sicherung läuft gerade (sie hält die Advisory-Sperre `herd.backup` auf einer eigenen Verbindung, solange sie läuft) |
+| `backup.already_running` | eine andere Sicherung (oder eine Wiederherstellung) läuft gerade (sie hält die Advisory-Sperre `herd.backup` auf einer eigenen Verbindung, solange sie läuft) |
+
+Die Sperre gilt für die Sitzung der Verbindung, nicht für eine Transaktion: Die
+Verbindung steht während der Sicherung im Zustand `idle`, nie `idle in transaction`. Ein
+`idle_in_transaction_session_timeout` des Servers oder der Rolle (bei verwalteten
+PostgreSQL-Diensten üblich) beendet sie also nicht. Geht die Verbindung trotzdem
+verloren (Server neu gestartet, Netz), ist die Sperre mit ihr weg; die Sicherung läuft
+zu Ende, meldet im Log `backup.lock_release_failed` (Code `backup.lock_lost`) und
+behält ihr Ergebnis: Aufräumen und Offsite laufen wie nach jeder gelungenen Sicherung.
 
 Zeilen, die noch `running` sind, während niemand die Sperre hält, gehören zu Sicherungen,
 deren Prozess starb (etwa vom Zeitlimit des CronJobs, 6 Stunden, beendet): Die nächste
@@ -113,7 +121,9 @@ Sicherung und die Fälligkeits-Schleife des Workers (einmal je Minute) setzen si
 `interrupted` mit Code `backup.interrupted` (Endzeit = Zeitpunkt des Markierens); das
 zählt als misslungene Sicherung (`HerdBackupFailing`). Eine Wiederherstellung setzt die
 Zeilen, die im Archiv noch liefen (darunter die Sicherung, die das Archiv schrieb), auf
-`interrupted` mit `backup.in_restored_archive`; die zählen nicht als Fehler. Die
+`interrupted` mit `backup.in_restored_archive`; die zählen nicht als Fehler. Das sind
+nur Zeilen, die spätestens in der Sekunde des Archivs (`created_at` im Manifest)
+begonnen haben; eine spätere `running`-Zeile bleibt, wie sie ist. Die
 Ablehnungen oben (`backup.already_running`, `backup.schema_*`,
 `backup.database_unavailable`) schreiben keine Zeile: sie meldet nur `HerdBackupTooOld`,
 sobald die letzte gelungene zu alt ist (und der Exit-Status 1 des Jobs).
@@ -304,6 +314,7 @@ Abgelehnt wird mit einem Code; am Ziel ändert sich dann nichts:
 | `archive.*` | das Archiv selbst passt nicht (siehe `verify` oben) |
 | `restore.archive_newer` | das Archiv hat eine Alembic-Revision, die dieser Code nicht kennt (neuere Version): erst die passende oder neuere App-Version einsetzen |
 | `restore.target_not_empty` | die Zieldatenbank hat schon Tabellen |
+| `restore.backup_running` | am Ziel läuft gerade eine Sicherung (sie hält die Sperre `herd.backup`): sie stoppen bzw. den CronJob aussetzen, dann erneut |
 | `restore.file_conflict` | ein Schlüssel des Archivs liegt in der Ablage mit anderem Inhalt |
 | `restore.server_too_old` | der Zielserver hat eine kleinere Hauptversion als der Quellserver |
 | `restore.tools_too_old` | `pg_restore` ist älter als das `pg_dump` des Archivs (oder fehlt) |
@@ -319,7 +330,10 @@ bleiben unlesbar. KI-Verbindungen, Konnektoren und OAuth-Clients melden dann „
 nicht verfügbar“, bis ein Admin den Wert neu einträgt.
 
 Der Ablauf, unter der Advisory-Sperre `herd.schema` (dieselbe nimmt jede Migration;
-ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migrieren):
+ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migrieren)
+und der Sicherungssperre `herd.backup` (bis zum Ende startet keine Sicherung, eine
+gestartete endet mit `backup.already_running`, und die Fälligkeits-Schleife markiert
+nichts):
 
 1. die Prüfungen oben;
 2. die Dateien des Archivs in die Ablage (je Datei beim Schreiben gegen das Manifest
@@ -336,7 +350,10 @@ ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migri
 
 Danach die App normal starten. `restore apply` gibt Revisionen, Tabellen und Dateien
 aus; scheitert ein Schritt, endet es mit `failed <code>` (`restore.pg_restore_failed`,
-`restore.tool_missing`, `archive.member_checksum`).
+`restore.tool_missing`, `archive.member_checksum`; hat sich das Archiv nach den
+Prüfungen geändert: `archive.truncated`, `archive.member_missing`,
+`archive.unreadable`). Die Datenbank bleibt dann leer, eben geschriebene Dateien werden
+wieder entfernt.
 
 Was Schritt 5 leert, steht in `CLEARED_AFTER_RESTORE` (`backend/app/ops/restore_after.py`):
 `collab_grant`, `oidc_flow`, `user_session`, `oauth_flow`. Jede Person meldet sich also
