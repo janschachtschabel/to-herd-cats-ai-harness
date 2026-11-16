@@ -76,8 +76,10 @@ check_states() {
   for service in db app backup; do
     grep -q "^$service running" <<<"$states" || fail "$service is not running: $states"
   done
-  if "${compose[@]}" ps --format '{{.Ports}}' | grep -q -- '->'; then
-    fail "a port is published"
+  local ports
+  ports="$("${compose[@]}" ps --format '{{.Ports}}')"
+  if grep -q -- '->' <<<"$ports"; then
+    fail "a port is published: $ports"
   fi
 }
 
@@ -119,7 +121,7 @@ echo "config ok: without .env and with .env.example"
 "${compose[@]}" up -d --pull never
 wait_app ""
 check_states
-"${compose[@]}" logs init | grep -q 'DOMAIN is empty: skipped' || fail "init did not skip DOMAIN"
+grep -q 'DOMAIN is empty: skipped' <<<"$("${compose[@]}" logs init)" || fail "init did not skip DOMAIN"
 first_secrets="$(secrets)"
 echo "first deploy ok: every container runs or ended with 0"
 
@@ -129,7 +131,7 @@ sed -i "s|^DOMAIN=$|DOMAIN=https://$domain|" "$work/.env"
 if "${compose[@]}" up -d --pull never >"$work/refused.log" 2>&1; then
   fail "a DOMAIN with https:// was accepted"
 fi
-"${compose[@]}" logs init | grep -q 'DOMAIN must be a bare host name' \
+grep -q 'DOMAIN must be a bare host name' <<<"$("${compose[@]}" logs init)" \
   || fail "init did not explain the DOMAIN"
 states="$("${compose[@]}" ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}')"
 grep -qx 'init exited 2' <<<"$states" || fail "init did not end with 2: $states"
@@ -166,10 +168,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 [[ $code == 401 ]] || fail "Traefik did not route https://$domain to the app (got $code)"
-curl -sk --resolve "$domain:$port:127.0.0.1" "https://$domain:$port/spaces" | grep -q 'id="root"' \
-  || fail "the SPA is not served through Traefik"
+spa="$(curl -sk --resolve "$domain:$port:127.0.0.1" "https://$domain:$port/spaces")" \
+  || fail "https://$domain/spaces did not answer through Traefik"
+grep -q 'id="root"' <<<"$spa" || fail "the SPA is not served through Traefik"
 [[ "$(login)" == 200 ]] || fail "the one-time admin cannot sign in"
-grep -i '^set-cookie: __Host-herd_session=' "$work/headers" | grep -qiE ';[[:space:]]*secure' \
+session_cookie="$(grep -i '^set-cookie: __Host-herd_session=' "$work/headers" || true)"
+grep -qiE ';[[:space:]]*secure' <<<"$session_cookie" \
   || fail "the session cookie is not a Secure __Host- cookie: $(grep -i '^set-cookie' "$work/headers" | cut -d= -f1)"
 echo "second deploy ok: https://$domain through Traefik, admin signs in (__Host-, Secure)"
 
@@ -189,8 +193,8 @@ echo "live events (SSE) and live editing (WebSocket 101/403) pass Traefik"
 wait_healthy backup
 made="$("${compose[@]}" exec -T backup python -m app.ops backup run | tr -d '\r' | tail -1)"
 [[ $made == *" offsite=off" ]] || fail "backup run printed: $made"
-"${compose[@]}" exec -T backup python -m app.ops backup list | grep -q $'\tok\t' \
-  || fail "backup list shows no good run"
+runs="$("${compose[@]}" exec -T backup python -m app.ops backup list)" || fail "backup list failed"
+grep -q $'\tok\t' <<<"$runs" || fail "backup list shows no good run: $runs"
 "${compose[@]}" exec -T backup sh -c 'ls /backups/herd-*.tar /backups/herd-*.manifest.json' \
   >/dev/null || fail "no archive with its manifest in the volume"
 echo "backup ok: healthy, a good backup with its manifest in the volume"

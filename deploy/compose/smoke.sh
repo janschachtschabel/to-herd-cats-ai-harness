@@ -282,18 +282,23 @@ state="$(json 'd["state"]' "$(api "$base_b/api/automations/$automation_id")")"
 [[ $state == done ]] || fail "automation $automation_id is $state after its one term"
 
 # The worker delivered both (with SMOKE_NODES the worker service is the only dispatcher).
-dispatched() {
+# Its /metrics is read whole before grep looks at it: `... | grep -q` under pipefail fails
+# when grep stops at the match and the exec loses the rest of the text (over 8 KiB).
+worker_metrics() {
   "${compose[@]}" exec -T "$worker" python -c \
-    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-    | grep -Eq "^herd_outbox_dispatch_total\\{handler=\"$1\",result=\"ok\"\\} [1-9]"
+    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())"
+}
+dispatched() {
+  local metrics
+  metrics="$(worker_metrics)" || return 1
+  grep -Eq "^herd_outbox_dispatch_total\\{handler=\"$1\",result=\"ok\"\\} [1-9]" <<<"$metrics"
 }
 for handler in publish_live ticket_timeline; do
   for _ in $(seq 10); do dispatched "$handler" && break; sleep 0.5; done
   dispatched "$handler" || fail "$worker reports no $handler delivery"
 done
-"${compose[@]}" exec -T "$worker" python -c \
-  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-  | grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' \
+metrics="$(worker_metrics)" || fail "$worker does not answer /metrics"
+grep -Eq '^herd_automation_firings_total\{outcome="started"\} 1(\.0)?$' <<<"$metrics" \
   || fail "$worker does not report exactly one fired term"
 
 # Backups (docs/SICHERUNG.md): one run in the service backup (as 10001, offsite off), the
@@ -304,20 +309,21 @@ uid="$("${compose[@]}" exec -T backup id -u | tr -d '\r')"
 made="$("${compose[@]}" exec -T backup python -m app.ops backup run | tr -d '\r' | tail -1)"
 [[ $made == *" offsite=off" ]] || fail "backup run printed: $made"
 archive="${made%% *}"
-"${compose[@]}" exec -T backup python -m app.ops backup list | grep -q $'\tok\t' \
-  || fail "backup list shows no good run"
+runs="$("${compose[@]}" exec -T backup python -m app.ops backup list)" || fail "backup list failed"
+grep -q $'\tok\t' <<<"$runs" || fail "backup list shows no good run: $runs"
 backed_up() {
-  "${compose[@]}" exec -T "$worker" python -c \
-    "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:9090/metrics', timeout=5).read().decode())" \
-    | grep -Eq '^herd_backup_last_success_timestamp_seconds [1-9]'
+  local metrics
+  metrics="$(worker_metrics)" || return 1
+  grep -Eq '^herd_backup_last_success_timestamp_seconds [1-9]' <<<"$metrics"
 }
 for _ in $(seq 1 30); do backed_up && break; sleep 1; done
 backed_up || fail "$worker does not export the backup's gauge"
 "${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore' >/dev/null
-"${compose[@]}" exec -T \
+applied="$("${compose[@]}" exec -T \
   -e HERD_DATABASE_URL=postgresql+asyncpg://herd@db:5432/herd_restore \
   -e HERD_DATA_DIR=/tmp/restore-data backup python -m app.ops restore apply "$archive" \
-  | tail -1 | grep -q "^restored " || fail "restore apply into herd_restore failed"
+  | tr -d '\r' | tail -1)" || fail "restore apply into herd_restore failed"
+[[ $applied == "restored "* ]] || fail "restore apply into herd_restore printed: $applied"
 pages="$("${compose[@]}" exec -T db psql -tA -U herd -d herd_restore \
   -c "SELECT count(*) FROM page WHERE id = '$page_id'" | tr -d '\r')"
 [[ $pages == 1 ]] || fail "the restored database lacks the page"

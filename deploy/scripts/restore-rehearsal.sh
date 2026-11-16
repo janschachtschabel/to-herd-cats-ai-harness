@@ -110,8 +110,9 @@ sha_a="$(api_a "$base_a$attachment_url" | sha256sum | cut -d' ' -f1)"
 say "backup of A while it runs"
 archive="$(app_env "$db_a" "$work/data-a" "$py" -m app.ops backup create | tail -1)"
 [[ -f $archive ]] || fail "backup create printed $archive"
-app_env "$db_a" "$work/data-a" "$py" -m app.ops backup verify "$archive" \
-  | grep -qx ok || fail "backup verify"
+verified="$(app_env "$db_a" "$work/data-a" "$py" -m app.ops backup verify "$archive")" \
+  || fail "backup verify: $verified"
+grep -qx ok <<<"$verified" || fail "backup verify: $verified"
 echo "   $(basename "$archive"): $(stat -c %s "$archive") bytes"
 # A stops, so that what it does from now on (none expected) cannot blur the comparison.
 kill "${pids[0]}" && wait "${pids[0]}" || true
@@ -119,7 +120,7 @@ kill "${pids[0]}" && wait "${pids[0]}" || true
 say "restore check and apply into empty B ($db_b)"
 app_env "$db_b" "$work/data-b" "$py" -m app.ops restore check "$archive" \
   >"$work/check.out" || { cat "$work/check.out" >&2; fail "restore check"; }
-tail -1 "$work/check.out" | grep -qx ok || fail "restore check: $(cat "$work/check.out")"
+[[ "$(tail -1 "$work/check.out")" == ok ]] || fail "restore check: $(cat "$work/check.out")"
 app_env "$db_b" "$work/data-b" "$py" -m app.ops restore apply "$archive" \
   | tail -1 | tee "$work/apply.out"
 grep -q '^restored ' "$work/apply.out" || fail "restore apply"
