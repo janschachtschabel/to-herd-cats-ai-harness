@@ -38,7 +38,7 @@ async def test_a_dump_member_cut_off_after_the_checks_fails_with_a_code(
     await login(owner, real_db.owner_email)
     await _page_with(owner, ("a.png", PNG))
     archive = await make_archive(source_settings(tmp_path, data_dir))
-    restore_files = restore_module._restore_files
+    restore_files = restore_module.restore_files
 
     async def restore_files_then_cut(storage: object, path: Path, manifest: Manifest) -> list[str]:
         added = await restore_files(storage, path, manifest)  # type: ignore[arg-type]
@@ -46,7 +46,7 @@ async def test_a_dump_member_cut_off_after_the_checks_fails_with_a_code(
         _cut_the_dump(path)  # the file changes on disk after it was checked
         return added
 
-    monkeypatch.setattr(restore_module, "_restore_files", restore_files_then_cut)
+    monkeypatch.setattr(restore_module, "restore_files", restore_files_then_cut)
     code = await run(["restore", "apply", str(archive)], target.settings, SettableClock(AT))
 
     assert code == 1

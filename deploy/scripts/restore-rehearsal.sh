@@ -195,8 +195,8 @@ code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-b" "$base_b/api/pag
 [[ $code == 404 ]] || fail "the page made after the archive answered $code"
 sha_r="$(curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$base_b$attachment_url" | sha256sum | cut -d' ' -f1)"
 [[ $sha_r == "$sha_a" ]] || fail "the attachment after the replace differs"
-app_env "$db_b" "$work/data-b" "$py" -m app.ops backup list | grep -q $'\tpre_restore\tok\t' \
-  || fail "the safety archive is not listed"
+runs="$(app_env "$db_b" "$work/data-b" "$py" -m app.ops backup list)" || fail "backup list on B failed"
+grep -q $'\tpre_restore\tok\t' <<<"$runs" || fail "the safety archive is not listed: $runs"
 
 say "a manipulated archive is refused"
 cp "$archive" "$work/spoiled.tar"
