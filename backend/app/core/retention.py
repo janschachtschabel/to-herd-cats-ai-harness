@@ -47,7 +47,10 @@ _PROOF = "evidence (spec 12.6); deleting it is the operator's decision (docs/SIC
 RETENTION: Mapping[str, Retention] = {
     # Identity and organisation (M1)
     "organization": Keep("the installation's tenant; everything else hangs on it"),
-    "app_user": Keep("people are deactivated, never deleted: authorship stays readable"),
+    "app_user": Keep(
+        "people are deactivated, never deleted (authorship stays readable); only a"
+        " rejected sign-up, never active, is deleted (users/removal_repository.py)"
+    ),
     "user_group": Keep(_SETTING),
     "group_member": Keep(_SETTING),
     "space": Keep(_CONTENT),
@@ -73,7 +76,10 @@ RETENTION: Mapping[str, Retention] = {
     "message": Keep(_CONTENT),
     "message_mention": Keep("goes with its message"),
     "reaction": Keep("goes with its message"),
-    "notification": Keep("the person's own inbox; she reads and clears it"),
+    "notification": Keep(
+        "the person's own inbox; read and done are states, nothing deletes one but its"
+        " message, thread, proposal or account going"
+    ),
     "dm_inspection": Keep(_PROOF),
     "event_outbox": Cleans(
         "app.worker.dispatcher:Dispatcher.cleanup",

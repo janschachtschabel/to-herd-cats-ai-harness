@@ -207,8 +207,11 @@ eine neue Tabelle keine hat. Drei Arten:
 - **Bleibt** (`Keep`, mit Begründung): Inhalte der Organisation (Seiten, Nachrichten,
   Tickets, Skills, Anhänge), Einstellungen (Verbindungen, Agenten, Aufgaben, Anbieter,
   Konnektoren, Server) und alles, was mit seinem Elternteil geht (Versionen, Erwähnungen,
-  Reaktionen, Mitgliedschaften). Benachrichtigungen bleiben, bis die Person sie
-  aufräumt. Nachweise bleiben ebenfalls: `audit_log`, `usage_record`, `run`/`run_event`
+  Reaktionen, Mitgliedschaften). Benachrichtigungen bleiben auch: „gelesen“ und
+  „erledigt“ sind Zustände, gelöscht wird eine nur mit ihrer Nachricht, ihrem Gespräch,
+  ihrem Vorschlag oder ihrem Konto (die Tabelle wächst also mit der Nutzung). Personen
+  werden deaktiviert, nicht gelöscht; nur ein abgelehntes, nie aktives selbst
+  registriertes Konto wird gelöscht ([`ANMELDUNG.md`](ANMELDUNG.md)). Nachweise bleiben ebenfalls: `audit_log`, `usage_record`, `run`/`run_event`
   (mit Rückfragen, Freigaben, Abbrüchen), `dm_inspection`, `backup_run` (eine Zeile je
   Sicherung). Sie zu löschen ist eine Entscheidung des Betreibers (Aufbewahrungspflichten,
   Datenschutz), nicht des Codes; wer kürzen will, löscht mit SQL in einem Wartungsfenster
@@ -371,19 +374,35 @@ Nicht in dieser Umgebung ausgeführt (kein Docker); die Befehle folgen `compose.
 Verzeichnis `deploy/compose`, mit derselben `.env` und `ai.env` (gleicher
 `HERD_SECRET_KEY`) wie die gesicherte Installation:
 
+Erst prüfen, dann sichern, erst danach etwas löschen: Lehnt die Prüfung ab
+(`restore.secret_key_mismatch`, `restore.tools_too_old`, `archive.*`), ist noch nichts
+verloren.
+
 ```bash
 docker compose exec backup python -m app.ops backup list   # das Archiv wählen (Name)
+docker compose exec backup python -m app.ops backup verify /backups/<archiv>.tar
+# Prüfen, solange die alte Datenbank noch da ist: ein Einmal-Container des App-Dienstes
+# mit dem Sicherungs-Volume. Erwartet wird genau ein Problem, restore.target_not_empty
+# (die Datenbank ist ja noch voll); jedes andere zuerst beheben.
+docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
+  app restore check /backups/<archiv>.tar
+# Ein Weg zurück: der jetzige Stand als eigene Sicherung (bleibt im Volume)
+docker compose exec backup python -m app.ops backup run
 docker compose stop app backup             # mit compose.nodes.yml: api-a api-b worker collab backup
 # Datenbank leeren (das Volume bleibt; nur die Datenbank herd wird neu angelegt)
 docker compose exec db psql -U herd -d postgres \
   -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
-# prüfen, dann einspielen: ein Einmal-Container des App-Dienstes mit dem Sicherungs-Volume
+# noch einmal prüfen (jetzt: ok), dann einspielen
 docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
   app restore check /backups/<archiv>.tar
 docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
   app restore apply /backups/<archiv>.tar
 docker compose up -d --wait                # die App startet auf dem eingespielten Stand
 ```
+
+Scheitert das Einspielen trotzdem (`failed <code>`), bleibt die Datenbank leer
+(`pg_restore` läuft in einer Transaktion): mit der eben gemachten Sicherung zurück auf
+den alten Stand (dieselben Schritte ab „Datenbank leeren“, mit ihrem Archiv).
 
 Der App-Dienst hat die Anhänge (`app-data`) beschreibbar eingehängt und liest
 `HERD_SECRET_KEY` aus `ai.env`; der Dienst `backup` hängt sie nur lesend ein und taugt
@@ -404,17 +423,28 @@ Nicht in einem Cluster ausgeführt; die Namen folgen dem Chart (`<f>` ist der
 vollständige Name, etwa `herd-to-herd-cats-ai`). Mit dem Release, dessen Image zur
 Revision des Archivs passt oder neuer ist:
 
-1. Die App anhalten (mit Autoscaler genügt `scale` auch: ein HPA skaliert nicht von 0)
+1. Prüfen und sichern, solange die App noch läuft (der Job-Pod braucht wegen der
+   Pod-Affinität einen laufenden API-Pod): einen Job aus dem CronJob mit `command`
+   `["/usr/bin/tini", "--", "python", "-m", "app.ops", "restore", "check",
+   "/backups/<archiv>.tar"]` ableiten (wie in Schritt 4, aber Affinität und
+   `readOnly` bleiben) und sein Log lesen: erwartet wird genau
+   `restore.target_not_empty`, jedes andere Problem zuerst beheben. Dann den jetzigen
+   Stand als Weg zurück sichern und abwarten:
+   ```bash
+   kubectl create job <f>-backup-before-restore --from=cronjob/<f>-backup
+   kubectl wait --for=condition=complete --timeout=6h job/<f>-backup-before-restore
+   ```
+2. Die App anhalten (mit Autoscaler genügt `scale` auch: ein HPA skaliert nicht von 0)
    und die nächtliche Sicherung aussetzen:
    ```bash
    kubectl scale deployment/<f>-api deployment/<f>-worker deployment/<f>-collab --replicas=0
    kubectl patch cronjob/<f>-backup -p '{"spec":{"suspend":true}}'
    ```
-2. Die Datenbank leeren. Mitgeliefertes PostgreSQL:
+3. Die Datenbank leeren. Mitgeliefertes PostgreSQL:
    `kubectl exec <f>-postgresql-0 -- psql -U herd -d postgres -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd'`;
    eine externe Datenbank leert ihr Betrieb (neu anlegen, Besitzer die Rolle aus
    `database.url`).
-3. Einen Job aus dem CronJob ableiten, der einspielt statt sichert:
+4. Einen Job aus dem CronJob ableiten, der einspielt statt sichert:
    ```bash
    kubectl create job <f>-restore --from=cronjob/<f>-backup --dry-run=client -o yaml > restore.yaml
    ```
@@ -425,7 +455,7 @@ Revision des Archivs passt oder neuer ist:
    API-Pod, und es läuft keiner). `HERD_SECRET_KEY` bekommt der Job wie der CronJob aus
    `ai.existingSecret`; ohne passenden Schlüssel `"--without-secrets"` anhängen (oben).
    Dann `kubectl apply -f restore.yaml` und `kubectl logs -f job/<f>-restore`.
-4. Die App wieder starten: `helm upgrade` mit denselben Werten (setzt die Replikas und
+5. Die App wieder starten: `helm upgrade` mit denselben Werten (setzt die Replikas und
    lässt den Migrations-Job laufen; die Datenbank steht nach dem Einspielen auf dem
    Head) oder `kubectl scale` auf die vorigen Zahlen; den CronJob mit
    `{"spec":{"suspend":false}}` wieder einschalten und `kubectl delete job <f>-restore`.
