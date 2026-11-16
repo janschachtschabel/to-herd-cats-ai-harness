@@ -1250,10 +1250,14 @@ und `HerdAutoscalerAtMax` (ein Autoscaler des Charts 30 Minuten am Maximum, Warn
 braucht kube-state-metrics). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Backend Stand M7, sonst M6)
+## Tests (Stand M9a; ältere Zeilen zum Vergleich)
 
 | Paket | Tests | Stand |
 |---|---|---|
+| Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `c20e30b`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
+| Frontend (`vitest`), M9a | 632 in 113 Dateien | 16.11.2026: 632 grün im ersten Lauf |
+| Collab (`node --test`), M9a | 280 | 16.11.2026: 279 grün, 1 übersprungen |
+| Browser (`e2e/`, Playwright, echte App in Rolle `all`), M9a | 73 in 22 Dateien | 16.11.2026: erster Lauf 72 grün, 1 rot: `oidc.spec.mjs` „a person links an account…“ legte dora@e2e.example an, die `ai-agents.spec.mjs` schon mit anderem Passwort angelegt hatte (401 bei der Anmeldung; nur im ganzen Lauf, behoben mit einer eigenen Person). Danach 73 grün, 9,8 min |
 | Backend (`pytest`, echtes PostgreSQL), M7 | 2.037 (Backend-Stand von Commit `51d3dc5`) | 14.11.2026: 2.034 grün, 3 rot: `test_wiki_review_pass.py::test_a_due_page_is_reminded_once_per_interval` (der Test rechnete „später am Tag“ als jetzt + 3 h und lief nach 21 Uhr UTC; behoben in `4631d15`), `test_run_cancel_races.py::test_a_cancel_before_the_finish_wins` (409 `conflict.retry` der kurzen Sperrgrenze unter Last, danach ein Deadlock beim Leeren der Tabellen) und als Folge `::test_a_cancel_during_the_finish_waits_and_finds_it_done` (Reste des vorigen Tests); die Datei allein dreimal grün; 33:06 min. ruff, ruff format, mypy (strict, 413 Dateien) sauber |
 | Backend (`pytest`, echtes PostgreSQL), M6 | 1.716 (Backend-Stand von Commit `c1e700a`, gleich dem von `aab401b`) | 14.11.2026: 1.715 grün, 1 rot: `test_run_replay.py::test_a_run_goes_on_after_its_last_recorded_step` (der Stub gab die zweite vorbereitete Antwort nicht zurück; unter Last der Maschine, danach die Datei allein dreimal grün); 27:40 min. ruff, ruff format, mypy (strict, 363 Dateien) sauber. Ein später hinzugekommener Test (`95f8273`) ist hier nicht mitgezählt |
 | Frontend (`vitest`) | 412 in 71 Dateien (Stand `aab401b`) | 14.11.2026: 411 grün, 1 rot unter Last (`SkillProposals.test.tsx`, „a space's moderators find them beside the skills“: die Navigation „Skills und Vorschläge“ nicht gefunden), die Datei allein grün (10 von 10) |
