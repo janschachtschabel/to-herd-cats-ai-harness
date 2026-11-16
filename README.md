@@ -365,7 +365,7 @@ zu ändern sind:
 | Variable | Standard | Wirkung |
 |---|---|---|
 | `HERD_PUBLIC_PORT` | `8080` | Port der API und der Weboberfläche (`/api`, `/mcp`, `/collab`) |
-| `HERD_INTERNAL_PORT` | `9090` | Port für Proben (`/live`, `/ready`), Metriken (`/metrics`) und die Rückrufe des Collab-Prozesses (`/internal/*`); nie nach außen freigeben |
+| `HERD_INTERNAL_PORT` | `9090` | Port für Proben (`/health`, `/ready`), Metriken (`/metrics`) und die Rückrufe des Collab-Prozesses (`/internal/*`); nie nach außen freigeben |
 | `HERD_BOOTSTRAP_ORG_NAME` | `Meine Organisation` | Name der Organisation, die der allererste Start anlegt (später in der Verwaltung zu ändern); ein Wort daraus darf nicht im Passwort der ersten Inhaberin stehen |
 | `HERD_SESSION_COOKIE_NAME` | `herd_session` | Name des Sitzungs-Cookies; über https mit dem Präfix `__Host-` ([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)) |
 | `HERD_COLLAB_API_URL` | `http://127.0.0.1:<HERD_INTERNAL_PORT>` | Wo der Collab-Prozess die API erreicht (ihren internen Port); nur für die Rolle `collab` in einem eigenen Container oder Pod nötig (Compose und Chart setzen sie) |
