@@ -88,7 +88,8 @@ database and the attachments together, on `HERD_BACKUP_SCHEDULE` (cron, UTC, def
 `30 2 * * *`), into the volume `backups` (`/backups`, mode 0700): one checked archive
 `herd-<UTC time>-<version>.tar` per run with its `.manifest.json`, the newest of the
 last 7 days, 4 weeks and 6 months kept (`HERD_BACKUP_KEEP_*`). It mounts the
-attachments read-only and serves no port. With the optional file `backup.env` (copy
+attachments read-only and serves no port; its health check asks whether `/backups` is
+there and writable (so `up --wait` waits for it too). With the optional file `backup.env` (copy
 `backup.env.example`; ignored by git) it copies every archive offsite with restic
 (`HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` and the storage's
 credentials, which go to restic alone). It reads `HERD_SECRET_KEY` from `ai.env` only

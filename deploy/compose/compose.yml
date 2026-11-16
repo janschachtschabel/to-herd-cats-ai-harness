@@ -130,9 +130,15 @@ services:
         required: false
       - path: backup.env
         required: false
-    # It serves no port: the image's health check (port 9090) does not apply.
+    # It serves no port, so the image's health check (port 9090) does not apply. A
+    # disabled check would fail `docker compose up --wait` at once ("no healthcheck
+    # configured"); this one asks whether the backup directory is there and writable
+    # (the volume mounted for uid 10001). The scheduler itself is the container's process.
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-c", "import os, sys; d = os.environ.get('HERD_BACKUP_DIR', '/backups'); sys.exit(0 if os.path.isdir(d) and os.access(d, os.W_OK | os.X_OK) else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     read_only: true
     # /tmp holds restic's cache only (the dump goes to /backups): capped, it is RAM.
     tmpfs:
