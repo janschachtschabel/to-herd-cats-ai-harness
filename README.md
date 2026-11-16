@@ -234,7 +234,7 @@ Leerlauf-Timeouts und Größenlimits am Ingress siehe
 Seit M3 gehört dazu der Worker der Outbox: ein Deployment `<release>-worker`
 (`HERD_ROLE=worker`, nur Port 9090; `worker.replicas`, Standard 1, mehrere sind sicher;
 `worker.env` für eigene Variablen, `api.env` gilt dort nicht; `worker.resources`,
-voreingestellt Request 50m/192Mi, Limit 384Mi) mit einem headless Service
+voreingestellt Request 250m/256Mi, Limit 384Mi, gemessen im Lasttest) mit einem headless Service
 `<release>-worker`, über den der ServiceMonitor seine Metriken holt. Mit
 `worker.replicas: 0` kommt nichts mehr live an; das meldet der Alarm `HerdWorkerAbsent`.
 Die PrometheusRule hat vier neue Alarme: `HerdOutboxBacklog` (das älteste offene
@@ -273,7 +273,8 @@ Seit M9 skaliert das Chart auf Wunsch selbst und hält Pods bei Wartungen: Mit
 einen HorizontalPodAutoscaler (`autoscaling/v2`) auf CPU an, Ziel 70 % des
 CPU-Requests, API 2 bis 6 Pods, Worker 1 bis 3; das Deployment nennt dann keine
 `replicas` mehr. Das braucht metrics-server und einen CPU-Request (sonst bricht das
-Chart ab; für die API empfiehlt der Steckbrief 250m), mehr als ein API-Pod braucht die
+Chart ab; voreingestellt sind die im Lasttest gemessenen 500m für die API und 250m für
+den Worker, siehe [Steckbrief](docs/STECKBRIEF.md#empfehlung-request-und-limit)), mehr als ein API-Pod braucht die
 Anhänge-PVC mit ReadWriteMany. Herunter geht es behutsam (ein Pod je 2 Minuten nach 5
 ruhigen Minuten). Jeder Pod hält bis zu 16 Datenbankverbindungen; die Grenzen so
 wählen, dass `max_connections` der Datenbank reicht (Rechnung im
@@ -426,7 +427,8 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   Volume schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
 - **Autoskalierung und Datenbankverbindungen** (M9): Jeder API- und Worker-Prozess hat
   einen Pool von 5 Verbindungen, der unter Last um bis zu 10 wächst, dazu eine für
-  LISTEN: höchstens 16 je Pod. Mit den Standardgrenzen der Autoscaler (API 6, Worker 3)
+  LISTEN: höchstens 16 je Pod, und das erreicht ein API-Pod unter Last auch (gemessen im
+  Lasttest: 2 API und 1 Worker hielten bis 33 Verbindungen). Mit den Standardgrenzen der Autoscaler (API 6, Worker 3)
   sind das im Ruhezustand 54, in der Spitze 144 Verbindungen, mit Backup-Job und
   Migration rund 150. PostgreSQL hat ab Werk `max_connections = 100`: Für die vollen
   Grenzen `max_connections` auf mindestens 160 setzen oder `maxReplicas` senken. Einen

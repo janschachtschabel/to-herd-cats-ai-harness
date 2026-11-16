@@ -9,7 +9,12 @@ Automatisierung aus M7 und der Endpunkt `/mcp` aus M8 (Abschnitte
 [Gemessen: Nachrichten](#gemessen-nachrichten-m3-ohne-docker),
 [Tickets (M4)](#tickets-m4), [Sprints und Boards (M4b)](#sprints-und-boards-m4b),
 [Agenten (M6)](#agenten-m6), [Automatisierung (M7)](#automatisierung-m7) und
-[MCP (M8)](#mcp-m8)). Was nicht gemessen ist, steht unter
+[MCP (M8)](#mcp-m8)), dazu aus M9 (Task 10, 16.11.2026) der Lasttest mit 200
+Personen auf zwei API-Prozessen, die tatsächlich genutzten Datenbankverbindungen,
+Sicherung und Wiederherstellung von 10.000 Seiten mit 1 GiB Anhängen und die
+Schreibgrenze durch `NOTIFY` ([Lasttest](#gemessen-lasttest-mit-200-personen-m9),
+[Sicherung](#gemessen-sicherung-und-wiederherstellung-m9),
+[NOTIFY](#gemessen-schreibgrenze-durch-notify-m9)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -580,14 +585,22 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   (`autoscaling/v2`, CPU-Ziel 70 % des Requests) für API (2 bis 6 Pods) und Worker
   (1 bis 3), Standard aus; herunter höchstens ein Pod je 2 Minuten. PodDisruptionBudgets
   (`maxUnavailable: 1`, nicht bereite Pods dürfen immer gehen) für API und Worker ab
-  zwei Pods; der Collab-Prozess (eine Replika) bekommt keins. **Datenbankverbindungen,
-  gerechnet, nicht gemessen:** je API- oder Worker-Prozess ein Pool von 5, unter Last
-  bis 15 (SQLAlchemy: `pool_size` 5, `max_overflow` 10), dazu eine für LISTEN, also
-  höchstens 16. Mit den Obergrenzen 6 API + 3 Worker: ohne Lastspitze bis 54, in der
-  Spitze 144, mit Backup-Job (Engine und `pg_dump`) und Migrations-Job rund 150.
-  PostgreSQL erlaubt ab Werk 100: Für die vollen Grenzen `max_connections` ≥ 160 oder
-  kleinere `maxReplicas`. Kein PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht
-  erst mit einem Leser); die gemessene Zahl unter Last liefert der Lasttest (M9 Task 10).
+  zwei Pods; der Collab-Prozess (eine Replika) bekommt keins. Die Grenzen (API 2 bis 6,
+  Worker 1 bis 3) bleiben nach dem Lasttest: Zwei API-Prozesse tragen die Referenz
+  (200 Personen, 95 Anfragen/s) an der Grenze der Ziele, sechs also rund das Dreifache
+  (im Cluster nicht gemessen). **Datenbankverbindungen (gemessen, M9):** je API- oder
+  Worker-Prozess ein Pool von 5, unter Last bis 15 (SQLAlchemy: `pool_size` 5,
+  `max_overflow` 10), dazu eine für LISTEN, also höchstens 16. Gemessen in
+  `pg_stat_activity` mit 2 API und 1 Worker ([Lasttest](#gemessen-lasttest-mit-200-personen-m9)):
+  10 nach dem Start (API je 2, Worker 6), 18 mit 200 angemeldeten Personen und offenen
+  Streams (API je 6), unter Last bis 33 (API je 16: der Pool war in Spitzen ausgeschöpft;
+  Worker 6, ohne Agenten-Läufe). Die 16 je API-Pod werden also wirklich erreicht. Mit den
+  Obergrenzen 6 API + 3 Worker: in Ruhe rund 54, in der Spitze bis 144, mit Backup-Job
+  (Engine und `pg_dump`) und Migrations-Job rund 150. PostgreSQL erlaubt ab Werk 100:
+  Für die vollen Grenzen `max_connections` ≥ 160 oder kleinere `maxReplicas`. Das
+  mitgelieferte PostgreSQL des Charts läuft mit 100: genug für die Standardreplikas
+  (2 API + 1 Worker, höchstens 48), nicht für die vollen Grenzen der Autoscaler. Kein
+  PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht erst mit einem Leser).
 - **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
   (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
   zwei Prozesse würden die Bearbeitenden einer Seite aufteilen. Der Zustand wird über
@@ -660,9 +673,7 @@ prüft alle 5 s für jedes offene Dokument Generation und Rechte über die API (
 Zeitplan, nur solange jemand live bearbeitet). Beim Start entfernt die API liegen
 gebliebene temporäre Dateien unter `HERD_DATA_DIR/tmp`, die älter als 24 Stunden sind. Abgelaufene und beendete Sitzungen (jeder
 Person), die seit mehr als einer Stunde abgelaufen sind, löscht jede Anmeldung mit, höchstens 500 auf einmal. Alte Ratenlimit-Einträge (jedes
-Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal. Der Sicherungs-CronJob (Spezifikation 12.6) ist
-noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
-`deploy/compose/README.md`).
+Schlüssels) löscht jede Anmeldeprüfung mit, höchstens 500 auf einmal.
 
 ## Ressourcen
 
@@ -724,6 +735,27 @@ noch nicht gebaut; Sicherung bis dahin mit `pg_dump` (siehe
   [Agenten (M6)](#agenten-m6)). RSS aus `/proc/<pid>/status` (`VmRSS`) während der
   Durchläufe, Zeiten des Servers aus `run.created_at`, `started_at` und `finished_at`,
   Größen mit `pg_column_size` und `pg_total_relation_size`.
+- **Lasttest 200 Personen (M9), ohne Docker:** eine Wegwerf-Datenbank auf dem lokalen
+  PostgreSQL 16 (`max_connections` 100, `shared_buffers` 128 MB, `fsync` an), daran
+  `HERD_ROLE=migrate`, dann zwei API-Prozesse (`api`, A und B, mit dem gebauten SPA über
+  `HERD_STATIC_DIR`), ein Worker und ein Collab-Prozess (`collab`), Code-Stand
+  `709d006`. Das Login-Ratenlimit ist nur in dieser Wegwerf-Installation hochgesetzt.
+  Daten über die öffentliche API (`deploy/compose/loadsetup.py`): 200 Personen in 4
+  Team-Bereichen zu je 50 (Rolle `editor`), je Bereich 250 veröffentlichte Seiten (rund
+  2 KB), ein Kanal und 250 Tickets. Szenario `deploy/compose/loadmix.py`: Jede Person
+  meldet sich an Knoten A oder B an (abwechselnd), öffnet dort `/api/stream`; nach 20 s
+  Ruhe wiederholt sie 180 s lang ihre Tätigkeit mit einer Pause von 2 s × 0,5…1,5
+  (Läufe 1 und 2) bzw. 4 s (Lauf 3). Mischung nach Entscheidung 20 (je Person): Seite
+  lesen 40 %, Suchen 10 %, Nachricht schreiben 15 %, Ticket in den nächsten Status
+  ziehen 10 %, Board und „meine Tickets“ im Wechsel 15 %, eigene Seite speichern 10 %;
+  SSE offen 100 %. Live-Zustellung: vom Absenden einer Nachricht bis `message.created`
+  mit ihrer ID in jedem der 50 Streams ihres Bereichs. Ausgewertet mit
+  `deploy/compose/loadreport.py` (P95 je Endpunkt gegen sein Ziel, getestet in
+  `backend/tests/test_loadgen_report.py`). Alle 2 s `deploy/scripts/measure-processes.sh`:
+  CPU und RSS je Prozess aus `/proc`, seine TCP-Verbindungen zur Datenbank, die
+  Backends der Datenbank aus `pg_stat_activity` (Zahl, CPU, Pss) und die Auslastung der
+  Maschine. Lastgenerator (ein Python-Prozess mit httpx), Datenbank und App teilten sich
+  die 4 vCPU; das Lastmittel steht bei jedem Lauf.
 - **Live-Bearbeitung:** eigenes Compose-Projekt, eine Seite, 10 Personen (Rolle
   `editor`, je eigene Sitzung). Statt 10 Browsern 10 Yjs-Clients
   (`@hocuspocus/provider` wie im Browser, Node-Skript auf derselben Maschine) über
@@ -838,6 +870,126 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   sie ist mit der Speicherprüfung nicht wiederholt (`docker build` geht in dieser
   Sandbox nicht).
 
+### Gemessen: Lasttest mit 200 Personen (M9)
+
+Je Lauf 200 Personen mit offenem Stream; Antwortzeiten am Client in ms (P50 / P95 /
+P99), Ziele nach Entscheidung 20: Lesen P95 ≤ 300 ms, Schreiben ≤ 500 ms, Live-Zustellung
+≤ 2 s, keine 5xx.
+
+| Endpunkt | Ziel P95 | Lauf 1: Pause 2 s | Lauf 2: Pause 2 s | Lauf 3: Pause 4 s |
+|---|---|---|---|---|
+| Seite lesen `GET /api/pages/{id}` | 300 | 26 / **228** / 430 | 31 / **307** / 545 | 13 / **34** / 123 |
+| Suchen `GET /api/search` | 300 | 66 / **277** / 507 | 76 / **361** / 553 | 51 / **80** / 256 |
+| Board `GET /api/spaces/{id}/board` | 300 | 43 / **292** / 493 | 53 / **401** / 586 | 25 / **51** / 352 |
+| Meine Tickets `GET /api/tickets?assignee=me` | 300 | 29 / **192** / 407 | 34 / **285** / 451 | 16 / **32** / 216 |
+| Nachricht schreiben `POST …/messages` | 500 | 43 / **300** / 585 | 54 / **441** / 704 | 24 / **62** / 307 |
+| Ticket ziehen `PATCH /api/tickets/{n}` | 500 | 38 / **282** / 483 | 45 / **392** / 597 | 21 / **53** / 226 |
+| Seite speichern `PATCH /api/pages/{id}` | 500 | 38 / **301** / 512 | 47 / **381** / 615 | 21 / **55** / 356 |
+| Live-Zustellung an 50 Streams | 2.000 | 98 / **456** / 749 | 122 / **643** / 964 | 62 / **144** / 415 |
+| Anfragen/s (alle Endpunkte) | | 95 | 94 | 48 |
+| Zustellungen (verloren) | | 129.150 (0) | 127.050 (0) | 66.600 (0) |
+| Fehler (5xx, Abbrüche) | 0 | 0 | 0 | 0 |
+| Ergebnis | | alle Ziele erreicht | Lesen verfehlt (307, 361, 401) | alle Ziele erreicht |
+| Lastmittel vor / während | | 0,5 / 3,1 | 1,7 / 3,0 | 1,6 / 1,7 |
+
+**Ergebnis:** Bei 95 Anfragen/s auf zwei API-Prozessen (jede Person alle 2 s eine
+Aktion, weit mehr als im Alltag) liegen die Ziele an der Grenze: Lauf 1 erreichte alle,
+Lauf 2 verfehlte drei Leseziele um 7 bis 101 ms; Schreiben, Live-Zustellung und
+Fehlerfreiheit hielten in beiden. Bei 48 Anfragen/s (Pause 4 s) liegt jedes P95 unter
+100 ms. **Engpass:** die CPU der Maschine, nicht ein einzelner Prozess. Die 4 vCPU
+trugen alles zugleich (zwei API-Prozesse je 0,6 Kerne, Datenbank 0,5, Worker 0,3,
+Lastgenerator 0,16, Messung) und waren zu 65–95 % belegt; jeder API-Prozess blieb unter
+0,9 Kernen. Dazu war der Pool jedes API-Prozesses in Spitzen ausgeschöpft (16
+Verbindungen), Anfragen warteten dann auf eine Verbindung. **Folgeaufgabe:** der
+Lasttest im Cluster (Pods mit eigenen Kernen, Ingress, Autoscaler; `load.sh` mit
+`docker stats` bzw. `loadmix.py` gegen den Ingress). Erst wenn dort das Lese-P95 bei
+95 Anfragen/s auf zwei Pods über 300 ms bleibt: die Poolgröße als Einstellung und ein
+Profil der Leseendpunkte. Bis dahin hält der Autoscaler mit dem gemessenen Request
+(siehe [Empfehlung](#empfehlung-request-und-limit)) die Last je Pod im Bereich von
+Lauf 3.
+
+Prozesse (Lauf 1; 100 % CPU = ein Kern; Datenbank: alle Backends der Datenbank, Pss
+statt RSS, die Verbindungen aus `pg_stat_activity`):
+
+| Phase | Prozess | CPU Ø | CPU max | RSS Ø | RSS max | DB-Verbindungen Ø / max |
+|---|---|---|---|---|---|---|
+| Leerlauf (nach dem Start) | API A / API B | 0,2 % / 0,2 % | 0,5 % | 203 / 198 MiB | 203 / 198 MiB | 2 / 2 |
+| Leerlauf | Worker | 2,4 % | 3,7 % | 200 MiB | 201 MiB | 6 / 6 |
+| Leerlauf | Collab | 0,1 % | 0,5 % | 98 MiB | 98 MiB | 0 |
+| Leerlauf | Datenbank | 0,6 % | 2,0 % | 51 MiB | 53 MiB | 10 / 10 |
+| warm (200 angemeldet, 200 Streams, Ruhe) | API A / API B | 0,2 % / 0,3 % | 0,9 % | 221 / 218 MiB | 221 / 218 MiB | 6 / 6 |
+| warm | Worker | 1,9 % | 3,0 % | 201 MiB | 201 MiB | 6 / 6 |
+| warm | Datenbank | 0,5 % | 1,5 % | 87 MiB | 87 MiB | 18 / 18 |
+| Last (180 s) | API A | 61 % | 75 % | 240 MiB | 242 MiB | 6,7 / 16 |
+| Last | API B | 61 % | 74 % | 238 MiB | 242 MiB | 6,9 / 16 |
+| Last | Worker | 32 % | 45 % | 209 MiB | 213 MiB | 6 / 6 |
+| Last | Collab | 0 % | 0 % | 98 MiB | 98 MiB | 0 |
+| Last | Datenbank | 51 % | 68 % | 165 MiB | 222 MiB | 20 / 32 |
+| Last | Lastgenerator | 16 % | 19 % | 332 MiB | 336 MiB | – |
+
+- **Lauf 2** (Pause 2 s): API 61 % Ø, 77 % / 86 % max, RSS 245 MiB; Worker 31 % Ø,
+  39 % max; Datenbank 48 % Ø, 67 % max, bis 33 Verbindungen. **Lauf 3** (Pause 4 s):
+  API je 33 % Ø, 52–54 % max, RSS 249 MiB, höchstens 7 Verbindungen je Prozess; Worker
+  18 % Ø, 25 % max, 217 MiB; Datenbank 32 % Ø, 54 % max, 184 MiB, 18–19 Verbindungen.
+- **Höchster Speicher** (`VmHWM`): API 340–377 MiB, erreicht beim Anmelden der 200
+  Personen vor dem Lauf (zwei argon2-Prüfungen zugleich, je 64 MiB) und nach dem Lauf
+  nicht wieder freigegeben (RSS im nächsten Leerlauf 242–249 MiB); Worker 213–217 MiB;
+  Collab 131 MiB (beim Start).
+- **Leerlauf je Rolle** ist seit M3 um rund 90 MiB gewachsen (API 107 → 198–203 MiB,
+  Worker 104 → 200 MiB): Seither laden die Prozesse die Module von KI, Agenten, MCP,
+  OIDC und Sicherung.
+- Der Collab-Prozess war im Szenario unbeteiligt (keine Live-Bearbeitung; Messung mit
+  10 Editoren siehe oben).
+
+### Gemessen: Sicherung und Wiederherstellung (M9)
+
+Wegwerf-Datenbank mit 10.000 Seiten (über die API angelegt, Datenbank 67 MB) und 64
+Anhängen zu 16 MiB (zufällige Bytes, nicht komprimierbar; zusammen 1.073.736.320 Bytes =
+1 GiB) auf dem lokalen Datenträger, ohne laufende App, mit `python -m app.ops` aus dem
+Code-Stand `709d006`; Lastmittel 0,7–0,9. Spitze RSS: der größte Prozess (Python oder
+`pg_dump`/`pg_restore`).
+
+| Schritt | Dauer | Spitze RSS |
+|---|---|---|
+| `backup create` | 10,1–11,3 s (vier Läufe; der erste nach einem Neustart der VM 33,1 s) | 119 MiB |
+| `backup verify` | 2,8–2,9 s | 100 MiB |
+| `restore check` (leere Datenbank, leere Ablage) | 2,8 s | 108 MiB |
+| `restore apply` (69 Tabellen, 64 Dateien) | 8,4–8,7 s (einmal nach dem Leeren des Seitencaches der VM) | 121 MiB |
+
+- **Archivgröße:** 1.081.149.440 Bytes (1,007 GiB): die Anhänge unverändert (das Archiv
+  komprimiert nicht) plus 7,4 MB für Datenbank-Dump und Manifest; das Manifest daneben
+  18 KB. Der Dump ist hier 11 % der Datenbankgröße (Indizes werden nicht gesichert,
+  Seitentext komprimiert gut).
+- Die Dauer hängt am Lesen der Anhänge: Der erste Lauf nach dem Neustart las von einem
+  kalten Datenträger (rund 32 MB/s), die übrigen aus dem Cache des Hosts. Auf
+  Netzspeicher ist mit der Lesegeschwindigkeit des Volumes zu rechnen.
+
+### Gemessen: Schreibgrenze durch NOTIFY (M9)
+
+Ein Python-Skript (asyncpg, nicht eingecheckt) an einer eigenen Datenbank desselben
+PostgreSQL 16: N Verbindungen schreiben je 10 s in einer Schleife eine Transaktion aus
+einem `INSERT` (100 Bytes) und, im zweiten Fall, einem `pg_notify` mit eigener Nutzlast
+(rund 180 Bytes, wie ein Live-Ereignis), während eine Verbindung lauscht (sie bekam
+jedes). Lastmittel vorher 0,7.
+
+| Verbindungen | Commits/s ohne NOTIFY | Commits/s mit NOTIFY |
+|---|---|---|
+| 1 | 2.487 | 1.749 |
+| 4 | 5.865 | 4.138 |
+| 16 | 8.487 | 4.686 |
+| 32 | 7.724 | 4.487 |
+
+PostgreSQL reiht die Commits mit `NOTIFY` hintereinander (eine Sperre auf die
+Benachrichtigungswarteschlange beim Commit); ab etwa vier Verbindungen bleibt es hier bei
+4.100–4.700 je Sekunde. In der App schickt jede schreibende Transaktion mit Ereignissen
+ein `NOTIFY herd_outbox` (in einer Transaktion zusammengefasst); der Worker schickt je
+Live-Ereignis ein `NOTIFY herd_live`, committet aber einen Stapel einer Bahn (bis 100
+Ereignisse) auf einmal. Jede schreibende Aktion kostet also einen solchen Commit an der
+API und einen Anteil an einem Stapel des Workers: **Schreibgrenze** auf dieser
+Datenbank rund 2.000 bis 4.000 schreibende Aktionen je Sekunde. Der Lasttest schrieb
+33 je Sekunde (Seiten, Nachrichten, Tickets), mehr als 60-mal weniger; vorher ist die
+CPU der API-Prozesse die Grenze.
+
 ### Nicht gemessen (hier nicht möglich oder nicht gemacht)
 
 - Echte Browser als Editoren in dieser Zahl (Last und Darstellung im Browser); die
@@ -873,7 +1025,17 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
   zugleich; zwei Worker beim Abschluss; „Mein Board“ einer Person mit Tickets in vielen
   Bereichen (gemessen ist ein Bereich); eine Daily-Ansicht, in der nur ein Teil der
   Karten seit dem letzten Arbeitstag geändert ist (hier alle).
-- Nachrichten: Speicher und CPU der Datenbank, echte Browser statt eines Skripts als
+- **Lasttest und Sicherung (M9):** im Container und im Cluster (`load.sh` mit `docker
+  stats`, Pods mit eigenen Kernen, Ingress, der Autoscaler beim Hoch- und
+  Herunterskalieren), mehr als zwei API-Prozesse, eine Datenbank auf eigener Maschine,
+  echte Browser (SPA-Dateien, Neuladen), Live-Bearbeitung, Hochladen und Importe im Mix,
+  Agenten-Läufe und Aufgaben unter dieser Last, die Dauer der 200 Anmeldungen vor dem
+  Lauf (nur ihr Speicher), eine Sicherung während des Lasttests, Sicherung auf
+  Netzspeicher, S3 oder mit vielen kleinen Dateien (gemessen: 64 große), Offsite-Kopie
+  mit restic, Wiederherstellung einer Datenbank mit Millionen Zeilen, die
+  Schreibgrenze mit der App selbst (gemessen: PostgreSQL allein).
+- Nachrichten: Speicher und CPU der Datenbank für Nachrichten allein (seit M9 nur im
+  ganzen Mix des Lasttests), echte Browser statt eines Skripts als
   Empfänger, mehr als ein Kanal oder viele Organisationen, Direktnachrichten und Threads
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
   `/api/stream`, der Verlust der LISTEN-Verbindung unter Last (`resync`) und ein
@@ -901,22 +1063,34 @@ Im Prozess (Node 22, 4 Kerne, ohne Image; Fix-Welle 2 der Prüfung M2), die Wiki
 
 ### Empfehlung Request und Limit
 
-Aus den Messwerten mit 20–30 % Puffer:
+Seit M9 aus dem [Lasttest](#gemessen-lasttest-mit-200-personen-m9) (ohne Docker, RSS
+statt cgroup-Speicher); das Chart setzt diese Werte als Standard (`values.yaml`, geprüft
+in `deploy/helm/scripts/chart-rules-scaling.sh`):
 
-| Container | CPU Request | CPU Limit | Speicher Request | Speicher Limit | Chart-Standard heute |
+| Container | CPU Request | CPU Limit | Speicher Request | Speicher Limit | Chart-Standard |
 |---|---|---|---|---|---|
-| api (je Pod, ohne Collab-Prozess) | 250m | 3500m oder keins | 256Mi | 330Mi | Request 100m / 256Mi, Limit 512Mi |
-| collab (eine Replika) | 50m | 500m | 128Mi | 1Gi | Request 50m / 128Mi, Limit 1Gi |
-| worker (je Replika) | 50m | 300m (ohne Läufe gemessen) | 256Mi | 330Mi | Request 50m / 192Mi, Limit 384Mi |
-| db (mitgeliefert) | 100m | keins | 100Mi | 105Mi | Request 100m / 256Mi, Limit 1Gi |
+| api (je Pod, ohne Collab-Prozess) | 500m | keins | 320Mi | 512Mi | gleich (bis M9: 100m / 256Mi) |
+| worker (je Replika) | 250m | keins | 256Mi | 384Mi | gleich (bis M9: 50m / 192Mi) |
+| collab (eine Replika) | 50m | keins | 128Mi | 1Gi | gleich |
+| db (mitgeliefert) | 250m | keins | 256Mi | 1Gi | gleich (bis M9: 100m) |
+| Sicherungs-Job | 50m | keins | 128Mi | 512Mi | gleich |
 
-- **api CPU:** Limit = Lastspitze 3,2 Kerne + 10 %. Ein kleineres Limit bricht nichts,
-  es senkt nur den Anmeldedurchsatz. Der Request ist gesetzt, nicht gemessen: Leerlauf
-  und warm liegen unter 1 %.
-- **api Speicher:** Die Messung enthält den Collab-Prozess (rund 35 MiB im Leerlauf,
-  92 MiB RSS beim Tippen). Request = Last-Durchschnitt 218 MiB + 20 %, Limit =
-  Lastspitze 253 MiB + 30 %; ohne Collab-Prozess bleibt damit Reserve. Das Chart
-  behält 256Mi/512Mi.
+- **api CPU:** je Prozess 0,2 % im Leerlauf, 33 % Ø / 54 % max bei 48 Anfragen/s auf
+  zwei Prozessen (P95 ≤ 80 ms) und 61 % Ø / 75–86 % max bei 95 Anfragen/s (P95 an der
+  Grenze der Ziele). Mit dem Ziel des Autoscalers (70 %) bekommt ein Pod ab 350m Hilfe,
+  also zwischen der bequemen und der knappen Messung; ohne Autoscaler reserviert der
+  Request, was ein Pod bei der halben Referenzlast braucht. Kein CPU-Limit: Anmeldungen
+  (argon2) brauchen kurz mehrere Kerne (M2: 3,2 Kerne bei 20 gleichzeitigen
+  Anmeldungen), ein Limit würde nur drosseln.
+- **api Speicher:** RSS 198–203 MiB nach dem Start, 238–249 MiB unter Last und danach,
+  höchstens 340–377 MiB beim Anmelden von 200 Personen (zwei argon2-Prüfungen zu
+  64 MiB zugleich). Request = Last 246 MiB + 20 % ≈ 300 → 320Mi; Limit 512Mi = Spitze
+  377 MiB + 35 %.
+- **worker:** CPU 2 % im Leerlauf (Fälligkeits-Schleife, Metriken), 18 % Ø bei 48 und
+  31–32 % Ø / 39–45 % max bei 95 Anfragen/s; Request 250m (der Autoscaler hilft ab
+  175m, der Last von Lauf 3). Speicher: RSS 200–217 MiB ohne Agenten-Läufe, in M6 bis
+  249 MiB mit 16 Läufen zugleich; Request 256Mi, Limit 384Mi. Wer
+  `HERD_RUN_CONCURRENCY` erhöht, gibt dem Worker mehr Speicher.
 - **collab:** CPU beim Tippen von 10 Personen bis 0,4 Kerne für den ganzen Container
   (API, Weiterleitung und Collab-Prozess zusammen), Speicher (RSS) 92 MiB mit einem
   kleinen Dokument. Große Seiten kosten viel mehr (Prüfung M4-1 P12, gemessen im
@@ -928,20 +1102,18 @@ Aus den Messwerten mit 20–30 % Puffer:
   unter `HERD_COLLAB_MEMORY_BUDGET_MB` (400, Schätzung, `docs/WIKI.md`); Faustregel
   Limit ≥ (130 MB + 250 MB je Prüf-Thread + Budget) / 0,8 = 975 MB. Das Chart setzt
   128Mi/1Gi (vorher 512Mi: drei bis fünf große Tabellen-Seiten brachten ihn darüber).
-- **worker:** In M3 RSS 104–107 MiB in Ruhe und bei 20 Nachrichten je Sekunde, CPU
-  20–24 %. Mit den Läufen der Agenten (M6) 173 MiB im Leerlauf, unter Last 199–234 MiB
-  mit 4 Läufen zugleich und 249 MiB mit 16 (alles ohne Image gemessen). Request =
-  Lastmittel rund 210 MiB + 20 %, Limit = Spitze 249 MiB + 30 %; CPU unter Läufen nicht
-  gemessen, das CPU-Limit stammt aus M3. Das Chart setzt Request 192Mi und Limit
-  384Mi; das Limit reicht, der Request liegt unter der Last. Beides bleibt, bis eine
-  Messung im Container vorliegt. Wer `HERD_RUN_CONCURRENCY` erhöht, gibt dem Worker mehr
-  Speicher.
-- **api mit SSE:** 200 offene Verbindungen und 20 Nachrichten je Sekunde kosteten je
-  Prozess +15 MiB und bis 50 % eines Kerns (ohne Anmeldelast); das bleibt im Rahmen der
-  Empfehlung oben.
-- **db:** Die Formel ergibt 100Mi/105Mi, aber nur für eine fast leere Datenbank.
-  PostgreSQLs `shared_buffers` ist ab Werk schon 128 MB; mit echten Daten wächst der
-  Bedarf. Das Chart behält 256Mi/1Gi. Produktiv ist die Datenbank ohnehin extern.
+- **db:** 32 Backends, CPU 48–51 % Ø / 67–68 % max bei 95 Anfragen/s, 32 % Ø bei 48;
+  Pss aller Backends 165–184 MiB Ø, höchstens 222 MiB (`shared_buffers` 128 MB anteilig
+  gezählt). Request 250m (die halbe Referenzlast), Speicher 256Mi/1Gi wie bisher; mit
+  echten Daten wächst der Bedarf. Produktiv ist die Datenbank ohnehin extern; das
+  mitgelieferte PostgreSQL hat `max_connections` 100 (siehe
+  [Clusterfähigkeit](#clusterfähigkeit)).
+- **Sicherungs-Job:** gemessen höchstens 119–121 MiB RSS je Prozess
+  ([Sicherung](#gemessen-sicherung-und-wiederherstellung-m9)); 128Mi/512Mi bleiben.
+- **Autoscaler-Grenzen:** API 2 bis 6, Worker 1 bis 3 bleiben. Zwei API-Pods trugen die
+  Referenz knapp, sechs tragen rund das Dreifache (nicht im Cluster gemessen); die
+  Datenbankverbindungen der vollen Grenzen (bis 144) stehen unter
+  [Clusterfähigkeit](#clusterfähigkeit).
 - **Volume `/data`:** Anhänge (je Inhalt einmal) und temporäre Dateien von Upload,
   Import und Export (bis 100 MiB je laufendem Import). Das Chart legt 10Gi an.
 

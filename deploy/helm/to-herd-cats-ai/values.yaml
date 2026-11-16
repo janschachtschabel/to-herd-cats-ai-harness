@@ -23,7 +23,7 @@ imagePullSecrets: []
 ## @param api.autoscaling.minReplicas Fewest API pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
 ## @param api.autoscaling.maxReplicas Most API pods (more than 1 needs persistence.accessModes [ReadWriteMany])
 ## @param api.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of api.resources.requests.cpu, the autoscaler aims at (1 to 100)
-## @param api.resources Resource requests and limits of the API container
+## @param api.resources Resource requests and limits of the API container; the defaults come from the load test (docs/STECKBRIEF.md, Empfehlung Request und Limit: with the autoscaler's 70 % of 500m a pod gets help where P95 was still far below its targets). No CPU limit: throttling costs latency, and sign-in bursts (argon2) use several cores for seconds
 ## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
 ## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
 ## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL
@@ -36,8 +36,8 @@ api:
     targetCPUUtilizationPercentage: 70
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 500m
+      memory: 320Mi
     limits:
       memory: 512Mi
   cookieSecure: true
@@ -51,7 +51,7 @@ api:
 ## @param worker.autoscaling.minReplicas Fewest worker pods (at least 1; from 2 a PodDisruptionBudget keeps one up during drains)
 ## @param worker.autoscaling.maxReplicas Most worker pods (each holds up to 16 database connections)
 ## @param worker.autoscaling.targetCPUUtilizationPercentage Average CPU use, in percent of worker.resources.requests.cpu, the autoscaler aims at (1 to 100)
-## @param worker.resources Resource requests and limits of the worker container
+## @param worker.resources Resource requests and limits of the worker container; the defaults come from the load test (docs/STECKBRIEF.md). More HERD_RUN_CONCURRENCY needs more memory
 ## @param worker.env Extra environment variables of the worker (name: value), e.g. HERD_LOG_LEVEL (api.env does not apply here)
 worker:
   replicas: 1
@@ -62,8 +62,8 @@ worker:
     targetCPUUtilizationPercentage: 70
   resources:
     requests:
-      cpu: 50m
-      memory: 192Mi
+      cpu: 250m
+      memory: 256Mi
     limits:
       memory: 384Mi
   env: {}
@@ -221,7 +221,7 @@ postgresql:
     storageClass: ""
   resources:
     requests:
-      cpu: 100m
+      cpu: 250m
       memory: 256Mi
     limits:
       memory: 1Gi

@@ -83,4 +83,22 @@ grep -q "maxUnavailable: 2$" <<<"$(doc PodDisruptionBudget t-to-herd-cats-ai-api
 out=$(render --set podDisruptionBudget.enabled=false --set worker.replicas=2)
 grep -q "^kind: PodDisruptionBudget" <<<"$out" && fail "a budget with podDisruptionBudget.enabled=false"
 if render --set podDisruptionBudget.maxUnavailable=0 >/dev/null; then fail "a budget that lets no pod go rendered"; fi
+
+# Default requests and limits come from the load test (plan M9 Task 10, docs/STECKBRIEF.md,
+# Empfehlung Request und Limit): the autoscaler's 70 % of the CPU request is where the
+# measured P95 was still far below its targets; memory is the RSS under load + 20 %.
+out=$(render)
+resources() { awk '/^ *resources:/{r=1} r&&/^ *(ports|volumeMounts|env|securityContext|livenessProbe):/{exit} r' \
+  <<<"$(doc "$1" "$2" "$out")"; }
+api=$(resources Deployment t-to-herd-cats-ai-api)
+grep -A2 "requests:" <<<"$api" | grep -q "cpu: 500m" || fail "the API's CPU request is not the measured 500m"
+grep -A2 "requests:" <<<"$api" | grep -q "memory: 320Mi" || fail "the API's memory request is not the measured 320Mi"
+grep -A2 "limits:" <<<"$api" | grep -q "memory: 512Mi" || fail "the API's memory limit is not 512Mi"
+grep -A2 "limits:" <<<"$api" | grep -q "cpu:" && fail "the API has a CPU limit (throttling costs latency)"
+worker=$(resources Deployment t-to-herd-cats-ai-worker)
+grep -A2 "requests:" <<<"$worker" | grep -q "cpu: 250m" || fail "the worker's CPU request is not the measured 250m"
+grep -A2 "requests:" <<<"$worker" | grep -q "memory: 256Mi" || fail "the worker's memory request is not the measured 256Mi"
+grep -A2 "limits:" <<<"$worker" | grep -q "memory: 384Mi" || fail "the worker's memory limit is not 384Mi"
+db=$(resources StatefulSet t-to-herd-cats-ai-postgresql)
+grep -A2 "requests:" <<<"$db" | grep -q "cpu: 250m" || fail "the bundled PostgreSQL's CPU request is not the measured 250m"
 true
