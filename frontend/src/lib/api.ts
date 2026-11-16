@@ -99,7 +99,12 @@ export function onUnauthorized(handler: (() => void) | null): void {
 }
 
 // A 401 from these is an answer, not a lost session.
-const SESSION_PATHS = ['/api/auth/login', '/api/auth/me', '/api/auth/logout']
+const SESSION_PATHS = [
+  '/api/auth/login',
+  '/api/auth/login/second-factor',
+  '/api/auth/me',
+  '/api/auth/logout',
+]
 
 // Who to tell when the installation is in maintenance (503 `maintenance.active`).
 let maintenanceHandler: (() => void) | null = null

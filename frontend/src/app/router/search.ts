@@ -48,6 +48,13 @@ export function safeRedirect(value: unknown): string | undefined {
 export interface LoginSearch {
   redirect?: string | undefined
   error?: string | undefined
+  /** The provider was right; the sign-in waits for the second factor. */
+  second_factor?: 'totp' | undefined
+}
+
+/** After a provider: the sign-in waits for the second factor (`totp`); nothing else. */
+export function secondFactor(value: unknown): 'totp' | undefined {
+  return value === 'totp' ? value : undefined
 }
 
 /** A sign-in's refusal code from the address (`oidc.<reason>`); nothing else. */

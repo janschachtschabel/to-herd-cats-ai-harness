@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Field, SaveError } from '@/features/shared/forms'
 import { OidcButtons } from './OidcButtons'
 import { PendingApproval } from './PendingApproval'
+import { SecondFactorForm } from './SecondFactorForm'
 import { useLogin, useSignInProviders } from './queries'
 
 /** A self-registered account that waits for approval: its own page, no form. */
@@ -15,18 +16,28 @@ const PENDING = 'oidc.account_pending'
 export function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { redirect, error } = useSearch({ from: '/login' })
+  const { redirect, error, second_factor } = useSearch({ from: '/login' })
   const login = useLogin()
   const withProviders = useSignInProviders().length > 0
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  // After a provider the address says so; after the password, the answer.
+  const [waiting, setWaiting] = useState(second_factor === 'totp')
+  const onward = () => void navigate({ to: redirect ?? '/spaces' })
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     login.mutate(
       { email, password },
-      { onSuccess: () => void navigate({ to: redirect ?? '/spaces' }) },
+      { onSuccess: (result) => (result.signedIn ? onward() : setWaiting(true)) },
     )
+  }
+
+  function restart() {
+    setWaiting(false)
+    setPassword('')
+    login.reset()
+    void navigate({ to: '/login', search: { redirect }, replace: true })
   }
 
   return (
@@ -37,6 +48,18 @@ export function LoginPage() {
       </div>
       {error === PENDING ? (
         <PendingApproval />
+      ) : waiting ? (
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>
+              <h1 className="text-lg font-semibold">{t('totp.signIn.title')}</h1>
+            </CardTitle>
+            <CardDescription>{t('totp.signIn.hint')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SecondFactorForm onSignedIn={onward} onRestart={restart} />
+          </CardContent>
+        </Card>
       ) : (
         <Card className="w-full max-w-sm">
           <CardHeader>

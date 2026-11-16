@@ -10,7 +10,7 @@ import { AppShell } from '@/app/shell/AppShell'
 import { meQuery } from '@/features/auth/queries'
 import { MaintenanceGate } from '@/features/shared/MaintenancePage'
 import { NotFoundPage } from './NotFoundPage'
-import { safeRedirect, signInError, type LoginSearch } from './search'
+import { safeRedirect, secondFactor, signInError, type LoginSearch } from './search'
 
 const LoginPage = lazyRouteComponent(() => import('@/features/auth/LoginPage'), 'LoginPage')
 
@@ -31,11 +31,12 @@ export const rootRoute = createRootRouteWithContext<RouterContext>()({
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  // Both keys always come back, undefined when refused: TanStack Router lays the result
+  // Every key always comes back, undefined when refused: TanStack Router lays the result
   // over the raw search, so a key left out would keep its unchecked value.
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     redirect: safeRedirect(search.redirect),
     error: signInError(search.error),
+    second_factor: secondFactor(search.second_factor),
   }),
   beforeLoad: async ({ context, search }) => {
     const me = await context.queryClient.ensureQueryData(meQuery)

@@ -1,4 +1,10 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { api, unwrap, type Me, type Permission, type Schemas } from '@/lib/api'
 import { runBeforeLogout } from '@/lib/beforeLogout'
 
@@ -26,15 +32,34 @@ export function usePermission(permission: Permission): boolean {
   return hasPermission(useMe(), permission)
 }
 
+/** The answer of the password step: signed in, or the sign-in waits for the second
+ *  factor (a person with TOTP; no session yet). */
+export type LoginResult = { signedIn: true } | { signedIn: false; expiresAt: string }
+
+function signedIn(queryClient: QueryClient, me: Me) {
+  queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
+  queryClient.setQueryData(meQuery.queryKey, me)
+}
+
 export function useLogin() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (body: { email: string; password: string }) =>
-      unwrap(await api.POST('/api/auth/login', { body })),
-    onSuccess: (me) => {
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
-      queryClient.setQueryData(meQuery.queryKey, me)
+    mutationFn: async (body: { email: string; password: string }): Promise<LoginResult> => {
+      const answer = unwrap(await api.POST('/api/auth/login', { body }))
+      if ('expires_at' in answer) return { signedIn: false, expiresAt: answer.expires_at }
+      signedIn(queryClient, answer)
+      return { signedIn: true }
     },
+  })
+}
+
+/** The second step: a code from the authenticator or a recovery code. */
+export function useSecondFactor() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: Schemas['SecondFactorIn']) =>
+      unwrap(await api.POST('/api/auth/login/second-factor', { body })),
+    onSuccess: (me) => signedIn(queryClient, me),
   })
 }
 
