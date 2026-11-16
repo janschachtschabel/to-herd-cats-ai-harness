@@ -3,7 +3,7 @@ complete and the session and CSRF guards, `test_route_hiding.py` the hiding ones
 
 A new route that is not listed fails `test_every_api_route_is_listed`, so it cannot
 ship without a decision on who may call it. Guards:
-- `public`: no session needed (login; logout, which only ends the session it is sent
+- `public`: no session needed (login and its second step; logout, which only ends the session it is sent
   with and answers 204 without one; whether the installation is in maintenance).
 - `session`: any logged-in person; anonymous → 401.
 - `admin`: an administration right; members and guests → 403
@@ -59,6 +59,12 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/auth/me", "session"),
     ("PATCH", "/api/auth/me", "session"),
     ("POST", "/api/auth/me/password", "session"),
+    ("POST", "/api/auth/login/second-factor", "public"),
+    ("GET", "/api/auth/me/totp", "session"),
+    ("POST", "/api/auth/me/totp/setup", "session"),
+    ("POST", "/api/auth/me/totp/confirm", "session"),
+    ("POST", "/api/auth/me/totp/disable", "session"),
+    ("POST", "/api/auth/me/totp/recovery-codes", "session"),
     ("GET", "/api/auth/providers", "public"),
     ("GET", "/api/maintenance", "public"),  # also in maintenance (plan M9 decision 9)
     ("GET", "/api/auth/oidc/{key}/start", "public"),
@@ -174,6 +180,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/admin/users/{user_id}/deactivate", "admin"),
     ("POST", "/api/admin/users/{user_id}/sign-out", "admin"),
     ("POST", "/api/admin/users/{user_id}/reactivate", "admin"),
+    ("POST", "/api/admin/users/{user_id}/totp/reset", "admin"),
     ("GET", "/api/admin/users/pending/count", "admin"),
     ("POST", "/api/admin/users/{user_id}/approve", "admin"),
     ("POST", "/api/admin/users/{user_id}/reject", "admin"),
