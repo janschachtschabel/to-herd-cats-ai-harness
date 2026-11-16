@@ -130,3 +130,23 @@ def test_secrets_reach_the_app_only_as_files(services: dict[str, dict[str, Any]]
                 assert value in written, f"{name}: {key}"
     assert services["db"]["environment"]["POSTGRES_PASSWORD_FILE"].endswith(f"/{DB_PASSWORD}")
     assert services["app"]["environment"]["HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE"] in written
+
+
+def test_every_deploy_pulls_the_app_image(services: dict[str, dict[str, Any]]) -> None:
+    """Compose's default (`missing`) would keep an old :1.0 on a redeploy (review R8)."""
+    for name, service in services.items():
+        if service["image"] == IMAGE:
+            assert service.get("pull_policy") == "always", name
+
+
+def test_no_long_running_service_of_the_image_disables_its_check(
+    services: dict[str, dict[str, Any]],
+) -> None:
+    """The image has a HEALTHCHECK; `disable: true` fails `up --wait` ("no healthcheck
+    configured"). Only init, which ends, may disable it."""
+    for name, service in services.items():
+        if service["image"] == IMAGE and name != "init":
+            check = service.get("healthcheck", {})
+            assert not check.get("disable"), name
+    backup = services["backup"]["healthcheck"]["test"]
+    assert "HERD_BACKUP_DIR" in " ".join(backup) and "os.W_OK" in " ".join(backup)

@@ -13,10 +13,13 @@
 # API with the SPA, the worker (outbox, agent runs, automations) and the live-editing
 # process as a child on 127.0.0.1, which the API relays under /collab; so one Traefik
 # router serves everything. backup makes the backups into the volume backups.
+# Every deploy pulls the image (pull_policy: always), so a redeploy brings the newest
+# image of HERD_IMAGE_TAG (1.0: the newest 1.0.x).
 
 services:
   init:
     image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
     entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
     command: ["init", "--secrets", "/secrets", "--db-secret", "/db-secret"]
     environment:
@@ -60,6 +63,7 @@ services:
 
   app:
     image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
     depends_on:
       init:
         condition: service_completed_successfully
@@ -115,6 +119,7 @@ services:
   # kept. By hand: docker compose exec backup python -m app.ops backup run (or list).
   backup:
     image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
     entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.ops"]
     command: ["backup", "schedule"]
     depends_on:
@@ -140,11 +145,13 @@ services:
       - db-secret:/db-secret:ro
     networks:
       - internal
+    # The image's own check asks the API; this one asks whether the backup directory is
+    # there and writable (the scheduler itself is the container's process). A disabled
+    # check would fail `docker compose up --wait` ("no healthcheck configured").
     healthcheck:
-      disable: true
-    read_only: true
-    tmpfs:
-      - /tmp:size=1g
+      test: ["CMD", "python", "-c", "import os, sys; d = os.environ.get('HERD_BACKUP_DIR', '/backups'); sys.exit(0 if os.path.isdir(d) and os.access(d, os.W_OK | os.X_OK) else 1)"]
+      interval: 10s
+      timeout: 3s
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
