@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger, OffsiteState
@@ -16,6 +16,10 @@ from app.modules.orgs.models import Organization
 # takes it knows no backup is running, so every `running` row is one whose process died.
 BACKUP_LOCK = "herd.backup"
 _KEY = func.hashtextextended(BACKUP_LOCK, 0)
+# The error code of an `interrupted` run: its process died (counts as a failure), or it
+# was the restored archive's own run, running in its snapshot (it made the archive).
+INTERRUPTED = "backup.interrupted"
+IN_RESTORED_ARCHIVE = "backup.in_restored_archive"
 
 
 async def hold_backup_lock(connection: AsyncConnection) -> bool:
@@ -81,12 +85,21 @@ class BackupRunRepository:
 
     async def figures(self) -> BackupFigures:
         """For the gauges, over every organisation (there is one): the last finish of a
-        good and of a failed backup, the size of the last good one, the last finish of
-        a good backup whose offsite push worked and of one whose push failed."""
+        good and of a failed backup (a killed one, `interrupted`, counts as failed; the
+        restored archive's own run, running in its snapshot, does not), the size of the
+        last good one, the last finish of a good backup whose offsite push worked and
+        of one whose push failed."""
         ok = BackupRun.state == BackupState.OK
         last_ok = await self.session.scalar(select(func.max(BackupRun.finished_at)).where(ok))
+        failed = or_(
+            BackupRun.state == BackupState.FAILED,
+            and_(
+                BackupRun.state == BackupState.INTERRUPTED,
+                BackupRun.error_code.is_distinct_from(IN_RESTORED_ARCHIVE),
+            ),
+        )
         last_failed = await self.session.scalar(
-            select(func.max(BackupRun.finished_at)).where(BackupRun.state == BackupState.FAILED)
+            select(func.max(BackupRun.finished_at)).where(failed)
         )
         size = await self.session.scalar(
             select(BackupRun.bytes)
@@ -103,13 +116,13 @@ class BackupRunRepository:
             last_ok, last_failed, size, offsite[OffsiteState.OK], offsite[OffsiteState.FAILED]
         )
 
-    async def interrupt_running(self, at: datetime) -> int:
+    async def interrupt_running(self, at: datetime, *, code: str = INTERRUPTED) -> int:
         """Runs still `running` whose process is gone (after a restore, or seen by
-        whoever holds the backup lock); how many."""
+        whoever holds the backup lock), with `code`; how many."""
         result = await self.session.execute(
             update(BackupRun)
             .where(BackupRun.state == BackupState.RUNNING)
-            .values(state=BackupState.INTERRUPTED, finished_at=at)
+            .values(state=BackupState.INTERRUPTED, finished_at=at, error_code=code)
         )
         return int(result.rowcount)  # type: ignore[attr-defined]
 

@@ -134,8 +134,9 @@ services:
     healthcheck:
       disable: true
     read_only: true
+    # /tmp holds restic's cache only (the dump goes to /backups): capped, it is RAM.
     tmpfs:
-      - /tmp
+      - /tmp:size=1g
     volumes:
       - app-data:/data:ro
       - backups:/backups

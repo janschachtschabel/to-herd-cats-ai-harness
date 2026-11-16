@@ -110,11 +110,24 @@ Traceback):
 Zeilen, die noch `running` sind, während niemand die Sperre hält, gehören zu Sicherungen,
 deren Prozess starb (etwa vom Zeitlimit des CronJobs, 6 Stunden, beendet): Die nächste
 Sicherung und die Fälligkeits-Schleife des Workers (einmal je Minute) setzen sie auf
-`interrupted` (Endzeit = Zeitpunkt des Markierens); eine Wiederherstellung ebenso.
-`HerdBackupTooOld` meldet weiterhin, wenn die letzte gelungene zu alt ist.
+`interrupted` mit Code `backup.interrupted` (Endzeit = Zeitpunkt des Markierens); das
+zählt als misslungene Sicherung (`HerdBackupFailing`). Eine Wiederherstellung setzt die
+Zeilen, die im Archiv noch liefen (darunter die Sicherung, die das Archiv schrieb), auf
+`interrupted` mit `backup.in_restored_archive`; die zählen nicht als Fehler. Die
+Ablehnungen oben (`backup.already_running`, `backup.schema_*`,
+`backup.database_unavailable`) schreiben keine Zeile: sie meldet nur `HerdBackupTooOld`,
+sobald die letzte gelungene zu alt ist (und der Exit-Status 1 des Jobs).
 
-Ein Lauf schreibt zuerst eine Zeile `backup_run` (`running`), dann Dump und Dateien in
-eine versteckte `.part`-Datei, die erst am Ende umbenannt wird; danach liest er das
+Die versteckten Dateien einer gestorbenen Sicherung (`.herd-*.part`: Archiv,
+Begleitdatei und Dump, bis zu einem ganzen Archiv groß) entfernt die nächste Sicherung,
+während sie die Sperre hält (Log `backup.leftovers_removed` mit der Anzahl); andere
+Dateien im Verzeichnis rührt sie nicht an.
+
+Ein Lauf schreibt zuerst eine Zeile `backup_run` (`running`), dann den Dump in eine
+versteckte Arbeitsdatei neben dem Archiv (`.<archiv>.db.dump.part`, Modus 0600, auf dem
+Sicherungs-Volume, nie in `/tmp`) und Dump und Dateien in eine versteckte `.part`-Datei,
+die erst am Ende umbenannt wird; die Arbeitsdatei ist danach weg. Auf dem Volume braucht
+eine Sicherung also kurz Platz für den Dump zweimal plus die Anhänge. Danach liest er das
 Archiv vollständig zurück und prüft es. Erst dann ist der Lauf `ok`. Scheitert etwas,
 wird alles Geschriebene entfernt und der Lauf mit einem Code `failed`:
 
@@ -217,7 +230,7 @@ lässt sich nicht abfragen) und meldet:
 | Metrik | Bedeutung |
 |---|---|
 | `herd_backup_last_success_timestamp_seconds` | Ende der letzten gelungenen Sicherung (0: noch keine) |
-| `herd_backup_last_failure_timestamp_seconds` | Ende der letzten misslungenen |
+| `herd_backup_last_failure_timestamp_seconds` | Ende der letzten misslungenen (`failed`, oder `interrupted` mit `backup.interrupted`) |
 | `herd_backup_last_bytes` | Größe des letzten gelungenen Archivs |
 | `herd_backup_offsite_last_success_timestamp_seconds` | letzte gelungene Sicherung, die das restic-Repository erreichte |
 | `herd_backup_offsite_last_failure_timestamp_seconds` | letzte gelungene Sicherung, deren Offsite-Schritt scheiterte |
@@ -242,6 +255,8 @@ schreibgeschützt und öffnet keinen Port. `HERD_SECRET_KEY` kommt aus `ai.env` 
 Schlüsselkennung im Archiv), Repository, Passwort und Speicherzugang für restic aus
 `backup.env` (Vorlage `backup.env.example`). Von Hand:
 `docker compose exec backup python -m app.ops backup run` (oder `list`, `verify`).
+`/tmp` des Dienstes ist ein tmpfs (Arbeitsspeicher) mit 1 GiB Obergrenze: dort liegt nur
+der Cache von restic, der Dump geht ins Volume `backups`.
 `smoke.sh` sichert im Dienst, spielt das Archiv in eine zweite Datenbank ein und kopiert
 eine Sicherung mit dem echten restic in ein Repository im Container.
 
@@ -258,7 +273,10 @@ sollte ReadWriteMany sein, sonst muss der Job anders auf den richtigen Knoten ko
 Speicherzugangsdaten; es erreicht nur den Backup-Job, von `ai.existingSecret` bekommt er
 allein `HERD_SECRET_KEY`. Mit `networkPolicy.enabled` darf der Job nur DNS, die Datenbank
 und `backup.offsite.egress` erreichen. Der Worker bekommt `HERD_BACKUP_ALERT_AFTER_HOURS`
-aus `backup.alertAfterHours`. Das Image bringt restic 0.18.1 mit (Prüfsumme je
+aus `backup.alertAfterHours`. `/tmp` des Job-Pods (emptyDir, nur der Cache von restic)
+ist auf `backup.tmpSizeLimit` (2Gi) begrenzt; der Dump liegt während der Sicherung neben
+dem Archiv auf der PVC `<release>-backups`, die also neben den behaltenen Archiven Platz
+für einen Dump mehr braucht. Das Image bringt restic 0.18.1 mit (Prüfsumme je
 Architektur aus den `SHA256SUMS` der Veröffentlichung).
 
 ## Wiederherstellen (in eine leere Installation)
@@ -305,11 +323,12 @@ ein startender App-Prozess in Rolle `all` wartet also, statt dazwischen zu migri
    geprüft; schon vorhandene mit gleichem Inhalt bleiben);
 3. die Datenbank mit `pg_restore --no-owner --no-privileges --single-transaction
    --exit-on-error` (ganz oder gar nicht; scheitert es, werden die eben geschriebenen
-   Dateien wieder entfernt);
+   Dateien wieder entfernt); der Dump geht aus dem Archiv direkt in `pg_restore`
+   (Standardeingabe), ohne Zwischendatei;
 4. `alembic upgrade head`, wenn das Archiv eine ältere bekannte Revision hat;
 5. in einer Transaktion: alle Sitzungen und offenen OAuth-Abläufe gelöscht (nach einer
    Wiederherstellung ist jede Anmeldung ungültig), Sicherungsläufe im Zustand `running`
-   werden `interrupted`, ein Audit-Eintrag `backup.restored` (`system`, Archivname,
+   werden `interrupted` (`backup.in_restored_archive`, kein Fehler für den Alarm), ein Audit-Eintrag `backup.restored` (`system`, Archivname,
    Revisionen).
 
 Danach die App normal starten. `restore apply` gibt Revisionen, Tabellen und Dateien

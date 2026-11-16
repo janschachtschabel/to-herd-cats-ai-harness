@@ -1,7 +1,8 @@
 """What follows a restore, in one transaction (plan M9 decision 6, spec 12.6): every
 session and every open sign-in flow is gone (nobody stays signed in across a
-restore), backups that were running in the archive's snapshot become `interrupted`,
-and the restore is audited as `backup.restored` by `system`.
+restore), backups that were running in the archive's snapshot (the archive's own
+run among them) become `interrupted` with `backup.in_restored_archive`, which the failure gauge does
+not count, and the restore is audited as `backup.restored` by `system`.
 
 CLEARED_AFTER_RESTORE names the tables emptied; a module that adds such state (OIDC
 flows, collab grants) adds its table here, and a test checks that each exists.
@@ -11,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import Clock
 from app.modules.audit.recorder import record_system
-from app.modules.backups.repository import BackupRunRepository, clear_tables
+from app.modules.backups.repository import (
+    IN_RESTORED_ARCHIVE,
+    BackupRunRepository,
+    clear_tables,
+)
 
 # `collab_grant` first: emptying `user_session` would only make its grants powerless.
 CLEARED_AFTER_RESTORE: tuple[str, ...] = (
@@ -32,7 +37,7 @@ async def finish_restore(
 ) -> None:
     await clear_tables(session, CLEARED_AFTER_RESTORE)
     runs = BackupRunRepository(session)
-    await runs.interrupt_running(clock.now())
+    await runs.interrupt_running(clock.now(), code=IN_RESTORED_ARCHIVE)
     org_id = await runs.installation_org()
     if org_id is None:
         return

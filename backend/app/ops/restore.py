@@ -5,14 +5,14 @@ Under the schema lock (`schema_lock.py`, held from the check to the end): the ch
 (each checked against the manifest while written; keys already here have the same
 content), the database with `pg_restore --single-transaction` (files added for it are
 removed again if it fails), `alembic upgrade head` when the archive is older, and
-`finish_restore`. A refused restore changes nothing (`RestoreRefused` with the codes);
-a failed one raises `RestoreFailed` with a code.
+`finish_restore`. The dump goes from the archive straight into pg_restore's stdin, so
+a restore needs no scratch space. A refused restore changes nothing (`RestoreRefused`
+with the codes); a failed one raises `RestoreFailed` with a code.
 """
 
 import asyncio
 import hashlib
 import tarfile
-import tempfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -132,19 +132,21 @@ async def _restore_files(storage: LocalStorage, archive: Path, manifest: Manifes
 
 
 async def _restore_database(settings: Settings, archive: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="restore-") as scratch:
-        dump_file = Path(scratch) / DUMP_MEMBER
-        with tarfile.open(archive, "r:") as tar:
-            handle = tar.extractfile(PREFIX + DUMP_MEMBER)
-            if handle is None:
-                raise RestoreFailed("archive.member_missing")
-            with dump_file.open("wb") as out:
-                while chunk := await asyncio.to_thread(handle.read, CHUNK):
-                    out.write(chunk)
+    """The archive's dump straight from the tar member into pg_restore: no scratch
+    file (no /tmp, no second copy on disk)."""
+    with tarfile.open(archive, "r:") as tar:
+        handle = tar.extractfile(PREFIX + DUMP_MEMBER)
+        if handle is None:
+            raise RestoreFailed("archive.member_missing")
         try:
-            await restore(settings, dump_file)
+            await restore(settings, _read(handle))
         except ToolFailed as failed:
             raise RestoreFailed(failed.code) from None
+
+
+async def _read(handle: IO[bytes]) -> AsyncIterator[bytes]:
+    while chunk := await asyncio.to_thread(handle.read, CHUNK):
+        yield chunk
 
 
 async def _chunks(handle: IO[bytes], digest: "hashlib._Hash") -> AsyncIterator[bytes]:

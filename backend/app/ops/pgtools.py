@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from sqlalchemy import text
@@ -97,10 +98,11 @@ async def dump(settings: Settings, snapshot_id: str, out: Path) -> None:
         raise ToolFailed("backup.dump_failed", status)
 
 
-async def restore(settings: Settings, dump_file: Path) -> None:
-    """`pg_restore` of `dump_file` into the settings' database: all or nothing
-    (`--single-transaction --exit-on-error`), without owners and grants (managed
-    databases have other roles)."""
+async def restore(settings: Settings, dump: AsyncIterator[bytes]) -> None:
+    """`pg_restore` of the custom-format dump read from `dump` (piped to its stdin, no
+    scratch file) into the settings' database: all or nothing (`--single-transaction
+    --exit-on-error`), without owners and grants (managed databases have other
+    roles)."""
     path = shutil.which("pg_restore")
     if path is None:
         raise ToolFailed("restore.tool_missing")
@@ -113,12 +115,25 @@ async def restore(settings: Settings, dump_file: Path) -> None:
         "--exit-on-error",
         "--no-password",
         f"--dbname={env.get('PGDATABASE', '')}",
-        str(dump_file),
         env=env,
-        stdin=asyncio.subprocess.DEVNULL,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
     )
+    stdin = process.stdin
+    assert stdin is not None  # PIPE above
+    try:
+        async for chunk in dump:
+            stdin.write(chunk)
+            await stdin.drain()
+        stdin.close()
+        await stdin.wait_closed()
+    except (BrokenPipeError, ConnectionResetError):
+        pass  # pg_restore stopped reading: its exit status says why
+    except BaseException:
+        process.kill()
+        await process.wait()
+        raise
     status = await process.wait()
     if status != 0:
         raise ToolFailed("restore.pg_restore_failed", status)

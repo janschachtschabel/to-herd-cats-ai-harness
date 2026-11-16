@@ -14,6 +14,7 @@ from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
 from app.core.config import get_settings
@@ -24,6 +25,7 @@ from app.models_registry import Base
 from app.modules.ai.models import AiConnection
 from app.modules.audit.models import AuditLog
 from app.modules.backups.models import BackupRun
+from app.modules.backups.repository import BackupRunRepository
 from app.ops.archive import read_sidecar
 from app.ops.backup import write_archive
 from app.ops.cli import run
@@ -123,13 +125,17 @@ async def test_running_backup_rows_become_interrupted(
     engine = make_engine(target.settings.database())
     try:
         async with engine.connect() as conn:
-            states = (await conn.scalars(select(BackupRun.state))).all()
+            states = (await conn.execute(select(BackupRun.state, BackupRun.error_code))).all()
+            async with AsyncSession(bind=conn) as session:
+                figures = await BackupRunRepository(session).figures()
             entry = (
                 await conn.execute(select(AuditLog).where(AuditLog.action == "backup.restored"))
             ).one()
     finally:
         await engine.dispose()
-    assert states == ["interrupted"]  # the archive's own run was running in its snapshot
+    # The archive's own run was running in its snapshot: no failure (HerdBackupFailing).
+    assert states == [("interrupted", "backup.in_restored_archive")]
+    assert figures.last_failed is None
     assert entry.actor_type == "system"
     assert entry.details == {
         "archive": archive.name,

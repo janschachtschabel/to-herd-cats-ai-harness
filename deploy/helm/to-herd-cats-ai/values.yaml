@@ -136,9 +136,10 @@ persistence:
 ## @param backup.keepWeekly Older weeks whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_WEEKLY); offsite, restic forget gets the same numbers but counts the periods overlapping, so it reaches back less far (docs/SICHERUNG.md)
 ## @param backup.keepMonthly Older months whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_MONTHLY)
 ## @param backup.alertAfterHours Age of the last good backup at which HerdBackupTooOld fires, in hours (HERD_BACKUP_ALERT_AFTER_HOURS; worker, which exports it as herd_backup_alert_after_seconds); a little more than the schedule's interval
+## @param backup.tmpSizeLimit Size limit of the backup pod's /tmp (emptyDir; restic's cache lives there). The dump is written next to the archive on the backups claim, never to /tmp; a restore streams it into pg_restore
 ## @param backup.resources Resource requests and limits of the backup container (pg_dump, tar and restic stream; memory does not grow with the data)
 ## @param backup.persistence.existingClaim Name of an existing PersistentVolumeClaim for the archives; empty: the chart creates one (kept on uninstall)
-## @param backup.persistence.size Size of the claim the chart creates: room for the archives the retention keeps (each about the dump plus the attachments)
+## @param backup.persistence.size Size of the claim the chart creates: room for the archives the retention keeps (each about the dump plus the attachments) and, while a backup runs, its dump once more (scratch file, removed afterwards)
 ## @param backup.persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
 ## @param backup.persistence.accessModes Access modes of the claim the chart creates (one job at a time: ReadWriteOnce is enough)
 ## @param backup.offsite.existingSecret Name of an existing Secret whose keys are environment variables of the backup job alone: HERD_BACKUP_OFFSITE_REPOSITORY (the restic repository, e.g. s3:https://s3.example/bucket/herd), HERD_BACKUP_OFFSITE_PASSWORD (its password) and the storage's credentials (AWS_*, B2_*, AZURE_*, GOOGLE_*, OS_*, ST_*), which go to restic and nothing else. Empty: no offsite copy (offsite=off)
@@ -150,6 +151,7 @@ backup:
   keepWeekly: 4
   keepMonthly: 6
   alertAfterHours: 26
+  tmpSizeLimit: 2Gi
   resources:
     requests:
       cpu: 50m

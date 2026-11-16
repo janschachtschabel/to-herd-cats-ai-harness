@@ -114,9 +114,19 @@ seccompProfile:
 {{/* Volumes of the app pods: a writable /tmp and the database password file
 (the files volume /data is the API's alone, see deployment-api.yaml). */}}
 {{- define "herd.volumes" -}}
+{{- include "herd.volumesSized" (dict "root" . "tmpSizeLimit" "") -}}
+{{- end -}}
+
+{{/* herd.volumes with a sizeLimit on /tmp ("" for none): dict root, tmpSizeLimit. */}}
+{{- define "herd.volumesSized" -}}
 - name: tmp
+{{- if .tmpSizeLimit }}
+  emptyDir:
+    sizeLimit: {{ .tmpSizeLimit }}
+{{- else }}
   emptyDir: {}
-{{- with include "herd.databaseSecret" . }}
+{{- end }}
+{{- with include "herd.databaseSecret" .root }}
 - name: database-password
   secret:
     secretName: {{ . }}

@@ -7,9 +7,12 @@
    These refusals write no `backup_run` row.
 1. Rows still `running` belong to backups whose process died (killed by the job's time
    limit, say): holding the lock, the backup marks them `interrupted` (as the worker's
-   due loop and a restore do). Its own `running` row is committed first, so a backup
-   that dies midway is visible.
-2. In one exported snapshot: the figures (`snapshot.py`) and `pg_dump -Fc --snapshot`.
+   due loop and a restore do) and removes the hidden `.herd-*.part` files such a backup
+   left in the backups directory (`remove_leftovers`). Its own `running` row is
+   committed first, so a backup that dies midway is visible.
+2. In one exported snapshot: the figures (`snapshot.py`) and `pg_dump -Fc --snapshot`
+   into a hidden scratch file next to the archive (`.<name>.db.dump.part`, mode 0600),
+   never into /tmp; it is removed once it is in the archive or the backup failed.
 3. The snapshot's attachment files are copied from the storage (a deleted file stays
    for its tombstone's grace, `core/storage_tombstones.py`), then the manifest.
 4. The archive is read back (`verify_archive`); only a good one makes the run `ok`.
@@ -22,7 +25,7 @@ is audited as `backup.created` by `system` with the trigger as `via`.
 """
 
 import logging
-import tempfile
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -61,6 +64,7 @@ from app.version import app_version
 logger = logging.getLogger(__name__)
 
 ARCHIVE_PREFIX = "herd-"
+PART_SUFFIX = ".part"
 SCHEMA_CODES = {
     SchemaState.NONE: "backup.no_schema",
     SchemaState.BEHIND: "backup.schema_behind",
@@ -139,6 +143,8 @@ async def _locked(
             return BackupOutcome(None, None, BackupState.FAILED, "backup.no_organization")
         if dead := await runs.interrupt_running(started):
             logger.warning("backup.interrupted_found", extra={"count": dead})
+        if left := remove_leftovers(settings.backup_dir):
+            logger.warning("backup.leftovers_removed", extra={"count": left})
         run_id = (await runs.start(org_id, trigger, started)).id
     path = settings.backup_dir / archive_name(started, app_version())
     written = False
@@ -187,8 +193,9 @@ async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: dateti
     private_dir(path.parent)
     pg_dump_version = tool_version("pg_dump")
     storage = LocalStorage(settings.data_dir)
-    with tempfile.TemporaryDirectory(prefix="herd-backup-") as scratch:
-        dump_file = Path(scratch) / DUMP_MEMBER
+    dump_file = path.with_name(f".{path.name.removesuffix('.tar')}.{DUMP_MEMBER}{PART_SUFFIX}")
+    os.close(os.open(dump_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+    try:
         async with open_snapshot(engine) as snapshot:
             if int(pg_dump_version.split(".")[0]) < snapshot.server_major:
                 raise BackupFailed("backup.tools_too_old")
@@ -202,6 +209,22 @@ async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: dateti
         except BaseException:
             writer.abort()
             raise
+    finally:
+        dump_file.unlink(missing_ok=True)
+
+
+def remove_leftovers(directory: Path) -> int:
+    """Remove the hidden `.herd-*.part` files of backups that died midway (archive,
+    sidecar and scratch dump); the number removed. Only while holding the backup lock:
+    then no other backup is writing one."""
+    if not directory.is_dir():
+        return 0
+    removed = 0
+    for path in directory.glob(f".{ARCHIVE_PREFIX}*{PART_SUFFIX}"):
+        if path.is_file() and not path.is_symlink():
+            path.unlink(missing_ok=True)
+            removed += 1
+    return removed
 
 
 async def _add_files(writer: ArchiveWriter, storage: Storage, snapshot: Snapshot) -> None:

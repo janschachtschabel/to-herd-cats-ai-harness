@@ -113,7 +113,7 @@ spec:
                 - name: backups
                   mountPath: /backups
           volumes:
-            {{- include "herd.volumes" . | nindent 12 }}
+            {{- include "herd.volumesSized" (dict "root" . "tmpSizeLimit" .Values.backup.tmpSizeLimit) | nindent 12 }}
             - name: data
               persistentVolumeClaim:
                 claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}

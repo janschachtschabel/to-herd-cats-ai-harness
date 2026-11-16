@@ -137,6 +137,7 @@ async def test_the_next_backup_marks_a_dead_one_interrupted(
     assert outcome.state == BackupState.OK
     dead, made = await _runs(real_db)
     assert (dead.state, dead.finished_at) == (BackupState.INTERRUPTED, AT)
+    assert dead.error_code == "backup.interrupted"
     assert made.state == BackupState.OK
 
 
@@ -165,4 +166,8 @@ async def test_the_due_loop_marks_a_dead_backup_and_leaves_a_live_one(
         await engine.dispose()
     await DueLoop(real_db.database, clock=SettableClock(AT)).cleanup_if_due()
     (dead,) = await _runs(real_db)
-    assert (dead.state, dead.finished_at) == (BackupState.INTERRUPTED, AT)
+    assert (dead.state, dead.finished_at, dead.error_code) == (
+        BackupState.INTERRUPTED,
+        AT,
+        "backup.interrupted",
+    )

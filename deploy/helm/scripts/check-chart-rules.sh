@@ -304,6 +304,8 @@ grep -A2 -- "- name: data" <<<"$cron" | grep -q "readOnly: true" || fail "the fi
 grep -A2 -- "- name: backups" <<<"$cron" | grep -q "claimName: t-to-herd-cats-ai-backups" \
   || fail "the archives are not on the chart's claim"
 grep -q "envFrom\|HERD_AI_" <<<"$cron" && fail "the backup job gets more than its own environment"
+grep -A3 -- "- name: tmp" <<<"$cron" | grep -q "sizeLimit: 2Gi" \
+  || fail "the backup pod's /tmp has no size limit (backup.tmpSizeLimit)"
 claim=$(doc PersistentVolumeClaim t-to-herd-cats-ai-backups "$out")
 grep -q "helm.sh/resource-policy: keep" <<<"$claim" || fail "the backups claim is not kept"
 grep -A1 -- "- name: HERD_BACKUP_ALERT_AFTER_HOURS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
