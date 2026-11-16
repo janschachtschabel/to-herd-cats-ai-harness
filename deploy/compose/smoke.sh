@@ -16,6 +16,9 @@
 #   SMOKE_NODES=1 bash deploy/compose/smoke.sh        (compose.nodes.yml: two API nodes,
 #       a worker, collab and a migration run in place of role all; the message is posted
 #       on node A and must arrive on a stream of node B, SMOKE_PORT_B=18081 by default)
+#   SMOKE_S3=1 bash deploy/compose/smoke.sh           (compose.s3.yml: attachments in
+#       SeaweedFS; the file must not reach /data, `storage check` passes, the restore puts
+#       the files under another prefix and `storage copy --to local` reads them back)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -41,6 +44,12 @@ if [[ ${SMOKE_NODES:-0} == 1 ]]; then
   worker=worker
   base_b="http://127.0.0.1:${HERD_HOST_PORT_B}"
 fi
+s3=${SMOKE_S3:-0}
+if [[ $s3 == 1 ]]; then
+  [[ ${SMOKE_NODES:-0} == 1 ]] && { echo "SMOKE_S3 runs with role all only" >&2; exit 2; }
+  project=to-herd-cats-ai-smoke-s3
+  files+=(-f compose.s3.yml)
+fi
 
 # The secrets: .env if there is one, else a throwaway one (removed again below).
 env_file=.env
@@ -51,6 +60,8 @@ if [[ ! -f "$env_file" ]]; then
     echo "HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com"
     echo "HERD_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 24)"
     echo "HERD_INTERNAL_TOKEN=$(openssl rand -hex 32)"
+    echo "HERD_S3_ACCESS_KEY_ID=herd$(openssl rand -hex 8)"
+    echo "HERD_S3_SECRET_ACCESS_KEY=$(openssl rand -hex 24)"
   } >"$env_file"
 fi
 compose=(docker compose -p "$project" --env-file "$env_file" "${files[@]}")
@@ -123,6 +134,12 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -X POST -H 'X-Requested-
   -H 'Content-Type: application/octet-stream' --data-binary 'smoke' \
   "$base/api/pages/$page_id/attachments?filename=smoke.txt")
 [[ $code == 201 ]] || fail "uploading an attachment answered $code"
+if [[ $s3 == 1 ]]; then
+  stored="$("${compose[@]}" exec -T app find /data -path '*/attachments/*' -type f | wc -l)"
+  (( stored == 0 )) || fail "the attachment went to /data, not to S3"
+  checked="$("${compose[@]}" exec -T app python -m app.ops storage check | tr -d '\r' | tail -1)"
+  [[ $checked == "ok s3" ]] || fail "storage check printed: $checked"
+fi
 
 # Live editing: the WebSocket through the API's relay to the collab process. With the
 # owner's cookie the relay hands the collab process a grant for the page, which
@@ -319,11 +336,17 @@ backed_up() {
 for _ in $(seq 1 30); do backed_up && break; sleep 1; done
 backed_up || fail "$worker does not export the backup's gauge"
 "${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore' >/dev/null
-applied="$("${compose[@]}" exec -T \
-  -e HERD_DATABASE_URL=postgresql+asyncpg://herd@db:5432/herd_restore \
-  -e HERD_DATA_DIR=/tmp/restore-data backup python -m app.ops restore apply "$archive" \
+target=(-e HERD_DATABASE_URL=postgresql+asyncpg://herd@db:5432/herd_restore
+  -e HERD_DATA_DIR=/tmp/restore-data)
+[[ $s3 == 1 ]] && target+=(-e HERD_S3_PREFIX=restored)
+applied="$("${compose[@]}" exec -T "${target[@]}" backup python -m app.ops restore apply "$archive" \
   | tr -d '\r' | tail -1)" || fail "restore apply into herd_restore failed"
 [[ $applied == "restored "* ]] || fail "restore apply into herd_restore printed: $applied"
+if [[ $s3 == 1 ]]; then  # the restored files are under the prefix `restored`: read them back
+  copied="$("${compose[@]}" exec -T "${target[@]}" backup python -m app.ops storage copy --to local \
+    | tr -d '\r' | tail -1)" || fail "storage copy from S3 failed"
+  [[ $copied == "copied "[1-9]* ]] || fail "storage copy from S3 printed: $copied"
+fi
 pages="$("${compose[@]}" exec -T db psql -tA -U herd -d herd_restore \
   -c "SELECT count(*) FROM page WHERE id = '$page_id'" | tr -d '\r')"
 [[ $pages == 1 ]] || fail "the restored database lacks the page"

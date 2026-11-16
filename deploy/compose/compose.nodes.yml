@@ -9,7 +9,8 @@
 # is the only outbox dispatcher (role worker: notifications, page timelines, live
 # updates) and works on the agent runs; `collab` runs live editing (role collab) and calls the API nodes' internal
 # port under the alias `api`; `backup` (compose.yml) starts after the migration. Both API
-# nodes share the files volume (one host). Only the
+# nodes share the files volume (one host), or an S3 store with HERD_STORAGE=s3 (set in
+# .env, see compose.yml; the worker removes unused files after their grace). Only the
 # two public ports are published; 9090 and the collab port stay inside.
 
 x-node: &node
@@ -31,8 +32,18 @@ x-database: &database
   HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
   HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
 
+# Where attachments live (see compose.yml): the API nodes and the worker.
+x-storage: &storage
+  HERD_STORAGE: ${HERD_STORAGE:-local}
+  HERD_S3_ENDPOINT: ${HERD_S3_ENDPOINT:-}
+  HERD_S3_REGION: ${HERD_S3_REGION:-us-east-1}
+  HERD_S3_BUCKET: ${HERD_S3_BUCKET:-}
+  HERD_S3_ACCESS_KEY_ID: ${HERD_S3_ACCESS_KEY_ID:-}
+  HERD_S3_SECRET_ACCESS_KEY: ${HERD_S3_SECRET_ACCESS_KEY:-}
+  HERD_S3_PREFIX: ${HERD_S3_PREFIX:-}
+
 x-api-env: &api-env
-  <<: *database
+  <<: [*database, *storage]
   HERD_ROLE: api
   HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
   HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
@@ -110,7 +121,7 @@ services:
   worker:
     <<: *node
     environment:
-      <<: *database
+      <<: [*database, *storage]
       HERD_ROLE: worker
       HERD_AI_APPROVAL_HOURS: ${HERD_AI_APPROVAL_HOURS:-72}
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
