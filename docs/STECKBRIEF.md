@@ -1254,7 +1254,7 @@ stehen nie in Labels.
 
 | Paket | Tests | Stand |
 |---|---|---|
-| Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `c20e30b`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
+| Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `2f5207f`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
 | Frontend (`vitest`), M9a | 632 in 113 Dateien | 16.11.2026: 632 grün im ersten Lauf |
 | Collab (`node --test`), M9a | 280 | 16.11.2026: 279 grün, 1 übersprungen |
 | Browser (`e2e/`, Playwright, echte App in Rolle `all`), M9a | 73 in 22 Dateien | 16.11.2026: erster Lauf 72 grün, 1 rot: `oidc.spec.mjs` „a person links an account…“ legte dora@e2e.example an, die `ai-agents.spec.mjs` schon mit anderem Passwort angelegt hatte (401 bei der Anmeldung; nur im ganzen Lauf, behoben mit einer eigenen Person). Danach 73 grün, 9,8 min |
