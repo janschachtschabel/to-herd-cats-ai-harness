@@ -59,7 +59,8 @@ boards), `docs/KI.md` (connections, keys, egress, assignment, usage, policy, the
 `docs/AGENTEN.md` (agents and automations: use, admin, worker runs and the due loop,
 limits, metrics and alerts), `docs/MCP.md` (tokens, `/mcp` with Claude Code and Codex,
 external agents, servers, connectors, catalogue, operation, metrics and alerts),
-`docs/SICHERUNG.md` (backup, restore, retention), `docs/ANMELDUNG.md` (password and
+`docs/SICHERUNG.md` (backup, restore, retention), `docs/HOSTINGER.md` (install on a
+Hostinger VPS, the simplest path), `docs/ANMELDUNG.md` (password and
 OIDC sign-in, approval), `docs/SICHERHEIT.md` (ASVS rows; `tests/test_security_doc.py`),
 `docs/RELEASE-<version>.md` (release notes, linked from the README).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
@@ -151,6 +152,17 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `core/config_ops.py` (`HERD_BACKUP_*`). Deleted files keep a tombstone for 48 h
   (`core/storage_tombstones.py`). Rehearsal `deploy/scripts/restore-rehearsal.sh` with
   `scripts/compare_databases.py`.
+- Hostinger stack (M9b Task 19, Jan's rules `vorgaben/hostinger-docker.md`): the root
+  `docker-compose.yml` with `.env.example` (every variable empty, German comments) for
+  the Docker Manager's "Compose from URL": GHCR image, no build, no ports, no bind
+  mounts, default network `${TRAEFIK_NETWORK:-herd-web}` (never `external`), Traefik
+  labels (router/service `herd-app`), no anchors, tabs, nested variables or `$$`.
+  `python -m app.stack init` (`app/stack/init.py`) generates the secrets once into the
+  volumes `secrets`/`db-secret`, checks `DOMAIN` (bare host name, exit 2) and the
+  one-time admin with the app's password rules, skips missing values (exit 0); the
+  app reads every secret through `HERD_*_FILE` (`core/config_files.py`). Rules are
+  enforced by `tests/test_hostinger_compose.py`; CI runs
+  `deploy/scripts/hostinger-smoke.sh`. `deploy/compose/` stays the build/reference variant.
 - Retention (M9): `core/retention.py` holds a rule for every table (`Keep`, `Upkeep`,
   `Cleans`; `tests/test_retention.py` fails for a table without one); the due loop's
   `worker/upkeep.py` deletes expired rows.
@@ -246,6 +258,8 @@ bash deploy/compose/load.sh                             # docker stats idle/warm
 # 200-person load test without Docker: deploy/compose/{loadsetup,loadmix,loadreport}.py,
 # deploy/scripts/measure-processes.sh (RSS/CPU per role from /proc); README of compose
 bash deploy/scripts/restore-rehearsal.sh                # backup A → restore into empty B → compare (PGHOST/PGPORT)
+bash deploy/scripts/hostinger-smoke.sh                  # root docker-compose.yml: config, empty first deploy,
+                                                        # values, host-network Traefik (image ghcr.io/…:$HOSTINGER_SMOKE_TAG)
 ```
 
 ```bash

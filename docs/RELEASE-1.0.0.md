@@ -43,6 +43,9 @@ nur erweiternd, zurückgebaut wird frühestens eine Freigabe später (README,
   - Aufbewahrungskatalog, die Migrationsregel ab dieser Freigabe;
   - Sicherheitsprüfung nach ASVS 5.0 L2 ([`SICHERHEIT.md`](SICHERHEIT.md));
   - Lasttest und gemessene Ressourcen ([`STECKBRIEF.md`](STECKBRIEF.md)).
+- **Installation auf einem Hostinger-VPS:** `docker-compose.yml` im Hauptordner für den
+  Docker Manager („Compose from URL“), erster Start ohne Variablen, Geheimnisse erzeugt
+  ein Init-Dienst, HTTPS über Hostingers Traefik ([`HOSTINGER.md`](HOSTINGER.md)).
 
 ## Hinweise zum Update
 
