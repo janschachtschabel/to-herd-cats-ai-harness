@@ -96,6 +96,32 @@ if out=$(render --set api.replicas=1 --set "persistence.accessModes={ReadWriteOn
   fail "a backup on a ReadWriteOncePod files claim rendered"
 fi
 grep -q "ReadWriteOncePod" <<<"$out" || fail "unexpected error: $out"
-render --set api.replicas=1 --set "persistence.accessModes={ReadWriteOncePod}" --set backup.enabled=false >/dev/null \
+out=$(render --set api.replicas=1 --set "persistence.accessModes={ReadWriteOncePod}" --set backup.enabled=false) \
   || fail "ReadWriteOncePod without backups did not render"
+# On ReadWriteOncePod only the API pod has the files: the worker mounts none.
+grep -q "claimName: t-to-herd-cats-ai-data" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker mounts a ReadWriteOncePod files claim"
+
+# The worker removes the files of deleted attachments after their grace (the due loop,
+# core/storage_tombstones.py), so it mounts the files claim at /data like the API: on
+# ReadWriteMany anywhere, on a ReadWriteOnce claim beside an API pod.
+out=$(render)
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+grep -q "claimName: t-to-herd-cats-ai-data" <<<"$worker" || fail "the worker does not mount the files claim"
+grep -B1 -A1 -- "- name: data$" <<<"$worker" | grep -q "mountPath: /data" || fail "the worker's files are not at /data"
+grep -q "podAffinity" <<<"$worker" && fail "the worker seeks an API pod on a ReadWriteMany claim"
+out=$(render --set api.replicas=1 --set "persistence.accessModes={ReadWriteOnce}")
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+grep -q "claimName: t-to-herd-cats-ai-data" <<<"$worker" || fail "the worker does not mount a ReadWriteOnce files claim"
+grep -A10 "podAffinity:" <<<"$worker" | grep -q "app.kubernetes.io/component: api$" \
+  || fail "the worker may land away from the API on a ReadWriteOnce claim"
+grep -A12 "podAffinity:" <<<"$worker" | grep -q "topologyKey: kubernetes.io/hostname" \
+  || fail "the worker's affinity is not per node"
+out=$(render --set persistence.existingClaim=files)
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+grep -q "claimName: files$" <<<"$worker" || fail "the worker does not mount persistence.existingClaim"
+grep -q "podAffinity" <<<"$worker" && fail "the worker seeks an API pod on an existing claim"
+out=$(render --set persistence.enabled=false --set backup.enabled=false) || fail "persistence.enabled false does not render: $out"
+grep -q "persistentVolumeClaim" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker mounts a claim with persistence.enabled false"
 true

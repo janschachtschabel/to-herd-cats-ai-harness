@@ -115,7 +115,7 @@ publicUrl: ""
 
 ## @section Files (HERD_DATA_DIR=/data)
 
-## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only, or with s3.enabled, where /data holds temporary files only)
+## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod and the worker (it removes the files of deleted attachments after their grace; on a ReadWriteOnce claim it runs beside an API pod, on ReadWriteOncePod those files stay); off: an emptyDir per pod (files are lost with the pod; for trials only, or with s3.enabled, where /data holds temporary files only)
 ## @param persistence.existingClaim Name of an existing PersistentVolumeClaim to use; empty: the chart creates one (kept on uninstall)
 ## @param persistence.size Size of the claim the chart creates
 ## @param persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default

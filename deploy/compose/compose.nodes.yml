@@ -132,6 +132,10 @@ services:
       HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
     env_file: *ai-keys
     depends_on: *after-migrate
+    # The due loop removes the files of deleted attachments after their grace
+    # (core/storage_tombstones.py); with HERD_STORAGE=s3 it uses the store instead.
+    volumes:
+      - app-data:/data
     stop_grace_period: 30s
 
   # The service backup of compose.yml (docs/SICHERUNG.md), here after the migration.

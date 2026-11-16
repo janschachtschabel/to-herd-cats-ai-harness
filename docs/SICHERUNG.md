@@ -233,7 +233,10 @@ eine neue Tabelle keine hat. Drei Arten:
   und sichert vorher.
 - **Fälligkeits-Schleife** (`Upkeep`, mit Frist): `automation_event` (7 Tage nach seinem
   Termin), `automation_firing` und `mcp_call` (90 Tage), `storage_tombstone` (48 h, dann
-  die Datei, wenn sie unbenutzt ist), und die abgelaufenen Zeilen: `user_session`
+  die Datei, wenn sie unbenutzt ist; der Worker hängt dafür die Anhänge ein, in
+  `compose.nodes.yml` das Volume `app-data`, im Chart die Anhänge-PVC, bei
+  ReadWriteOnce neben einem API-Pod; auf ReadWriteOncePod bleiben solche Dateien
+  liegen; mit S3 nimmt er den Speicher), und die abgelaufenen Zeilen: `user_session`
   (1 h nach Ende), `oauth_flow` und `oidc_flow` (bei Ablauf), `collab_grant` (1 h nach
   Ablauf), `rate_limit_hit` (60 s), `ai_rate_window` (1 h).
 - **Räumt selbst auf** (`Cleans`): die Outbox (`event_outbox` 7 Tage nach der

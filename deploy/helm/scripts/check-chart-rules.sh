@@ -114,7 +114,8 @@ grep -q "name: monitoring" <<<"$policy" || fail "the scrapers in internalFrom ca
 
 # The worker (outbox dispatcher, HERD_ROLE=worker): its own Deployment, one replica by
 # default, more on request (they claim disjoint batches); probes and metrics on the
-# internal port, no public port, no files, no live-editing token. Its container has the
+# internal port, no public port, no live-editing token (its files claim, for removing
+# the files of deleted attachments: chart-rules-placement.sh). Its container has the
 # API's name, so HerdNotReady covers it.
 out=$(render)
 worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
@@ -125,8 +126,8 @@ grep -q -- "- name: to-herd-cats-ai$" <<<"$worker" || fail "the worker container
 grep -A3 "readinessProbe:" <<<"$worker" | grep -q "path: /ready" || fail "the worker's readiness is not /ready"
 grep -A4 "readinessProbe:" <<<"$worker" | grep -q "port: internal" || fail "the worker's probes are not on 9090"
 grep -B1 "containerPort: 9090" <<<"$worker" | grep -q "name: internal" || fail "the worker has no internal port"
-grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL\|mountPath: /data" <<<"$worker" \
-  && fail "the worker has a public port, the live-editing token or the files"
+grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL" <<<"$worker" \
+  && fail "the worker has a public port or the live-editing token"
 grep -q "HERD_DATABASE_PASSWORD_FILE" <<<"$worker" || fail "the worker has no database password"
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
 grep -A1 -- "- name: HERD_ROLE" <<<"$api" | grep -q "value: api$" || fail "the API pods do not run role api"

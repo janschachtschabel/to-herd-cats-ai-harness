@@ -43,6 +43,12 @@ done
 # With the store the backup job mounts no files claim and needs no API pod beside it.
 grep -q "claimName: t-to-herd-cats-ai-data" <<<"$cron" && fail "the backup job mounts the files claim with s3.enabled"
 grep -q "podAffinity" <<<"$cron" && fail "the backup job seeks an API pod with s3.enabled"
+# The worker reaches the files through the store too: no claim, no API pod beside it.
+out=$(render "${s3[@]}")
+worker=$(doc Deployment t-to-herd-cats-ai-worker "$out")
+grep -q "claimName: t-to-herd-cats-ai-data" <<<"$worker" && fail "the worker mounts the files claim with s3.enabled"
+grep -q "podAffinity" <<<"$worker" && fail "the worker seeks an API pod with s3.enabled"
+out=$(render "${s3[@]}" --set s3.prefix=herd/prod --set persistence.enabled=false)
 grep -q "PersistentVolumeClaim" <<<"$(doc PersistentVolumeClaim t-to-herd-cats-ai-data "$out")" \
   && fail "a files claim renders with persistence.enabled false"
 
