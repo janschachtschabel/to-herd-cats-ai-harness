@@ -289,8 +289,10 @@ und `backup.offsite.egress` erreichen. Der Worker bekommt `HERD_BACKUP_ALERT_AFT
 aus `backup.alertAfterHours`. `/tmp` des Job-Pods (emptyDir, nur der Cache von restic)
 ist auf `backup.tmpSizeLimit` (2Gi) begrenzt; der Dump liegt während der Sicherung neben
 dem Archiv auf der PVC `<release>-backups`, die also neben den behaltenen Archiven Platz
-für einen Dump mehr braucht. Das Image bringt restic 0.18.1 mit (Prüfsumme je
-Architektur aus den `SHA256SUMS` der Veröffentlichung).
+für einen Dump mehr braucht. Das Image bringt restic 0.19.1 mit, aus den Quellen
+gebaut (Quellarchiv mit der Prüfsumme aus den `SHA256SUMS` der Veröffentlichung, Go
+1.27.4, Module mit Sicherheitskorrekturen aus `deploy/restic/go.mod` und `go.sum`;
+siehe `Dockerfile`), weil die veröffentlichten Binärdateien mit älterem Go gebaut sind.
 
 ## Wiederherstellen (in eine leere Installation)
 

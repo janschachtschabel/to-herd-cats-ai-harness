@@ -14,6 +14,7 @@
 
 ARG PYTHON_IMAGE=python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 ARG NODE_IMAGE=node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+ARG GO_IMAGE=golang:1.27.4-trixie@sha256:f18c3d73a184fb0582828510722e723b63a93f7188d11dd223d9be6f6880e65d
 
 # --- frontend: the SPA as static files --------------------------------------------
 FROM ${NODE_IMAGE} AS frontend
@@ -58,17 +59,29 @@ ADD --checksum=sha256:c5b0666b4cb676901f90dfcb37106783c5fe2077b04590973b88595061
 ADD --checksum=sha256:eae1d3aa50c48fb23b8cbdf4e369d0910dfc538566bfd09df89a774aa84a48b9 \
     https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-arm64 /tini-arm64
 
-# --- restic (offsite backups, plan M9 decision 8; BSD-2-Clause), checked against the
-# release's published SHA256SUMS and unpacked with Python's bz2 -----------------------
-FROM ${PYTHON_IMAGE} AS restic
+# --- restic (offsite backups, plan M9 decision 8; BSD-2-Clause), built from source -----
+# The release binaries lag behind Go's and the libraries' security fixes (0.19.1 is
+# built with go1.26.4; Trivy fails the image on them), so restic is built here: the
+# release's source archive (checksum from its SHA256SUMS) with deploy/restic/go.mod and
+# go.sum, which are the release's own with the modules Trivy flagged raised to fixed
+# versions (`go get github.com/klauspost/compress@v1.18.7 golang.org/x/net@v0.62.0
+# google.golang.org/grpc@v1.83.2 && go mod tidy` in the unpacked source; go.sum checks
+# every module), the official build's tags and flags, without self-update.
+# Cross-compiled on the build platform (CGO_ENABLED=0), -trimpath for a reproducible
+# binary. The stage restic-bin exports only the binary (CI's backend job tests it).
+FROM --platform=${BUILDPLATFORM} ${GO_IMAGE} AS restic
 ARG TARGETARCH
-ADD --checksum=sha256:680838f19d67151adba227e1570cdd8af12c19cf1735783ed1ba928bc41f363d \
-    https://github.com/restic/restic/releases/download/v0.18.1/restic_0.18.1_linux_amd64.bz2 /restic-amd64.bz2
-ADD --checksum=sha256:87f53fddde38764095e9c058a3b31834052c37e5826d2acf34e18923c006bd45 \
-    https://github.com/restic/restic/releases/download/v0.18.1/restic_0.18.1_linux_arm64.bz2 /restic-arm64.bz2
-RUN python -c "import bz2, shutil, sys; shutil.copyfileobj(bz2.open(sys.argv[1]), open('/restic', 'wb'))" \
-        "/restic-${TARGETARCH}.bz2" \
-    && chmod 0755 /restic
+ADD --checksum=sha256:bb9b1a19040744d26d8a79be029d4e6b189c45ccc9d8831d7fe367d3c33df725 \
+    https://github.com/restic/restic/releases/download/v0.19.1/restic-0.19.1.tar.gz /restic.tar.gz
+WORKDIR /src
+RUN tar -xzf /restic.tar.gz --strip-components=1 && rm /restic.tar.gz
+COPY deploy/restic/go.mod deploy/restic/go.sum ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
+        go build -trimpath -buildvcs=false -tags disable_grpc_modules -ldflags "-s -w" \
+        -o /restic ./cmd/restic
+
+FROM scratch AS restic-bin
+COPY --from=restic /restic /restic
 
 # --- runtime -------------------------------------------------------------------------
 FROM ${PYTHON_IMAGE}
@@ -100,7 +113,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/apt /var/log/dpkg.log
 WORKDIR /app
 COPY --from=tini --chmod=0755 /tini-${TARGETARCH} /usr/bin/tini
-COPY --from=restic /restic /usr/local/bin/restic
+COPY --from=restic-bin /restic /usr/local/bin/restic
 COPY --from=python /app /app
 COPY --from=frontend /src/frontend/dist /app/static
 COPY --from=collab /usr/local/bin/node /usr/local/bin/node
