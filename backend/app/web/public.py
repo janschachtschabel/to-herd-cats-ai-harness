@@ -63,6 +63,7 @@ from app.modules.wiki import router as wiki
 from app.modules.wiki.attachments_router import attachments, page_attachments
 from app.modules.wiki.transfer_router import page_export, space_transfer
 from app.modules.wiki.versions_router import page_versions
+from app.version import app_version
 from app.web.collab_proxy import router as collab_relay
 from app.web.spa import mount_spa
 
@@ -175,6 +176,7 @@ def create_public_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
         title="to-herd-cats-ai",
+        version=app_version(),
         lifespan=_lifespan,
         openapi_url="/api/openapi.json",
         # Swagger UI loads its scripts from a CDN: never in production, where the
