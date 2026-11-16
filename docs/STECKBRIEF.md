@@ -67,16 +67,17 @@ erlaubte Domains nur mit Freigabe durch einen Admin ([`ANMELDUNG.md`](ANMELDUNG.
 der Collab-Prozess bekommt kurzlebige, seitengebundene Berechtigungen statt des
 Sitzungs-Cookies; Autoskalierung und PodDisruptionBudgets im Chart; Aufbewahrungsregel
 für jede Tabelle; Prüfung gegen OWASP ASVS 5.0 Stufe 2 ([`SICHERHEIT.md`](SICHERHEIT.md)).
-Hybride Suche und Embeddings (M5 Tasks 8 bis 11) und M9b (Einspielen im Betrieb und in
-der Verwaltung, S3, mehrere Collab-Instanzen, TOTP, ASVS-Lücken J7–J14) folgen.
+**Vorhanden (M9b):** mehrere Collab-Instanzen, jede Seite in PostgreSQL an eine
+gebunden (ohne Redis). Hybride Suche und Embeddings (M5 Tasks 8 bis 11) und der Rest von
+M9b (Einspielen im Betrieb und in der Verwaltung, S3, TOTP, ASVS-Lücken J7–J14) folgen.
 
 | | |
 |---|---|
 | Dienst-ID | `to-herd-cats-ai` (Log-Feld `service`, `OTEL_SERVICE_NAME`, Image, Chart) |
 | Image | `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y`, ein Image für alle Rollen (`HERD_ROLE=api\|migrate\|all\|worker\|collab`) |
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
-| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, genau eine Replika). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
-| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar) |
+| Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, `collab.replicas`, Standard 1, mehrere seit M9b: jede Seite an eine Instanz gebunden). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
+| Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar; mit mehreren Instanzen meldet jede ihre Adresse in `HERD_COLLAB_ADVERTISE_URL`) |
 | Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export; seit M9 ein Volume für Sicherungsarchive (`HERD_BACKUP_DIR`, Standard `/backups`) |
 | Lizenz | Apache-2.0 |
 
@@ -95,7 +96,7 @@ ist die Antwortzeit am Client, inklusive Docker-Portweiterleitung; alle Antworte
 | Seite lesen | `GET /api/spaces/{id}/pages/by-path` | 19 / 25 ms | 171 / 219 ms | 112/s |
 | Volltextsuche (100 Seiten à 2 KB, Wort in allen) | `GET /api/search?q=…&limit=20` | 23 / 31 ms | 174 / 224 ms | 109/s |
 | Seite lesen, während 10 Personen live tippen | `GET /api/pages/{id}` (4/s, sequenziell) | 14 / 18 ms | – | – |
-| Live-Bearbeitung: Änderung erscheint bei den anderen | WebSocket `/collab/` | 10 Editoren: 5 / 9 ms (P99 12 ms) | – | 20 Änderungen/s gesamt |
+| Live-Bearbeitung: Änderung erscheint bei den anderen | WebSocket `/collab/` | 10 Editoren: 5 / 9 ms (P99 12 ms); 40 Editoren auf 8 Seiten, zwei Instanzen (M9b, ohne Docker): 24 / 38 ms (P90), P99 54 ms | – | 20 bzw. 79 Änderungen/s gesamt |
 | Speichern im Markdown-Modus beendet die Live-Sitzung | `PATCH /api/pages/{id}` → Close-Code 4409 | 10 Editoren: 0,3 s und 4,4 s (zwei Läufe) | – | – |
 
 Die Lastzeilen der Wiki-Endpunkte liefen einzeln (je 20 s, nur dieser Endpunkt); der
@@ -600,7 +601,7 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   (`autoscaling/v2`, CPU-Ziel 70 % des Requests) für API (2 bis 6 Pods) und Worker
   (1 bis 3), Standard aus; herunter höchstens ein Pod je 2 Minuten. PodDisruptionBudgets
   (`maxUnavailable: 1`, nicht bereite Pods dürfen immer gehen) für API und Worker ab
-  zwei Pods; der Collab-Prozess (eine Replika) bekommt keins. Die Grenzen (API 2 bis 6,
+  zwei Pods, für den Collab-Prozess ab zwei Replikas (seit M9b). Die Grenzen (API 2 bis 6,
   Worker 1 bis 3) bleiben nach dem Lasttest: Zwei API-Prozesse tragen die Referenz
   (200 Personen, 95 Anfragen/s) an der Grenze der Ziele, sechs also rund das Dreifache
   (im Cluster nicht gemessen). **Datenbankverbindungen (gemessen, M9):** je API- oder
@@ -618,16 +619,23 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   und Worker-Pods) + 10 darüber liegt (Chart-Regel in `chart-rules-scaling.sh`). Bei
   einer externen Datenbank kennt das Chart die Grenze nicht. Kein
   PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht erst mit einem Leser).
-- **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
-  (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
-  zwei Prozesse würden die Bearbeitenden einer Seite aufteilen. Der Zustand wird über
-  die API in PostgreSQL gespeichert (spätestens 10 s nach einer Änderung und beim
-  Beenden); nach einem Neustart verbinden sich die Browser selbst neu. Ungespeicherte
-  Änderungen der letzten Sekunden (höchstens 10 s) im Speicher des Prozesses gehen dabei
-  verloren, sofern kein Browser sie wieder einspielt. Mehrere Collab-Instanzen
-  (Spezifikation 12.4, Stufe 2) kommen mit M9b Task 15, ohne Redis/Valkey: Jede Seite
-  wird in PostgreSQL an eine Instanz gebunden (Plan M9, Entscheidung 17; Abweichung von
-  12.4).
+- **Collab-Prozess (Live-Bearbeitung, seit M9b mehrere Instanzen):** `collab.replicas`
+  (Standard 1 mit `strategy: Recreate`; ab 2 `RollingUpdate` mit `maxUnavailable: 0`
+  und ein PodDisruptionBudget). Ein Live-Dokument liegt im Speicher genau einer
+  Instanz: Jede Instanz meldet sich alle 5 s bei der API (`HERD_COLLAB_ADVERTISE_URL`,
+  im Chart die Pod-IP), die API bindet jede Seite in PostgreSQL an eine lebende Instanz
+  (die mit den wenigsten Seiten; `collab_page_owner`, mit Epoche) und leitet jede
+  Verbindung der Seite dorthin; ohne Redis/Valkey (Plan M9, Entscheidung 17; Abweichung
+  von Spezifikation 12.4). Speichern und Prüfen nennen Instanz und Epoche; eine
+  abgelöste Instanz wird mit 409 `collab.not_owner` abgewiesen und verwirft ihr Dokument
+  (Close-Code 4409). Beim Beenden (SIGTERM) nimmt eine Instanz keine neuen Seiten mehr,
+  speichert alles, schließt mit 1012 und gibt ihre Seiten frei; die Browser verbinden
+  sich selbst neu, zu einer anderen Instanz (gemessen: 1,5 s, nichts verloren, siehe
+  [Messung](#gemessen-live-bearbeitung-mit-40-editoren-und-zwei-instanzen-m9b)). Stürzt
+  eine Instanz ab, gehen ihre Seiten nach 15 s ohne Lebenszeichen an andere;
+  Ungespeichertes der letzten Sekunden (höchstens 10 s) geht dann verloren, sofern kein
+  Browser es wieder einspielt. Der Zustand wird über die API in PostgreSQL gespeichert
+  (spätestens 10 s nach einer Änderung und beim Beenden).
 - **Mehrere API-Knoten und Live-Zustellung (M3):** Eine Nachricht, die an einem Knoten
   geschrieben wird, kommt an den SSE-Verbindungen jedes Knotens an (`NOTIFY herd_live`,
   jeder API-Prozess lauscht mit einer eigenen Datenbankverbindung außerhalb des Pools);
@@ -841,6 +849,48 @@ argon2-Prüfungen (je 64 MiB) gleichzeitig laufen.
   Im Cluster läuft der Collab-Prozess als eigener Pod; ihn allein hat hier niemand
   gemessen, sein RSS ist der beste Anhaltspunkt.
 
+### Gemessen: Live-Bearbeitung mit 40 Editoren und zwei Instanzen (M9b)
+
+Ohne Docker auf der Maschine der übrigen Messungen (4 vCPU, Lastmittel vorher 0,2–0,6):
+ein API-Prozess (`HERD_ROLE=api`), ein Worker, zwei Collab-Prozesse (`HERD_ROLE=collab`,
+je mit eigener `HERD_COLLAB_ADVERTISE_URL`) und das lokale PostgreSQL 16, Code-Stand
+`a5b7727` (Branch `m9b-task15`). Daten mit `deploy/compose/loadsetup.py --people 40
+--teams 1 --pages 8 --tickets 0`; Last mit `collab/scripts/live-load.mjs`: 40 Personen
+mit eigener Sitzung, je 5 auf einer der 8 Seiten, verbunden wie der Browser
+(`@hocuspocus/provider` über die Weiterleitung `/collab/` der API); jede tippt alle
+500 ms ein Wort, 60 s lang. Gemessen wird die Zeit vom Tippen bis zur Ankunft bei jeder
+anderen Person derselben Seite. CPU und Speicher mit `deploy/scripts/measure-processes.sh`
+(100 % = ein Kern).
+
+| Lauf | Wörter (Ankünfte) | Zustellung P50 / P90 / P99 / max | verloren | gespeichert nach dem Tippen | Dokumente gleich |
+|---|---|---|---|---|---|
+| 1: beide Instanzen laufen | 4.760 (19.040) | 24 / 38 / 54 / 63 ms | 0 | 2,0 s | ja |
+| 2: eine Instanz nach 31 s beendet (SIGTERM) | 4.760 (19.040) | 25 / 43 / 464 / 1.497 ms | 0 | 0,1 s | ja |
+
+- **Verteilung:** Die 8 Seiten lagen je zur Hälfte auf den zwei Instanzen (4 und 4,
+  Epoche 1), alle 5 Personen einer Seite auf derselben Instanz. Verbunden und
+  synchronisiert waren alle 40 nach 1,2–1,4 s.
+- **Beenden einer Instanz (Lauf 2):** Die 20 Personen ihrer 4 Seiten bekamen Close-Code
+  1012 und waren nach 1,47 s (P50; höchstens 1,49 s) über die Weiterleitung bei der
+  anderen Instanz wieder verbunden; die 4 Seiten trugen danach Epoche 2, alle 8 lagen
+  auf der verbliebenen Instanz. Was in der Lücke getippt wurde, kam nach dem
+  Wiederverbinden an (daher P99 464 ms und max 1,5 s); kein Wort ging verloren, und jedes
+  stand danach im Markdown der Seite. Die Lücke ist im Wesentlichen die Wartezeit des
+  Providers vor dem nächsten Versuch.
+- **Prozesse** (Ø / max CPU, RSS max):
+
+| Phase | API | Worker | Collab A | Collab B | Datenbank | Lastgenerator |
+|---|---|---|---|---|---|---|
+| Leerlauf | 0,3 / 0,5 %, 215 MiB | 2,6 / 3,4 %, 202 MiB | 0,3 / 1,2 %, 126 MiB | 0,3 / 1,2 %, 107 MiB | 0,5 / 0,7 %, 81 MiB (Pss), 11 Verb. | – |
+| Lauf 1 | 9,7 / 19 %, 232 MiB | 2,9 / 8,1 %, 203 MiB | 3,6 / 8,7 %, 150 MiB | 3,4 / 8,5 %, 149 MiB | 1,5 / 2,6 %, 92 MiB, 12 Verb. | 11 / 15 %, 124 MiB |
+| Lauf 2 | 10,7 / 25 %, 237 MiB | 2,6 / 3,3 %, 203 MiB | beendet | 4,8 / 13 %, 189 MiB | 1,7 / 3,1 %, 86 MiB, 12 Verb. | 14 / 23 %, 135 MiB |
+
+- **Ergebnis:** Zwei Instanzen teilen sich die Seiten gleichmäßig; die Zustellung bleibt
+  bei 79 Änderungen/s weit unter dem Ziel (2 s), und die meiste CPU kostet die
+  Weiterleitung in der API (rund 0,1 Kerne), nicht der Collab-Prozess (unter 0,04 Kernen
+  je Instanz). Nicht gemessen: Absturz einer Instanz (SIGKILL; die Seiten wechseln nach
+  15 s), Pods im Cluster.
+
 ### Gemessen: Nachrichten (M3, ohne Docker)
 
 Lauf 3 (Schreiben an Knoten A, Lastmittel der Maschine 3):
@@ -1019,9 +1069,10 @@ CPU der API-Prozesse die Grenze.
 - Echte Browser als Editoren in dieser Zahl (Last und Darstellung im Browser); die
   Demo (`docs/demo/m2.md`) lief mit zwei echten Chromium-Instanzen, ohne Zeitmessung.
 - Betrieb hinter einem echten Ingress-Controller (WebSocket-Upgrade, Leerlauf-Timeouts),
-  mehrere API-Replikas, der Collab-Prozess als eigener Pod, Neustart des
-  Collab-Prozesses unter Last. Kein Kubernetes in der Sandbox.
-- Mehr als eine Seite mit Live-Bearbeitung gleichzeitig, große Seiten (nahe 200.000
+  mehrere API-Replikas, Collab-Instanzen als eigene Pods (ohne Cluster gemessen: zwei
+  Instanzen, eine unter Last mit SIGTERM beendet, M9b), Absturz einer Instanz unter
+  Last. Kein Kubernetes in der Sandbox.
+- Große Seiten unter Live-Last (nahe 200.000
   Zeichen oder 5 MiB Yjs-Zustand), Uploads und Importe unter Last. Die Dauer eines
   großen Imports ist nur ohne Image gemessen (Review M2 R19, im Prozess gegen das lokale
   PostgreSQL, 2.000 Seiten in einem Ordner mit Tags): vorher 80 s, jetzt 11 s
@@ -1095,7 +1146,7 @@ in `deploy/helm/scripts/chart-rules-scaling.sh`):
 |---|---|---|---|---|---|
 | api (je Pod, ohne Collab-Prozess) | 500m | keins | 320Mi | 512Mi | gleich (bis M9: 100m / 256Mi) |
 | worker (je Replika) | 250m | keins | 256Mi | 384Mi | gleich (bis M9: 50m / 192Mi) |
-| collab (eine Replika) | 50m | keins | 128Mi | 1Gi | gleich |
+| collab (je Replika) | 50m | keins | 128Mi | 1Gi | gleich |
 | db (mitgeliefert) | 250m | keins | 256Mi | 1Gi | gleich (bis M9: 100m) |
 | Sicherungs-Job | 50m | keins | 128Mi | 512Mi | gleich |
 
