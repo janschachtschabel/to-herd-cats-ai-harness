@@ -13,13 +13,15 @@
 2. In one exported snapshot: the figures (`snapshot.py`) and `pg_dump -Fc --snapshot`
    into a hidden scratch file next to the archive (`.<name>.db.dump.part`, mode 0600),
    never into /tmp; it is removed once it is in the archive or the backup failed.
-3. The snapshot's attachment files are copied from the storage (a deleted file stays
-   for its tombstone's grace, `core/storage_tombstones.py`), then the manifest.
+3. The snapshot's attachment files are copied from the storage, local or S3
+   (`HERD_STORAGE`; a deleted file stays for its tombstone's grace,
+   `core/storage_tombstones.py`), then the manifest (naming the storage).
 4. The archive is read back (`verify_archive`); only a good one makes the run `ok`.
 
 Any failure removes what was written and makes the run `failed` with a code
 (`backup.no_organization`, `backup.no_schema`, `backup.tool_missing`,
-`backup.tools_too_old`, `backup.dump_failed`, `backup.file_missing`, `backup.io`,
+`backup.tools_too_old`, `backup.dump_failed`, `backup.file_missing`,
+`backup.storage_unavailable` (the object store did not answer), `backup.io`,
 `backup.verify_failed`, `backup.failed`). Nothing of the content is logged; a success
 is audited as `backup.created` by `system` with the trigger as `via`.
 """
@@ -39,7 +41,7 @@ from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import SchemaState, schema_state
 from app.core.secrets import key_id
-from app.core.storage import LocalStorage, Storage, StoredFileMissing
+from app.core.storage import Storage, StorageUnavailable, StoredFileMissing, get_storage
 from app.modules.audit.recorder import record_system
 from app.modules.backups.models import BackupState, BackupTrigger
 from app.modules.backups.repository import (
@@ -204,7 +206,7 @@ async def write_archive(settings: Settings, path: Path, at: datetime) -> str:
 async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: datetime) -> str:
     private_dir(path.parent)
     pg_dump_version = tool_version("pg_dump")
-    storage = LocalStorage(settings.data_dir)
+    storage = get_storage(settings)
     dump_file = path.with_name(f".{path.name.removesuffix('.tar')}.{DUMP_MEMBER}{PART_SUFFIX}")
     os.close(os.open(dump_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
     try:
@@ -259,7 +261,7 @@ def _manifest(
         created_at=at.astimezone(UTC).strftime(CREATED_AT_FORMAT),
         server_major=snapshot.server_major,
         pg_dump_version=pg_dump_version,
-        storage="local",
+        storage=settings.storage,
         tables=snapshot.tables,
         files={"count": len(snapshot.files), "bytes": sum(f.size for f in snapshot.files)},
         members={},
@@ -274,6 +276,8 @@ def _code_of(exc: Exception) -> str:
         return exc.code
     if isinstance(exc, NoSchema):
         return "backup.no_schema"
+    if isinstance(exc, StorageUnavailable):
+        return "backup.storage_unavailable"
     if isinstance(exc, OSError):
         return "backup.io"
     return "backup.failed"

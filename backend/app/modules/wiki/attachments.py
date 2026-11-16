@@ -101,7 +101,7 @@ class AttachmentService:
             attachments = self.repo(actor)
             await attachments.lock_blob(body.sha256)
             key = storage_key(actor.org_id, body.sha256)
-            await self.storage.put(key, body.chunks())
+            await self.storage.put(key, body.chunks(), size=body.size, sha256=body.sha256)
             attachment = await attachments.add(
                 Attachment(
                     org_id=actor.org_id,

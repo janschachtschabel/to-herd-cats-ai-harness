@@ -3,7 +3,8 @@
 Problems (any one refuses the restore): the archive's own (`verify_archive`),
 `restore.archive_newer` (a revision this code does not know), `restore.target_not_empty`
 (a table in schema `public`), `restore.file_conflict` (a key of the archive is stored
-here with other content), `restore.server_too_old` (the server's major version is
+here with other content; local or S3, `HERD_STORAGE`), `restore.storage_unavailable`
+(the object store did not answer), `restore.server_too_old` (the server's major version is
 below the archive's), `restore.tools_too_old` (`pg_restore` is older than the archive's
 `pg_dump`), `restore.secret_key_mismatch` and `restore.secret_key_missing` (the archive
 has `enc:` values and neither HERD_SECRET_KEY nor HERD_SECRET_KEY_PREVIOUS has its key
@@ -12,7 +13,6 @@ id; `--without-secrets` restores anyway). Warnings: `restore.env_missing:<NAME>`
 `restore.secrets_unreadable:<table.column>=<n>`.
 """
 
-import hashlib
 import os
 import tarfile
 from dataclasses import dataclass, field
@@ -25,13 +25,12 @@ from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import known_revisions
 from app.core.secrets import key_id
-from app.core.storage import LocalStorage, StorageKeyError
+from app.core.storage import StorageKeyError, StorageUnavailable, get_storage, stored_sha256
 from app.ops.archive import FILES_PREFIX, MANIFEST_MEMBER, PREFIX, verify_archive
 from app.ops.manifest import Manifest
 from app.ops.pgtools import ToolFailed, client_major, server_major
 
 KEY_PROBLEMS = frozenset({"restore.secret_key_mismatch", "restore.secret_key_missing"})
-CHUNK = 1024 * 1024
 
 
 @dataclass
@@ -72,6 +71,8 @@ async def check_on(
             check.problems.append("restore.file_conflict")
     except StorageKeyError:  # a member name no storage key can have
         check.problems.append("archive.format_unknown")
+    except StorageUnavailable:
+        check.problems.append("restore.storage_unavailable")
     if await server_major(conn) < manifest.server_major:
         check.problems.append("restore.server_too_old")
     try:
@@ -112,19 +113,11 @@ def _check_keys(check: RestoreCheck, settings: Settings, manifest: Manifest) -> 
 
 
 async def _file_conflict(settings: Settings, manifest: Manifest) -> bool:
-    storage = LocalStorage(settings.data_dir)
+    storage = get_storage(settings)
     for name, member in manifest.members.items():
         if not name.startswith(FILES_PREFIX):
             continue
-        key = name.removeprefix(FILES_PREFIX)
-        if await storage.exists(key) and _sha256(storage.path_of(key)) != member["sha256"]:
+        stored = await stored_sha256(storage, name.removeprefix(FILES_PREFIX))
+        if stored is not None and stored != member["sha256"]:
             return True
     return False
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(CHUNK):
-            digest.update(chunk)
-    return digest.hexdigest()

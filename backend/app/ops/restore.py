@@ -4,16 +4,16 @@ Under the schema lock (`schema_lock.py`, held from the check to the end) and the
 backup lock (refused with `restore.backup_running` while a backup runs; no backup
 starts until the restore is over): the checks
 (`restore_checks.py`; with `without_secrets` the key problems are let pass), the files
-(each checked against the manifest while written; keys already here have the same
-content), the database with `pg_restore --single-transaction` (files added for it are
-removed again if it fails), `alembic upgrade head` when the archive is older, and
-`finish_restore`. The dump goes from the archive straight into pg_restore's stdin, so
-a restore needs no scratch space. A refused restore changes nothing (`RestoreRefused`
+(local or S3, `HERD_STORAGE`; each checked against the manifest's size and SHA-256
+while written; keys already here have the same content), the database with
+`pg_restore --single-transaction` (files added for it are removed again if it
+fails), `alembic upgrade head` when the archive is older, and `finish_restore`. The
+dump goes from the archive straight into pg_restore's stdin, so a restore needs no
+scratch space. A refused restore changes nothing (`RestoreRefused`
 with the codes); a failed one raises `RestoreFailed` with a code.
 """
 
 import asyncio
-import hashlib
 import tarfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -26,7 +26,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import upgrade_head
-from app.core.storage import LocalStorage
+from app.core.storage import Storage, StorageUnavailable, StoredContentMismatch, get_storage
 from app.modules.backups.repository import hold_backup_lock, release_backup_lock
 from app.ops.archive import CHUNK, DUMP_MEMBER, FILES_PREFIX, PREFIX
 from app.ops.manifest import Manifest
@@ -83,13 +83,12 @@ async def restore_into_empty(
 async def _apply(
     conn: AsyncConnection, settings: Settings, archive: Path, manifest: Manifest, clock: Clock
 ) -> RestoreReport:
-    storage = LocalStorage(settings.data_dir)
+    storage = get_storage(settings)
     added = await restore_files(storage, archive, manifest)
     try:
         await _restore_database(settings, archive)
     except BaseException:
-        for key in added:
-            await storage.delete(key)
+        await remove_files(storage, added)
         raise
     await conn.run_sync(upgrade_head)
     await conn.commit()
@@ -116,9 +115,10 @@ async def heads(conn: AsyncConnection) -> list[str]:
     return list((await conn.scalars(text("SELECT version_num FROM alembic_version"))).all())
 
 
-async def restore_files(storage: LocalStorage, archive: Path, manifest: Manifest) -> list[str]:
-    """Write the archive's files that are not here yet; the keys written (none of them
-    stays when one fails)."""
+async def restore_files(storage: Storage, archive: Path, manifest: Manifest) -> list[str]:
+    """Write the archive's files that are not here yet, each checked against its size
+    and SHA-256 by the storage while written; the keys written (none of them stays
+    when one fails)."""
     added: list[str] = []
     try:
         with tarfile.open(archive, "r:") as tar:
@@ -131,16 +131,28 @@ async def restore_files(storage: LocalStorage, archive: Path, manifest: Manifest
                 handle = tar.extractfile(PREFIX + name)
                 if handle is None:
                     raise RestoreFailed("archive.member_missing")
-                digest = hashlib.sha256()
                 added.append(key)
-                await storage.put(key, _chunks(handle, digest))
-                if digest.hexdigest() != member["sha256"]:
-                    raise RestoreFailed("archive.member_checksum")
+                await storage.put(key, read_chunks(handle), size=member["size"], sha256=member["sha256"])
+    except StoredContentMismatch:
+        await remove_files(storage, added)
+        raise RestoreFailed("archive.member_checksum") from None
+    except StorageUnavailable:
+        await remove_files(storage, added)
+        raise RestoreFailed("restore.storage_unavailable") from None
     except BaseException:
-        for key in added:
-            await storage.delete(key)
+        await remove_files(storage, added)
         raise
     return added
+
+
+async def remove_files(storage: Storage, keys: list[str]) -> None:
+    """Take back the files a failed restore added (best effort: a store that fails
+    now leaves them, unused, for a later restore to find with the same content)."""
+    for key in keys:
+        try:
+            await storage.delete(key)
+        except StorageUnavailable:
+            return
 
 
 async def _restore_database(settings: Settings, archive: Path) -> None:
@@ -166,10 +178,4 @@ async def _restore_database(settings: Settings, archive: Path) -> None:
 
 async def read_chunks(handle: IO[bytes]) -> AsyncIterator[bytes]:
     while chunk := await asyncio.to_thread(handle.read, CHUNK):
-        yield chunk
-
-
-async def _chunks(handle: IO[bytes], digest: "hashlib._Hash") -> AsyncIterator[bytes]:
-    while chunk := await asyncio.to_thread(handle.read, CHUNK):
-        digest.update(chunk)
         yield chunk
