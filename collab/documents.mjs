@@ -46,6 +46,10 @@ export function documentRules({ api, log, retryMs, ending, checks }) {
     if (grants.length === 0 && unsaved.length === 0) return false;
     const answer = await api.check(state.pageId, grants, state.generation, unsaved);
     if (answer.status !== 200) return false;
+    if (answer.body.maintenance) {
+      discard(document, state, CLOSE.maintenance);
+      return true;
+    }
     revoke(document, new Set(answer.body.revoked_grants ?? []));
     if (!answer.body.generation_ok) {
       discard(document, state, CLOSE.generationEnded);

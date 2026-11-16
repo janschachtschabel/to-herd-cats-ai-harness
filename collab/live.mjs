@@ -33,6 +33,9 @@
 //   bring them back on reconnecting: the API ends the generation (the check names the
 //   unsaved sessions), the document is dropped and everyone is closed with 4409. Until
 //   the API has confirmed it, the document takes no messages and no one joins it.
+// - The installation is in maintenance (plan M9 decision 9: a restore replaces it):
+//   every connection is closed with 4503, the document is dropped unsaved; the API
+//   stores nothing meanwhile (503), and its grants are gone after the restore.
 import { ApiUnavailable } from "./api.mjs";
 import { documentRules } from "./documents.mjs";
 import { DENIAL, openRules } from "./opening.mjs";

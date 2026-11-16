@@ -147,6 +147,33 @@ test("ends every connection when the check reports a new generation", async () =
   await until(() => a.closes.includes(4409));
 });
 
+test("maintenance closes every connection with 4503 and saves nothing", async () => {
+  const a = open({ grant: "herd_cg_a" });
+  const b = open({ grant: "herd_cg_b" });
+  await Promise.all([synced(a), synced(b)]);
+  await until(() => api.saves.length === 1);
+  const answer = api.saveAnswer;
+  // In maintenance the API refuses saves (503: tried again later) and the check
+  // reports it.
+  api.saveAnswer = () => [503, { error: { code: "maintenance.active" } }];
+  type(a.doc, "kurz vor der Wartung");
+  api.checkAnswer = () => [
+    200,
+    {
+      generation_ok: false,
+      generation: 0,
+      revoked_grants: [],
+      ended_grants: [],
+      maintenance: true,
+    },
+  ];
+  await until(() => a.closes.includes(4503) && b.closes.includes(4503));
+  api.saveAnswer = answer; // maintenance over: a retry would be stored now
+  const after = api.saves.length;
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.deepEqual(api.saves.slice(after), [], "the dropped document is never saved");
+});
+
 test("closes a revoked grant's connection with 4403", async () => {
   const a = open({ grant: "herd_cg_a" });
   const b = open({ grant: "herd_cg_b" });
