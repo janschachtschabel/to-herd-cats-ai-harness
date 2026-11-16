@@ -2,7 +2,7 @@
 with the old key in `HERD_SECRET_KEY_PREVIOUS`, every `enc:` reference (AI
 connections; connectors, shared and personal, with their OAuth access and refresh
 tokens; OAuth client secrets; open OAuth flows' verifiers; OIDC providers' client
-secrets) is rotated in one
+secrets; people's TOTP secrets) is rotated in one
 transaction; if any cannot be decrypted, nothing changes. The values are never shown;
 a failure names only the table and the row's id."""
 
@@ -15,6 +15,7 @@ from app.modules.ai.repository import encrypted_connections
 from app.modules.connectors.repository import encrypted_connectors
 from app.modules.oauth.repository import all_flows, encrypted_clients
 from app.modules.oidc.repository import encrypted_providers
+from app.modules.totp.repository import all_totps
 
 
 class RotationFailed(Exception):  # noqa: N818
@@ -56,6 +57,9 @@ async def rotate_secrets(session: AsyncSession) -> int:
         provider.client_secret_ref = _rotated(
             "oidc_provider", provider.id, provider.client_secret_ref
         )
+        count += 1
+    for totp in await all_totps(session):
+        totp.secret_ref = _rotated("user_totp", totp.id, totp.secret_ref)
         count += 1
     await session.flush()
     return count

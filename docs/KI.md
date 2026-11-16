@@ -56,7 +56,8 @@ Eine Verbindung beschreibt einen Anbieter, der das OpenAI-Protokoll spricht:
   `HERD_SECRET_KEY_PREVIOUS` entfernen. Das Skript schlüsselt alle `enc:`-Werte (der
   KI-Verbindungen und der Konnektoren, geteilter wie persönlicher, samt OAuth-Token,
   OAuth-Client-Geheimnissen und den Prüfwerten offener OAuth-Abläufe, siehe
-  [`MCP.md`](MCP.md#konnektoren)) in einer Transaktion neu um (alles oder nichts) und
+  [`MCP.md`](MCP.md#konnektoren), der OIDC-Anbieter und der TOTP-Geheimnisse,
+  siehe [`ANMELDUNG.md`](ANMELDUNG.md#zweiter-faktor-totp)) in einer Transaktion neu um (alles oder nichts) und
   nennt nur ihre Zahl. Das Image enthält
   `backend/scripts/` nicht: den Wechsel aus einem Quellstand desselben Release starten,
   mit derselben Datenbank und beiden Schlüsseln in der Umgebung.

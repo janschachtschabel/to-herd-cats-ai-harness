@@ -300,7 +300,9 @@ Datenbank. Rotation: neuen Schlüssel setzen, alten als `HERD_SECRET_KEY_PREVIOU
 `scripts/rotate_secrets.py` alle `enc:`-Werte neu verschlüsseln, dann den alten
 entfernen ([`KI.md`](KI.md)). Das Sicherungsmanifest nennt die Schlüsselkennung, damit
 eine Wiederherstellung den passenden Schlüssel findet ([`SICHERUNG.md`](SICHERUNG.md)).
-Ein verlorener Schlüssel macht nur die `enc:`-Werte unbrauchbar (neu eintragen).
+Ein verlorener Schlüssel macht nur die `enc:`-Werte unbrauchbar (neu eintragen; wer
+TOTP eingerichtet hat, meldet sich mit einem Wiederherstellungscode an oder lässt TOTP
+von einem Admin zurücksetzen).
 
 ## Verbindungen
 

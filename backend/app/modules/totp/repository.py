@@ -112,6 +112,13 @@ class TotpRepository:
         return int(count or 0)
 
 
+async def all_totps(session: AsyncSession) -> list[UserTotp]:
+    """Every TOTP row, in every organisation, locked: for the key rotation
+    (`scripts/rotate_secrets.py`; the secrets are always `enc:`)."""
+    stmt = select(UserTotp).order_by(UserTotp.id).with_for_update()
+    return list((await session.scalars(stmt)).all())
+
+
 class ChallengeRepository:
     """Sign-ins waiting for the second factor, looked up by the hash of the cookie's
     token (the organisation is not known before that)."""

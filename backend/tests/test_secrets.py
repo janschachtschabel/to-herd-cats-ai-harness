@@ -13,6 +13,7 @@ from app.modules.ai.secret_rotation import RotationFailed, rotate_secrets
 from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
 from app.modules.oidc.models import OidcProvider, ProviderKind
 from app.modules.orgs.models import Organization
+from app.modules.totp.models import UserTotp
 from app.modules.users.models import User
 
 KEY = "k" * 40
@@ -313,3 +314,23 @@ def test_oidc_env_references_take_only_their_prefix() -> None:
             secrets.env_ref(name, secrets.OIDC_ENV_PREFIX)
     with pytest.raises(ValidationFailed):
         secrets.env_ref("HERD_OIDC_GOOGLE")  # an AI connection never names an OIDC secret
+
+
+async def test_totp_secrets_are_rotated_too(
+    session: AsyncSession, org: Organization, make_user, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A person's TOTP secret (plan M9 task 16) is `enc:` too; a rotation that skipped
+    it would lock everyone with TOTP out once the old key is removed."""
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    person = await make_user()
+    row = UserTotp(org_id=org.id, user_id=person.id, secret_ref=secrets.encrypt("JBSWY3DP"))
+    session.add(row)
+    await session.flush()
+    old = row.secret_ref
+    monkeypatch.setattr(get_settings(), "secret_key", SecretStr(OTHER_KEY))
+    monkeypatch.setattr(get_settings(), "secret_key_previous", SecretStr(KEY))
+    assert await rotate_secrets(session) == 1
+    assert row.secret_ref != old
+    monkeypatch.setattr(get_settings(), "secret_key_previous", None)
+    assert secrets.resolve(row.secret_ref).get_secret_value() == "JBSWY3DP"
