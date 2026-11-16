@@ -110,9 +110,11 @@ spec:
               mountPath: /data
             {{- end }}
             {{- with include "herd.s3VolumeMount" . }}{{ . | nindent 12 }}{{- end }}
+            {{- with include "herd.backupsVolumeMount" . }}{{ . | nindent 12 }}{{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
         {{- with include "herd.s3Volume" . }}{{ . | nindent 8 }}{{- end }}
+        {{- with include "herd.backupsVolume" . }}{{ . | nindent 8 }}{{- end }}
         {{- if $files }}
         - name: data
           persistentVolumeClaim:

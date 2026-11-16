@@ -3,7 +3,8 @@
 Stand: M9a (Archiv und Sicherung über die Kommandozeile, Wiederherstellung in eine leere
 Installation mit Probe, Zeitplan, Aufbewahrung, Offsite mit restic, Alarme, Aufbewahrung
 je Tabelle) und aus M9b der Wartungsmodus mit dem Einspielen in eine **laufende**
-Installation über die Kommandozeile. Die Sicherung in der Verwaltung folgt in M9b.
+Installation über die Kommandozeile, dazu die Sicherung in der Verwaltung (Verwaltung →
+Sicherung, nur Inhaber; [unten](#in-der-verwaltung)).
 
 **Kurz für den Betrieb:**
 
@@ -22,6 +23,9 @@ Installation über die Kommandozeile. Die Sicherung in der Verwaltung folgt in M
    Sicherheitsarchiv des jetzigen Stands, dazwischen der Wartungsmodus. Auf einer neuen
    Maschine in eine **leere** Datenbank (Ablauf für [Compose](#ablauf-in-compose) und
    [Kubernetes](#ablauf-in-kubernetes)). Einmal im Jahr proben.
+6. Ohne Kommandozeile: **Verwaltung → Sicherung** (nur die Rolle `owner`) zeigt die
+   Sicherungen, sichert auf Knopfdruck, lädt Archive herunter und hoch, prüft sie und
+   spielt eines ein ([unten](#in-der-verwaltung)).
 
 ## Was gesichert wird
 
@@ -169,6 +173,73 @@ Manifest.
 **Werkzeuge:** Das Image bringt `postgresql-client-17` mit; unterstützt sind Server ab
 PostgreSQL 16. `pg_dump` muss mindestens die Hauptversion des Servers haben.
 
+## In der Verwaltung
+
+**Verwaltung → Sicherung** sehen nur Personen mit dem Recht `backup.manage` (die Rolle
+`owner`); allen anderen antwortet jede Route unter `/api/backups` wie ein unbekanntes
+Archiv (404 `backup.not_found`), und der Menüpunkt fehlt.
+
+- **Sicherungen**: die Läufe aus `backup_run`, neueste zuerst, seitenweise (Auslöser,
+  Zustand mit Fehlercode, Größe, Archiv, Offsite). Die Liste folgt live dem Ereignis
+  `backup.changed` (nur die Kennung des Laufs; an jeden aktiven Inhaber, direkt über
+  `NOTIFY`, weil Kommandozeile und CronJob ohne Worker laufen).
+- **„Jetzt sichern“** legt einen Lauf mit `trigger=admin` im Zustand `running` an
+  („wartet auf den Worker“, Audit `backup.requested`). Der Worker sieht alle 3 Sekunden
+  nach, nimmt den ältesten Auftrag auf und sichert wie `backup run` (Sperre
+  `herd.backup`: eine Sicherung zugleich; läuft gerade eine andere, wartet der Auftrag; im
+  Wartungsmodus auch). Ein Auftrag, der 10 Minuten lang niemanden fand, gilt wie ein
+  abgebrochener Lauf (`backup.interrupted`); ein Auftrag, den die Prüfung des Schemas
+  vorher ablehnt, endet `failed` mit deren Code. Ein Archiv, das eingespielt wird,
+  bringt seine offenen Aufträge nicht wieder: Sie werden `backup.in_restored_archive`.
+- **Archive**: die Dateien `herd-*.tar` und `upload-*.tar` im Sicherungsverzeichnis
+  (seitenweise; Verweise und andere Dateien bleiben unsichtbar).
+  **Herunterladen** streamt das Archiv (`Cache-Control: private, no-store`, Audit
+  `backup.downloaded`). **Hochladen** nimmt ein Archiv als Rohdaten bis
+  `HERD_BACKUP_UPLOAD_MAX_BYTES` (Standard 2 GiB; darüber 413
+  `backup.upload_too_large`) entgegen, schreibt es als Teildatei (0600) ins
+  Sicherungsverzeichnis, prüft es wie `backup verify` und lehnt es bei jedem Problem ab
+  (422 `backup.archive_invalid` mit den Codes; die Datei wird entfernt). Ein gutes heißt
+  danach `upload-<UTC-Zeit>-<8 Zeichen>.tar` mit eigener Begleitdatei (Audit
+  `backup.uploaded`). Die Aufbewahrung räumt nur `herd-*.tar` auf: Hochgeladene Archive
+  bleiben, bis jemand sie im Verzeichnis löscht. Teildateien, die älter als ein Tag sind
+  (abgebrochene Uploads), entfernt der nächste Upload. Ein Proxy davor muss so große
+  Anfragen durchlassen (ingress-nginx: `proxy-body-size`).
+- **„Prüfen“** liest das Archiv vollständig (wie `verify`) und stellt Archiv und
+  Installation nebeneinander: Version, Datenbank-Revision, PostgreSQL und
+  `pg_dump`/`pg_restore`, Ablage, Tabellen, Zeilen, Dateien und ihre Größe, dazu, ob der
+  Schlüssel passt (`match`, `mismatch`, `missing`, `not_needed`), was das Einspielen
+  verhindert und die Hinweise (dieselben Codes wie `restore check`, Audit
+  `backup.checked`). Ein manipuliertes Archiv zeigt `archive.checksum`.
+- **„Einspielen …“** gibt es nur, wenn die Prüfung nichts meldet. Bestätigt wird durch
+  das Eintippen des Namens der Organisation (der Dialog nennt ihn; 422
+  `backup.confirm_mismatch` sonst). Dann läuft dasselbe wie
+  `restore apply ARCHIV --replace` (`via=admin`, Audit `backup.restore_requested`):
+  zuerst das Sicherheitsarchiv, dann der Wartungsmodus. Jede Seite, die danach eine
+  Anfrage stellt, zeigt die **Wartungsseite** und fragt alle 3 Sekunden
+  `GET /api/maintenance`; ist die Wartung vorbei, lädt sie neu und landet bei der
+  Anmeldung (alle Sitzungen sind ungültig). Das Einspielen läuft in dem API-Prozess, der
+  die Anfrage angenommen hat, und höchstens einmal (kein gespeicherter Auftrag, der aus
+  einem Archiv wiederkäme); eines zugleich (409 `backup.restore_running`, oder
+  `restore.already_running`, wenn die Kommandozeile oder eine Migration die Sperre hält),
+  nicht während einer Sicherung (409 `backup.already_running`). Scheitert es vor dem
+  Wartungsmodus (etwa das Sicherheitsarchiv), bleibt alles, wie es war; die Seite nennt
+  den Grund (Audit `backup.restore_failed` mit `via=admin`).
+- **Einzelne Bereiche**: ein Hinweis auf den
+  [Export je Bereich](#ergänzung-export-je-bereich).
+
+Dafür brauchen API und Worker das Sicherungsverzeichnis (`HERD_BACKUP_DIR`, `/backups`)
+mit Schreibrecht: In Compose hängen `app` (bzw. `api-a`, `api-b` und `worker`) das
+Volume `backups` ein, im Hostinger-Stack `app`. Im Chart hängen API- und Worker-Pods die
+PVC `<release>-backups` nur ein, wenn sie sich teilen lässt: mit
+`backup.persistence.accessModes: [ReadWriteMany]` oder einem eigenen Claim
+(`backup.persistence.existingClaim`, dann ReadWriteMany oder auf andere Weise für jeden
+API- und Worker-Pod erreichbar). Die PVC, die das Chart seit 1.0 mit ReadWriteOnce
+anlegt, bleibt dem CronJob allein (Zugriffsarten einer PVC lassen sich nicht ändern):
+Die Seite zeigt dann die Sicherungen, aber keine Archive, und „Jetzt sichern“ endet mit
+`backup.io`. Umstellen: eine ReadWriteMany-PVC anlegen, die Archive mit einem Hilfs-Pod
+hinüberkopieren und sie als `backup.persistence.existingClaim` nennen. Die
+Upload-Grenze ist `backup.uploadMaxBytes` (nur die API-Pods).
+
 ## Zeitplan, Aufbewahrung, Offsite
 
 Ein Lauf (`backup run`): Archiv schreiben → zurücklesen und prüfen → erst dann `ok` →
@@ -185,6 +256,7 @@ in `backup_run` sagt, welcher Teil scheiterte (`state`, `offsite_state` `off|ok|
 | `HERD_BACKUP_OFFSITE_REPOSITORY` | leer (aus) | restic-Repository, z. B. `s3:https://s3.example/bucket/herd`, `b2:bucket:herd`, `sftp:backup@host:/srv/herd` |
 | `HERD_BACKUP_OFFSITE_PASSWORD` | – | Passwort des restic-Repositorys (Geheimnis; Pflicht mit Repository) |
 | `HERD_BACKUP_ALERT_AFTER_HOURS` | `26` | ab diesem Alter der letzten gelungenen Sicherung feuert `HerdBackupTooOld` (der Worker meldet den Wert als Metrik) |
+| `HERD_BACKUP_UPLOAD_MAX_BYTES` | `2147483648` (2 GiB) | größtes Archiv, das ein Inhaber in der Verwaltung hochlädt (API; im Chart `backup.uploadMaxBytes`) |
 
 **Aufbewahrung** (Großvater-Vater-Sohn, UTC): das neueste gelungene Archiv bleibt immer;
 dazu das neueste je Tag für die letzten 7 Tage mit Archiv, davor das neueste je

@@ -120,6 +120,7 @@ Variable (siehe Schritt 2).
 | `HERD_IMAGE_TAG` | Version des Images (`ghcr.io/janschachtschabel/to-herd-cats-ai`): `1.0` folgt jeder `1.0.x` (jede Bereitstellung holt die neueste), `1.0.3` bleibt genau dort. | `1.0` |
 | `HERD_BACKUP_SCHEDULE` | Wann gesichert wird, Cron mit fünf Feldern in UTC. | `30 2 * * *` (täglich 02:30 UTC) |
 | `HERD_BACKUP_KEEP_DAILY`, `…_WEEKLY`, `…_MONTHLY` | Wie viele Sicherungen bleiben (die neueste je Tag, Woche, Monat). | 7, 4, 6 |
+| `HERD_BACKUP_UPLOAD_MAX_BYTES` | Wie groß ein Archiv sein darf, das ein Inhaber unter Verwaltung → Sicherung hochlädt (Bytes). | 2147483648 (2 GiB) |
 | `HERD_BACKUP_ALERT_AFTER_HOURS` | Ab wie vielen Stunden ohne gute Sicherung der Alarm `HerdBackupTooOld` anschlägt. **Nur mit einem eigenen Prometheus sichtbar**, den dieser Stack nicht mitbringt; ob die Sicherungen gelingen, zeigt hier `backup list` (siehe [Sicherungen](#sicherungen)). | 26 |
 | `HERD_COLLAB_MEMORY_BUDGET_MB` | Speicher für Seiten in der Live-Bearbeitung; auf 2 GB RAM z. B. `200`. | 400 |
 | `HERD_RUN_CONCURRENCY` | KI-Agenten-Läufe gleichzeitig. | 4 |
@@ -187,7 +188,10 @@ geprüftes Archiv in das Volume **`<projekt>_backups`**, auf dem VPS unter
 `/var/lib/docker/volumes/<projekt>_backups/_data/`. Zu jeder Sicherung gehören **zwei
 Dateien**: das Archiv `herd-<zeit>-<version>.tar` und seine Beschreibung
 `herd-<zeit>-<version>.manifest.json`. Alte Sicherungen räumt er nach den
-`HERD_BACKUP_KEEP_*`-Werten ab. In der Webkonsole:
+`HERD_BACKUP_KEEP_*`-Werten ab. Einfacher geht es in der App: **Verwaltung →
+Sicherung** (nur Inhaber) zeigt die Sicherungen, sichert auf Knopfdruck, lädt Archive
+herunter und hoch, prüft und spielt sie ein ([`SICHERUNG.md`](SICHERUNG.md#in-der-verwaltung)).
+In der Webkonsole:
 
 ```bash
 cd /docker/<projekt>

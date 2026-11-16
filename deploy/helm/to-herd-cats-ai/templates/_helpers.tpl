@@ -259,6 +259,9 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{- define "herd.apiOwnEnv" -}}
 {{ include "herd.env" (dict "root" . "role" "api") }}
 {{ include "herd.aiApiEnv" . }}
+# The administration's archive uploads (docs/SICHERUNG.md).
+- name: HERD_BACKUP_UPLOAD_MAX_BYTES
+  value: {{ .Values.backup.uploadMaxBytes | int64 | quote }}
 {{ include "herd.mcpApiEnv" . }}
 {{ include "herd.oidcApiEnv" . }}
 {{- with include "herd.s3Env" . }}
@@ -354,4 +357,31 @@ file (HERD_S3_SECRET_ACCESS_KEY_FILE); neither is ever a value. */}}
   mountPath: /var/run/secrets/herd/s3
   readOnly: true
 {{- end }}
+{{- end -}}
+
+{{/* Whether the API and worker pods mount the backups claim on /backups, for the
+administration's page: with backup.enabled, on a ReadWriteMany claim the chart creates
+or an existing claim (the operator's to make reachable). "true" or "". */}}
+{{- define "herd.backupsShared" -}}
+{{- $b := .Values.backup -}}
+{{- if and $b.enabled (or $b.persistence.existingClaim (has "ReadWriteMany" $b.persistence.accessModes)) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/* The backups claim's volume and mount for the API and worker pods (herd.backupsShared). */}}
+{{- define "herd.backupsVolume" -}}
+{{- if include "herd.backupsShared" . -}}
+- name: backups
+  persistentVolumeClaim:
+    claimName: {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "herd.fullname" .)) }}
+{{- end -}}
+{{- end -}}
+
+{{- define "herd.backupsVolumeMount" -}}
+{{- if include "herd.backupsShared" . -}}
+# The archives, for the administration's page (Verwaltung → Sicherung).
+- name: backups
+  mountPath: /backups
+{{- end -}}
 {{- end -}}

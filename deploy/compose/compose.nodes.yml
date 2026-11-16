@@ -61,6 +61,8 @@ x-api-env: &api-env
   # Sign-in through OIDC (docs/ANMELDUNG.md); client secrets env:HERD_OIDC_<NAME> in ai.env.
   HERD_OIDC_ALLOWED_HOSTS: ${HERD_OIDC_ALLOWED_HOSTS:-}
   HERD_OIDC_RATE_PER_MINUTE: ${HERD_OIDC_RATE_PER_MINUTE:-30}
+  # The administration's archive uploads (docs/SICHERUNG.md), in bytes.
+  HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
 
 # AI keys for the processes that call providers: the API nodes (connection tests, model
 # lists) and the worker (agent runs). See compose.yml.
@@ -97,8 +99,10 @@ services:
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT:-8080}:8080"
+    # backups: the administration's archives (downloads, uploads, checks, restores).
     volumes:
       - app-data:/data
+      - backups:/backups
     networks:
       default:
         aliases: [api]
@@ -111,8 +115,10 @@ services:
     depends_on: *after-migrate
     ports:
       - "${HERD_BIND_ADDRESS:-127.0.0.1}:${HERD_HOST_PORT_B:-8081}:8080"
+    # backups: the administration's archives (downloads, uploads, checks, restores).
     volumes:
       - app-data:/data
+      - backups:/backups
     networks:
       default:
         aliases: [api]
@@ -134,8 +140,10 @@ services:
     depends_on: *after-migrate
     # The due loop removes the files of deleted attachments after their grace
     # (core/storage_tombstones.py); with HERD_STORAGE=s3 it uses the store instead.
+    # backups: it makes the backups owners ask for in the administration.
     volumes:
       - app-data:/data
+      - backups:/backups
     stop_grace_period: 30s
 
   # The service backup of compose.yml (docs/SICHERUNG.md), here after the migration.

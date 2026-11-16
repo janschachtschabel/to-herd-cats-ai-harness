@@ -128,6 +128,7 @@
         "keepWeekly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_WEEKLY"},
         "keepMonthly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_MONTHLY"},
         "alertAfterHours": {"type": "number", "exclusiveMinimum": 0, "maximum": 1440, "description": "HERD_BACKUP_ALERT_AFTER_HOURS (worker): HerdBackupTooOld"},
+        "uploadMaxBytes": {"type": "integer", "minimum": 1, "description": "HERD_BACKUP_UPLOAD_MAX_BYTES (API): largest archive an owner may upload"},
         "tmpSizeLimit": {"type": "string", "pattern": "^[0-9]+(Ki|Mi|Gi|Ti)$", "description": "sizeLimit of the backup pod's /tmp emptyDir (restic's cache; the dump goes to the backups claim)"},
         "resources": {
           "type": "object",
@@ -176,7 +177,7 @@
           "description": "Offsite copies with restic"
         }
       },
-      "required": ["enabled", "schedule", "keepDaily", "keepWeekly", "keepMonthly", "alertAfterHours", "tmpSizeLimit", "resources", "persistence", "offsite"],
+      "required": ["enabled", "schedule", "keepDaily", "keepWeekly", "keepMonthly", "alertAfterHours", "uploadMaxBytes", "tmpSizeLimit", "resources", "persistence", "offsite"],
       "description": "The backup CronJob, its claim and the offsite copy"
     },
     "worker": {

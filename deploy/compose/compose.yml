@@ -87,8 +87,11 @@ services:
       HERD_MCP_CATALOG_DIR: ${HERD_MCP_CATALOG_DIR:-}
       HERD_MCP_MAX_CALLS_PER_RUN: ${HERD_MCP_MAX_CALLS_PER_RUN:-20}
       # Backups (docs/SICHERUNG.md): the worker exports the age of the last good backup
-      # at which HerdBackupTooOld fires, in hours.
+      # at which HerdBackupTooOld fires, in hours. The administration's page (owners)
+      # lists, makes, checks and restores archives on the volume backups; an uploaded
+      # archive may be this large (bytes, default 2 GiB; a proxy in front needs as much).
       HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
+      HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
       # Sign-in through OIDC (docs/ANMELDUNG.md): private hosts (names or CIDR, comma
       # separated) an identity provider may run on (empty: public ones only); starts
       # and callbacks per client address and minute. HERD_PUBLIC_URL must be set.
@@ -105,8 +108,11 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    # backups: the administration's archives ("Jetzt sichern" runs in the worker,
+    # downloads, uploads, checks and a restore in the API).
     volumes:
       - app-data:/data
+      - backups:/backups
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true

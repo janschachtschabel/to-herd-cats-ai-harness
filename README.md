@@ -145,7 +145,9 @@ Aus M9a der Betrieb in Produktion:
   --replace --confirm "<Organisation>"`): erst ein Sicherheitsarchiv, dann der
   **Wartungsmodus** (die API antwortet 503, der Worker pausiert), der Tausch in einer
   Transaktion (scheitert er, bleibt der alte Stand ganz), danach ist jede Person
-  abgemeldet.
+  abgemeldet. Inhaber erledigen das alles auch in **Verwaltung → Sicherung**: sichern auf
+  Knopfdruck, Archive herunter- und hochladen, gegen die Installation prüfen und
+  einspielen (Bestätigung mit dem Namen der Organisation, danach die Wartungsseite).
 - **Anmeldung über OpenID Connect**: Google als Vorlage (nur Client-ID und Secret
   eintragen), jeder andere Anbieter mit Discovery (Keycloak, Entra ID …); Konten
   verknüpfen im Profil. **Selbstregistrierung** für erlaubte Domains: das neue Konto

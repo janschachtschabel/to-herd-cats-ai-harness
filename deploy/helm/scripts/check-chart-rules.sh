@@ -364,5 +364,6 @@ grep -q "HERD_ROLE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" || fa
 source "$root/deploy/helm/scripts/chart-rules-scaling.sh"
 source "$root/deploy/helm/scripts/chart-rules-placement.sh"
 source "$root/deploy/helm/scripts/chart-rules-storage.sh"
+source "$root/deploy/helm/scripts/chart-rules-admin.sh"
 
 echo "chart rules OK"

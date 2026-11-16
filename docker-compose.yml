@@ -12,7 +12,8 @@
 # app runs every role in one container (HERD_ROLE=all): migrations at the start, the
 # API with the SPA, the worker (outbox, agent runs, automations) and the live-editing
 # process as a child on 127.0.0.1, which the API relays under /collab; so one Traefik
-# router serves everything. backup makes the backups into the volume backups.
+# router serves everything. backup makes the backups into the volume backups; app
+# mounts it too, for the administration's page (Verwaltung → Sicherung).
 # Every deploy pulls the image (pull_policy: always), so a redeploy brings the newest
 # image of HERD_IMAGE_TAG (1.0: the newest 1.0.x).
 
@@ -90,8 +91,10 @@ services:
       HERD_COLLAB_MEMORY_BUDGET_MB: ${HERD_COLLAB_MEMORY_BUDGET_MB:-400}
       HERD_RUN_CONCURRENCY: ${HERD_RUN_CONCURRENCY:-4}
       HERD_BACKUP_ALERT_AFTER_HOURS: ${HERD_BACKUP_ALERT_AFTER_HOURS:-26}
+      HERD_BACKUP_UPLOAD_MAX_BYTES: ${HERD_BACKUP_UPLOAD_MAX_BYTES:-2147483648}
     volumes:
       - app-data:/data
+      - backups:/backups
       - secrets:/secrets:ro
       - db-secret:/db-secret:ro
     networks:

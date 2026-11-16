@@ -248,6 +248,7 @@ live P95 ≤ 2 s, no 5xx).
 | `HERD_BACKUP_KEEP_WEEKLY` | no | `4` | Older weeks whose newest good archive stays, 0 to 1000 (`backup`) |
 | `HERD_BACKUP_KEEP_MONTHLY` | no | `6` | Older months whose newest good archive stays, 0 to 1000 (`backup`) |
 | `HERD_BACKUP_ALERT_AFTER_HOURS` | no | `26` | Age (h) of the last good backup at which `HerdBackupTooOld` fires, exported by the worker (`app`, `worker`) |
+| `HERD_BACKUP_UPLOAD_MAX_BYTES` | no | `2147483648` | Largest archive an owner may upload under Verwaltung → Sicherung, in bytes (`app`, API nodes; they and the worker mount the volume `backups` for that page) |
 | `HERD_BACKUP_OFFSITE_REPOSITORY`, `HERD_BACKUP_OFFSITE_PASSWORD` | no | empty | restic repository and its password, in `backup.env` (`backup`); empty: no offsite copy |
 | `HERD_STORAGE` | no | `local` | Where attachments live: `local` (the volume `app-data`) or `s3` (`app`, API nodes, `worker`, `backup`; `compose.s3.yml` sets it) |
 | `HERD_S3_ENDPOINT` | with `s3` | empty | The store's address, `scheme://host[:port]` without a path; requests are path-style and pass the egress guard with this host as the one private target (`compose.s3.yml`: `http://s3:8333`) |
