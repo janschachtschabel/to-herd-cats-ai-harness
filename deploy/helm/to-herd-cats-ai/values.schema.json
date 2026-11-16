@@ -331,6 +331,7 @@
       "properties": {
         "enabled": {"type": "boolean", "description": "Run the bundled single-pod PostgreSQL (test and staging only)"},
         "image": {"type": "string", "description": "PostgreSQL (pgvector) image", "minLength": 1},
+        "maxConnections": {"type": "integer", "minimum": 20, "maximum": 10000, "description": "max_connections of the bundled PostgreSQL; must cover 16 per API and worker pod plus 10"},
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -360,7 +361,7 @@
           }
         }
       },
-      "required": ["enabled", "image", "storage", "resources"],
+      "required": ["enabled", "image", "maxConnections", "storage", "resources"],
       "description": "Bundled PostgreSQL"
     },
     "ingress": {

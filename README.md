@@ -431,8 +431,11 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   Lasttest: 2 API und 1 Worker hielten bis 33 Verbindungen). Mit den Standardgrenzen der Autoscaler (API 6, Worker 3)
   sind das im Ruhezustand 54, in der Spitze 144 Verbindungen, mit Backup-Job und
   Migration rund 150. PostgreSQL hat ab Werk `max_connections = 100`: Für die vollen
-  Grenzen `max_connections` auf mindestens 160 setzen oder `maxReplicas` senken. Einen
-  Verbindungs-Pooler (PgBouncer) bringt das Chart nicht mit.
+  Grenzen eine externe Datenbank auf mindestens 160 setzen oder `maxReplicas` senken.
+  Das mitgelieferte PostgreSQL des Charts startet mit `postgresql.maxConnections`
+  (Standard 200), und das Chart rendert nicht, wenn 16 × (höchste Zahl der API- und
+  Worker-Pods) + 10 darüber liegt. Einen Verbindungs-Pooler (PgBouncer) bringt das
+  Chart nicht mit.
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort

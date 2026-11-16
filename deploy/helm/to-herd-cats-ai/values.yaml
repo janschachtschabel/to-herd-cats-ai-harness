@@ -213,9 +213,11 @@ database:
 ## @param postgresql.storage.size Size of the data volume
 ## @param postgresql.storage.storageClass Storage class of the data volume; empty: the cluster default
 ## @param postgresql.resources Resource requests and limits of the PostgreSQL container
+## @param postgresql.maxConnections PostgreSQL's max_connections (passed as a server argument). Every API or worker pod holds up to 16 connections; the chart refuses to render when 16 × (the most API pods + the most worker pods) + 10 (backup job, migration, psql) exceeds it. 200 fits the full default autoscaler bounds (154)
 postgresql:
   enabled: true
   image: pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
+  maxConnections: 200
   storage:
     size: 8Gi
     storageClass: ""

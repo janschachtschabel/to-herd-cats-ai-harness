@@ -598,8 +598,10 @@ es deshalb nur außerhalb von `HERD_ENVIRONMENT=production`; das Image setzt
   Obergrenzen 6 API + 3 Worker: in Ruhe rund 54, in der Spitze bis 144, mit Backup-Job
   (Engine und `pg_dump`) und Migrations-Job rund 150. PostgreSQL erlaubt ab Werk 100:
   Für die vollen Grenzen `max_connections` ≥ 160 oder kleinere `maxReplicas`. Das
-  mitgelieferte PostgreSQL des Charts läuft mit 100: genug für die Standardreplikas
-  (2 API + 1 Worker, höchstens 48), nicht für die vollen Grenzen der Autoscaler. Kein
+  mitgelieferte PostgreSQL des Charts läuft mit `postgresql.maxConnections` (Standard
+  200, als Serverargument); das Chart rendert nicht, wenn 16 × (höchste Zahl der API-
+  und Worker-Pods) + 10 darüber liegt (Chart-Regel in `chart-rules-scaling.sh`). Bei
+  einer externen Datenbank kennt das Chart die Grenze nicht. Kein
   PgBouncer im Chart (`HERD_DB_PGBOUNCER` aus 12.4 entsteht erst mit einem Leser).
 - **Collab-Prozess (Live-Bearbeitung):** genau eine Replika mit `strategy: Recreate`
   (Spezifikation 12.4, Stufe 1). Ein Live-Dokument liegt im Speicher dieses Prozesses;
@@ -1106,7 +1108,7 @@ in `deploy/helm/scripts/chart-rules-scaling.sh`):
   Pss aller Backends 165–184 MiB Ø, höchstens 222 MiB (`shared_buffers` 128 MB anteilig
   gezählt). Request 250m (die halbe Referenzlast), Speicher 256Mi/1Gi wie bisher; mit
   echten Daten wächst der Bedarf. Produktiv ist die Datenbank ohnehin extern; das
-  mitgelieferte PostgreSQL hat `max_connections` 100 (siehe
+  mitgelieferte PostgreSQL hat `max_connections` 200 (`postgresql.maxConnections`, siehe
   [Clusterfähigkeit](#clusterfähigkeit)).
 - **Sicherungs-Job:** gemessen höchstens 119–121 MiB RSS je Prozess
   ([Sicherung](#gemessen-sicherung-und-wiederherstellung-m9)); 128Mi/512Mi bleiben.

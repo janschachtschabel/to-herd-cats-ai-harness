@@ -101,4 +101,29 @@ grep -A2 "requests:" <<<"$worker" | grep -q "memory: 256Mi" || fail "the worker'
 grep -A2 "limits:" <<<"$worker" | grep -q "memory: 384Mi" || fail "the worker's memory limit is not 384Mi"
 db=$(resources StatefulSet t-to-herd-cats-ai-postgresql)
 grep -A2 "requests:" <<<"$db" | grep -q "cpu: 250m" || fail "the bundled PostgreSQL's CPU request is not the measured 250m"
+
+# The bundled PostgreSQL allows the connections the pods may hold at their most: 16 per
+# API or worker pod (pool 5 + overflow 10 + LISTEN, measured in the load test) plus 10
+# for the backup job, the migration and an operator's psql (plan M9 Task 11). Its
+# max_connections is a value (200 by default, above the 154 of the full default bounds),
+# and bounds that need more do not render.
+db=$(doc StatefulSet t-to-herd-cats-ai-postgresql "$(render)")
+grep -q 'args: \["-c", "max_connections=200"\]' <<<"$db" || fail "the bundled PostgreSQL does not get max_connections 200"
+db=$(doc StatefulSet t-to-herd-cats-ai-postgresql "$(render --set postgresql.maxConnections=300)")
+grep -q '"max_connections=300"' <<<"$db" || fail "postgresql.maxConnections is not used"
+render --set api.autoscaling.enabled=true --set worker.autoscaling.enabled=true >/dev/null \
+  || fail "the full default autoscaler bounds do not fit the bundled PostgreSQL"
+if out=$(render --set api.autoscaling.enabled=true --set api.autoscaling.maxReplicas=10 \
+  --set worker.autoscaling.enabled=true); then
+  fail "autoscaler bounds above the bundled PostgreSQL's max_connections rendered"
+fi
+grep -q "postgresql.maxConnections (200) is below the 218 connections" <<<"$out" || fail "unexpected error: $out"
+if out=$(render --set api.replicas=12 --set worker.replicas=1); then
+  fail "replicas above the bundled PostgreSQL's max_connections rendered"
+fi
+grep -q "postgresql.maxConnections (200) is below the 218 connections" <<<"$out" || fail "unexpected error: $out"
+render --set postgresql.enabled=false --set database.url=postgresql+asyncpg://herd@db:5432/herd \
+  --set database.existingSecret=db --set api.autoscaling.enabled=true \
+  --set api.autoscaling.maxReplicas=10 --set worker.autoscaling.enabled=true >/dev/null \
+  || fail "an external database's connections are checked (the chart cannot know its limit)"
 true
