@@ -7,8 +7,8 @@ them; its collab process names no instance, which the API serves as before while
 instance owns the page.
 
 Revision ID: daa60bc7c565
-Revises: 9e4b6d2f8a17
-Create Date: 2027-01-04 09:00:00.000000
+Revises: c4d8e1f7a2b9
+Create Date: 2027-01-07 09:00:00.000000
 """
 
 from collections.abc import Sequence
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "daa60bc7c565"
-down_revision: str | None = "9e4b6d2f8a17"
+down_revision: str | None = "c4d8e1f7a2b9"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
