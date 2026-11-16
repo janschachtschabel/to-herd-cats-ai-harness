@@ -15,7 +15,7 @@ from tests.factories_spaces import personal_space_of
 from tests.test_access import actor_of
 
 SPACES = "/api/spaces"
-ALL_SYSTEM = [
+ADMIN_SYSTEM = [
     "agent.manage",
     "ai.manage",
     "audit.read",
@@ -28,13 +28,14 @@ ALL_SYSTEM = [
     "tag.manage",
     "user.manage",
 ]
+OWNER_SYSTEM = sorted([*ADMIN_SYSTEM, "backup.manage"])  # owners only (plan M9 decision 10)
 
 
 @pytest.mark.parametrize(
     ("role", "expected"),
     [
-        (SystemRole.OWNER, ALL_SYSTEM),
-        (SystemRole.ADMIN, ALL_SYSTEM),
+        (SystemRole.OWNER, OWNER_SYSTEM),
+        (SystemRole.ADMIN, ADMIN_SYSTEM),
         (SystemRole.MEMBER, ["directory.read", "space.create"]),
         (SystemRole.GUEST, []),
     ],
@@ -56,7 +57,7 @@ async def test_system_permissions_are_read_live(session: AsyncSession, member: U
     ]
     member.system_role = SystemRole.ADMIN
     await session.flush()
-    assert [a.value for a in await system_permissions(session, actor)] == ALL_SYSTEM
+    assert [a.value for a in await system_permissions(session, actor)] == ADMIN_SYSTEM
     member.is_active = False
     await session.flush()
     assert await system_permissions(session, actor) == []

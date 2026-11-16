@@ -1,7 +1,8 @@
 """The one permission check (spec 4.2). Every service asks `require` (or `can`); there
 is no other place that decides who may do what.
 
-- System admins and owners may do everything, in every space of their organisation.
+- System admins and owners may do everything, in every space of their organisation,
+  except what only an owner may (`OWNER_ONLY_ACTIONS`: `backup.manage`).
 - System-wide actions follow the system role (`SYSTEM_ROLE_ACTIONS`), except the
   derived ones (`DERIVED_ACTIONS`): `ai.use` holds whoever the AI assignment gives a
   usable connection (`modules/ai/effective.py`), `agent.create_personal` whoever has

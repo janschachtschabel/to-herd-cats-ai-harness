@@ -33,6 +33,9 @@ class Action(StrEnum):
     AI_MANAGE = "ai.manage"  # AI connections, assignments and usage (spec 7)
     AGENT_MANAGE = "agent.manage"  # create and change the organisation's agents (spec 8.1)
     SKILL_MANAGE = "skill.manage"  # organisation-wide skills (space skills: `page.moderate`)
+    # Backups and restores (plan M9 decision 10): owners only, never admins. An archive
+    # holds direct messages that admins read only through the audited inspection.
+    BACKUP_MANAGE = "backup.manage"
     AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
     # Own personal agents (spec 8.1, plan M6 decision 13): derived, `ai.use` while the
     # organisation allows personal agents.
@@ -113,10 +116,13 @@ DERIVED_ACTIONS: frozenset[Action] = frozenset(
     {Action.AI_USE, Action.AGENT_CREATE_PERSONAL, Action.MCP_USE}
 )
 
+# System-wide actions only the owner holds (an admin holds every other one).
+OWNER_ONLY_ACTIONS: frozenset[Action] = frozenset({Action.BACKUP_MANAGE})
+
 # System-wide actions per system role.
 SYSTEM_ROLE_ACTIONS: dict[SystemRole, frozenset[Action]] = {
     SystemRole.OWNER: frozenset(Action) - DERIVED_ACTIONS,
-    SystemRole.ADMIN: frozenset(Action) - DERIVED_ACTIONS,
+    SystemRole.ADMIN: frozenset(Action) - DERIVED_ACTIONS - OWNER_ONLY_ACTIONS,
     SystemRole.MEMBER: frozenset({Action.SPACE_CREATE, Action.DIRECTORY_READ}),
     SystemRole.GUEST: frozenset(),
 }
