@@ -290,6 +290,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean", "description": "Run the collab process (live editing)"},
+        "replicas": {"type": "integer", "minimum": 1, "description": "Collab pods; from 2 each page is bound to one of them (RollingUpdate, PodDisruptionBudget)"},
         "resources": {
           "type": "object",
           "description": "Kubernetes ResourceRequirements",
@@ -324,8 +325,8 @@
           "required": ["existingSecret"]
         }
       },
-      "required": ["enabled", "resources", "env", "internalToken"],
-      "description": "The collab Deployment (HERD_ROLE=collab), always one replica"
+      "required": ["enabled", "replicas", "resources", "env", "internalToken"],
+      "description": "The collab Deployment (HERD_ROLE=collab)"
     },
     "secrets": {
       "type": "object",

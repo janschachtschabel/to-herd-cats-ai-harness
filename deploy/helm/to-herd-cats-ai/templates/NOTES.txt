@@ -8,19 +8,19 @@ Worker (outbox: notifications, page timelines, live updates; agent runs; due aut
 Every API or worker pod holds up to 16 database connections: with the most pods the database needs room for {{ mul 16 (add (include "herd.maxReplicas" (dict "root" . "component" "api")) (include "herd.maxReplicas" (dict "root" . "component" "worker"))) }} ({{ if .Values.postgresql.enabled }}the bundled PostgreSQL allows {{ .Values.postgresql.maxConnections }}, postgresql.maxConnections{{ else }}PostgreSQL allows 100 by default: set max_connections of your database{{ end }}; docs/STECKBRIEF.md).
 {{- end }}
 {{- $budgets := list }}
-{{- range $component := list "api" "worker" }}
-{{- if and $.Values.podDisruptionBudget.enabled (ge (int (include "herd.minReplicas" (dict "root" $ "component" $component))) 2) }}
+{{- range $component := list "api" "worker" "collab" }}
+{{- if and $.Values.podDisruptionBudget.enabled (or (ne $component "collab") $.Values.collab.enabled) (ge (int (include "herd.minReplicas" (dict "root" $ "component" $component))) 2) }}
 {{- $budgets = append $budgets $component }}
 {{- end }}
 {{- end }}
 {{- with $budgets }}
-PodDisruptionBudgets (at most {{ $.Values.podDisruptionBudget.maxUnavailable }} pod away at a time): {{ join ", " . }}; a component with one pod and the collab process get none.
+PodDisruptionBudgets (at most {{ $.Values.podDisruptionBudget.maxUnavailable }} pod away at a time): {{ join ", " . }}; a component with one pod gets none.
 {{- end }}
 {{- if .Values.ingress.enabled }}
 Live updates (GET /api/stream, Server-Sent Events) stay open for hours: the Ingress must not buffer them and must allow a long read timeout (see ingress.annotations in values.yaml).
 {{- end }}
 {{- if .Values.collab.enabled }}
-Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab (one replica, by design).
+Live editing: the collab process runs as {{ include "herd.fullname" . }}-collab ({{ if gt (int .Values.collab.replicas) 1 }}{{ .Values.collab.replicas }} pods; each page is bound to one of them, docs/WIKI.md{{ else }}one pod, replaced with Recreate; collab.replicas for more{{ end }}).
 {{- with include "herd.publicUrl" . }} Browsers must open the app at {{ . }}.{{ else }} No publicUrl: WebSocket Origins must match the host the request came to.{{ end }}
 {{- end }}
 Files (attachments): {{ if .Values.persistence.enabled }}{{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }} on /data (kept on uninstall){{ else }}an emptyDir per API pod: files are lost with the pod (persistence.enabled=false){{ end }}.

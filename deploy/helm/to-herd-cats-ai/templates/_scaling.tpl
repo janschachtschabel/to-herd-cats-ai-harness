@@ -1,10 +1,11 @@
-{{/* Replicas, autoscalers and disruption budgets of the api and worker Deployments
-(plan M9 decision 19). Each takes (dict "root" $ "component" "api"|"worker"). */}}
+{{/* Replicas, autoscalers and disruption budgets of the api, worker and collab
+Deployments (plan M9 decisions 17 and 19). Each takes (dict "root" $ "component"
+"api"|"worker"|"collab"); collab has no autoscaler. */}}
 
 {{/* The fewest pods the component runs: autoscaling.minReplicas or replicas. */}}
 {{- define "herd.minReplicas" -}}
 {{- $values := index .root.Values .component -}}
-{{- if $values.autoscaling.enabled -}}
+{{- if dig "autoscaling" "enabled" false $values -}}
 {{- $values.autoscaling.minReplicas -}}
 {{- else -}}
 {{- $values.replicas -}}

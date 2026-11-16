@@ -87,6 +87,7 @@ backup:
           - port: 443
             protocol: TCP
 collab:
+  replicas: 2
   internalToken:
     existingSecret: herd-internal-token
 database:

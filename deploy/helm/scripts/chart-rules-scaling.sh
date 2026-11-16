@@ -1,6 +1,7 @@
 # Chart rules for scaling (plan M9 Task 7, decision 19): HorizontalPodAutoscalers for the
-# API and the worker, PodDisruptionBudgets from two replicas, and the files claim with
-# autoscaled API pods. Sourced by check-chart-rules.sh (uses its render, doc and fail).
+# API and the worker, PodDisruptionBudgets from two replicas, the files claim with
+# autoscaled API pods, and several collab pods (plan M9 Task 15, decision 17). Sourced by
+# check-chart-rules.sh (uses its render, doc and fail).
 
 # No autoscaler by default: the Deployments carry their replicas.
 out=$(render)
@@ -83,6 +84,25 @@ grep -q "maxUnavailable: 2$" <<<"$(doc PodDisruptionBudget t-to-herd-cats-ai-api
 out=$(render --set podDisruptionBudget.enabled=false --set worker.replicas=2)
 grep -q "^kind: PodDisruptionBudget" <<<"$out" && fail "a budget with podDisruptionBudget.enabled=false"
 if render --set podDisruptionBudget.maxUnavailable=0 >/dev/null; then fail "a budget that lets no pod go rendered"; fi
+
+# Several collab pods (collab.replicas): each page is bound to one of them, so they
+# roll one at a time (a new pod first; the old one drains: it saves, lets go of its
+# pages and the browsers reconnect to the others), with a budget like the API's.
+out=$(render --set collab.replicas=2)
+collab=$(doc Deployment t-to-herd-cats-ai-collab "$out")
+grep -q "^  replicas: 2$" <<<"$collab" || fail "collab.replicas is not used"
+grep -A4 "strategy:" <<<"$collab" | grep -q "type: RollingUpdate" || fail "several collab pods are replaced with Recreate"
+grep -A4 "strategy:" <<<"$collab" | grep -q "maxUnavailable: 0$" || fail "a collab rollout takes a pod away first"
+grep -A4 "strategy:" <<<"$collab" | grep -q "maxSurge: 1$" || fail "a collab rollout does not start one new pod at a time"
+pdb=$(doc PodDisruptionBudget t-to-herd-cats-ai-collab "$out")
+[[ -n $pdb ]] || fail "no budget for two collab pods"
+grep -A4 "selector:" <<<"$pdb" | grep -q "app.kubernetes.io/component: collab$" || fail "the collab budget selects other pods"
+grep -q "maxUnavailable: 1$" <<<"$pdb" || fail "the collab budget lets more than one pod go"
+[[ -z $(doc PodDisruptionBudget t-to-herd-cats-ai-collab "$(render --set collab.replicas=2 \
+  --set podDisruptionBudget.enabled=false)") ]] || fail "a collab budget with podDisruptionBudget.enabled=false"
+[[ -z $(doc PodDisruptionBudget t-to-herd-cats-ai-collab "$(render --set collab.replicas=2 \
+  --set collab.enabled=false)") ]] || fail "a collab budget without collab"
+if render --set collab.replicas=0 >/dev/null; then fail "collab.replicas=0 rendered (collab.enabled=false is the switch)"; fi
 
 # Default requests and limits come from the load test (plan M9 Task 10, docs/STECKBRIEF.md,
 # Empfehlung Request und Limit): the autoscaler's 70 % of the CPU request is where the

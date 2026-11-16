@@ -1,10 +1,12 @@
 {{- if .Values.collab.enabled }}
 # The collab process (live editing, HERD_ROLE=collab: node collab/server.mjs).
-# Exactly one replica, replaced with Recreate: a page's live document lives in this
-# process's memory while people edit it, so two processes would each hold their own
-# copy and split the page's editors (spec 12.4, stage 1). Its state is saved to
-# PostgreSQL through the API (at the latest 10 s after a change, and on SIGTERM
-# before it exits); the browsers reconnect by themselves after a restart.
+# A page's live document lives in one process's memory while people edit it. With
+# collab.replicas above 1 each pod announces itself at its pod IP and the API binds
+# every page to one pod, relaying all of the page's browsers there (spec 12.4, plan M9
+# decision 17); the pods roll one at a time. One replica (the default) is replaced with
+# Recreate. Its state is saved to PostgreSQL through the API (at the latest 10 s after
+# a change, and on SIGTERM, when it drains: no new pages, everything saved, its pages
+# let go); the browsers reconnect by themselves, to another pod if there is one.
 # Memory: the process refuses to load more documents than HERD_COLLAB_MEMORY_BUDGET_MB
 # (default 400) by its own estimate; the limit must hold that plus ~130 MB for the
 # process and ~250 MB per check worker, with a fifth to spare (docs/WIKI.md).
@@ -16,9 +18,16 @@ metadata:
     {{- include "herd.labels" . | nindent 4 }}
     app.kubernetes.io/component: collab
 spec:
-  replicas: 1
+  replicas: {{ .Values.collab.replicas }}
   strategy:
+    {{- if gt (int .Values.collab.replicas) 1 }}
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    {{- else }}
     type: Recreate
+    {{- end }}
   selector:
     matchLabels:
       {{- include "herd.selectorLabels" . | nindent 6 }}
@@ -36,7 +45,8 @@ spec:
       {{- end }}
       securityContext:
         {{- include "herd.podSecurityContext" . | nindent 8 }}
-      # SIGTERM: the process saves every open document (up to 10 s), then exits.
+      # SIGTERM: the process drains (no new pages, every open document saved, up to
+      # 10 s, its pages let go), then exits.
       terminationGracePeriodSeconds: 30
       containers:
         - name: collab

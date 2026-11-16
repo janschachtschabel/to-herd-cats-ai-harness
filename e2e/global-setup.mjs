@@ -158,7 +158,6 @@ export default async function globalSetup() {
     HERD_PUBLIC_PORT: String(port),
     HERD_INTERNAL_PORT: String(port + 1),
     HERD_COLLAB_PORT: String(port + 2),
-    HERD_COLLAB_URL: `ws://127.0.0.1:${port + 2}`,
     HERD_INTERNAL_TOKEN: "e2e-".padEnd(48, "x"),
     HERD_BOOTSTRAP_ADMIN_EMAIL: OWNER.email,
     HERD_BOOTSTRAP_ADMIN_PASSWORD: OWNER.password,

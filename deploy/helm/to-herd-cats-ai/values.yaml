@@ -190,7 +190,7 @@ backup:
 
 ## @section Disruptions
 
-## @param podDisruptionBudget.enabled A PodDisruptionBudget (policy/v1) for each of api and worker that runs at least two pods (replicas, or autoscaling.minReplicas); one pod alone gets none, so a node drain never hangs on it. The collab process is one pod by design and gets none. Pods that are not ready may always be evicted
+## @param podDisruptionBudget.enabled A PodDisruptionBudget (policy/v1) for each of api, worker and collab that runs at least two pods (replicas, or autoscaling.minReplicas); one pod alone gets none, so a node drain never hangs on it. Pods that are not ready may always be evicted
 ## @param podDisruptionBudget.maxUnavailable Pods of one component a voluntary disruption (drain, cluster upgrade) may take at once (at least 1; keep it below the component's pods)
 podDisruptionBudget:
   enabled: true
@@ -199,11 +199,13 @@ podDisruptionBudget:
 ## @section Live editing (HERD_ROLE=collab)
 
 ## @param collab.enabled Run the collab process (Hocuspocus, live editing) as its own Deployment; the API relays /collab/ WebSockets to it. Off: the live editor reports that live editing is off
+## @param collab.replicas Collab pods. 1: replaced with Recreate. From 2: each pod announces itself at its pod IP, the API binds every page to one of them and relays all of its browsers there (docs/WIKI.md); the pods roll one at a time and get a PodDisruptionBudget. Each pod holds its own memory budget (collab.resources)
 ## @param collab.resources Resource requests and limits of the collab container. Sizing rule (docs/WIKI.md): memory limit ≥ (130 MiB + 250 MiB × HERD_COLLAB_CHECK_WORKERS + HERD_COLLAB_MEMORY_BUDGET_MB) / 0.8; the defaults (1 worker, budget 400) need 975 MiB. A larger budget (collab.env) needs a larger limit
 ## @param collab.env Extra environment variables of the collab process (name: value); the same refusals as api.env
 ## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
 collab:
   enabled: true
+  replicas: 1
   resources:
     requests:
       cpu: 50m

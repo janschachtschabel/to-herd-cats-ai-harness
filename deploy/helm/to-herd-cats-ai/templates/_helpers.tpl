@@ -271,11 +271,10 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{ include "herd.publicUrlEnv" . }}
 {{- end }}
 {{- if .Values.collab.enabled }}
-# Live editing: /collab/ WebSockets are checked here and relayed to the
-# collab process, which calls back on the internal port with the token.
+# Live editing: /collab/ WebSockets are checked here and relayed to the collab
+# pod that owns the page (each announces its address), which calls back on the
+# internal port with the token.
 {{ include "herd.internalTokenEnv" . }}
-- name: HERD_COLLAB_URL
-  value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
 {{- end }}
 {{- end -}}
 
@@ -305,6 +304,14 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 # The API's internal port (/internal/collab/*), guarded by the token.
 - name: HERD_COLLAB_API_URL
   value: {{ printf "http://%s-internal:9090" (include "herd.fullname" .) | quote }}
+# Where the API's relay reaches this pod: it announces itself there (plan M9
+# decision 17). The pod IP comes from the Downward API.
+- name: HERD_COLLAB_POD_IP
+  valueFrom:
+    fieldRef:
+      fieldPath: status.podIP
+- name: HERD_COLLAB_ADVERTISE_URL
+  value: "ws://$(HERD_COLLAB_POD_IP):1234"
 {{ include "herd.internalTokenEnv" . }}
 {{- if include "herd.publicUrl" . }}
 {{ include "herd.publicUrlEnv" . }}

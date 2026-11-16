@@ -42,7 +42,8 @@ doc() { awk -v k="kind: $1" -v n="name: $2" '
   kind && $0 == "  " n { hit=1 }
   END { if (hit) printf "%s", buf }' <<<"$3"; }
 
-# Live editing: one collab replica, replaced with Recreate (documents live in memory).
+# Live editing: one collab replica by default, replaced with Recreate (documents live in
+# memory); several: chart-rules-scaling.sh.
 out=$(render)
 collab=$(doc Deployment t-to-herd-cats-ai-collab "$out")
 [[ -n $collab ]] || fail "no collab Deployment by default"
@@ -51,8 +52,14 @@ grep -q "type: Recreate" <<<"$collab" || fail "collab is not replaced with Recre
 grep -A1 -- "- name: HERD_ROLE" <<<"$collab" | grep -q "value: collab" || fail "collab role not set"
 grep -q 'value: "http://t-to-herd-cats-ai-internal:9090"' <<<"$collab" \
   || fail "collab does not reach the API's internal port"
+# Each collab pod announces itself at its own pod IP (plan M9 Task 15); the API relays
+# to the pod that owns a page, so it gets no fixed collab address.
+grep -B3 "fieldPath: status.podIP" <<<"$collab" | grep -q -- "- name: HERD_COLLAB_POD_IP" \
+  || fail "the collab pod does not learn its IP from the Downward API"
+grep -A1 -- "- name: HERD_COLLAB_ADVERTISE_URL" <<<"$collab" | grep -q 'value: "ws://$(HERD_COLLAB_POD_IP):1234"' \
+  || fail "the collab pod does not announce itself at its pod IP"
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
-grep -q 'value: "ws://t-to-herd-cats-ai-collab:1234"' <<<"$api" || fail "the API does not relay to collab"
+grep -q "HERD_COLLAB_URL\|HERD_COLLAB_ADVERTISE_URL" <<<"$api" && fail "the API gets a fixed collab address"
 
 # The internal token is never a chart value: generated into a kept Secret, or taken
 # from collab.internalToken.existingSecret.
@@ -68,7 +75,7 @@ out=$(render --set collab.internalToken.existingSecret=herd-token)
 grep -A4 -- "- name: HERD_INTERNAL_TOKEN" <<<"$out" | grep -q "name: herd-token" \
   || fail "collab.internalToken.existingSecret is not used"
 out=$(render --set collab.enabled=false)
-grep -q "HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL" <<<"$out" && fail "live-editing settings without collab"
+grep -q "HERD_INTERNAL_TOKEN\|HERD_COLLAB_ADVERTISE_URL" <<<"$out" && fail "live-editing settings without collab"
 
 # HERD_PUBLIC_URL: from the Ingress (https with TLS) unless publicUrl is set.
 out=$(render --set ingress.enabled=true --set api.forwardedAllowIps=10.0.0.0/8 \
@@ -126,7 +133,7 @@ grep -q -- "- name: to-herd-cats-ai$" <<<"$worker" || fail "the worker container
 grep -A3 "readinessProbe:" <<<"$worker" | grep -q "path: /ready" || fail "the worker's readiness is not /ready"
 grep -A4 "readinessProbe:" <<<"$worker" | grep -q "port: internal" || fail "the worker's probes are not on 9090"
 grep -B1 "containerPort: 9090" <<<"$worker" | grep -q "name: internal" || fail "the worker has no internal port"
-grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_URL" <<<"$worker" \
+grep -q "containerPort: 8080\|HERD_INTERNAL_TOKEN\|HERD_COLLAB_" <<<"$worker" \
   && fail "the worker has a public port or the live-editing token"
 grep -q "HERD_DATABASE_PASSWORD_FILE" <<<"$worker" || fail "the worker has no database password"
 api=$(doc Deployment t-to-herd-cats-ai-api "$out")
