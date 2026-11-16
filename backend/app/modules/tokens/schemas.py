@@ -42,6 +42,9 @@ class TokenIn(BaseModel):
     space_ids: list[uuid.UUID] | None = Field(
         default=None, min_length=1, max_length=MAX_SCOPE_SPACES
     )
+    # A person with TOTP: a current code from the authenticator (403
+    # `auth.second_factor_required` without, 422 `auth.second_factor_invalid` if wrong).
+    second_factor_code: str | None = Field(default=None, min_length=1, max_length=16)
 
 
 class TokenOut(BaseModel):

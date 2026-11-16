@@ -9,6 +9,7 @@ for an unknown agent).
   422 `token.space_invalid`, the same for unknown ones; left out: all of them.
 - The clear text (`herd_agt_…`) is returned this once. Revoking is idempotent; a
   token of another agent answers like an unknown one (404 `token.not_found`).
+- An issuer with TOTP gives a current code (`totp/gate.py`).
 - The audit names the agent, kind, mode, scope size and expiry, never a hash or the
   clear text (`access_token.created`, `access_token.revoked`).
 """
@@ -33,6 +34,7 @@ from app.modules.tokens.repository import TokenRepository
 from app.modules.tokens.service import TARGET, details_of, token_not_found
 from app.modules.tokens.standing import holds_mcp_use
 from app.modules.tokens.values import new_secret, token_digest
+from app.modules.totp.gate import require_second_factor
 
 
 class AgentTokenService:
@@ -49,6 +51,7 @@ class AgentTokenService:
         mode: TokenMode,
         expires_in_days: int,
         space_ids: list[uuid.UUID] | None,
+        second_factor_code: str | None = None,
     ) -> tuple[AccessToken, str]:
         agent = await AgentService(self.session).get(actor, agent_id)
         if not agent.external:
@@ -59,6 +62,7 @@ class AgentTokenService:
         readable = await AgentRepository(self.session, actor.org_id).roles(agent.id)
         if any(space_id not in readable for space_id in scope or ()):
             raise ValidationFailed(code="token.space_invalid")
+        await require_second_factor(self.session, actor, second_factor_code)
         secret = new_secret(TokenKind.AGENT)
         now = self.clock.now()
         token = await self.repo.add(

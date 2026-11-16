@@ -30,6 +30,7 @@ from app.modules.audit.recorder import record
 from app.modules.tokens.models import AccessToken, TokenKind, TokenMode
 from app.modules.tokens.repository import Listed, TokenRepository
 from app.modules.tokens.values import new_secret, token_digest
+from app.modules.totp.gate import require_second_factor
 
 TARGET = "access_token"
 
@@ -51,12 +52,14 @@ class TokenService:
         mode: TokenMode,
         expires_in_days: int,
         space_ids: list[uuid.UUID] | None,
+        second_factor_code: str | None = None,
     ) -> tuple[AccessToken, str]:
         await self._require_mcp(actor)
         scope = list(dict.fromkeys(space_ids)) if space_ids is not None else None
         for space_id in scope or ():
             if not await can(self.session, actor, Action.SPACE_READ, space_id):
                 raise ValidationFailed(code="token.space_invalid")
+        await require_second_factor(self.session, actor, second_factor_code)
         secret = new_secret(TokenKind.PERSONAL)
         now = self.clock.now()
         token = await self.repo.add(

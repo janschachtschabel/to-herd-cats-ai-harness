@@ -46,7 +46,7 @@ async def list_my_tokens(
 async def create_token(body: TokenIn, actor: ActorDep, session: SessionDep) -> TokenCreatedOut:
     """A new token; `secret` is its clear text, shown this once."""
     token, secret = await TokenService(session).create(
-        actor, body.name, body.mode, body.expires_in_days, body.space_ids
+        actor, body.name, body.mode, body.expires_in_days, body.space_ids, body.second_factor_code
     )
     return TokenCreatedOut.of(token, secret)
 
@@ -130,7 +130,13 @@ async def create_agent_token(
 ) -> TokenCreatedOut:
     """A token for an external agent (`herd_agt_…`); `secret` is shown this once."""
     token, secret = await AgentTokenService(session).create(
-        actor, agent_id, body.name, body.mode, body.expires_in_days, body.space_ids
+        actor,
+        agent_id,
+        body.name,
+        body.mode,
+        body.expires_in_days,
+        body.space_ids,
+        body.second_factor_code,
     )
     return TokenCreatedOut.of(token, secret)
 
