@@ -16,7 +16,7 @@ function dmWith(approval: Approval, meId = 'asker', diff: object | null = null) 
   const message = makeMessage({
     kind: 'approval',
     author: { type: 'agent', id: HILDA.id, name: HILDA.name },
-    body_md: approval.summary,
+    body_md: approval.tool,
     run_id: 'run-1',
     card: { type: 'approval', id: approval.id },
     conversation_id: dm.id,

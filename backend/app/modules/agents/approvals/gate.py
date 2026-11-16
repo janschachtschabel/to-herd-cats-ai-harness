@@ -58,8 +58,10 @@ from app.modules.agents.approvals import cards
 from app.modules.agents.approvals.models import Approval, ApprovalOutcome, ApprovalState
 from app.modules.agents.approvals.repository import WaitedRepository
 from app.modules.agents.approvals.shown import NOT_SHOWN, shown_in_full
+from app.modules.agents.approvals.summary import summary
 from app.modules.agents.toolbox import external
 from app.modules.agents.toolbox.base import CallRef, RunRef, Subject, ToolContext, ToolSpec, Wait
+from app.modules.agents.toolbox.writing import into_own_conversation
 from app.modules.messaging.models import MessageKind
 from app.runtime.loop import Halt, ToolResult
 
@@ -199,7 +201,7 @@ async def _ask(
             fingerprint=fingerprint(spec.name, canonical, subjects),
             summary=external.summary(spec.remote)
             if spec.remote
-            else cards.summary(spec.name, canonical),
+            else await summary(ctx, spec.name, canonical, subjects),
             state=ApprovalState.PENDING,
             addressed_to=ctx.run.user_id,
             expires_at=cards.until(),
@@ -207,8 +209,16 @@ async def _ask(
             personal=personal,
         )
     )
+    # The card names the tool only: the summary is the person asked's (module review
+    # M8 5, L1); in a marked run's DM alone with her it is marked like its messages.
+    alone = await into_own_conversation(ctx, ctx.run.conversation_id) is None
     card = await cards.post(
-        ctx, MessageKind.APPROVAL, approval.id, approval.summary, approval.addressed_to
+        ctx,
+        MessageKind.APPROVAL,
+        approval.id,
+        spec.name,
+        approval.addressed_to,
+        personal=ctx.reads.personal and alone,
     )
     approval.message_id = card.id
     await ctx.session.flush()

@@ -70,7 +70,8 @@ async def test_a_release_writes_exactly_what_was_shown_unmarked(ext: Ext, work: 
     approval = await asks_release(ext, await ext.bench.run_next())
     assert approval["tool"] == "post_message" and approval["args"]["text"] == text
     (card,) = [m for m in await ext.bench.messages() if m["kind"] == "approval"]
-    assert card["personal"] is False and SECRET not in card["body_md"]  # names, no content
+    # the tool only; marked like her DM's other messages (module review M8 5, L1)
+    assert card["personal"] is True and card["body_md"] == "post_message"
     assert await _in(ext, channel) == []
     await decide(ext, approval, "approve")
     assert await ext.bench.run_next() == StopReason.COMPLETED

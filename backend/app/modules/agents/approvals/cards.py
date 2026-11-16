@@ -3,10 +3,11 @@
 A card is a message of the run's agent in the run's conversation (`kind` `approval`
 or `question`, `client_id` the approval's or the question's id, its run in `run_id`),
 posted through `MessageService` with the run's actor like any of the agent's
-messages: its `message.created` event carries ids only. Its text is the approval's
-summary (the tool and the ids the call names, never content of what it changes; the
-diff of a page is fetched from `GET /api/approvals/{id}/diff` by the person asked) or
-the agent's question. The person asked gets an activity entry (`approval` or
+messages: its `message.created` event carries ids only. Its text is the tool's name
+for an approval (its summary, `summary.py`, and the call's arguments are the person
+asked's, from `GET /api/approvals/{id}`; a page's diff from `.../diff`; module review
+M8 5, L1) or the agent's question. Both are marked personal in a marked run (only
+alone with the person). The person asked gets an activity entry (`approval` or
 `question`) for the card.
 
 Whom a card asks: the person who asked the run. (The agent's responsible person
@@ -27,28 +28,9 @@ from app.modules.messaging.models import Message, MessageKind
 from app.modules.messaging.notification_models import NotificationReason
 from app.modules.messaging.service import MessageService
 
-# The arguments a summary names: ids, keys and choices, never a text.
-NAMED = (
-    "key",
-    "page_id",
-    "space_id",
-    "parent_id",
-    "status",
-    "assignee_type",
-    "assignee_id",
-    "conversation_id",
-    "reply_to",
-)
-MAX_SUMMARY = 500
-
 
 def until() -> datetime:
     return utcnow() + timedelta(hours=get_settings().ai_approval_hours)
-
-
-def summary(tool: str, args: dict[str, object]) -> str:
-    named = [f"{k}={args[k]}" for k in NAMED if args.get(k) is not None]
-    return (f"{tool}: {', '.join(named)}" if named else tool)[:MAX_SUMMARY]
 
 
 async def post(
@@ -62,7 +44,7 @@ async def post(
 ) -> Message:
     """The card, and the activity entry of the person it asks. Where it answers: a
     heartbeat's run opens its term's thread only now (`automations/runs.py`).
-    `personal`: a marked run's question (`message.personal`)."""
+    `personal`: a marked run's card alone with the person (`message.personal`)."""
     thread = ctx.run.reply_to
     if thread is None:
         opened = await automation_runs.open_thread(ctx.session, ctx.run.org_id, ctx.run.id)

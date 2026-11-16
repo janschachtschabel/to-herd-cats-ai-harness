@@ -84,12 +84,21 @@ Ein Werkzeug kann für einen Agenten auf **„Nach Freigabe“** stehen. Will de
 nutzen, erscheint im Gespräch (oder Thread) eine **Freigabekarte**: was er tun will (mit
 Diff bei Seiten), wer entscheidet, bis wann. Entscheiden darf nur die Person, die den
 Lauf ausgelöst hat, und nur, wenn sie die Änderung auch selbst vornehmen dürfte. Andere
-sehen die Karte ohne Knöpfe. **Freigeben** setzt den Lauf fort; **Ablehnen** (mit
+sehen die Karte ohne Knöpfe und nur mit dem Namen des Werkzeugs: Die Zusammenfassung
+(`summary`) und die Angaben des Aufrufs sieht nur die gefragte Person. Die
+Zusammenfassung nennt nur, was das System selbst aufgelöst hat: den Schlüssel eines
+Tickets, das der Lauf an seinem Ort findet, den Namen eines Status, wie der Bereich ihn
+führt, und die IDs der Objekte, an die die Freigabe gebunden ist; nie einen Text, den
+das Modell gewählt hat (was sich nicht auflösen lässt, fehlt dort; Review M8 5,
+Befund L1). In einem markierten Lauf ist die Karte in ihrer Direktnachricht allein mit
+dem Agenten selbst als persönlich markiert (auch bei einer Einsicht durch Admins
+zurückgehalten). **Freigeben** setzt den Lauf fort; **Ablehnen** (mit
 optionalem Grund) teilt das dem Agenten mit, er arbeitet ohne diese Änderung weiter.
 Hat sich das Objekt zwischen Anfrage und Ausführung geändert (z. B. hat jemand die Seite
 bearbeitet), wird nichts ausgeführt; die Karte zeigt „Veraltet“, und der Agent kann neu
-fragen. Schreibende **externe Werkzeuge** (Stufe 4) fragen immer: Die Karte nennt Server
-und Werkzeug („Tracker · create_issue“), die entscheidende Person sieht die Argumente,
+fragen. Schreibende **externe Werkzeuge** (Stufe 4) fragen immer: Die Karte nennt das
+Werkzeug, die entscheidende Person sieht dazu Server und Werkzeug („Tracker ·
+create_issue“) und die Argumente,
 die nach der Freigabe an den Server gehen. Hat sich der Server oder das Werkzeug seit
 der Anfrage geändert, ist die Freigabe veraltet, und es wird nichts gesendet. Ohne Entscheidung endet der Lauf nach `HERD_AI_APPROVAL_HOURS` (Standard 72
 Stunden). Eine **Rückfrage** (`ask_user`) erscheint ebenso als Karte mit Antwortfeld

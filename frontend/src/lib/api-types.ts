@@ -4458,7 +4458,10 @@ export interface components {
         /**
          * ApprovalOut
          * @description A tool call waiting for (or given) a person's release. `summary`: the tool and
-         *     the ids the call names. `args`: the call's arguments, only for the person asked
+         *     what the system resolved of the call's arguments (a ticket's key, a status's name,
+         *     the ids of what it changes; never a text the model chose), or for an external
+         *     tool its server and tool; only for the person asked (null for others, module
+         *     review M8 5, L1). `args`: the call's arguments, only for the person asked
          *     (null for others). `diff_url`: for a page's new content, where that person reads
          *     the diff against the page as it is now (`GET`), instead of the text. `step` and
          *     `call_id`: the call it waits for, as the run's journal names it (the step a run
@@ -4468,9 +4471,9 @@ export interface components {
          *     asked; for everyone else both are null and `redacted` is true (as in the run
          *     view, review M6 finding 6). `external`: for a call of an external tool (it sends
          *     `args` to that server once released), else null. `personal`: asked because the
-         *     run carries the asker's personal mark and the call owes her release under it: what
-         *     is released is written (or sent) where others can read it now or later (module
-         *     review M8 2; M8 4, K5).
+         *     run carries the asker's personal mark (every release then but a message into its
+         *     DM alone with her): what is released is written (or sent) where others can read
+         *     it now or later (module review M8 2; M8 5, L2).
          */
         ApprovalOut: {
             /**
@@ -4532,7 +4535,7 @@ export interface components {
             /** Step */
             step: number;
             /** Summary */
-            summary: string;
+            summary: string | null;
             /** Tool */
             tool: string;
             /** Version */

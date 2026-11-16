@@ -85,11 +85,12 @@ async def test_a_confirm_tool_is_offered_and_its_call_waits_for_a_release(work: 
     assert approval["diff_url"] == f"/api/approvals/{approval['id']}/diff"
     assert approval["conversation_id"] == work.bench.dm_id
     assert await proposals(work) == []  # nothing written yet
-    # The card: the agent's message in the run's conversation, with the summary only.
+    # The card: the agent's message in the run's conversation, with the tool's name only
+    # (the summary is the person asked's, module review M8 5, L1).
     (card,) = [m for m in await work.bench.messages() if m["kind"] == "approval"]
     assert card["id"] == approval["message_id"]
     assert card["card"] == {"type": "approval", "id": approval["id"]}
-    assert card["body_md"] == approval["summary"] and NEW not in card["body_md"]
+    assert card["body_md"] == "propose_page_change" and card["personal"] is False
     assert card["author"]["type"] == "agent" and card["run_id"] == str(run_id)
     # The activity entry of the person asked.
     activity = (await work.bench.people.alice.get("/api/activity")).json()["items"]

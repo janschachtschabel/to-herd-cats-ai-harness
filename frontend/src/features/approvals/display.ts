@@ -40,7 +40,8 @@ export function questionView(question: Question, now: number): QuestionView {
 }
 
 /** What a call would change, for links: a page and a ticket, from the call's
- *  arguments (the person asked) or else the server's summary (`tool: k=v, ...`). */
+ *  arguments or else the server's summary (`tool: k=v, ...`); both are the person
+ *  asked's alone, so anyone else gets none. */
 export interface Subjects {
   pageId: string | null
   ticketNumber: number | null
@@ -55,7 +56,7 @@ export function subjectsOf(approval: Pick<Approval, 'args' | 'summary'>): Subjec
     for (const [key, value] of Object.entries(approval.args)) {
       if (typeof value === 'string') named[key] = value
     }
-  } else {
+  } else if (approval.summary !== null) {
     const list = approval.summary.split(': ').slice(1).join(': ')
     for (const part of list.split(', ')) {
       const at = part.indexOf('=')
@@ -75,9 +76,10 @@ export function shownArgs(approval: Approval): Record<string, unknown> | null {
 }
 
 /** An external tool's own name on a release card: the server names it in the summary
- *  ("<server> · <tool>"). Null for the catalog's tools. */
+ *  ("<server> · <tool>"), for the person asked. Null for the catalog's tools, and for
+ *  anyone else (the card's title then names the tool as the run does). */
 export function externalToolOf(approval: Pick<Approval, 'external' | 'summary'>): string | null {
-  if (!approval.external) return null
+  if (!approval.external || approval.summary === null) return null
   const at = approval.summary.indexOf(' · ')
   return at >= 0 ? approval.summary.slice(at + 3) : approval.summary
 }

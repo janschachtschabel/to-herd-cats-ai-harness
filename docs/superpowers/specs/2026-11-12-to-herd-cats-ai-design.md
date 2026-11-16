@@ -246,6 +246,8 @@ Freigaben gehen an diese Person. Fehlt sie, gehen sie an die verantwortliche Per
 
 *Geändert nach Review M8 [Claude, 15.11.2026]: Auch der Folgelauf, den ein endender Lauf in ihrer Direktnachricht für eine Nachricht aus seiner Wartezeit einreiht, ist an der Zeile des Gesprächs mit „Neu beginnen“ geordnet: Er wird mit Hinweis abgebrochen, oder „Neu beginnen“ weicht mit 409 `conflict.retry` und bricht ihn beim nächsten Drücken ab. Keiner endet stumm. Review M8 5, Befund L4.*
 
+*Geändert nach Review M8 [Claude, 15.11.2026]: Eine Freigabekarte im Gespräch nennt nur das Werkzeug. Ihre Zusammenfassung (nur für die gefragte Person, wie die Angaben des Aufrufs) nennt nur, was das System aufgelöst hat: den Schlüssel eines Tickets, das der Lauf an seinem Ort findet, den Status mit dem Namen, den sein Bereich führt, die IDs der gebundenen Objekte; nie einen Text, den das Modell gewählt hat, auch ohne die persönliche Marke. In der Direktnachricht allein mit ihr ist die Karte eines markierten Laufs persönlich markiert. Review M8 5, Befund L1.*
+
 *Geändert nach Review M8 [Claude, 15.11.2026]: Was die externen Werkzeuge eines Agenten zu jedem Modellaufruf beitragen (Name, Beschreibung, Argumentschema), ist zusammen auf 100.000 Zeichen begrenzt. Die Werkzeuge werden in der Reihenfolge genommen, in der sie zuerst gelistet wurden, jedes, solange die Summe passt; die Auswahl ist bei jedem Schritt, jeder Fortsetzung und beim Wiederholen dieselbe. Die Werkzeugliste des Agenten zeigt, was wegbleibt, und eine Metrik zählt es ohne Namen. Review M8 2, Befund G5.*
 
 ### 5.6 Publikumsregel: Was ein Agent ausgeben darf [Claude, siehe F3]
