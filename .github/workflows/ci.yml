@@ -66,16 +66,13 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends postgresql-client-17
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
-      - name: restic 0.18.1 (the image's; tests/test_backup_offsite_restic.py runs it for real)
+      # The image's own restic: the Dockerfile's stage restic-bin (built from source,
+      # deploy/restic), exported as a file; tests/test_backup_offsite_restic.py runs it.
+      - name: restic 0.19.1 (the image's build; tests/test_backup_offsite_restic.py runs it for real)
         working-directory: .
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/restic.bz2" \
-            https://github.com/restic/restic/releases/download/v0.18.1/restic_0.18.1_linux_amd64.bz2
-          echo "680838f19d67151adba227e1570cdd8af12c19cf1735783ed1ba928bc41f363d  $RUNNER_TEMP/restic.bz2" \
-            | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/restic-bin"
-          bunzip2 -c "$RUNNER_TEMP/restic.bz2" > "$RUNNER_TEMP/restic-bin/restic"
-          chmod 0755 "$RUNNER_TEMP/restic-bin/restic"
+          docker build --target restic-bin --output "type=local,dest=$RUNNER_TEMP/restic-bin" .
+          "$RUNNER_TEMP/restic-bin/restic" version
           echo "$RUNNER_TEMP/restic-bin" >> "$GITHUB_PATH"
           echo "HERD_TEST_RESTIC_REQUIRED=1" >> "$GITHUB_ENV"
       - run: uv sync --locked
