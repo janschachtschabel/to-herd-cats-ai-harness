@@ -10,6 +10,12 @@ app runs as user 10001 with a read-only filesystem (writable: `/tmp` and the vol
 published; port 9090 (`/health`, `/ready`, `/metrics`, the collab process's internal
 API) stays inside the compose network.
 
+For a Hostinger VPS (Docker Manager, "Compose from URL") or any server with a Traefik on
+80/443, the simpler variant is the root [`docker-compose.yml`](../../docker-compose.yml):
+the published image, every secret generated on the first start, HTTPS through Traefik
+labels, no published port ([`docs/HOSTINGER.md`](../../docs/HOSTINGER.md)). This
+directory stays the build and reference variant.
+
 Live editing needs `HERD_INTERNAL_TOKEN` (at least 32 characters, `openssl rand -hex
 32`). Set `HERD_PUBLIC_URL` to the address browsers use (e.g. `https://wiki.example`
 behind a reverse proxy); empty, a WebSocket's Origin must match the host it was sent

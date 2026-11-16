@@ -163,7 +163,8 @@ Verwaltung, Worker, Metriken) und der Aufgaben: [`docs/AGENTEN.md`](docs/AGENTEN
 MCP (Token, `/mcp` mit Claude Code und Codex, externe Agenten, Server, Konnektoren,
 Katalog, Betrieb): [`docs/MCP.md`](docs/MCP.md), von Sicherung und Wiederherstellung:
 [`docs/SICHERUNG.md`](docs/SICHERUNG.md), der Anmeldung (Passwort, OIDC, Freigabe):
-[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md), die Sicherheitsprüfung:
+[`docs/ANMELDUNG.md`](docs/ANMELDUNG.md), die Installation auf einem Hostinger-VPS:
+[`docs/HOSTINGER.md`](docs/HOSTINGER.md), die Sicherheitsprüfung:
 [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 
 Weitere Dokumente: [Steckbrief](docs/STECKBRIEF.md) (Betriebsdaten, gemessene
@@ -172,6 +173,17 @@ Ressourcen), [Demo M1](docs/demo/m1.md), [Demo M2](docs/demo/m2.md),
 [Demo M7](docs/demo/m7.md), [Demo M8](docs/demo/m8.md), [Demo M9](docs/demo/m9.md),
 [Compose-Referenz](deploy/compose/README.md),
 [Helm-Chart](deploy/helm/to-herd-cats-ai/values.yaml).
+
+## Installation auf einem Hostinger-VPS (der einfachste Weg)
+
+Ohne Kommandozeile, ohne eigenen Proxy: Im Hostinger Docker Manager **Compose from URL**
+mit `https://github.com/janschachtschabel/to-herd-cats-ai-harness` bereitstellen, dann
+in der `.env` `DOMAIN`, `ADMIN_EMAIL` und `ADMIN_PASSWORD` eintragen und erneut
+bereitstellen. Die [`docker-compose.yml`](docker-compose.yml) im Hauptordner nimmt das
+fertige Image von GHCR, erzeugt alle Geheimnisse beim ersten Start selbst und bekommt
+HTTPS von Hostingers Traefik. Schritt für Schritt, die Felder der `.env`, DNS, Updates,
+Sicherungen und Diagnose: [`docs/HOSTINGER.md`](docs/HOSTINGER.md). Derselbe Stack läuft
+auf jedem Server mit einem Traefik auf 80/443 (`docker compose up -d` im Hauptordner).
 
 ## Schnellstart mit Docker Compose
 
@@ -492,6 +504,14 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
+- **Geheimnisse als Dateien:** Ebenso lesen `HERD_SECRET_KEY_FILE`,
+  `HERD_INTERNAL_TOKEN_FILE` und `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` den Wert aus einer
+  Datei (ein Zeilenende am Schluss zählt nicht). Wert und Datei zugleich, eine
+  unlesbare oder (bei Schlüssel und Token) leere Datei sind Startfehler, die die
+  Variable nennen, nie den Inhalt; eine leere Passwortdatei heißt „keine erste
+  Person“. Die Regeln des Werts (Mindestlänge) gelten auch für die Datei. Der
+  Hostinger-Stack ([`docs/HOSTINGER.md`](docs/HOSTINGER.md)) übergibt so jedes
+  Geheimnis.
 - **KI-Schlüssel** (M5): Verbindungen speichern den API-Schlüssel nie im Klartext,
   sondern als Verweis `env:HERD_AI_<NAME>` (Umgebungsvariable mit diesem Präfix; die
   eigenen Einstellungen mit dem Präfix wie `HERD_AI_EGRESS_PROXY` sind ausgenommen) oder
