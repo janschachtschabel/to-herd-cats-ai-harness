@@ -5,137 +5,29 @@
 // HERD_COLLAB_INTEGRATION=1 (`npm run test:integration`).
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn, execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { createServer } from "node:net";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { yDocToMarkdown } from "../markdown.mjs";
 import { client, synced, type, until } from "./helpers.mjs";
+import { INTERNAL_TOKEN, PASSWORD, enabled, startBackend } from "./integration-backend.mjs";
 
-const enabled = process.env.HERD_COLLAB_INTEGRATION === "1";
-const ADMIN_URL =
-  process.env.HERD_IT_ADMIN_URL ?? "postgresql://herd:herd@localhost:5433/herd_test";
-const BACKEND = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "backend");
-const PASSWORD = "integration-pw-123";
-const database = `herd_collab_it_${process.pid}`;
-let backend;
-let dataDir;
-let base;
-let wsBase;
+let it;
+let api;
+let login;
+let open;
+let content;
 let collabBase;
 let internalBase;
-const INTERNAL_TOKEN = "it-".padEnd(48, "x");
 const clients = [];
-
-function freePort() {
-  return new Promise((resolve) => {
-    const server = createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-function psql(sql) {
-  execFileSync("psql", [ADMIN_URL, "-qc", sql], { stdio: "ignore" });
-}
-
-async function api(path, { method = "GET", cookie, body } = {}) {
-  const response = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "herd",
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await response.text();
-  return {
-    status: response.status,
-    body: text ? JSON.parse(text) : null,
-    headers: response.headers,
-  };
-}
-
-async function login(email) {
-  const r = await api("/api/auth/login", { method: "POST", body: { email, password: PASSWORD } });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  const cookie = r.headers.get("set-cookie").split(";")[0];
-  return { cookie, user: r.body.user };
-}
-
-function open(cookie, pageId, generation) {
-  const c = client(`${wsBase}/collab/${pageId}?generation=${generation}`, {
-    cookie,
-    origin: base,
-    name: `page:${pageId}`,
-  });
-  clients.push(c);
-  return c;
-}
-
-async function content(cookie, pageId) {
-  return (await api(`/api/pages/${pageId}`, { cookie })).body;
-}
 
 before(async () => {
   if (!enabled) return;
-  psql(`DROP DATABASE IF EXISTS ${database}`);
-  psql(`CREATE DATABASE ${database}`);
-  dataDir = mkdtempSync(join(tmpdir(), "herd-collab-it-"));
-  const [publicPort, internalPort, collabPort] = [
-    await freePort(),
-    await freePort(),
-    await freePort(),
-  ];
-  const url = new URL(ADMIN_URL);
-  base = `http://127.0.0.1:${publicPort}`;
-  wsBase = `ws://127.0.0.1:${publicPort}`;
-  collabBase = `127.0.0.1:${collabPort}`;
-  internalBase = `http://127.0.0.1:${internalPort}`;
-  backend = spawn("uv", ["run", "--no-sync", "python", "-m", "app.launch"], {
-    cwd: BACKEND,
-    stdio: process.env.HERD_IT_VERBOSE ? "inherit" : "ignore",
-    env: {
-      ...process.env,
-      HERD_ROLE: "all",
-      HERD_ENVIRONMENT: "development",
-      HERD_DATABASE_URL: `postgresql+asyncpg://${url.username}:${url.password}@${url.host}/${database}`,
-      HERD_PUBLIC_PORT: String(publicPort),
-      HERD_INTERNAL_PORT: String(internalPort),
-      HERD_COLLAB_PORT: String(collabPort),
-      HERD_COLLAB_URL: `ws://127.0.0.1:${collabPort}`,
-      HERD_INTERNAL_TOKEN: INTERNAL_TOKEN,
-      HERD_BOOTSTRAP_ADMIN_EMAIL: "owner@it.example",
-      HERD_BOOTSTRAP_ADMIN_PASSWORD: PASSWORD,
-      HERD_DATA_DIR: dataDir,
-      HERD_LOG_FORMAT: "text",
-    },
-  });
-  await until(async () => {
-    try {
-      const ready = await fetch(`http://127.0.0.1:${internalPort}/ready`);
-      const live = await fetch(`http://127.0.0.1:${collabPort}/health`);
-      return ready.status === 200 && live.status === 200;
-    } catch {
-      return false;
-    }
-  }, 60_000);
+  it = await startBackend();
+  ({ api, login, open, content, collabBase, internalBase } = it);
 });
 
 after(async () => {
   if (!enabled) return;
   for (const c of clients) c.destroy();
-  if (backend) {
-    backend.kill("SIGTERM");
-    await new Promise((resolve) => backend.once("exit", resolve));
-  }
-  psql(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
-  rmSync(dataDir, { recursive: true, force: true });
+  await it?.stop();
 });
 
 test(

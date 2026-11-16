@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test --test-concurrency=1 \"test/*.test.mjs\"",
-    "test:integration": "HERD_COLLAB_INTEGRATION=1 node --test test/integration.test.mjs",
+    "test:integration": "HERD_COLLAB_INTEGRATION=1 node --test test/integration.test.mjs test/integration-instances.test.mjs",
     "lint": "oxlint --deny-warnings . && prettier --check .",
     "format": "prettier --write ."
   },
