@@ -14,7 +14,8 @@ import {
   stubProvider,
 } from "./oidc-helpers.mjs";
 
-const DORA = { email: "dora@e2e.example", password: "e2e-password-789", name: "Dora" };
+// Her own address: ai-agents.spec.mjs creates dora@e2e.example with another password.
+const OLGA = { email: "olga@e2e.example", password: "e2e-password-789", name: "Olga" };
 
 /** A browser context that accepts the stub's certificate (the run's own). */
 const newContext = (browser) => browser.newContext({ ignoreHTTPSErrors: true });
@@ -35,15 +36,15 @@ test("a person links an account in the profile and then signs in with it", async
 }) => {
   const admin = await adminContext(browser);
   await stubProvider(admin, "firma", "Firmen-Login");
-  if (!(await userNamed(admin, DORA.email))) {
-    await call(admin, "POST", "/api/admin/users", DORA);
+  if (!(await userNamed(admin, OLGA.email))) {
+    await call(admin, "POST", "/api/admin/users", OLGA);
   }
 
-  const dora = await newContext(browser);
-  await signIn(dora, DORA);
+  const olga = await newContext(browser);
+  await signIn(olga, OLGA);
   // The address at the provider need not match: linking from the profile is explicit.
-  await scriptOidc({ identity: { sub: "dora-at-firma", email: "d.privat@elsewhere.example" } });
-  const profile = await dora.newPage();
+  await scriptOidc({ identity: { sub: "olga-at-firma", email: "o.privat@elsewhere.example" } });
+  const profile = await olga.newPage();
   await profile.goto("/profile");
   await profile.getByRole("button", { name: "Mit Firmen-Login verknüpfen" }).click();
   await expect(profile).toHaveURL(/\/profile\?linked=firma$/);
@@ -52,15 +53,15 @@ test("a person links an account in the profile and then signs in with it", async
     profile.getByRole("button", { name: "Verknüpfung mit Firmen-Login lösen" }),
   ).toBeVisible();
 
-  // A browser without a session: the button on the sign-in page brings Dora in.
+  // A browser without a session: the button on the sign-in page brings Olga in.
   const fresh = await newContext(browser);
   const page = await fresh.newPage();
   await page.goto("/login");
   await page.getByRole("link", { name: "Anmelden mit Firmen-Login" }).click();
   await expect(page).toHaveURL(/\/spaces/);
   const me = await call(fresh, "GET", "/api/auth/me");
-  expect(me.user.email).toBe(DORA.email);
-  await Promise.all([admin.close(), dora.close(), fresh.close()]);
+  expect(me.user.email).toBe(OLGA.email);
+  await Promise.all([admin.close(), olga.close(), fresh.close()]);
 });
 
 test("someone from an allowed domain registers through Google, waits for approval and starts without AI", async ({
