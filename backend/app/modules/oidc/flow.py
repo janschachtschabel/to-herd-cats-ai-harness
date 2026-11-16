@@ -17,7 +17,9 @@ PKCE (S256), `state` and `nonce`, bound to the browser.
   unknown `kid` fetches the JWKS again, at most once a minute across every node) and
   the admission carried out (`accounts.py`). The answer is a page of the app with a
   fixed code, never the provider's words. A self-registration opens no session: the
-  account awaits an admin's approval (`/login?error=oidc.account_pending`).
+  account awaits an admin's approval (`/login?error=oidc.account_pending`). A person
+  with TOTP gets no session either, but a sign-in waiting for the second factor
+  (`/login?second_factor=totp`, `totp/sign_in.py`).
 
 Start and callback count per client address (`HERD_OIDC_RATE_PER_MINUTE`). Nothing of
 the claims, the code or the tokens is logged; the metric counts outcomes by code.
@@ -50,6 +52,8 @@ from app.modules.oidc.models import OidcFlow, OidcProvider
 from app.modules.oidc.providers import extra_parameters
 from app.modules.oidc.repository import FlowRepository, IdentityRepository, ProviderRepository
 from app.modules.orgs.repository import OrganizationRepository
+from app.modules.totp.challenges import open_challenge
+from app.modules.totp.repository import TotpRepository
 
 FLOW_MINUTES = 10
 BINDING_COOKIE = "herd_oidc"
@@ -95,6 +99,8 @@ class Finished:
     outcome: str  # the metric's and the log's word
     session_token: str | None = None
     user_id: uuid.UUID | None = None
+    # A person with TOTP: no session yet, a sign-in waiting for the second factor.
+    challenge_token: str | None = None
 
 
 class FlowService:
@@ -237,9 +243,14 @@ class FlowService:
             count_outcome(admitted.outcome)
             location = f"{LOGIN_PAGE}?{urlencode({'error': PENDING})}"
             return Finished(location, admitted.outcome, user_id=admitted.user.id)
-        token = await AuthService(self.session, self.settings).open_session(admitted.user, now)
         count_outcome(admitted.outcome)
-        return Finished("/", admitted.outcome, token, admitted.user.id)
+        user = admitted.user
+        if await TotpRepository(self.session, user.org_id).active(user.id) is not None:
+            challenge = await open_challenge(self.session, user, "oidc")
+            location = f"{LOGIN_PAGE}?{urlencode({'second_factor': 'totp'})}"
+            return Finished(location, admitted.outcome, None, user.id, challenge.token)
+        token = await AuthService(self.session, self.settings).open_session(user, now)
+        return Finished("/", admitted.outcome, token, user.id)
 
     async def _link(self, provider: OidcProvider, session_id: uuid.UUID, subject: str) -> Finished:
         auth = await AuthService(self.session, self.settings).resolve_session(session_id)

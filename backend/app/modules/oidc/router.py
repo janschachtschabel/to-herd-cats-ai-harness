@@ -29,6 +29,7 @@ from app.modules.oidc.protocol import ProviderFailure
 from app.modules.oidc.repository import ProviderRepository
 from app.modules.oidc.schemas import IdentityOut, LinkStartOut, PublicProviderOut
 from app.modules.orgs.repository import OrganizationRepository
+from app.modules.totp.cookies import set_challenge_cookie
 
 router = APIRouter(tags=["oidc"])
 _FLOW = COOKIE_PATH.removeprefix("/api")
@@ -124,6 +125,8 @@ async def callback(
     if finished.session_token is not None:
         await AuthService(session, settings).end_replaced(session_token(request, settings))
         set_session_cookie(response, request, settings, finished.session_token)
+    if finished.challenge_token is not None:
+        set_challenge_cookie(response, request, settings, finished.challenge_token)
     return response
 
 
