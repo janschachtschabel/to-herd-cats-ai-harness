@@ -314,6 +314,16 @@ jobs:
         env:
           SMOKE_NODES: "1"
           SMOKE_SKIP_BUILD: "1"
+      # The Hostinger stack (root docker-compose.yml, docs/HOSTINGER.md) with the image
+      # built above: `docker compose config -q` without .env and with .env.example, a
+      # first deploy with that empty .env, a refused https:// DOMAIN, then DOMAIN and the
+      # one-time admin through a Traefik in the host's network (secrets unchanged).
+      - name: Hostinger stack (config, empty first deploy, values, Traefik)
+        run: |
+          docker tag to-herd-cats-ai:local ghcr.io/janschachtschabel/to-herd-cats-ai:ci
+          bash deploy/scripts/hostinger-smoke.sh
+        env:
+          HOSTINGER_SMOKE_TAG: ci
       - name: Trivy (HIGH and CRITICAL with a fix available fail the job)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
