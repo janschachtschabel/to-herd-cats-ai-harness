@@ -65,6 +65,7 @@ async def test_a_grant_works_only_for_its_page_and_generation(
         "generation": 0,
         "revoked_grants": [grant],
         "ended_grants": [],
+        "maintenance": False,
     }
     # A Markdown save ends the generation: the grant of the old one opens nothing new.
     fresh = await get_page(wiki.editor, page)
@@ -102,6 +103,7 @@ async def test_an_unknown_grant_ends_no_generation(
         "generation": 1,
         "revoked_grants": sorted(strangers),
         "ended_grants": [],
+        "maintenance": False,
     }
     # Without any grant of the page either.
     r = await check(collab, page, [], unsaved=strangers, generation=1)
@@ -187,6 +189,7 @@ async def test_logout_keeps_the_grant_for_saving_within_the_hour(
         "generation": 0,
         "revoked_grants": [],
         "ended_grants": [anna],
+        "maintenance": False,
     }
     assert (await put_live(collab, page, [anna], content_md="Annas Satz")).status_code == 200
     versions = await wiki.editor2.get(f"/api/pages/{page['id']}/versions")
@@ -209,6 +212,7 @@ async def test_logout_keeps_the_grant_for_saving_within_the_hour(
         "generation": 1,
         "revoked_grants": [anna],
         "ended_grants": [],
+        "maintenance": False,
     }
 
 

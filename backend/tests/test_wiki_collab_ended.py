@@ -42,6 +42,7 @@ async def test_logout_with_unsaved_edits_is_saved_and_the_generation_goes_on(
         "generation": 0,
         "revoked_grants": [],
         "ended_grants": [anna],
+        "maintenance": False,
     }
     r = await put_live(collab, page, [anna, ben], content_md="Start\n\nAnnas Satz und Bens Text")
     assert r.status_code == 200, r.text
@@ -86,6 +87,7 @@ async def test_an_ended_session_without_the_right_is_revoked(
         "generation": 1,
         "revoked_grants": [anna],
         "ended_grants": [],
+        "maintenance": False,
     }
 
 

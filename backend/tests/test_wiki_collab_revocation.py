@@ -88,6 +88,7 @@ async def test_deactivated_user_is_revoked_and_a_logout_has_ended(
         "generation": 0,
         "revoked_grants": [editor2],  # the deactivation deleted the sessions
         "ended_grants": [editor],  # a logout is no revocation (review M2 R2)
+        "maintenance": False,
     }
     expect_error(await put_live(collab, page, [moderator, editor2]), 403, "collab.editors_revoked")
     assert (await put_live(collab, page, [moderator, editor])).status_code == 200
@@ -118,6 +119,7 @@ async def test_unsaved_edits_of_a_revoked_editor_end_the_generation(
         "generation": 0,
         "revoked_grants": [editor2],
         "ended_grants": [],
+        "maintenance": False,
     }
     # With unsaved edits: the generation ends, once.
     r = await check(collab, page, [editor, editor2], unsaved=[editor2])
@@ -181,6 +183,7 @@ async def test_unsaved_edits_end_the_generation_when_no_session_is_valid(
         "generation": 1,
         "revoked_grants": sorted([editor, editor2]),
         "ended_grants": [],
+        "maintenance": False,
     }
     after = await get_page(wiki.moderator, page)
     assert (after["content_md"], after["collab_generation"]) == ("a", 1)
