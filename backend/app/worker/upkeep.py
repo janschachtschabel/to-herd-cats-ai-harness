@@ -10,7 +10,12 @@ It also marks backups whose process died (`backup_run` rows still `running` whil
 backup holds the backup lock, plan M9 task 8) `interrupted`, so a backup killed by its
 job's time limit does not stay `running`.
 
-`DueLoop.cleanup_if_due` runs it (`run_upkeep`), one transaction per batch and table."""
+`DueLoop.cleanup_if_due` runs it (`run_upkeep`), one transaction per batch and table.
+The expiry is judged at the wall time (`wall`), the time the modules write and check
+those columns against (a login is valid while `expires_at > utcnow()`), never at the
+clock that schedules, which runs ahead in the browser tests (`tests/support/
+e2e_clock.py`) and would end logins still valid; the backups at the clock's `now`,
+which their runs are written with (`app/ops`)."""
 
 from datetime import datetime
 
@@ -36,14 +41,14 @@ async def remove_expired(session: AsyncSession, table: str, now: datetime, limit
     return await delete_older(session, target, target.c[rule.since], now - rule.after, limit)
 
 
-async def run_upkeep(database: Database, now: datetime, limit: int) -> int:
-    """Every expiring table, batch by batch (one transaction each), then the dead
-    backups; how many rows were removed."""
+async def run_upkeep(database: Database, *, wall: datetime, now: datetime, limit: int) -> int:
+    """Every expiring table at `wall`, batch by batch (one transaction each), then the
+    dead backups at `now`; how many rows were removed."""
     removed = 0
     for table in EXPIRING:
         while True:
             async with database.session_factory() as session, session.begin():
-                count = await remove_expired(session, table, now, limit)
+                count = await remove_expired(session, table, wall, limit)
             removed += count
             if count < limit:
                 break

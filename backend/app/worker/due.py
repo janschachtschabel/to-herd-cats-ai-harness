@@ -32,7 +32,8 @@ out (`upkeep.py`: sessions, flows, grants, rate limits; and backups whose proces
 died). The periods are the
 retention catalogue's (`core/retention.py`).
 
-The time comes from a `Clock` (`app.core.clock`); tests set theirs. A task of its own
+The time comes from a `Clock` (`app.core.clock`); tests set theirs. Only the expiry
+upkeep judges at the wall time, as the modules that write those rows do. A task of its own
 reads the gauges from the database every METRICS_SECONDS (`automations/metrics.py`:
 due automations, the lag of the oldest due term, paused ones by reason, spaces the
 review has still to go through today). Up to two database connections at a time.
@@ -51,6 +52,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.db import Database
+from app.core.models_base import utcnow
 from app.core.retention import upkeep_after
 from app.core.storage import get_storage
 from app.core.storage_tombstones import remove_buried
@@ -206,7 +208,9 @@ class DueLoop:
         self._last_cleanup = now
         removed = await self.cleanup()
         await self.remove_buried_files()
-        await run_upkeep(self.database, self.clock.now(), self.cleanup_batch)
+        await run_upkeep(  # expiry at the wall time (`upkeep.py`)
+            self.database, wall=utcnow(), now=self.clock.now(), limit=self.cleanup_batch
+        )
         return removed
 
     async def cleanup(self) -> tuple[int, int, int]:

@@ -1,7 +1,8 @@
 """The due loop's expiry upkeep (plan M9 task 8): login sessions, OAuth and OIDC flows,
 collab grants, rate-limit hits and AI rate windows go once their time column is older
 than the catalogue's period, across organisations, in bounded batches; younger rows
-stay. Time comes from a `SettableClock`."""
+stay. `remove_expired` is given its time; the due loop gives it the wall time, never
+its `SettableClock`."""
 
 import secrets
 import uuid
@@ -194,17 +195,22 @@ async def test_rows_past_their_period_go_and_younger_ones_stay(
 
 
 async def test_the_due_loop_runs_the_upkeep_with_its_cleanup(real_db: RealDb) -> None:
+    """By the wall time that wrote and checks the rows, never the loop's clock: a login
+    still valid stays while the clock that schedules runs eight days ahead (the browser
+    tests' clock, `tests/support/e2e_clock.py`)."""
+    now = utcnow()
     async with real_db.database.session_factory() as session:
         owner = await session.scalar(select(User).where(User.email == real_db.owner_email))
         assert owner is not None
         ended = upkeep_after("user_session")
         session.add_all(
             UserSession(org_id=owner.org_id, user_id=owner.id, token_hash=_hex(), expires_at=at)
-            for at in [NOW - ended - timedelta(minutes=1)] * 3 + [NOW]
+            for at in [now - ended - timedelta(minutes=1)] * 3 + [now + timedelta(days=7)]
         )
-        session.add(RateLimitHit(key="test:old", hit_at=NOW - timedelta(minutes=5)))
+        session.add(RateLimitHit(key="test:old", hit_at=now - timedelta(minutes=5)))
         await session.commit()
-    loop = DueLoop(real_db.database, clock=SettableClock(NOW), cleanup_batch=2)
+    ahead = SettableClock(now + timedelta(days=8))
+    loop = DueLoop(real_db.database, clock=ahead, cleanup_batch=2)
     assert await loop.cleanup_if_due() is not None
     async with real_db.database.session_factory() as session:
         sessions = await session.scalar(select(func.count()).select_from(UserSession))
