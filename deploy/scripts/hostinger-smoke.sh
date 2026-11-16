@@ -6,10 +6,15 @@
 #  1. `docker compose config -q` without .env and with .env.example as .env.
 #  2. First deploy with that empty .env: init ends with 0, db, app and backup run, no
 #     port is published.
-#  3. DOMAIN with https:// is refused by init with a clear message.
-#  4. DOMAIN and the one-time admin set, `up -d` again: the secrets stay the same, a
-#     Traefik (docker provider, host network, the labels' entrypoint and resolver names)
-#     routes https://DOMAIN to the app, the admin signs in, the cookie is Secure.
+#  3. DOMAIN with https:// is refused by init with a clear message, and the stack stays
+#     stopped (depends_on init restart: true stops db, app and backup first;
+#     docs/HOSTINGER.md says so).
+#  4. DOMAIN fixed and the one-time admin set, `up -d` again: everything runs again with
+#     the same secrets, a Traefik (docker provider, host network, the labels' entrypoint
+#     and resolver names) routes https://DOMAIN to the app, the admin signs in with a
+#     __Host- cookie that is Secure, the live events (SSE) and the live editing's
+#     WebSocket (101 for the right Origin, 403 for a foreign one) pass Traefik, and the
+#     backup service is healthy and makes a good backup into its volume.
 #  5. ADMIN_PASSWORD cleared, `up -d`: the app restarts (depends_on init restart: true),
 #     its password file is empty, the admin still signs in, the secrets stay the same.
 #
@@ -76,8 +81,29 @@ check_states() {
   fi
 }
 
+# Wait until a service's container reports healthy.
+wait_healthy() {
+  local id
+  for _ in $(seq 1 60); do
+    id="$("${compose[@]}" ps -q "$1" || true)"
+    [[ -n $id && "$(docker inspect -f '{{.State.Health.Status}}' "$id")" == healthy ]] && return 0
+    sleep 2
+  done
+  fail "$1 did not become healthy"
+}
+
+# The status of a WebSocket handshake on the live editing's path with Origin $1.
+collab_handshake() {
+  curl -sk --http1.1 --max-time 5 --resolve "$domain:$port:127.0.0.1" -o /dev/null \
+    -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+    -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+    -H "Origin: $1" \
+    "https://$domain:$port/collab/00000000-0000-4000-8000-000000000000?generation=1" || true
+}
+
 login() {
-  curl -sk --resolve "$domain:$port:127.0.0.1" -o /dev/null -D "$work/headers" -w '%{http_code}' \
+  curl -sk --resolve "$domain:$port:127.0.0.1" -o /dev/null -D "$work/headers" -c "$work/jar" \
+    -w '%{http_code}' \
     -X POST "https://$domain:$port/api/auth/login" \
     -H 'Content-Type: application/json' -H 'X-Requested-With: herd' \
     --data "{\"email\": \"chef@example.org\", \"password\": \"$admin_password\"}"
@@ -105,7 +131,12 @@ if "${compose[@]}" up -d --pull never >"$work/refused.log" 2>&1; then
 fi
 "${compose[@]}" logs init | grep -q 'DOMAIN must be a bare host name' \
   || fail "init did not explain the DOMAIN"
-echo "DOMAIN with https:// refused with a clear message"
+states="$("${compose[@]}" ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}')"
+grep -qx 'init exited 2' <<<"$states" || fail "init did not end with 2: $states"
+if grep -qE '^(db|app|backup) running' <<<"$states"; then
+  fail "a service still runs after the refusal; docs/HOSTINGER.md says the stack stops: $states"
+fi
+echo "DOMAIN with https:// refused with a clear message; the stack stays stopped"
 
 # 4. DOMAIN and the one-time admin, then Traefik in front.
 admin_password="$(openssl rand -hex 16)"
@@ -117,6 +148,7 @@ before="$(started)"
 wait_app "$before"
 check_states
 [[ "$(secrets)" == "$first_secrets" ]] || fail "the secrets changed on the second deploy"
+echo "the value fixed: everything runs again with the same secrets"
 
 # Hostinger's Traefik: host network, docker provider, exposedbydefault=false, entrypoints
 # web and websecure, resolver letsencrypt (here without a reachable CA: default cert).
@@ -137,8 +169,31 @@ done
 curl -sk --resolve "$domain:$port:127.0.0.1" "https://$domain:$port/spaces" | grep -q 'id="root"' \
   || fail "the SPA is not served through Traefik"
 [[ "$(login)" == 200 ]] || fail "the one-time admin cannot sign in"
-grep -qi '^set-cookie:.*secure' "$work/headers" || fail "the session cookie is not Secure"
-echo "second deploy ok: same secrets, https://$domain through Traefik, admin signs in"
+grep -i '^set-cookie: __Host-herd_session=' "$work/headers" | grep -qiE ';[[:space:]]*secure' \
+  || fail "the session cookie is not a Secure __Host- cookie: $(grep -i '^set-cookie' "$work/headers" | cut -d= -f1)"
+echo "second deploy ok: https://$domain through Traefik, admin signs in (__Host-, Secure)"
+
+# The live events: an SSE stream through Traefik (curl ends it after 3 s).
+curl -sk --resolve "$domain:$port:127.0.0.1" --max-time 3 -b "$work/jar" -o /dev/null \
+  -D "$work/sse" "https://$domain:$port/api/stream" || true
+grep -qi '^content-type: text/event-stream' "$work/sse" \
+  || fail "no event stream through Traefik: $(head -1 "$work/sse")"
+# The live editing: the relay's WebSocket handshake, by Origin.
+code="$(collab_handshake "https://$domain")"
+[[ $code == 101 ]] || fail "the collab WebSocket with the right Origin answered $code"
+code="$(collab_handshake "https://elsewhere.example.net")"
+[[ $code == 403 ]] || fail "the collab WebSocket with a foreign Origin answered $code"
+echo "live events (SSE) and live editing (WebSocket 101/403) pass Traefik"
+
+# The backup service: healthy, and a backup now lands in its volume.
+wait_healthy backup
+made="$("${compose[@]}" exec -T backup python -m app.ops backup run | tr -d '\r' | tail -1)"
+[[ $made == *" offsite=off" ]] || fail "backup run printed: $made"
+"${compose[@]}" exec -T backup python -m app.ops backup list | grep -q $'\tok\t' \
+  || fail "backup list shows no good run"
+"${compose[@]}" exec -T backup sh -c 'ls /backups/herd-*.tar /backups/herd-*.manifest.json' \
+  >/dev/null || fail "no archive with its manifest in the volume"
+echo "backup ok: healthy, a good backup with its manifest in the volume"
 
 # 5. The one-time password cleared: the app restarts, nothing is left of it.
 sed -i 's|^ADMIN_PASSWORD=.*$|ADMIN_PASSWORD=|' "$work/.env"
