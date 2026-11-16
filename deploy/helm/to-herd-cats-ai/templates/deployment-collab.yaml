@@ -43,21 +43,8 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: HERD_ROLE
-              value: collab
-            - name: HERD_COLLAB_PORT
-              value: "1234"
-            # The API's internal port (/internal/collab/*), guarded by the token.
-            - name: HERD_COLLAB_API_URL
-              value: {{ printf "http://%s-internal:9090" (include "herd.fullname" .) | quote }}
-            {{- include "herd.internalTokenEnv" . | nindent 12 }}
-            {{- if include "herd.publicUrl" . }}
-            {{- include "herd.publicUrlEnv" . | nindent 12 }}
-            {{- end }}
-            {{- range $name, $value := .Values.collab.env }}
-            - name: {{ $name }}
-              value: {{ $value | quote }}
-            {{- end }}
+            {{- $own := include "herd.collabOwnEnv" . }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.collab.env "where" "collab.env") | nindent 12 }}
           ports:
             - name: collab
               containerPort: 1234

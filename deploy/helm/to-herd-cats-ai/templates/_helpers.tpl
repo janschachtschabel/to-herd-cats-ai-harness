@@ -105,7 +105,29 @@ seccompProfile:
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ . | quote }}
 {{- end }}
-{{- range $name, $value := $root.Values.api.env }}
+{{- end -}}
+
+{{/* A container's environment: the chart's own entries (`own`, a rendered list), then
+the values' extra map (`extra`, named `where`). The render fails for an extra name that
+names a secret (PASSWORD, SECRET, TOKEN, EGRESS_PROXY, OFFSITE) or that the chart sets
+itself, in any case (the app reads its settings case-insensitively, and the last of two
+entries would win): secrets come from Secrets, the chart's settings from its values. */}}
+{{- define "herd.withExtraEnv" -}}
+{{- $taken := dict -}}
+{{- range regexFindAll "(?m)^- name: \\S+" .own -1 }}
+{{- $_ := set $taken (upper (trimPrefix "- name: " .)) true -}}
+{{- end }}
+{{- range $name, $value := .extra }}
+{{- if regexMatch "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE" (upper $name) }}
+{{- fail (printf "%s.%s names a secret: it comes from a Secret, never from values" $.where $name) }}
+{{- end }}
+{{- if hasKey $taken (upper $name) }}
+{{- fail (printf "%s.%s is set by the chart itself (or twice): use the chart's value for it" $.where $name) }}
+{{- end }}
+{{- $_ := set $taken (upper $name) true -}}
+{{- end }}
+{{- .own }}
+{{- range $name, $value := .extra }}
 - name: {{ $name }}
   value: {{ $value | quote }}
 {{- end }}
@@ -231,4 +253,51 @@ seccompProfile:
 - name: HERD_MCP_MAX_CALLS_PER_RUN
   value: {{ .Values.mcp.maxCallsPerRun | quote }}
 {{ include "herd.mcpServersEnv" . }}
+{{- end -}}
+
+{{/* The API container's own environment (api.env comes after, herd.withExtraEnv). */}}
+{{- define "herd.apiOwnEnv" -}}
+{{ include "herd.env" (dict "root" . "role" "api") }}
+{{ include "herd.aiApiEnv" . }}
+{{ include "herd.mcpApiEnv" . }}
+{{ include "herd.oidcApiEnv" . }}
+{{- if include "herd.publicUrl" . }}
+{{ include "herd.publicUrlEnv" . }}
+{{- end }}
+{{- if .Values.collab.enabled }}
+# Live editing: /collab/ WebSockets are checked here and relayed to the
+# collab process, which calls back on the internal port with the token.
+{{ include "herd.internalTokenEnv" . }}
+- name: HERD_COLLAB_URL
+  value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
+{{- end }}
+{{- end -}}
+
+{{/* The worker container's own environment (worker.env comes after). */}}
+{{- define "herd.workerOwnEnv" -}}
+{{ include "herd.databaseEnv" (dict "root" . "role" "worker") }}
+{{- with .Values.tracing.otlpEndpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
+{{ include "herd.aiWorkerEnv" . }}
+{{ include "herd.mcpWorkerEnv" . }}
+# The backups' gauges (docs/SICHERUNG.md): HerdBackupTooOld's limit.
+- name: HERD_BACKUP_ALERT_AFTER_HOURS
+  value: {{ .Values.backup.alertAfterHours | quote }}
+{{- end -}}
+
+{{/* The collab container's own environment (collab.env comes after). */}}
+{{- define "herd.collabOwnEnv" -}}
+- name: HERD_ROLE
+  value: collab
+- name: HERD_COLLAB_PORT
+  value: "1234"
+# The API's internal port (/internal/collab/*), guarded by the token.
+- name: HERD_COLLAB_API_URL
+  value: {{ printf "http://%s-internal:9090" (include "herd.fullname" .) | quote }}
+{{ include "herd.internalTokenEnv" . }}
+{{- if include "herd.publicUrl" . }}
+{{ include "herd.publicUrlEnv" . }}
+{{- end }}
 {{- end -}}

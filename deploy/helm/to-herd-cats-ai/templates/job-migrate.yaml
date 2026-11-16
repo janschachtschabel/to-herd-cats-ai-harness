@@ -45,7 +45,8 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "herd.env" (dict "root" . "role" "migrate") | nindent 12 }}
+            {{- $own := include "herd.env" (dict "root" . "role" "migrate") }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.api.env "where" "api.env") | nindent 12 }}
           # No secrets.existingSecret: migrations need only the database.
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}

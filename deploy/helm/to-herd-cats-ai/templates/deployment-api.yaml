@@ -37,20 +37,8 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "herd.env" (dict "root" . "role" "api") | nindent 12 }}
-            {{- include "herd.aiApiEnv" . | nindent 12 }}
-            {{- include "herd.mcpApiEnv" . | nindent 12 }}
-            {{- include "herd.oidcApiEnv" . | nindent 12 }}
-            {{- if include "herd.publicUrl" . }}
-            {{- include "herd.publicUrlEnv" . | nindent 12 }}
-            {{- end }}
-            {{- if .Values.collab.enabled }}
-            # Live editing: /collab/ WebSockets are checked here and relayed to the
-            # collab process, which calls back on the internal port with the token.
-            {{- include "herd.internalTokenEnv" . | nindent 12 }}
-            - name: HERD_COLLAB_URL
-              value: {{ printf "ws://%s-collab:1234" (include "herd.fullname" .) | quote }}
-            {{- end }}
+            {{- $own := include "herd.apiOwnEnv" . }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.api.env "where" "api.env") | nindent 12 }}
           {{- if or .Values.secrets.existingSecret .Values.ai.existingSecret .Values.oidc.existingSecret }}
           envFrom:
             {{- with .Values.secrets.existingSecret }}

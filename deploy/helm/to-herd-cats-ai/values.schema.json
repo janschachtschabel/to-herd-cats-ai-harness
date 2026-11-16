@@ -72,8 +72,8 @@
         "forwardedAllowIps": {"type": "string", "description": "Trusted reverse proxies (HERD_FORWARDED_ALLOW_IPS); required when ingress.enabled"},
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         }
       },
@@ -189,8 +189,8 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         }
       },
@@ -291,8 +291,8 @@
         },
         "env": {
           "type": "object",
-          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE are refused: those come from Secrets)",
-          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE"}},
+          "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "not": {"pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Ee][Gg][Rr][Ee][Ss][Ss]_[Pp][Rr][Oo][Xx][Yy]|[Oo][Ff][Ff][Ss][Ii][Tt][Ee]"}},
           "additionalProperties": {"type": "string"}
         },
         "internalToken": {

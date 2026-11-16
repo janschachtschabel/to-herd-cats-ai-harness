@@ -44,20 +44,8 @@ spec:
           image: {{ include "herd.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "herd.databaseEnv" (dict "root" . "role" "worker") | nindent 12 }}
-            {{- with .Values.tracing.otlpEndpoint }}
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ . | quote }}
-            {{- end }}
-            {{- include "herd.aiWorkerEnv" . | nindent 12 }}
-            {{- include "herd.mcpWorkerEnv" . | nindent 12 }}
-            # The backups' gauges (docs/SICHERUNG.md): HerdBackupTooOld's limit.
-            - name: HERD_BACKUP_ALERT_AFTER_HOURS
-              value: {{ .Values.backup.alertAfterHours | quote }}
-            {{- range $name, $value := .Values.worker.env }}
-            - name: {{ $name }}
-              value: {{ $value | quote }}
-            {{- end }}
+            {{- $own := include "herd.workerOwnEnv" . }}
+            {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.worker.env "where" "worker.env") | nindent 12 }}
           {{- with .Values.ai.existingSecret }}
           # AI keys: HERD_SECRET_KEY(_PREVIOUS), HERD_AI_EGRESS_PROXY, HERD_AI_<NAME>.
           envFrom:

@@ -41,7 +41,7 @@ grep -A4 -- "- name: HERD_INTERNAL_TOKEN" <<<"$collab" | grep -q "name: herd-int
 # carries a value of its own (only valueFrom, envFrom or a file), and no ConfigMap.
 leaks=$(awk '
   /- name: / { name = $NF; next }
-  /^ *value: / && name ~ /(PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE)/ && name !~ /_FILE$/ { print name }
+  /^ *value: / && toupper(name) ~ /(PASSWORD|SECRET|TOKEN|EGRESS_PROXY|OFFSITE)/ && toupper(name) !~ /_FILE$/ { print name }
   { name = "" }' <<<"$out")
 [[ -z $leaks ]] || fail "secrets as values: $leaks"
 grep -q "^kind: ConfigMap" <<<"$out" && fail "a ConfigMap appeared with ci/full-values.yaml"
@@ -49,6 +49,22 @@ grep -q "^kind: Secret" <<<"$out" && fail "the chart makes a Secret although eve
 if render --set api.env.HERD_SECRET_KEY=x >/dev/null; then fail "api.env took HERD_SECRET_KEY"; fi
 if render --set worker.env.HERD_DATABASE_PASSWORD=x >/dev/null; then fail "worker.env took a password"; fi
 if render --set collab.env.HERD_INTERNAL_TOKEN=x >/dev/null; then fail "collab.env took the internal token"; fi
+# In any case (the app reads names case-insensitively), and never a name the chart sets
+# itself: the last of two entries wins (module review M9a, N7).
+if render --set-string api.env.herd_secret_key=x >/dev/null; then fail "api.env took herd_secret_key"; fi
+if out=$(render --set-string 'api.env.HERD_DATABASE_URL=postgresql+asyncpg://herd:pw@db/herd'); then
+  fail "api.env overrode HERD_DATABASE_URL"
+fi
+grep -q "api.env.HERD_DATABASE_URL is set by the chart itself" <<<"$out" || fail "unexpected error: $out"
+if render --set-string api.env.herd_database_url=x >/dev/null; then fail "api.env overrode herd_database_url"; fi
+if render --set-string worker.env.Herd_Role=api >/dev/null; then fail "worker.env overrode HERD_ROLE"; fi
+if render --set-string collab.env.HERD_COLLAB_API_URL=http://x >/dev/null; then
+  fail "collab.env overrode HERD_COLLAB_API_URL"
+fi
+if render --set-string api.env.herd_log_level=x --set-string api.env.HERD_LOG_LEVEL=y >/dev/null; then
+  fail "api.env took one name twice"
+fi
+render --set-string api.env.Herd_Log_Level=DEBUG >/dev/null || fail "api.env refused a name of its own"
 
 # The sign-in providers' egress (oidc.egress): the API pods alone, egress only, nothing
 # without rules.
