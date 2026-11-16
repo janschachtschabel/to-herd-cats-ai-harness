@@ -1,6 +1,6 @@
-# Anmeldung: Passwort und OIDC (Google und andere)
+# Anmeldung: Passwort, zweiter Faktor und OIDC (Google und andere)
 
-Stand M9a (Tasks 4, 5, 5b und 9). Neben der Anmeldung mit E-Mail und Passwort kann sich
+Stand M9a (Tasks 4, 5, 5b und 9) und M9b Task 16 (zweiter Faktor mit TOTP). Neben der Anmeldung mit E-Mail und Passwort kann sich
 eine Person über einen OpenID-Connect-Anbieter (OIDC) anmelden: Google als fertige
 Vorlage, jeder andere Anbieter mit Discovery (Keycloak, Entra ID, Authentik …) als
 „allgemein“. Optional legen sich Personen aus erlaubten Domains dabei selbst ein Konto
@@ -39,9 +39,74 @@ eigenes Passwort im Profil (mit dem alten).
   fehlt das Präfix. **Nach dem Update auf M9 wird jede über https angemeldete Person
   einmal abgemeldet**, weil das alte Cookie ohne Präfix dort nicht mehr zählt
   ([README](../README.md#freigaben-und-updates)).
-- **Zweiter Faktor:** lokale Passwortkonten haben keinen; TOTP kommt in M9b (Task 16)
-  als freiwillige Wahl, auch für Owner und Admins (Jans Antwort J3). Wer MFA für alle
+- **Zweiter Faktor:** freiwillig mit TOTP, auch für Owner und Admins (Jans Antwort J3),
+  siehe [unten](#zweiter-faktor-totp). Niemand muss ihn einrichten; wer MFA für alle
   braucht, lässt die Personen nur über einen Anbieter mit Pflicht-MFA anmelden.
+
+## Zweiter Faktor (TOTP)
+
+Jede Person mit Passwort kann im **Profil → Zwei-Faktor-Anmeldung** einen zweiten Faktor
+einschalten: einen sechsstelligen Code aus einer Authenticator-App (TOTP nach RFC 6238,
+SHA-1, 30 Sekunden; etwa Aegis, FreeOTP, Google Authenticator, 1Password, Bitwarden).
+Er ist freiwillig, auch für Owner und Admins (Jans Antwort J3).
+
+- **Einrichten:** mit dem aktuellen Passwort bestätigen; die App zeigt einmal einen
+  Schlüssel (160 Zufallsbits) als QR-Code und als Text. Der QR-Code entsteht im Browser
+  (keine Anfrage an einen Dritten). Eingeschaltet ist der zweite Faktor erst, wenn ein
+  Code aus der App bestätigt ist; dann zeigt das Profil **einmal zehn
+  Wiederherstellungscodes** (je 120 Zufallsbits, `ABCDEF-GHIJKL-…`), und alle anderen
+  Sitzungen der Person enden (sie wurden ohne zweiten Faktor geöffnet). Der Schlüssel
+  liegt verschlüsselt (`enc:` unter `HERD_SECRET_KEY`) in `user_totp` und wird nie
+  wieder angezeigt, geloggt oder protokolliert; die Wiederherstellungscodes nur als
+  SHA-256.
+- **Anmelden:** nach dem richtigen Passwort öffnet die App noch keine Sitzung. Sie
+  antwortet `202` und merkt sich eine wartende Anmeldung (`sign_in_challenge`, nur der
+  Hash des Zufallswerts aus dem HttpOnly-Cookie `herd_sign_in`, über https
+  `__Host-herd_sign_in`), gültig 5 Minuten und einmal verwendbar. Die Anmeldeseite
+  fragt dann nach dem Code oder einem Wiederherstellungscode
+  (`POST /api/auth/login/second-factor`); erst dann entsteht die Sitzung. Dasselbe gilt
+  nach einer Anmeldung über einen OIDC-Anbieter, wenn die Person TOTP eingeschaltet hat:
+  der Rückruf führt auf `/login?second_factor=totp`.
+- **Gültigkeit eines Codes:** der Code des aktuellen 30-Sekunden-Schritts und je ein
+  Schritt davor und danach (Uhrabweichung, Tippzeit), also höchstens 90 Sekunden. Jeder
+  Schritt gilt nur einmal: Ein Code wird nach seiner Verwendung (auch auf einem anderen
+  Weg) und jeder ältere abgelehnt. Ein Wiederherstellungscode gilt genau einmal.
+- **Raten bremsen:** falsche Codes zählen je Person (`HERD_LOGIN_RATE_LIMIT_PER_MINUTE`,
+  5 je Minute, egal wofür: Anmeldung, Ausschalten, neue Codes, Zugangstoken), jede
+  Anfrage des zweiten Schritts zusätzlich je Client-Adresse wie die Passwort-Anmeldung
+  (`HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE`); nach 5 falschen Codes ist eine wartende
+  Anmeldung beendet (zurück zum Passwort). Antwort dann 429 `auth.too_many_attempts`.
+- **Ausschalten:** im Profil mit einem aktuellen Code oder einem
+  Wiederherstellungscode. **Neue Wiederherstellungscodes** (die alten werden ungültig)
+  mit einem aktuellen Code aus der App.
+- **Gerät verloren:** mit einem Wiederherstellungscode anmelden und TOTP neu
+  einrichten. Ohne Code setzt ein Admin unter **Verwaltung → Personen → „Zwei-Faktor
+  zurücksetzen“** zurück (`POST /api/admin/users/{id}/totp/reset`, `user.manage`; den
+  zweiten Faktor eines Owners nur ein Owner; Audit `user.totp_reset`). Der Admin
+  vergewissert sich vorher, wer fragt, auf demselben Weg wie beim Anlegen des Kontos
+  (persönlich, über einen bekannten Rückrufweg; ASVS V6.4.4). Danach meldet sich die
+  Person nur mit dem Passwort an, bis sie TOTP neu einrichtet; laufende Sitzungen
+  bleiben, wartende Anmeldungen enden.
+- **Zugangstoken:** wer TOTP eingeschaltet hat, gibt beim Anlegen eines Zugangstokens
+  (eigenes oder das eines externen Agenten) einen aktuellen Code an (403
+  `auth.second_factor_required` ohne, 422 `auth.second_factor_invalid` bei einem
+  falschen); ein Token ist ein weiterer Weg hinein und soll nicht leichter zu bekommen
+  sein als eine Anmeldung.
+- **Ohne Passwort, ohne Schlüssel:** Konten ohne Passwort (nur über einen Anbieter)
+  richten keinen TOTP ein, dort gilt der zweite Faktor des Anbieters. Ohne
+  `HERD_SECRET_KEY` bietet das Profil TOTP nicht an (409 `totp.no_secret_key`). Wird
+  der Schlüssel gewechselt, schlüsselt `scripts/rotate_secrets.py` die TOTP-Schlüssel
+  mit um ([`KI.md`](KI.md)); geht er verloren (oder wird eine Sicherung mit
+  `--without-secrets` eingespielt), helfen nur noch Wiederherstellungscodes oder das
+  Zurücksetzen durch einen Admin.
+- **Protokoll:** `auth.sign_in` mit `outcome=second_factor` nach dem ersten Schritt,
+  dann `method=password+totp` (bzw. `oidc+recovery_code` …) und `outcome=ok`, oder
+  `method=second_factor` mit dem Ablehnungscode; nie ein Code, Schlüssel oder Cookie.
+  Audit: `user.totp_enabled`, `user.totp_disabled`, `user.totp_recovery_codes_renewed`,
+  `user.totp_reset`, ohne Inhalte.
+- **Nach einem Update:** Eine ältere Version kennt die TOTP-Tabellen nicht und würde
+  Personen mit TOTP nur mit dem Passwort anmelden; nicht auf eine ältere Version
+  zurückgehen, sobald jemand TOTP eingeschaltet hat.
 
 ## Voraussetzungen (Betrieb)
 
@@ -247,6 +312,17 @@ Auf der Anmeldeseite (`/login?error=<code>`) bzw. im Profil (`/profile?link_erro
 | `oidc.provider_unreachable` | Anbieter nicht erreichbar (Egress-Sperre, Netz, Zeitüberschreitung). |
 | `oidc.provider_error`, `oidc.issuer_mismatch`, `oidc.id_token_invalid` | Antwort des Anbieters unbrauchbar bzw. ID-Token ungültig. |
 | `oidc.public_url_missing` | `HERD_PUBLIC_URL` fehlt (Verwaltung). |
+
+Zweiter Faktor (Antworten der API):
+
+| Code | Bedeutung |
+|---|---|
+| `auth.second_factor_invalid` | Code falsch, außerhalb des Zeitfensters oder schon verwendet; Wiederherstellungscode unbekannt oder verbraucht. |
+| `auth.second_factor_expired` | Keine wartende Anmeldung (abgelaufen, schon verwendet, nach 5 falschen Codes beendet, Cookie fehlt, TOTP inzwischen zurückgesetzt, Person deaktiviert): noch einmal mit dem Passwort. |
+| `auth.second_factor_required` | Ein Zugangstoken braucht einen aktuellen Code. |
+| `auth.too_many_attempts` | Zu viele falsche Codes der Person (oder Anfragen der Adresse) in der letzten Minute. |
+| `totp.already_enabled`, `totp.no_setup`, `totp.not_enabled` | Einrichten, obwohl eingeschaltet; Bestätigen ohne begonnene Einrichtung; Ausschalten, obwohl aus. |
+| `totp.no_password`, `totp.no_secret_key` | Konto ohne Passwort; kein `HERD_SECRET_KEY` gesetzt. |
 
 ## Überwachung
 

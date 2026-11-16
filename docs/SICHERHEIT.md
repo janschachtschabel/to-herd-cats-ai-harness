@@ -1,7 +1,7 @@
 # Sicherheit: Prüfung gegen OWASP ASVS 5.0, Stufe 2
 
 Stand 16.11.2026 (M9, Task 9; Jans Antworten und die Planung der Lücken mit Task 11
-nachgetragen). Geprüft wurde to-herd-cats-ai gegen den **OWASP
+nachgetragen; der zweite Faktor mit M9b Task 16). Geprüft wurde to-herd-cats-ai gegen den **OWASP
 Application Security Verification Standard 5.0.0** (Mai 2025), Stufe 2 (L2). Jede
 Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht geprüft.
 
@@ -11,8 +11,9 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **182 erfüllt**, **59 nicht anwendbar**, **12 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 122 erfüllt, 49 nicht anwendbar, 12 Lücke).
+- Ergebnis: **188 erfüllt**, **53 nicht anwendbar**, **12 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 128 erfüllt, 43 nicht anwendbar, 12 Lücke). Mit
+  M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
   entweder der Aufgabe, die sie schließt (Task 16, Task 18), oder einer dokumentierten
@@ -62,12 +63,14 @@ Abweichungen: MFA für lokale Passwortkonten (J3) und TLS zwischen API und
 Collab-Prozess (J12 b).
 
 **J3 – Mehr-Faktor-Anmeldung (V6.3.3). Abweichung.** Jans Antwort: TOTP vorerst **nur
-optional**, auch für Owner und Admins, ohne Pflicht. Task 16 (M9b) baut TOTP für lokale
-Konten als freiwilligen zweiten Faktor und muss dabei V6.4.4 und V6.5.1 bis V6.5.5
-erfüllen (Wiederherstellung bei Verlust, Codes nur einmal, Wiederherstellungscodes
-gehasht, Seeds aus CSPRNG, Lebensdauer) und für Personen mit TOTP das Anlegen von
-Zugangstoken an den zweiten Faktor binden (V6.3.4). Weil niemand ihn einrichten muss,
-bleibt V6.3.3 eine **dokumentierte Abweichung von ASVS L2** für lokale Passwortkonten.
+optional**, auch für Owner und Admins, ohne Pflicht. M9b Task 16 hat TOTP für
+Passwortkonten als freiwilligen zweiten Faktor gebaut (`backend/app/modules/totp/`,
+[`ANMELDUNG.md`](ANMELDUNG.md#zweiter-faktor-totp)) und erfüllt damit V6.4.4 und V6.5.1
+bis V6.5.5 (Wiederherstellung bei Verlust, Codes nur einmal, Wiederherstellungscodes
+gehasht, Seeds aus CSPRNG, Lebensdauer); für Personen mit TOTP verlangen das Anlegen von
+Zugangstoken und eine Anmeldung über OIDC den zweiten Faktor ebenfalls (V6.3.4). Weil
+niemand ihn einrichten muss, bleibt V6.3.3 eine **dokumentierte Abweichung von ASVS L2**
+für lokale Passwortkonten.
 Konten, die sich über OIDC anmelden, bekommen den zweiten Faktor vom Anbieter (Google
 Workspace, Entra ID, Keycloak …); wer ASVS L2 ohne Abweichung braucht, meldet sich nur
 über einen Anbieter mit Pflicht-MFA an und vergibt keine Passwörter.
@@ -214,7 +217,7 @@ Wege, auf denen sich jemand gegenüber der App ausweist (es gibt keine weiteren)
 
 | Weg | Wer | Wo | Nachweis |
 |---|---|---|---|
-| E-Mail und Passwort | Personen mit lokalem Passwort | `POST /api/auth/login` | Sitzungs-Cookie |
+| E-Mail und Passwort | Personen mit lokalem Passwort | `POST /api/auth/login` (mit TOTP danach `POST /api/auth/login/second-factor`) | Sitzungs-Cookie |
 | OIDC (Google, allgemeiner Anbieter) | Personen mit verknüpfter Identität | `/api/auth/oidc/<Schlüssel>/…`, [`ANMELDUNG.md`](ANMELDUNG.md) | Sitzungs-Cookie |
 | Zugangstoken `herd_pat_`/`herd_agt_` | Personen und externe Agenten | nur `/mcp`, [`MCP.md`](MCP.md) | `Authorization: Bearer` |
 | Collab-Berechtigung `herd_cg_` | der Collab-Prozess im Namen einer Person | nur `/internal/collab/*` | `Authorization: Bearer` |
@@ -229,7 +232,14 @@ Standardkonten: das erste Konto entsteht nur aus `HERD_BOOTSTRAP_ADMIN_EMAIL` un
 je Adresse und E-Mail 5 Fehlversuche; gezählt in PostgreSQL über alle Knoten, ein
 unbekanntes Konto kostet dieselbe Hash-Arbeit (Dummy-Hash). Es gibt keine Kontosperre,
 die ein Fremder auslösen könnte: eine andere Adresse kommt weiter durch. OIDC-Starts und
-Rückrufe sind je Adresse begrenzt, falsche alte Passwörter im Profil je Person.
+Rückrufe sind je Adresse begrenzt, falsche alte Passwörter im Profil je Person, falsche
+TOTP- und Wiederherstellungscodes je Person (5 je Minute) und je wartender Anmeldung
+(nach 5 ist sie beendet).
+
+**Zweiter Faktor.** Freiwillig mit TOTP (RFC 6238, eigener Code auf `hmac`), für jede
+Person mit Passwort; Einzelheiten in [`ANMELDUNG.md`](ANMELDUNG.md#zweiter-faktor-totp).
+Das Passwort allein öffnet dann keine Sitzung, nur eine wartende Anmeldung (5 Minuten,
+einmal, an ein HttpOnly-Cookie gebunden, nur ihr Hash in PostgreSQL).
 
 **Passwortregeln.** 10 bis 200 Zeichen, sonst keine Regeln zur Zusammensetzung; das
 Passwort wird unverändert gehasht (kein Kürzen, kein Trimmen). Abgelehnt wird ein neues
@@ -481,7 +491,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 |---|---|---|---|---|---|
 | V6.1 | V6.1.1 | L1 | Schutz gegen Raten dokumentiert | erfüllt | Abschnitt „Anmeldung“: Grenzen je Adresse und je Adresse+Konto, Ausgang ohne fremde Sperre, Einstellungen. |
 | V6.1 | V6.1.2 | L2 | Liste kontextbezogener Wörter dokumentiert | erfüllt | Abschnitt „Anmeldung“, Passwortregeln. |
-| V6.1 | V6.1.3 | L2 | Alle Anmeldewege dokumentiert | erfüllt | Abschnitt „Anmeldung“ (Passwort, OIDC, Zugangstoken für `/mcp`, Collab-Berechtigung, internes Token); `docs/ANMELDUNG.md`, `docs/MCP.md`. |
+| V6.1 | V6.1.3 | L2 | Alle Anmeldewege dokumentiert | erfüllt | Abschnitt „Anmeldung“ (Passwort mit optionalem TOTP, OIDC, Zugangstoken für `/mcp`, Collab-Berechtigung, internes Token); `docs/ANMELDUNG.md`, `docs/MCP.md`. |
 | V6.2 | V6.2.1 | L1 | Mindestens 8 Zeichen | erfüllt | Mindestens 10 (`core/password_rule.py`). `tests/test_users.py::test_create_validates_input`. |
 | V6.2 | V6.2.2 | L1 | Passwort änderbar | erfüllt | `POST /api/auth/me/password` und Profil (`users/profile.py`, `features/profile/PasswordForm.tsx`). `tests/test_profile.py`. |
 | V6.2 | V6.2.3 | L1 | Änderung braucht altes und neues Passwort | erfüllt | `PasswordChangeIn` verlangt beide; falsches altes 422 `auth.wrong_password`, Fehlversuche begrenzt. `tests/test_profile.py`. |
@@ -496,17 +506,17 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V6.2 | V6.2.12 | L2 | Gegen geleakte Passwörter prüfen | erfüllt | Die Liste aus V6.2.4 stammt aus Leak-Sammlungen (Top-Million von Pwdb-Public). Nicht abgefragt wird ein vollständiger Leak-Bestand (etwa Have I Been Pwned per k-Anonymität): das wäre ein Aufruf nach außen bei jedem Passwortwechsel (Hinweis H1). |
 | V6.3 | V6.3.1 | L1 | Schutz gegen Credential Stuffing umgesetzt | erfüllt | `auth/service.py` (Grenzen je Adresse und je Adresse+Konto, Dummy-Hash bei unbekannten Konten), OIDC je Adresse. `tests/test_login_limits.py`, `tests/test_auth.py::test_login_is_rate_limited`. |
 | V6.3 | V6.3.2 | L1 | Keine Standardkonten | erfüllt | Das erste Konto entsteht nur aus `HERD_BOOTSTRAP_ADMIN_EMAIL`/`_PASSWORD` (Compose verlangt beide, kein Standardwert). `tests/test_auth.py::test_bootstrap_without_credentials_creates_nothing`. |
-| V6.3 | V6.3.3 | L2 | Mehr-Faktor-Anmeldung | Lücke | Lokale Passwortkonten haben keinen zweiten Faktor; über OIDC leistet ihn der Anbieter. Abweichung (J3: TOTP nur optional, auch für Owner und Admins; Task 16). |
-| V6.3 | V6.3.4 | L2 | Keine undokumentierten Wege, gleiche Stärke | erfüllt | Abschnitt „Anmeldung“ nennt alle Wege; `/mcp` nimmt nur Zugangstoken, `/internal` nur das interne Token, alles andere nur die Sitzung. Hinweis: mit TOTP (Task 16) muss das Anlegen von Zugangstoken für Personen mit TOTP den zweiten Faktor voraussetzen. |
+| V6.3 | V6.3.3 | L2 | Mehr-Faktor-Anmeldung | Lücke | TOTP gibt es für jede Person mit Passwort (M9b Task 16, `totp/`), aber freiwillig: Jans Antwort J3 (nur optional, auch für Owner und Admins). Über OIDC leistet den zweiten Faktor der Anbieter. Dokumentierte Abweichung. |
+| V6.3 | V6.3.4 | L2 | Keine undokumentierten Wege, gleiche Stärke | erfüllt | Abschnitt „Anmeldung“ nennt alle Wege; `/mcp` nimmt nur Zugangstoken, `/internal` nur das interne Token, alles andere nur die Sitzung. Wer TOTP eingeschaltet hat, gibt den Code nach dem Passwort und nach einem OIDC-Anbieter, und für jedes neue Zugangstoken (`totp/gate.py`). `tests/test_totp_oidc.py`, `tests/test_totp_tokens.py`. |
 | V6.4 | V6.4.1 | L1 | Erstpasswörter | nicht anwendbar | Das System erzeugt keine Erstpasswörter oder Aktivierungscodes (Admins setzen ein Passwort, oder die Person meldet sich über OIDC an). |
 | V6.4 | V6.4.2 | L1 | Keine Passworthinweise/Sicherheitsfragen | erfüllt | Gibt es nicht. |
 | V6.4 | V6.4.3 | L2 | Sicheres Zurücksetzen | erfüllt | Kein Selbstbedienungs-Reset; ein Admin (`user.manage`, das Passwort eines Owners nur ein Owner) setzt ein neues, alle Sitzungen enden, Audit `user.password_changed` (`users/service.py`). `tests/test_users.py`. |
-| V6.4 | V6.4.4 | L2 | Verlorener zweiter Faktor | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
-| V6.5 | V6.5.1 | L2 | Einmalcodes nur einmal | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
-| V6.5 | V6.5.2 | L2 | Wiederherstellungscodes gehasht | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
-| V6.5 | V6.5.3 | L2 | Seeds aus CSPRNG | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
-| V6.5 | V6.5.4 | L2 | Mindestens 20 Bit | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
-| V6.5 | V6.5.5 | L2 | Lebensdauer von Codes | nicht anwendbar | Noch kein zweiter Faktor; Task 16 muss es erfüllen. |
+| V6.4 | V6.4.4 | L2 | Verlorener zweiter Faktor | erfüllt | Wiederherstellungscodes (einmal je Code) oder Zurücksetzen durch einen Admin (`user.manage`, den eines Owners nur ein Owner) mit Audit `user.totp_reset`; die Doku verlangt dieselbe Identitätsprüfung wie beim Anlegen des Kontos (`users/service.reset_totp`, `docs/ANMELDUNG.md`). `tests/test_totp_admin.py`. |
+| V6.5 | V6.5.1 | L2 | Einmalcodes nur einmal | erfüllt | Ein TOTP-Schritt gilt nur, wenn er neuer ist als der zuletzt angenommene (eine Anweisung, `totp/repository.use_step`); ein Wiederherstellungscode wird von der Anweisung gelöscht, die ihn annimmt. `tests/test_totp_setup.py::test_the_code_that_confirmed_cannot_turn_it_off`, `::test_an_earlier_step_is_refused_after_a_later_one`, `tests/test_totp_sign_in.py::test_a_recovery_code_opens_the_session_once`, `::test_a_used_step_is_refused_at_sign_in`. |
+| V6.5 | V6.5.2 | L2 | Wiederherstellungscodes gehasht | erfüllt | Je 120 Zufallsbits (über 112), daher SHA-256 ohne Salz zulässig; nur der Hash steht in `totp_recovery_code` (`totp/recovery.py`). `tests/test_totp_setup.py::test_confirming_turns_it_on_with_ten_hashed_recovery_codes`. |
+| V6.5 | V6.5.3 | L2 | Seeds aus CSPRNG | erfüllt | TOTP-Schlüssel 160 Bit und Wiederherstellungscodes aus `secrets.token_bytes` (`totp/codes.new_secret`, `totp/recovery.new_codes`); der Schlüssel liegt `enc:` unter `HERD_SECRET_KEY`. `tests/test_totp_codes.py::test_new_secrets_are_160_random_bits_in_base32`. |
+| V6.5 | V6.5.4 | L2 | Mindestens 20 Bit | erfüllt | Wiederherstellungscodes 120 Bit; TOTP sechs Ziffern (RFC 6238). |
+| V6.5 | V6.5.5 | L2 | Lebensdauer von Codes | erfüllt | TOTP-Schritt 30 s, angenommen höchstens ein Schritt davor und danach; eine wartende Anmeldung gilt 5 Minuten (`totp/codes.py`, `totp/challenges.py`). `tests/test_totp_codes.py::test_the_current_step_and_one_on_either_side_match`, `tests/test_totp_sign_in.py::test_codes_outside_the_window_are_refused`, `::test_a_challenge_expires`. |
 | V6.6 | V6.6.1 | L2 | SMS/Telefon | nicht anwendbar | Kein Out-of-Band-Verfahren. |
 | V6.6 | V6.6.2 | L2 | Out-of-Band gebunden | nicht anwendbar | Kein Out-of-Band-Verfahren. |
 | V6.6 | V6.6.3 | L2 | Out-of-Band gegen Raten | nicht anwendbar | Kein Out-of-Band-Verfahren. |
