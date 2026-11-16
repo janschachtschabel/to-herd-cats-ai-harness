@@ -21,6 +21,7 @@ export const LIVE_EVENTS = [
   'card.changed',
   'skill_proposal.changed',
   'automation.changed',
+  'backup.changed',
   'resync',
 ] as const
 

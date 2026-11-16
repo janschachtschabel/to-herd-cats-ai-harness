@@ -1,0 +1,151 @@
+{
+  "nav": { "backup": "Sicherung" },
+  "maintenance": {
+    "title": "Wartung",
+    "text": "Die Installation wird gerade gewartet: Eine Sicherung wird eingespielt. Danach meldest du dich neu an.",
+    "checking": "Diese Seite prüft alle paar Sekunden, ob es weitergeht."
+  },
+  "backup": {
+    "title": "Sicherung",
+    "description": "Sicherungen der ganzen Installation: Datenbank und Anhänge in einem Archiv. Nur Inhaber sehen diese Seite.",
+    "start": "Jetzt sichern",
+    "starting": "Wird angefordert …",
+    "runs": {
+      "title": "Sicherungen",
+      "empty": "Noch keine Sicherung.",
+      "started": "Begonnen",
+      "trigger": "Auslöser",
+      "state": "Zustand",
+      "size": "Größe",
+      "archive": "Archiv",
+      "offsite": "Offsite",
+      "waiting": "wartet auf den Worker"
+    },
+    "triggers": {
+      "schedule": "Zeitplan",
+      "cli": "Kommandozeile",
+      "admin": "Verwaltung",
+      "pre_restore": "vor dem Einspielen"
+    },
+    "states": {
+      "running": "läuft",
+      "ok": "gelungen",
+      "failed": "gescheitert",
+      "interrupted": "abgebrochen"
+    },
+    "offsite": { "off": "aus", "ok": "kopiert", "failed": "gescheitert" },
+    "archives": {
+      "title": "Archive",
+      "description": "Die Archive im Sicherungsverzeichnis. Ein Archiv einer anderen Installation lädst du hier hoch.",
+      "empty": "Noch kein Archiv.",
+      "name": "Name",
+      "created": "Erstellt",
+      "size": "Größe",
+      "origin": "Herkunft",
+      "uploaded": "hochgeladen",
+      "made": "Sicherung",
+      "upload": "Archiv hochladen",
+      "uploading": "Wird hochgeladen …",
+      "uploaded_done": "{{name}} ist hochgeladen und geprüft.",
+      "download": "Herunterladen",
+      "downloadLabel": "{{name}} herunterladen",
+      "check": "Prüfen",
+      "checkLabel": "{{name}} prüfen",
+      "file": "Archiv (.tar)"
+    },
+    "check": {
+      "title": "Prüfung von {{name}}",
+      "checking": "Das Archiv wird gelesen und geprüft …",
+      "what": "Angabe",
+      "archive": "Archiv",
+      "installation": "Diese Installation",
+      "appVersion": "Version",
+      "revision": "Datenbank-Revision",
+      "server": "PostgreSQL",
+      "tools": "pg_dump / pg_restore",
+      "storage": "Ablage",
+      "tables": "Tabellen",
+      "rows": "Zeilen",
+      "files": "Dateien",
+      "fileCount": "{{count}} ({{size}})",
+      "createdAt": "Erstellt am {{at}}.",
+      "key": "Schlüssel (HERD_SECRET_KEY)",
+      "keys": {
+        "match": "passt",
+        "mismatch": "passt nicht",
+        "missing": "fehlt",
+        "not_needed": "nicht nötig (keine verschlüsselten Werte)"
+      },
+      "keyBlocked": "Der Schlüssel dieser Installation passt nicht zum Archiv: Seine verschlüsselten Werte wären unlesbar. Einspielen ist gesperrt.",
+      "problems": "Was das Einspielen verhindert",
+      "warnings": "Hinweise",
+      "fine": "Das Archiv ist unverändert und passt zu dieser Installation.",
+      "blocked": "Einspielen ist gesperrt, solange die Prüfung Probleme meldet.",
+      "replace": "Einspielen …"
+    },
+    "replace": {
+      "title": "Installation ersetzen",
+      "text": "Alles in dieser Installation wird durch den Stand des Archivs {{name}} ersetzt. Vorher wird der jetzige Stand gesichert. Während des Einspielens ist die Installation in Wartung; danach sind alle abgemeldet.",
+      "confirm": "Tippe zur Bestätigung den Namen der Organisation ein: {{org}}",
+      "submit": "Ersetzen",
+      "started": "Einspielen läuft: Zuerst wird der jetzige Stand gesichert, dann beginnt die Wartung.",
+      "failed": "Das letzte Einspielen ({{name}}) ist gescheitert: {{reason}}. Der bisherige Stand ist unverändert.",
+      "requested": "Einspielen von {{name}} angefordert am {{at}}."
+    },
+    "export": {
+      "title": "Einzelne Bereiche",
+      "text": "Ein einzelner Bereich lässt sich jederzeit als Markdown-ZIP exportieren: im Bereich über „Import/Export“ → „Bereich exportieren (ZIP)“. Das ersetzt keine Sicherung der Installation."
+    },
+    "codes": {
+      "archive": {
+        "checksum": "Das Archiv wurde nach dem Sichern verändert (Prüfsumme stimmt nicht).",
+        "format_unknown": "Kein Sicherungsarchiv dieses Formats.",
+        "member_missing": "Dem Archiv fehlt ein Teil.",
+        "member_checksum": "Ein Teil des Archivs wurde verändert.",
+        "truncated": "Das Archiv ist unvollständig (abgeschnitten)."
+      },
+      "restore": {
+        "archive_newer": "Das Archiv stammt von einer neueren Version.",
+        "file_conflict": "Eine Datei des Archivs liegt hier schon mit anderem Inhalt.",
+        "storage_unavailable": "Der Dateispeicher antwortet nicht.",
+        "server_too_old": "Der PostgreSQL-Server ist älter als der des Archivs.",
+        "tools_too_old": "pg_restore ist älter als das pg_dump des Archivs.",
+        "secret_key_mismatch": "Der Schlüssel (HERD_SECRET_KEY) passt nicht zum Archiv.",
+        "secret_key_missing": "Das Archiv hat verschlüsselte Werte, hier ist kein Schlüssel gesetzt.",
+        "env_missing": "Die Umgebungsvariable {{detail}} fehlt hier.",
+        "secrets_unreadable": "Unlesbar bleiben: {{detail}}.",
+        "safety_backup_failed": "Die Sicherung des jetzigen Stands ist gescheitert ({{detail}}).",
+        "already_running": "Ein anderes Einspielen oder eine Migration läuft gerade.",
+        "confirm_mismatch": "Der Name der Organisation stimmt nicht.",
+        "failed": "Das Einspielen ist gescheitert.",
+        "finish_failed": "Nach dem Einspielen ist ein Schritt gescheitert; die Installation bleibt in Wartung."
+      },
+      "backup": {
+        "interrupted": "Der Prozess endete vor dem Abschluss.",
+        "in_restored_archive": "Lief, als das eingespielte Archiv entstand.",
+        "dump_failed": "pg_dump ist gescheitert.",
+        "file_missing": "Eine Anhangsdatei fehlt.",
+        "storage_unavailable": "Der Dateispeicher antwortet nicht.",
+        "io": "Schreiben ins Sicherungsverzeichnis gescheitert.",
+        "verify_failed": "Das Archiv war beim Zurücklesen fehlerhaft.",
+        "tools_too_old": "pg_dump ist älter als der Server.",
+        "tool_missing": "pg_dump fehlt.",
+        "schema_behind": "Die Datenbank ist nicht auf dem Stand dieser Version.",
+        "schema_ahead": "Die Datenbank ist neuer als diese Version.",
+        "no_schema": "Die Datenbank hat kein Schema.",
+        "failed": "Die Sicherung ist gescheitert."
+      }
+    }
+  },
+  "errors": {
+    "backup": {
+      "already_running": "Eine Sicherung läuft schon oder wartet auf den Worker.",
+      "restore_running": "Ein Einspielen läuft schon.",
+      "confirm_mismatch": "Der Name stimmt nicht mit dem Namen der Organisation überein.",
+      "replace_refused": "Die Prüfung meldet Probleme: Einspielen ist gesperrt.",
+      "archive_invalid": "Die Datei ist kein gültiges Sicherungsarchiv.",
+      "upload_too_large": "Das Archiv ist größer, als diese Installation annimmt (HERD_BACKUP_UPLOAD_MAX_BYTES).",
+      "not_found": "Dieses Archiv gibt es nicht (mehr)."
+    }
+  }
+}

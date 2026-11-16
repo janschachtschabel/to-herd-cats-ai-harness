@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import {
   Bot,
+  DatabaseBackup,
   Eye,
   History,
   LogIn,
@@ -36,6 +37,7 @@ const ADMIN_ICONS: Record<AdminLink['to'], typeof UserRound> = {
   '/admin/ai': Sparkles,
   '/admin/agents': Bot,
   '/admin/skills': ScrollText,
+  '/admin/backup': DatabaseBackup,
 }
 
 /** The number of self-registered accounts awaiting approval, beside "Personen" (the

@@ -5,6 +5,7 @@ import { userKeys } from '@/features/admin/users/queries'
 import { agentKeys } from '@/features/agents/keys'
 import { approvalKeys } from '@/features/approvals/queries'
 import { automationEventKeys, automationKeys } from '@/features/automations/queries'
+import { backupKeys } from '@/features/backup/queries'
 import { noteRunProgress } from '@/features/agents/live'
 import { proposalEventKeys } from '@/features/proposals/live'
 import { proposalKeys } from '@/features/proposals/queries'
@@ -47,6 +48,7 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
         automationKeys.lists,
         automationKeys.details,
         automationKeys.allFirings,
+        backupKeys.all,
       ]
     case 'access.changed':
       // Reload whatever is shown; what is gone answers 404 and is dropped.
@@ -103,6 +105,8 @@ export function keysFor(queryClient: QueryClient, event: LiveEvent): Key[] {
       return [skillProposalKeys.all, skillKeys.all]
     case 'automation.changed':
       return automationEventKeys(event.automationId ?? null)
+    case 'backup.changed':
+      return [backupKeys.all]
     case 'card.changed':
       // A run's card was decided, answered or settled (ran or stale): the cards, the
       // run, and their messages.

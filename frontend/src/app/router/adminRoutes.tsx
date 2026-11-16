@@ -60,6 +60,8 @@ const AgentAdminPage = lazyRouteComponent(
   'AgentAdminPage',
 )
 
+const BackupPage = lazyRouteComponent(() => import('@/features/backup/BackupPage'), 'BackupPage')
+
 const SkillsAdminPage = lazyRouteComponent(
   () => import('@/features/skills/SkillsAdminPage'),
   'SkillsAdminPage',
@@ -258,6 +260,14 @@ const skillsRoute = createRoute({
   },
 })
 
+/** Backups of the installation (plan M9 task 13): owners only (`backup.manage`). */
+const backupRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/backup',
+  loader: ({ context }) => requirePermission(context.me, 'backup.manage'),
+  component: BackupPage,
+})
+
 /** The administration (`/admin/...`): each page only for those with its right. */
 export const adminTree = adminRoute.addChildren([
   adminIndexRoute,
@@ -280,4 +290,5 @@ export const adminTree = adminRoute.addChildren([
   agentsRoute,
   agentRoute,
   skillsRoute,
+  backupRoute,
 ])

@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 import { AppShell } from '@/app/shell/AppShell'
 import { meQuery } from '@/features/auth/queries'
+import { MaintenanceGate } from '@/features/shared/MaintenancePage'
 import { NotFoundPage } from './NotFoundPage'
 import { safeRedirect, signInError, type LoginSearch } from './search'
 
@@ -18,7 +19,12 @@ export interface RouterContext {
 }
 
 export const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
+  // In maintenance (a request answered 503 `maintenance.active`) the whole window waits.
+  component: () => (
+    <MaintenanceGate>
+      <Outlet />
+    </MaintenanceGate>
+  ),
   notFoundComponent: NotFoundPage,
 })
 

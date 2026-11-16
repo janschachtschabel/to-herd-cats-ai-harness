@@ -36,6 +36,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       'ai.manage',
       'agent.manage',
       'skill.manage',
+      'backup.manage',
     ],
   },
 ]
@@ -51,6 +52,7 @@ export interface AdminLink {
     | '/admin/ai'
     | '/admin/agents'
     | '/admin/skills'
+    | '/admin/backup'
   labelKey:
     | 'nav.users'
     | 'nav.signIn'
@@ -61,6 +63,7 @@ export interface AdminLink {
     | 'nav.ai'
     | 'nav.agents'
     | 'nav.skills'
+    | 'nav.backup'
   permission: Permission
 }
 
@@ -74,6 +77,8 @@ export const ADMIN_LINKS: readonly AdminLink[] = [
   { to: '/admin/ai', labelKey: 'nav.ai', permission: 'ai.manage' },
   { to: '/admin/agents', labelKey: 'nav.agents', permission: 'agent.manage' },
   { to: '/admin/skills', labelKey: 'nav.skills', permission: 'skill.manage' },
+  // Owners only (plan M9 decision 10): an archive holds every direct message.
+  { to: '/admin/backup', labelKey: 'nav.backup', permission: 'backup.manage' },
 ]
 
 function holds(me: Me | null, permission: Permission): boolean {

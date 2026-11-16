@@ -15,7 +15,7 @@ from app.modules.auth.deps import ActorDep, SessionDep, SettingsDep
 from app.modules.backups.schemas import (
     ArchiveOut,
     BackupRunOut,
-    CheckOut,
+    ArchiveCheckOut,
     ReplaceIn,
     ReplaceOut,
     RestoreStatusOut,
@@ -107,13 +107,13 @@ async def download_archive(
     return StreamingResponse(file_chunks(handle), media_type="application/x-tar", headers=headers)
 
 
-@router.post("/archives/{name}/check", response_model=CheckOut)
+@router.post("/archives/{name}/check", response_model=ArchiveCheckOut)
 async def check_archive(
     name: str, actor: ActorDep, session: SessionDep, settings: SettingsDep
-) -> CheckOut:
+) -> ArchiveCheckOut:
     """The archive against this installation; `can_replace` when nothing blocks."""
     report = await BackupAdmin(session, settings).check(actor, name)
-    return CheckOut.of(name, report)
+    return ArchiveCheckOut.of(name, report)
 
 
 @router.post(

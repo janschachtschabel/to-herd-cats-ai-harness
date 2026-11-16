@@ -101,10 +101,29 @@ export function onUnauthorized(handler: (() => void) | null): void {
 // A 401 from these is an answer, not a lost session.
 const SESSION_PATHS = ['/api/auth/login', '/api/auth/me', '/api/auth/logout']
 
+// Who to tell when the installation is in maintenance (503 `maintenance.active`).
+let maintenanceHandler: (() => void) | null = null
+
+export function onMaintenance(handler: (() => void) | null): void {
+  maintenanceHandler = handler
+}
+
+async function inMaintenance(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.clone().json()) as ErrorBody
+    return body.error?.code === 'maintenance.active'
+  } catch {
+    return false
+  }
+}
+
 const sessionGuard: Middleware = {
-  onResponse({ response, request }) {
+  async onResponse({ response, request }) {
     const path = new URL(request.url).pathname
     if (response.status === 401 && !SESSION_PATHS.includes(path)) unauthorizedHandler?.()
+    if (response.status === 503 && maintenanceHandler && (await inMaintenance(response))) {
+      maintenanceHandler()
+    }
     return undefined
   },
 }

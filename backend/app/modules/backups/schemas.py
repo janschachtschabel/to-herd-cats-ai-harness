@@ -81,7 +81,7 @@ class FiguresOut(BaseModel):
         return cls(**figures.__dict__)
 
 
-class CheckOut(BaseModel):
+class ArchiveCheckOut(BaseModel):
     """`problems`: codes, any one blocks replacing (`can_replace` false); `key`:
     whether HERD_SECRET_KEY fits the archive's `enc:` values."""
 
@@ -95,7 +95,7 @@ class CheckOut(BaseModel):
     can_replace: bool
 
     @classmethod
-    def of(cls, name: str, report: CheckReport) -> "CheckOut":
+    def of(cls, name: str, report: CheckReport) -> "ArchiveCheckOut":
         return cls(
             archive_name=name,
             problems=report.problems,

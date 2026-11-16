@@ -1650,6 +1650,94 @@
         "title": "ApprovalState",
         "type": "string"
       },
+      "ArchiveCheckOut": {
+        "description": "`problems`: codes, any one blocks replacing (`can_replace` false); `key`:\nwhether HERD_SECRET_KEY fits the archive's `enc:` values.",
+        "properties": {
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive_name": {
+            "title": "Archive Name",
+            "type": "string"
+          },
+          "can_replace": {
+            "title": "Can Replace",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "installation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "anyOf": [
+              {
+                "enum": [
+                  "match",
+                  "mismatch",
+                  "missing",
+                  "not_needed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "archive_name",
+          "problems",
+          "warnings",
+          "created_at",
+          "archive",
+          "installation",
+          "key",
+          "can_replace"
+        ],
+        "title": "ArchiveCheckOut",
+        "type": "object"
+      },
       "ArchiveOut": {
         "description": "An archive in the backups directory; `uploaded`: an owner uploaded it.",
         "properties": {
@@ -2992,6 +3080,36 @@
           }
         },
         "title": "CheckIn",
+        "type": "object"
+      },
+      "CheckOut": {
+        "description": "The outcome as a state, never with the provider's own words.",
+        "properties": {
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        },
+        "required": [
+          "status",
+          "model",
+          "duration_ms"
+        ],
+        "title": "CheckOut",
         "type": "object"
       },
       "CheckStatus": {
@@ -15857,124 +15975,6 @@
         "title": "VersionSummaryOut",
         "type": "object"
       },
-      "app__modules__ai__schemas__CheckOut": {
-        "description": "The outcome as a state, never with the provider's own words.",
-        "properties": {
-          "duration_ms": {
-            "title": "Duration Ms",
-            "type": "integer"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "status": {
-            "$ref": "#/components/schemas/CheckStatus"
-          }
-        },
-        "required": [
-          "status",
-          "model",
-          "duration_ms"
-        ],
-        "title": "CheckOut",
-        "type": "object"
-      },
-      "app__modules__backups__schemas__CheckOut": {
-        "description": "`problems`: codes, any one blocks replacing (`can_replace` false); `key`:\nwhether HERD_SECRET_KEY fits the archive's `enc:` values.",
-        "properties": {
-          "archive": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiguresOut"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "archive_name": {
-            "title": "Archive Name",
-            "type": "string"
-          },
-          "can_replace": {
-            "title": "Can Replace",
-            "type": "boolean"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          },
-          "installation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiguresOut"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "key": {
-            "anyOf": [
-              {
-                "enum": [
-                  "match",
-                  "mismatch",
-                  "missing",
-                  "not_needed"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Key"
-          },
-          "problems": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Problems",
-            "type": "array"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Warnings",
-            "type": "array"
-          }
-        },
-        "required": [
-          "archive_name",
-          "problems",
-          "warnings",
-          "created_at",
-          "archive",
-          "installation",
-          "key",
-          "can_replace"
-        ],
-        "title": "CheckOut",
-        "type": "object"
-      },
       "app__modules__messaging__schemas__ExpectedVersion": {
         "properties": {
           "version": {
@@ -19678,7 +19678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__modules__ai__schemas__CheckOut"
+                  "$ref": "#/components/schemas/CheckOut"
                 }
               }
             },
@@ -23674,7 +23674,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__modules__backups__schemas__CheckOut"
+                  "$ref": "#/components/schemas/ArchiveCheckOut"
                 }
               }
             },

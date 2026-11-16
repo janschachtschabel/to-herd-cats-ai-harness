@@ -4709,6 +4709,27 @@ export interface components {
          */
         ApprovalState: "pending" | "approved" | "rejected" | "expired";
         /**
+         * ArchiveCheckOut
+         * @description `problems`: codes, any one blocks replacing (`can_replace` false); `key`:
+         *     whether HERD_SECRET_KEY fits the archive's `enc:` values.
+         */
+        ArchiveCheckOut: {
+            archive: components["schemas"]["FiguresOut"] | null;
+            /** Archive Name */
+            archive_name: string;
+            /** Can Replace */
+            can_replace: boolean;
+            /** Created At */
+            created_at: string | null;
+            installation: components["schemas"]["FiguresOut"] | null;
+            /** Key */
+            key: ("match" | "mismatch" | "missing" | "not_needed") | null;
+            /** Problems */
+            problems: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
          * ArchiveOut
          * @description An archive in the backups directory; `uploaded`: an owner uploaded it.
          */
@@ -5173,6 +5194,17 @@ export interface components {
         CheckIn: {
             /** Model */
             model?: string | null;
+        };
+        /**
+         * CheckOut
+         * @description The outcome as a state, never with the provider's own words.
+         */
+        CheckOut: {
+            /** Duration Ms */
+            duration_ms: number;
+            /** Model */
+            model: string | null;
+            status: components["schemas"]["CheckStatus"];
         };
         /**
          * CheckStatus
@@ -9882,38 +9914,6 @@ export interface components {
             /** Via Token */
             via_token?: string | null;
         };
-        /**
-         * CheckOut
-         * @description The outcome as a state, never with the provider's own words.
-         */
-        app__modules__ai__schemas__CheckOut: {
-            /** Duration Ms */
-            duration_ms: number;
-            /** Model */
-            model: string | null;
-            status: components["schemas"]["CheckStatus"];
-        };
-        /**
-         * CheckOut
-         * @description `problems`: codes, any one blocks replacing (`can_replace` false); `key`:
-         *     whether HERD_SECRET_KEY fits the archive's `enc:` values.
-         */
-        app__modules__backups__schemas__CheckOut: {
-            archive: components["schemas"]["FiguresOut"] | null;
-            /** Archive Name */
-            archive_name: string;
-            /** Can Replace */
-            can_replace: boolean;
-            /** Created At */
-            created_at: string | null;
-            installation: components["schemas"]["FiguresOut"] | null;
-            /** Key */
-            key: ("match" | "mismatch" | "missing" | "not_needed") | null;
-            /** Problems */
-            problems: string[];
-            /** Warnings */
-            warnings: string[];
-        };
         /** ExpectedVersion */
         app__modules__messaging__schemas__ExpectedVersion: {
             /** Version */
@@ -12223,7 +12223,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__modules__ai__schemas__CheckOut"];
+                    "application/json": components["schemas"]["CheckOut"];
                 };
             };
             /** @description Validation Error */
@@ -14740,7 +14740,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__modules__backups__schemas__CheckOut"];
+                    "application/json": components["schemas"]["ArchiveCheckOut"];
                 };
             };
             /** @description Validation Error */
