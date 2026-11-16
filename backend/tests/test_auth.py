@@ -279,7 +279,7 @@ def test_password_and_token_primitives() -> None:
 
 BOOT = Settings(
     bootstrap_admin_email="Boss@Example.com",
-    bootstrap_admin_password=SecretStr("boss-password-123"),
+    bootstrap_admin_password=SecretStr("lantern-orbit-73-q"),
     bootstrap_org_name="Müller & Söhne",
 )
 
@@ -290,7 +290,7 @@ async def test_bootstrap_creates_org_and_owner(session: AsyncSession, client: As
     assert org.name == "Müller & Söhne"
     user = (await session.scalars(select(User))).one()
     assert (user.email, user.system_role, user.org_id) == ("boss@example.com", "owner", org.id)
-    await login(client, "boss@example.com", "boss-password-123")
+    await login(client, "boss@example.com", "lantern-orbit-73-q")
 
 
 async def test_bootstrap_is_idempotent(session: AsyncSession) -> None:

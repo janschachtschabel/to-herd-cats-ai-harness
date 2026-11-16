@@ -182,7 +182,11 @@ docker compose up -d --build --wait
 
 Dann <http://127.0.0.1:8080> öffnen und mit `HERD_BOOTSTRAP_ADMIN_EMAIL` und
 `HERD_BOOTSTRAP_ADMIN_PASSWORD` aus `.env` anmelden. Diese erste Person (Inhaberin)
-entsteht nur beim allerersten Start; das Passwort danach in der App ändern (Menü oben
+entsteht nur beim allerersten Start. Ihr Passwort muss die Passwortregeln erfüllen
+([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md): 10 bis 200 Zeichen, nicht auf der Liste
+geleakter Passwörter, kein Wort aus Organisation oder Adresse); sonst bricht der Start
+mit „bootstrap refused“ und Exit-Status 4 ab, und es wird nichts angelegt. Das Passwort
+danach in der App ändern (Menü oben
 rechts → „Profil und Einstellungen“; dort ändert jede Person ihr eigenes Passwort und
 ihre Sprache).
 
@@ -339,7 +343,7 @@ PostgreSQL 16 oder neuer. Die Standard-URLs erwarten die Rolle `herd` (Passwort
 ```bash
 cd backend && uv sync
 cd backend && HERD_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
-  HERD_BOOTSTRAP_ADMIN_PASSWORD=admin-password-123 HERD_LOG_FORMAT=text \
+  HERD_BOOTSTRAP_ADMIN_PASSWORD=lantern-orbit-73-q HERD_LOG_FORMAT=text \
   uv run python -m app.launch          # migriert, dann API auf :8080, Proben auf :9090
 
 cd frontend && npm ci && npm run dev   # Vite; leitet /api und /collab an http://localhost:8080 weiter

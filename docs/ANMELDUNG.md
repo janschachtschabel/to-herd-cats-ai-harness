@@ -9,7 +9,10 @@ an; es wartet, bis ein Admin es freigibt.
 ## Anmeldung mit Passwort
 
 Das erste Konto (Inhaberin) entsteht beim allerersten Start aus
-`HERD_BOOTSTRAP_ADMIN_EMAIL` und `HERD_BOOTSTRAP_ADMIN_PASSWORD`; weitere legen Admins
+`HERD_BOOTSTRAP_ADMIN_EMAIL` und `HERD_BOOTSTRAP_ADMIN_PASSWORD` (das Passwort muss die
+Regeln unten erfüllen, mit dem Namen aus `HERD_BOOTSTRAP_ORG_NAME` und der Adresse als
+Kontext; sonst bricht der Start mit `bootstrap refused` und Exit-Status 4 ab, ohne
+etwas anzulegen); weitere legen Admins
 unter **Verwaltung → Personen** an. Es gibt keinen Selbstbedienungs-Reset: ein Admin
 setzt ein neues Passwort, dann enden alle Sitzungen der Person. Jede Person ändert ihr
 eigenes Passwort im Profil (mit dem alten).

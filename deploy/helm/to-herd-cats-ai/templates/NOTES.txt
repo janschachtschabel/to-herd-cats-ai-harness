@@ -36,7 +36,9 @@ For production set postgresql.enabled=false, database.url and database.existingS
 
 secrets.existingSecret is empty: no first owner is created. Create a Secret with
 HERD_BOOTSTRAP_ADMIN_EMAIL and HERD_BOOTSTRAP_ADMIN_PASSWORD and set
-secrets.existingSecret to its name.
+secrets.existingSecret to its name. The password must pass the password rules (no
+breached password, no word of the organisation or the address), or the API pods stop
+with "bootstrap refused" (exit status 4) and create nothing.
 {{- end }}
 {{- if not .Values.ai.existingSecret }}
 

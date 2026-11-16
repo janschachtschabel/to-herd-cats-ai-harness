@@ -36,7 +36,7 @@ from app.core.logging import configure_logging
 from app.core.migrations import upgrade_head
 from app.core.spool import remove_stale_spools
 from app.modules.messaging.live import LiveHub
-from app.modules.orgs.service import ensure_bootstrap
+from app.modules.orgs.service import BootstrapRefused, ensure_bootstrap
 from app.web.collab_proxy import MAX_MESSAGE_BYTES
 from app.web.internal import create_internal_app
 from app.web.public import create_public_app
@@ -55,6 +55,7 @@ _STEPS: dict[str, tuple[Step, ...]] = {
 }
 
 COLLAB_EXIT_CODE = 3
+BOOTSTRAP_EXIT_CODE = 4  # HERD_BOOTSTRAP_ADMIN_PASSWORD refused (orgs/service.py)
 COLLAB_STOP_SECONDS = 15.0
 # How long an idle keep-alive connection stays open (HERD_KEEP_ALIVE_SECONDS). A client
 # that reuses a pooled connection at the moment the server closes it gets the request
@@ -297,9 +298,18 @@ def run_collab(settings: Settings) -> None:
 
 
 async def bootstrap(settings: Settings) -> None:
-    """The organisation and first owner, in their own transaction, before serving."""
+    """The organisation and first owner, in their own transaction, before serving. A
+    guessable first password stops the start (exit status 4), with nothing created."""
     async with get_database().session_factory() as session:
-        await ensure_bootstrap(session, settings)
+        try:
+            await ensure_bootstrap(session, settings)
+        except BootstrapRefused as refused:
+            logger.error(
+                "bootstrap refused: HERD_BOOTSTRAP_ADMIN_PASSWORD is easy to guess (%s);"
+                " choose another one (docs/ANMELDUNG.md) and start again",
+                refused.code,
+            )
+            raise SystemExit(BOOTSTRAP_EXIT_CODE) from None
         await session.commit()
 
 

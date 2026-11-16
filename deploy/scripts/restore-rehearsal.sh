@@ -34,7 +34,8 @@ db_b="herd_rehearsal_b_${suffix}"
 work="$(mktemp -d)"
 pids=()
 admin_email="admin@rehearsal.example"
-admin_password="rehearsal-admin-$RANDOM-$RANDOM"
+# The first owner's password passes the password checks too (no "admin", "rehearsal").
+admin_password="lantern-orbit-$RANDOM-$RANDOM"
 # No context word of the demo people (their domain demo.example makes "demo" one).
 demo_password="rehearsal-people-$RANDOM-$RANDOM"
 # The backend's interpreter itself (not `uv run`), so that stopping an app reaches it.

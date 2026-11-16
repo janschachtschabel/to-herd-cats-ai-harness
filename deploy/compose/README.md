@@ -58,7 +58,8 @@ docker compose up -d --build --wait
 
 Open <http://127.0.0.1:8080> and log in with `HERD_BOOTSTRAP_ADMIN_EMAIL` and
 `HERD_BOOTSTRAP_ADMIN_PASSWORD`. The first owner is created on the first start
-only; change the password afterwards in the app.
+only (its password must pass the password rules, or the start stops with "bootstrap
+refused"); change the password afterwards in the app.
 
 This reference serves plain http for local trials, so the session cookie is not
 `Secure` by default. Behind a TLS reverse proxy, set `HERD_BIND_ADDRESS` /
@@ -179,7 +180,7 @@ live P95 ≤ 2 s, no 5xx).
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
 | `POSTGRES_PASSWORD` | yes | | Database password; the app gets it as `HERD_DATABASE_PASSWORD`, never inside `HERD_DATABASE_URL` |
-| `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only |
+| `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only; it must pass the password rules (no breached password, no word of the organisation or the address; `docs/ANMELDUNG.md`), or the start stops with exit status 4 |
 | `HERD_BOOTSTRAP_ADMIN_EMAIL` | no | `admin@example.com` | Email of the first owner |
 | `HERD_BIND_ADDRESS` | no | `127.0.0.1` | Host address port 8080 is published on |
 | `HERD_HOST_PORT` | no | `8080` | Host port for the app (node A in `compose.nodes.yml`) |
