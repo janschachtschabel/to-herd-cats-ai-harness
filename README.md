@@ -5,6 +5,9 @@ Austausch in Kanälen, und KI-Agenten als Teammitglieder mit denselben Rechten w
 Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
+**Version 1.0.0** (erste Freigabe; was sie enthält, Hinweise zum Update und bekannte
+Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)).
+
 **Stand: M9a (Produktion, erster Teil) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
 M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5
 Tasks 8 bis 11) und M9b fehlen noch.** Aus M1:
@@ -572,8 +575,8 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   Version hat vorab migriert). Nicht bereit ist er ohne Revision oder bei einer
   bekannten älteren. Deshalb müssen Migrationen mit der vorherigen Version verträglich
   sein: erst erweitern, frühestens eine Version später zurückbauen.
-  `backend/alembic/RELEASED` nennt die Revision der letzten Freigabe (leer bis zum
-  ersten Tag; beim Taggen auf den Head setzen, `release.yml` prüft es). `scripts/check_migrations.py` (CI-Job
+  `backend/alembic/RELEASED` nennt die Revision der letzten Freigabe (seit 1.0.0
+  `9e4b6d2f8a17`; beim Taggen auf den Head setzen, `release.yml` prüft es). `scripts/check_migrations.py` (CI-Job
   `backend`) lehnt in jeder späteren Revision Löschen, Umbenennen und Typwechsel ab
   (`drop_*`, `rename_table`, `alter_column(type_=…/new_column_name=…)`, `op.execute`
   mit `DROP`/`RENAME`), außer die Revision erklärt `contract_of = "<Revision>"` und
@@ -854,7 +857,8 @@ das Image `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y` und das Chart als O
 `ghcr.io/<owner>/charts`. Tag, Version in `backend/pyproject.toml` und `version` und
 `appVersion` des Charts müssen gleich sein (`deploy/helm/scripts/check-chart-version.sh`).
 Getaggt wird nur auf Jans Wort; die erste Freigabe ist `v1.0.0` nach dem Modul-Review
-von M9a und seiner Fix-Welle (Antwort J1).
+von M9a und seiner Fix-Welle (Antwort J1), beschrieben in
+[`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md).
 
 **Vor dem Taggen, von Hand:**
 
