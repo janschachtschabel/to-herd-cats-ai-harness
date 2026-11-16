@@ -357,8 +357,21 @@ Live-Bearbeitungsprozess, `node collab/server.mjs`). `all` enthält den Worker. 
 `all` startet die API den Collab-Prozess als Kindprozess auf
 `127.0.0.1:${HERD_COLLAB_PORT}`, wenn `HERD_INTERNAL_TOKEN` gesetzt ist (dafür
 `cd collab && npm ci`); ohne Token bleibt die Live-Bearbeitung aus. Alle
-Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`). Nach Änderungen
-an der API `npm run generate:api` im Frontend ausführen.
+Einstellungen sind `HERD_*`-Variablen (`backend/app/core/config.py`); die meisten
+beschreiben die Dokumente ihres Bereichs (Sicherung, Anmeldung, KI, Agenten, MCP, Wiki,
+Nachrichten) und `deploy/compose/README.md`. Grundeinstellungen der Prozesse, die selten
+zu ändern sind:
+
+| Variable | Standard | Wirkung |
+|---|---|---|
+| `HERD_PUBLIC_PORT` | `8080` | Port der API und der Weboberfläche (`/api`, `/mcp`, `/collab`) |
+| `HERD_INTERNAL_PORT` | `9090` | Port für Proben (`/live`, `/ready`), Metriken (`/metrics`) und die Rückrufe des Collab-Prozesses (`/internal/*`); nie nach außen freigeben |
+| `HERD_BOOTSTRAP_ORG_NAME` | `Meine Organisation` | Name der Organisation, die der allererste Start anlegt (später in der Verwaltung zu ändern); ein Wort daraus darf nicht im Passwort der ersten Inhaberin stehen |
+| `HERD_SESSION_COOKIE_NAME` | `herd_session` | Name des Sitzungs-Cookies; über https mit dem Präfix `__Host-` ([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)) |
+| `HERD_COLLAB_API_URL` | `http://127.0.0.1:<HERD_INTERNAL_PORT>` | Wo der Collab-Prozess die API erreicht (ihren internen Port); nur für die Rolle `collab` in einem eigenen Container oder Pod nötig (Compose und Chart setzen sie) |
+| `HERD_COLLAB_SCRIPT` | `collab/server.mjs` des Quellstands (im Image `/app/collab/server.mjs`) | Das Skript, das `node` als Collab-Prozess startet; nur für eigene Pfade |
+
+Nach Änderungen an der API `npm run generate:api` im Frontend ausführen.
 
 Demodaten für eine frische Test-Installation (drei Personen, der Bereich „Team Nord“
 mit zwei Seiten, Kanäle mit Threads, Erwähnungen und Reaktionen, eine Direktnachricht,
@@ -369,7 +382,7 @@ drei Sprints: „Sprint 45“ abgeschlossen mit Bilanz, „Sprint 46“ laufend,
 geplant, und ein Vorrat; der Worker muss laufen):
 
 ```bash
-cd backend && HERD_DEMO_ADMIN_PASSWORD=admin-password-123 HERD_DEMO_PASSWORD=seed-people-pw-123 \
+cd backend && HERD_DEMO_ADMIN_PASSWORD=lantern-orbit-73-q HERD_DEMO_PASSWORD=seed-people-pw-123 \
   uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com
 ```
 

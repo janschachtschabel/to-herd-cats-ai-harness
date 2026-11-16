@@ -30,8 +30,11 @@ eigenes Passwort im Profil (mit dem alten).
   Task 18 ([`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)). Abmelden beendet sie; ein
   Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
   beenden alle Sitzungen einer Person.
-- **Cookie-Name:** über https (oder mit `HERD_COOKIE_SECURE=true`) `__Host-herd_session`
-  (Secure, HttpOnly, SameSite=Lax, Pfad `/`), über reines http `herd_session`. Hinter
+- **Cookie-Name:** `HERD_SESSION_COOKIE_NAME` (Standard `herd_session`); über https
+  (oder mit `HERD_COOKIE_SECURE=true`) bekommt er das Präfix `__Host-`, also
+  `__Host-herd_session` (Secure, HttpOnly, SameSite=Lax, Pfad `/`), über reines http
+  bleibt er `herd_session`. Ein Name, der schon mit `__Host-` oder `__Secure-` beginnt,
+  bleibt, wie er ist. Hinter
   einem Reverse Proxy muss die App https erkennen (`HERD_FORWARDED_ALLOW_IPS`), sonst
   fehlt das Präfix. **Nach dem Update auf M9 wird jede über https angemeldete Person
   einmal abgemeldet**, weil das alte Cookie ohne Präfix dort nicht mehr zählt
