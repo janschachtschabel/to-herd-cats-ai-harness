@@ -2,7 +2,8 @@
 # rules in scripts/chart-rules-placement.sh): autoscalers for the API and the worker
 # with their disruption budgets, every Secret named (none generated), backups with an
 # offsite copy and its egress, sign-in through OIDC with its egress, the MCP catalogue,
-# existing claims, Ingress with TLS, NetworkPolicy, monitoring and tracing.
+# attachments in S3 with its egress, existing claims, Ingress with TLS, NetworkPolicy,
+# monitoring and tracing.
 image:
   tag: "1.0.0"
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
@@ -56,6 +57,21 @@ oidc:
 publicUrl: https://herd.example.com
 persistence:
   existingClaim: herd-files
+s3:
+  enabled: true
+  endpoint: https://s3.eu-central-1.amazonaws.com
+  region: eu-central-1
+  bucket: herd-files
+  prefix: herd/prod
+  existingSecret: herd-s3
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 443
+          protocol: TCP
 backup:
   schedule: "15 1 * * *"
   alertAfterHours: 25

@@ -115,7 +115,7 @@ publicUrl: ""
 
 ## @section Files (HERD_DATA_DIR=/data)
 
-## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only)
+## @param persistence.enabled Keep the files (attachments) on a PersistentVolumeClaim mounted at /data in every API pod; off: an emptyDir per pod (files are lost with the pod; for trials only, or with s3.enabled, where /data holds temporary files only)
 ## @param persistence.existingClaim Name of an existing PersistentVolumeClaim to use; empty: the chart creates one (kept on uninstall)
 ## @param persistence.size Size of the claim the chart creates
 ## @param persistence.storageClass Storage class of the claim the chart creates; empty: the cluster default
@@ -128,9 +128,27 @@ persistence:
   accessModes:
     - ReadWriteMany
 
+## @section Attachments in S3 (plan M9 decision 18; docs/SICHERUNG.md)
+
+## @param s3.enabled Keep the attachments in an S3-compatible store (AWS S3, SeaweedFS, Ceph, Garage, ...; HERD_STORAGE=s3) instead of the files claim: several API pods then need no ReadWriteMany volume (persistence.enabled may be false: /data becomes an emptyDir for temporary files of uploads and imports), and the backup job takes the files from the store. Moving an installation's files: with persistence still enabled, `kubectl exec deploy/<release>-to-herd-cats-ai-api -- python -m app.ops storage copy --to s3`, then switch, then run the copy once more (it copies only what is missing)
+## @param s3.endpoint The store's address, scheme://host[:port] without a path (HERD_S3_ENDPOINT), e.g. https://s3.eu-central-1.amazonaws.com or http://seaweedfs.storage.svc:8333 (https outside the cluster); requests are path-style and pass the egress guard, with this host as the one private target. Required with s3.enabled
+## @param s3.region The region the store signs requests for (HERD_S3_REGION); most S3-compatible stores accept us-east-1
+## @param s3.bucket The bucket (HERD_S3_BUCKET, 3 to 63 of a-z 0-9 . -); it must exist. Required with s3.enabled
+## @param s3.prefix Keys go under this prefix inside the bucket (HERD_S3_PREFIX; lower-case segments separated by /), so several installations can share one bucket; empty: the bucket's top level
+## @param s3.existingSecret Name of an existing Secret with the bucket's keys: "access-key-id" (HERD_S3_ACCESS_KEY_ID) and "secret-access-key" (mounted as a file, HERD_S3_SECRET_ACCESS_KEY_FILE). Required with s3.enabled; keys are never values
+## @param s3.egress Egress rules (NetworkPolicyEgressRule list) of the API, worker and backup pods to the store, with networkPolicy.enabled (e.g. its Service's pods on 8333, or its address range on 443). Empty: with networkPolicy.enabled the store is reachable only through networkPolicy.egress
+s3:
+  enabled: false
+  endpoint: ""
+  region: us-east-1
+  bucket: ""
+  prefix: ""
+  existingSecret: ""
+  egress: []
+
 ## @section Backups (plan M9; docs/SICHERUNG.md)
 
-## @param backup.enabled Run the backup CronJob (`python -m app.ops backup run --scheduled`): an archive of the database and the attachments, read back and checked, on a PersistentVolumeClaim of its own, then the retention below and, with backup.offsite.existingSecret, a restic copy offsite. It mounts the files claim (persistence) read-only: on a claim the chart creates with ReadWriteOnce its pod is placed on an API pod's node (pod affinity); ReadWriteOncePod cannot be shared and is refused; an existing claim must be ReadWriteMany or the job must land on the right node by other means. Needs persistence.enabled
+## @param backup.enabled Run the backup CronJob (`python -m app.ops backup run --scheduled`): an archive of the database and the attachments, read back and checked, on a PersistentVolumeClaim of its own, then the retention below and, with backup.offsite.existingSecret, a restic copy offsite. It mounts the files claim (persistence) read-only: on a claim the chart creates with ReadWriteOnce its pod is placed on an API pod's node (pod affinity); ReadWriteOncePod cannot be shared and is refused; an existing claim must be ReadWriteMany or the job must land on the right node by other means. Needs persistence.enabled, or s3.enabled (then it reads the files from the store and mounts no files claim)
 ## @param backup.schedule When the CronJob runs (cron, five fields, time zone Etc/UTC). One at a time (concurrencyPolicy Forbid); a failed run is not retried (backoffLimit 0) and fires HerdBackupFailing
 ## @param backup.keepDaily Days whose newest good archive stays on the claim, 0 to 1000 (HERD_BACKUP_KEEP_DAILY); the newest good archive always stays, failed ones are removed at once
 ## @param backup.keepWeekly Older weeks whose newest good archive stays, 0 to 1000 (HERD_BACKUP_KEEP_WEEKLY); offsite, restic forget gets the same numbers but counts the periods overlapping, so it reaches back less far (docs/SICHERUNG.md)

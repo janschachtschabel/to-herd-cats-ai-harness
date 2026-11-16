@@ -258,6 +258,29 @@ spec:
   egress:
     {{- toYaml . | nindent 4 }}
 {{- end }}
+{{- if and .Values.s3.enabled .Values.s3.egress }}
+---
+# The S3 store (s3.endpoint): the API pods (uploads, downloads), the worker (files
+# removed after their grace) and the backup job. Empty, it is not rendered and the
+# store is reachable only through networkPolicy.egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" . }}-s3-egress
+  labels:
+    {{- include "herd.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" . | nindent 6 }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, worker, backup]
+  policyTypes: [Egress]
+  egress:
+    {{- toYaml .Values.s3.egress | nindent 4 }}
+{{- end }}
 {{- if .Values.postgresql.enabled }}
 ---
 # The bundled PostgreSQL: reachable only from the app pods (and the backup job), no

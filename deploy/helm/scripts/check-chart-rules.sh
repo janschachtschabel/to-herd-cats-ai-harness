@@ -362,5 +362,6 @@ grep -q "HERD_ROLE" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" || fa
 # Scaling, and where the M9 settings and secrets go (plan M9 Task 7).
 source "$root/deploy/helm/scripts/chart-rules-scaling.sh"
 source "$root/deploy/helm/scripts/chart-rules-placement.sh"
+source "$root/deploy/helm/scripts/chart-rules-storage.sh"
 
 echo "chart rules OK"

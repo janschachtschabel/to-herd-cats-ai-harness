@@ -1,20 +1,23 @@
 {{- if .Values.backup.enabled }}
-{{- if not .Values.persistence.enabled }}
-{{- fail "backup.enabled needs persistence.enabled: the backup reads the attachments from the files claim (set backup.enabled=false for trials without one)" }}
+{{- /* With s3.enabled the backup reads the attachments from the store: no files claim. */ -}}
+{{- $filesClaim := not .Values.s3.enabled }}
+{{- if and $filesClaim (not .Values.persistence.enabled) }}
+{{- fail "backup.enabled needs persistence.enabled (or s3.enabled): the backup reads the attachments from the files claim (set backup.enabled=false for trials without one)" }}
 {{- end }}
-{{- if and (not .Values.persistence.existingClaim) (has "ReadWriteOncePod" .Values.persistence.accessModes) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+{{- if and $filesClaim (not .Values.persistence.existingClaim) (has "ReadWriteOncePod" .Values.persistence.accessModes) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
 {{- fail "backup.enabled cannot use a ReadWriteOncePod files claim: the backup pod mounts it beside the API pod (use ReadWriteOnce or ReadWriteMany, or backup.enabled=false)" }}
 {{- end }}
 {{- /* On a ReadWriteOnce claim the chart created, the backup pod must run where an API
 pod has the claim mounted. */ -}}
-{{- $besideApi := and (not .Values.persistence.existingClaim) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
+{{- $besideApi := and $filesClaim (not .Values.persistence.existingClaim) (not (has "ReadWriteMany" .Values.persistence.accessModes)) }}
 # Backups (plan M9, docs/SICHERUNG.md): `python -m app.ops backup run --scheduled` (the
 # trigger recorded is schedule; by hand, without the flag, cli) writes an archive
 # of the database (pg_dump from one snapshot) and the attachments to /backups, reads it
 # back and checks it, applies the retention and, with backup.offsite.existingSecret,
 # copies it with restic. One at a time (Forbid); a failed run is not retried, its
 # backup_run row says why and HerdBackupFailing fires (the worker exports the gauges).
-# The files claim is mounted read-only; HERD_SECRET_KEY (ai.existingSecret) only names
+# The files claim is mounted read-only (with s3.enabled the files come from the store
+# and /data is an emptyDir); HERD_SECRET_KEY (ai.existingSecret) only names
 # its key id in the archive. restic's environment is built by the job: the offsite
 # Secret's storage credentials reach restic alone.
 apiVersion: batch/v1
@@ -95,6 +98,7 @@ spec:
                       key: HERD_SECRET_KEY
                       optional: true
                 {{- end }}
+                {{- with include "herd.s3Env" . }}{{ . | nindent 16 }}{{- end }}
               {{- with .Values.backup.offsite.existingSecret }}
               # HERD_BACKUP_OFFSITE_REPOSITORY, HERD_BACKUP_OFFSITE_PASSWORD, AWS_*, B2_*, ...
               envFrom:
@@ -110,14 +114,20 @@ spec:
                 - name: data
                   mountPath: /data
                   readOnly: true
+                {{- with include "herd.s3VolumeMount" . }}{{ . | nindent 16 }}{{- end }}
                 - name: backups
                   mountPath: /backups
           volumes:
             {{- include "herd.volumesSized" (dict "root" . "tmpSizeLimit" .Values.backup.tmpSizeLimit) | nindent 12 }}
             - name: data
+              {{- if $filesClaim }}
               persistentVolumeClaim:
                 claimName: {{ .Values.persistence.existingClaim | default (printf "%s-data" (include "herd.fullname" .)) }}
                 readOnly: true
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            {{- with include "herd.s3Volume" . }}{{ . | nindent 12 }}{{- end }}
             - name: backups
               persistentVolumeClaim:
                 claimName: {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "herd.fullname" .)) }}

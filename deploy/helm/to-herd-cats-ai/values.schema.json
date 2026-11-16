@@ -99,11 +99,30 @@
       "required": ["enabled", "existingClaim", "size", "storageClass", "accessModes"],
       "description": "The files volume (attachments) of the API pods"
     },
+    "s3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "description": "HERD_STORAGE=s3 for the API, worker and backup pods"},
+        "endpoint": {"type": "string", "maxLength": 2048, "pattern": "^(https?://[A-Za-z0-9.:\\[\\]-]+/?)?$", "description": "HERD_S3_ENDPOINT: scheme://host[:port], no path, no credentials"},
+        "region": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$", "description": "HERD_S3_REGION"},
+        "bucket": {"type": "string", "pattern": "^([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])?$", "description": "HERD_S3_BUCKET; required with s3.enabled"},
+        "prefix": {"type": "string", "maxLength": 512, "pattern": "^/?([a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)*/?)?$", "description": "HERD_S3_PREFIX: lower-case segments separated by /"},
+        "existingSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "A Secret with the keys access-key-id and secret-access-key; required with s3.enabled"},
+        "egress": {
+          "type": "array",
+          "description": "NetworkPolicyEgressRules of the API, worker and backup pods to the store, with networkPolicy.enabled",
+          "items": {"type": "object"}
+        }
+      },
+      "required": ["enabled", "endpoint", "region", "bucket", "prefix", "existingSecret", "egress"],
+      "description": "Attachments in an S3-compatible store"
+    },
     "backup": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run --scheduled); needs persistence.enabled"},
+        "enabled": {"type": "boolean", "description": "Run the backup CronJob (python -m app.ops backup run --scheduled); needs persistence.enabled or s3.enabled"},
         "schedule": {"type": "string", "pattern": "^\\S+( \\S+){4}$", "description": "Cron schedule of the CronJob, five fields, Etc/UTC"},
         "keepDaily": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_DAILY"},
         "keepWeekly": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "HERD_BACKUP_KEEP_WEEKLY"},
@@ -500,5 +519,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

@@ -261,6 +261,9 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{ include "herd.aiApiEnv" . }}
 {{ include "herd.mcpApiEnv" . }}
 {{ include "herd.oidcApiEnv" . }}
+{{- with include "herd.s3Env" . }}
+{{ . }}
+{{- end }}
 {{- if include "herd.publicUrl" . }}
 {{ include "herd.publicUrlEnv" . }}
 {{- end }}
@@ -282,6 +285,9 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{- end }}
 {{ include "herd.aiWorkerEnv" . }}
 {{ include "herd.mcpWorkerEnv" . }}
+{{- with include "herd.s3Env" . }}
+{{ . }}
+{{- end }}
 # The backups' gauges (docs/SICHERUNG.md): HerdBackupTooOld's limit.
 - name: HERD_BACKUP_ALERT_AFTER_HOURS
   value: {{ .Values.backup.alertAfterHours | quote }}
@@ -299,5 +305,53 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{ include "herd.internalTokenEnv" . }}
 {{- if include "herd.publicUrl" . }}
 {{ include "herd.publicUrlEnv" . }}
+{{- end }}
+{{- end -}}
+
+{{/* Attachments in S3 (s3.*, plan M9 decision 18): the settings of the API, worker
+and backup pods. The access key comes from the Secret by reference, the secret key as a
+file (HERD_S3_SECRET_ACCESS_KEY_FILE); neither is ever a value. */}}
+{{- define "herd.s3Env" -}}
+{{- if .Values.s3.enabled -}}
+{{- $secret := required "s3.existingSecret is required with s3.enabled (keys access-key-id and secret-access-key)" .Values.s3.existingSecret -}}
+- name: HERD_STORAGE
+  value: s3
+- name: HERD_S3_ENDPOINT
+  value: {{ required "s3.endpoint is required with s3.enabled" .Values.s3.endpoint | quote }}
+- name: HERD_S3_REGION
+  value: {{ .Values.s3.region | quote }}
+- name: HERD_S3_BUCKET
+  value: {{ required "s3.bucket is required with s3.enabled" .Values.s3.bucket | quote }}
+{{- with .Values.s3.prefix }}
+- name: HERD_S3_PREFIX
+  value: {{ . | quote }}
+{{- end }}
+- name: HERD_S3_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secret }}
+      key: access-key-id
+- name: HERD_S3_SECRET_ACCESS_KEY_FILE
+  value: /var/run/secrets/herd/s3/secret-access-key
+{{- end }}
+{{- end -}}
+
+{{- define "herd.s3Volume" -}}
+{{- if .Values.s3.enabled -}}
+- name: s3-secret
+  secret:
+    secretName: {{ .Values.s3.existingSecret }}
+    defaultMode: 0440
+    items:
+      - key: secret-access-key
+        path: secret-access-key
+{{- end }}
+{{- end -}}
+
+{{- define "herd.s3VolumeMount" -}}
+{{- if .Values.s3.enabled -}}
+- name: s3-secret
+  mountPath: /var/run/secrets/herd/s3
+  readOnly: true
 {{- end }}
 {{- end -}}

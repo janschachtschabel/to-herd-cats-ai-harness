@@ -84,8 +84,10 @@ spec:
             {{- include "herd.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             {{- include "herd.volumeMounts" . | nindent 12 }}
+            {{- with include "herd.s3VolumeMount" . }}{{ . | nindent 12 }}{{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
+        {{- with include "herd.s3Volume" . }}{{ . | nindent 8 }}{{- end }}
 ---
 # The worker's internal port, for the metrics scrape only (headless: nothing else
 # connects to it). The ServiceMonitor selects it by app.kubernetes.io/endpoint.
