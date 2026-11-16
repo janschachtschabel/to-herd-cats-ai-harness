@@ -493,6 +493,11 @@ genau eine Instanz gebunden** (Plan M9, Entscheidung 17; ohne Redis):
 - **Keine Instanz:** Meldet sich keine lebende Instanz (etwa kurz nach dem Start, bevor
   der Collab-Prozess sich angemeldet hat), schließt das Relay mit 4502
   `collab.unavailable`; der Editor versucht es weiter.
+- **Wartungsmodus:** Während des Einspielens eines Archivs nimmt die interne API weder
+  Anmeldungen noch Freigaben von Instanzen an (503 `maintenance.active`; auch der
+  Herzschlag schreibt in die Datenbank, die gerade ersetzt wird). Die Instanzen laufen
+  weiter, gelten nach 15 s als weg und melden sich nach dem Wartungsmodus innerhalb von
+  5 s wieder an; bis dahin schließt das Relay mit 4502, und der Editor versucht es weiter.
 - **Bemessung:** Jede Instanz hat ihr eigenes Speicherbudget
   (`HERD_COLLAB_MEMORY_BUDGET_MB`) und Limit (Faustregel oben). Die Instanzen teilen sich
   die Seiten, nicht die Bearbeitenden einer Seite: Eine einzelne sehr gefragte Seite
