@@ -13,9 +13,14 @@
 #      of their content);
 #   5. app B: /ready, the demo admin signs in, A's session cookie does not, the
 #      attachment downloaded from B has A's SHA-256;
-#   6. a manipulated copy of the archive fails `restore check` with
+#   6. B changed (a page "Nach der Sicherung"), then replaced while it runs (plan M9
+#      task 12): `restore apply --replace --confirm "<organisation>"` answers with the
+#      safety archive, B answered 503 in between, B's session is gone, the page made
+#      after the archive is gone, the attachment is still there, the safety archive
+#      is listed (`backup list`, trigger pre_restore);
+#   7. a manipulated copy of the archive fails `restore check` with
 #      archive.member_checksum;
-#   7. both apps stopped, both databases dropped, the scratch directory removed.
+#   8. both apps stopped, both databases dropped, the scratch directory removed.
 #
 # Prints "REHEARSAL OK" and exits 0 only if every step holds.
 #
@@ -141,6 +146,41 @@ code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-a" "$base_b/api/aut
 sha_b="$(curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$base_b$attachment_url" | sha256sum | cut -d' ' -f1)"
 [[ $sha_b == "$sha_a" ]] || fail "the attachment from B differs"
 echo "   attachment sha256 $sha_b on both"
+
+say "replace B while it runs, from the same archive"
+api_b() { curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$@"; }
+json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
+org_name="$(api_b "$base_b/api/auth/me" | json '["org"]["name"]')"
+later_id="$(api_b -H 'Content-Type: application/json' -X POST "$base_b/api/spaces/$space_id/pages" \
+  --data '{"title": "Nach der Sicherung"}' | json '["id"]')"
+code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-b" "$base_b/api/pages/$later_id")"
+[[ $code == 200 ]] || fail "the page made on B answered $code"
+# What B answers meanwhile, twice a second.
+(while :; do
+  curl -s -o /dev/null -w '%{http_code}\n' -b "$work/jar-b" "$base_b/api/auth/me" || true
+  sleep 0.5
+done) >"$work/watch.out" 2>/dev/null &
+watch=$!
+pids+=("$watch")
+app_env "$db_b" "$work/data-b" "$py" -m app.ops restore apply "$archive" --replace \
+  --confirm "$org_name" | tail -1 | tee "$work/replace.out"
+kill "$watch" 2>/dev/null || true
+grep -q '^replaced by .*safety archive herd-' "$work/replace.out" || fail "replace"
+grep -qx 503 "$work/watch.out" || fail "B never answered 503 during the replace"
+echo "   B answered $(sort "$work/watch.out" | uniq -c | paste -sd' ') meanwhile"
+for _ in $(seq 1 20); do  # the cache follows the NOTIFY of maintenance's end
+  code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-b" "$base_b/api/auth/me")"
+  [[ $code == 503 ]] || break
+  sleep 0.5
+done
+[[ $code == 401 ]] || fail "B's session after the replace answered $code"
+[[ $(login "$base_b" "$work/jar-b") == 200 ]] || fail "login on B after the replace"
+code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-b" "$base_b/api/pages/$later_id")"
+[[ $code == 404 ]] || fail "the page made after the archive answered $code"
+sha_r="$(curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$base_b$attachment_url" | sha256sum | cut -d' ' -f1)"
+[[ $sha_r == "$sha_a" ]] || fail "the attachment after the replace differs"
+app_env "$db_b" "$work/data-b" "$py" -m app.ops backup list | grep -q $'\tpre_restore\tok\t' \
+  || fail "the safety archive is not listed"
 
 say "a manipulated archive is refused"
 cp "$archive" "$work/spoiled.tar"

@@ -1094,6 +1094,12 @@ DBOS aus: [Aufgaben im Worker](#aufgaben-im-worker-m7).
   der dritten solchen endet der Lauf mit `error` (Detail `attempts`).
 - Ohne laufenden Worker gehen keine Läufe verloren; sie warten (`HerdRunsQueued`,
   `HerdWorkerAbsent`).
+- **Wartungsmodus** (M9b, Einspielen eines Archivs im laufenden Betrieb,
+  [`SICHERUNG.md`](SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)):
+  Der Worker nimmt keine Läufe auf, feuert keine Aufgaben und liefert keine Ereignisse
+  aus; Läufe in Arbeit gibt er ab wie bei SIGTERM. Nach der Wartung nimmt ein Worker
+  sie wieder auf, sofern das eingespielte Archiv sie enthält (ein Lauf, dessen
+  Sperrfrist im Archiv noch galt, wartet bis zu deren Ende).
 
 ### Aufgaben im Worker (M7)
 

@@ -2,8 +2,8 @@
 
 Stand: M9a (Archiv und Sicherung über die Kommandozeile, Wiederherstellung in eine leere
 Installation mit Probe, Zeitplan, Aufbewahrung, Offsite mit restic, Alarme, Aufbewahrung
-je Tabelle). Einspielen in eine laufende Installation (Wartungsmodus) und Sicherung in
-der Verwaltung folgen in M9b.
+je Tabelle) und aus M9b der Wartungsmodus mit dem Einspielen in eine **laufende**
+Installation über die Kommandozeile. Die Sicherung in der Verwaltung folgt in M9b.
 
 **Kurz für den Betrieb:**
 
@@ -16,9 +16,12 @@ der Verwaltung folgen in M9b.
    `HERD_BACKUP_OFFSITE_PASSWORD` setzen (restic, verschlüsselt).
 4. Alarme `HerdBackupTooOld`, `HerdBackupFailing` und `HerdOffsiteBackupFailing`
    beobachten (Prometheus, Chart).
-5. Wiederherstellen: in eine **leere** Datenbank, mit gestoppter App (Ablauf für
-   [Compose](#ablauf-in-compose) und [Kubernetes](#ablauf-in-kubernetes)); einmal im
-   Jahr proben.
+5. Wiederherstellen: am einfachsten **im laufenden Betrieb** mit
+   `restore apply ARCHIV --replace --confirm "<Name der Organisation>"`
+   ([unten](#einspielen-in-eine-laufende-installation-wartungsmodus)): zuerst ein
+   Sicherheitsarchiv des jetzigen Stands, dazwischen der Wartungsmodus. Auf einer neuen
+   Maschine in eine **leere** Datenbank (Ablauf für [Compose](#ablauf-in-compose) und
+   [Kubernetes](#ablauf-in-kubernetes)). Einmal im Jahr proben.
 
 ## Was gesichert wird
 
@@ -294,6 +297,135 @@ gebaut (Quellarchiv mit der Prüfsumme aus den `SHA256SUMS` der Veröffentlichun
 1.27.4, Module mit Sicherheitskorrekturen aus `deploy/restic/go.mod` und `go.sum`;
 siehe `Dockerfile`), weil die veröffentlichten Binärdateien mit älterem Go gebaut sind.
 
+## Einspielen in eine laufende Installation (Wartungsmodus)
+
+Ersetzt den ganzen Stand einer **laufenden** Installation durch ein Archiv, ohne die App
+anzuhalten. Mit den `HERD_*`-Einstellungen der Installation (Datenbank,
+`HERD_DATA_DIR`, `HERD_SECRET_KEY`, `HERD_BACKUP_DIR`):
+
+```bash
+python -m app.ops restore check ARCHIV         # erwartet: restore.target_not_empty, sonst nichts
+python -m app.ops restore apply ARCHIV --replace --confirm "<Name der Organisation>" [--without-secrets]
+python -m app.ops maintenance status           # "off" oder "on restore since <Zeit>"
+python -m app.ops maintenance off              # nur nach einem Abbruch (unten)
+```
+
+`--confirm` verlangt den Namen der Organisation der **laufenden** Installation, genau
+(Groß- und Kleinschreibung zählen): ein Schutz gegen das Einspielen in die falsche
+Installation. Es ist der Name aus `HERD_BOOTSTRAP_ORG_NAME` beim ersten Start (Standard
+„Meine Organisation“); angemeldet zeigt ihn `/api/auth/me` im Browser (`org.name`). Ohne
+`--confirm` endet der Befehl mit `restore.confirm_missing`.
+
+**Was geschieht** (alles unter der Advisory-Sperre `herd.schema`, keine Migration und
+keine zweite Wiederherstellung dazwischen):
+
+1. die Prüfungen aus [`restore check`](#wiederherstellen-in-eine-leere-installation)
+   außer „leer“, dazu der Name;
+2. ein **Sicherheitsarchiv** des jetzigen Stands nach `HERD_BACKUP_DIR` (eine normale
+   Sicherung mit Auslöser `pre_restore`, sie zählt für Aufbewahrung und Alarme wie jede
+   andere); misslingt es, geht nichts weiter. Danach hält der Befehl die Sperre
+   `herd.backup`: keine andere Sicherung liest die Datenbank, während sie getauscht wird;
+3. **Wartungsmodus an** (Audit `maintenance.started`); 10 Sekunden Auslauf, in denen
+   jeder Prozess davon erfährt (sofort über `NOTIFY herd_maintenance`, spätestens nach
+   5 Sekunden) und laufende Anfragen enden;
+4. die Dateien des Archivs, die noch nicht in der Ablage liegen, dann die Datenbank in
+   **einer** Transaktion (`psql`): `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`,
+   der Dump des Archivs (aus `pg_restore --file=-`, ohne Zwischendatei), der
+   Wartungsmodus im eingespielten Stand, `COMMIT`. Das `COMMIT` geht erst hinaus, wenn
+   `pg_restore` fehlerfrei durch ist; bei jedem Fehler wird `psql` beendet, bevor es ein
+   `COMMIT` liest, und die Transaktion rollt zurück;
+5. `alembic upgrade head` (ein älteres Archiv wird angehoben), dann wie bei der
+   leeren Installation: alle Sitzungen, offenen Anmeldeabläufe und
+   Live-Berechtigungen gelöscht, Audit `backup.restored` (mit `replaced`,
+   `safety_archive` und `via: cli`); das Sicherheitsarchiv steht danach auch in der
+   eingespielten Installation in `backup list`; Dateien, die nur der alte Stand
+   brauchte, bekommen einen Grabstein und verschwinden nach 48 Stunden, wenn nichts
+   sie wieder braucht;
+6. **Wartungsmodus aus** (Audit `maintenance.ended`).
+
+Die Ausgabe nennt Revisionen, Tabellen, Dateien und das Sicherheitsarchiv:
+`replaced by <archiv>: revision … -> …, 70 tables, 3 files; safety archive herd-….tar`.
+Die Dauer ist die einer Sicherung plus die eines Einspielens plus 10 Sekunden (Messung
+mit 10.000 Seiten und 1 GiB Anhängen: Sicherung 10–11 s, Einspielen 8–9 s,
+[`STECKBRIEF.md`](STECKBRIEF.md)).
+
+**Was Personen merken:** Im Wartungsmodus antwortet die API auf alles mit 503
+`maintenance.active` und `Retry-After: 30`, außer `GET /api/maintenance` (sagt, seit wann
+und warum) und den Dateien der Oberfläche; `/health`, `/ready` und `/metrics` auf dem
+internen Port bleiben erreichbar. Live-Verbindungen (`/api/stream`) enden und verbinden
+sich neu (dann 503); die Live-Bearbeitung schließt mit 4503 und speichert nichts mehr
+(was in den letzten Sekunden getippt wurde, gehört zum Stand, der ersetzt wird). Danach
+ist jede Person abgemeldet und meldet sich neu an. Ein Zugang über `/mcp` antwortet
+ebenfalls 503; Zugangstoken bleiben gültig, wenn das Archiv sie enthält.
+
+**Was der Worker tut:** Die Schleifen pausieren (keine Ereignisse, keine Fälligkeiten,
+keine Aufräumarbeiten); Agenten-Läufe, die gerade laufen, werden wie bei einem Stopp
+abgebrochen und nach der Wartung aus ihrem Journal fortgesetzt, sofern das Archiv sie
+enthält. Ein pausierter Worker bleibt `ready` (kein `HerdWorkerStalled`).
+
+**Voraussetzungen:** `psql` und `pg_restore` im `PATH` (im Image enthalten); die
+Datenbankrolle der App muss das Schema `public` löschen dürfen (Besitzerin der Datenbank
+oder des Schemas; bei verwalteten Datenbanken prüfen); auf dem Sicherungs-Volume Platz
+für ein weiteres Archiv. Eine Transaktion, die irgendwo offen hängt, hält das
+`DROP SCHEMA` höchstens 60 Sekunden auf (`lock_timeout`), dann scheitert der Tausch.
+
+Abgelehnt wird (am Ziel ändert sich nichts) mit den Codes der Prüfung und:
+
+| Code | Bedeutung |
+|---|---|
+| `restore.confirm_missing` | `--replace` ohne `--confirm` |
+| `restore.confirm_mismatch` | der Name stimmt nicht (oder die Datenbank hat keine Organisation: dann in eine leere Installation einspielen) |
+| `restore.safety_backup_failed:<code>` | das Sicherheitsarchiv misslang, `<code>` aus der Tabelle der Sicherung oben (`backup.schema_behind`: erst migrieren) |
+| `backup.already_running` | eine Sicherung begann gerade; noch einmal versuchen |
+
+Scheitert der Tausch (`failed <code>`), ist der **alte Stand vollständig** da: die eben
+geschriebenen Dateien sind entfernt, der Wartungsmodus ist aus, das Audit hat
+`backup.restore_failed` (Archiv, Code). Das Sicherheitsarchiv bleibt `ok` in
+`backup list`. Codes: `restore.swap_failed` (ein SQL-Fehler im Tausch, etwa fehlende
+Rechte für `DROP SCHEMA` oder die Sperrfrist), `restore.pg_restore_failed`,
+`restore.tool_missing`, `archive.member_checksum`, `restore.failed` (etwas anderes).
+
+**Abbruch nach dem Tausch** (`failed restore.finish_failed`, selten: etwa die Migration
+oder die Verbindung brach ab): Die Datenbank hat schon den Stand des Archivs, der
+Wartungsmodus bleibt **an** (die App bedient niemanden mit halb fertigem Stand). Ursache
+im Log beheben, die Datenbank migrieren, falls nötig (`HERD_ROLE=migrate`, im Chart der
+Migrations-Job), und denselben Befehl noch einmal ausführen: Er nimmt ein neues
+Sicherheitsarchiv und läuft ganz durch. `maintenance off` nur, wer bewusst ohne
+erneutes Einspielen weitermacht (die Sitzungen aus dem Archiv gelten dann noch). Endet der
+Befehl selbst mitten im Tausch (Prozess beendet), rollt die Datenbank zurück; der
+Wartungsmodus bleibt an, bis `maintenance off` oder ein neuer Versuch ihn beendet.
+
+Das Recht `backup.manage` (Sicherungen und Einspielen in der Verwaltung, M9b) hat nur die
+Rolle `owner`, nicht `admin`: Ein Archiv enthält Direktnachrichten, die Admins nur über
+die protokollierte Einsicht lesen. Die Kommandozeile handelt als `system` (`via=cli`).
+
+### Im laufenden Betrieb mit Compose
+
+Nicht in dieser Umgebung ausgeführt (kein Docker); die Befehle folgen `compose.yml`. Die
+App läuft weiter; eingespielt wird aus einem Einmal-Container des App-Dienstes (der
+Dienst `backup` hängt die Anhänge nur lesend ein):
+
+```bash
+docker compose exec backup python -m app.ops backup list   # das Archiv wählen
+docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
+  app restore check /backups/<archiv>.tar          # erwartet: restore.target_not_empty
+docker compose run --rm --no-deps -v backups:/backups --entrypoint "python -m app.ops" \
+  app restore apply /backups/<archiv>.tar --replace --confirm "Meine Organisation"
+```
+
+Mit `compose.nodes.yml` genauso; alle Knoten gehen gemeinsam in den Wartungsmodus.
+
+### Im laufenden Betrieb mit Kubernetes
+
+Nicht in einem Cluster ausgeführt. Einen Job aus dem CronJob ableiten wie in Schritt 4
+[unten](#ablauf-in-kubernetes), aber mit `command` `["/usr/bin/tini", "--", "python",
+"-m", "app.ops", "restore", "apply", "/backups/<archiv>.tar", "--replace", "--confirm",
+"<Name der Organisation>"]`; beim Volume und beim Einhängen `data` jedes
+`readOnly: true` entfernen, den `affinity`-Block **behalten** (die API-Pods laufen, und
+eine ReadWriteOnce-PVC der Anhänge verlangt denselben Knoten). Die App nicht anhalten
+und den CronJob nicht aussetzen (das Einspielen hält die Sperre `herd.backup`; ein
+CronJob, der gerade dann startet, endet mit `backup.already_running`).
+
 ## Wiederherstellen (in eine leere Installation)
 
 Eingespielt wird über die Kommandozeile, mit den `HERD_*`-Einstellungen der
@@ -307,7 +439,8 @@ python -m app.ops restore apply ARCHIV [--without-secrets]   # nur in eine leere
 **Leer** heißt: keine Tabelle im Schema `public` (eine frisch angelegte Datenbank, noch
 nicht migriert, kein App-Prozess hat sie gestartet) und in der Ablage kein Schlüssel des
 Archivs mit anderem Inhalt (gleicher Schlüssel = gleicher Inhalt, geprüft über SHA-256).
-Einspielen in eine laufende Installation folgt in M9b.
+Eine laufende Installation ersetzt `--replace`
+([unten](#einspielen-in-eine-laufende-installation-wartungsmodus)).
 
 Abgelehnt wird mit einem Code; am Ziel ändert sich dann nichts:
 
@@ -506,7 +639,10 @@ Bereiche, für die Weitergabe von Wissen und als lesbare Kopie ohne die App.
 Demodaten und Anhang, Sicherung während A läuft, Einspielen in eine leere Datenbank B,
 Vergleich aller Tabellen (`scripts/compare_databases.py`: Zeilen und Prüfsumme des
 Inhalts), Anmeldung an B, das alte Cookie von A gilt nicht, der Anhang hat dieselbe
-Prüfsumme, ein manipuliertes Archiv wird abgelehnt. Ohne Docker, gegen einen
+Prüfsumme; dann wird das laufende B (mit einer neuen Seite) durch dasselbe Archiv
+ersetzt (`--replace`): B antwortet dazwischen 503, danach ist Bs Sitzung ungültig, die
+neue Seite weg, der Anhang da und das Sicherheitsarchiv gelistet; zuletzt wird ein
+manipuliertes Archiv abgelehnt. Ohne Docker, gegen einen
 PostgreSQL-Server über `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` (Standard
 `localhost:5433`, `herd`); Ausgabe der letzten Probe in
 [`demo/m9.md`](demo/m9.md). In der CI läuft sie als Job `restore` gegen PostgreSQL 17.

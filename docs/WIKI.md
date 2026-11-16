@@ -552,7 +552,10 @@ die Adresse des nginx, `HERD_COOKIE_SECURE=true`.
   mehr als ein Viertel aller), 4507 Live-Editor ausgelastet (Speicherbudget des
   Collab-Prozesses, siehe oben), 4408/4504 Verbindungsaufbau zu langsam oder 15 Minuten
   nichts gesendet (der Browser verbindet sich neu),
-  4502/4503 Collab-Prozess nicht erreichbar bzw. aus.
+  4502/4503 Collab-Prozess nicht erreichbar bzw. aus; 4503 mit Grund `maintenance` bzw.
+  `maintenance.active`: die Installation ist im Wartungsmodus (Einspielen eines Archivs,
+  [`SICHERUNG.md`](SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)),
+  das Dokument wird ungespeichert verworfen.
 - Metriken auf Port 9090: `herd_collab_connections` (offene Verbindungen),
   `herd_collab_saves_total{result}` (Speicherungen: `saved`, `generation_ended`,
   `revoked`, `too_large`, `refused`, `unrepresentable`: ein Stand, der sich nicht als

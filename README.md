@@ -9,8 +9,9 @@ Menschen. Die Spezifikation steht in
 Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)).
 
 **Stand: M9a (Produktion, erster Teil) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
-M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7); hybride Suche und Embeddings (M5
-Tasks 8 bis 11) und M9b fehlen noch.** Aus M1:
+M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7), dazu aus M9b der Wartungsmodus mit
+dem Einspielen in eine laufende Installation; hybride Suche und Embeddings (M5 Tasks 8
+bis 11) und der Rest von M9b fehlen noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -140,7 +141,11 @@ Aus M9a der Betrieb in Produktion:
   Zeitplan (Compose-Dienst `backup`, CronJob im Chart) mit Aufbewahrung
   (Großvater-Vater-Sohn), verschlüsselter Offsite-Kopie mit restic und Alarmen;
   **Wiederherstellung** in eine leere Installation (`python -m app.ops restore …`), als
-  Probe durchgespielt.
+  Probe durchgespielt; seit M9b auch **im laufenden Betrieb** (`restore apply …
+  --replace --confirm "<Organisation>"`): erst ein Sicherheitsarchiv, dann der
+  **Wartungsmodus** (die API antwortet 503, der Worker pausiert), der Tausch in einer
+  Transaktion (scheitert er, bleibt der alte Stand ganz), danach ist jede Person
+  abgemeldet.
 - **Anmeldung über OpenID Connect**: Google als Vorlage (nur Client-ID und Secret
   eintragen), jeder andere Anbieter mit Discovery (Keycloak, Entra ID …); Konten
   verknüpfen im Profil. **Selbstregistrierung** für erlaubte Domains: das neue Konto
@@ -381,7 +386,7 @@ zu ändern sind:
 |---|---|---|
 | `HERD_PUBLIC_PORT` | `8080` | Port der API und der Weboberfläche (`/api`, `/mcp`, `/collab`) |
 | `HERD_INTERNAL_PORT` | `9090` | Port für Proben (`/health`, `/ready`), Metriken (`/metrics`) und die Rückrufe des Collab-Prozesses (`/internal/*`); nie nach außen freigeben |
-| `HERD_BOOTSTRAP_ORG_NAME` | `Meine Organisation` | Name der Organisation, die der allererste Start anlegt (später in der Verwaltung zu ändern); ein Wort daraus darf nicht im Passwort der ersten Inhaberin stehen |
+| `HERD_BOOTSTRAP_ORG_NAME` | `Meine Organisation` | Name der Organisation, die der allererste Start anlegt (die Oberfläche ändert ihn nicht; `restore apply --replace` verlangt ihn als Bestätigung); ein Wort daraus darf nicht im Passwort der ersten Inhaberin stehen |
 | `HERD_SESSION_COOKIE_NAME` | `herd_session` | Name des Sitzungs-Cookies; über https mit dem Präfix `__Host-` ([`docs/ANMELDUNG.md`](docs/ANMELDUNG.md)) |
 | `HERD_COLLAB_API_URL` | `http://127.0.0.1:<HERD_INTERNAL_PORT>` | Wo der Collab-Prozess die API erreicht (ihren internen Port); nur für die Rolle `collab` in einem eigenen Container oder Pod nötig (Compose und Chart setzen sie) |
 | `HERD_COLLAB_SCRIPT` | `collab/server.mjs` des Quellstands (im Image `/app/collab/server.mjs`) | Das Skript, das `node` als Collab-Prozess startet; nur für eigene Pfade |
@@ -486,7 +491,9 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   Archive des ganzen Datenstands (Datenbank und Anhänge aus einem Snapshot) nach
   `HERD_BACKUP_DIR`; `backup run` dazu mit Aufbewahrung und restic-Kopie, nach Zeitplan
   im Compose-Dienst `backup` bzw. im CronJob des Charts, mit Alarmen; `restore
-  check|apply` spielt in eine leere Installation ein. Format, Schlüssel, Fehlercodes und
+  check|apply` spielt in eine leere Installation ein, `restore apply --replace --confirm
+  "<Organisation>"` ersetzt eine laufende (Sicherheitsarchiv, Wartungsmodus mit 503,
+  `python -m app.ops maintenance status|off`). Format, Schlüssel, Fehlercodes und
   Betrieb in [`docs/SICHERUNG.md`](docs/SICHERUNG.md). Archive sind unverschlüsselt: das
   Volume schützen und `HERD_SECRET_KEY` getrennt aufbewahren.
 - **Autoskalierung und Datenbankverbindungen** (M9): Jeder API- und Worker-Prozess hat
@@ -911,7 +918,8 @@ Genau ein Head.
    laufen.
 3. Zurück zur vorigen Version nur mit dem Archiv aus Schritt 1, in eine leere Datenbank
    ([`docs/SICHERUNG.md`](docs/SICHERUNG.md#wiederherstellen-in-eine-leere-installation));
-   eine neuere Revision spielt die alte Version nicht ein (`restore.archive_newer`).
+   eine neuere Revision spielt die alte Version nicht ein (`restore.archive_newer`), und
+   `--replace` taugt dafür nicht (es hebt das Archiv auf den Head des laufenden Codes).
 
 **Einmal abgemeldet nach dem Update auf M9:** Über https heißen die Cookies seit M9
 `__Host-herd_session` und `__Host-herd_oidc` (ASVS V3.3.3). Das alte Cookie
