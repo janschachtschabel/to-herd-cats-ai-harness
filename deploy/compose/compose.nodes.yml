@@ -7,11 +7,14 @@
 # `app` (role all) is switched off. `migrate` migrates once and exits; `api-a` and
 # `api-b` serve (role api, published on HERD_HOST_PORT and HERD_HOST_PORT_B); `worker`
 # is the only outbox dispatcher (role worker: notifications, page timelines, live
-# updates) and works on the agent runs; `collab` runs live editing (role collab) and calls the API nodes' internal
-# port under the alias `api`; `backup` (compose.yml) starts after the migration. Both API
-# nodes share the files volume (one host), or an S3 store with HERD_STORAGE=s3 (set in
-# .env, see compose.yml; the worker removes unused files after their grace). Only the
-# two public ports are published; 9090 and the collab port stay inside.
+# updates) and works on the agent runs; `collab-a` and `collab-b` run live editing (role
+# collab, two instances: each announces its own address, HERD_COLLAB_ADVERTISE_URL, and
+# the API binds every page to one of them, docs/WIKI.md) and call the API nodes'
+# internal port under the alias `api`; `backup` (compose.yml) starts after the
+# migration. Both API nodes share the files volume (one host), or an S3 store with
+# HERD_STORAGE=s3 (set in .env, see compose.yml; the worker removes unused files after
+# their grace). Only the two public ports are published; 9090 and the collab port stay
+# inside.
 
 x-node: &node
   image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
@@ -48,7 +51,6 @@ x-api-env: &api-env
   HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
   HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
   HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
-  HERD_COLLAB_URL: ws://collab:1234
   HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
   HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
   HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
@@ -69,6 +71,30 @@ x-api-env: &api-env
 x-ai-keys: &ai-keys
   - path: ai.env
     required: false
+
+# A collab instance (role collab). Live documents live in this process's memory: it
+# loads no more than HERD_COLLAB_MEMORY_BUDGET_MB (400) by its estimate and refuses the
+# next page as "busy" (4507). The limit holds that, the process and one check worker
+# with a fifth to spare (docs/WIKI.md, sizing rule); a larger budget needs a larger
+# limit. On SIGTERM it drains: it saves, lets go of its pages and exits (the browsers
+# reconnect to the other instance).
+x-collab-env: &collab-env
+  HERD_ROLE: collab
+  HERD_COLLAB_API_URL: http://api:9090
+  HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
+  HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
+
+x-collab: &collab
+  <<: *node
+  mem_limit: 1g
+  # The image's health check asks port 9090, which the collab role does not serve.
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+    interval: 10s
+    timeout: 3s
+    start_period: 30s
+    retries: 3
+  stop_grace_period: 30s
 
 x-after-migrate: &after-migrate
   db:
@@ -150,23 +176,14 @@ services:
   backup:
     depends_on: *after-migrate
 
-  collab:
-    <<: *node
+  collab-a:
+    <<: *collab
     environment:
-      HERD_ROLE: collab
-      HERD_COLLAB_API_URL: http://api:9090
-      HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN}
-      HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
-    # Live documents live in this process's memory: it loads no more than
-    # HERD_COLLAB_MEMORY_BUDGET_MB (400) by its estimate and refuses the next page as
-    # "busy" (4507). The limit holds that, the process and one check worker with a fifth
-    # to spare (docs/WIKI.md, sizing rule); a larger budget needs a larger limit.
-    mem_limit: 1g
-    # The image's health check asks port 9090, which the collab role does not serve.
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:1234/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-      interval: 10s
-      timeout: 3s
-      start_period: 30s
-      retries: 3
-    stop_grace_period: 30s
+      <<: *collab-env
+      HERD_COLLAB_ADVERTISE_URL: ws://collab-a:1234
+
+  collab-b:
+    <<: *collab
+    environment:
+      <<: *collab-env
+      HERD_COLLAB_ADVERTISE_URL: ws://collab-b:1234

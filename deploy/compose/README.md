@@ -147,9 +147,12 @@ smoke.sh` runs the smoke test on `compose.s3.yml`.
 `compose.nodes.yml` replaces `app` with the roles one by one, as the Helm chart runs
 them: `migrate` (once, then exits), `api-a` and `api-b` (role `api`, published on
 `HERD_HOST_PORT` and `HERD_HOST_PORT_B`, default 8081), `worker` (role `worker`, the only
-outbox dispatcher) and `collab` (role `collab`). A message written on one node arrives
-live on the other through PostgreSQL (`LISTEN`/`NOTIFY`). It is the acceptance setup for
-live delivery across nodes, not a production layout (one host, one database).
+outbox dispatcher) and two collab instances, `collab-a` and `collab-b` (role `collab`,
+each announcing its own address in `HERD_COLLAB_ADVERTISE_URL`; the API binds every page
+to one of them and relays all of its browsers there, `docs/WIKI.md`). A message written
+on one node arrives live on the other through PostgreSQL (`LISTEN`/`NOTIFY`). It is the
+acceptance setup for live delivery across nodes, not a production layout (one host, one
+database).
 
 Only processes that run a worker (`app` in role `all`, `worker` here) report the outbox
 gauges on `/metrics` (`herd_outbox_pending`, `herd_outbox_oldest_pending_seconds`,
@@ -172,7 +175,9 @@ docker compose -f compose.yml -f compose.nodes.yml down -v
 throwaway volumes (and a throwaway `.env` if there is none), logs in, checks
 `/ready`, the user id and the published ports, creates a page with an attachment (the
 files volume), opens the page's live-editing WebSocket with the owner's cookie (the
-collab process authenticates it) and without one (closed with 4401), opens the live
+collab process authenticates it) and without one (closed with 4401), checks that the
+live collab instances announced themselves (one in role `all`, two with
+`compose.nodes.yml`) and that the page is bound to exactly one of them, opens the live
 stream (`/api/stream`), posts a message in `#allgemein` and waits for its
 `message.created` event, checks that the worker counted the delivery
 (`herd_outbox_dispatch_total{handler="publish_live",result="ok"}`), lets a one-off

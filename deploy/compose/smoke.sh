@@ -14,8 +14,9 @@
 #   SMOKE_SKIP_BUILD=1 bash deploy/compose/smoke.sh   (use an image built beforehand,
 #                                            tagged to-herd-cats-ai:${HERD_IMAGE_TAG:-local})
 #   SMOKE_NODES=1 bash deploy/compose/smoke.sh        (compose.nodes.yml: two API nodes,
-#       a worker, collab and a migration run in place of role all; the message is posted
-#       on node A and must arrive on a stream of node B, SMOKE_PORT_B=18081 by default)
+#       a worker, two collab instances and a migration run in place of role all; the
+#       message is posted on node A and must arrive on a stream of node B,
+#       SMOKE_PORT_B=18081 by default)
 #   SMOKE_S3=1 bash deploy/compose/smoke.sh           (compose.s3.yml: attachments in
 #       SeaweedFS; the file must not reach /data, `storage check` passes, the restore puts
 #       the files under another prefix and `storage copy --to local` reads them back)
@@ -29,7 +30,8 @@ base="http://127.0.0.1:${HERD_HOST_PORT}"
 work="$(mktemp -d)"
 stream_pid=""
 
-# One node in role all (app), or two API nodes, a worker and collab (SMOKE_NODES=1).
+# One node in role all (app), or two API nodes, a worker and two collab instances
+# (SMOKE_NODES=1).
 project=to-herd-cats-ai-smoke
 files=(-f compose.yml)
 node_a=app
@@ -183,6 +185,14 @@ with connect(url, additional_headers=origin) as ws:
     except ConnectionClosed as closed:
         assert closed.rcvd is not None and closed.rcvd.code == 4401, closed.rcvd
 PY
+# Collab instances (plan M9 task 15): role all announces its one child, the nodes
+# setup collab-a and collab-b; the page just opened is bound to exactly one of them.
+sql() { "${compose[@]}" exec -T db psql -tA -U herd -d herd -c "$1" | tr -d '\r'; }
+instances=$(sql "SELECT count(*) FROM collab_instance WHERE heartbeat_at > now() - interval '15 seconds'")
+[[ $instances == $([[ ${SMOKE_NODES:-0} == 1 ]] && echo 2 || echo 1) ]] \
+  || fail "$instances live collab instances announced themselves"
+[[ $(sql "SELECT count(*) FROM collab_page_owner WHERE page_id = '$page_id' AND epoch = 1") == 1 ]] \
+  || fail "the page is not bound to one collab instance"
 
 # Messages, live: a stream on node B (the one node without SMOKE_NODES), a message in
 # #allgemein posted on node A. The worker hands the outbox event to publish_live, which
