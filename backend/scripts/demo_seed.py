@@ -9,11 +9,13 @@ with a model configured (`HERD_DEMO_AI_KIND`, see scripts/demo_ai_model.py) also
 work (M6) and automations and budgets (M7, scripts/demo_automations.py); MCP (M8,
 scripts/demo_mcp.py): the switch on and Anna's read token, with a model an external
 agent with a ticket waiting for pick-up, and with `--mcp-stub URL` a server on that
-stub (never the outside network by default).
+stub (never the outside network by default); sign-in (M9, scripts/demo_oidc.py): with
+`--oidc-stub URL` only, an OIDC provider on that stub with self-registration for
+demo.example (sign-ups wait for an admin's approval).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com \\
-        [--mcp-stub https://localhost:8098/mcp]
+        [--mcp-stub https://localhost:8098/mcp] [--oidc-stub https://localhost:8100]
 
 `HERD_DEMO_ADMIN_PASSWORD` is the admin's password, `HERD_DEMO_PASSWORD` (at least 10
 characters) becomes the demo people's password. Passwords are read from the
@@ -37,6 +39,7 @@ from scripts import (
     demo_automations,
     demo_mcp,
     demo_messaging,
+    demo_oidc,
     demo_sprints,
     demo_tickets,
 )
@@ -70,6 +73,7 @@ class Seeded:
     ai: demo_ai.SeededAi | None = None
     automations: demo_automations.SeededAutomations | None = None
     mcp: demo_mcp.SeededMcp = field(default_factory=demo_mcp.SeededMcp)
+    oidc: demo_oidc.SeededOidc = field(default_factory=demo_oidc.SeededOidc)
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -130,12 +134,14 @@ async def seed(
     wait_seconds: float = 60,
     ai: demo_ai.Ai | None = None,
     mcp_stub: str | None = None,
+    oidc_stub: str | None = None,
 ) -> Seeded:
     """Creates the demo. `connect()` gives a new client (own cookies, CSRF header) of
     the installation; `settle()` is awaited before the page discussion is used (a
     no-op against a running installation, whose worker writes the system entries);
     `ai`: the model for the agents (none: no agents); `mcp_stub`: an MCP server's
-    address for the demo's server (none: no server)."""
+    address for the demo's server (none: no server); `oidc_stub`: an OIDC stub's issuer
+    for the demo's sign-in provider (none: no provider)."""
     seeded = Seeded()
     admin = await _login(connect, admin_email, admin_password)
     await _people(admin, people_password, seeded)
@@ -190,6 +196,7 @@ async def seed(
         with_agents=ai is not None,
         mcp_stub=mcp_stub,
     )
+    seeded.oidc = await demo_oidc.build(admin, oidc_stub=oidc_stub)
     return seeded
 
 
@@ -208,7 +215,7 @@ LEAVE = """# Urlaub
 """
 
 
-async def _main(base: str, admin_email: str, mcp_stub: str | None) -> int:
+async def _main(base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None) -> int:
     admin_password = os.environ.get("HERD_DEMO_ADMIN_PASSWORD", "")
     people_password = os.environ.get("HERD_DEMO_PASSWORD", "")
     if not admin_password or len(people_password) < 10:
@@ -234,6 +241,7 @@ async def _main(base: str, admin_email: str, mcp_stub: str | None) -> int:
             settle=nothing,
             ai=ai,
             mcp_stub=mcp_stub,
+            oidc_stub=oidc_stub,
         )
     except DemoExists as exists:
         print(f"demo data present already ({exists}); nothing changed")
@@ -259,6 +267,11 @@ async def _main(base: str, admin_email: str, mcp_stub: str | None) -> int:
             else ""
         )
         + (f", MCP server {demo_mcp.SERVER}" if seeded.mcp.server_id else "")
+        + (
+            f", sign-in {demo_oidc.NAME} (sign-up for {demo_oidc.DOMAIN})"
+            if seeded.oidc.provider_id
+            else ""
+        )
     )
     return 0
 
@@ -270,8 +283,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--mcp-stub", help="an MCP server's address (a stub) for the demo's server; none: none"
     )
+    parser.add_argument(
+        "--oidc-stub", help="an OIDC stub's issuer for the demo's sign-in provider; none: none"
+    )
     args = parser.parse_args(argv)
-    return asyncio.run(_main(args.base.rstrip("/"), args.admin, args.mcp_stub))
+    return asyncio.run(_main(args.base.rstrip("/"), args.admin, args.mcp_stub, args.oidc_stub))
 
 
 if __name__ == "__main__":

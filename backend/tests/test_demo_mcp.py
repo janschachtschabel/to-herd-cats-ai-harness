@@ -85,7 +85,9 @@ async def test_with_a_stub_a_server_with_a_shared_connector_and_one_tool_approve
 def test_the_seed_takes_a_stub_address_by_argument(monkeypatch: Any) -> None:
     seen: dict[str, Any] = {}
 
-    async def fake_main(base: str, admin_email: str, mcp_stub: str | None) -> int:
+    async def fake_main(
+        base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None
+    ) -> int:
         seen.update(base=base, admin=admin_email, mcp_stub=mcp_stub)
         return 0
 
