@@ -1254,6 +1254,8 @@ stehen nie in Labels.
 
 | Paket | Tests | Stand |
 |---|---|---|
+| Backend (`pytest`, echtes PostgreSQL), Fix-Welle M9a | 2.832 (mit dem Test gegen echtes restic 0.18.1) | 16.11.2026: 2.832 grün, 1 Warnung (SADeprecationWarning); 41:14 min. ruff, ruff format, mypy (strict, 561 Dateien) sauber, `check_migrations` grün |
+| Frontend (`vitest`), Fix-Welle M9a | 633 in 113 Dateien | 16.11.2026: 633 grün im ersten Lauf |
 | Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `2f5207f`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
 | Frontend (`vitest`), M9a | 632 in 113 Dateien | 16.11.2026: 632 grün im ersten Lauf |
 | Collab (`node --test`), M9a | 280 | 16.11.2026: 279 grün, 1 übersprungen |
