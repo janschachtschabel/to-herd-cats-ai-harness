@@ -1,7 +1,7 @@
 """The due loop's expiry upkeep (plan M9 task 8): login sessions, OAuth and OIDC flows,
-collab grants, rate-limit hits and AI rate windows go once their time column is older
-than the catalogue's period, across organisations, in bounded batches; younger rows
-stay. `remove_expired` is given its time; the due loop gives it the wall time, never
+collab grants, rate-limit hits, AI rate windows and sign-ins waiting for a second
+factor go once their time column is older than the catalogue's period, across
+organisations, in bounded batches; younger rows stay. `remove_expired` is given its time; the due loop gives it the wall time, never
 its `SettableClock`."""
 
 import secrets
@@ -27,6 +27,7 @@ from app.modules.oidc.models import OidcFlow, OidcProvider, ProviderKind
 from app.modules.orgs.models import Organization
 from app.modules.spaces.models import Space
 from app.modules.spaces.service import SpaceService
+from app.modules.totp.models import SignInChallenge
 from app.modules.users.models import User
 from app.modules.wiki.collab_models import CollabGrant
 from app.modules.wiki.models import Page
@@ -146,6 +147,12 @@ async def _oidc(session: AsyncSession, org: Organization, user: User, at: dateti
     )
 
 
+async def _challenge(session: AsyncSession, org: Organization, user: User, at: datetime) -> Base:
+    return SignInChallenge(
+        org_id=org.id, user_id=user.id, token_hash=_hex(), method="password", expires_at=at
+    )
+
+
 MAKERS: dict[str, Make] = {
     "user_session": _login,
     "rate_limit_hit": _hit,
@@ -153,6 +160,7 @@ MAKERS: dict[str, Make] = {
     "collab_grant": _grant,
     "oauth_flow": _oauth,
     "oidc_flow": _oidc,
+    "sign_in_challenge": _challenge,
 }
 
 
