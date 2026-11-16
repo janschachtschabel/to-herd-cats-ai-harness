@@ -1,3 +1,4 @@
 deploy/compose/.env
 deploy/compose/ai.env
 deploy/compose/backup.env
+/.env
