@@ -32,7 +32,7 @@ class BodyReadTimeout(AppError):
     code = "request.timeout"
 
 
-async def _arriving(
+async def arriving(
     stream: AsyncIterator[bytes], seconds: float, total: float
 ) -> AsyncIterator[bytes]:
     """`stream`, refused with 408 when the next part takes longer than `seconds` or the
@@ -85,10 +85,10 @@ async def spool(stream: AsyncIterator[bytes], max_bytes: int, *, code: str) -> S
     decoder = codecs.getincrementaldecoder("utf-8")()
     settings = get_settings()
     try:
-        arriving = _arriving(
+        parts = arriving(
             stream, settings.body_read_timeout_seconds, settings.body_total_timeout_seconds
         )
-        async for chunk in arriving:
+        async for chunk in parts:
             if not chunk:
                 continue
             spooled.size += len(chunk)

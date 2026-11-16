@@ -1,16 +1,25 @@
 """The SQL of `backup_run`. A backup acts for the installation, not for a person:
-its row belongs to the installation's organisation (there is one, `orgs/models.py`)."""
+its row belongs to the installation's organisation (there is one, `orgs/models.py`).
+
+An owner's "Jetzt sichern" (plan M9 task 13) is a row with trigger `admin` in state
+`running` that no backup has taken up yet: a request. A worker takes it up within
+REQUEST_GRACE (`modules/backups/jobs.py`); until then whoever holds the backup lock
+spares it (`interrupt_running(spare_requests_since=...)`), afterwards it counts as a
+backup whose process died. A restore spares none: a request in a restored archive is
+never run again."""
 
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import ColumnElement, and_, func, not_, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
+from app.core.permissions import SYSTEM_ROLE_ACTIONS, Action
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger, OffsiteState
 from app.modules.orgs.models import Organization
+from app.modules.users.models import User
 
 # A backup holds this advisory lock on a connection of its own while it runs: whoever
 # takes it knows no backup is running, so every `running` row is one whose process died.
@@ -20,6 +29,8 @@ _KEY = func.hashtextextended(BACKUP_LOCK, 0)
 # was the restored archive's own run, running in its snapshot (it made the archive).
 INTERRUPTED = "backup.interrupted"
 IN_RESTORED_ARCHIVE = "backup.in_restored_archive"
+# How long an administrator's request waits for a worker before it counts as dead.
+REQUEST_GRACE = timedelta(minutes=10)
 
 
 async def hold_backup_lock(connection: AsyncConnection) -> bool:
@@ -154,14 +165,22 @@ class BackupRunRepository:
         )
 
     async def interrupt_running(
-        self, at: datetime, *, code: str = INTERRUPTED, started_before: datetime | None = None
+        self,
+        at: datetime,
+        *,
+        code: str = INTERRUPTED,
+        started_before: datetime | None = None,
+        spare_requests_since: datetime | None = None,
     ) -> int:
         """Runs still `running` whose process is gone (after a restore, or seen by
         whoever holds the backup lock), with `code`; with `started_before`, only runs
-        that started before that time; how many."""
+        that started before that time; with `spare_requests_since`, not the
+        administrators' requests made since then (waiting for a worker); how many."""
         stmt = update(BackupRun).where(BackupRun.state == BackupState.RUNNING)
         if started_before is not None:
             stmt = stmt.where(BackupRun.started_at < started_before)
+        if spare_requests_since is not None:
+            stmt = stmt.where(not_(_request_since(spare_requests_since)))
         result = await self.session.execute(
             stmt.values(state=BackupState.INTERRUPTED, finished_at=at, error_code=code)
         )
@@ -172,7 +191,52 @@ class BackupRunRepository:
         transaction); how many."""
         if not await self.session.scalar(select(func.pg_try_advisory_xact_lock(_KEY))):
             return 0
-        return await self.interrupt_running(at)
+        return await self.interrupt_running(at, spare_requests_since=at - REQUEST_GRACE)
+
+    async def any_running(self, org_id: uuid.UUID) -> bool:
+        """A backup runs, or an administrator's request waits."""
+        found = await self.session.scalar(
+            select(BackupRun.id)
+            .where(BackupRun.org_id == org_id, BackupRun.state == BackupState.RUNNING)
+            .limit(1)
+        )
+        return found is not None
+
+    async def oldest_request(self, since: datetime) -> uuid.UUID | None:
+        """The oldest administrator's request made since `since` still waiting (or
+        whose worker died: it is taken up again), over every organisation."""
+        return await self.session.scalar(
+            select(BackupRun.id)
+            .where(BackupRun.state == BackupState.RUNNING, _request_since(since))
+            .order_by(BackupRun.started_at, BackupRun.id)
+            .limit(1)
+        )
+
+    async def page(
+        self, org_id: uuid.UUID, limit: int, after: tuple[datetime, uuid.UUID] | None
+    ) -> list[BackupRun]:
+        """Newest first, up to `limit` + 1 rows (whether there is a next page), after
+        the (started_at, id) of the last row of the page before."""
+        stmt = select(BackupRun).where(BackupRun.org_id == org_id)
+        if after is not None:
+            stmt = stmt.where(
+                or_(
+                    BackupRun.started_at < after[0],
+                    and_(BackupRun.started_at == after[0], BackupRun.id < after[1]),
+                )
+            )
+        stmt = stmt.order_by(BackupRun.started_at.desc(), BackupRun.id.desc()).limit(limit + 1)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def managers(self, org_id: uuid.UUID) -> list[uuid.UUID]:
+        """The active people of the organisation who hold `backup.manage` (owners)."""
+        roles = [r for r, acts in SYSTEM_ROLE_ACTIONS.items() if Action.BACKUP_MANAGE in acts]
+        rows = await self.session.scalars(
+            select(User.id)
+            .where(User.org_id == org_id, User.is_active, User.system_role.in_(roles))
+            .order_by(User.id)
+        )
+        return list(rows.all())
 
     async def latest(self, org_id: uuid.UUID, limit: int) -> list[BackupRun]:
         """Newest first."""
@@ -183,6 +247,10 @@ class BackupRunRepository:
             .limit(limit)
         )
         return list((await self.session.scalars(stmt)).all())
+
+
+def _request_since(since: datetime) -> ColumnElement[bool]:
+    return and_(BackupRun.trigger == BackupTrigger.ADMIN, BackupRun.started_at >= since)
 
 
 async def clear_tables(session: AsyncSession, names: Iterable[str]) -> None:

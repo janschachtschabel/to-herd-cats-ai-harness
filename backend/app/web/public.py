@@ -28,6 +28,8 @@ from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
 from app.modules.automations import router as automations_router
+from app.modules.backups.replacing import replace_runner
+from app.modules.backups.router import router as backups_router
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
@@ -149,6 +151,7 @@ def api_router() -> APIRouter:
     api.include_router(skills.skills)
     api.include_router(skill_assignments.agent_skills)
     api.include_router(skill_proposals.skill_proposals)
+    api.include_router(backups_router)
     return api
 
 
@@ -160,6 +163,7 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
         ),
         RouteLimit("POST", re.compile(r"/api/spaces/[^/]+/import"), settings.import_max_bytes),
         RouteLimit("POST", re.compile(r"/api/skills/import"), SKILL_IMPORT_MAX_BYTES),
+        RouteLimit("POST", re.compile(r"/api/backups/archives"), settings.backup_upload_max_bytes),
     ]
 
 
@@ -167,7 +171,8 @@ def body_limits(settings: Settings) -> list[RouteLimit]:
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """The live hub (`app.state.live`) listens while the app serves, and so does the
     process's maintenance cache, which ends the live streams when maintenance begins.
-    Uvicorn runs this; apps driven without a lifespan (ASGI tests) have a hub that is
+    A replace an owner started in this process (`backups/replacing.py`) is cancelled
+    when it stops. Uvicorn runs this; apps driven without a lifespan (ASGI tests) have a hub that is
     not running, and `/api/stream` answers 503 there."""
     hub: LiveHub = app.state.live
     cache = maintenance_cache()
@@ -177,6 +182,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await replace_runner().stop()
         cache.on_start.remove(hub.close_all)
         await cache.stop()
         await hub.stop()

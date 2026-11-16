@@ -18,6 +18,12 @@
    `core/storage_tombstones.py`), then the manifest (naming the storage).
 4. The archive is read back (`verify_archive`); only a good one makes the run `ok`.
 
+With `run_id` (an owner's request, plan M9 task 13: a worker takes it up,
+`modules/backups/jobs.py`) the backup is that row's instead of a new one; a request
+that is gone (no longer `running`, or older than REQUEST_GRACE) is
+`backup.request_gone`, and a backup holding the lock leaves it waiting, quietly. Every
+change of the row tells the owners (`backup.changed`, `modules/backups/live.py`).
+
 Any failure removes what was written and makes the run `failed` with a code
 (`backup.no_organization`, `backup.no_schema`, `backup.tool_missing`,
 `backup.tools_too_old`, `backup.dump_failed`, `backup.file_missing`,
@@ -43,6 +49,7 @@ from app.core.migrations import SchemaState, schema_state
 from app.core.secrets import key_id
 from app.core.storage import Storage, StorageUnavailable, StoredFileMissing, get_storage
 from app.modules.audit.recorder import record_system
+from app.modules.backups.live import tell_managers
 from app.modules.backups.models import BackupState, BackupTrigger
 from app.modules.backups.repository import (
     BackupRunRepository,
@@ -58,6 +65,7 @@ from app.ops.archive import (
     sidecar_of,
     verify_archive,
 )
+from app.ops.backup_start import ARCHIVE_PREFIX, PART_SUFFIX, Job, begin, remove_leftovers
 from app.ops.manifest import CREATED_AT_FORMAT, FORMAT, Manifest
 from app.ops.pgtools import ToolFailed, dump, tool_version
 from app.ops.snapshot import NoSchema, Snapshot, open_snapshot
@@ -65,8 +73,8 @@ from app.version import app_version
 
 logger = logging.getLogger(__name__)
 
-ARCHIVE_PREFIX = "herd-"
-PART_SUFFIX = ".part"
+__all__ = ["ARCHIVE_PREFIX", "BackupFailed", "BackupOutcome", "create_backup", "remove_leftovers"]
+
 SCHEMA_CODES = {
     SchemaState.NONE: "backup.no_schema",
     SchemaState.BEHIND: "backup.schema_behind",
@@ -93,12 +101,16 @@ def archive_name(at: datetime, version: str) -> str:
 
 
 async def create_backup(
-    settings: Settings, *, trigger: BackupTrigger, clock: Clock
+    settings: Settings,
+    *,
+    trigger: BackupTrigger,
+    clock: Clock,
+    run_id: uuid.UUID | None = None,
 ) -> BackupOutcome:
     engine = make_engine(settings.database())
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     try:
-        return await _create(settings, engine, sessions, trigger, clock)
+        return await _create(settings, engine, sessions, Job(trigger, clock, run_id))
     finally:
         await engine.dispose()
 
@@ -112,8 +124,7 @@ async def _create(
     settings: Settings,
     engine: AsyncEngine,
     sessions: async_sessionmaker[AsyncSession],
-    trigger: BackupTrigger,
-    clock: Clock,
+    job: Job,
 ) -> BackupOutcome:
     try:
         schema = await schema_state(engine)
@@ -123,9 +134,11 @@ async def _create(
         return _refused(SCHEMA_CODES[schema])
     async with engine.connect() as holder:
         if not await hold_backup_lock(holder):
+            if job.request is not None:  # it waits for the next turn
+                return BackupOutcome(None, None, BackupState.FAILED, "backup.already_running")
             return _refused("backup.already_running")
         try:
-            return await _locked(settings, engine, sessions, trigger, clock)
+            return await _locked(settings, engine, sessions, job)
         finally:
             await _release(holder)
 
@@ -146,20 +159,16 @@ async def _locked(
     settings: Settings,
     engine: AsyncEngine,
     sessions: async_sessionmaker[AsyncSession],
-    trigger: BackupTrigger,
-    clock: Clock,
+    job: Job,
 ) -> BackupOutcome:
+    clock, trigger = job.clock, job.trigger
     started = clock.now()
     async with sessions() as session, session.begin():
-        runs = BackupRunRepository(session)
-        org_id = await runs.installation_org()
-        if org_id is None:
-            return BackupOutcome(None, None, BackupState.FAILED, "backup.no_organization")
-        if dead := await runs.interrupt_running(started):
-            logger.warning("backup.interrupted_found", extra={"count": dead})
-        if left := remove_leftovers(settings.backup_dir):
-            logger.warning("backup.leftovers_removed", extra={"count": left})
-        run_id = (await runs.start(org_id, trigger, started)).id
+        begun = await begin(session, settings, job, started)
+    if isinstance(begun, str):
+        logger.warning("backup.refused", extra={"code": begun})
+        return BackupOutcome(None, None, BackupState.FAILED, begun)
+    org_id, run_id = begun
     path = settings.backup_dir / archive_name(started, app_version())
     written = False
     try:
@@ -176,6 +185,7 @@ async def _locked(
             await BackupRunRepository(session).finish(
                 run_id, state=BackupState.FAILED, at=clock.now(), error_code=code
             )
+            await tell_managers(session, org_id, run_id)
         return BackupOutcome(run_id, None, BackupState.FAILED, code)
     size = path.stat().st_size
     async with sessions() as session, session.begin():
@@ -189,6 +199,7 @@ async def _locked(
         )
         details = {"archive": path.name, "bytes": size, "via": trigger.value}
         await record_system(session, org_id, "backup.created", "backup_run", run_id, details)
+        await tell_managers(session, org_id, run_id)
     logger.info("backup.created", extra={"run_id": str(run_id), "bytes": size})
     return BackupOutcome(run_id, path, BackupState.OK, None)
 
@@ -225,20 +236,6 @@ async def _write(settings: Settings, engine: AsyncEngine, path: Path, at: dateti
             raise
     finally:
         dump_file.unlink(missing_ok=True)
-
-
-def remove_leftovers(directory: Path) -> int:
-    """Remove the hidden `.herd-*.part` files of backups that died midway (archive,
-    sidecar and scratch dump); the number removed. Only while holding the backup lock:
-    then no other backup is writing one."""
-    if not directory.is_dir():
-        return 0
-    removed = 0
-    for path in directory.glob(f".{ARCHIVE_PREFIX}*{PART_SUFFIX}"):
-        if path.is_file() and not path.is_symlink():
-            path.unlink(missing_ok=True)
-            removed += 1
-    return removed
 
 
 async def _add_files(writer: ArchiveWriter, storage: Storage, snapshot: Snapshot) -> None:

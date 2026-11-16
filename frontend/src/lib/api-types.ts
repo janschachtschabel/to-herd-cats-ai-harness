@@ -2061,6 +2061,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Backups
+         * @description The backups, newest first.
+         */
+        get: operations["list_backups_api_backups_get"];
+        put?: never;
+        /**
+         * Start Backup
+         * @description Back up now: a worker makes the backup; `backup.changed` tells its progress.
+         *     409 `backup.already_running` while one runs or waits.
+         */
+        post: operations["start_backup_api_backups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Archives
+         * @description The archives in the backups directory, newest first.
+         */
+        get: operations["list_archives_api_backups_archives_get"];
+        put?: never;
+        /**
+         * Upload Archive
+         * @description An archive from elsewhere, checked: 413 `backup.upload_too_large`, 422
+         *     `backup.archive_invalid` with the problems.
+         */
+        post: operations["upload_archive_api_backups_archives_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Archive */
+        get: operations["download_archive_api_backups_archives__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Archive
+         * @description The archive against this installation; `can_replace` when nothing blocks.
+         */
+        post: operations["check_archive_api_backups_archives__name__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/archives/{name}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Installation
+         * @description Replace the whole installation with the archive (a safety archive first, then
+         *     maintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409
+         *     `backup.already_running`, `backup.restore_running`, `backup.replace_refused`.
+         */
+        post: operations["replace_installation_api_backups_archives__name__replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Restore Status
+         * @description The last attempt to replace the installation from the administration.
+         */
+        get: operations["restore_status_api_backups_restore_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels": {
         parameters: {
             query?: never;
@@ -4580,6 +4709,23 @@ export interface components {
          */
         ApprovalState: "pending" | "approved" | "rejected" | "expired";
         /**
+         * ArchiveOut
+         * @description An archive in the backups directory; `uploaded`: an owner uploaded it.
+         */
+        ArchiveOut: {
+            /** Bytes */
+            bytes: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Name */
+            name: string;
+            /** Uploaded */
+            uploaded: boolean;
+        };
+        /**
          * AssigneeIn
          * @description A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`
          *     and `ticket.assign`, and starts its work on the ticket.
@@ -4798,6 +4944,46 @@ export interface components {
             version: number;
         };
         /**
+         * BackupRunOut
+         * @description One backup. A run with trigger `admin` in state `running` and no archive yet may
+         *     still wait for a worker.
+         */
+        BackupRunOut: {
+            /** Archive */
+            archive: string | null;
+            /** Archive Sha256 */
+            archive_sha256: string | null;
+            /** Bytes */
+            bytes: number | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            offsite_state: components["schemas"]["OffsiteState"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            state: components["schemas"]["BackupState"];
+            trigger: components["schemas"]["BackupTrigger"];
+        };
+        /**
+         * BackupState
+         * @enum {string}
+         */
+        BackupState: "running" | "ok" | "failed" | "interrupted";
+        /**
+         * BackupTrigger
+         * @enum {string}
+         */
+        BackupTrigger: "schedule" | "cli" | "admin" | "pre_restore";
+        /**
          * BaseUrlSpec
          * @description The instance's address, which the admin may change (a self-managed GitLab).
          */
@@ -4987,17 +5173,6 @@ export interface components {
         CheckIn: {
             /** Model */
             model?: string | null;
-        };
-        /**
-         * CheckOut
-         * @description The outcome as a state, never with the provider's own words.
-         */
-        CheckOut: {
-            /** Duration Ms */
-            duration_ms: number;
-            /** Model */
-            model: string | null;
-            status: components["schemas"]["CheckStatus"];
         };
         /**
          * CheckStatus
@@ -5720,6 +5895,30 @@ export interface components {
          * @enum {string}
          */
         EventType: "page.published" | "ticket.created" | "attachment.uploaded" | "page.review_due";
+        /**
+         * FiguresOut
+         * @description `tools_major`: the archive's pg_dump, this installation's pg_restore.
+         */
+        FiguresOut: {
+            /** Alembic Revision */
+            alembic_revision: string;
+            /** App Version */
+            app_version: string;
+            /** File Bytes */
+            file_bytes: number;
+            /** Files */
+            files: number;
+            /** Rows */
+            rows: number;
+            /** Server Major */
+            server_major: number;
+            /** Storage */
+            storage: string;
+            /** Tables */
+            tables: number;
+            /** Tools Major */
+            tools_major: number | null;
+        };
         /**
          * FiringOut
          * @description One term of the log: how it went, the run it started, whether a heartbeat's
@@ -6601,6 +6800,11 @@ export interface components {
             token_endpoint: string;
         };
         /**
+         * OffsiteState
+         * @enum {string}
+         */
+        OffsiteState: "off" | "ok" | "failed";
+        /**
          * OidcSecretIn
          * @description Either the secret itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or
          *     the name of an environment variable `HERD_OIDC_*` (`env`).
@@ -6816,6 +7020,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** Page[ArchiveOut] */
+        Page_ArchiveOut_: {
+            /** Items */
+            items: components["schemas"]["ArchiveOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** Page[AttachmentOut] */
         Page_AttachmentOut_: {
             /** Items */
@@ -6834,6 +7045,13 @@ export interface components {
         Page_AutomationOut_: {
             /** Items */
             items: components["schemas"]["AutomationOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[BackupRunOut] */
+        Page_BackupRunOut_: {
+            /** Items */
+            items: components["schemas"]["BackupRunOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -7817,6 +8035,44 @@ export interface components {
          * @enum {string}
          */
         RemoteStatus: "ok" | "blocked" | "timeout" | "unreachable" | "unauthorized" | "forbidden" | "not_found" | "rate_limited" | "redirect" | "server_error" | "too_large" | "protocol_error" | "secret_unavailable";
+        /**
+         * ReplaceIn
+         * @description The organisation's name, exactly, as the confirmation.
+         */
+        ReplaceIn: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** ReplaceOut */
+        ReplaceOut: {
+            /** Archive Name */
+            archive_name: string;
+        };
+        /**
+         * RestoreAttemptOut
+         * @description The last attempt to replace the installation from here: `requested` (under way,
+         *     or its process ended), `failed` with a code.
+         */
+        RestoreAttemptOut: {
+            /** Archive Name */
+            archive_name: string | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Code */
+            code: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "requested" | "failed";
+        };
+        /** RestoreStatusOut */
+        RestoreStatusOut: {
+            attempt: components["schemas"]["RestoreAttemptOut"] | null;
+        };
         /**
          * RunEventOut
          * @description One step of a run (model call: usage and the answer's parts; tool call: name,
@@ -9625,6 +9881,38 @@ export interface components {
             title: string;
             /** Via Token */
             via_token?: string | null;
+        };
+        /**
+         * CheckOut
+         * @description The outcome as a state, never with the provider's own words.
+         */
+        app__modules__ai__schemas__CheckOut: {
+            /** Duration Ms */
+            duration_ms: number;
+            /** Model */
+            model: string | null;
+            status: components["schemas"]["CheckStatus"];
+        };
+        /**
+         * CheckOut
+         * @description `problems`: codes, any one blocks replacing (`can_replace` false); `key`:
+         *     whether HERD_SECRET_KEY fits the archive's `enc:` values.
+         */
+        app__modules__backups__schemas__CheckOut: {
+            archive: components["schemas"]["FiguresOut"] | null;
+            /** Archive Name */
+            archive_name: string;
+            /** Can Replace */
+            can_replace: boolean;
+            /** Created At */
+            created_at: string | null;
+            installation: components["schemas"]["FiguresOut"] | null;
+            /** Key */
+            key: ("match" | "mismatch" | "missing" | "not_needed") | null;
+            /** Problems */
+            problems: string[];
+            /** Warnings */
+            warnings: string[];
         };
         /** ExpectedVersion */
         app__modules__messaging__schemas__ExpectedVersion: {
@@ -11935,7 +12223,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckOut"];
+                    "application/json": components["schemas"]["app__modules__ai__schemas__CheckOut"];
                 };
             };
             /** @description Validation Error */
@@ -14292,6 +14580,231 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backups_api_backups_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BackupRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_backup_api_backups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupRunOut"];
+                };
+            };
+        };
+    };
+    list_archives_api_backups_archives_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ArchiveOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_archive_api_backups_archives_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-tar": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveOut"];
+                };
+            };
+        };
+    };
+    download_archive_api_backups_archives__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-tar": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_archive_api_backups_archives__name__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__modules__backups__schemas__CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_installation_api_backups_archives__name__replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_status_api_backups_restore_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreStatusOut"];
                 };
             };
         };

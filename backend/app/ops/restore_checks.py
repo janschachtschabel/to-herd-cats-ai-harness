@@ -51,11 +51,17 @@ async def check_restore(settings: Settings, archive: Path) -> RestoreCheck:
 
 
 async def check_on(
-    conn: AsyncConnection, settings: Settings, archive: Path, *, into_empty: bool = True
+    conn: AsyncConnection,
+    settings: Settings,
+    archive: Path,
+    *,
+    into_empty: bool = True,
+    verified: bool = False,
 ) -> RestoreCheck:
     """With `into_empty` false (replacing a running installation, `replace.py`) a
-    database with tables is no problem."""
-    problems = verify_archive(archive)
+    database with tables is no problem. With `verified` the caller has read the
+    archive back already and found nothing (the administration does it in a thread)."""
+    problems = [] if verified else verify_archive(archive)
     if problems:
         return RestoreCheck(problems=problems)
     manifest = inner_manifest(archive)

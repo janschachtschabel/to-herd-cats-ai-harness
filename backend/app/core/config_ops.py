@@ -31,6 +31,9 @@ class OpsSettings(BaseSettings):
     # The worker exports it as herd_backup_alert_after_seconds: HerdBackupTooOld fires
     # when the last good backup is older.
     backup_alert_after_hours: float = Field(default=26.0, gt=0, le=24 * 60)
+    # The largest archive an owner may upload in the administration (plan M9 task 13),
+    # in bytes; it is written into backup_dir.
+    backup_upload_max_bytes: int = Field(default=2 * 1024**3, ge=1)
 
     @model_validator(mode="after")
     def _backup_settings_fit(self) -> Self:

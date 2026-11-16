@@ -26,6 +26,10 @@ restore in between):
    grace, unless used again), and maintenance off.
    If a step here fails, maintenance stays on (`restore.finish_failed`): the database
    holds the archive, not yet ready to serve; `docs/SICHERUNG.md` says what to do.
+
+`via` names who started it in the audit (`cli`, or `admin` for an owner in the
+administration, `modules/backups/replacing.py`); with `wait` false a schema lock held
+elsewhere (another restore, a migration) refuses at once (`restore.already_running`).
 """
 
 import asyncio
@@ -67,7 +71,7 @@ from app.ops.restore import (
 )
 from app.ops.restore_after import finish_restore
 from app.ops.restore_checks import KEY_PROBLEMS, check_on
-from app.ops.schema_lock import schema_lock
+from app.ops.schema_lock import SchemaLockBusy, schema_lock
 from app.ops.snapshot import row_counts
 from app.ops.swap import swap_database
 
@@ -88,6 +92,7 @@ class _Plan:
     manifest: Manifest
     org_id: uuid.UUID
     clock: Clock
+    via: str
 
 
 async def replace_running(
@@ -98,34 +103,55 @@ async def replace_running(
     without_secrets: bool,
     clock: Clock,
     drain_seconds: float | None = None,
+    via: str = VIA,
+    wait: bool = True,
 ) -> ReplaceReport:
     engine = make_engine(settings.database())
     try:
-        async with engine.connect() as conn, schema_lock(conn):
-            check = await check_on(conn, settings, archive, into_empty=False)
-            async with AsyncSession(bind=conn) as session:
-                installation = await BackupRunRepository(session).installation()
-            await conn.commit()
-            problems = [p for p in check.problems if not (without_secrets and p in KEY_PROBLEMS)]
-            if installation is None or installation[1] != confirm:
-                problems.append("restore.confirm_mismatch")
-            if problems or check.manifest is None or installation is None:
-                raise RestoreRefused(problems)
-            plan = _Plan(settings, archive, check.manifest, installation[0], clock)
-            safety = await _safety_archive(conn, plan)
-            if not await hold_backup_lock(conn):
-                await conn.commit()
-                raise RestoreRefused(["backup.already_running"])
-            await conn.commit()
+        async with engine.connect() as conn:
             try:
-                drain = DRAIN_SECONDS if drain_seconds is None else drain_seconds
-                report = await _replace(conn, plan, safety, drain)
-            finally:
-                await release_backup_lock(conn)
-                await conn.commit()
-            return ReplaceReport(report, settings.backup_dir / (safety.archive or ""))
+                async with schema_lock(conn, wait=wait):
+                    return await _locked(
+                        conn, settings, archive, confirm, without_secrets, clock, drain_seconds, via
+                    )
+            except SchemaLockBusy:
+                raise RestoreRefused(["restore.already_running"]) from None
     finally:
         await engine.dispose()
+
+
+async def _locked(
+    conn: AsyncConnection,
+    settings: Settings,
+    archive: Path,
+    confirm: str,
+    without_secrets: bool,
+    clock: Clock,
+    drain_seconds: float | None,
+    via: str,
+) -> ReplaceReport:
+    check = await check_on(conn, settings, archive, into_empty=False)
+    async with AsyncSession(bind=conn) as session:
+        installation = await BackupRunRepository(session).installation()
+    await conn.commit()
+    problems = [p for p in check.problems if not (without_secrets and p in KEY_PROBLEMS)]
+    if installation is None or installation[1] != confirm:
+        problems.append("restore.confirm_mismatch")
+    if problems or check.manifest is None or installation is None:
+        raise RestoreRefused(problems)
+    plan = _Plan(settings, archive, check.manifest, installation[0], clock, via)
+    safety = await _safety_archive(conn, plan)
+    if not await hold_backup_lock(conn):
+        await conn.commit()
+        raise RestoreRefused(["backup.already_running"])
+    await conn.commit()
+    try:
+        drain = DRAIN_SECONDS if drain_seconds is None else drain_seconds
+        report = await _replace(conn, plan, safety, drain)
+    finally:
+        await release_backup_lock(conn)
+        await conn.commit()
+    return ReplaceReport(report, settings.backup_dir / (safety.archive or ""))
 
 
 async def _safety_archive(conn: AsyncConnection, plan: _Plan) -> BackupRun:
@@ -147,7 +173,7 @@ async def _replace(
 ) -> RestoreReport:
     async with AsyncSession(bind=conn) as session:
         await MaintenanceService(session).begin(
-            plan.org_id, MaintenanceReason.RESTORE, plan.clock.now(), via=VIA
+            plan.org_id, MaintenanceReason.RESTORE, plan.clock.now(), via=plan.via
         )
         await session.commit()
     await asyncio.sleep(drain)  # requests and steps under way end; the caches follow
@@ -194,8 +220,8 @@ async def _failed(conn: AsyncConnection, plan: _Plan, code: str) -> None:
     """The old state, whole: maintenance off and the attempt audited."""
     await conn.rollback()
     async with AsyncSession(bind=conn) as session:
-        await MaintenanceService(session).end(plan.org_id, via=VIA)
-        details = {"archive": plan.archive.name, "code": code, "via": VIA}
+        await MaintenanceService(session).end(plan.org_id, via=plan.via)
+        details = {"archive": plan.archive.name, "code": code, "via": plan.via}
         await record_system(
             session, plan.org_id, "backup.restore_failed", "organization", plan.org_id, details
         )
@@ -216,14 +242,14 @@ async def _finish(conn: AsyncConnection, plan: _Plan, safety: BackupRun) -> Rest
             revision_from=plan.manifest.alembic_revision,
             revision_to=revision_to,
             clock=plan.clock,
-            replaced={"replaced": True, "safety_archive": safety.archive, "via": VIA},
+            replaced={"replaced": True, "safety_archive": safety.archive, "via": plan.via},
         )
         runs = BackupRunRepository(session)
         installation = await runs.installation()
         if installation is not None:
             await runs.copy_finished(installation[0], safety)
             await bury(session, installation[0], _only_old_files(plan, safety))
-        await MaintenanceService(session).end_all(via=VIA)
+        await MaintenanceService(session).end_all(via=plan.via)
         await session.commit()
     tables = await row_counts(conn)
     await conn.commit()

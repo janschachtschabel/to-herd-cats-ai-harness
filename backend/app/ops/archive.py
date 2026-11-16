@@ -118,10 +118,7 @@ class ArchiveWriter:
         await asyncio.to_thread(_sync_close, self._out)
         os.replace(self._part, self.path)
         archive_sha256 = self._hash.hexdigest()
-        sidecar = json.loads(data)
-        sidecar["archive_sha256"] = archive_sha256
-        _write_private(sidecar_of(self.path), json.dumps(sidecar, sort_keys=True, indent=2))
-        _sync_dir(self.path.parent)
+        write_sidecar(self.path, data, archive_sha256)
         return archive_sha256
 
     def abort(self) -> None:
@@ -143,6 +140,15 @@ class ArchiveWriter:
     def _pad(self) -> None:
         if self._written % _BLOCK:
             self._data(b"\0" * (_BLOCK - self._written % _BLOCK))
+
+
+def write_sidecar(path: Path, manifest: bytes, archive_sha256: str) -> None:
+    """The sidecar of the archive at `path`: its manifest (JSON) plus `archive_sha256`
+    (also for an archive uploaded on its own, `modules/backups/archives.py`)."""
+    sidecar = json.loads(manifest)
+    sidecar["archive_sha256"] = archive_sha256
+    _write_private(sidecar_of(path), json.dumps(sidecar, sort_keys=True, indent=2))
+    _sync_dir(path.parent)
 
 
 def read_sidecar(path: Path) -> tuple[Manifest, str]:

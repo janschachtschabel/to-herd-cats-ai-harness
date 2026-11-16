@@ -1650,6 +1650,36 @@
         "title": "ApprovalState",
         "type": "string"
       },
+      "ArchiveOut": {
+        "description": "An archive in the backups directory; `uploaded`: an owner uploaded it.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "uploaded": {
+            "title": "Uploaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "bytes",
+          "created_at",
+          "uploaded"
+        ],
+        "title": "ArchiveOut",
+        "type": "object"
+      },
       "AssigneeIn": {
         "description": "A person, or (plan M6 decision 7) an agent: assigning an agent needs `ai.use`\nand `ticket.assign`, and starts its work on the ticket.",
         "properties": {
@@ -2311,6 +2341,120 @@
         "title": "AutomationUpdate",
         "type": "object"
       },
+      "BackupRunOut": {
+        "description": "One backup. A run with trigger `admin` in state `running` and no archive yet may\nstill wait for a worker.",
+        "properties": {
+          "archive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive"
+          },
+          "archive_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Sha256"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "offsite_state": {
+            "$ref": "#/components/schemas/OffsiteState"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BackupState"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/BackupTrigger"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "state",
+          "started_at",
+          "finished_at",
+          "archive",
+          "bytes",
+          "archive_sha256",
+          "error_code",
+          "offsite_state"
+        ],
+        "title": "BackupRunOut",
+        "type": "object"
+      },
+      "BackupState": {
+        "enum": [
+          "running",
+          "ok",
+          "failed",
+          "interrupted"
+        ],
+        "title": "BackupState",
+        "type": "string"
+      },
+      "BackupTrigger": {
+        "enum": [
+          "schedule",
+          "cli",
+          "admin",
+          "pre_restore"
+        ],
+        "title": "BackupTrigger",
+        "type": "string"
+      },
       "BaseUrlSpec": {
         "additionalProperties": false,
         "description": "The instance's address, which the admin may change (a self-managed GitLab).",
@@ -2848,36 +2992,6 @@
           }
         },
         "title": "CheckIn",
-        "type": "object"
-      },
-      "CheckOut": {
-        "description": "The outcome as a state, never with the provider's own words.",
-        "properties": {
-          "duration_ms": {
-            "title": "Duration Ms",
-            "type": "integer"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "status": {
-            "$ref": "#/components/schemas/CheckStatus"
-          }
-        },
-        "required": [
-          "status",
-          "model",
-          "duration_ms"
-        ],
-        "title": "CheckOut",
         "type": "object"
       },
       "CheckStatus": {
@@ -4991,6 +5105,67 @@
         ],
         "title": "EventType",
         "type": "string"
+      },
+      "FiguresOut": {
+        "description": "`tools_major`: the archive's pg_dump, this installation's pg_restore.",
+        "properties": {
+          "alembic_revision": {
+            "title": "Alembic Revision",
+            "type": "string"
+          },
+          "app_version": {
+            "title": "App Version",
+            "type": "string"
+          },
+          "file_bytes": {
+            "title": "File Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "server_major": {
+            "title": "Server Major",
+            "type": "integer"
+          },
+          "storage": {
+            "title": "Storage",
+            "type": "string"
+          },
+          "tables": {
+            "title": "Tables",
+            "type": "integer"
+          },
+          "tools_major": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools Major"
+          }
+        },
+        "required": [
+          "app_version",
+          "alembic_revision",
+          "server_major",
+          "tools_major",
+          "storage",
+          "tables",
+          "rows",
+          "files",
+          "file_bytes"
+        ],
+        "title": "FiguresOut",
+        "type": "object"
       },
       "FiringOut": {
         "description": "One term of the log: how it went, the run it started, whether a heartbeat's\nrun answered `HEARTBEAT_OK` (nothing delivered).",
@@ -7146,6 +7321,15 @@
         "title": "OAuthSpec",
         "type": "object"
       },
+      "OffsiteState": {
+        "enum": [
+          "off",
+          "ok",
+          "failed"
+        ],
+        "title": "OffsiteState",
+        "type": "string"
+      },
       "OidcSecretIn": {
         "additionalProperties": false,
         "description": "Either the secret itself (`value`, stored encrypted; needs `HERD_SECRET_KEY`) or\nthe name of an environment variable `HERD_OIDC_*` (`env`).",
@@ -7716,6 +7900,33 @@
         "title": "Page[ApprovalOut]",
         "type": "object"
       },
+      "Page_ArchiveOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[ArchiveOut]",
+        "type": "object"
+      },
       "Page_AttachmentOut_": {
         "properties": {
           "items": {
@@ -7795,6 +8006,33 @@
           "items"
         ],
         "title": "Page[AutomationOut]",
+        "type": "object"
+      },
+      "Page_BackupRunOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BackupRunOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[BackupRunOut]",
         "type": "object"
       },
       "Page_BudgetOut_": {
@@ -10786,6 +11024,102 @@
         ],
         "title": "RemoteStatus",
         "type": "string"
+      },
+      "ReplaceIn": {
+        "description": "The organisation's name, exactly, as the confirmation.",
+        "properties": {
+          "confirm": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ReplaceIn",
+        "type": "object"
+      },
+      "ReplaceOut": {
+        "properties": {
+          "archive_name": {
+            "title": "Archive Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archive_name"
+        ],
+        "title": "ReplaceOut",
+        "type": "object"
+      },
+      "RestoreAttemptOut": {
+        "description": "The last attempt to replace the installation from here: `requested` (under way,\nor its process ended), `failed` with a code.",
+        "properties": {
+          "archive_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Name"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "state": {
+            "enum": [
+              "requested",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "at",
+          "archive_name",
+          "code"
+        ],
+        "title": "RestoreAttemptOut",
+        "type": "object"
+      },
+      "RestoreStatusOut": {
+        "properties": {
+          "attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestoreAttemptOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "attempt"
+        ],
+        "title": "RestoreStatusOut",
+        "type": "object"
       },
       "RunEventOut": {
         "description": "One step of a run (model call: usage and the answer's parts; tool call: name,\narguments, result, the spaces it came from; stop: the reason). `redacted`: parts\nthe reader may not read are left out (`agents/runs.py`); the asking person always\ngets everything. `tokens_*`, `cost` (model calls with a price) and `duration_ms`\n(model and tool calls) where the step recorded them, null otherwise.",
@@ -15523,6 +15857,124 @@
         "title": "VersionSummaryOut",
         "type": "object"
       },
+      "app__modules__ai__schemas__CheckOut": {
+        "description": "The outcome as a state, never with the provider's own words.",
+        "properties": {
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        },
+        "required": [
+          "status",
+          "model",
+          "duration_ms"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "app__modules__backups__schemas__CheckOut": {
+        "description": "`problems`: codes, any one blocks replacing (`can_replace` false); `key`:\nwhether HERD_SECRET_KEY fits the archive's `enc:` values.",
+        "properties": {
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive_name": {
+            "title": "Archive Name",
+            "type": "string"
+          },
+          "can_replace": {
+            "title": "Can Replace",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "installation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiguresOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "anyOf": [
+              {
+                "enum": [
+                  "match",
+                  "mismatch",
+                  "missing",
+                  "not_needed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "archive_name",
+          "problems",
+          "warnings",
+          "created_at",
+          "archive",
+          "installation",
+          "key",
+          "can_replace"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
       "app__modules__messaging__schemas__ExpectedVersion": {
         "properties": {
           "version": {
@@ -19226,7 +19678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CheckOut"
+                  "$ref": "#/components/schemas/app__modules__ai__schemas__CheckOut"
                 }
               }
             },
@@ -22986,6 +23438,337 @@
         "summary": "Take Over Automation",
         "tags": [
           "automations"
+        ]
+      }
+    },
+    "/api/backups": {
+      "get": {
+        "description": "The backups, newest first.",
+        "operationId": "list_backups_api_backups_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BackupRunOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Backups",
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "description": "Back up now: a worker makes the backup; `backup.changed` tells its progress.\n409 `backup.already_running` while one runs or waits.",
+        "operationId": "start_backup_api_backups_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Backup",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives": {
+      "get": {
+        "description": "The archives in the backups directory, newest first.",
+        "operationId": "list_archives_api_backups_archives_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ArchiveOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Archives",
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "description": "An archive from elsewhere, checked: 413 `backup.upload_too_large`, 422\n`backup.archive_invalid` with the problems.",
+        "operationId": "upload_archive_api_backups_archives_post",
+        "requestBody": {
+          "content": {
+            "application/x-tar": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Upload Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}": {
+      "get": {
+        "operationId": "download_archive_api_backups_archives__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-tar": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}/check": {
+      "post": {
+        "description": "The archive against this installation; `can_replace` when nothing blocks.",
+        "operationId": "check_archive_api_backups_archives__name__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__modules__backups__schemas__CheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Archive",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/archives/{name}/replace": {
+      "post": {
+        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`backup.already_running`, `backup.restore_running`, `backup.replace_refused`.",
+        "operationId": "replace_installation_api_backups_archives__name__replace_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Installation",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/backups/restore": {
+      "get": {
+        "description": "The last attempt to replace the installation from the administration.",
+        "operationId": "restore_status_api_backups_restore_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Restore Status",
+        "tags": [
+          "backups"
         ]
       }
     },

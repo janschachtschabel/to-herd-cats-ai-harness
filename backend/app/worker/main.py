@@ -25,7 +25,9 @@ Agent runs (`runs.py`) have a loop of their own beside these, outside `ready`; t
 outbox's NOTIFY wakes it too (a new message to an agent commits with an event). It
 adds up to `HERD_RUN_CONCURRENCY` + 3 database connections. Automations that come
 due fire in the due loop (`due.py`), also outside `ready`, with up to two connections
-(firing, gauges).
+(firing, gauges). An owner's "Jetzt sichern" is taken up by a loop of its own
+(`modules/backups/jobs.py`), also outside `ready`, with up to two connections while a
+backup runs.
 
 In maintenance (plan M9 decision 9) the loops pause: the process's maintenance cache
 (`modules/maintenance/cache.py`), which the worker runs, tells them; a paused pass
@@ -43,6 +45,7 @@ from app.core.config import get_settings
 from app.core.db import Database
 from app.core.listen import Listener
 from app.core.outbox import OUTBOX_CHANNEL
+from app.modules.backups.jobs import BackupJobLoop
 from app.modules.backups.metrics import update_backup_metrics
 from app.modules.maintenance.cache import maintenance_cache
 from app.worker.dispatcher import Dispatcher
@@ -72,11 +75,16 @@ class _Loop:
 
 class Worker:
     def __init__(
-        self, dispatcher: Dispatcher, runs: RunLoop | None = None, due: DueLoop | None = None
+        self,
+        dispatcher: Dispatcher,
+        runs: RunLoop | None = None,
+        due: DueLoop | None = None,
+        backups: BackupJobLoop | None = None,
     ) -> None:
         self.dispatcher = dispatcher
         self.runs = runs
         self.due = due
+        self.backups = backups
         self.metrics = worker_metrics()  # only processes with a worker export these
         self._running = False
         self._stop = asyncio.Event()
@@ -126,6 +134,7 @@ class Worker:
         metering = asyncio.create_task(self._metrics_loop())
         running = asyncio.create_task(self.runs.serve(self._stop)) if self.runs else None
         firing = asyncio.create_task(self.due.serve(self._stop)) if self.due else None
+        backing = asyncio.create_task(self.backups.serve(self._stop)) if self.backups else None
         loops = [asyncio.create_task(self._loop(ROUTER, self._route_pass))]
         for handler in self.dispatcher.handlers:
             loops.append(asyncio.create_task(self._loop(handler.name, self._lane_pass(handler))))
@@ -138,7 +147,7 @@ class Worker:
             metering.cancel()
             for task in loops:
                 task.cancel()
-            extra = [task for task in (running, firing) if task is not None]
+            extra = [task for task in (running, firing, backing) if task is not None]
             for task in (listening, metering, *loops, *extra):
                 with suppress(asyncio.CancelledError):
                     await task
@@ -218,4 +227,5 @@ def create_worker(database: Database) -> Worker:
     settings = get_settings()
     timeout = settings.worker_handler_timeout_seconds
     runs = RunLoop(database, concurrency=settings.run_concurrency, lease=settings.run_lease_seconds)
-    return Worker(Dispatcher(database, handler_timeout=timeout), runs, DueLoop(database))
+    dispatcher = Dispatcher(database, handler_timeout=timeout)
+    return Worker(dispatcher, runs, DueLoop(database), BackupJobLoop(database))
