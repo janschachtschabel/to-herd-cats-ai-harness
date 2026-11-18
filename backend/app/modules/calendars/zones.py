@@ -35,14 +35,20 @@ def localise(wall: datetime, tzid: str) -> datetime:
     """The instant (UTC) of the wall time `wall` in `tzid`."""
     if wall.tzinfo is not None:
         raise ValueError("a wall time is naive")
-    return wall.replace(tzinfo=zone(tzid), fold=0).astimezone(UTC)
+    try:
+        return wall.replace(tzinfo=zone(tzid), fold=0).astimezone(UTC)
+    except OverflowError:
+        raise ValueError("the time lies outside the range of datetime") from None
 
 
 def wall(instant: datetime, tzid: str) -> datetime:
     """The wall time of the instant `instant` in `tzid` (naive)."""
     if instant.tzinfo is None:
         raise ValueError("an instant is aware")
-    return instant.astimezone(zone(tzid)).replace(tzinfo=None, fold=0)
+    try:
+        return instant.astimezone(zone(tzid)).replace(tzinfo=None, fold=0)
+    except OverflowError:
+        raise ValueError("the time lies outside the range of datetime") from None
 
 
 def all_day_bounds(first: date, last: date) -> tuple[datetime, datetime]:

@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.modules.calendars import recurrence
+from app.modules.calendars import recurrence, zones
 from app.modules.calendars.recurrence import RuleInvalid, Series
 
 HOUR = timedelta(hours=1)
@@ -223,3 +223,17 @@ def test_empty_parts_are_refused(rule: str) -> None:
     with pytest.raises(RuleInvalid) as refused:
         recurrence.check_rule(rule)
     assert refused.value.code == "event.rrule_invalid"
+
+
+def test_zone_arithmetic_beyond_datetimes_range_is_a_value_error() -> None:
+    # R2-3 "no OverflowError anywhere": the helpers below the series refuse such input
+    # as the bad input it is (ValueError; SeriesInvalid for a moved wall time).
+    with pytest.raises(ValueError, match="range"):
+        zones.localise(datetime.max, "America/New_York")
+    with pytest.raises(ValueError, match="range"):
+        zones.localise(datetime.min, "Asia/Tokyo")
+    with pytest.raises(ValueError, match="range"):
+        zones.wall(datetime.max.replace(tzinfo=UTC), "Asia/Tokyo")
+    with pytest.raises(recurrence.SeriesInvalid) as refused:
+        recurrence.shift(datetime.max, timedelta(days=1))
+    assert refused.value.code == "event.time_out_of_range"

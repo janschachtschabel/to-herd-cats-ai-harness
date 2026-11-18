@@ -287,7 +287,11 @@ def count_before(series: Series, recurrence_id: datetime) -> int:
 
 
 def shift(wall: datetime, delta: timedelta) -> datetime:
-    """The wall time `delta` later, by the clock on the wall."""
+    """The wall time `delta` later, by the clock on the wall (`event.time_out_of_range`
+    beyond `datetime`'s years)."""
     if wall.tzinfo is not None:
         raise ValueError("a wall time is naive")
-    return wall + delta
+    try:
+        return wall + delta
+    except OverflowError:
+        raise SeriesInvalid("event.time_out_of_range") from None
