@@ -120,6 +120,14 @@ writeLimit:
   perMinute: 120
   uploadsPerMinute: 30
 
+## @section Virus scan (M9b; docs/WIKI.md, docs/SICHERHEIT.md)
+
+## @param virusScan.clamavAddress A clamd of your own, not shipped with the chart, as host:port (e.g. clamav.tools.svc:3310; HERD_CLAMAV_ADDRESS; API). Set: attachments and imports are scanned before they are stored; a find answers 422 attachment.rejected_by_scan, a scanner that cannot answer 503 attachment.scan_unavailable (fails closed). Its StreamMaxLength must be at least the import limit (100 MiB). Empty: no scan
+## @param virusScan.egress Egress rules (NetworkPolicyEgressRule list) of the API pods alone to clamd, with networkPolicy.enabled (e.g. its pods on 3310). Empty: with networkPolicy.enabled clamd is reachable only through networkPolicy.egress
+virusScan:
+  clamavAddress: ""
+  egress: []
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 

@@ -91,6 +91,16 @@
       },
       "required": ["perMinute", "uploadsPerMinute"]
     },
+    "virusScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The optional virus scan of uploads through a clamd of your own (J11)",
+      "properties": {
+        "clamavAddress": {"type": "string", "pattern": "^(([A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\]):[0-9]{1,5})?$", "description": "HERD_CLAMAV_ADDRESS (API): host:port; empty: no scan"},
+        "egress": {"type": "array", "description": "NetworkPolicyEgressRules of the API pods alone to clamd, with networkPolicy.enabled", "items": {"type": "object"}}
+      },
+      "required": ["clamavAddress", "egress"]
+    },
     "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},
     "persistence": {
       "type": "object",
@@ -532,5 +542,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "writeLimit", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "writeLimit", "virusScan", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

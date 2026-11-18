@@ -6,6 +6,10 @@
     },
     "rate": {
       "limited": "Zu viele Änderungen in kurzer Zeit. Bitte warte einen Moment und versuche es dann noch einmal."
+    },
+    "attachment": {
+      "rejected_by_scan": "Die Datei wurde vom Virenscan abgelehnt.",
+      "scan_unavailable": "Der Virenscan ist gerade nicht erreichbar, daher wurde nichts gespeichert. Bitte versuche es später noch einmal."
     }
   },
   "security": {

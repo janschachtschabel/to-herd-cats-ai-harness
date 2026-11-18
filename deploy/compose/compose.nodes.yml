@@ -59,6 +59,9 @@ x-api-env: &api-env
   # Writes per person and minute, uploads apart (docs/SICHERHEIT.md); beyond: 429.
   HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
   HERD_UPLOAD_RATE_PER_MINUTE: ${HERD_UPLOAD_RATE_PER_MINUTE:-30}
+  # Optional virus scan of uploads: a clamd of your own as host:port (compose.yml has an
+  # example service); empty: no scan; set: a scanner that cannot answer refuses uploads.
+  HERD_CLAMAV_ADDRESS: ${HERD_CLAMAV_ADDRESS:-}
   HERD_AI_CHECK_TIMEOUT_SECONDS: ${HERD_AI_CHECK_TIMEOUT_SECONDS:-20}
   HERD_AI_PERSONAL_AGENTS_MAX: ${HERD_AI_PERSONAL_AGENTS_MAX:-5}
   HERD_AI_AUTOMATIONS_MAX: ${HERD_AI_AUTOMATIONS_MAX:-20}

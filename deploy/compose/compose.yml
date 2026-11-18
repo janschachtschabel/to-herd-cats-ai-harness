@@ -73,6 +73,10 @@ services:
       # Writes per person (and per agent) and minute, uploads apart; beyond: 429.
       HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
       HERD_UPLOAD_RATE_PER_MINUTE: ${HERD_UPLOAD_RATE_PER_MINUTE:-30}
+      # Optional virus scan of attachments and imports: a clamd of your own as
+      # host:port (e.g. clamav:3310, see the example below); empty: no scan. Set, it
+      # fails closed: a scanner that cannot answer refuses uploads (503).
+      HERD_CLAMAV_ADDRESS: ${HERD_CLAMAV_ADDRESS:-}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
       # AI and agents (docs/AGENTEN.md): test call timeout, personal agents and
       # automations per person, hours a run waits for a release or an answer, runs at
@@ -179,6 +183,15 @@ services:
       - no-new-privileges:true
     stop_grace_period: 30s
     restart: unless-stopped
+
+  # Example only, not shipped with the app: a clamd for HERD_CLAMAV_ADDRESS=clamav:3310
+  # (docs/WIKI.md). Set StreamMaxLength in its clamd.conf to at least the import limit
+  # (HERD_IMPORT_MAX_BYTES, 100 MiB by default), or large uploads are refused (503).
+  # clamav:
+  #   image: clamav/clamav:stable
+  #   volumes:
+  #     - ./clamd.conf:/etc/clamav/clamd.conf:ro
+  #   restart: unless-stopped
 
 volumes:
   db-data:

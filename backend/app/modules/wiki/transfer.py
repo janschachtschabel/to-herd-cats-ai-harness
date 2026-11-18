@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import virus_scan
 from app.core.access import Action, Actor, require
 from app.core.access_repository import remembered_facts
 from app.core.config import get_settings
@@ -92,6 +93,7 @@ class PageImport:
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
             await require(self.session, actor, Action.SPACE_MANAGE, space_id)
+            await virus_scan.scan(get_settings(), body.chunks())  # the whole archive, once
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
             # One operation in one transaction: rights as checked just now, slugs and
             # order per parent read once (thousands of pages, review M2 R19).
@@ -210,7 +212,7 @@ class PageImport:
             return
         try:
             attachment = await self.attachments.add(
-                self.actor, page.id, parts[-1], _entry(zipped, info)
+                self.actor, page.id, parts[-1], _entry(zipped, info), scanned=True
             )
         except archive.UNREADABLE:
             self._skip(info, "unreadable")

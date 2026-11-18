@@ -22,7 +22,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import pagination
+from app.core import pagination, virus_scan
 from app.core.access import Action, Actor
 from app.core.config import get_settings
 from app.core.errors import NotFound, ValidationFailed
@@ -89,13 +89,24 @@ class AttachmentService:
         return attachment
 
     async def add(
-        self, actor: Actor, page_id: uuid.UUID, filename: str, stream: AsyncIterator[bytes]
+        self,
+        actor: Actor,
+        page_id: uuid.UUID,
+        filename: str,
+        stream: AsyncIterator[bytes],
+        *,
+        scanned: bool = False,
     ) -> Attachment:
-        """Read `stream`, check the rights (again), store the file, within the caller's
-        transaction (an import's entries stay part of the import's one transaction)."""
+        """Read `stream`, scan it (the optional virus scan, before anything is stored;
+        `scanned`: an import's entry, whose whole archive was scanned), check the rights
+        (again), store the file, within the caller's transaction (an import's entries
+        stay part of the import's one transaction)."""
         name = clean_filename(filename)
-        limit = get_settings().attachment_max_bytes
+        settings = get_settings()
+        limit = settings.attachment_max_bytes
         with await spool(stream, limit, code="attachment.too_large") as body:
+            if not scanned:
+                await virus_scan.scan(settings, body.chunks())
             page = await self._editable(actor, page_id)
             kind = await asyncio.to_thread(filetypes.detect, body.head, body.text, body.file, name)
             attachments = self.repo(actor)

@@ -97,12 +97,17 @@ Task 18.** *Entscheidung:* bauen. Eine Grenze je Person in PostgreSQL (wie
 (etwa 120 Schreibvorgänge und 30 Uploads je Minute), 429 `rate.limited` mit
 `Retry-After`; Agenten zählen wie Personen. Der Lasttest (Task 10) darf nicht anschlagen.
 
-**J11 – Virenscan (V5.4.3). Geplant, M9b Task 18 (optional).** *Entscheidung:* optional
-bauen. ClamAV (`clamd`, als eigener Dienst über TCP angesprochen, nicht gelinkt) über
-`HERD_CLAMAV_ADDRESS`, Standard aus (dann wie heute). Ist er eingestellt, werden Anhänge
-und Importe vor dem Speichern geprüft; ein Fund lehnt mit 422 ab, ein nicht erreichbarer
-oder scheiternder Scanner ebenfalls (fail closed). Ohne Scanner bleibt V5.4.3 offen;
-das ist eine Entscheidung des Betriebs.
+**J11 – Virenscan (V5.4.3). Gebaut, M9b Task 18 (optional).** *Entscheidung:* optional
+bauen. ClamAV (`clamd`, vom Betrieb als eigener Dienst betrieben und über TCP mit
+`zINSTREAM` angesprochen; eigener Client in `core/virus_scan.py`, nichts gelinkt, nichts
+mitgeliefert) über `HERD_CLAMAV_ADDRESS` (`host:port`), Standard leer = aus (dann wie
+bisher). Ist er eingestellt, werden Anhänge und Wiki-Importe (das ganze Archiv) vor dem
+Speichern geprüft; ein Fund lehnt mit 422 `attachment.rejected_by_scan` ab, ein nicht
+erreichbarer, mit Fehler antwortender oder nach 120 s nicht fertiger Scanner mit 503
+`attachment.scan_unavailable` (fail closed); gespeichert wird dann nichts. Gezählt wird
+nur das Ergebnis (`herd_virus_scans_total{outcome}`), nie Name oder Inhalt. Ohne
+eingestellten Scanner bleibt V5.4.3 eine **dokumentierte Abweichung**; das ist eine
+Entscheidung des Betriebs.
 
 **J12 – Verschlüsselung und Authentisierung im Cluster (V12.3.1, V12.3.3, V12.3.4,
 V13.2.1). Teils geplant (M9b Task 18), teils Abweichung.** *Entscheidung:* (a) TLS zur
@@ -212,7 +217,8 @@ Gespeichert wird inhaltsadressiert (`attachments/<org_id>/<sha256>` unter
 `HERD_DATA_DIR`), der Dateiname ist nur Metadatum. Ausgeliefert wird jede Datei mit
 `Content-Disposition` nach RFC 6266, `nosniff` und einer CSP mit `sandbox`; nur
 Rasterbilder zeigt die Seite `inline`, alles andere ist ein Download.
-Ein Virenscan fehlt (J11). Einzelheiten: [`WIKI.md`](WIKI.md) (Anhänge, Import),
+Ein Virenscan ist optional (J11): mit `HERD_CLAMAV_ADDRESS` prüft ein `clamd` des Betriebs
+Anhänge und Importe vor dem Speichern (Fund 422, Scanner nicht verfügbar 503). Einzelheiten: [`WIKI.md`](WIKI.md) (Anhänge, Import),
 [`AGENTEN.md`](AGENTEN.md) (Skills).
 
 ## Anmeldung
@@ -492,7 +498,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V5.3 | V5.3.2 | L1 | Pfade nicht aus Dateinamen | erfüllt | Speicherschlüssel `attachments/<org_id>/<sha256>` (`core/storage.py`); der Name ist nur Metadatum. SPA-Pfade ohne `..`/Symlinks (`web/spa.py`, `tests/test_spa.py`). |
 | V5.4 | V5.4.1 | L2 | Dateiname im Content-Disposition | erfüllt | Immer `Content-Disposition` mit dem gespeicherten Namen (`core/downloads.content_disposition`); Namen aus der Anfrage werden ignoriert. |
 | V5.4 | V5.4.2 | L2 | Dateinamen kodiert (RFC 6266) | erfüllt | ASCII-Ersatz ohne Anführungszeichen und Steuerzeichen plus `filename*=UTF-8''…` (`core/downloads.py`). |
-| V5.4 | V5.4.3 | L2 | Virenscan | Lücke | Kein Virenscanner. J11, optional geplant M9b Task 18 (ClamAV, Standard aus). |
+| V5.4 | V5.4.3 | L2 | Virenscan | Lücke | Optional gebaut (M9b Task 18, J11): mit `HERD_CLAMAV_ADDRESS` prüft ein `clamd` des Betriebs Anhänge und Importe vor dem Speichern, fail closed (`core/virus_scan.py`; `tests/test_virus_scan.py::test_an_infected_upload_is_refused`, `test_an_unreachable_scanner_refuses_uploads_when_configured`). Standard aus: ohne eingestellten Scanner dokumentierte Abweichung (Entscheidung des Betriebs). |
 
 ### V6 Authentication
 

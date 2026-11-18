@@ -12,6 +12,8 @@ describe('errorMessage', () => {
     ['storage.unavailable', 503],
     ['maintenance.active', 503],
     ['rate.limited', 429],
+    ['attachment.rejected_by_scan', 422],
+    ['attachment.scan_unavailable', 503],
   ])('%s has its own text', (code, status) => {
     const t = i18n.t.bind(i18n)
     for (const locale of ['de', 'en'] as const) {

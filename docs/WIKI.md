@@ -100,6 +100,18 @@ zählt sie nicht mit.
   Grabstein, `storage_tombstone`); danach entfernt sie der Worker, wenn sie nicht
   wieder benutzt wird. So findet eine laufende Sicherung jede Datei ihres
   Datenbank-Stands (M9).
+- **Virenscan (optional, seit M9b):** Mit `HERD_CLAMAV_ADDRESS` (`host:port` eines
+  `clamd`, den der Betrieb selbst betreibt; Chart `virusScan.clamavAddress`) prüft die
+  App jeden Anhang und jeden Import (das ganze Archiv) vor dem Speichern. Ein Fund lehnt
+  mit 422 `attachment.rejected_by_scan` ab („Die Datei wurde vom Virenscan
+  abgelehnt.“). Ist der Scanner nicht erreichbar, antwortet er mit einem Fehler oder
+  braucht er länger als 120 s, wird nichts gespeichert: 503
+  `attachment.scan_unavailable` (fail closed). `clamd`s `StreamMaxLength` muss
+  mindestens so groß sein wie die Import-Grenze (100 MiB), sonst lehnt er große Dateien
+  mit einem Fehler ab. Die Metrik `herd_virus_scans_total{outcome}` (`clean`, `found`,
+  `failed`) zählt die Ergebnisse; Namen oder Inhalte landen nie in Logs oder Metriken.
+  Leer (Standard) prüft nichts. Ein Beispiel-Dienst steht auskommentiert in
+  `deploy/compose/compose.yml`.
 - **Suche:** Strg+K (oder „Suche“ in der Seitenleiste) durchsucht Titel und Inhalt
   aller Seiten, die man lesen darf, optional nur im aktuellen Bereich. Entwürfe findet
   nur, wer sie sehen darf.

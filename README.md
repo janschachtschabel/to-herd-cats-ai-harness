@@ -825,6 +825,11 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   anlegen (Demo-Daten, `loadsetup.py`), warten bei 429 die genannte Zeit ab. Metrik
   `herd_rate_limited_total{area}` (`write`, `upload`); Chart `writeLimit.perMinute`,
   `writeLimit.uploadsPerMinute`. Einzelheiten: [`SICHERHEIT.md`](docs/SICHERHEIT.md).
+- **Virenscan (optional, seit M9b):** `HERD_CLAMAV_ADDRESS` (`host:port` eines eigenen
+  `clamd`, nicht mitgeliefert; Chart `virusScan.clamavAddress`, Freigabe im Netz
+  `virusScan.egress`) prüft Anhänge und Importe vor dem Speichern; Fund 422, Scanner
+  nicht verfügbar 503 (fail closed). Leer (Standard): kein Scan. Einzelheiten:
+  [`WIKI.md`](docs/WIKI.md).
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
   Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M7 ohne DBOS (Plan

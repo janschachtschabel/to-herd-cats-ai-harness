@@ -27,6 +27,13 @@ RATE_LIMITED = Counter(
     ["area"],
     registry=REGISTRY,
 )
+# Uploads scanned by the optional clamd (J11, `virus_scan.py`): clean, found, failed.
+VIRUS_SCANS = Counter(
+    "herd_virus_scans_total",
+    "Uploads scanned by the configured virus scanner, by outcome.",
+    ["outcome"],
+    registry=REGISTRY,
+)
 HTTP_REQUEST_DURATION = Histogram(
     "herd_http_request_duration_seconds",
     "Duration of HTTP requests on the public port.",

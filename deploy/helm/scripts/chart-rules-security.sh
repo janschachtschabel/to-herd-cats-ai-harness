@@ -34,3 +34,26 @@ done
 grep -A1 -- "- name: HERD_UPLOAD_RATE_PER_MINUTE" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
   | grep -q 'value: "60"' || fail "writeLimit.uploadsPerMinute does not reach the API"
 if render --set writeLimit.perMinute=0 >/dev/null; then fail "writeLimit.perMinute took 0"; fi
+
+# J11: the optional clamd address reaches the API alone (empty by default), a bad one is
+# refused, and its egress policy is the API's, only with networkPolicy.enabled.
+out=$(render)
+grep -A1 -- "- name: HERD_CLAMAV_ADDRESS" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q 'value: ""' || fail "the API lacks HERD_CLAMAV_ADDRESS (empty by default)"
+grep -q "HERD_CLAMAV_ADDRESS" <<<"$(doc Deployment t-to-herd-cats-ai-worker "$out")" \
+  && fail "the worker gets the clamd address"
+out=$(render --set virusScan.clamavAddress=clamav.tools.svc:3310)
+grep -A1 -- "- name: HERD_CLAMAV_ADDRESS" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q 'value: "clamav.tools.svc:3310"' || fail "virusScan.clamavAddress does not reach the API"
+if render --set virusScan.clamavAddress=clamav >/dev/null; then fail "virusScan.clamavAddress took a host without port"; fi
+out=$(render --set networkPolicy.enabled=true)
+[[ -z $(doc NetworkPolicy t-to-herd-cats-ai-virus-scan-egress "$out") ]] || fail "clamd egress is open without virusScan.egress"
+out=$(render --set networkPolicy.enabled=true --set 'virusScan.egress[0].ports[0].port=3310')
+policy=$(doc NetworkPolicy t-to-herd-cats-ai-virus-scan-egress "$out")
+[[ -n $policy ]] || fail "no NetworkPolicy for virusScan.egress"
+grep -A6 "podSelector:" <<<"$policy" | grep -q "app.kubernetes.io/component: api$" || fail "clamd egress is not the API's"
+grep -q "port: 3310" <<<"$policy" || fail "virusScan.egress is not passed on"
+out=$(render --set 'virusScan.egress[0].ports[0].port=3310')
+if grep -q "^kind: NetworkPolicy" <<<"$out"; then
+  fail "virusScan.egress renders a policy without networkPolicy.enabled"
+fi

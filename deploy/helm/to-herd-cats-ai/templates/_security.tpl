@@ -8,6 +8,9 @@
   value: {{ .Values.writeLimit.perMinute | quote }}
 - name: HERD_UPLOAD_RATE_PER_MINUTE
   value: {{ .Values.writeLimit.uploadsPerMinute | quote }}
+# A clamd of the operator's to scan uploads; empty: no scan (J11).
+- name: HERD_CLAMAV_ADDRESS
+  value: {{ .Values.virusScan.clamavAddress | quote }}
 {{- end -}}
 
 {{/* Settings of the worker pods that close ASVS gaps (plan M9 Task 18). */}}

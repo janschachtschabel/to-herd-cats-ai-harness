@@ -54,6 +54,16 @@ oidc:
       ports:
         - port: 443
           protocol: TCP
+virusScan:
+  clamavAddress: clamav.tools.svc:3310
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tools
+      ports:
+        - port: 3310
+          protocol: TCP
 publicUrl: https://herd.example.com
 persistence:
   existingClaim: herd-files

@@ -6,6 +6,10 @@
     },
     "rate": {
       "limited": "Too many changes in a short time. Please wait a moment and try again."
+    },
+    "attachment": {
+      "rejected_by_scan": "The file was rejected by the virus scan.",
+      "scan_unavailable": "The virus scan cannot be reached right now, so nothing was stored. Please try again later."
     }
   },
   "security": {

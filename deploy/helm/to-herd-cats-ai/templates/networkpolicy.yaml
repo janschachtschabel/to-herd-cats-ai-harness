@@ -258,6 +258,26 @@ spec:
   egress:
     {{- toYaml . | nindent 4 }}
 {{- end }}
+{{- with .Values.virusScan.egress }}
+---
+# The operator's clamd (virusScan.clamavAddress): the API pods alone, which scan uploads.
+# Empty, it is not rendered and clamd is reachable only through networkPolicy.egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "herd.fullname" $ }}-virus-scan-egress
+  labels:
+    {{- include "herd.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "herd.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: api
+  policyTypes: [Egress]
+  egress:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
 {{- if and .Values.s3.enabled .Values.s3.egress }}
 ---
 # The S3 store (s3.endpoint): the API pods (uploads, downloads), the worker (files
