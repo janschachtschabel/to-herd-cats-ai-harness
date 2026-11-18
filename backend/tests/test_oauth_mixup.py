@@ -82,6 +82,23 @@ async def test_callback_per_client_and_iss_checked(
     assert len(stub.state.token_requests("authorization_code")) == exchanges
 
 
+async def test_a_response_at_the_wrong_callback_uses_the_flow_up(
+    oauth_ready: OAuthStub, ai_people: People
+) -> None:
+    """The state was shown to the wrong place: the flow does not wait for the right one."""
+    stub = oauth_ready
+    made, connector = await _connector(ai_people, stub, "A", issuer=stub.url)
+    other, _ = await _connector(ai_people, stub, "B", issuer=stub.url)
+    stub.state.iss = stub.url
+    url = await authorize(ai_people.admin, SHARED, connector["id"])
+    granted = stub.state.authorize(url)
+    wrong = f"/api/ai/oauth/{other['id']}/callback"
+    assert await _status(ai_people, wrong, granted) == "invalid"
+    own = f"/api/ai/oauth/{made['id']}/callback"
+    assert await _status(ai_people, own, granted) == "invalid"
+    assert stub.state.token_requests("authorization_code") == []
+
+
 async def test_the_shared_callback_finishes_flows_started_before_the_update(
     oauth_ready: OAuthStub, ai_people: People, session: AsyncSession
 ) -> None:
