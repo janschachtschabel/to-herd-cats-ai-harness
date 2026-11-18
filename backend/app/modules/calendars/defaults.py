@@ -4,9 +4,13 @@ the general open space („Allgemein“) one, each on the first call that lists 
 without a name (the interface words them in the reader's language) until renamed, are
 never archived (`service.archive`) and count within the limit of 20 calendars.
 
-Only a person acting for herself makes them: a run (an actor with a read or write
-scope) writes nothing it was not asked to, and an admin who names another person's
-personal space only reads it (`member_space_ids` holds no such space)."""
+Lists make them only for a person acting for herself: a run (an actor with a read or
+write scope) writes nothing it was not asked to, and an admin who lists another
+person's personal space by naming it makes nothing there (`member_space_ids` holds no
+such space). Making a calendar is different: `service.create` makes the space's
+default first, whoever creates, because it counts within the limit; so an admin who
+creates a calendar in another person's personal space (`calendar.moderate` by admin
+power, audited) makes her „Mein Kalender“ too."""
 
 import uuid
 
