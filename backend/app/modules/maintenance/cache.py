@@ -6,6 +6,9 @@ locked or not there yet.
 
 A refresh that fails (the database is locked, unreachable, or has no table yet) keeps
 what the cache knew, so maintenance that was on stays on until a read says otherwise.
+A process that starts knows nothing yet: until its first good read it counts as in
+maintenance (`UNKNOWN`: active, no reason), so one that starts while a restore holds
+the tables neither serves nor runs its loops (review M9b F7).
 Turning on calls `on_start` (the public app ends its live streams there; browsers
 reconnect and get 503). One cache per process (`maintenance_cache()`): whatever runs
 in it (the public app, the worker) starts and stops it, and it runs while any of
@@ -20,7 +23,7 @@ from contextlib import suppress
 from app.core.db import Database
 from app.core.listen import Listener
 from app.modules.maintenance.repository import CHANNEL, MaintenanceRepository
-from app.modules.maintenance.state import INACTIVE
+from app.modules.maintenance.state import INACTIVE, UNKNOWN
 
 __all__ = ["INACTIVE", "POLL_SECONDS", "MaintenanceCache", "in_maintenance", "maintenance_cache"]
 
@@ -91,10 +94,12 @@ class MaintenanceCache:
                     await listening
 
     async def start(self, database: Database) -> None:
-        """Run while any user of this process does; the state is read once first."""
+        """Run while any user of this process does; the state is read once first, and
+        until a read succeeds the process counts as in maintenance (UNKNOWN)."""
         self._users += 1
         if self._task is None:
             self._stop = asyncio.Event()
+            self.state = UNKNOWN
             await self.refresh(database)
             self._task = asyncio.create_task(self.run(database, self._stop))
 

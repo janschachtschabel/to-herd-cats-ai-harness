@@ -81,3 +81,26 @@ async def test_turning_on_calls_the_start_hooks_once(real_db: RealDb) -> None:
     await cache.refresh(real_db.database)
     await cache.refresh(real_db.database)
     assert calls == ["closed"]
+
+
+async def test_a_starting_process_counts_as_in_maintenance_until_it_has_read() -> None:
+    """Review M9b F7: a process that starts while a swap holds the tables must not
+    serve on what it never read; the first good read decides."""
+    unreachable = Database("postgresql+asyncpg://herd:herd@127.0.0.1:1/nowhere")
+    cache = MaintenanceCache(poll_seconds=3600, listen=False)
+    try:
+        await cache.start(unreachable)
+        assert cache.active
+        assert cache.state.reason is None and cache.state.started_at is None
+    finally:
+        await cache.stop()
+        await unreachable.dispose()
+
+
+async def test_a_starting_process_serves_once_it_read_no_maintenance(real_db: RealDb) -> None:
+    cache = MaintenanceCache(poll_seconds=3600, listen=False)
+    try:
+        await cache.start(real_db.database)
+        assert cache.state == INACTIVE
+    finally:
+        await cache.stop()

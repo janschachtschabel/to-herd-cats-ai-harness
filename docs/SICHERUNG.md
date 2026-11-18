@@ -451,7 +451,9 @@ keine zweite Wiederherstellung dazwischen):
    `herd.backup`: keine andere Sicherung liest die Datenbank, während sie getauscht wird;
 3. **Wartungsmodus an** (Audit `maintenance.started`); 10 Sekunden Auslauf, in denen
    jeder Prozess davon erfährt (sofort über `NOTIFY herd_maintenance`, spätestens nach
-   5 Sekunden) und laufende Anfragen enden;
+   5 Sekunden) und laufende Anfragen enden. Ein Prozess, der erst danach startet (ein
+   neuer Pod, ein Neustart), gilt so lange als in Wartung, bis er den Zustand einmal
+   gelesen hat;
 4. die Dateien des Archivs, die noch nicht in der Ablage liegen (lokal oder in S3, wie
    `HERD_STORAGE` sagt; [unten](#anhänge-in-s3)), dann die Datenbank in
    **einer** Transaktion (`psql`): `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`,
