@@ -201,7 +201,9 @@ Archiv (404 `backup.not_found`), und der Menüpunkt fehlt.
   (422 `backup.archive_invalid` mit den Codes; die Datei wird entfernt). Ein gutes heißt
   danach `upload-<UTC-Zeit>-<8 Zeichen>.tar` mit eigener Begleitdatei (Audit
   `backup.uploaded`). Die Aufbewahrung räumt nur `herd-*.tar` auf: Hochgeladene Archive
-  bleiben, bis jemand sie im Verzeichnis löscht. Teildateien, die älter als ein Tag sind
+  bleiben, bis jemand sie im Verzeichnis löscht. Ein hochgeladenes Archiv läuft beim
+  Einspielen als Skript ([Was ein Archiv ausführen darf](#was-ein-archiv-ausführen-darf)):
+  nur Archive der eigenen Installationen hochladen. Teildateien, die älter als ein Tag sind
   (abgebrochene Uploads), entfernt der nächste Upload. Ein Proxy davor muss so große
   Anfragen durchlassen (ingress-nginx: `proxy-body-size`).
 - **„Prüfen“** liest das Archiv vollständig (wie `verify`) und stellt Archiv und
@@ -456,7 +458,10 @@ keine zweite Wiederherstellung dazwischen):
    der Dump des Archivs (aus `pg_restore --file=-`, ohne Zwischendatei), der
    Wartungsmodus im eingespielten Stand, `COMMIT`. Das `COMMIT` geht erst hinaus, wenn
    `pg_restore` fehlerfrei durch ist; bei jedem Fehler wird `psql` beendet, bevor es ein
-   `COMMIT` liest, und die Transaktion rollt zurück;
+   `COMMIT` liest, und die Transaktion rollt zurück. Vom Dump läuft nur, was zum Schema
+   dieser Software gehört (siehe [Was ein Archiv ausführen darf](#was-ein-archiv-ausführen-darf));
+   unmittelbar vor dem `COMMIT` prüft der Tausch, dass seine Transaktion noch dieselbe
+   ist;
 5. `alembic upgrade head` (ein älteres Archiv wird angehoben), dann wie bei der
    leeren Installation: alle Sitzungen, offenen Anmeldeabläufe und
    Live-Berechtigungen gelöscht, Audit `backup.restored` (mit `replaced`,
@@ -486,7 +491,9 @@ keine Aufräumarbeiten); Agenten-Läufe, die gerade laufen, werden wie bei einem
 abgebrochen und nach der Wartung aus ihrem Journal fortgesetzt, sofern das Archiv sie
 enthält. Ein pausierter Worker bleibt `ready` (kein `HerdWorkerStalled`).
 
-**Voraussetzungen:** `psql` und `pg_restore` im `PATH` (im Image enthalten); die
+**Voraussetzungen:** `psql` und `pg_restore` im `PATH` (im Image enthalten), mindestens
+16.10 bzw. 17.6 (sonst `restore.tools_too_old`: erst diese Versionen sperren
+Metabefehle im Skript eines Dumps mit `\restrict`); die
 Datenbankrolle der App muss das Schema `public` löschen dürfen (Besitzerin der Datenbank
 oder des Schemas; bei verwalteten Datenbanken prüfen); auf dem Sicherungs-Volume Platz
 für ein weiteres Archiv. Eine Transaktion, die irgendwo offen hängt, hält das
@@ -508,7 +515,20 @@ geschriebenen Dateien sind entfernt, der Wartungsmodus ist aus, das Audit hat
 `backup.restore_failed` (Archiv, Code). Das Sicherheitsarchiv bleibt `ok` in
 `backup list`. Codes: `restore.swap_failed` (ein SQL-Fehler im Tausch, etwa fehlende
 Rechte für `DROP SCHEMA` oder die Sperrfrist), `restore.pg_restore_failed`,
-`restore.tool_missing`, `archive.member_checksum`, `restore.failed` (etwas anderes).
+`restore.tool_missing`, `archive.member_checksum`, `archive.dump_foreign`,
+`restore.failed` (etwas anderes). Ob der alte Stand da ist, nimmt der Befehl nicht an:
+Er fragt nach jedem Fehler die Datenbank (das Schema `public` hat nach einem Rückrollen
+noch dieselbe Kennung, nach einem gelungenen Tausch eine Markierung dieses Tauschs).
+
+**Unklarer Stand** (`failed restore.swap_broken` oder `restore.swap_unknown`, sollte nie
+vorkommen): Das Skript des Archivs hat die Transaktion selbst beendet (ein `COMMIT` in
+einer Definition), oder die Datenbank war danach nicht zu erreichen. Dann ist der alte
+Stand womöglich **nicht** mehr da; der Wartungsmodus bleibt an, soweit die Datenbank es
+noch zulässt (Audit `backup.restore_failed` mit dem Code). Das Sicherheitsarchiv aus
+Schritt 2 mit `restore apply … --replace` einspielen (bei `swap_broken` hat die
+Datenbank vielleicht keine Organisation mehr: dann wie bei einer
+[leeren Installation](#wiederherstellen-in-eine-leere-installation), nach dem Leeren),
+und das fremde Archiv nicht noch einmal verwenden.
 
 **Abbruch nach dem Tausch** (`failed restore.finish_failed`, selten: etwa die Migration
 oder die Verbindung brach ab): Die Datenbank hat schon den Stand des Archivs, der
@@ -518,7 +538,47 @@ Migrations-Job), und denselben Befehl noch einmal ausführen: Er nimmt ein neues
 Sicherheitsarchiv und läuft ganz durch. `maintenance off` nur, wer bewusst ohne
 erneutes Einspielen weitermacht (die Sitzungen aus dem Archiv gelten dann noch). Endet der
 Befehl selbst mitten im Tausch (Prozess beendet), rollt die Datenbank zurück; der
-Wartungsmodus bleibt an, bis `maintenance off` oder ein neuer Versuch ihn beendet.
+Wartungsmodus bleibt an, bis `maintenance off` oder ein neuer Versuch ihn beendet. Wird
+der Befehl (oder der API-Prozess) unterbrochen, nachdem das `COMMIT` hinaus ist, fragt er
+zuerst die Datenbank: Hat sie schon den Stand des Archivs, endet er wie oben mit
+`restore.finish_failed` (die Dateien des Archivs bleiben, der Wartungsmodus bleibt an);
+sonst wie ein gescheiterter Tausch.
+
+### Was ein Archiv ausführen darf
+
+Ein Dump im Format von `pg_dump` ist ein Skript: Jede Definition steht als Text darin
+und läuft beim Einspielen so, wie sie dasteht, mit der Rolle, die einspielt (bei
+[getrennten Rollen](#getrennte-datenbankrollen-seit-m9b-optional) die Migrationsrolle,
+sonst die Datenbankrolle der App). Ein
+Archiv, das jemand hochlädt oder ins Sicherungsverzeichnis legt, ist darum so
+vertrauenswürdig wie eine Shell des Betreibers. Drei Schutzschichten begrenzen, was ein
+fremdes oder verändertes Archiv anrichten kann:
+
+1. **Nur unser Schema.** Jede Prüfung (`restore check`, „Prüfen“) und jedes Einspielen
+   liest das Inhaltsverzeichnis des Dumps (`pg_restore --list`) und lässt nur Tabellen,
+   ihre Daten, Sequenzen, Vorgaben, Indexe und Constraints im Schema `public` zu,
+   Funktionen und Trigger nur mit den Namen aus unseren Migrationen. Rechte (`ACL`)
+   und ein Kommentar am Schema `public` bleiben weg (die Rechte der Laufzeitrolle
+   vergibt die Migration nach dem Einspielen neu); alles andere (ein anderes Schema,
+   eine Erweiterung, ein Kommentar, eine Sicht, eine Regel, ein Ereignis-Trigger, eine
+   fremde Funktion) lehnt das Archiv ab: `archive.dump_foreign`. Eingespielt wird genau
+   die geprüfte Liste (`pg_restore --use-list`).
+2. **Keine Metabefehle.** `pg_restore` ab 16.10/17.6 umschließt das Skript mit
+   `\restrict` und einem Schlüssel, den der Tausch zufällig wählt; `psql` führt darin
+   keine Befehle wie `\!` aus.
+3. **Eine Transaktion.** Beendet das Skript die Transaktion selbst, schlägt die Prüfung
+   vor unserem `COMMIT` fehl (`restore.swap_broken`, oben).
+
+Eine Datei des Archivs muss unter dem Schlüssel liegen, der ihre SHA-256 nennt
+(`attachments/<org>/<sha256>`), sonst `archive.member_checksum`.
+
+Die Definitionen erlaubter Einträge bleiben Text aus dem Archiv. Wer auch das begrenzen
+will, lässt mit einer **Rolle ohne Superuser-Recht** einspielen (Besitzerin der
+Datenbank, nicht `POSTGRES_USER`; bei getrennten Rollen die Migrationsrolle): Dann kann
+auch ein manipulierter Eintrag keine Programme auf dem Datenbankserver starten
+(`COPY … TO PROGRAM`) oder Dateien lesen. Die
+mitgelieferten Compose-Stacks verbinden die App der Einfachheit halber mit der Rolle aus
+`POSTGRES_USER` (ein Superuser).
 
 Das Recht `backup.manage` (Sicherungen und Einspielen in der Verwaltung, M9b) hat nur die
 Rolle `owner`, nicht `admin`: Ein Archiv enthält Direktnachrichten, die Admins nur über
@@ -642,7 +702,8 @@ Abgelehnt wird mit einem Code; am Ziel ändert sich dann nichts:
 | `restore.backup_running` | am Ziel läuft gerade eine Sicherung (sie hält die Sperre `herd.backup`): sie stoppen bzw. den CronJob aussetzen, dann erneut |
 | `restore.file_conflict` | ein Schlüssel des Archivs liegt in der Ablage mit anderem Inhalt |
 | `restore.server_too_old` | der Zielserver hat eine kleinere Hauptversion als der Quellserver |
-| `restore.tools_too_old` | `pg_restore` ist älter als das `pg_dump` des Archivs (oder fehlt) |
+| `restore.tools_too_old` | `pg_restore` ist älter als das `pg_dump` des Archivs (oder fehlt); beim Einspielen in eine laufende Installation auch: `pg_restore` oder `psql` älter als 16.10 bzw. 17.6 |
+| `archive.dump_foreign` | der Dump enthält mehr als das Schema dieser Software ([oben](#was-ein-archiv-ausführen-darf)) |
 | `restore.secret_key_mismatch` | das Archiv hat `enc:`-Werte, und weder `HERD_SECRET_KEY` noch `HERD_SECRET_KEY_PREVIOUS` hat die Kennung aus dem Manifest |
 | `restore.secret_key_missing` | dasselbe, ohne jeden Schlüssel am Ziel |
 
@@ -665,8 +726,10 @@ nichts):
    geprüft; schon vorhandene mit gleichem Inhalt bleiben);
 3. die Datenbank mit `pg_restore --no-owner --no-privileges --single-transaction
    --exit-on-error` (ganz oder gar nicht; scheitert es, werden die eben geschriebenen
-   Dateien wieder entfernt); der Dump geht aus dem Archiv direkt in `pg_restore`
-   (Standardeingabe), ohne Zwischendatei;
+   Dateien wieder entfernt), nur die Einträge, die zum Schema dieser Software gehören
+   (`--use-list`, [Was ein Archiv ausführen darf](#was-ein-archiv-ausführen-darf)); der
+   Dump geht aus dem Archiv direkt in `pg_restore` (Standardeingabe), ohne
+   Zwischendatei;
 4. `alembic upgrade head`, wenn das Archiv eine ältere bekannte Revision hat;
 5. in einer Transaktion: alle Sitzungen und offenen OAuth-Abläufe gelöscht (nach einer
    Wiederherstellung ist jede Anmeldung ungültig), Sicherungsläufe im Zustand `running`

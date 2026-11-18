@@ -6,7 +6,10 @@ Problems (any one refuses the restore): the archive's own (`verify_archive`),
 here with other content; local or S3, `HERD_STORAGE`), `restore.storage_unavailable`
 (the object store did not answer), `restore.server_too_old` (the server's major version is
 below the archive's), `restore.tools_too_old` (`pg_restore` is older than the archive's
-`pg_dump`), `restore.secret_key_mismatch` and `restore.secret_key_missing` (the archive
+`pg_dump`; replacing: pg_restore or psql without `\\restrict`, `pgtools.RESTRICT_SINCE`),
+`archive.dump_foreign` (the dump holds more than our schema, `dump_toc.py`),
+`archive.member_checksum` (a file's key does not end in its SHA-256),
+`restore.secret_key_mismatch` and `restore.secret_key_missing` (the archive
 has `enc:` values and neither HERD_SECRET_KEY nor HERD_SECRET_KEY_PREVIOUS has its key
 id; `--without-secrets` restores anyway). Warnings: `restore.env_missing:<NAME>` (an
 `env:` reference whose variable is not set) and, with a key problem,
@@ -29,9 +32,17 @@ from app.core.db_roles import schema_owner_problem
 from app.core.migrations import known_revisions
 from app.core.secrets import key_id
 from app.core.storage import StorageKeyError, StorageUnavailable, get_storage, stored_sha256
-from app.ops.archive import FILES_PREFIX, MANIFEST_MEMBER, PREFIX, verify_archive
-from app.ops.manifest import Manifest
-from app.ops.pgtools import ToolFailed, client_major, server_major
+from app.ops.archive import (
+    DUMP_MEMBER,
+    FILES_PREFIX,
+    MANIFEST_MEMBER,
+    PREFIX,
+    read_chunks,
+    verify_archive,
+)
+from app.ops.dump_toc import FOREIGN, list_dump
+from app.ops.manifest import Manifest, Member
+from app.ops.pgtools import ToolFailed, client_major, require_restrict, server_major
 
 KEY_PROBLEMS = frozenset({"restore.secret_key_mismatch", "restore.secret_key_missing"})
 
@@ -84,18 +95,51 @@ async def check_on(
         check.problems.append("archive.format_unknown")
     except StorageUnavailable:
         check.problems.append("restore.storage_unavailable")
+    if any(_misnamed(name, member) for name, member in manifest.members.items()):
+        check.problems.append("archive.member_checksum")
     if await server_major(conn) < manifest.server_major:
         check.problems.append("restore.server_too_old")
     try:
         if client_major("pg_restore") < manifest.tools_major():
             check.problems.append("restore.tools_too_old")
+        elif not into_empty:
+            require_restrict("pg_restore", "psql")
     except ToolFailed:
         check.problems.append("restore.tools_too_old")
+    check.problems += await _dump_problems(archive)
     _check_keys(check, settings, manifest)
     check.warnings[:0] = [
         f"restore.env_missing:{name}" for name in manifest.env_refs if not os.environ.get(name)
     ]
     return check
+
+
+def _misnamed(name: str, member: Member) -> bool:
+    """A file's storage key ends in its content's SHA-256 (`attachments/<org>/<sha>`):
+    an archive cannot put other bytes under a key that names them."""
+    if not name.startswith(FILES_PREFIX):
+        return False
+    return name.rsplit("/", 1)[-1] != member["sha256"]
+
+
+async def _dump_problems(archive: Path) -> list[str]:
+    """The dump's table of contents judged (`dump_toc.py`): `archive.dump_foreign`, or
+    `archive.format_unknown` for a dump pg_restore cannot list."""
+    try:
+        with tarfile.open(archive, "r:") as tar:
+            handle = tar.extractfile(PREFIX + DUMP_MEMBER)
+            if handle is None:
+                return ["archive.member_missing"]
+            await list_dump(read_chunks(handle))
+    except ToolFailed as failed:
+        if failed.code == FOREIGN:
+            return [FOREIGN]
+        if failed.code == "restore.tool_missing":
+            return []  # named as `restore.tools_too_old`
+        return ["archive.format_unknown"]
+    except (KeyError, tarfile.TarError, EOFError, OSError):
+        return ["archive.truncated"]
+    return []
 
 
 def inner_manifest(archive: Path) -> Manifest:

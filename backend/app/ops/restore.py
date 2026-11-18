@@ -13,12 +13,9 @@ scratch space. A refused restore changes nothing (`RestoreRefused`
 with the codes); a failed one raises `RestoreFailed` with a code.
 """
 
-import asyncio
 import tarfile
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO
 
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
@@ -28,7 +25,8 @@ from app.core.db import make_engine
 from app.core.migrations import upgrade_head
 from app.core.storage import Storage, StorageUnavailable, StoredContentMismatch, get_storage
 from app.modules.backups.repository import hold_backup_lock, release_backup_lock
-from app.ops.archive import CHUNK, DUMP_MEMBER, FILES_PREFIX, PREFIX
+from app.ops.archive import DUMP_MEMBER, FILES_PREFIX, PREFIX, read_chunks
+from app.ops.dump_toc import list_dump
 from app.ops.manifest import Manifest
 from app.ops.pgtools import ToolFailed, restore
 from app.ops.restore_after import finish_restore
@@ -167,7 +165,8 @@ async def _restore_database(settings: Settings, archive: Path) -> None:
             handle = tar.extractfile(PREFIX + DUMP_MEMBER)
             if handle is None:
                 raise RestoreFailed("archive.member_missing")
-            await restore(settings, read_chunks(handle))
+            listing = await list_dump(read_chunks(handle))
+            await restore(settings, listing.dump, use_list=listing.use_list)
     except ToolFailed as failed:
         raise RestoreFailed(failed.code) from None
     except KeyError:
@@ -176,8 +175,3 @@ async def _restore_database(settings: Settings, archive: Path) -> None:
         raise RestoreFailed("archive.truncated") from None
     except OSError:
         raise RestoreFailed("archive.unreadable") from None
-
-
-async def read_chunks(handle: IO[bytes]) -> AsyncIterator[bytes]:
-    while chunk := await asyncio.to_thread(handle.read, CHUNK):
-        yield chunk

@@ -96,7 +96,9 @@ async def test_a_failed_replace_on_s3_takes_back_the_objects_it_wrote(
     before = _objects(s3_stub)
     archive, _ = await _second_archive(real_db, make_real_client, tmp_path, data_dir)
     stay_on = maintenance_sql.stay_on_sql
-    monkeypatch.setattr("app.ops.replace.stay_on_sql", lambda at: stay_on(at) + "SELECT 1 / 0;\n")
+    monkeypatch.setattr(
+        "app.ops.replace_steps.stay_on_sql", lambda at: stay_on(at) + "SELECT 1 / 0;\n"
+    )
     with pytest.raises(RestoreFailed) as failed:
         await replace_running(
             settings,

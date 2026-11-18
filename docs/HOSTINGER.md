@@ -300,6 +300,12 @@ Einzelheiten und alle Meldungen stehen in [`SICHERUNG.md`](SICHERUNG.md)
 6. Wieder starten: `docker compose up -d` (oder im Docker Manager neu bereitstellen).
    Alle melden sich neu an, mit ihren Passwörtern aus der Sicherung.
 
+Spiele nur Archive ein, die aus deiner eigenen Installation stammen: Ein Archiv läuft
+beim Einspielen als Skript mit der Datenbankrolle der App, und in diesem Stack ist das
+der Superuser aus `POSTGRES_USER` ([Was ein Archiv ausführen darf](SICHERUNG.md#was-ein-archiv-ausführen-darf)).
+Ein Dump mit mehr als dem Schema der App lehnt die Prüfung ab
+(`archive.dump_foreign`).
+
 Scheitert das Einspielen (`failed <code>`), bleibt die Datenbank leer. Dann mit einer
 anderen Sicherung ab Schritt 4 wiederholen (auf demselben VPS z. B. mit der aus
 Schritt 1).

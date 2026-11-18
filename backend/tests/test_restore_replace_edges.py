@@ -10,11 +10,11 @@ from sqlalchemy import text
 
 from app.core.db import make_engine
 from app.core.migrations import alembic_config
-from app.ops.archive import read_sidecar
+from app.ops.archive import read_chunks, read_sidecar
 from app.ops.backup import write_archive
 from app.ops.cli import run
 from app.ops.replace import replace_running
-from app.ops.restore import RestoreFailed, read_chunks
+from app.ops.restore import RestoreFailed
 from tests.factories_restore import AT, Target, make_archive, source_settings
 from tests.real_db import RealDb
 from tests.replace_helpers import NAME, marked, printed, running, scalar
@@ -67,7 +67,7 @@ async def test_a_cut_off_dump_commits_nothing(
             if sent >= keep:
                 return
 
-    monkeypatch.setattr("app.ops.replace.read_chunks", cut)
+    monkeypatch.setattr("app.ops.replace_steps.read_chunks", cut)
     with pytest.raises(RestoreFailed) as failed:
         await replace_running(
             target.settings,

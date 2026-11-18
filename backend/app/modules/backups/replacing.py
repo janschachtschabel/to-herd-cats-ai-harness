@@ -38,6 +38,8 @@ from app.ops.restore import RestoreFailed, RestoreRefused
 logger = logging.getLogger(__name__)
 
 VIA = "admin"
+# Failures after which the database may not hold the old state (`ops/replace.py`).
+UNSETTLED = frozenset({"restore.finish_failed", "restore.swap_broken", "restore.swap_unknown"})
 Replace = Callable[..., Awaitable[object]]
 
 
@@ -106,8 +108,8 @@ class ReplaceRunner:
             await _record_failure(archive.name, refused.problems)
         except RestoreFailed as failed:
             logger.warning("backup.replace_failed", extra={"code": failed.code})
-            if failed.code == "restore.finish_failed":  # maintenance stays on; the
-                return  # database is the archive's: nothing to record in it now
+            if failed.code in UNSETTLED:  # maintenance stays on; the database is the
+                return  # archive's, or neither state whole: nothing to record in it now
             await _tell()
         except Exception as exc:
             logger.warning("backup.replace_failed", extra={"error": type(exc).__name__})

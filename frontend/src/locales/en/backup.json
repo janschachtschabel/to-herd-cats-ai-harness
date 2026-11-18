@@ -108,14 +108,15 @@
         "format_unknown": "Not a backup archive of this format.",
         "member_missing": "A part of the archive is missing.",
         "member_checksum": "A part of the archive was changed.",
-        "truncated": "The archive is incomplete (cut off)."
+        "truncated": "The archive is incomplete (cut off).",
+        "dump_foreign": "The archive's database holds more than this software's schema (such as foreign functions or extensions)."
       },
       "restore": {
         "archive_newer": "The archive comes from a newer version.",
         "file_conflict": "A file of the archive is here already with other content.",
         "storage_unavailable": "The file storage does not answer.",
         "server_too_old": "The PostgreSQL server is older than the archive's.",
-        "tools_too_old": "pg_restore is older than the archive's pg_dump.",
+        "tools_too_old": "pg_restore is older than the archive's pg_dump, or pg_restore/psql are older than 16.10 or 17.6.",
         "secret_key_mismatch": "The key (HERD_SECRET_KEY) does not fit the archive.",
         "secret_key_missing": "The archive has encrypted values and no key is set here.",
         "env_missing": "The environment variable {{detail}} is not set here.",
@@ -125,7 +126,9 @@
         "confirm_mismatch": "The organisation's name does not match.",
         "failed": "The restore failed.",
         "finish_failed": "A step after the restore failed; the installation stays in maintenance.",
-        "not_schema_owner": "With separate database roles the app itself may not restore; that works only on the command line with the migration role (docs/SICHERUNG.md)."
+        "not_schema_owner": "With separate database roles the app itself may not restore; that works only on the command line with the migration role (docs/SICHERUNG.md).",
+        "swap_broken": "The archive ended the swap's transaction itself; the old state may be gone. The installation stays in maintenance.",
+        "swap_unknown": "After the swap, the database's state could not be determined. The installation stays in maintenance."
       },
       "backup": {
         "interrupted": "The process ended before it finished.",

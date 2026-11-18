@@ -12,7 +12,8 @@ import os
 import re
 import shutil
 import subprocess
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import text
@@ -82,6 +83,32 @@ def client_major(tool: str) -> int:
     return int(tool_version(tool).split(".")[0])
 
 
+# The first releases whose pg_restore writes `\restrict <key>` around a dump's SQL and
+# whose psql refuses backslash commands inside it (CVE-2025-8714); 18 has it from .0.
+RESTRICT_SINCE = {16: 10, 17: 6}
+
+
+def restrict_capable(version: str) -> bool:
+    """Whether a tool of `version` (`tool_version`) knows `\\restrict`."""
+    major, _, minor = version.partition(".")
+    if int(major) >= 18:
+        return True
+    since = RESTRICT_SINCE.get(int(major))
+    return since is not None and int(minor or 0) >= since
+
+
+def require_restrict(*tools: str) -> None:
+    """ToolFailed `restore.tools_too_old` unless every tool knows `\\restrict`
+    (`restore.tool_missing` if one is missing)."""
+    for tool in tools:
+        try:
+            version = tool_version(tool)
+        except ToolFailed:
+            raise ToolFailed("restore.tool_missing") from None
+        if not restrict_capable(version):
+            raise ToolFailed("restore.tools_too_old")
+
+
 async def dump(settings: Settings, snapshot_id: str, out: Path) -> None:
     """`pg_dump -Fc` of the database in the exported snapshot `snapshot_id` (its
     transaction stays open meanwhile) into `out`."""
@@ -104,28 +131,31 @@ async def dump(settings: Settings, snapshot_id: str, out: Path) -> None:
         raise ToolFailed("backup.dump_failed", status)
 
 
-async def restore(settings: Settings, dump: AsyncIterator[bytes]) -> None:
+async def restore(settings: Settings, dump: AsyncIterator[bytes], *, use_list: str) -> None:
     """`pg_restore` of the custom-format dump read from `dump` (piped to its stdin, no
     scratch file) into the settings' database: all or nothing (`--single-transaction
     --exit-on-error`), without owners and grants (managed databases have other
-    roles)."""
+    roles), only the entries of `use_list` (`dump_toc.list_dump`)."""
     path = shutil.which("pg_restore")
     if path is None:
         raise ToolFailed("restore.tool_missing")
     env = child_env(settings)
-    process = await asyncio.create_subprocess_exec(
-        path,
-        "--no-owner",
-        "--no-privileges",
-        "--single-transaction",
-        "--exit-on-error",
-        "--no-password",
-        f"--dbname={env.get('PGDATABASE', '')}",
-        env=env,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
+    with use_list_file(use_list) as (list_fd, list_path):
+        process = await asyncio.create_subprocess_exec(
+            path,
+            "--no-owner",
+            "--no-privileges",
+            "--single-transaction",
+            "--exit-on-error",
+            "--no-password",
+            f"--use-list={list_path}",
+            f"--dbname={env.get('PGDATABASE', '')}",
+            env=env,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            pass_fds=(list_fd,),
+        )
     stdin = process.stdin
     assert stdin is not None  # PIPE above
     try:
@@ -143,3 +173,17 @@ async def restore(settings: Settings, dump: AsyncIterator[bytes]) -> None:
     status = await process.wait()
     if status != 0:
         raise ToolFailed("restore.pg_restore_failed", status)
+
+
+@contextmanager
+def use_list_file(content: str) -> Iterator[tuple[int, str]]:
+    """A `--use-list` file in memory (no scratch file on disk): its descriptor (for
+    `pass_fds`) and the path a child opens it by."""
+    fd = os.memfd_create("herd-use-list", 0)
+    try:
+        data = memoryview(content.encode())
+        while data:
+            data = data[os.write(fd, data) :]
+        yield fd, f"/dev/fd/{fd}"
+    finally:
+        os.close(fd)

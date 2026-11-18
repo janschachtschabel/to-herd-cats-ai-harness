@@ -25,7 +25,7 @@ import tarfile
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import BinaryIO
+from typing import IO, BinaryIO
 
 from app.ops.manifest import FORMAT, Manifest, ManifestInvalid, Member
 
@@ -82,7 +82,7 @@ class ArchiveWriter:
         handle = await asyncio.to_thread(source.open, "rb")
         try:
             size = os.fstat(handle.fileno()).st_size
-            await self.add_stream(name, size, _read_chunks(handle))
+            await self.add_stream(name, size, read_chunks(handle))
         finally:
             handle.close()
 
@@ -238,7 +238,7 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-async def _read_chunks(handle: BinaryIO) -> AsyncIterator[bytes]:
+async def read_chunks(handle: IO[bytes]) -> AsyncIterator[bytes]:
     while chunk := await asyncio.to_thread(handle.read, CHUNK):
         yield chunk
 

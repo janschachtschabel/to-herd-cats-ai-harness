@@ -108,14 +108,15 @@
         "format_unknown": "Kein Sicherungsarchiv dieses Formats.",
         "member_missing": "Dem Archiv fehlt ein Teil.",
         "member_checksum": "Ein Teil des Archivs wurde verändert.",
-        "truncated": "Das Archiv ist unvollständig (abgeschnitten)."
+        "truncated": "Das Archiv ist unvollständig (abgeschnitten).",
+        "dump_foreign": "Die Datenbank im Archiv enthält mehr als das Schema dieser Software (etwa fremde Funktionen oder Erweiterungen)."
       },
       "restore": {
         "archive_newer": "Das Archiv stammt von einer neueren Version.",
         "file_conflict": "Eine Datei des Archivs liegt hier schon mit anderem Inhalt.",
         "storage_unavailable": "Der Dateispeicher antwortet nicht.",
         "server_too_old": "Der PostgreSQL-Server ist älter als der des Archivs.",
-        "tools_too_old": "pg_restore ist älter als das pg_dump des Archivs.",
+        "tools_too_old": "pg_restore ist älter als das pg_dump des Archivs, oder pg_restore/psql sind älter als 16.10 bzw. 17.6.",
         "secret_key_mismatch": "Der Schlüssel (HERD_SECRET_KEY) passt nicht zum Archiv.",
         "secret_key_missing": "Das Archiv hat verschlüsselte Werte, hier ist kein Schlüssel gesetzt.",
         "env_missing": "Die Umgebungsvariable {{detail}} fehlt hier.",
@@ -125,7 +126,9 @@
         "confirm_mismatch": "Der Name der Organisation stimmt nicht.",
         "failed": "Das Einspielen ist gescheitert.",
         "finish_failed": "Nach dem Einspielen ist ein Schritt gescheitert; die Installation bleibt in Wartung.",
-        "not_schema_owner": "Mit getrennten Datenbankrollen darf die App selbst nicht einspielen; das geht nur auf der Kommandozeile mit der Migrationsrolle (docs/SICHERUNG.md)."
+        "not_schema_owner": "Mit getrennten Datenbankrollen darf die App selbst nicht einspielen; das geht nur auf der Kommandozeile mit der Migrationsrolle (docs/SICHERUNG.md).",
+        "swap_broken": "Das Archiv hat die Transaktion des Tauschs selbst beendet; der alte Stand ist womöglich nicht mehr da. Die Installation bleibt in Wartung.",
+        "swap_unknown": "Nach dem Tausch ließ sich nicht feststellen, welchen Stand die Datenbank hat. Die Installation bleibt in Wartung."
       },
       "backup": {
         "interrupted": "Der Prozess endete vor dem Abschluss.",

@@ -130,7 +130,9 @@ async def test_a_failed_replace_keeps_the_old_state(
     before_files = target.files()
     stay_on = maintenance_sql.stay_on_sql
     # An SQL error in the middle of the swap: after DROP SCHEMA and the archive's data.
-    monkeypatch.setattr("app.ops.replace.stay_on_sql", lambda at: stay_on(at) + "SELECT 1 / 0;\n")
+    monkeypatch.setattr(
+        "app.ops.replace_steps.stay_on_sql", lambda at: stay_on(at) + "SELECT 1 / 0;\n"
+    )
     with pytest.raises(RestoreFailed) as failed:
         await replace_running(
             target.settings,

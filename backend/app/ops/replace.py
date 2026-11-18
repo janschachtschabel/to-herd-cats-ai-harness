@@ -13,12 +13,16 @@ restore in between):
    DRAIN_SECONDS for requests and steps under way to end.
 4. The archive's files that are not here yet, in the configured storage (local or S3,
    `HERD_STORAGE`; content-addressed: present keys hold the same content), then the
-   database in one transaction (`swap.py`), which also leaves maintenance on in the
-   restored state.
-   If anything here fails (the drain included: a cancel or Ctrl-C in it), the old
-   state is whole: the files written are removed,
-   maintenance ends, `backup.restore_failed` is audited (the safety run stays `ok`:
-   its archive is good) and `RestoreFailed` carries the code.
+   database in one transaction (`swap.py`: only our schema's entries of the dump),
+   which also leaves maintenance on in the restored state. What follows a failure
+   depends on the state the database says it holds (`replace_steps.py`):
+   rolled back (anything failing here, the drain included: a cancel or Ctrl-C in
+   it): the old state is whole, the files written are removed, maintenance ends,
+   `backup.restore_failed` is audited (the safety run stays `ok`: its archive is good)
+   and `RestoreFailed` carries the code; committed after all (a cancel once COMMIT was
+   sent): `restore.finish_failed` as in point 5, the archive's files stay; neither
+   (`restore.swap_broken`, `restore.swap_unknown`): maintenance stays on, nothing
+   claims the old state.
 5. In the restored database: `alembic upgrade head` with maintenance kept on in the
    same transaction (an older archive has no maintenance table before it), then
    `finish_restore` (everyone signed out, `backup.restored` with `replaced`, the
@@ -34,8 +38,7 @@ elsewhere (another restore, a migration) refuses at once (`restore.already_runni
 """
 
 import asyncio
-import tarfile
-import uuid
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,7 +50,6 @@ from app.core.db import make_engine
 from app.core.migrations import upgrade_head
 from app.core.storage import Storage, get_storage
 from app.core.storage_tombstones import bury
-from app.modules.audit.recorder import record_system
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger
 from app.modules.backups.repository import (
     BackupRunRepository,
@@ -55,18 +57,17 @@ from app.modules.backups.repository import (
     release_backup_lock,
 )
 from app.modules.maintenance.models import MaintenanceReason
-from app.modules.maintenance.repository import stay_on, stay_on_sql
+from app.modules.maintenance.repository import stay_on
 from app.modules.maintenance.service import MaintenanceService
-from app.ops.archive import DUMP_MEMBER, FILES_PREFIX, PREFIX, read_sidecar
+from app.ops.archive import FILES_PREFIX, read_sidecar
 from app.ops.backup import create_backup
 from app.ops.manifest import Manifest
-from app.ops.pgtools import ToolFailed
+from app.ops.replace_steps import Plan, failed, swap, uncertain
 from app.ops.restore import (
     RestoreFailed,
     RestoreRefused,
     RestoreReport,
     heads,
-    read_chunks,
     remove_files,
     restore_files,
 )
@@ -74,7 +75,9 @@ from app.ops.restore_after import finish_restore
 from app.ops.restore_checks import KEY_PROBLEMS, check_on
 from app.ops.schema_lock import SchemaLockBusy, schema_lock
 from app.ops.snapshot import row_counts
-from app.ops.swap import swap_database
+from app.ops.swap import SwapCommitted, SwapUncertain
+
+logger = logging.getLogger(__name__)
 
 DRAIN_SECONDS = 10.0
 VIA = "cli"
@@ -84,16 +87,6 @@ VIA = "cli"
 class ReplaceReport:
     restore: RestoreReport
     safety_archive: Path
-
-
-@dataclass(frozen=True)
-class _Plan:
-    settings: Settings
-    archive: Path
-    manifest: Manifest
-    org_id: uuid.UUID
-    clock: Clock
-    via: str
 
 
 async def replace_running(
@@ -140,7 +133,7 @@ async def _locked(
         problems.append("restore.confirm_mismatch")
     if problems or check.manifest is None or installation is None:
         raise RestoreRefused(problems)
-    plan = _Plan(settings, archive, check.manifest, installation[0], clock, via)
+    plan = Plan(settings, archive, check.manifest, installation[0], clock, via)
     safety = await _safety_archive(conn, plan)
     if not await hold_backup_lock(conn):
         await conn.commit()
@@ -155,7 +148,7 @@ async def _locked(
     return ReplaceReport(report, settings.backup_dir / (safety.archive or ""))
 
 
-async def _safety_archive(conn: AsyncConnection, plan: _Plan) -> BackupRun:
+async def _safety_archive(conn: AsyncConnection, plan: Plan) -> BackupRun:
     outcome = await create_backup(
         plan.settings, trigger=BackupTrigger.PRE_RESTORE, clock=plan.clock
     )
@@ -170,7 +163,7 @@ async def _safety_archive(conn: AsyncConnection, plan: _Plan) -> BackupRun:
 
 
 async def _replace(
-    conn: AsyncConnection, plan: _Plan, safety: BackupRun, drain: float
+    conn: AsyncConnection, plan: Plan, safety: BackupRun, drain: float
 ) -> RestoreReport:
     async with AsyncSession(bind=conn) as session:
         await MaintenanceService(session).begin(
@@ -183,12 +176,17 @@ async def _replace(
         await asyncio.sleep(drain)  # requests and steps under way end; the caches follow
         storage = get_storage(plan.settings)  # local or S3 (`HERD_STORAGE`)
         added = await restore_files(storage, plan.archive, plan.manifest)
-        await _swap(plan)
+        await swap(plan)
+    except SwapCommitted as exc:  # interrupted once the swap had committed (F5)
+        raise RestoreFailed(exc.code) from exc  # the archive's files stay: it uses them
+    except SwapUncertain as exc:  # the old state may be gone: maintenance stays on
+        await uncertain(plan, exc.code)
+        raise RestoreFailed(exc.code) from exc
     except BaseException as exc:  # the swap rolled back (or never began): the old state
         if storage is not None:
             await remove_files(storage, added)
         code = exc.code if isinstance(exc, RestoreFailed) else "restore.failed"
-        await _failed(conn, plan, code)
+        await failed(conn, plan, code)
         if isinstance(exc, RestoreFailed) or not isinstance(exc, Exception):
             raise  # interrupted (a signal, a cancel): as it came
         raise RestoreFailed(code) from exc
@@ -198,40 +196,7 @@ async def _replace(
         raise RestoreFailed("restore.finish_failed") from exc
 
 
-async def _swap(plan: _Plan) -> None:
-    """Like `restore._restore_database`: an archive that changed after the checks
-    fails with an `archive.*` code, and the swap never commits half of a dump."""
-    try:
-        with tarfile.open(plan.archive, "r:") as tar:
-            handle = tar.extractfile(PREFIX + DUMP_MEMBER)
-            if handle is None:
-                raise RestoreFailed("archive.member_missing")
-            await swap_database(
-                plan.settings, read_chunks(handle), tail_sql=stay_on_sql(plan.clock.now())
-            )
-    except ToolFailed as failed:
-        raise RestoreFailed(failed.code) from None
-    except KeyError:
-        raise RestoreFailed("archive.member_missing") from None
-    except (tarfile.TarError, EOFError):
-        raise RestoreFailed("archive.truncated") from None
-    except OSError:
-        raise RestoreFailed("archive.unreadable") from None
-
-
-async def _failed(conn: AsyncConnection, plan: _Plan, code: str) -> None:
-    """The old state, whole: maintenance off and the attempt audited."""
-    await conn.rollback()
-    async with AsyncSession(bind=conn) as session:
-        await MaintenanceService(session).end(plan.org_id, via=plan.via)
-        details = {"archive": plan.archive.name, "code": code, "via": plan.via}
-        await record_system(
-            session, plan.org_id, "backup.restore_failed", "organization", plan.org_id, details
-        )
-        await session.commit()
-
-
-async def _finish(conn: AsyncConnection, plan: _Plan, safety: BackupRun) -> RestoreReport:
+async def _finish(conn: AsyncConnection, plan: Plan, safety: BackupRun) -> RestoreReport:
     await conn.run_sync(upgrade_head)
     await stay_on(conn, plan.clock.now())  # the same transaction as the migration
     await conn.commit()
@@ -260,7 +225,7 @@ async def _finish(conn: AsyncConnection, plan: _Plan, safety: BackupRun) -> Rest
     return RestoreReport(plan.manifest.alembic_revision, revision_to, tables, files)
 
 
-def _only_old_files(plan: _Plan, safety: BackupRun) -> set[str]:
+def _only_old_files(plan: Plan, safety: BackupRun) -> set[str]:
     """The files the replaced state had and the archive has not."""
     old, _ = read_sidecar(plan.settings.backup_dir / (safety.archive or ""))
     return _file_keys(old) - _file_keys(plan.manifest)
