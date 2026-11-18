@@ -106,7 +106,7 @@ async def replace_running(
     via: str = VIA,
     wait: bool = True,
 ) -> ReplaceReport:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with engine.connect() as conn:
             try:

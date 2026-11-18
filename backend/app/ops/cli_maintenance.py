@@ -25,7 +25,7 @@ def add_commands(areas: Any) -> None:
 
 
 async def _status(args: argparse.Namespace, settings: Settings, clock: Clock) -> int:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with async_sessionmaker(engine)() as session:
             state = await MaintenanceService(session).state()
@@ -40,7 +40,7 @@ async def _status(args: argparse.Namespace, settings: Settings, clock: Clock) ->
 
 
 async def _off(args: argparse.Namespace, settings: Settings, clock: Clock) -> int:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with async_sessionmaker(engine)() as session:
             ended = await MaintenanceService(session).end_all(via="cli")

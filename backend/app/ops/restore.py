@@ -60,7 +60,7 @@ class RestoreReport:
 async def restore_into_empty(
     settings: Settings, archive: Path, *, without_secrets: bool, clock: Clock
 ) -> RestoreReport:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with engine.connect() as conn, schema_lock(conn):
             if not await hold_backup_lock(conn):

@@ -85,6 +85,9 @@ spec:
                 {{- with include "herd.databaseTlsEnv" . }}
                 {{- . | nindent 16 }}
                 {{- end }}
+                {{- with include "herd.migrateDatabaseEnv" . }}
+                {{- . | nindent 16 }}
+                {{- end }}
                 - name: HERD_BACKUP_DIR
                   value: /backups
                 - name: HERD_BACKUP_KEEP_DAILY
@@ -114,6 +117,7 @@ spec:
                 {{- include "herd.containerSecurityContext" . | nindent 16 }}
               volumeMounts:
                 {{- include "herd.volumeMounts" . | nindent 16 }}
+                {{- with include "herd.migrateVolumeMount" . }}{{ . | nindent 16 }}{{- end }}
                 - name: data
                   mountPath: /data
                   readOnly: true
@@ -122,6 +126,7 @@ spec:
                   mountPath: /backups
           volumes:
             {{- include "herd.volumesSized" (dict "root" . "tmpSizeLimit" .Values.backup.tmpSizeLimit) | nindent 12 }}
+            {{- with include "herd.migrateVolume" . }}{{ . | nindent 12 }}{{- end }}
             - name: data
               {{- if $filesClaim }}
               persistentVolumeClaim:

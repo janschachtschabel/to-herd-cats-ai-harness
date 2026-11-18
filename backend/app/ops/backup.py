@@ -107,7 +107,7 @@ async def create_backup(
     clock: Clock,
     run_id: uuid.UUID | None = None,
 ) -> BackupOutcome:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     try:
         return await _create(settings, engine, sessions, Job(trigger, clock, run_id))
@@ -207,7 +207,7 @@ async def _locked(
 async def write_archive(settings: Settings, path: Path, at: datetime) -> str:
     """An archive of the settings' database at `path`, without a `backup_run` row
     (`create_backup` records one); the archive's SHA-256."""
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         return await _write(settings, engine, path, at)
     finally:

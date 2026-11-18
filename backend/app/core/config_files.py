@@ -24,6 +24,7 @@ FILE_SECRETS: dict[str, bool] = {
     "internal_token_previous": False,
     "bootstrap_admin_password": True,
     "s3_secret_access_key": False,
+    "migrate_database_password": False,
 }
 
 
@@ -47,6 +48,7 @@ class SecretFileSettings(BaseSettings):
     internal_token_previous_file: Path | None = None
     bootstrap_admin_password_file: Path | None = None
     s3_secret_access_key_file: Path | None = None
+    migrate_database_password_file: Path | None = None
 
     @model_validator(mode="before")
     @classmethod

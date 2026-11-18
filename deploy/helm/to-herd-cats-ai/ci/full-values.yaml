@@ -105,6 +105,10 @@ database:
   existingSecret: herd-db
   sslMode: verify-full
   caSecret: herd-db-ca
+  migrate:
+    url: postgresql+asyncpg://herd_owner@db.example.internal:5432/herd
+    existingSecret: herd-db-owner
+    runtimeRole: herd
 postgresql:
   enabled: false
 ingress:

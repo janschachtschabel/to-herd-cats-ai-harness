@@ -10,7 +10,9 @@ below the archive's), `restore.tools_too_old` (`pg_restore` is older than the ar
 has `enc:` values and neither HERD_SECRET_KEY nor HERD_SECRET_KEY_PREVIOUS has its key
 id; `--without-secrets` restores anyway). Warnings: `restore.env_missing:<NAME>` (an
 `env:` reference whose variable is not set) and, with a key problem,
-`restore.secrets_unreadable:<table.column>=<n>`.
+`restore.secrets_unreadable:<table.column>=<n>`. And `restore.not_schema_owner`: the
+connection's role could not restore (the runtime role of separate roles, J14; a
+restore connects with HERD_MIGRATE_DATABASE_URL).
 """
 
 import os
@@ -23,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import Settings
 from app.core.db import make_engine
+from app.core.db_roles import schema_owner_problem
 from app.core.migrations import known_revisions
 from app.core.secrets import key_id
 from app.core.storage import StorageKeyError, StorageUnavailable, get_storage, stored_sha256
@@ -42,7 +45,7 @@ class RestoreCheck:
 
 async def check_restore(settings: Settings, archive: Path) -> RestoreCheck:
     """The check on a connection of its own (`restore check`)."""
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with engine.connect() as conn:
             return await check_on(conn, settings, archive)
@@ -72,6 +75,8 @@ async def check_on(
     tables = await conn.scalar(text("SELECT count(*) FROM pg_tables WHERE schemaname = 'public'"))
     if tables and into_empty:
         check.problems.append("restore.target_not_empty")
+    if owner := await schema_owner_problem(conn):
+        check.problems.append(owner)
     try:
         if await _file_conflict(settings, manifest):
             check.problems.append("restore.file_conflict")

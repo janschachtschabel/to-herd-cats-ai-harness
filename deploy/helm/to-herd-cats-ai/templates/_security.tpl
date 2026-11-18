@@ -37,3 +37,51 @@ backup). The bundled PostgreSQL speaks no TLS, so it refuses the modes that need
   value: /var/run/secrets/herd/database-ca/ca.crt
 {{- end }}
 {{- end -}}
+
+{{/* Separate database roles (J14): the schema owner's URL and password file for the
+migration job and the backup job only; the API and worker pods keep database.url, the
+runtime role, which migrations give data rights only. */}}
+{{- define "herd.migrateDatabaseEnv" -}}
+{{- $m := .Values.database.migrate -}}
+{{- if or $m.url $m.runtimeRole -}}
+{{- if .Values.postgresql.enabled -}}
+{{- fail "database.migrate needs an external database (postgresql.enabled false)" -}}
+{{- end -}}
+{{- if not (and $m.url $m.runtimeRole) -}}
+{{- fail "database.migrate.url and database.migrate.runtimeRole go together" -}}
+{{- end -}}
+{{- if regexMatch "://[^/@]*:[^/@]*@" $m.url -}}
+{{- fail "database.migrate.url must not contain a password: put it into the Secret named by database.migrate.existingSecret (key \"password\")" -}}
+{{- end -}}
+- name: HERD_MIGRATE_DATABASE_URL
+  value: {{ $m.url | quote }}
+{{- if $m.existingSecret }}
+- name: HERD_MIGRATE_DATABASE_PASSWORD_FILE
+  value: /var/run/secrets/herd/database-migrate/password
+{{- end }}
+- name: HERD_DATABASE_RUNTIME_ROLE
+  value: {{ $m.runtimeRole | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/* The schema owner's password file (database.migrate.existingSecret, key
+"password"): a volume and its mount, migration and backup pods only. */}}
+{{- define "herd.migrateVolume" -}}
+{{- with .Values.database.migrate.existingSecret }}
+- name: database-migrate-password
+  secret:
+    secretName: {{ . }}
+    defaultMode: 0440
+    items:
+      - key: password
+        path: password
+{{- end }}
+{{- end -}}
+
+{{- define "herd.migrateVolumeMount" -}}
+{{- if .Values.database.migrate.existingSecret }}
+- name: database-migrate-password
+  mountPath: /var/run/secrets/herd/database-migrate
+  readOnly: true
+{{- end }}
+{{- end -}}

@@ -253,6 +253,11 @@ class Settings(
             url = url.set(password=self._database_password.get_secret_value())
         return url
 
+    def migrate_database(self) -> URL:
+        """Migrations, backups and restores: the schema owner's URL when roles are
+        separate (HERD_MIGRATE_DATABASE_URL, J14), else `database()`."""
+        return self.migrate_database_url_with_password() or self.database()
+
 
 @lru_cache
 def get_settings() -> Settings:

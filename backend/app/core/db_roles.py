@@ -1,0 +1,54 @@
+"""Separate database roles (plan M9 task 18, J14; ASVS 5.0 V13.2.2), an option.
+
+The migration role (HERD_MIGRATE_DATABASE_URL) owns the schema: migrations, backups and
+restores connect with it (`Settings.migrate_database`). The runtime role
+(HERD_DATABASE_RUNTIME_ROLE, the user of HERD_DATABASE_URL) gets data rights only:
+`grant_runtime_role` runs at the end of every migration run (`alembic/env.py`), so the
+rights cover every table and sequence, including a role named only later, and
+`ALTER DEFAULT PRIVILEGES` covers what later migrations create. CREATE on schema
+`public` is taken from PUBLIC (PostgreSQL 15 and later do that already).
+
+Without HERD_DATABASE_RUNTIME_ROLE nothing is granted: one role does everything, as
+before."""
+
+from sqlalchemy import text
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import AsyncConnection
+
+DATA = "SELECT, INSERT, UPDATE, DELETE"
+NUMBERS = "USAGE, SELECT, UPDATE"
+
+
+def runtime_grants(role: str) -> list[str]:
+    """The statements; `role` is a plain name (`config_database` checks it), quoted."""
+    who = '"' + role.replace('"', '""') + '"'
+    return [
+        f"GRANT USAGE ON SCHEMA public TO {who}",
+        f"GRANT {DATA} ON ALL TABLES IN SCHEMA public TO {who}",
+        f"GRANT {NUMBERS} ON ALL SEQUENCES IN SCHEMA public TO {who}",
+        f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT {DATA} ON TABLES TO {who}",
+        f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT {NUMBERS} ON SEQUENCES TO {who}",
+        "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+    ]
+
+
+def grant_runtime_role(connection: Connection, role: str) -> None:
+    """Give `role` the data rights, inside the connection's transaction."""
+    for statement in runtime_grants(role):
+        connection.execute(text(statement))
+
+
+# The connected role may restore: it can create in `public` and owns (or is a member of
+# the owner of) every table there.
+_OWNS_SCHEMA = text(
+    "SELECT has_schema_privilege('public', 'CREATE') AND NOT EXISTS ("
+    " SELECT 1 FROM pg_tables WHERE schemaname = 'public'"
+    " AND NOT pg_has_role(current_user, tableowner, 'USAGE'))"
+)
+
+
+async def schema_owner_problem(conn: AsyncConnection) -> str | None:
+    """`restore.not_schema_owner` when this connection's role could not restore (the
+    runtime role of separate roles); a restore needs the migration role."""
+    owns = await conn.scalar(_OWNS_SCHEMA)
+    return None if owns else "restore.not_schema_owner"

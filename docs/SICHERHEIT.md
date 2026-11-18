@@ -1,7 +1,8 @@
 # Sicherheit: Prüfung gegen OWASP ASVS 5.0, Stufe 2
 
-Stand 16.11.2026 (M9, Task 9; Jans Antworten und die Planung der Lücken mit Task 11
-nachgetragen; der zweite Faktor mit M9b Task 16). Geprüft wurde to-herd-cats-ai gegen den **OWASP
+Stand 18.11.2026 (M9, Task 9; Jans Antworten und die Planung der Lücken mit Task 11
+nachgetragen; der zweite Faktor mit M9b Task 16, die Lücken J7 bis J14 mit M9b
+Task 18). Geprüft wurde to-herd-cats-ai gegen den **OWASP
 Application Security Verification Standard 5.0.0** (Mai 2025), Stufe 2 (L2). Jede
 Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht geprüft.
 
@@ -11,9 +12,11 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **195 erfüllt**, **53 nicht anwendbar**, **5 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 135 erfüllt, 43 nicht anwendbar, 5 Lücke). Mit
-  M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
+- Ergebnis: **196 erfüllt**, **53 nicht anwendbar**, **4 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 136 erfüllt, 43 nicht anwendbar, 4 Lücke). Mit
+  M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt, mit M9b Task 18
+  V2.4.1, V7.3.1, V7.5.1, V7.5.2, V10.2.2, V12.3.1, V13.2.1 und V13.2.2. Die vier
+  übrigen Lücken sind dokumentierte Abweichungen (unten).
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
   entweder der Aufgabe, die sie schließt (Task 16, Task 18), oder einer dokumentierten
@@ -54,13 +57,13 @@ mit einem Test und in einem eigenen Commit:
 
 ## Offene Lücken: Entscheidungen und Planung
 
-Diese Lücken sind größer als ein halber Tag oder brauchten eine Entscheidung. Nichts davon
-ist in M9a gebaut. J3 hat Jan am 15.11.2026 beantwortet; J7 bis J14 sind Fragen der
-Sicherheitstechnik, nicht des Produkts: Claude hat sie entschieden (Jan kann
-widersprechen), gebaut werden sie in **M9b Task 18** (Plan
-`docs/superpowers/plans/2026-11-15-m9-produktion.md`). Zwei Teile bleiben dokumentierte
-Abweichungen: MFA für lokale Passwortkonten (J3) und TLS zwischen API und
-Collab-Prozess (J12 b).
+Diese Lücken waren größer als ein halber Tag oder brauchten eine Entscheidung. J3 hat
+Jan am 15.11.2026 beantwortet; J7 bis J14 sind Fragen der Sicherheitstechnik, nicht des
+Produkts: Claude hat sie entschieden (Jan kann widersprechen), gebaut sind sie mit
+**M9b Task 18** (Plan `docs/superpowers/plans/2026-11-15-m9-produktion.md`). Drei Teile
+bleiben dokumentierte Abweichungen: MFA für lokale Passwortkonten (J3, V6.3.3), TLS
+zwischen API und Collab-Prozess (J12 b, V12.3.3 und V12.3.4) und der Virenscan ohne
+eingestellten Scanner (J11, V5.4.3: gebaut, aber Standard aus).
 
 **J3 – Mehr-Faktor-Anmeldung (V6.3.3). Abweichung.** Jans Antwort: TOTP vorerst **nur
 optional**, auch für Owner und Admins, ohne Pflicht. M9b Task 16 hat TOTP für
@@ -138,11 +141,15 @@ eingelöst. Die gemeinsame Adresse früherer Versionen beendet nur Abläufe, die
 begannen. Bestehende Registrierungen brauchen die neue Rückruf-Adresse (Hinweis in
 [`MCP.md`](MCP.md)).
 
-**J14 – Getrennte Datenbankrollen (V13.2.2). Geplant, M9b Task 18.** *Entscheidung:*
-bauen, als Option. Eine Migrationsrolle besitzt das Schema, die Laufzeitrolle bekommt nur
-DML-Rechte (`GRANT` in einer Migration); Compose und Chart können zwei Rollen nutzen. Der
-Standard bleibt eine Rolle für kleine Installationen (dokumentiert); Sicherung und
-Wiederherstellung laufen mit der Migrationsrolle.
+**J14 – Getrennte Datenbankrollen (V13.2.2). Gebaut, M9b Task 18 (Option).**
+*Entscheidung:* bauen, als Option. Eine Migrationsrolle (`HERD_MIGRATE_DATABASE_URL`)
+besitzt das Schema; Migration, Sicherung und Wiederherstellung verbinden sich mit ihr.
+Die Laufzeitrolle (`HERD_DATABASE_RUNTIME_ROLE`, die Rolle von `HERD_DATABASE_URL`)
+bekommt am Ende jeder Migration nur Datenrechte auf alle Tabellen und Sequenzen und per
+`ALTER DEFAULT PRIVILEGES` auf künftige (`core/db_roles.py`); Schemaänderungen sind ihr
+verwehrt. Compose (`compose.roles.yml`) und Chart (`database.migrate.*`) können zwei
+Rollen nutzen. Der Standard bleibt eine Rolle für kleine Installationen
+([`SICHERUNG.md`](SICHERUNG.md#getrennte-datenbankrollen-seit-m9b-optional)).
 
 ## Betriebsvoraussetzungen und Hinweise
 
@@ -673,7 +680,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 |---|---|---|---|---|---|
 | V13.1 | V13.1.1 | L2 | Kommunikation dokumentiert | erfüllt | Abschnitt „Verbindungen“. |
 | V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | erfüllt | Collab → API trägt je Aufruf eine kurzlebige Berechtigung und das interne Token, das sich ohne Ausfall wechseln lässt (`HERD_INTERNAL_TOKEN_PREVIOUS`, `web/internal.py`; M9b Task 18, J12 c). Datenbank: eigenes Dienstkonto mit Passwort, auf Wunsch über TLS. `tests/test_internal_token_rotation.py::test_both_internal_tokens_are_accepted`. |
-| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | Lücke | Container laufen ohne root (uid 10001); aber App und Migration nutzen dieselbe Datenbankrolle, die das Schema besitzt. J14, geplant M9b Task 18 (Migrations- und Laufzeitrolle als Option). |
+| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | erfüllt | Container laufen ohne root (uid 10001). Datenbank: getrennte Rollen als Option, die Laufzeitrolle nur mit Datenrechten, Migration, Sicherung und Wiederherstellung mit der Rolle, die das Schema besitzt (`core/db_roles.py`, `HERD_MIGRATE_DATABASE_URL`, `HERD_DATABASE_RUNTIME_ROLE`; Compose `compose.roles.yml`, Chart `database.migrate.*`; M9b Task 18, J14). Standard eine Rolle (dokumentiert). `tests/test_database_roles.py::test_the_runtime_role_cannot_alter_the_schema`. |
 | V13.2 | V13.2.3 | L2 | Keine Standard-Zugangsdaten | erfüllt | Compose verlangt `POSTGRES_PASSWORD` und das Bootstrap-Passwort ohne Standardwert (`deploy/compose/compose.yml`); `HERD_INTERNAL_TOKEN` mindestens 32 Zeichen (`tests/test_config.py`). |
 | V13.2 | V13.2.4 | L2 | Allowlist für Ziele nach außen | erfüllt | Nach außen nur zu Zielen, die Admins eintragen (KI-Verbindungen, MCP-Server, OIDC-Anbieter, OAuth-Clients) und nur an öffentliche Adressen (private nur per Allowlist): `core/egress.py`, `core/egress_allowance.py`; im Chart zusätzlich NetworkPolicy-Egress. |
 | V13.2 | V13.2.5 | L2 | Server mit Allowlist | erfüllt | Wie V13.2.4; Dateien nur unter `HERD_DATA_DIR`, SPA nur aus `HERD_STATIC_DIR`. |

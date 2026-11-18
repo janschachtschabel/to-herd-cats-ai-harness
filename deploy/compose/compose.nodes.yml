@@ -124,6 +124,12 @@ services:
     environment:
       <<: *database
       HERD_ROLE: migrate
+      # Separate database roles (docs/SICHERUNG.md): the schema owner migrates and
+      # gives HERD_DATABASE_RUNTIME_ROLE (then the role of HERD_DATABASE_URL on the
+      # other nodes) data rights only. Empty: one role.
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
     depends_on:
       db:
         condition: service_healthy

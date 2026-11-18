@@ -48,7 +48,7 @@ async def run_backup(
     rule = keep_rule(settings)
     apply_retention(settings.backup_dir, rule)
     offsite = await push_offsite(settings, outcome.archive, rule, clock)
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with async_sessionmaker(engine)() as session, session.begin():
             runs = BackupRunRepository(session)

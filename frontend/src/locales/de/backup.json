@@ -1,5 +1,7 @@
 {
-  "nav": { "backup": "Sicherung" },
+  "nav": {
+    "backup": "Sicherung"
+  },
   "maintenance": {
     "title": "Wartung",
     "text": "Die Installation wird gerade gewartet: Eine Sicherung wird eingespielt. Danach meldest du dich neu an.",
@@ -33,7 +35,11 @@
       "failed": "gescheitert",
       "interrupted": "abgebrochen"
     },
-    "offsite": { "off": "aus", "ok": "kopiert", "failed": "gescheitert" },
+    "offsite": {
+      "off": "aus",
+      "ok": "kopiert",
+      "failed": "gescheitert"
+    },
     "archives": {
       "title": "Archive",
       "description": "Die Archive im Sicherungsverzeichnis. Ein Archiv einer anderen Installation lädst du hier hoch.",
@@ -118,7 +124,8 @@
         "already_running": "Ein anderes Einspielen oder eine Migration läuft gerade.",
         "confirm_mismatch": "Der Name der Organisation stimmt nicht.",
         "failed": "Das Einspielen ist gescheitert.",
-        "finish_failed": "Nach dem Einspielen ist ein Schritt gescheitert; die Installation bleibt in Wartung."
+        "finish_failed": "Nach dem Einspielen ist ein Schritt gescheitert; die Installation bleibt in Wartung.",
+        "not_schema_owner": "Mit getrennten Datenbankrollen darf die App selbst nicht einspielen; das geht nur auf der Kommandozeile mit der Migrationsrolle (docs/SICHERUNG.md)."
       },
       "backup": {
         "interrupted": "Der Prozess endete vor dem Abschluss.",

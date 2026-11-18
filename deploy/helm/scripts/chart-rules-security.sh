@@ -99,3 +99,41 @@ grep -A6 -- "- name: HERD_INTERNAL_TOKEN_PREVIOUS" <<<"$(doc Deployment t-to-her
 if grep -q "HERD_INTERNAL_TOKEN_PREVIOUS" <<<"$(doc Deployment t-to-herd-cats-ai-collab "$out")"; then
   fail "the collab process gets the previous token"
 fi
+
+# J14: separate database roles. The schema owner's URL, password file and the runtime
+# role reach the migration and backup jobs only; the API and worker keep database.url.
+# Both values go together, never with the bundled PostgreSQL, never with a password.
+roles=("${ext[@]}" --set database.migrate.url=postgresql+asyncpg://herd@db.example:5432/herd
+  --set database.migrate.existingSecret=db-owner --set database.migrate.runtimeRole=herd_app)
+out=$(render "${ext[@]}")
+grep -q "HERD_MIGRATE_DATABASE\|HERD_DATABASE_RUNTIME_ROLE\|database-migrate" <<<"$out" \
+  && fail "separate roles without database.migrate"
+out=$(render "${roles[@]}")
+for pod in "Job t-to-herd-cats-ai-migrate" "CronJob t-to-herd-cats-ai-backup"; do
+  # shellcheck disable=SC2086
+  manifest=$(doc $pod "$out")
+  grep -A1 -- "- name: HERD_MIGRATE_DATABASE_URL" <<<"$manifest" \
+    | grep -q 'value: "postgresql+asyncpg://herd@db.example:5432/herd"' || fail "no owner URL in $pod"
+  grep -A1 -- "- name: HERD_MIGRATE_DATABASE_PASSWORD_FILE" <<<"$manifest" \
+    | grep -q "value: /var/run/secrets/herd/database-migrate/password" || fail "no owner password in $pod"
+  grep -A1 -- "- name: HERD_DATABASE_RUNTIME_ROLE" <<<"$manifest" | grep -q 'value: "herd_app"' \
+    || fail "no runtime role in $pod"
+  grep -A2 -- "- name: database-migrate-password" <<<"$manifest" | grep -q "secretName: db-owner" \
+    || fail "the owner's password is not mounted in $pod"
+done
+for pod in api worker collab; do
+  grep -q "HERD_MIGRATE_DATABASE\|database-migrate" <<<"$(doc Deployment "t-to-herd-cats-ai-$pod" "$out")" \
+    && fail "the $pod pods get the schema owner's access"
+done
+if render "${ext[@]}" --set database.migrate.url=postgresql+asyncpg://herd@db.example:5432/herd >/dev/null 2>&1; then
+  fail "database.migrate.url took no runtime role"
+fi
+if render --set database.migrate.url=postgresql+asyncpg://herd@x:5432/herd --set database.migrate.runtimeRole=herd_app >/dev/null 2>&1; then
+  fail "database.migrate took the bundled PostgreSQL"
+fi
+if render "${roles[@]}" --set database.migrate.url=postgresql+asyncpg://herd:pw@db.example:5432/herd >/dev/null 2>&1; then
+  fail "database.migrate.url took a password"
+fi
+if render "${roles[@]}" --set 'database.migrate.runtimeRole=Herd App' >/dev/null 2>&1; then
+  fail "database.migrate.runtimeRole took a name that needs quoting"
+fi

@@ -1,5 +1,7 @@
 {
-  "nav": { "backup": "Backup" },
+  "nav": {
+    "backup": "Backup"
+  },
   "maintenance": {
     "title": "Maintenance",
     "text": "The installation is in maintenance: a backup is being restored. Afterwards you sign in again.",
@@ -33,7 +35,11 @@
       "failed": "failed",
       "interrupted": "interrupted"
     },
-    "offsite": { "off": "off", "ok": "copied", "failed": "failed" },
+    "offsite": {
+      "off": "off",
+      "ok": "copied",
+      "failed": "failed"
+    },
     "archives": {
       "title": "Archives",
       "description": "The archives in the backup directory. Upload an archive of another installation here.",
@@ -118,7 +124,8 @@
         "already_running": "Another restore or a migration is running.",
         "confirm_mismatch": "The organisation's name does not match.",
         "failed": "The restore failed.",
-        "finish_failed": "A step after the restore failed; the installation stays in maintenance."
+        "finish_failed": "A step after the restore failed; the installation stays in maintenance.",
+        "not_schema_owner": "With separate database roles the app itself may not restore; that works only on the command line with the migration role (docs/SICHERUNG.md)."
       },
       "backup": {
         "interrupted": "The process ended before it finished.",

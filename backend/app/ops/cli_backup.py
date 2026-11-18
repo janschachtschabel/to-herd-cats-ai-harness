@@ -92,7 +92,7 @@ async def _verify(args: argparse.Namespace, settings: Settings, clock: Clock) ->
 
 
 async def _list(args: argparse.Namespace, settings: Settings, clock: Clock) -> int:
-    engine = make_engine(settings.database())
+    engine = make_engine(settings.migrate_database(), settings=settings)
     try:
         async with async_sessionmaker(engine)() as session:
             runs = BackupRunRepository(session)

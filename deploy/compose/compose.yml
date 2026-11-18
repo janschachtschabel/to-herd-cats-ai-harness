@@ -4,7 +4,8 @@
 # that child keeps its live documents under HERD_COLLAB_MEMORY_BUDGET_MB, 400 by
 # default, and needs up to about 800 MB with it, docs/WIKI.md. If the child dies, the
 # app exits and `restart: unless-stopped` starts it again).
-# compose.nodes.yml runs the roles in separate containers instead (two API nodes).
+# compose.nodes.yml runs the roles in separate containers instead (two API nodes);
+# compose.roles.yml separates the database roles (schema owner and runtime role).
 # Secrets come from .env next to this file (see .env.example), the AI keys from the
 # optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
@@ -63,6 +64,12 @@ services:
       # setting; the bundled db speaks no TLS (same host, no network in between).
       HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
       HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
+      # Separate database roles (docs/SICHERUNG.md; compose.roles.yml sets them up):
+      # the schema owner for migrations, backups and restores, and the role of
+      # HERD_DATABASE_URL that gets data rights only. Empty: one role, as by default.
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
       # Shared by the API and the collab process (live editing); at least 32 characters.
@@ -159,6 +166,9 @@ services:
       HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
       HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
+      HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
+      HERD_MIGRATE_DATABASE_PASSWORD: ${HERD_MIGRATE_DATABASE_PASSWORD:-}
+      HERD_DATABASE_RUNTIME_ROLE: ${HERD_DATABASE_RUNTIME_ROLE:-}
       HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
       HERD_BACKUP_KEEP_DAILY: ${HERD_BACKUP_KEEP_DAILY:-7}
       HERD_BACKUP_KEEP_WEEKLY: ${HERD_BACKUP_KEEP_WEEKLY:-4}

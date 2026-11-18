@@ -374,6 +374,48 @@ gebaut (Quellarchiv mit der Prüfsumme aus den `SHA256SUMS` der Veröffentlichun
 1.27.4, Module mit Sicherheitskorrekturen aus `deploy/restic/go.mod` und `go.sum`;
 siehe `Dockerfile`), weil die veröffentlichten Binärdateien mit älterem Go gebaut sind.
 
+## Getrennte Datenbankrollen (seit M9b, optional)
+
+Standard ist **eine** Datenbankrolle: Sie besitzt das Schema und bedient zugleich die
+Anfragen. Für kleine Installationen genügt das. Wer es enger will (ASVS V13.2.2),
+trennt zwei Rollen:
+
+- Die **Migrationsrolle** besitzt das Schema. Mit ihr verbinden sich die Migration, die
+  Sicherung (`pg_dump`) und das Einspielen (`pg_restore`, `psql`), über
+  `HERD_MIGRATE_DATABASE_URL` (ohne Passwort) und `HERD_MIGRATE_DATABASE_PASSWORD`
+  bzw. `HERD_MIGRATE_DATABASE_PASSWORD_FILE`. Alle Befehle von `python -m app.ops`
+  nehmen sie, wenn sie gesetzt ist.
+- Die **Laufzeitrolle** ist die Rolle von `HERD_DATABASE_URL` und steht in
+  `HERD_DATABASE_RUNTIME_ROLE`. Am Ende jeder Migration bekommt sie `SELECT`, `INSERT`,
+  `UPDATE` und `DELETE` auf alle Tabellen, `USAGE`, `SELECT` und `UPDATE` auf alle
+  Sequenzen, und über `ALTER DEFAULT PRIVILEGES` dasselbe auf alles, was spätere
+  Migrationen anlegen. Ändern, Anlegen oder Löschen von Tabellen darf sie nicht;
+  `CREATE` im Schema `public` wird `PUBLIC` entzogen (`core/db_roles.py`).
+  `HERD_MIGRATE_DATABASE_URL` ohne `HERD_DATABASE_RUNTIME_ROLE` ist ein Startfehler.
+- Die Rollen legt der Betrieb an (die Laufzeitrolle mit `LOGIN` und Passwort, sonst
+  nichts). Wird die Laufzeitrolle erst später benannt, genügt eine Migration
+  (`HERD_ROLE=migrate` oder ein Neustart in Rolle `all`); die Rechte werden bei jedem
+  Lauf neu vergeben.
+- **Einspielen in die laufende Installation aus der Verwaltung** geht mit getrennten
+  Rollen nicht: Die Prüfung meldet `restore.not_schema_owner`, weil die App nur die
+  Laufzeitrolle hat. Eingespielt wird dann auf der Kommandozeile mit der
+  Migrationsrolle (`python -m app.ops restore apply --replace --confirm NAME`, im
+  Container des Backup-Dienstes bzw. ‑Jobs, der sie kennt). Sichern aus der Verwaltung
+  („Jetzt sichern“) bleibt möglich: Der Worker liest mit der Laufzeitrolle alles.
+
+**Compose:** `deploy/compose/compose.roles.yml` über `compose.yml`
+(`docker compose -f compose.yml -f compose.roles.yml up -d`, `HERD_APP_DB_PASSWORD` in
+`.env`): Der Dienst `db-roles` legt die Rolle `herd_app` einmal an und setzt bei jedem
+Start ihr Passwort; die App bedient Anfragen als `herd_app` und migriert als `herd`,
+der Dienst `backup` sichert als `herd`. Mit `compose.nodes.yml` nimmt der Dienst
+`migrate` die drei Variablen; die Laufzeitrolle der Knoten setzt man dort über eine
+eigene Überlagerung von `HERD_DATABASE_URL` und `HERD_DATABASE_PASSWORD`.
+
+**Helm:** `database.migrate.url`, `database.migrate.existingSecret` (Schlüssel
+`password`) und `database.migrate.runtimeRole` (nur zusammen, nur mit externer
+Datenbank). Nur der Migrations-Job und der Backup-Job bekommen die Migrationsrolle;
+API- und Worker-Pods verbinden sich mit `database.url`, also als Laufzeitrolle.
+
 ## Einspielen in eine laufende Installation (Wartungsmodus)
 
 Ersetzt den ganzen Stand einer **laufenden** Installation durch ein Archiv, ohne die App

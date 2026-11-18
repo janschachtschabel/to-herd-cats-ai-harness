@@ -46,6 +46,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- $own := include "herd.env" (dict "root" . "role" "migrate") }}
+            {{- with include "herd.migrateDatabaseEnv" . }}
+            {{- $own = printf "%s\n%s" $own . }}
+            {{- end }}
             {{- include "herd.withExtraEnv" (dict "own" $own "extra" .Values.api.env "where" "api.env") | nindent 12 }}
           # No secrets.existingSecret: migrations need only the database.
           resources:
@@ -54,5 +57,7 @@ spec:
             {{- include "herd.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             {{- include "herd.volumeMounts" . | nindent 12 }}
+            {{- with include "herd.migrateVolumeMount" . }}{{ . | nindent 12 }}{{- end }}
       volumes:
         {{- include "herd.volumes" . | nindent 8 }}
+        {{- with include "herd.migrateVolume" . }}{{ . | nindent 8 }}{{- end }}

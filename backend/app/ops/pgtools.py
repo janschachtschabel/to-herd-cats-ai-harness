@@ -35,9 +35,9 @@ class ToolFailed(Exception):
 
 
 def child_env(settings: Settings) -> dict[str, str]:
-    """The whole environment of a PostgreSQL tool: where to connect, the password and
-    TLS."""
-    url = settings.database()
+    """The whole environment of a PostgreSQL tool: where to connect (the schema owner
+    when roles are separate, J14), the password and TLS."""
+    url = settings.migrate_database()
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"}
     for name, value in (
         ("PGHOST", url.host),

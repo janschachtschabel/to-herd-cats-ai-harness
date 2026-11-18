@@ -522,6 +522,12 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   die CAs des Systems) gelten für jede Verbindung der App und für
   `pg_dump`/`pg_restore` der Sicherung; sie gewinnen über ein `ssl`/`sslmode` in der
   URL. Chart `database.sslMode` und `database.caSecret` (Secret mit `ca.crt`).
+- **Getrennte Datenbankrollen (seit M9b, optional):** `HERD_MIGRATE_DATABASE_URL`
+  (+ `HERD_MIGRATE_DATABASE_PASSWORD[_FILE]`) für Migration, Sicherung und
+  Wiederherstellung, `HERD_DATABASE_RUNTIME_ROLE` für die Rolle von
+  `HERD_DATABASE_URL`, die nur Datenrechte bekommt. Standard: eine Rolle. Compose
+  `compose.roles.yml`, Chart `database.migrate.*`; Einzelheiten:
+  [`SICHERUNG.md`](docs/SICHERUNG.md#getrennte-datenbankrollen-seit-m9b-optional).
 - **Geheimnisse als Dateien:** Ebenso lesen `HERD_SECRET_KEY_FILE`,
   `HERD_INTERNAL_TOKEN_FILE`, `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` und
   `HERD_S3_SECRET_ACCESS_KEY_FILE` den Wert aus einer Datei (ein Zeilenende am Schluss

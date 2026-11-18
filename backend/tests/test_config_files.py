@@ -17,6 +17,7 @@ ALL = [
     "internal_token_previous",
     "bootstrap_admin_password",
     "s3_secret_access_key",
+    "migrate_database_password",
 ]
 
 
@@ -34,6 +35,7 @@ def _file(tmp_path: Path, name: str, content: str) -> Path:
         ("internal_token_previous", TOKEN),
         ("bootstrap_admin_password", "Zq8!vR2#mLp4"),
         ("s3_secret_access_key", "s3-secret-from-a-file"),
+        ("migrate_database_password", "owner-pw-from-a-file"),
     ],
 )
 def test_a_secret_comes_from_its_file(
@@ -66,7 +68,14 @@ def test_an_unreadable_file_is_refused_by_name(
 
 
 @pytest.mark.parametrize(
-    "field", ["secret_key", "internal_token", "internal_token_previous", "s3_secret_access_key"]
+    "field",
+    [
+        "secret_key",
+        "internal_token",
+        "internal_token_previous",
+        "s3_secret_access_key",
+        "migrate_database_password",
+    ],
 )
 def test_an_empty_file_is_refused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, field: str
