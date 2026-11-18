@@ -36,7 +36,8 @@ its steps so far as `k`, for whoever may see its conversation `c`; a heartbeat's
 before it delivers anything names no `c` but its asker `u` (review M7, finding 5).
 `backup.changed` (plan M9 task 13, `u` an owner, `b` the run) is sent directly, not
 through the outbox (`modules/backups/live.py`). Every
-API process's hub (`live.py`) decodes it again; anything it cannot use is dropped.
+API process's hub (`live.py`) decodes it again (`live_decode.py`); anything it cannot use
+is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
 """
 
@@ -267,47 +268,3 @@ async def publish_live(session: AsyncSession, event: Event) -> None:
     if len(payload.encode()) > MAX_PAYLOAD_BYTES:  # ids only: cannot happen
         raise ValueError("live payload too large")
     await session.execute(select(func.pg_notify(LIVE_CHANNEL, payload)))
-
-
-def decode(raw: str) -> LiveEvent | None:
-    """The event in a NOTIFY payload; None for anything else."""
-    try:
-        data = json.loads(raw)
-        if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
-            return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a", "y", "b")
-        ids = {key: _strict_uuid(data.get(key)) for key in keys}
-        org_id = _strict_uuid(data.get("o"))
-        step = data.get("k")
-        if step is not None and (not isinstance(step, int) or isinstance(step, bool)):
-            raise TypeError("not a step")
-    except (ValueError, TypeError, RecursionError):
-        return None
-    if org_id is None:
-        return None
-    return LiveEvent(
-        data["t"],
-        org_id,
-        ids["c"],
-        ids["m"],
-        ids["p"],
-        ids["u"],
-        ids["w"],
-        ids["s"],
-        ids["r"],
-        ids["n"],
-        step,
-        ids["x"],
-        ids["a"],
-        ids["y"],
-        ids["b"],
-    )
-
-
-def _strict_uuid(value: object) -> uuid.UUID | None:
-    """None for null; a UUID for its text; anything else is refused (ValueError)."""
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TypeError("not an id")
-    return uuid.UUID(value)

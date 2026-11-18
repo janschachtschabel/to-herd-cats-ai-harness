@@ -282,7 +282,7 @@ def test_role_collab_runs_node_in_place(monkeypatch):
     monkeypatch.setenv("HERD_COLLAB_ADVERTISE_URL", "ws://10.1.2.3:1234")
     settings = Settings(role="collab", internal_token=TOKEN, collab_api_url="http://api:9090")
     monkeypatch.setattr(launch, "get_settings", lambda: settings)
-    monkeypatch.setattr(launch.os, "execvpe", lambda *args: calls.append(args))
+    monkeypatch.setattr(os, "execvpe", lambda *args: calls.append(args))
     launch.main()
     ((file, argv, env),) = calls
     assert file == "node" and argv[1].endswith("collab/server.mjs")

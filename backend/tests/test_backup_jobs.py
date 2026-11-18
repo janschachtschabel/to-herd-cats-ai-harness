@@ -26,7 +26,8 @@ from app.modules.backups.repository import (
     hold_backup_lock,
     release_backup_lock,
 )
-from app.modules.messaging.live_events import LIVE_CHANNEL, decode
+from app.modules.messaging.live_decode import decode
+from app.modules.messaging.live_events import LIVE_CHANNEL
 from app.modules.users.models import User
 from app.ops import backup as backup_module
 from app.ops.backup import create_backup
