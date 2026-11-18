@@ -2,16 +2,20 @@
 archived), counts within the limit of 20, and is stored without a name until someone
 renames it (the interface names it in the reader's language)."""
 
+import uuid
 from typing import Any
 
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.access import member_space_ids
 from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE
+from app.modules.calendars.repository import CalendarRepository
+from app.modules.spaces.models import Space, SpaceKind
 from app.modules.spaces.service import GENERAL_SPACE_NAME
 from app.modules.users.models import User
 from tests.factories import MakeUser, login
-from tests.factories_calendar import listed, new_calendar
+from tests.factories_calendar import actor_of, listed, new_calendar
 from tests.factories_spaces import MakeSpace, personal_space_of
 
 
@@ -82,3 +86,22 @@ async def test_the_default_counts_within_the_limit(
             c for c in await listed(client, url)
         ]
     assert not any(c["is_default"] for c in await listed(client, url))
+
+
+async def test_spaces_due_a_default_come_in_the_order_they_are_locked(
+    session: AsyncSession, make_user: MakeUser
+) -> None:
+    """R1-M3: `ensure_defaults` locks the spaces in the order `defaults_due` gives them;
+    by id, so two first calls of one person never lock in opposite orders."""
+    person = await make_user()
+    own = await personal_space_of(session, person)
+    general = Space(  # stored after her personal space, with the smaller id
+        id=uuid.UUID(int=1), org_id=person.org_id, kind=SpaceKind.OPEN, name=GENERAL_SPACE_NAME
+    )
+    session.add(general)
+    await session.flush()
+    actor = await actor_of(session, person)
+    due = await CalendarRepository(session, person.org_id).defaults_due(
+        member_space_ids(actor), person.id, GENERAL_SPACE_NAME
+    )
+    assert due == [general.id, own.id]
