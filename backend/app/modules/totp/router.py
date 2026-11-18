@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.clock import Clock
 from app.modules.auth.context import AuthContext
-from app.modules.auth.cookies import session_token, set_session_cookie
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
+from app.modules.auth.handover import hand_over
 from app.modules.auth.me import me_out
 from app.modules.auth.schemas import MeOut
-from app.modules.auth.service import AuthService
 from app.modules.totp.cookies import challenge_token, clear_challenge_cookie
 from app.modules.totp.schemas import (
     RecoveryCodesOut,
@@ -100,7 +99,6 @@ async def second_factor(
     ip = request.client.host if request.client else None
     token = challenge_token(request, settings)
     signed_in = await SecondStep(session, settings, clock).finish(token, body.proof(), ip)
-    await AuthService(session, settings).end_replaced(session_token(request, settings))
-    set_session_cookie(response, request, settings, signed_in.session_token)
+    await hand_over(session, settings, request, response, signed_in.session_token)
     clear_challenge_cookie(response, request, settings)
     return await me_out(AuthContext(user=signed_in.user), session, settings)

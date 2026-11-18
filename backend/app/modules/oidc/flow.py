@@ -249,7 +249,7 @@ class FlowService:
             challenge = await open_challenge(self.session, user, "oidc")
             location = f"{LOGIN_PAGE}?{urlencode({'second_factor': 'totp'})}"
             return Finished(location, admitted.outcome, None, user.id, challenge.token)
-        token = await AuthService(self.session, self.settings).open_session(user, now)
+        token = await AuthService(self.session, self.settings).open_session(user)
         return Finished("/", admitted.outcome, token, user.id)
 
     async def _link(self, provider: OidcProvider, session_id: uuid.UUID, subject: str) -> Finished:

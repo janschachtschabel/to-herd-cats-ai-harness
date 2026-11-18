@@ -13,6 +13,7 @@ function profileApi(me: Me) {
   return mockApi({
     'GET /api/auth/me': () => current,
     'GET /api/auth/me/totp': TOTP_OFF,
+    'GET /api/auth/me/sessions': page([]),
     'GET /api/spaces': page([]),
     'PATCH /api/auth/me': (call: Call) => {
       const body = call.body as { locale: 'de' | 'en'; version: number }
@@ -27,6 +28,7 @@ describe('profile', () => {
     mockApi({
       'GET /api/auth/me': makeMe(['space.create'], { locale: 'en' }),
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
     })
     await renderApp('/spaces')
@@ -63,6 +65,7 @@ describe('profile', () => {
     const api = mockApi({
       'GET /api/auth/me': makeMe(['space.create']),
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'POST /api/auth/me/password': (call: Call) =>
         (call.body as { current_password: string }).current_password === 'altes-passwort-1'
@@ -93,6 +96,7 @@ describe('profile', () => {
     mockApi({
       'GET /api/auth/me': makeMe(['space.create']),
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'POST /api/auth/me/password': (call: Call) =>
         (call.body as { new_password: string }).new_password === 'basketball'
@@ -118,6 +122,7 @@ describe('profile', () => {
     const api = mockApi({
       'GET /api/auth/me': () => current,
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'POST /api/auth/me/password': () => (bump(), { status: 204 }),
       'PATCH /api/auth/me': (call: Call) => {
@@ -147,6 +152,7 @@ describe('profile', () => {
     const api = mockApi({
       'GET /api/auth/me': () => current,
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'PATCH /api/auth/me': (call: Call) => {
         const body = call.body as { locale: 'de' | 'en'; version: number }
@@ -172,6 +178,7 @@ describe('profile', () => {
     mockApi({
       'GET /api/auth/me': makeMe(['space.create']),
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
       'PATCH /api/auth/me': apiError(409, 'users.version_conflict'),
     })
@@ -189,6 +196,7 @@ describe('profile', () => {
     const api = mockApi({
       'GET /api/auth/me': makeMe([]),
       'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/sessions': page([]),
       'GET /api/spaces': page([]),
     })
     const { user } = await renderApp('/profile')

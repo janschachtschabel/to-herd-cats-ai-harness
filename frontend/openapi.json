@@ -7606,6 +7606,78 @@
         "title": "Outcome",
         "type": "string"
       },
+      "OwnSessionOut": {
+        "description": "One of the caller's running login sessions. `device`: browser and system, no\nversion (null for an unknown client); `current`: the session of this request.",
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "format": "date-time",
+            "title": "Last Used At",
+            "type": "string"
+          },
+          "signed_in_at": {
+            "format": "date-time",
+            "title": "Signed In At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "signed_in_at",
+          "last_used_at",
+          "current"
+        ],
+        "title": "OwnSessionOut",
+        "type": "object"
+      },
+      "OwnSessionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnSessionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "OwnSessionPage",
+        "type": "object"
+      },
       "PageCreate": {
         "additionalProperties": false,
         "properties": {
@@ -23036,6 +23108,120 @@
           }
         },
         "summary": "Change My Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions": {
+      "get": {
+        "description": "The caller's running sessions, newest first.",
+        "operationId": "list_own_sessions_api_auth_me_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnSessionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Own Sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions/sign-out-others": {
+      "post": {
+        "description": "Every session of the caller ends but this one.",
+        "operationId": "sign_out_others_api_auth_me_sessions_sign_out_others_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sign Out Others",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me/sessions/{session_id}": {
+      "delete": {
+        "description": "One of the caller's sessions ends (this one too: then the cookie goes).",
+        "operationId": "end_own_session_api_auth_me_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Own Session",
         "tags": [
           "auth"
         ]

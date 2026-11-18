@@ -135,12 +135,15 @@ async def test_session_token_is_stored_hashed(
 
 
 async def test_sessions_store_no_client_details(session: AsyncSession) -> None:
-    """Nothing reads a session's address or browser, so neither is kept; its last use
-    is kept for the idle limit (J7)."""
+    """Nothing reads a session's address, so it is not kept; of the browser only a
+    device hint without version (J8), and its last use for the idle limit (J7)."""
     columns = await session.run_sync(
         lambda s: {c["name"] for c in inspect(s.connection()).get_columns("user_session")}
     )
-    assert columns == {"id", "org_id", "user_id", "token_hash", "expires_at", "last_used_at"}
+    assert columns == {
+        *("id", "org_id", "user_id", "token_hash", "expires_at"),
+        *("last_used_at", "signed_in_at", "device"),
+    }
 
 
 @pytest.mark.parametrize("case", ["unknown", "inactive", "no_password"])

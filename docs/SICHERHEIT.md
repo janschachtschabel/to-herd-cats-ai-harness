@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **189 erfüllt**, **53 nicht anwendbar**, **11 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 129 erfüllt, 43 nicht anwendbar, 11 Lücke). Mit
+- Ergebnis: **190 erfüllt**, **53 nicht anwendbar**, **10 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 130 erfüllt, 43 nicht anwendbar, 10 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -81,7 +81,7 @@ auch wenn niemand sie nutzte. *Entscheidung:* bauen. `HERD_SESSION_IDLE_HOURS` (
 Minute geschrieben; danach 401 `auth.session_invalid`. Die offene Live-Verbindung (SSE)
 zählt nicht als Nutzung. Einstellung in Compose, Chart und Doku.
 
-**J8 – Eigene Sitzungen sehen und beenden (V7.5.2). Geplant, M9b Task 18.**
+**J8 – Eigene Sitzungen sehen und beenden (V7.5.2). Gebaut, M9b Task 18.**
 *Entscheidung:* bauen, im Profil: Liste der eigenen Sitzungen (Gerätehinweis aus dem
 gekürzten User-Agent, Anmeldezeit, letzte Nutzung aus J7) mit „Abmelden“ je Sitzung und
 „Alle anderen abmelden“; `GET/DELETE /api/auth/me/sessions` (paginiert, Audit).
@@ -549,7 +549,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V7.4 | V7.4.4 | L2 | Abmelden überall erreichbar | erfüllt | Personenmenü in der Kopfleiste jeder angemeldeten Seite (`frontend/src/app/shell/UserMenu.tsx`). |
 | V7.4 | V7.4.5 | L2 | Admins beenden Sitzungen | erfüllt | `POST /api/admin/users/{id}/sign-out` und Knopf „Abmelden“ in der Personenverwaltung (`users/service.sign_out`, `UsersPage.tsx`). `tests/test_users.py::test_an_administrator_signs_a_person_out_everywhere`, `AdminPages.test.tsx`. |
 | V7.5 | V7.5.1 | L2 | Erneute Anmeldung vor sensiblen Änderungen | Lücke | E-Mail kann niemand selbst ändern, das Passwort nur mit dem alten. Aber eine neue OIDC-Verknüpfung (ein neuer Anmeldeweg) braucht nur die laufende Sitzung. J9, geplant M9b Task 18. |
-| V7.5 | V7.5.2 | L2 | Eigene Sitzungen sehen und beenden | Lücke | Es gibt keine Liste der eigenen Sitzungen (nur „alle anderen enden“ beim Passwortwechsel). J8, geplant M9b Task 18. |
+| V7.5 | V7.5.2 | L2 | Eigene Sitzungen sehen und beenden | erfüllt | Profil „Angemeldete Geräte“: laufende Sitzungen mit Gerätehinweis (ohne Version), Anmeldezeit und letzter Nutzung, je Sitzung „Abmelden“ und „Alle anderen abmelden“; eine fremde Sitzung antwortet wie eine unbekannte, Audit `user.session_ended` (`auth/own_sessions.py`, `features/profile/sessions/`; M9b Task 18, J8). `tests/test_own_sessions.py`, `Sessions.test.tsx`. |
 | V7.6 | V7.6.1 | L2 | Föderierte Lebensdauer wie dokumentiert | erfüllt | Abschnitt „Sitzungen“: höchstens `HERD_SESSION_TTL_HOURS` nach der IdP-Anmeldung, dann neu über den IdP. |
 | V7.6 | V7.6.2 | L2 | Sitzung nur mit Zutun | erfüllt | Eine OIDC-Sitzung entsteht nur nach dem Klick auf den Anbieter und mit gebundenem Ablauf (`oidc/flow.py`, Bindungs-Cookie gegen Login-CSRF). `tests/test_oidc_flow.py`. |
 

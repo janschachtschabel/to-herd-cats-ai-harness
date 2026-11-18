@@ -1,3 +1,6 @@
+import uuid
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.permissions import Action
@@ -20,3 +23,19 @@ class MeOut(BaseModel):
     org: OrgOut
     permissions: list[Action]
     ai_model: str | None
+
+
+class OwnSessionOut(BaseModel):
+    """One of the caller's running login sessions. `device`: browser and system, no
+    version (null for an unknown client); `current`: the session of this request."""
+
+    id: uuid.UUID
+    device: str | None
+    signed_in_at: datetime
+    last_used_at: datetime
+    current: bool
+
+
+class OwnSessionPage(BaseModel):
+    items: list[OwnSessionOut]
+    next_cursor: str | None

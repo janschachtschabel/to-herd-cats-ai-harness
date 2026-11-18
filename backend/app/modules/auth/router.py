@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.modules.auth.context import AuthContext
-from app.modules.auth.cookies import clear_session_cookie, session_token, set_session_cookie
+from app.modules.auth.cookies import clear_session_cookie, session_token
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
+from app.modules.auth.handover import hand_over
 from app.modules.auth.me import me_out
 from app.modules.auth.schemas import LoginRequest, MeOut
 from app.modules.auth.service import AuthService, SecondFactorNeeded
@@ -38,8 +39,7 @@ async def login(
         answer = JSONResponse(waiting.model_dump(mode="json"), status_code=202)
         set_challenge_cookie(answer, request, settings, result.challenge_token)
         return answer
-    await service.end_replaced(session_token(request, settings))
-    set_session_cookie(response, request, settings, result.token)
+    await hand_over(session, settings, request, response, result.token)
     return await _me(AuthContext(user=result.user), session, settings)
 
 

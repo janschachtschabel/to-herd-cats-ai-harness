@@ -1,0 +1,22 @@
+{
+  "errors": {
+    "auth": {
+      "session_not_found": "This session no longer exists."
+    }
+  },
+  "security": {
+    "sessions": {
+      "title": "Signed-in devices",
+      "description": "Where you are signed in right now. A session ends after 24 hours without use and after 7 days at the latest.",
+      "current": "This device",
+      "unknownDevice": "Unknown device",
+      "signedInAt": "Signed in {{date}}",
+      "lastUsed": "Last used {{date}}",
+      "end": "Sign out",
+      "endNamed": "Sign out {{device}}",
+      "endOthers": "Sign out all others",
+      "endOthersTitle": "Sign out all other devices?",
+      "endOthersText": "Every session but this one ends at once. Whoever was signed in there must sign in again."
+    }
+  }
+}

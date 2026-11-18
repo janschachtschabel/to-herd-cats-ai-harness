@@ -1881,6 +1881,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Own Sessions
+         * @description The caller's running sessions, newest first.
+         */
+        get: operations["list_own_sessions_api_auth_me_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/sessions/sign-out-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Out Others
+         * @description Every session of the caller ends but this one.
+         */
+        post: operations["sign_out_others_api_auth_me_sessions_sign_out_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End Own Session
+         * @description One of the caller's sessions ends (this one too: then the cookie goes).
+         */
+        delete: operations["end_own_session_api_auth_me_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me/totp": {
         parameters: {
             query?: never;
@@ -7045,6 +7105,39 @@ export interface components {
          * @enum {string}
          */
         Outcome: "ok" | "refused" | "invalid" | "failed";
+        /**
+         * OwnSessionOut
+         * @description One of the caller's running login sessions. `device`: browser and system, no
+         *     version (null for an unknown client); `current`: the session of this request.
+         */
+        OwnSessionOut: {
+            /** Current */
+            current: boolean;
+            /** Device */
+            device: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Used At
+             * Format: date-time
+             */
+            last_used_at: string;
+            /**
+             * Signed In At
+             * Format: date-time
+             */
+            signed_in_at: string;
+        };
+        /** OwnSessionPage */
+        OwnSessionPage: {
+            /** Items */
+            items: components["schemas"]["OwnSessionOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** PageCreate */
         PageCreate: {
             /**
@@ -14420,6 +14513,85 @@ export interface operations {
                 "application/json": components["schemas"]["PasswordChangeIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_sessions_api_auth_me_sessions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnSessionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_out_others_api_auth_me_sessions_sign_out_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    end_own_session_api_auth_me_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

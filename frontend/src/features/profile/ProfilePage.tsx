@@ -8,6 +8,7 @@ import { TokensLink } from '@/features/tokens/TokensLink'
 import { SUPPORTED_LOCALES, type Locale } from '@/lib/i18n'
 import { LinkedAccounts } from './identities/LinkedAccounts'
 import { PasswordForm } from './PasswordForm'
+import { SessionsSection } from './sessions/SessionsSection'
 import { TotpSection } from './totp/TotpSection'
 import { useChangeLocale } from './queries'
 
@@ -37,6 +38,7 @@ export function ProfilePage({ linked, linkError }: { linked?: string; linkError?
         <PasswordForm />
       </section>
       <TotpSection />
+      <SessionsSection />
       <LinkedAccounts linked={linked} linkError={linkError} />
       <TokensLink />
       <MyUsage />

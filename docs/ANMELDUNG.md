@@ -35,6 +35,16 @@ eigenes Passwort im Profil (mit dem alten).
   beiden Dateien, Helm als `api.sessionIdleHours`. Abmelden beendet sie; ein
   Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
   beenden alle Sitzungen einer Person.
+- **Eigene Sitzungen:** Im Profil unter „Angemeldete Geräte“ sieht jede Person ihre
+  laufenden Sitzungen (Browser und System ohne Version, etwa „Firefox · Linux“,
+  Anmeldezeit, letzte Nutzung; „Dieses Gerät“ markiert die eigene) und meldet eine
+  einzelne oder „Alle anderen“ ab (ASVS V7.5.2). Das beendet die Sitzung sofort, auch
+  ihre Live-Verbindungen; Audit `user.session_ended` mit der Kennung der Sitzung bzw.
+  der Anzahl, nie dem Gerät. API: `GET /api/auth/me/sessions` (paginiert),
+  `DELETE /api/auth/me/sessions/{id}` (eine fremde oder beendete Sitzung antwortet wie
+  eine unbekannte: 404 `auth.session_not_found`),
+  `POST /api/auth/me/sessions/sign-out-others`. Die Adresse eines Geräts speichert die
+  App nicht.
 - **Cookie-Name:** `HERD_SESSION_COOKIE_NAME` (Standard `herd_session`); über https
   (oder mit `HERD_COOKIE_SECURE=true`) bekommt er das Präfix `__Host-`, also
   `__Host-herd_session` (Secure, HttpOnly, SameSite=Lax, Pfad `/`), über reines http

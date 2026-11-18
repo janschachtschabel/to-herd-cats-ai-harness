@@ -363,6 +363,7 @@
         "updated": "Person changed",
         "password_changed": "Password changed",
         "signed_out": "Signed out everywhere",
+        "session_ended": "Device signed out",
         "deactivated": "Person deactivated",
         "reactivated": "Person reactivated"
       },

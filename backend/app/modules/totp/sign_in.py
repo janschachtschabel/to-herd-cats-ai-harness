@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
-from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.security import hash_token
 from app.modules.auth.service import AuthService
@@ -86,7 +85,7 @@ class SecondStep:
             raise Unauthorized(code="auth.second_factor_invalid")
         await factor.passed(user.id, attempt)
         await self.challenges.drop(challenge)
-        session_token = await AuthService(self.session, self.settings).open_session(user, utcnow())
+        session_token = await AuthService(self.session, self.settings).open_session(user)
         return SignedIn(user, session_token), f"{challenge.method}+{method}"
 
     async def _user(self, challenge: SignInChallenge | None) -> User | None:

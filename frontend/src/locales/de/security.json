@@ -1,0 +1,22 @@
+{
+  "errors": {
+    "auth": {
+      "session_not_found": "Diese Sitzung gibt es nicht mehr."
+    }
+  },
+  "security": {
+    "sessions": {
+      "title": "Angemeldete Geräte",
+      "description": "Hier bist du gerade angemeldet. Eine Sitzung endet nach 24 Stunden ohne Nutzung und spätestens nach 7 Tagen.",
+      "current": "Dieses Gerät",
+      "unknownDevice": "Unbekanntes Gerät",
+      "signedInAt": "Angemeldet am {{date}}",
+      "lastUsed": "Zuletzt genutzt {{date}}",
+      "end": "Abmelden",
+      "endNamed": "{{device}} abmelden",
+      "endOthers": "Alle anderen abmelden",
+      "endOthersTitle": "Alle anderen Geräte abmelden?",
+      "endOthersText": "Alle Sitzungen außer dieser enden sofort. Wer dort angemeldet war, muss sich neu anmelden."
+    }
+  }
+}

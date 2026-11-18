@@ -21,6 +21,7 @@ function totpApi(start: TotpStatus) {
     'GET /api/auth/me/identities': page([]),
     'GET /api/auth/providers': page([]),
     'GET /api/auth/me/totp': () => status,
+    'GET /api/auth/me/sessions': page([]),
     'POST /api/auth/me/totp/setup': {
       secret: SECRET,
       uri: `otpauth://totp/Org:mia%40example.com?secret=${SECRET}&issuer=Org`,

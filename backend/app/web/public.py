@@ -27,6 +27,7 @@ from app.modules.ai import usage_router as ai_usage
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
+from app.modules.auth.sessions_router import router as own_sessions_router
 from app.modules.automations import router as automations_router
 from app.modules.backups.replacing import replace_runner
 from app.modules.backups.router import router as backups_router
@@ -79,6 +80,7 @@ def api_router() -> APIRouter:
     api = APIRouter(prefix="/api", dependencies=[Depends(csrf_guard)])
     api.include_router(maintenance_router)
     api.include_router(auth_router)
+    api.include_router(own_sessions_router)
     api.include_router(totp_router)
     api.include_router(oidc_router)
     api.include_router(oidc_admin.providers)

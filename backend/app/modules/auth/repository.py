@@ -99,21 +99,70 @@ class SessionRepository:
 
     async def delete_for_user(
         self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None
-    ) -> None:
-        """All of the person's sessions, except `keep` if given."""
-        await self.delete_for_users(org_id, [user_id], keep=keep)
+    ) -> int:
+        """All of the person's sessions, except `keep` if given; how many there were."""
+        return await self.delete_for_users(org_id, [user_id], keep=keep)
 
     async def delete_for_users(
         self, org_id: uuid.UUID, user_ids: Sequence[uuid.UUID], *, keep: uuid.UUID | None = None
-    ) -> None:
+    ) -> int:
         """All of these people's sessions, except `keep` if given, and every sign-in of
-        theirs that waits for the second factor."""
+        theirs that waits for the second factor; how many sessions there were."""
         if not user_ids:
-            return
+            return 0
         await ChallengeRepository(self.session).delete_for_users(org_id, user_ids)
         stmt = delete(UserSession).where(
             UserSession.org_id == org_id, UserSession.user_id.in_(user_ids)
         )
         if keep is not None:
             stmt = stmt.where(UserSession.id != keep)
-        await self.session.execute(stmt)
+        deleted = await self.session.scalars(stmt.returning(UserSession.id))
+        return len(deleted.all())
+
+    async def note_device(self, token_hash: str, device: str | None) -> None:
+        """The device hint of the session just opened with this token."""
+        await self.session.execute(
+            update(UserSession).where(UserSession.token_hash == token_hash).values(device=device)
+        )
+
+    async def list_running(
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        now: datetime,
+        *,
+        before: uuid.UUID | None,
+        limit: int,
+    ) -> Sequence[UserSession]:
+        """The person's running sessions, newest first (ids are UUIDv7), those older
+        than `before` if given."""
+        stmt = (
+            select(UserSession)
+            .where(
+                UserSession.org_id == org_id,
+                UserSession.user_id == user_id,
+                running(now, self.idle),
+            )
+            .order_by(UserSession.id.desc())
+            .limit(limit)
+        )
+        if before is not None:
+            stmt = stmt.where(UserSession.id < before)
+        return (await self.session.scalars(stmt)).all()
+
+    async def delete_own(
+        self, org_id: uuid.UUID, user_id: uuid.UUID, session_id: uuid.UUID, now: datetime
+    ) -> bool:
+        """The person's running session with this id ends (its row goes); whether there
+        was one."""
+        deleted = await self.session.scalar(
+            delete(UserSession)
+            .where(
+                UserSession.id == session_id,
+                UserSession.org_id == org_id,
+                UserSession.user_id == user_id,
+                running(now, self.idle),
+            )
+            .returning(UserSession.id)
+        )
+        return deleted is not None

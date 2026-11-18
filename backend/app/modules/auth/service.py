@@ -77,7 +77,7 @@ class AuthService:
             challenge = await open_challenge(self.session, user, "password")
             log_sign_in("password", "second_factor", client=ip, user_id=user.id)
             return SecondFactorNeeded(challenge.token, challenge.expires_at)
-        token = await self.open_session(user, session_clock().now())
+        token = await self.open_session(user)
         log_sign_in("password", "ok", client=ip, user_id=user.id)
         return SessionOpened(user, token)
 
@@ -126,9 +126,10 @@ class AuthService:
             user.password_hash = rehashed
         return user
 
-    async def open_session(self, user: User, now: datetime) -> str:
+    async def open_session(self, user: User) -> str:
         """A new login session for an active person whose sign-in was checked (password
-        or OIDC); the token goes into the cookie and nowhere else."""
+        or OIDC); the token goes into the cookie and nowhere else (`handover.py`)."""
+        now = session_clock().now()
         token = new_session_token()
         # Housekeeping without a background task: every login removes a bounded batch
         # of expired sessions, anyone's (people who never return included).
@@ -142,6 +143,7 @@ class AuthService:
                 token_hash=hash_token(token),
                 expires_at=now + timedelta(hours=self.settings.session_ttl_hours),
                 last_used_at=now,
+                signed_in_at=now,
             )
         )
         user.last_login_at = now
