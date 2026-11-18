@@ -499,7 +499,9 @@ Abgelehnt wird (am Ziel ändert sich nichts) mit den Codes der Prüfung und:
 | `restore.safety_backup_failed:<code>` | das Sicherheitsarchiv misslang, `<code>` aus der Tabelle der Sicherung oben (`backup.schema_behind`: erst migrieren) |
 | `backup.already_running` | eine Sicherung begann gerade; noch einmal versuchen |
 
-Scheitert der Tausch (`failed <code>`), ist der **alte Stand vollständig** da: die eben
+Scheitert der Tausch (`failed <code>`) oder wird das Einspielen zwischen Wartungsmodus und
+Tausch abgebrochen (Strg-C oder ein Stopp des Prozesses im Auslauf), ist der **alte
+Stand vollständig** da: die eben
 geschriebenen Dateien sind entfernt, der Wartungsmodus ist aus, das Audit hat
 `backup.restore_failed` (Archiv, Code). Das Sicherheitsarchiv bleibt `ok` in
 `backup list`. Codes: `restore.swap_failed` (ein SQL-Fehler im Tausch, etwa fehlende

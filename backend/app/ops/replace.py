@@ -15,7 +15,8 @@ restore in between):
    `HERD_STORAGE`; content-addressed: present keys hold the same content), then the
    database in one transaction (`swap.py`), which also leaves maintenance on in the
    restored state.
-   If anything here fails, the old state is whole: the files written are removed,
+   If anything here fails (the drain included: a cancel or Ctrl-C in it), the old
+   state is whole: the files written are removed,
    maintenance ends, `backup.restore_failed` is audited (the safety run stays `ok`:
    its archive is good) and `RestoreFailed` carries the code.
 5. In the restored database: `alembic upgrade head` with maintenance kept on in the
@@ -44,7 +45,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.core.migrations import upgrade_head
-from app.core.storage import get_storage
+from app.core.storage import Storage, get_storage
 from app.core.storage_tombstones import bury
 from app.modules.audit.recorder import record_system
 from app.modules.backups.models import BackupRun, BackupState, BackupTrigger
@@ -176,14 +177,16 @@ async def _replace(
             plan.org_id, MaintenanceReason.RESTORE, plan.clock.now(), via=plan.via
         )
         await session.commit()
-    await asyncio.sleep(drain)  # requests and steps under way end; the caches follow
-    storage = get_storage(plan.settings)  # local or S3 (`HERD_STORAGE`)
+    storage: Storage | None = None
     added: list[str] = []
-    try:
+    try:  # from here on, whatever ends the replace ends maintenance (review M9b F4)
+        await asyncio.sleep(drain)  # requests and steps under way end; the caches follow
+        storage = get_storage(plan.settings)  # local or S3 (`HERD_STORAGE`)
         added = await restore_files(storage, plan.archive, plan.manifest)
         await _swap(plan)
     except BaseException as exc:  # the swap rolled back (or never began): the old state
-        await remove_files(storage, added)
+        if storage is not None:
+            await remove_files(storage, added)
         code = exc.code if isinstance(exc, RestoreFailed) else "restore.failed"
         await _failed(conn, plan, code)
         if isinstance(exc, RestoreFailed) or not isinstance(exc, Exception):
