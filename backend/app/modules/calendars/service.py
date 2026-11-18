@@ -14,6 +14,11 @@ At most `MAX_CALENDARS_PER_SPACE` calendars that are not archived per space (409
 `calendar.limit`), counted under the space's row lock. Every change names the version
 it read (409 `calendar.version_conflict`). A default calendar cannot be archived (409
 `calendar.default_kept`).
+
+Known gap (review M10 task 1, R1-M2; shared with tickets and sprints): `require`
+writes an admin's `admin.access` in the request's transaction, so a refused change
+(409) rolls it back with the request. No helper writes audit outside that
+transaction; events (task 3b) must audit before anything that can refuse.
 """
 
 import builtins
