@@ -1,10 +1,12 @@
 """The calendar's libraries each stay behind one boundary (plan M10, tech stack):
-`python-dateutil` only in `modules/calendars/recurrence.py` and `recurrence_jump.py`."""
+`python-dateutil` only in `modules/calendars/recurrence.py` and `recurrence_jump.py`,
+in `app` and in `scripts` alike."""
 
 import ast
 from pathlib import Path
 
 import app
+import scripts
 
 DATEUTIL_HOMES = {
     Path("modules/calendars/recurrence.py"),
@@ -24,10 +26,12 @@ def _imports(path: Path) -> set[str]:
 
 def test_only_recurrence_imports_dateutil() -> None:
     root = Path(app.__file__).parent
+    backend = root.parent
     offenders = {
-        f"{path.relative_to(root)}: {name}"
-        for path in sorted(root.rglob("*.py"))
-        if path.relative_to(root) not in DATEUTIL_HOMES
+        f"{path.relative_to(backend)}: {name}"
+        for top in (root, Path(scripts.__file__).parent)
+        for path in sorted(top.rglob("*.py"))
+        if path.relative_to(backend) not in {Path("app") / home for home in DATEUTIL_HOMES}
         for name in _imports(path)
         if name.split(".")[0] == "dateutil"
     }
