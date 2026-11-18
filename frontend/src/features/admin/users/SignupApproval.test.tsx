@@ -41,7 +41,7 @@ describe('self-registered accounts awaiting approval (plan M9 task 5b)', () => {
       },
     })
     const { user, router } = await renderApp('/admin/users')
-    const nav = await screen.findByRole('link', { name: /Personen/ })
+    const nav = await screen.findByRole('link', { name: /^Personen/ })
     expect(await within(nav).findByText('1 Konto wartet auf Freigabe')).toBeInTheDocument()
     expect(
       await screen.findByText('Wartet auf Freigabe', { selector: '[data-slot="badge"]' }),

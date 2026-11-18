@@ -136,6 +136,7 @@ const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
   validateSearch: profileSearch,
+  loader: () => ProfilePage.preload?.(),
   component: function ProfileRoute() {
     const { linked, link_error } = profileRoute.useSearch()
     return <ProfilePage linked={linked} linkError={link_error} />

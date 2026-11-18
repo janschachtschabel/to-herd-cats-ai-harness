@@ -97,7 +97,10 @@ const usersRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/users',
   validateSearch: usersSearch,
-  loader: ({ context }) => requirePermission(context.me, 'user.manage'),
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'user.manage')
+    await UsersPage.preload?.()
+  },
   component: function UsersRoute() {
     const { filter } = usersRoute.useSearch()
     return <UsersPage filter={filter ?? 'all'} />
@@ -253,7 +256,10 @@ const skillsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/skills',
   validateSearch: skillsSearch,
-  loader: ({ context }) => requirePermission(context.me, 'skill.manage'),
+  loader: async ({ context }) => {
+    requirePermission(context.me, 'skill.manage')
+    await SkillsAdminPage.preload?.()
+  },
   component: function SkillsRoute() {
     const { view } = skillsRoute.useSearch()
     return <SkillsAdminPage view={view ?? 'skills'} />
