@@ -10,7 +10,6 @@ from app.core.access import Action, actor_for, system_permissions
 from app.core.config import Settings
 from app.core.errors import RateLimited, Unauthorized
 from app.core.failure_limit import FailureLimiter
-from app.core.models_base import utcnow
 from app.core.ratelimit import RateLimiter, limit_key
 from app.core.retention import upkeep_after
 from app.core.security import (
@@ -27,6 +26,7 @@ from app.modules.auth.context import AuthContext
 from app.modules.auth.models import UserSession
 from app.modules.auth.repository import SessionRepository
 from app.modules.auth.sign_in_log import log_sign_in, log_sign_out
+from app.modules.auth.timing import session_clock
 from app.modules.orgs.models import Organization
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.totp.challenges import open_challenge
@@ -58,7 +58,8 @@ type Login = SessionOpened | SecondFactorNeeded
 class AuthService:
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
         self.session = session
-        self.sessions = SessionRepository(session)
+        idle = settings.session_idle_hours
+        self.sessions = SessionRepository(session, timedelta(hours=idle) if idle else None)
         self.users = UserRepository(session)
         self.orgs = OrganizationRepository(session)
         self.settings = settings
@@ -76,7 +77,7 @@ class AuthService:
             challenge = await open_challenge(self.session, user, "password")
             log_sign_in("password", "second_factor", client=ip, user_id=user.id)
             return SecondFactorNeeded(challenge.token, challenge.expires_at)
-        token = await self.open_session(user, utcnow())
+        token = await self.open_session(user, session_clock().now())
         log_sign_in("password", "ok", client=ip, user_id=user.id)
         return SessionOpened(user, token)
 
@@ -140,6 +141,7 @@ class AuthService:
                 user_id=user.id,
                 token_hash=hash_token(token),
                 expires_at=now + timedelta(hours=self.settings.session_ttl_hours),
+                last_used_at=now,
             )
         )
         user.last_login_at = now
@@ -149,33 +151,39 @@ class AuthService:
         """A sign-in replaces the browser's session: the token it had ends (ASVS 5.0
         V7.2.4), whoever it belonged to."""
         if token:
-            await self.sessions.end_by_hash(hash_token(token), utcnow())
+            await self.sessions.end_by_hash(hash_token(token), session_clock().now())
 
     async def logout(self, token: str) -> None:
-        ended = await self.sessions.end_by_hash(hash_token(token), utcnow())
+        ended = await self.sessions.end_by_hash(hash_token(token), session_clock().now())
         if ended is not None:
             log_sign_out(ended)
 
-    async def resolve(self, token: str) -> AuthContext | None:
-        user_session = await self.sessions.get_active(hash_token(token), utcnow())
+    async def resolve(self, token: str, *, use: bool = False) -> AuthContext | None:
+        """The caller of a running session. `use`: the request counts as the session's
+        use (J7): its last use is noted, at most once a minute, and committed at once,
+        so no row lock is held for the rest of the request."""
+        now = session_clock().now()
+        user_session = await self.sessions.get_active(hash_token(token), now)
         if user_session is None or not user_session.user.is_active:
             return None
+        if use and await self.sessions.touch(user_session.id, now):
+            await self.session.commit()
         return AuthContext(user=user_session.user, session_id=user_session.id)
 
     async def resolve_session(self, session_id: uuid.UUID) -> AuthContext | None:
         """The caller of a login session known by its id (live editing checks again
         whether the session of an open connection still holds)."""
-        user_session = await self.sessions.get_active_by_id(session_id, utcnow())
+        user_session = await self.sessions.get_active_by_id(session_id, session_clock().now())
         if user_session is None or not user_session.user.is_active:
             return None
         return AuthContext(user=user_session.user, session_id=user_session.id)
 
     async def resolve_ended_session(self, session_id: uuid.UUID) -> AuthContext | None:
-        """The caller of a login session that ended by logout or expiry, while the
-        person is still active (deactivation and an administrator's or a password
+        """The caller of a login session that ended by logout, expiry or idleness, while
+        the person is still active (deactivation and an administrator's or a password
         change's sign-out delete the session instead)."""
         user_session = await self.sessions.get_by_id(session_id)
-        if user_session is None or user_session.expires_at > utcnow():
+        if user_session is None or not self.sessions.ended(user_session, session_clock().now()):
             return None
         if not user_session.user.is_active:
             return None

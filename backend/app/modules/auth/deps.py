@@ -18,6 +18,9 @@ from app.modules.auth.service import AuthService
 CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "herd"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Opening the live stream (`messaging/router_live.py`) is no use of the session (J7):
+# an open tab must not keep an unattended session alive.
+LIVE_STREAM_PATH = "/api/stream"
 
 # scope="function": the session's exit (commit or rollback) runs when the endpoint
 # returns, before the response is sent. With the default scope it would run after the
@@ -33,11 +36,13 @@ async def current_auth(
     request: Request, session: SessionDep, settings: SettingsDep
 ) -> AsyncIterator[AuthContext]:
     """The caller, from the session cookie; every log line of the request names them,
-    the request line included."""
+    the request line included. The request is a use of the session (J7), except the
+    opening of the live stream, which only checks it."""
     token = session_token(request, settings)
     if not token:
         raise Unauthorized(code="auth.required")
-    ctx = await AuthService(session, settings).resolve(token)
+    use = request.url.path != LIVE_STREAM_PATH
+    ctx = await AuthService(session, settings).resolve(token, use=use)
     if ctx is None:
         raise Unauthorized(code="auth.session_invalid")
     fields = {"org_id": str(ctx.org_id), "actor": str(ctx.principal)}

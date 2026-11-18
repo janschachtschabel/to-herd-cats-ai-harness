@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **188 erfüllt**, **53 nicht anwendbar**, **12 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 128 erfüllt, 43 nicht anwendbar, 12 Lücke). Mit
+- Ergebnis: **189 erfüllt**, **53 nicht anwendbar**, **11 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 129 erfüllt, 43 nicht anwendbar, 11 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -75,8 +75,8 @@ Konten, die sich über OIDC anmelden, bekommen den zweiten Faktor vom Anbieter (
 Workspace, Entra ID, Keycloak …); wer ASVS L2 ohne Abweichung braucht, meldet sich nur
 über einen Anbieter mit Pflicht-MFA an und vergibt keine Passwörter.
 
-**J7 – Inaktivitätsgrenze (V7.3.1). Geplant, M9b Task 18.** Eine Sitzung gilt 7 Tage,
-auch wenn niemand sie nutzt. *Entscheidung:* bauen. `HERD_SESSION_IDLE_HOURS` (Standard
+**J7 – Inaktivitätsgrenze (V7.3.1). Gebaut, M9b Task 18.** Eine Sitzung galt 7 Tage,
+auch wenn niemand sie nutzte. *Entscheidung:* bauen. `HERD_SESSION_IDLE_HOURS` (Standard
 24, 0 = aus); die Sitzung merkt `last_used_at`, bei der Auflösung höchstens einmal je
 Minute geschrieben; danach 401 `auth.session_invalid`. Die offene Live-Verbindung (SSE)
 zählt nicht als Nutzung. Einstellung in Compose, Chart und Doku.
@@ -271,9 +271,14 @@ der Anbieter einen zweiten Faktor verlangt, entscheidet seine Verwaltung.
   `__Host-herd_session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`); gespeichert
   ist nur sein SHA-256. Jede Anfrage löst es in PostgreSQL auf.
 - **Absolute Dauer** 7 Tage (`HERD_SESSION_TTL_HOURS`, Standard 168), nie verlängert,
-  auch nicht durch Nutzung. **Keine Inaktivitätsgrenze** (Lücke V7.3.1, J7). Das
-  weicht von NIST SP 800-63B-4 ab (AAL2: erneute Anmeldung spätestens nach 24
-  Stunden und nach 1 Stunde Inaktivität): gewählt für ein Arbeitswerkzeug, das man täglich offen hat;
+  auch nicht durch Nutzung. **Inaktivitätsgrenze** 24 Stunden
+  (`HERD_SESSION_IDLE_HOURS`, `0` = aus; M9b Task 18, J7): Jede Anfrage merkt die
+  letzte Nutzung (höchstens einmal je Minute geschrieben, ohne auf eine gesperrte Zeile
+  zu warten), danach 401 `auth.session_invalid`. Das Öffnen der Live-Verbindung zählt
+  nicht als Nutzung; eine schon offene Live-Verbindung liefert bis zu ihrem Ende weiter
+  nur Kennungen, nie Inhalte. Das weicht von NIST SP 800-63B-4 ab (AAL2: erneute
+  Anmeldung spätestens nach 24 Stunden und nach 1 Stunde Inaktivität): gewählt für ein
+  Arbeitswerkzeug, das man täglich offen hat;
   ausgeglichen durch Abmelden überall durch Admins, Ende aller Sitzungen bei Passwort-
   wechsel, Deaktivierung und Lösen einer OIDC-Verknüpfung.
 - **Gleichzeitige Sitzungen:** keine Höchstzahl; jedes Gerät und jeder Browser hat
@@ -529,14 +534,14 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 
 | Kapitel | Nummer | Stufe | Thema | Status | Beleg |
 |---|---|---|---|---|---|
-| V7.1 | V7.1.1 | L2 | Zeitgrenzen dokumentiert | erfüllt | Abschnitt „Sitzungen“: 7 Tage absolut, keine Inaktivitätsgrenze (Lücke V7.3.1), Abweichung von NIST SP 800-63B begründet. |
+| V7.1 | V7.1.1 | L2 | Zeitgrenzen dokumentiert | erfüllt | Abschnitt „Sitzungen“: 7 Tage absolut, 24 Stunden ohne Nutzung, Abweichung von NIST SP 800-63B begründet. |
 | V7.1 | V7.1.2 | L2 | Gleichzeitige Sitzungen dokumentiert | erfüllt | Abschnitt „Sitzungen“: keine Höchstzahl, jedes Gerät eine Sitzung. |
 | V7.1 | V7.1.3 | L2 | Föderierte Sitzungen dokumentiert | erfüllt | Abschnitt „Sitzungen“: die Sitzung der App ist von der des IdP unabhängig; kein Single Logout. |
 | V7.2 | V7.2.1 | L1 | Prüfung im Backend | erfüllt | Jede Anfrage löst das Cookie in Postgres auf (`auth/service.resolve`). |
 | V7.2 | V7.2.2 | L1 | Dynamische Token | erfüllt | Zufällige Referenztoken je Anmeldung (`core/security.new_session_token`). |
 | V7.2 | V7.2.3 | L1 | 128 Bit aus CSPRNG | erfüllt | 256 Bit aus `secrets.token_urlsafe(32)`, nur SHA-256 gespeichert. `tests/test_auth.py::test_session_token_is_stored_hashed`. |
 | V7.2 | V7.2.4 | L1 | Neues Token bei Anmeldung, altes endet | erfüllt | Jede Anmeldung (Passwort, OIDC) erzeugt ein neues Token und beendet das mitgebrachte (`auth/service.end_replaced`). `tests/test_cookie_security.py::test_signing_in_again_ends_the_session_it_replaces`, `test_an_oidc_sign_in_ends_the_session_it_replaces`. |
-| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | Lücke | Es gibt keine; eine Sitzung gilt bis zu ihrem Ablauf. J7, geplant M9b Task 18 (`HERD_SESSION_IDLE_HOURS`, Standard 24). |
+| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | erfüllt | `HERD_SESSION_IDLE_HOURS` (Standard 24, 0 = aus): ohne Anfrage endet die Sitzung; `user_session.last_used_at`, höchstens einmal je Minute geschrieben, die Live-Verbindung zählt nicht (`auth/repository.running`, `touch`; M9b Task 18, J7). `tests/test_session_idle.py::test_an_idle_session_ends_after_the_idle_hours`, `test_last_used_is_written_at_most_once_a_minute`. |
 | V7.3 | V7.3.2 | L2 | Absolute Höchstdauer | erfüllt | `HERD_SESSION_TTL_HOURS` (Standard 168), nie verlängert (`auth/service.open_session`). `tests/test_auth.py::test_expired_session_is_rejected`. |
 | V7.4 | V7.4.1 | L1 | Abmelden beendet die Sitzung im Backend | erfüllt | `end_by_hash` setzt den Ablauf auf jetzt (`auth/repository.py`). `tests/test_auth.py::test_logout_invalidates_session`. Bewusste Ausnahme (Review M2 R2): eine bereits offene Live-Bearbeitung speichert ihre letzten Änderungen noch bis zu einer Stunde, lässt aber niemanden neu zu. |
 | V7.4 | V7.4.2 | L1 | Deaktivieren beendet alle Sitzungen | erfüllt | `users/service.deactivate` löscht sie. `tests/test_users.py::test_deactivate_deletes_sessions_and_blocks_login`. |

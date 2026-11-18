@@ -372,5 +372,6 @@ source "$root/deploy/helm/scripts/chart-rules-scaling.sh"
 source "$root/deploy/helm/scripts/chart-rules-placement.sh"
 source "$root/deploy/helm/scripts/chart-rules-storage.sh"
 source "$root/deploy/helm/scripts/chart-rules-admin.sh"
+source "$root/deploy/helm/scripts/chart-rules-security.sh"
 
 echo "chart rules OK"

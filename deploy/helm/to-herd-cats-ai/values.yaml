@@ -26,6 +26,7 @@ imagePullSecrets: []
 ## @param api.resources Resource requests and limits of the API container; the defaults come from the load test (docs/STECKBRIEF.md, Empfehlung Request und Limit: with the autoscaler's 70 % of 500m a pod gets help where P95 was still far below its targets). No CPU limit: throttling costs latency, and sign-in bursts (argon2) use several cores for seconds
 ## @param api.cookieSecure Send the session cookie with Secure (HERD_COOKIE_SECURE); keep true unless the app is reached over plain http from something other than localhost
 ## @param api.forwardedAllowIps Reverse proxies whose X-Forwarded-For/-Proto the app believes (HERD_FORWARDED_ALLOW_IPS: comma-separated IPs or CIDRs, e.g. the pod network of the ingress controller, 10.0.0.0/8). Without it every client has the ingress pod's address (audit, login limits) and the scheme stays http. Required when ingress.enabled
+## @param api.sessionIdleHours Hours without a request after which a login session ends, 0 to 8760 (HERD_SESSION_IDLE_HOURS; API). 0: no idle limit (a session still ends after 7 days). Opening the live stream is no use
 ## @param api.env Extra environment variables of the API and the migration job (name: value), e.g. HERD_LOG_LEVEL. Never a secret's name (PASSWORD, SECRET, TOKEN, EGRESS_PROXY, OFFSITE, in any case) nor a name the chart sets itself (HERD_DATABASE_URL, HERD_ROLE, …): the render fails
 api:
   replicas: 2
@@ -42,6 +43,7 @@ api:
       memory: 512Mi
   cookieSecure: true
   forwardedAllowIps: ""
+  sessionIdleHours: 24
   env: {}
 
 ## @section Worker (HERD_ROLE=worker)

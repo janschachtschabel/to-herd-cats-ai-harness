@@ -67,6 +67,9 @@ services:
       HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
       HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
       HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      # A login session ends after this many hours without a request (0: no idle
+      # limit; it still ends after 7 days). docs/ANMELDUNG.md.
+      HERD_SESSION_IDLE_HOURS: ${HERD_SESSION_IDLE_HOURS:-24}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
       # AI and agents (docs/AGENTEN.md): test call timeout, personal agents and
       # automations per person, hours a run waits for a release or an answer, runs at

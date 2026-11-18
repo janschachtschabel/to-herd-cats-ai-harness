@@ -70,6 +70,7 @@
         },
         "cookieSecure": {"type": "boolean", "description": "Session cookie with Secure (HERD_COOKIE_SECURE)"},
         "forwardedAllowIps": {"type": "string", "description": "Trusted reverse proxies (HERD_FORWARDED_ALLOW_IPS); required when ingress.enabled"},
+        "sessionIdleHours": {"type": "integer", "minimum": 0, "maximum": 8760, "description": "Hours without a request after which a login session ends (HERD_SESSION_IDLE_HOURS); 0: no idle limit"},
         "env": {
           "type": "object",
           "description": "Extra environment variables (name: value); never a secret (names with PASSWORD, SECRET, TOKEN, EGRESS_PROXY or OFFSITE, in any case, are refused: those come from Secrets) and never a name the chart sets itself (the render fails)",
@@ -77,7 +78,7 @@
           "additionalProperties": {"type": "string"}
         }
       },
-      "required": ["replicas", "autoscaling", "resources", "cookieSecure", "forwardedAllowIps", "env"],
+      "required": ["replicas", "autoscaling", "resources", "cookieSecure", "forwardedAllowIps", "sessionIdleHours", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
     },
     "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},

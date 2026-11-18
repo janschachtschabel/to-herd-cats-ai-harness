@@ -26,8 +26,13 @@ eigenes Passwort im Profil (mit dem alten).
   (30) Versuche je Minute, je Adresse und E-Mail `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (5)
   Fehlversuche; gezählt in PostgreSQL über alle API-Knoten. Keine Kontosperre.
 - **Sitzung:** ein Cookie, gültig `HERD_SESSION_TTL_HOURS` (168, also 7 Tage) ab der
-  Anmeldung, durch Nutzung nicht verlängert; eine Grenze für Untätigkeit kommt mit M9b
-  Task 18 ([`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)). Abmelden beendet sie; ein
+  Anmeldung, durch Nutzung nicht verlängert. Ohne Anfrage endet sie schon nach
+  `HERD_SESSION_IDLE_HOURS` Stunden (Standard 24, `0` schaltet die Grenze ab; ASVS
+  V7.3.1, [`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)): Die Sitzung merkt ihre letzte
+  Nutzung, höchstens einmal je Minute geschrieben; danach antwortet die API 401
+  `auth.session_invalid` und die App zeigt die Anmeldung. Ein offener Tab mit der
+  Live-Verbindung (`/api/stream`) zählt nicht als Nutzung; Compose setzt den Wert in
+  beiden Dateien, Helm als `api.sessionIdleHours`. Abmelden beendet sie; ein
   Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
   beenden alle Sitzungen einer Person.
 - **Cookie-Name:** `HERD_SESSION_COOKIE_NAME` (Standard `herd_session`); über https

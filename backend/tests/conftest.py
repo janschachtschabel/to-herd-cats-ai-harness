@@ -59,6 +59,7 @@ from tests.factories_oauth import (  # noqa: E402, F401
 from tests.factories_oidc import _oidc_stub, oidc_egress, oidc_stub  # noqa: E402, F401
 from tests.factories_restore import target  # noqa: E402, F401
 from tests.factories_s3 import _s3_stub, s3_storage, s3_stub  # noqa: E402, F401
+from tests.factories_sessions import session_time  # noqa: E402, F401
 from tests.factories_skills import lab  # noqa: E402, F401
 from tests.factories_spaces import make_space, open_space, team_space  # noqa: E402, F401
 from tests.factories_tickets import desk  # noqa: E402, F401

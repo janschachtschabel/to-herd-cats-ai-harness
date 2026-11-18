@@ -264,6 +264,7 @@ entries would win): secrets come from Secrets, the chart's settings from its val
   value: {{ .Values.backup.uploadMaxBytes | int64 | quote }}
 {{ include "herd.mcpApiEnv" . }}
 {{ include "herd.oidcApiEnv" . }}
+{{ include "herd.securityApiEnv" . }}
 {{- with include "herd.s3Env" . }}
 {{ . }}
 {{- end }}
