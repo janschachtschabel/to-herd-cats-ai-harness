@@ -10,6 +10,11 @@ const id = () => `00000000-0000-7000-8000-9${String(++counter).padStart(11, '0')
 
 export const HILDA = { id: '00000000-0000-7000-8000-0000000000a1', name: 'Hilda' }
 
+/** A deadline the wall clock never reaches: cards read `Date.now()`, so a fixed date in
+ *  the near future turns every pending card into an expired one once it has passed.
+ *  Tests about expiry pass their own past `expires_at`. */
+const FAR_FUTURE = '2099-01-01T09:00:00Z'
+
 export function makeRun(overrides: Partial<Run> = {}): Run {
   return {
     id: id(),
@@ -80,7 +85,7 @@ export function makeApproval(overrides: Partial<Approval> = {}): Approval {
     reason: null,
     redacted: false,
     external: null,
-    expires_at: '2026-11-17T09:00:00Z',
+    expires_at: FAR_FUTURE,
     created_at: '2026-11-14T09:00:00Z',
     version: 1,
     ...overrides,
@@ -99,7 +104,7 @@ export function makeQuestion(overrides: Partial<Question> = {}): Question {
     addressed_to: 'asker',
     answer: null,
     answered_at: null,
-    expires_at: '2026-11-17T09:00:00Z',
+    expires_at: FAR_FUTURE,
     created_at: '2026-11-14T09:00:00Z',
     version: 1,
     ...overrides,
