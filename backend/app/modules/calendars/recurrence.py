@@ -127,10 +127,23 @@ def _ahead(wall: datetime) -> datetime:
     return wall.replace(year=wall.year + _AHEAD_YEARS)
 
 
+def _byweekday(rule: ParsedRule) -> list[weekday]:
+    """BYDAY as `dateutil` takes it. RFC 5545 reads BYDAY as one list, but `dateutil`
+    keeps plain and numbered days as two filters that must both hold; where a rule
+    mixes them, each plain day becomes all its numbered ones (within the month, or the
+    year of a YEARLY rule without BYMONTH), which is the same set of days."""
+    numbered = [weekday(day, n) for day, n in rule.byday if n]
+    plain = [day for day, n in rule.byday if not n]
+    if not (numbered and plain):
+        return numbered or [weekday(day) for day in plain]
+    top = 53 if rule.freq is Freq.YEARLY and not rule.bymonth else 5
+    return numbered + [weekday(day, n) for day in plain for n in range(1, top + 1)]
+
+
 def _kwargs(rule: ParsedRule, start: datetime) -> dict[str, Any]:
     """`dateutil`'s arguments with the defaults taken from the original start, so the
     rule can run from a jumped one."""
-    byweekday = [weekday(day, n or None) for day, n in rule.byday]
+    byweekday = _byweekday(rule)
     bymonth, bymonthday = list(rule.bymonth), list(rule.bymonthday)
     if not (bymonthday or byweekday):
         if rule.freq is Freq.YEARLY:

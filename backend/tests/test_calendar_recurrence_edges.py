@@ -79,3 +79,23 @@ def test_an_until_at_the_ends_of_the_years_reads_back_and_expands(
     assert recurrence.occurrences(series, *window)[0].recurrence_id == start
     assert recurrence.last_end(series) is not None
     assert recurrence.next_after(series, window[0]) is not None
+
+
+def _days(rule: str, start: datetime, until: datetime) -> list[datetime]:
+    series = Series(start, HOUR, "UTC", False, rule)
+    window = (start.replace(tzinfo=UTC), until.replace(tzinfo=UTC))
+    return [o.recurrence_id for o in recurrence.occurrences(series, *window)]
+
+
+def test_a_mixed_byday_of_a_year_without_bymonth_counts_within_the_year() -> None:
+    # R2-1: "20MO,SU" of a year is its 20th Monday (18 May 2026) and every Sunday.
+    found = _days("FREQ=YEARLY;BYDAY=20MO,SU", datetime(2026, 5, 1, 9), datetime(2026, 6, 1))
+    assert [d.day for d in found] == [1, 3, 10, 17, 18, 24, 31]
+
+
+def test_bysetpos_picks_from_the_union_of_a_mixed_byday() -> None:
+    # R2-1 with BYSETPOS: the set of January 2026 under "-1MO,TH" is every Thursday and
+    # the last Monday (1, 8, 15, 22, 26, 29); its second to last is the 26th.
+    rule = "FREQ=MONTHLY;BYDAY=-1MO,TH;BYSETPOS=-2"
+    found = _days(rule, datetime(2026, 1, 1, 9), datetime(2026, 3, 1))
+    assert found == [datetime(2026, 1, 1, 9), datetime(2026, 1, 26, 9), datetime(2026, 2, 23, 9)]
