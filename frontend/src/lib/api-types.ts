@@ -104,6 +104,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/calendar-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Calendar Settings */
+        get: operations["get_calendar_settings_api_admin_calendar_settings_get"];
+        /** Set Calendar Settings */
+        put: operations["set_calendar_settings_api_admin_calendar_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/dm-inspect": {
         parameters: {
             query?: never;
@@ -2440,6 +2458,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendars
+         * @description The calendars of the spaces one belongs to (or open spaces one reads), the same
+         *     for admins; another space's calendars only by naming it.
+         */
+        get: operations["list_calendars_api_calendars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendars/{calendar_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Archive Calendar
+         * @description Archives the calendar: out of every list, 404 by id.
+         */
+        delete: operations["archive_calendar_api_calendars__calendar_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Calendar */
+        patch: operations["update_calendar_api_calendars__calendar_id__patch"];
+        trace?: never;
+    };
     "/api/channels": {
         parameters: {
             query?: never;
@@ -3568,6 +3628,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/spaces/{space_id}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Space Calendars */
+        get: operations["list_space_calendars_api_spaces__space_id__calendars_get"];
+        put?: never;
+        /** Create Calendar */
+        post: operations["create_calendar_api_spaces__space_id__calendars_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/spaces/{space_id}/channels": {
         parameters: {
             query?: never;
@@ -4255,7 +4333,7 @@ export interface components {
          * Action
          * @enum {string}
          */
-        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "backup.manage" | "ai.use" | "agent.create_personal" | "mcp.use";
+        Action: "space.read" | "space.manage" | "page.create" | "page.edit" | "page.publish" | "page.trash" | "page.moderate" | "channel.post" | "channel.manage" | "ticket.read" | "ticket.create" | "ticket.edit" | "ticket.assign" | "calendar.read" | "calendar.write" | "calendar.moderate" | "space.create" | "directory.read" | "user.manage" | "group.manage" | "audit.read" | "page.purge" | "tag.manage" | "dm.inspect" | "ai.manage" | "agent.manage" | "skill.manage" | "backup.manage" | "calendar.manage" | "ai.use" | "agent.create_personal" | "mcp.use" | "calendar.sync";
         /**
          * ActivityAccount
          * @description The self-registered account a `signup` notification is about (plan M9 task 5b;
@@ -5396,6 +5474,76 @@ export interface components {
          * @enum {string}
          */
         BudgetScope: "organisation" | "user" | "agent";
+        /**
+         * CalendarColor
+         * @description The eight fixed tones a calendar is drawn in (plan M10 decision 17).
+         * @enum {string}
+         */
+        CalendarColor: "blue" | "green" | "amber" | "red" | "violet" | "teal" | "pink" | "slate";
+        /**
+         * CalendarCreate
+         * @description A new calendar of the space (`calendar.moderate`); at most 20 per space (409
+         *     `calendar.limit`).
+         */
+        CalendarCreate: {
+            /** @default blue */
+            color?: components["schemas"]["CalendarColor"];
+            /** Name */
+            name: string;
+        };
+        /**
+         * CalendarOut
+         * @description `is_default`: made by the system for a personal space („Mein Kalender“) or the
+         *     general space; there is at most one per space.
+         */
+        CalendarOut: {
+            color: components["schemas"]["CalendarColor"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Space Id
+             * Format: uuid
+             */
+            space_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CalendarSettingsIn
+         * @description `sync_enabled`: whether people may connect their own external calendars
+         *     (`calendar.sync`; data leaves the house).
+         */
+        CalendarSettingsIn: {
+            /** Sync Enabled */
+            sync_enabled: boolean;
+            /** Version */
+            version: number;
+        };
+        /** CalendarSettingsOut */
+        CalendarSettingsOut: {
+            /** Sync Enabled */
+            sync_enabled: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CalendarUpdate
+         * @description Fields left out stay as they are (none can be null).
+         */
+        CalendarUpdate: {
+            color?: components["schemas"]["CalendarColor"] | null;
+            /** Name */
+            name?: string | null;
+            /** Version */
+            version: number;
+        };
         /**
          * CardOut
          * @description A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by
@@ -7439,6 +7587,13 @@ export interface components {
         Page_BudgetOut_: {
             /** Items */
             items: components["schemas"]["BudgetOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[CalendarOut] */
+        Page_CalendarOut_: {
+            /** Items */
+            items: components["schemas"]["CalendarOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -10513,6 +10668,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_calendar_settings_api_admin_calendar_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSettingsOut"];
+                };
+            };
+        };
+    };
+    set_calendar_settings_api_admin_calendar_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSettingsOut"];
                 };
             };
             /** @description Validation Error */
@@ -15595,6 +15803,104 @@ export interface operations {
             };
         };
     };
+    list_calendars_api_calendars_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CalendarOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_calendar_api_calendars__calendar_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_calendar_api_calendars__calendar_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_channels_api_channels_get: {
         parameters: {
             query?: {
@@ -18074,6 +18380,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TicketSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_space_calendars_api_spaces__space_id__calendars_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CalendarOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_calendar_api_spaces__space_id__calendars_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                space_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
                 };
             };
             /** @description Validation Error */

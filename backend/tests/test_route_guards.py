@@ -26,6 +26,7 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
     grant = {"conversation_id": str(uuid7()), "reason": "a reason of some length"}
     member_ref = {"member_type": "user", "member_id": str(user.id)}
     providers = "/api/admin/oidc-providers"
+    calendar = "/api/admin/calendar-settings"
     new_provider = {"kind": "google", "client_id": "c", "client_secret": {"value": "s"}}
     return [
         ("GET", "/api/admin/audit", "/api/admin/audit", None),
@@ -75,6 +76,8 @@ def _table(user: User, group: Group) -> list[tuple[str, str, str, dict[str, obje
             f"{groups}/{group.id}/members/user/{user.id}",
             None,
         ),
+        ("GET", calendar, calendar, None),
+        ("PUT", calendar, calendar, {"sync_enabled": True, "version": 1}),
         ("GET", inspect, f"{inspect}?user_id={user.id}", None),
         ("POST", inspect, inspect, grant),
         (

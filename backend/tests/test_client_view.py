@@ -19,6 +19,7 @@ ADMIN_SYSTEM = [
     "agent.manage",
     "ai.manage",
     "audit.read",
+    "calendar.manage",  # the organisation's calendar switches (plan M10)
     "directory.read",
     "dm.inspect",
     "group.manage",

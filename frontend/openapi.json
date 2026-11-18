@@ -55,6 +55,9 @@
           "ticket.create",
           "ticket.edit",
           "ticket.assign",
+          "calendar.read",
+          "calendar.write",
+          "calendar.moderate",
           "space.create",
           "directory.read",
           "user.manage",
@@ -67,9 +70,11 @@
           "agent.manage",
           "skill.manage",
           "backup.manage",
+          "calendar.manage",
           "ai.use",
           "agent.create_personal",
-          "mcp.use"
+          "mcp.use",
+          "calendar.sync"
         ],
         "title": "Action",
         "type": "string"
@@ -2939,6 +2944,158 @@
         ],
         "title": "BudgetScope",
         "type": "string"
+      },
+      "CalendarColor": {
+        "description": "The eight fixed tones a calendar is drawn in (plan M10 decision 17).",
+        "enum": [
+          "blue",
+          "green",
+          "amber",
+          "red",
+          "violet",
+          "teal",
+          "pink",
+          "slate"
+        ],
+        "title": "CalendarColor",
+        "type": "string"
+      },
+      "CalendarCreate": {
+        "additionalProperties": false,
+        "description": "A new calendar of the space (`calendar.moderate`); at most 20 per space (409\n`calendar.limit`).",
+        "properties": {
+          "color": {
+            "$ref": "#/components/schemas/CalendarColor",
+            "default": "blue"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CalendarCreate",
+        "type": "object"
+      },
+      "CalendarOut": {
+        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space.",
+        "properties": {
+          "color": {
+            "$ref": "#/components/schemas/CalendarColor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "title": "Space Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "space_id",
+          "name",
+          "color",
+          "is_default",
+          "version"
+        ],
+        "title": "CalendarOut",
+        "type": "object"
+      },
+      "CalendarSettingsIn": {
+        "additionalProperties": false,
+        "description": "`sync_enabled`: whether people may connect their own external calendars\n(`calendar.sync`; data leaves the house).",
+        "properties": {
+          "sync_enabled": {
+            "title": "Sync Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_enabled",
+          "version"
+        ],
+        "title": "CalendarSettingsIn",
+        "type": "object"
+      },
+      "CalendarSettingsOut": {
+        "properties": {
+          "sync_enabled": {
+            "title": "Sync Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sync_enabled",
+          "version"
+        ],
+        "title": "CalendarSettingsOut",
+        "type": "object"
+      },
+      "CalendarUpdate": {
+        "additionalProperties": false,
+        "description": "Fields left out stay as they are (none can be null).",
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "CalendarUpdate",
+        "type": "object"
       },
       "CardOut": {
         "description": "A run's card (plan M6 task 7): what it waits for, `approval` or `question`, by\nid (`GET /api/approvals/{id}`, `GET /api/questions/{id}`, for those who may see\nit). The message's `body_md` is the card's summary or the question.",
@@ -8452,6 +8609,33 @@
           "items"
         ],
         "title": "Page[BudgetOut]",
+        "type": "object"
+      },
+      "Page_CalendarOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[CalendarOut]",
         "type": "object"
       },
       "Page_CatalogEntry_": {
@@ -16739,6 +16923,66 @@
         ]
       }
     },
+    "/api/admin/calendar-settings": {
+      "get": {
+        "operationId": "get_calendar_settings_api_admin_calendar_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Calendar Settings",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "put": {
+        "operationId": "set_calendar_settings_api_admin_calendar_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Calendar Settings",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
     "/api/admin/dm-inspect": {
       "get": {
         "description": "`dm.inspect`: a person's DMs, participants and times only (audited).",
@@ -24775,6 +25019,165 @@
         ]
       }
     },
+    "/api/calendars": {
+      "get": {
+        "description": "The calendars of the spaces one belongs to (or open spaces one reads), the same\nfor admins; another space's calendars only by naming it.",
+        "operationId": "list_calendars_api_calendars_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CalendarOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Calendars",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
+    "/api/calendars/{calendar_id}": {
+      "delete": {
+        "description": "Archives the calendar: out of every list, 404 by id.",
+        "operationId": "archive_calendar_api_calendars__calendar_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Calendar",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "patch": {
+        "operationId": "update_calendar_api_calendars__calendar_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "calendar_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Calendar Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Calendar",
+        "tags": [
+          "calendars"
+        ]
+      }
+    },
     "/api/channels": {
       "get": {
         "description": "The channels of every space the caller may read, by name.",
@@ -29326,6 +29729,128 @@
         "summary": "Board Column",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/spaces/{space_id}/calendars": {
+      "get": {
+        "operationId": "list_space_calendars_api_spaces__space_id__calendars_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CalendarOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Space Calendars",
+        "tags": [
+          "calendars"
+        ]
+      },
+      "post": {
+        "operationId": "create_calendar_api_spaces__space_id__calendars_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "space_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Space Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Calendar",
+        "tags": [
+          "calendars"
         ]
       }
     },

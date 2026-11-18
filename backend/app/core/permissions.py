@@ -21,6 +21,9 @@ class Action(StrEnum):
     TICKET_CREATE = "ticket.create"
     TICKET_EDIT = "ticket.edit"  # also: assign oneself an unassigned ticket, or let go of it
     TICKET_ASSIGN = "ticket.assign"  # assign anyone who may read tickets in the space
+    CALENDAR_READ = "calendar.read"  # see the space's calendars and their events (plan M10)
+    CALENDAR_WRITE = "calendar.write"  # create, change and delete events in them
+    CALENDAR_MODERATE = "calendar.moderate"  # create, rename, archive calendars; import
     # System-wide
     SPACE_CREATE = "space.create"
     DIRECTORY_READ = "directory.read"  # find people and groups to add to a space
@@ -36,6 +39,7 @@ class Action(StrEnum):
     # Backups and restores (plan M9 decision 10): owners only, never admins. An archive
     # holds direct messages that admins read only through the audited inspection.
     BACKUP_MANAGE = "backup.manage"
+    CALENDAR_MANAGE = "calendar.manage"  # the organisation's calendar switches (plan M10)
     AI_USE = "ai.use"  # derived from the AI assignment, never from a role (DERIVED_ACTIONS)
     # Own personal agents (spec 8.1, plan M6 decision 13): derived, `ai.use` while the
     # organisation allows personal agents.
@@ -43,6 +47,9 @@ class Action(StrEnum):
     # Access tokens for `/mcp` (plan M8 decision 5): derived, every active person but
     # guests while the organisation's switch is on.
     MCP_USE = "mcp.use"
+    # Connecting one's own external calendars (plan M10 decision 2): derived, every
+    # active person but guests while the organisation's sync switch is on.
+    CALENDAR_SYNC = "calendar.sync"
 
 
 class SpaceRole(StrEnum):
@@ -98,11 +105,16 @@ SPACE_ACTION_MIN_ROLE: dict[Action, SpaceRole] = {
     Action.TICKET_CREATE: SpaceRole.EDITOR,
     Action.TICKET_EDIT: SpaceRole.EDITOR,
     Action.TICKET_ASSIGN: SpaceRole.MODERATOR,
+    Action.CALENDAR_READ: SpaceRole.VIEWER,
+    Action.CALENDAR_WRITE: SpaceRole.EDITOR,
+    Action.CALENDAR_MODERATE: SpaceRole.MODERATOR,
 }
 
 # The space actions that only read; every other space action writes (a `write_scope`
 # holds them, `core/actor.WriteScope`).
-READ_ACTIONS: frozenset[Action] = frozenset({Action.SPACE_READ, Action.TICKET_READ})
+READ_ACTIONS: frozenset[Action] = frozenset(
+    {Action.SPACE_READ, Action.TICKET_READ, Action.CALENDAR_READ}
+)
 WRITE_ACTIONS: frozenset[Action] = frozenset(SPACE_ACTION_MIN_ROLE) - READ_ACTIONS
 
 # System roles that hold every right, in every space of their organisation (E4).
@@ -111,9 +123,10 @@ ADMIN_ROLES: frozenset[SystemRole] = frozenset({SystemRole.OWNER, SystemRole.ADM
 # System-wide actions no role grants: `access.can` derives them (`ai.use` from the
 # person's AI assignment, plan M5 decision 5; `agent.create_personal` from `ai.use`
 # and the organisation's switch, plan M6 decision 13; `mcp.use` from the
-# organisation's MCP switch, plan M8 decision 5).
+# organisation's MCP switch, plan M8 decision 5; `calendar.sync` from the
+# organisation's calendar sync switch, plan M10 decision 2).
 DERIVED_ACTIONS: frozenset[Action] = frozenset(
-    {Action.AI_USE, Action.AGENT_CREATE_PERSONAL, Action.MCP_USE}
+    {Action.AI_USE, Action.AGENT_CREATE_PERSONAL, Action.MCP_USE, Action.CALENDAR_SYNC}
 )
 
 # System-wide actions only the owner holds (an admin holds every other one).

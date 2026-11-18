@@ -1,5 +1,6 @@
 """The guards that hide what someone may not see (`tests/route_table.py`): an AI route,
-a space, page, conversation, message, ticket status, ticket or sprint without a role
+a space, page, conversation, message, ticket status, ticket, sprint or calendar without
+a role
 answers 404 exactly like something that does not exist; so does a page proposal, a
 skill proposal one may not decide, a skill for people without AI, one's access
 tokens without `mcp.use`, and the backups for anyone but an owner."""
@@ -13,6 +14,7 @@ from uuid_utils.compat import uuid7
 
 from app.core.actor import Actor
 from app.core.principal import Principal, SystemRole
+from app.modules.calendars.service import CalendarService, NewCalendar
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
 from app.modules.proposals.service import ProposalService
@@ -230,3 +232,17 @@ async def test_sprint_routes_hide_sprints_of_unseen_spaces(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == "sprint.not_found"
+
+
+async def test_calendar_routes_hide_calendars_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    calendar = await CalendarService(session).create(actor, team_space.id, NewCalendar("Geheim"))
+    for method, template, guard in ROUTES:
+        if guard == "calendar":
+            path = concrete(template, calendar_id=calendar.id)
+            body = BODIES.get((method, template))
+            response = await member_client.request(method, path, json=body)
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "calendar.not_found"

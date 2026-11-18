@@ -163,6 +163,9 @@ RETENTION: Mapping[str, Retention] = {
     "oidc_provider": Keep(_SETTING),
     "oidc_flow": Upkeep("expires_at", timedelta(0), EXPIRY),
     "user_identity": Keep("a person's link to a sign-in provider; she or an admin unlinks"),
+    # Calendars (M10)
+    "calendar": Keep(_CONTENT + "; archived calendars stay (their events and links point at them)"),
+    "calendar_setting": Keep(_SETTING),
 }
 
 

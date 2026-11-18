@@ -22,6 +22,9 @@ ship without a decision on who may call it. Guards:
   `ticket_status.not_found`.
 - `sprint`: a role in the sprint's space; otherwise 404 `sprint.not_found`, as for an
   id nobody has (plan M4b).
+- `calendar`: a role in the calendar's space; otherwise 404 `calendar.not_found`, as for
+  an id nobody has (plan M10). An admin outside the space reaches it by naming the
+  space (`/api/spaces/{space_id}/calendars`, audited); the calendar lists are `session`.
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
 - `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
@@ -174,6 +177,13 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/spaces/{space_id}/sprints", "space"),
     ("POST", "/api/spaces/{space_id}/sprints", "space"),
     ("PATCH", "/api/sprints/{sprint_id}", "sprint"),
+    ("GET", "/api/calendars", "session"),
+    ("GET", "/api/spaces/{space_id}/calendars", "space"),
+    ("POST", "/api/spaces/{space_id}/calendars", "space"),
+    ("PATCH", "/api/calendars/{calendar_id}", "calendar"),
+    ("DELETE", "/api/calendars/{calendar_id}", "calendar"),
+    ("GET", "/api/admin/calendar-settings", "admin"),
+    ("PUT", "/api/admin/calendar-settings", "admin"),
     ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
     ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
@@ -349,6 +359,7 @@ def concrete(
     sprint_id: object | None = None,
     proposal_id: object | None = None,
     skill_id: object | None = None,
+    calendar_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -360,6 +371,7 @@ def concrete(
         "/api/ai/budgets/{budget_id}",
         "/api/agents/{agent_id}",
         "/api/automations/{automation_id}",
+        "/api/calendars/{calendar_id}",
     )
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -386,6 +398,7 @@ def concrete(
         "{server_id}": str(uuid7()),
         "{tool_id}": str(uuid7()),
         "{sprint_id}": str(sprint_id or uuid7()),
+        "{calendar_id}": str(calendar_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
         "{approval_id}": str(uuid7()),
@@ -455,6 +468,9 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "ends_on": "2026-11-27",
     },
     ("PATCH", "/api/sprints/{sprint_id}"): {"name": "X", "version": 1},
+    ("POST", "/api/spaces/{space_id}/calendars"): {"name": "X"},
+    ("PATCH", "/api/calendars/{calendar_id}"): {"name": "X", "version": 1},
+    ("PUT", "/api/admin/calendar-settings"): {"sync_enabled": True, "version": 1},
     ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
     ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},

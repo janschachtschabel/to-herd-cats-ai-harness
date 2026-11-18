@@ -32,6 +32,7 @@ from app.modules.auth.write_limits import COUNTED
 from app.modules.automations import router as automations_router
 from app.modules.backups.replacing import replace_runner
 from app.modules.backups.router import router as backups_router
+from app.modules.calendars import router as calendars
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
 from app.modules.groups.router import router as groups_router
@@ -126,6 +127,9 @@ def api_router() -> APIRouter:
     api.include_router(ticket_statuses.statuses)
     api.include_router(ticket_sprints.space_sprints, dependencies=COUNTED)
     api.include_router(ticket_sprints.sprints, dependencies=COUNTED)
+    api.include_router(calendars.calendars)
+    api.include_router(calendars.space_calendars)
+    api.include_router(calendars.calendar_settings)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
