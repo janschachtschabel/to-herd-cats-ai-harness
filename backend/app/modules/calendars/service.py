@@ -12,7 +12,8 @@ reaches only by naming the space (`list_in`, `readable`), which goes through
 
 At most `MAX_CALENDARS_PER_SPACE` calendars that are not archived per space (409
 `calendar.limit`), counted under the space's row lock. Every change names the version
-it read (409 `calendar.version_conflict`).
+it read (409 `calendar.version_conflict`). A default calendar cannot be archived (409
+`calendar.default_kept`).
 """
 
 import builtins
@@ -110,8 +111,12 @@ class CalendarService:
         return calendar
 
     async def archive(self, actor: Actor, calendar_id: uuid.UUID, version: int) -> None:
-        """Gone for everyone: out of every list, 404 by id; its rows stay."""
+        """Gone for everyone: out of every list, 404 by id; its rows stay. A default
+        calendar is kept (409 `calendar.default_kept`): it is made once and there is no
+        way back from archiving."""
         calendar = await self._managed(actor, calendar_id, version)
+        if calendar.is_default:
+            raise Conflict("A default calendar is kept", code="calendar.default_kept")
         calendar.archived_at = utcnow()
         calendar.version += 1
         await self.session.flush()

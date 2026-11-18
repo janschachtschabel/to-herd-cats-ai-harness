@@ -71,10 +71,12 @@ class CalendarRepository:
         return await self.session.scalar(stmt)
 
     async def default_of(self, space_id: uuid.UUID) -> Calendar | None:
+        """The space's default calendar (never an archived one: a default is kept)."""
         stmt = select(Calendar).where(
             Calendar.org_id == self.org_id,
             Calendar.space_id == space_id,
             Calendar.is_default.is_(True),
+            Calendar.archived_at.is_(None),
         )
         return await self.session.scalar(stmt)
 
