@@ -264,7 +264,9 @@ unbekanntes Konto kostet dieselbe Hash-Arbeit (Dummy-Hash). Es gibt keine Kontos
 die ein Fremder auslösen könnte: eine andere Adresse kommt weiter durch. OIDC-Starts und
 Rückrufe sind je Adresse begrenzt, falsche alte Passwörter im Profil je Person, falsche
 TOTP- und Wiederherstellungscodes je Person (5 je Minute) und je wartender Anmeldung
-(nach 5 ist sie beendet).
+(nach 5 ist sie beendet); 10 falsche Codes in 24 Stunden sperren den zweiten Faktor für
+eine Stunde (Audit, Hinweis an die Person). Diese Sperre kann nur auslösen, wer das
+Passwort kennt.
 
 **Zweiter Faktor.** Freiwillig mit TOTP (RFC 6238, eigener Code auf `hmac`), für jede
 Person mit Passwort; Einzelheiten in [`ANMELDUNG.md`](ANMELDUNG.md#zweiter-faktor-totp).
@@ -539,7 +541,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V6.2 | V6.2.10 | L2 | Kein erzwungener Wechsel | erfüllt | Passwörter laufen nicht ab. |
 | V6.2 | V6.2.11 | L2 | Kontextwörter verhindern | erfüllt | Produkt, Organisation, E-Mail (lokaler Teil, Domain), Name (`core/password_check.context_words`); auch für das Passwort der ersten Inhaberin aus `HERD_BOOTSTRAP_ADMIN_PASSWORD` (sonst bricht der Start ab). `tests/test_password_guessing.py::test_a_guessable_new_password_is_refused`, `tests/test_bootstrap_password.py`. |
 | V6.2 | V6.2.12 | L2 | Gegen geleakte Passwörter prüfen | erfüllt | Die Liste aus V6.2.4 stammt aus Leak-Sammlungen (Top-Million von Pwdb-Public). Nicht abgefragt wird ein vollständiger Leak-Bestand (etwa Have I Been Pwned per k-Anonymität): das wäre ein Aufruf nach außen bei jedem Passwortwechsel (Hinweis H1). |
-| V6.3 | V6.3.1 | L1 | Schutz gegen Credential Stuffing umgesetzt | erfüllt | `auth/service.py` (Grenzen je Adresse und je Adresse+Konto, Dummy-Hash bei unbekannten Konten), OIDC je Adresse. `tests/test_login_limits.py`, `tests/test_auth.py::test_login_is_rate_limited`. |
+| V6.3 | V6.3.1 | L1 | Schutz gegen Credential Stuffing umgesetzt | erfüllt | `auth/service.py` (Grenzen je Adresse und je Adresse+Konto, Dummy-Hash bei unbekannten Konten), OIDC je Adresse. `tests/test_login_limits.py`, `tests/test_auth.py::test_login_is_rate_limited`. Der zweite Faktor: 5 falsche Codes je Minute, 10 in 24 Stunden sperren ihn für eine Stunde (`totp/factor.py`). `tests/test_totp_lock.py`. |
 | V6.3 | V6.3.2 | L1 | Keine Standardkonten | erfüllt | Das erste Konto entsteht nur aus `HERD_BOOTSTRAP_ADMIN_EMAIL`/`_PASSWORD` (Compose verlangt beide, kein Standardwert). `tests/test_auth.py::test_bootstrap_without_credentials_creates_nothing`. |
 | V6.3 | V6.3.3 | L2 | Mehr-Faktor-Anmeldung | Lücke | TOTP gibt es für jede Person mit Passwort (M9b Task 16, `totp/`), aber freiwillig: Jans Antwort J3 (nur optional, auch für Owner und Admins). Über OIDC leistet den zweiten Faktor der Anbieter. Dokumentierte Abweichung. |
 | V6.3 | V6.3.4 | L2 | Keine undokumentierten Wege, gleiche Stärke | erfüllt | Abschnitt „Anmeldung“ nennt alle Wege; `/mcp` nimmt nur Zugangstoken, `/internal` nur das interne Token, alles andere nur die Sitzung. Wer TOTP eingeschaltet hat, gibt den Code nach dem Passwort und nach einem OIDC-Anbieter, und für jedes neue Zugangstoken (`totp/gate.py`). `tests/test_totp_oidc.py`, `tests/test_totp_tokens.py`. |

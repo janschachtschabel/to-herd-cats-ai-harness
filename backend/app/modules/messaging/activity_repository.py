@@ -45,7 +45,7 @@ from sqlalchemy.orm import aliased
 from app.modules.automations.sight import AutomationSight
 from app.modules.automations.sight import seen as automation_seen
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
-from app.modules.messaging.notification_models import Notification
+from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import ConversationScope, visible_conversations
 from app.modules.messaging.ticket_hooks import ticket_hooks
 from app.modules.skills.sight import SkillProposalSight
@@ -166,8 +166,13 @@ class ActivityRepository:
                 .correlate_except(automation, agent, place)
             )
         about_automation = and_(Notification.automation_id.is_not(None), sees_automation)
+        own_lock = and_(  # my own second factor was locked (review M9b F9)
+            Notification.reason == NotificationReason.TOTP_LOCKED,
+            Notification.account_id == self.scope.principal.id,
+        )
         about_account = and_(
-            Notification.account_id.is_not(None), true() if self.manages_users else false()
+            Notification.account_id.is_not(None),
+            or_(true() if self.manages_users else false(), own_lock),
         )
         return and_(
             Notification.org_id == self.scope.org_id,

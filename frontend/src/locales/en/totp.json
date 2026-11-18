@@ -3,7 +3,8 @@
     "auth": {
       "second_factor_invalid": "The code is wrong or was used already.",
       "second_factor_expired": "The sign-in has expired. Please sign in with your password again.",
-      "second_factor_required": "Please enter a current code from your authenticator app."
+      "second_factor_required": "Please enter a current code from your authenticator app.",
+      "second_factor_locked": "After too many wrong codes, two-factor sign-in is locked for an hour."
     },
     "totp": {
       "already_enabled": "Two-factor sign-in is already on.",
@@ -85,5 +86,11 @@
       "code": "Code from the authenticator app",
       "codeHint": "A new token needs your second factor."
     }
+  },
+  "activity": {
+    "reasons": {
+      "totp_locked": "two-factor sign-in locked"
+    },
+    "totpLocked": "After ten wrong codes your two-factor sign-in is locked for an hour. If that was not you, someone may know your password: change it."
   }
 }

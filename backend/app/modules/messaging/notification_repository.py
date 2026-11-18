@@ -177,3 +177,18 @@ class NotificationRepository:
             .returning(Notification)
         )
         return list((await self.session.scalars(stmt)).all())
+
+    async def renew_about_account(
+        self, user_id: uuid.UUID, account_id: uuid.UUID, reason: NotificationReason
+    ) -> None:
+        """One unread notification about an account for `user_id`, new each time (an
+        earlier one of the same reason goes: the person sees the latest on top)."""
+        await self.session.execute(
+            delete(Notification).where(
+                Notification.org_id == self.org_id,
+                Notification.user_id == user_id,
+                Notification.account_id == account_id,
+                Notification.reason == reason,
+            )
+        )
+        await self.add_for_account(account_id, [(user_id, reason)])

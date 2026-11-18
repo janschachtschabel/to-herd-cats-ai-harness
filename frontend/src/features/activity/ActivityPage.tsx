@@ -10,6 +10,7 @@ import {
   MessageSquareReply,
   OctagonAlert,
   ScrollText,
+  ShieldAlert,
   ShieldCheck,
   UserCheck,
   UserPlus,
@@ -126,6 +127,7 @@ const REASON_ICONS: Record<ActivityEntry['reason'], typeof AtSign> = {
   automation: CalendarClock,
   review_due: ClipboardCheck,
   signup: UserPlus,
+  totp_locked: ShieldAlert,
 }
 
 /** Where an entry happened, for its sentence: its conversation, or where a proposal
@@ -177,6 +179,8 @@ function ActivityItem({
     } else if (entry.skill_proposal) {
       const proposalId = entry.skill_proposal.id
       void navigate({ to: '/skill-proposals/$proposalId', params: { proposalId } })
+    } else if (entry.reason === 'totp_locked') {
+      void navigate({ to: '/profile' })
     } else if (entry.account) {
       void navigate({ to: '/admin/users', search: { filter: 'pending' } })
     } else if (entry.automation) {
@@ -209,6 +213,8 @@ function ActivityItem({
             <ReviewDueSentence entry={entry} />
           ) : entry.reason === 'signup' ? (
             signupText(t, entry)
+          ) : entry.reason === 'totp_locked' ? (
+            t('activity.totpLocked')
           ) : (
             <>
               <span className="font-medium">{author ?? t('messaging.message.unknownAuthor')}</span>{' '}

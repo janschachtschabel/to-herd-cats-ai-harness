@@ -3,7 +3,8 @@
     "auth": {
       "second_factor_invalid": "Der Code stimmt nicht oder wurde schon verwendet.",
       "second_factor_expired": "Die Anmeldung ist abgelaufen. Bitte melde dich noch einmal mit deinem Passwort an.",
-      "second_factor_required": "Bitte gib einen aktuellen Code aus deiner Authenticator-App ein."
+      "second_factor_required": "Bitte gib einen aktuellen Code aus deiner Authenticator-App ein.",
+      "second_factor_locked": "Nach zu vielen falschen Codes ist die Zwei-Faktor-Anmeldung für eine Stunde gesperrt."
     },
     "totp": {
       "already_enabled": "Die Zwei-Faktor-Anmeldung ist schon eingeschaltet.",
@@ -85,5 +86,11 @@
       "code": "Code aus der Authenticator-App",
       "codeHint": "Für ein neues Token brauchst du deinen zweiten Faktor."
     }
+  },
+  "activity": {
+    "reasons": {
+      "totp_locked": "Zwei-Faktor-Anmeldung gesperrt"
+    },
+    "totpLocked": "Nach zehn falschen Codes ist deine Zwei-Faktor-Anmeldung für eine Stunde gesperrt. Warst du das nicht, kennt jemand vielleicht dein Passwort: Ändere es."
   }
 }

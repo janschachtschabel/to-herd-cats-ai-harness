@@ -15,7 +15,9 @@ owner when it kept failing); `review_due` (a page's review is due: plan M7 decis
 11; the message is the entry in the page's thread, for the space's moderators,
 `wiki/review_handlers.py`); `signup` (someone registered through OIDC and waits for
 approval: plan M9 task 5b; it names the account, `account_id`, and no conversation:
-for everyone who holds `user.manage`, `users/handlers.py`).
+for everyone who holds `user.manage`, `users/handlers.py`); `totp_locked` (my own
+second factor was locked after too many wrong codes: review M9b F9; it names my own
+account, for me alone, `totp/factor.py`).
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -54,6 +56,7 @@ class NotificationReason(StrEnum):
     AUTOMATION = "automation"  # an automation was paused (its owner's rights, failures)
     REVIEW_DUE = "review_due"  # a page I moderate is due for review (plan M7 task 6)
     SIGNUP = "signup"  # a self-registered account waits for approval (plan M9 task 5b)
+    TOTP_LOCKED = "totp_locked"  # my second factor locked after wrong codes (M9b F9)
 
 
 _TARGET_BEFORE_ACCOUNTS = (
@@ -81,7 +84,7 @@ class Notification(UuidPk, OrgScoped, Base):
         CheckConstraint(
             "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
             " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation',"
-            " 'review_due', 'signup')",
+            " 'review_due', 'signup', 'totp_locked')",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),

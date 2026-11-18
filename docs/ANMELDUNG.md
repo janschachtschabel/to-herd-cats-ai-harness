@@ -91,6 +91,13 @@ Er ist freiwillig, auch für Owner und Admins (Jans Antwort J3).
   Anfrage des zweiten Schritts zusätzlich je Client-Adresse wie die Passwort-Anmeldung
   (`HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE`); nach 5 falschen Codes ist eine wartende
   Anmeldung beendet (zurück zum Passwort). Antwort dann 429 `auth.too_many_attempts`.
+- **Sperre:** 10 falsche Codes innerhalb von 24 Stunden sperren den zweiten Faktor der
+  Person für eine Stunde (429 `auth.second_factor_locked`, auch für einen richtigen
+  Code; Anmelden, Ausschalten, neue Codes und Zugangstoken warten so lange). Die Sperre
+  steht im Audit (`user.totp_locked`, als `system`), und die Person findet in ihrer
+  Aktivität einen Hinweis (es könnte jemand ihr Passwort kennen). Ein richtiger Code
+  setzt die Zählung zurück; ein Admin-Reset des zweiten Faktors hebt auch die Sperre
+  auf. Auslösen kann sie nur, wer das Passwort kennt oder angemeldet ist.
 - **Ausschalten:** im Profil mit einem aktuellen Code oder einem
   Wiederherstellungscode. **Neue Wiederherstellungscodes** (die alten werden ungültig)
   mit einem aktuellen Code aus der App.
@@ -344,6 +351,7 @@ Zweiter Faktor (Antworten der API):
 | `auth.second_factor_expired` | Keine wartende Anmeldung (abgelaufen, schon verwendet, nach 5 falschen Codes beendet, Cookie fehlt, TOTP inzwischen zurückgesetzt, Person deaktiviert): noch einmal mit dem Passwort. |
 | `auth.second_factor_required` | Ein Zugangstoken braucht einen aktuellen Code. |
 | `auth.too_many_attempts` | Zu viele falsche Codes der Person (oder Anfragen der Adresse) in der letzten Minute. |
+| `auth.second_factor_locked` | 10 falsche Codes in 24 Stunden: der zweite Faktor ist für eine Stunde gesperrt. |
 | `totp.already_enabled`, `totp.no_setup`, `totp.not_enabled` | Einrichten, obwohl eingeschaltet; Bestätigen ohne begonnene Einrichtung; Ausschalten, obwohl aus. |
 | `totp.no_password`, `totp.no_secret_key` | Konto ohne Passwort; kein `HERD_SECRET_KEY` gesetzt. |
 

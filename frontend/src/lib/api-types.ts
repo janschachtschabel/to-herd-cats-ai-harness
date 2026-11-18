@@ -2301,7 +2301,8 @@ export interface paths {
         /**
          * Start Backup
          * @description Back up now: a worker makes the backup; `backup.changed` tells its progress.
-         *     409 `backup.already_running` while one runs or waits.
+         *     409 `backup.already_running` while one runs or waits, `backup.busy` while another
+         *     request is being handled.
          */
         post: operations["start_backup_api_backups_post"];
         delete?: never;
@@ -2385,7 +2386,8 @@ export interface paths {
          * Replace Installation
          * @description Replace the whole installation with the archive (a safety archive first, then
          *     maintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409
-         *     `backup.already_running`, `backup.restore_running`, `backup.replace_refused`.
+         *     `backup.already_running`, `backup.busy`, `backup.restore_running`,
+         *     `backup.replace_refused`.
          */
         post: operations["replace_installation_api_backups_archives__name__replace_post"];
         delete?: never;
@@ -7089,7 +7091,7 @@ export interface components {
          * NotificationReason
          * @enum {string}
          */
-        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup";
+        NotificationReason: "mention" | "reply" | "assignment" | "ticket_comment" | "proposal" | "approval" | "question" | "run_stopped" | "skill_proposal" | "automation" | "review_due" | "signup" | "totp_locked";
         /** OAuthSpec */
         OAuthSpec: {
             /** Authorization Endpoint */

@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,9 +25,12 @@ class UserTotp(UuidPk, OrgScoped, Base):
     """One per person. `secret_ref` is `enc:` under `HERD_SECRET_KEY`, never returned
     after setup. Without `confirmed_at` the setup waits for its first code and the
     secret protects nothing yet. `last_step`: the newest time step a code was accepted
-    for; no code of it or an earlier step is accepted again (ASVS 5.0 V6.5.1)."""
+    for; no code of it or an earlier step is accepted again (ASVS 5.0 V6.5.1).
+    `failures` wrong codes since `failures_since` (the window's start, `factor.py`);
+    until `locked_until` the second factor refuses everything (review M9b F9)."""
 
     __tablename__ = "user_totp"
+    __table_args__ = (CheckConstraint("failures >= 0", name="failures"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -37,6 +41,9 @@ class UserTotp(UuidPk, OrgScoped, Base):
     secret_ref: Mapped[str] = mapped_column(Text, nullable=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_step: Mapped[int | None] = mapped_column(BigInteger)
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    failures_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TotpRecoveryCode(UuidPk, OrgScoped, Base):

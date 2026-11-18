@@ -7552,7 +7552,8 @@
           "skill_proposal",
           "automation",
           "review_due",
-          "signup"
+          "signup",
+          "totp_locked"
         ],
         "title": "NotificationReason",
         "type": "string"
@@ -24448,7 +24449,7 @@
         ]
       },
       "post": {
-        "description": "Back up now: a worker makes the backup; `backup.changed` tells its progress.\n409 `backup.already_running` while one runs or waits.",
+        "description": "Back up now: a worker makes the backup; `backup.changed` tells its progress.\n409 `backup.already_running` while one runs or waits, `backup.busy` while another\nrequest is being handled.",
         "operationId": "start_backup_api_backups_post",
         "responses": {
           "202": {
@@ -24644,7 +24645,7 @@
     },
     "/api/backups/archives/{name}/replace": {
       "post": {
-        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`backup.already_running`, `backup.restore_running`, `backup.replace_refused`.",
+        "description": "Replace the whole installation with the archive (a safety archive first, then\nmaintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409\n`backup.already_running`, `backup.busy`, `backup.restore_running`,\n`backup.replace_refused`.",
         "operationId": "replace_installation_api_backups_archives__name__replace_post",
         "parameters": [
           {
