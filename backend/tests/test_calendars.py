@@ -17,16 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
 from app.core.pagination import PageParams
-from app.core.principal import SystemRole
+from app.core.permissions import SpaceRole
+from app.core.principal import Principal, SystemRole
 from app.modules.audit.models import ADMIN_ACCESS, AuditLog
-from app.modules.calendars.models import Calendar
+from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE, Calendar
 from app.modules.calendars.service import CalendarService, NewCalendar
+from app.modules.spaces.models import Space, SpaceKind
+from app.modules.spaces.repository import SpaceRepository
 from app.modules.spaces.service import GENERAL_SPACE_NAME
 from app.modules.users.models import User
 from tests.factories import MakeUser, login
 from tests.factories_calendar import actor_of, listed, new_calendar
 from tests.factories_spaces import MakeSpace, personal_space_of
-from tests.real_db import MakeRealClient, RealDb
+from tests.real_db import MakeRealClient, RealDb, waiting_for_locks
 
 
 @contextmanager
@@ -260,3 +263,39 @@ async def test_update_with_a_stale_version_answers_409(
     ):
         assert (r.status_code, r.json()["error"]["code"]) == (409, "calendar.version_conflict")
         assert r.json()["error"]["details"] == {"current_version": 2}
+
+
+async def test_two_calendars_made_at_once_at_nineteen_make_twenty(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    """R1-M7: the limit is counted under the space's row lock: of two calendars made at
+    once in a space that holds 19, one is made and one refused. A third transaction
+    holds the space's row until both requests wait for it, so they do meet."""
+    async with real_db.database.session_factory() as session, session.begin():
+        member = await session.scalar(select(User).where(User.email == real_db.member_email))
+        assert member is not None
+        team = await SpaceRepository(session).add(
+            Space(org_id=member.org_id, kind=SpaceKind.TEAM, name="Team")
+        )
+        await SpaceRepository(session).set_member(
+            team.id, Principal.user(member.id), SpaceRole.MODERATOR
+        )
+        for i in range(MAX_CALENDARS_PER_SPACE - 1):
+            session.add(
+                Calendar(org_id=member.org_id, space_id=team.id, name=f"K{i}", color="blue")
+            )
+    clients = [await make_real_client() for _ in range(2)]
+    for client in clients:
+        await login(client, real_db.member_email)
+    url = f"/api/spaces/{team.id}/calendars"
+    async with real_db.database.session_factory() as holder, holder.begin():
+        await holder.execute(select(Space.id).where(Space.id == team.id).with_for_update())
+        made = [asyncio.create_task(c.post(url, json={"name": "Neu"})) for c in clients]
+        await waiting_for_locks(real_db, 2)
+    answers = await asyncio.gather(*made)
+    assert sorted(a.status_code for a in answers) == [201, 409], [a.text for a in answers]
+    async with real_db.database.session_factory() as session:
+        count = await session.scalar(
+            select(func.count()).select_from(Calendar).where(Calendar.space_id == team.id)
+        )
+    assert count == MAX_CALENDARS_PER_SPACE

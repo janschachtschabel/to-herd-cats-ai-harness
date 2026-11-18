@@ -2,14 +2,16 @@
 archived), counts within the limit of 20, and is stored without a name until someone
 renames it (the interface names it in the reader's language)."""
 
+import asyncio
 import uuid
 from typing import Any
 
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import member_space_ids
-from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE
+from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE, Calendar
 from app.modules.calendars.repository import CalendarRepository
 from app.modules.spaces.models import Space, SpaceKind
 from app.modules.spaces.service import GENERAL_SPACE_NAME
@@ -17,6 +19,7 @@ from app.modules.users.models import User
 from tests.factories import MakeUser, login
 from tests.factories_calendar import actor_of, listed, new_calendar
 from tests.factories_spaces import MakeSpace, personal_space_of
+from tests.real_db import MakeRealClient, RealDb
 
 
 async def _client(make_client: Any, user: User) -> AsyncClient:
@@ -105,3 +108,29 @@ async def test_spaces_due_a_default_come_in_the_order_they_are_locked(
         member_space_ids(actor), person.id, GENERAL_SPACE_NAME
     )
     assert due == [general.id, own.id]
+
+
+async def test_the_general_default_is_made_once_for_two_first_callers(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    """R1-M7: two people's first calls at once make the general space's default once
+    (the space's row lock and the partial unique index)."""
+    async with real_db.database.session_factory() as session, session.begin():
+        general = Space(org_id=real_db.org_id, kind=SpaceKind.OPEN, name=GENERAL_SPACE_NAME)
+        session.add(general)
+    clients = []
+    for email in (real_db.owner_email, real_db.member_email) * 3:
+        client = await make_real_client()
+        await login(client, email)
+        clients.append(client)
+    answers = await asyncio.gather(*(c.get("/api/calendars") for c in clients))
+    assert [a.status_code for a in answers] == [200] * 6, [a.text for a in answers]
+    async with real_db.database.session_factory() as session:
+        count = await session.scalar(
+            select(func.count()).select_from(Calendar).where(Calendar.space_id == general.id)
+        )
+    assert count == 1
+    general_ids = {
+        c["id"] for a in answers for c in a.json()["items"] if c["space_id"] == str(general.id)
+    }
+    assert len(general_ids) == 1

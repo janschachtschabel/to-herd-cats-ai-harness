@@ -17,11 +17,12 @@ from app.core.pagination import PageParams
 from app.core.permissions import SpaceRole
 from app.core.principal import Principal, SystemRole
 from app.modules.audit.models import AuditLog
+from app.modules.calendars.repository import CalendarRepository
 from app.modules.calendars.service import CalendarService, NewCalendar
 from app.modules.users.models import User
 from tests.factories import MakeUser
 from tests.factories_calendar import actor_of
-from tests.factories_spaces import MakeSpace
+from tests.factories_spaces import MakeSpace, personal_space_of
 
 RIGHTS = (Action.CALENDAR_READ, Action.CALENDAR_WRITE, Action.CALENDAR_MODERATE)
 
@@ -156,3 +157,33 @@ async def test_run_scopes_apply_to_calendar_rights(
     with pytest.raises(Forbidden):
         await service.archive(writing, elsewhere.id, elsewhere.version)
     assert (await service.readable(writing, elsewhere.id)).id == elsewhere.id
+
+
+async def test_the_named_list_holds_to_a_read_scope(
+    session: AsyncSession, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """R1-M7: `list_in` under a run's read scope lists only a space of the scope, and
+    makes no default calendar (a run writes nothing it was not asked to)."""
+    person = await make_user()
+    here = await make_space("team", "Hier", members=[(person, "moderator")])
+    there = await make_space("team", "Dort", members=[(person, "moderator")])
+    own = await personal_space_of(session, person)
+    service = CalendarService(session)
+    plain = await actor_of(session, person)
+    made = await service.create(plain, here.id, NewCalendar("Hier"))
+    await service.create(plain, there.id, NewCalendar("Dort"))
+    roles = {here.id: SpaceRole.MODERATOR, own.id: SpaceRole.MODERATOR}
+    scoped = Actor(
+        plain.org_id,
+        plain.principal,
+        plain.system_role,
+        plain.group_ids,
+        read_scope=ReadScope.of(roles),
+    )
+    page = await service.list_in(scoped, here.id, PageParams(limit=100))
+    assert [c.id for c in page.items] == [made.id]
+    with pytest.raises(NotFound) as hidden:
+        await service.list_in(scoped, there.id, PageParams(limit=100))
+    assert hidden.value.code == "space.not_found"
+    assert (await service.list_in(scoped, own.id, PageParams(limit=100))).items == []
+    assert await CalendarRepository(session, plain.org_id).default_of(own.id) is None

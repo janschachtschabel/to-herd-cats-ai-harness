@@ -6,6 +6,7 @@ advisory locks) use these fixtures instead: the app's own `Database` points at
 `herd_test`, nothing is overridden, and every table is emptied afterwards.
 """
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 
@@ -81,6 +82,23 @@ async def real_db(engine: AsyncEngine) -> AsyncIterator[RealDb]:
 
 
 MakeRealClient = Callable[..., Awaitable[AsyncClient]]
+
+
+async def waiting_for_locks(real_db: RealDb, count: int) -> None:
+    """Until `count` backends of the test database wait for a lock (at most 10 s)."""
+    async with real_db.database.session_factory() as session:
+        for _ in range(500):
+            waiting = await session.scalar(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
+                    " AND wait_event_type = 'Lock'"
+                )
+            )
+            if waiting is not None and waiting >= count:
+                return
+            await session.rollback()  # the statistics are a snapshot per transaction
+            await asyncio.sleep(0.02)
+    raise AssertionError(f"fewer than {count} backends wait for a lock")
 
 
 @pytest.fixture
