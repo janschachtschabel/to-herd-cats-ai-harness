@@ -30,6 +30,8 @@ from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, weekday
 from app.modules.calendars import zones
 from app.modules.calendars.recurrence_jump import Counter, jump
 from app.modules.calendars.recurrence_rule import (
+    FIRST_YEAR,
+    LAST_YEAR,
     Freq,
     ParsedRule,
     RuleInvalid,
@@ -38,10 +40,17 @@ from app.modules.calendars.recurrence_rule import (
     parse_rule,
 )
 
-__all__ = ["Occurrence", "RuleInvalid", "Series", "SeriesInvalid", "TooDense", "check_rule"]
+__all__ = [
+    "FIRST_YEAR",
+    "LAST_YEAR",
+    "Occurrence",
+    "RuleInvalid",
+    "Series",
+    "SeriesInvalid",
+    "TooDense",
+    "check_rule",
+]
 
-FIRST_YEAR = 1900  # before it, zones keep local mean time
-LAST_YEAR = 2399
 DEFAULT_LIMIT = 2000
 LAST_END_CAP = 5000
 HORIZON = datetime(LAST_YEAR, 12, 31, 23, 59, 59)
@@ -177,7 +186,7 @@ def _rule_walls(
     begin = jump(rule, start, lo)
     counter.jumps += begin != start
     last = _last_instant(series, rule)
-    if last is not None and last.year <= LAST_YEAR:
+    if last is not None:
         stop = min(stop, _wall_of(series, last) + SLACK)
     matches = (
         wall

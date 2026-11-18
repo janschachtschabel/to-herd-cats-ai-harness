@@ -7,7 +7,9 @@ Taken: `FREQ` from `DAILY` up, `INTERVAL`, `COUNT` (at most 5,000) or `UNTIL`, `
 does not (`SECONDLY`/`MINUTELY`/`HOURLY`, `BYHOUR`/`BYMINUTE`/`BYSECOND`, `BYYEARDAY`,
 `BYWEEKNO`, a larger `COUNT` or `INTERVAL`, a floating `UNTIL`); with
 `event.rrule_invalid`: what is no rule (unknown or repeated parts, values out of
-range, `COUNT` with `UNTIL`, a day of the month no month has).
+range, `COUNT` with `UNTIL`, a day of the month no month has, a digit that is not
+ASCII); with `event.time_out_of_range`: an `UNTIL` outside the years 1900 to 2399,
+where series lie.
 """
 
 import re
@@ -16,6 +18,8 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from functools import lru_cache
 
+FIRST_YEAR = 1900  # before it, zones keep local mean time
+LAST_YEAR = 2399
 MAX_CHARS = 500
 MAX_COUNT = 5000
 MAX_INTERVAL = 1000
@@ -42,7 +46,8 @@ class SeriesInvalid(ValueError):
 
 
 class RuleInvalid(SeriesInvalid):
-    """`code` is `event.rrule_invalid` or `event.rrule_unsupported`."""
+    """`code` is `event.rrule_invalid`, `event.rrule_unsupported` or (an `UNTIL`
+    outside the calendar's years) `event.time_out_of_range`."""
 
 
 class Freq(StrEnum):
@@ -67,10 +72,8 @@ class ParsedRule:
     @property
     def text(self) -> str:
         parts = [f"FREQ={self.freq}"]
-        if isinstance(self.until, datetime):
-            parts.append(f"UNTIL={self.until:%Y%m%dT%H%M%SZ}")
-        elif self.until is not None:
-            parts.append(f"UNTIL={self.until:%Y%m%d}")
+        if self.until is not None:
+            parts.append(f"UNTIL={_until_text(self.until)}")
         if self.count is not None:
             parts.append(f"COUNT={self.count}")
         if self.interval != 1:
@@ -87,6 +90,14 @@ class ParsedRule:
         if self.wkst:
             parts.append(f"WKST={WEEKDAYS[self.wkst]}")
         return ";".join(parts)
+
+
+def _until_text(until: date | datetime) -> str:
+    # `%Y` is not zero-padded below the year 1000 on every platform: write it out.
+    day = f"{until.year:04d}{until.month:02d}{until.day:02d}"
+    if isinstance(until, datetime):
+        return f"{day}T{until.hour:02d}{until.minute:02d}{until.second:02d}Z"
+    return day
 
 
 def check_rule(text: str) -> str:
@@ -142,15 +153,17 @@ def _number(value: str, high: int) -> int:
 def _until(value: str) -> date | datetime:
     if not _UNTIL.fullmatch(value):
         raise _invalid()
+    forms = {8: "%Y%m%d", 15: "%Y%m%dT%H%M%S", 16: "%Y%m%dT%H%M%SZ"}
     try:
-        if len(value) == 8:
-            return datetime.strptime(value, "%Y%m%d").date()
-        if len(value) == 16 and value.endswith("Z"):
-            return datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
-        datetime.strptime(value, "%Y%m%dT%H%M%S")
+        read = datetime.strptime(value, forms[len(value)])
     except ValueError:
         raise _invalid() from None
-    raise _unsupported()  # a floating date-time: the calendar has no floating starts
+    if len(value) == 15:
+        raise _unsupported()  # a floating date-time: the calendar has no floating starts
+    until = read.date() if len(value) == 8 else read.replace(tzinfo=UTC)
+    if not FIRST_YEAR <= until.year <= LAST_YEAR:
+        raise RuleInvalid("event.time_out_of_range")
+    return until
 
 
 def _days(value: str, freq: Freq, in_months: bool) -> tuple[tuple[int, int], ...]:
