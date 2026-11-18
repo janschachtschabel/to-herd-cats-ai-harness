@@ -2982,7 +2982,7 @@
         "type": "object"
       },
       "CalendarOut": {
-        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space.",
+        "description": "`is_default`: made by the system for a personal space (\u201eMein Kalender\u201c) or the\ngeneral space; there is at most one per space, and it cannot be archived. `name`\nis null for a default nobody renamed: the interface words it.",
         "properties": {
           "color": {
             "$ref": "#/components/schemas/CalendarColor"
@@ -2997,8 +2997,15 @@
             "type": "boolean"
           },
           "name": {
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           },
           "space_id": {
             "format": "uuid",

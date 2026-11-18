@@ -15,11 +15,12 @@ CalendarName = Annotated[
 
 class CalendarOut(BaseModel):
     """`is_default`: made by the system for a personal space („Mein Kalender“) or the
-    general space; there is at most one per space."""
+    general space; there is at most one per space, and it cannot be archived. `name`
+    is null for a default nobody renamed: the interface words it."""
 
     id: uuid.UUID
     space_id: uuid.UUID
-    name: str
+    name: str | None
     color: CalendarColor
     is_default: bool
     version: int

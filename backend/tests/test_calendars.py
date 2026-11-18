@@ -4,7 +4,7 @@ calendars of the spaces the person is in (or open spaces she reads), the same fo
 admins (C1): a foreign personal or team space's calendars an admin reaches only by
 naming the space, which is audited. A calendar one may not see answers like an unknown
 id. Defaults: „Mein Kalender“ in the personal space and one in „Allgemein“, made once
-on the first call."""
+on the first call, without a stored name (the interface words them)."""
 
 import asyncio
 from collections.abc import Iterator
@@ -152,7 +152,7 @@ async def test_an_admins_list_holds_no_calendar_of_a_space_they_are_not_in(
     member_client = await _client(make_client, member)
     foreign_team = await new_calendar(member_client, team.id, "Team")
     foreign_personal = [c for c in await listed(member_client) if c["is_default"]]
-    assert [c["name"] for c in foreign_personal] == ["Mein Kalender"]
+    assert [c["name"] for c in foreign_personal] == [None]  # „Mein Kalender“, worded by the UI
     open_ = await make_space("open", members=[(member, "moderator")])
     shared = await new_calendar(member_client, open_.id, "Offen")
     for role in (SystemRole.OWNER, SystemRole.ADMIN):
@@ -202,12 +202,14 @@ async def test_the_personal_and_the_general_default_calendars(
     found = await listed(client)
     own = await personal_space_of(session, member)
     assert sorted((c["space_id"], c["name"], c["is_default"]) for c in found) == sorted(
-        [(str(own.id), "Mein Kalender", True), (str(general.id), GENERAL_SPACE_NAME, True)]
+        [(str(own.id), None, True), (str(general.id), None, True)]
     )
     assert await listed(client, f"/api/spaces/{other_open.id}/calendars") == []
     assert len(await listed(client)) == 2  # made once
     guest_client = await _client(make_client, guest)
-    assert [c["name"] for c in await listed(guest_client)] == ["Mein Kalender"]
+    assert [(c["space_id"], c["name"]) for c in await listed(guest_client)] == [
+        (str((await personal_space_of(session, guest)).id), None)
+    ]
     r = await guest_client.get(f"/api/spaces/{general.id}/calendars")
     assert r.status_code == 404  # guests read open spaces only as members
 

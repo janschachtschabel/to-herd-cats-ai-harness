@@ -46,11 +46,14 @@ class Calendar(UuidPk, OrgScoped, Base):
     a team calendar, an open space's the organisation's. At most
     `MAX_CALENDARS_PER_SPACE` that are not archived per space (`service.create`, under
     the space's row lock); at most one default per space (`defaults.py`, the partial
-    unique index). An archived calendar is gone for everyone (404)."""
+    unique index). An archived calendar is gone for everyone (404); a default one is
+    never archived. A default calendar has no `name` until someone renames it: the
+    interface names it in the reader's language („Mein Kalender“, „Allgemein“)."""
 
     __tablename__ = "calendar"
     __table_args__ = (
         CheckConstraint(f"color IN ({_COLORS})", name="color"),
+        CheckConstraint("name IS NOT NULL OR is_default", name="name"),
         UniqueConstraint("id", "space_id"),  # what an event's calendar refers to
         Index("ix_calendar_space_id", "space_id"),
         Index(
@@ -64,7 +67,8 @@ class Calendar(UuidPk, OrgScoped, Base):
     space_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("space.id", ondelete="CASCADE"), nullable=False
     )
-    name: Mapped[str] = mapped_column(String(NAME_MAX), nullable=False)
+    # Null only for a default calendar nobody renamed (the interface words it).
+    name: Mapped[str | None] = mapped_column(String(NAME_MAX))
     color: Mapped[CalendarColor] = mapped_column(String(16), nullable=False)
     # Made by the system on the first call (`defaults.py`), never by a person.
     is_default: Mapped[bool] = mapped_column(

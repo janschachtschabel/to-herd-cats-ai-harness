@@ -80,14 +80,15 @@ class CalendarRepository:
         )
         return await self.session.scalar(stmt)
 
-    async def insert_default(self, space_id: uuid.UUID, name: str, color: CalendarColor) -> None:
-        """The space's default calendar unless it has one (the partial unique index)."""
+    async def insert_default(self, space_id: uuid.UUID, color: CalendarColor) -> None:
+        """The space's default calendar, without a name, unless it has one (the partial
+        unique index)."""
         await self.session.execute(
             insert(Calendar)
             .values(
                 org_id=self.org_id,
                 space_id=space_id,
-                name=name,
+                name=None,
                 color=color,
                 is_default=True,
                 version=1,

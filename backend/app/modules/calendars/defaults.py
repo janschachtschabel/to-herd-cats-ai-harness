@@ -1,6 +1,7 @@
-"""Default calendars (plan M10 decision 2): a personal space gets „Mein Kalender“, the
-general open space („Allgemein“) a calendar of its name, each on the first call that
-lists it, once (the space's row lock and the partial unique index on `is_default`).
+"""Default calendars (plan M10 decision 2): a personal space gets one („Mein Kalender“),
+the general open space („Allgemein“) one, each on the first call that lists it, once
+(the space's row lock and the partial unique index on `is_default`). They are stored
+without a name (the interface words them in the reader's language) until renamed.
 
 Only a person acting for herself makes them: a run (an actor with a read or write
 scope) writes nothing it was not asked to, and an admin who names another person's
@@ -19,7 +20,6 @@ from app.modules.calendars.repository import CalendarRepository
 from app.modules.spaces.models import Space, SpaceKind
 from app.modules.spaces.service import GENERAL_SPACE_NAME
 
-PERSONAL_DEFAULT_NAME = "Mein Kalender"
 DEFAULT_COLOR = CalendarColor.BLUE
 
 
@@ -39,8 +39,7 @@ async def ensure_default(session: AsyncSession, actor: Actor, space_id: uuid.UUI
     space = await repo.lock_space(space_id)
     if space is None:
         raise NotFound(code="space.not_found")
-    name = PERSONAL_DEFAULT_NAME if space.kind == SpaceKind.PERSONAL else space.name
-    await repo.insert_default(space_id, name, DEFAULT_COLOR)
+    await repo.insert_default(space_id, DEFAULT_COLOR)
     made = await repo.default_of(space_id)
     assert made is not None  # inserted now, or by a transaction that committed first
     return made

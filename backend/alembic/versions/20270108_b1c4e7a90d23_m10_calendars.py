@@ -1,6 +1,6 @@
 """m10 calendars (plan M10 task 1, decision 2): calendars per space (`calendar`, at
-most one default per space by a partial unique index; `(id, space_id)` unique for the
-events' foreign key) and the organisation's calendar switches (`calendar_setting`, the
+most one default per space by a partial unique index; a default has no name until
+renamed; `(id, space_id)` unique for the events' foreign key) and the organisation's calendar switches (`calendar_setting`, the
 sync switch behind the derived right `calendar.sync`; no row means off).
 
 Expand only: two new tables. The previous release (1.0.0) neither reads nor writes
@@ -39,7 +39,7 @@ def upgrade() -> None:
     op.create_table(
         "calendar",
         sa.Column("space_id", sa.UUID(), nullable=False),
-        sa.Column("name", sa.String(length=120), nullable=False),
+        sa.Column("name", sa.String(length=120), nullable=True),
         sa.Column("color", sa.String(length=16), nullable=False),
         sa.Column("is_default", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True),
@@ -50,6 +50,7 @@ def upgrade() -> None:
             "color IN ('blue', 'green', 'amber', 'red', 'violet', 'teal', 'pink', 'slate')",
             name=op.f("ck_calendar_color"),
         ),
+        sa.CheckConstraint("name IS NOT NULL OR is_default", name=op.f("ck_calendar_name")),
         sa.ForeignKeyConstraint(
             ["org_id"],
             ["organization.id"],

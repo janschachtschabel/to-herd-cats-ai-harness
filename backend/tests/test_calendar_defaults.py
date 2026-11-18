@@ -7,10 +7,11 @@ from typing import Any
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.spaces.service import GENERAL_SPACE_NAME
 from app.modules.users.models import User
 from tests.factories import MakeUser, login
 from tests.factories_calendar import listed, new_calendar
-from tests.factories_spaces import MakeSpace
+from tests.factories_spaces import MakeSpace, personal_space_of
 
 
 async def _client(make_client: Any, user: User) -> AsyncClient:
@@ -25,7 +26,7 @@ async def test_a_default_calendar_cannot_be_archived(
     """R1-I1: archiving „Mein Kalender“ or the general space's calendar answers 409
     `calendar.default_kept`; the calendar stays, at its version."""
     person = await make_user()
-    await make_space("open", "Allgemein", members=[(person, "moderator")])
+    await make_space("open", GENERAL_SPACE_NAME, members=[(person, "moderator")])
     client = await _client(make_client, person)
     defaults = await listed(client)
     assert len(defaults) == 2 and all(c["is_default"] for c in defaults)
@@ -38,3 +39,24 @@ async def test_a_default_calendar_cannot_be_archived(
     other = await new_calendar(client, team.id)
     r = await client.delete(f"/api/calendars/{other['id']}", params={"version": 1})
     assert r.status_code == 204  # other calendars are archived as before
+
+
+async def test_a_default_calendar_has_no_stored_name_until_renamed(
+    session: AsyncSession, make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """R1-M5: „Mein Kalender“ and „Allgemein“ are words of the interface (rule 11): the
+    API says `name: null` and `is_default`; a name someone gives is kept as given."""
+    person = await make_user()
+    general = await make_space("open", GENERAL_SPACE_NAME, members=[(person, "moderator")])
+    client = await _client(make_client, person)
+    own = await personal_space_of(session, person)
+    found = await listed(client)
+    assert sorted((c["space_id"], c["name"], c["is_default"]) for c in found) == sorted(
+        [(str(own.id), None, True), (str(general.id), None, True)]
+    )
+    mine = next(c for c in found if c["space_id"] == str(own.id))
+    url = f"/api/calendars/{mine['id']}"
+    r = await client.patch(url, json={"name": "Privat", "version": mine["version"]})
+    assert (r.status_code, r.json()["name"], r.json()["is_default"]) == (200, "Privat", True)
+    r = await client.patch(url, json={"name": None, "version": r.json()["version"]})
+    assert r.status_code == 422  # a name once given is not taken back to null

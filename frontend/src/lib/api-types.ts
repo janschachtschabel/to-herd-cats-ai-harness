@@ -5494,7 +5494,8 @@ export interface components {
         /**
          * CalendarOut
          * @description `is_default`: made by the system for a personal space („Mein Kalender“) or the
-         *     general space; there is at most one per space.
+         *     general space; there is at most one per space, and it cannot be archived. `name`
+         *     is null for a default nobody renamed: the interface words it.
          */
         CalendarOut: {
             color: components["schemas"]["CalendarColor"];
@@ -5506,7 +5507,7 @@ export interface components {
             /** Is Default */
             is_default: boolean;
             /** Name */
-            name: string;
+            name: string | null;
             /**
              * Space Id
              * Format: uuid

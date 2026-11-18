@@ -1,0 +1,8 @@
+{
+  "calendars": {
+    "default": {
+      "personal": "My calendar",
+      "general": "General"
+    }
+  }
+}
