@@ -165,8 +165,10 @@ gebauten Umgebung (nie als Argument oder in einer URL); seine Ausgaben werden ni
 protokolliert.
 
 `verify` meldet: `archive.checksum` (die Prüfsumme der Begleitdatei passt nicht),
-`archive.format_unknown`, `archive.member_missing`, `archive.member_checksum` (ein
-Mitglied weicht vom Manifest ab oder steht nicht darin), `archive.truncated`. Ohne
+`archive.format_unknown` (auch: ein Manifest über 64 MiB, das gar nicht erst gelesen
+wird), `archive.member_missing`, `archive.member_checksum` (ein Mitglied weicht vom
+Manifest ab, steht nicht darin oder ist „sparse“), `archive.truncated` (auch: ein
+Mitglied, dessen angegebene Größe nicht in die Datei passt). Ohne
 Begleitdatei (ein einzeln kopiertes Archiv) prüft es die Mitglieder gegen das innere
 Manifest.
 

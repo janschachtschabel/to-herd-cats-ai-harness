@@ -3,19 +3,23 @@ what it does not know; `verify_archive` finds a changed byte, a missing member a
 truncated tail; the key id names the secret key without giving it away."""
 
 import hashlib
+import io
 import json
 import os
 import stat
+import subprocess
 import tarfile
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr
 
 from app.core import secrets
 from app.core.config import get_settings
-from app.ops.archive import ArchiveWriter, read_sidecar, verify_archive
+from app.ops import archive
+from app.ops.archive import ArchiveWriter, read_sidecar, sidecar_of, verify_archive
 from app.ops.manifest import Manifest, ManifestInvalid
 
 DUMP = b"PGDMP" + bytes(range(256)) * 40
@@ -185,3 +189,77 @@ def test_key_id_is_stable_and_never_the_key(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(get_settings(), "secret_key", None)
     monkeypatch.setattr(get_settings(), "secret_key_previous", None)
     assert secrets.current_key_ids() == (None, None)
+
+
+def _with_member(path: Path, out: Path, name: str, data: bytes, *, size: int | None = None) -> None:
+    """A copy of the archive with `name` replaced by `data` (declared as `size`)."""
+    with tarfile.open(path) as tar, tarfile.open(out, "w", format=tarfile.PAX_FORMAT) as copy:
+        for info in tar.getmembers():
+            if info.name == name:
+                info.size = len(data)
+                copy.addfile(info, io.BytesIO(data))
+            else:
+                copy.addfile(info, tar.extractfile(info))
+    if size is not None:  # the header claims more than the data that follows
+        raw = bytearray(out.read_bytes())
+        with tarfile.open(out) as tar:
+            info = tar.getmember(name)
+        header = tarfile.TarInfo(name)
+        header.size = size
+        header.mode = info.mode
+        header.mtime = info.mtime
+        block = header.tobuf(tarfile.GNU_FORMAT, "utf-8", "surrogateescape")
+        raw[info.offset : info.offset + len(block)] = block
+        out.write_bytes(bytes(raw))
+
+
+async def test_verify_reads_the_manifest_only_up_to_a_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review M9b F10: an uploaded archive whose manifest member is huge is refused
+    without reading it into memory."""
+    path = await _archive(tmp_path)
+    sidecar_of(path).unlink()  # an upload: checked by its members alone
+    monkeypatch.setattr(archive, "MANIFEST_MAX_BYTES", 4096)
+    big = tmp_path / "big.tar"
+    _with_member(path, big, "herd/manifest.json", b"{" + b" " * 8000 + b"}")
+    reads: list[int] = []
+    real = archive._bounded
+
+    def counting(handle: Any, limit: int) -> bytes | None:
+        reads.append(limit)
+        return real(handle, limit)
+
+    monkeypatch.setattr(archive, "_bounded", counting)
+    assert verify_archive(big) == ["archive.format_unknown"]
+    assert reads and max(reads) <= 4096 + 1
+
+
+async def test_verify_does_not_hash_a_member_larger_than_the_file(tmp_path: Path) -> None:
+    """A header may declare any size; a member that cannot fit is cut off."""
+    path = await _archive(tmp_path)
+    sidecar_of(path).unlink()
+    claims = tmp_path / "claims.tar"
+    _with_member(path, claims, "herd/db.dump", DUMP, size=1 << 40)
+    assert "archive.truncated" in verify_archive(claims)
+
+
+def test_verify_does_not_read_through_a_sparse_member(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sparse member declares gigabytes it does not hold (10 KiB of archive for a
+    4 GiB dump): it is no plain file of ours, refused unread."""
+    (tmp_path / "herd").mkdir()
+    (tmp_path / "herd" / "FORMAT").write_bytes(b"1\n")
+    with (tmp_path / "herd" / "db.dump").open("wb") as dump:
+        dump.truncate(4 << 30)
+    sparse = tmp_path / "sparse.tar"
+    subprocess.run(  # noqa: S603 (a fixed tool, no shell)
+        ["/usr/bin/tar", "--format=pax", "-cSf", str(sparse), "herd/FORMAT", "herd/db.dump"],
+        cwd=tmp_path,
+        check=True,
+    )
+    hashed: list[str] = []
+    monkeypatch.setattr(archive, "_member_sha256", lambda tar, info: hashed.append(info.name))
+    assert verify_archive(sparse) == ["archive.member_missing"]
+    assert hashed == []

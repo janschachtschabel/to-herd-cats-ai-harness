@@ -10,8 +10,10 @@ an archive under its name is always whole.
 
 `verify_archive` reads an archive back and names its problems as codes, never its
 content: `archive.checksum` (the sidecar's `archive_sha256` does not match),
-`archive.format_unknown`, `archive.member_missing`, `archive.member_checksum` (a
-member differs from the manifest, or is not in it) and `archive.truncated`. Without a
+`archive.format_unknown` (also a manifest over MANIFEST_MAX_BYTES, never read whole),
+`archive.member_missing`, `archive.member_checksum` (a member differs from the
+manifest, is not in it, or is sparse) and `archive.truncated` (also a member whose
+declared size does not fit in the file). Without a
 sidecar (an archive uploaded on its own) the members are checked against the inner
 manifest alone.
 """
@@ -36,6 +38,10 @@ DUMP_MEMBER = "db.dump"
 FILES_PREFIX = "files/"
 SIDECAR_SUFFIX = ".manifest.json"
 CHUNK = 1024 * 1024
+# The manifest names every member with its checksum: about 150 bytes per file, so this
+# holds some 400,000 files; FORMAT is one line.
+MANIFEST_MAX_BYTES = 64 * 1024 * 1024
+FORMAT_MAX_BYTES = 16
 _BLOCK = tarfile.BLOCKSIZE
 _RECORD = tarfile.RECORDSIZE
 
@@ -196,20 +202,26 @@ def verify_archive(path: Path) -> list[str]:
 
 
 def _read_members(path: Path) -> tuple[dict[str, Member | None], dict[str, bytes], bool]:
-    """Every member's checksum (None for one that is not a plain file or comes twice),
-    the content of FORMAT and the manifest, and whether the archive ends early."""
+    """Every member's checksum (None for one that is not a plain file, is sparse or
+    comes twice), the content of FORMAT and the manifest (each read only up to its
+    bound; one over it is left out: review M9b F10), and whether the archive ends
+    early (also: a member whose declared size does not fit in the file)."""
     seen: dict[str, Member | None] = {}
     inner: dict[str, bytes] = {}
+    file_size = path.stat().st_size
     try:
         with tarfile.open(path, "r:") as tar:
             for info in tar:
                 name = info.name.removeprefix(PREFIX)
-                if not info.name.startswith(PREFIX) or not info.isreg() or name in seen:
+                bad = not info.isreg() or info.issparse() or name in seen
+                if not info.name.startswith(PREFIX) or bad:
                     seen[name] = None
                     continue
+                if info.offset_data + info.size > file_size:
+                    return seen, inner, True
                 if name in (FORMAT_MEMBER, MANIFEST_MEMBER):
-                    handle = tar.extractfile(info)
-                    inner[name] = handle.read() if handle is not None else b""
+                    limit = MANIFEST_MAX_BYTES if name == MANIFEST_MEMBER else FORMAT_MAX_BYTES
+                    inner[name] = _bounded(tar.extractfile(info), limit) or b""  # over: unknown
                     continue
                 seen[name] = _member_sha256(tar, info)
             end = tar.offset
@@ -219,6 +231,22 @@ def _read_members(path: Path) -> tuple[dict[str, Member | None], dict[str, bytes
         raw.seek(end)
         tail = raw.read(2 * _BLOCK)
     return seen, inner, tail != b"\0" * (2 * _BLOCK)
+
+
+def _bounded(handle: IO[bytes] | None, limit: int) -> bytes | None:
+    """The member's content, or None when it is longer than `limit`."""
+    if handle is None:
+        return b""
+    content = handle.read(limit + 1)
+    return content if len(content) <= limit else None
+
+
+def read_manifest_member(handle: IO[bytes] | None) -> Manifest:
+    """The inner manifest from its member, read only up to MANIFEST_MAX_BYTES."""
+    content = _bounded(handle, MANIFEST_MAX_BYTES)
+    if content is None:
+        raise ManifestInvalid("the manifest is too large")
+    return Manifest.from_json(content)
 
 
 def _member_sha256(tar: tarfile.TarFile, info: tarfile.TarInfo) -> Member:

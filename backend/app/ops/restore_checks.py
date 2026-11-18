@@ -38,6 +38,7 @@ from app.ops.archive import (
     MANIFEST_MEMBER,
     PREFIX,
     read_chunks,
+    read_manifest_member,
     verify_archive,
 )
 from app.ops.dump_toc import FOREIGN, list_dump
@@ -144,9 +145,7 @@ async def _dump_problems(archive: Path) -> list[str]:
 
 def inner_manifest(archive: Path) -> Manifest:
     with tarfile.open(archive, "r:") as tar:
-        handle = tar.extractfile(PREFIX + MANIFEST_MEMBER)
-        assert handle is not None  # verify_archive found it
-        return Manifest.from_json(handle.read())
+        return read_manifest_member(tar.extractfile(PREFIX + MANIFEST_MEMBER))
 
 
 def _check_keys(check: RestoreCheck, settings: Settings, manifest: Manifest) -> None:
