@@ -11,7 +11,7 @@ from dateutil.rrule import rrulestr
 
 from app.modules.calendars import recurrence, zones
 from app.modules.calendars.recurrence import Series
-from app.modules.calendars.recurrence_jump import Counter, jump
+from app.modules.calendars.recurrence_jump import Counter, jump, week_start
 from app.modules.calendars.recurrence_rule import parse_rule
 
 RULES = 400
@@ -108,15 +108,19 @@ def _plain(
         until_text = next(p for p in parts if p.startswith("UNTIL="))[6:]
         until = datetime.strptime(until_text, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
         text = ";".join(p for p in parts if not p.startswith("UNTIL="))
-    rule = rrulestr(text, dtstart=series.start)
-    rule_count = parse_rule(series.rrule).count
+    parsed = parse_rule(series.rrule)
+    dtstart = series.start
+    if parsed.freq == "WEEKLY" and parsed.bysetpos:  # BYSETPOS counts in the whole week
+        dtstart = datetime.combine(week_start(dtstart.date(), parsed.wkst), dtstart.time())
+    rule = rrulestr(text, dtstart=dtstart)
+    rule_count = parsed.count
     tzid = series.tzid or "UTC"
     stop = zones.wall(window_to, tzid) + timedelta(days=2)
     walls: list[datetime] = [series.start]
     for wall in rule:
         if wall > stop:
             break
-        if wall != series.start:
+        if wall > series.start:
             walls.append(wall)
     if rule_count is not None:
         walls = list(islice(walls, rule_count))

@@ -28,7 +28,7 @@ from typing import Any
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, weekday
 
 from app.modules.calendars import zones
-from app.modules.calendars.recurrence_jump import Counter, jump
+from app.modules.calendars.recurrence_jump import Counter, jump, week_start
 from app.modules.calendars.recurrence_rule import (
     FIRST_YEAR,
     LAST_YEAR,
@@ -172,11 +172,19 @@ def _matches(
     """The rule's matches from `begin` on, in order, until one lies past `stop`."""
     if begin > HORIZON:
         return
+    first = begin
+    if rule.freq is Freq.WEEKLY and rule.bysetpos:
+        # `dateutil` builds a weekly period's set from DTSTART's day on, so BYSETPOS
+        # would count in a cut first week; run it from the week's start (WKST) and drop
+        # what lies before `begin` (RFC 5545 3.3.10: the whole set, then >= DTSTART).
+        first = datetime.combine(week_start(begin.date(), rule.wkst), begin.time())
     until = _ahead(min(stop, HORIZON))
-    run = rrule(dtstart=_ahead(begin), until=until, cache=False, **_kwargs(rule, start))
+    run = rrule(dtstart=_ahead(first), until=until, cache=False, **_kwargs(rule, start))
     for found in run:
         counter.candidates += 1
-        yield found.replace(year=found.year - _AHEAD_YEARS)
+        wall = found.replace(year=found.year - _AHEAD_YEARS)
+        if wall >= begin:
+            yield wall
 
 
 def _last_instant(series: Series, rule: ParsedRule) -> datetime | None:

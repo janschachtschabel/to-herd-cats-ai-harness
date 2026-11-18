@@ -26,7 +26,7 @@ class Counter:
     jumps: int = 0
 
 
-def _week_start(day: date, wkst: int) -> date:
+def week_start(day: date, wkst: int) -> date:
     return day - timedelta(days=(day.weekday() - wkst) % 7)
 
 
@@ -45,8 +45,8 @@ def jump(rule: ParsedRule, start: datetime, window_from: datetime) -> datetime:
         periods = (window_from.date() - start.date()).days // step
         begin = start.date() + timedelta(days=periods * step)
     elif rule.freq is Freq.WEEKLY:
-        first = _week_start(start.date(), rule.wkst)
-        weeks = (_week_start(window_from.date(), rule.wkst) - first).days // 7
+        first = week_start(start.date(), rule.wkst)
+        weeks = (week_start(window_from.date(), rule.wkst) - first).days // 7
         begin = first + timedelta(weeks=weeks // step * step)
     elif rule.freq is Freq.MONTHLY:
         months = (window_from.year - start.year) * 12 + window_from.month - start.month
