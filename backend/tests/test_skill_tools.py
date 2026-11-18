@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 
 from app.modules.agents.approvals.models import Approval
 from app.modules.agents.models import Agent
-from app.modules.agents.run_models import RunEvent, StopReason
+from app.modules.agents.run_models import Run, RunEvent, StopReason
 from app.modules.agents.toolbox import skill_tools
 from app.modules.agents.toolbox.base import NOT_FOUND
 from app.modules.agents.toolbox.catalog import CATALOG
@@ -42,7 +42,10 @@ def _prompts(lab: Lab) -> list[str]:
 
 async def _tool_events(lab: Lab) -> list[dict[str, Any]]:
     rows = await lab.bench.session.scalars(
-        select(RunEvent).where(RunEvent.kind == "tool_call").order_by(RunEvent.seq)
+        select(RunEvent)
+        .where(RunEvent.kind == "tool_call")
+        .join(Run, Run.id == RunEvent.run_id)
+        .order_by(Run.created_at, RunEvent.attempt, RunEvent.seq)
     )
     return [e.content for e in rows]
 

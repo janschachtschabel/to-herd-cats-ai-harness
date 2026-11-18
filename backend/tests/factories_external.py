@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core import egress
-from app.modules.agents.run_models import EventKind, RunEvent
+from app.modules.agents.run_models import EventKind, Run, RunEvent
 from tests.factories_agents import Bench
 from tests.factories_mcp import (
     SERVERS,
@@ -87,7 +87,10 @@ class Ext:
 
     async def tool_events(self) -> list[dict[str, Any]]:
         rows = await self.bench.session.scalars(
-            select(RunEvent).where(RunEvent.kind == EventKind.TOOL_CALL).order_by(RunEvent.seq)
+            select(RunEvent)
+            .where(RunEvent.kind == EventKind.TOOL_CALL)
+            .join(Run, Run.id == RunEvent.run_id)
+            .order_by(Run.created_at, RunEvent.attempt, RunEvent.seq)
         )
         return [dict(e.content) for e in rows]
 
