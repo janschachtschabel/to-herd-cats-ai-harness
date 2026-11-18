@@ -221,7 +221,9 @@ Archiv (404 `backup.not_found`), und der Menüpunkt fehlt.
   die Anfrage angenommen hat, und höchstens einmal (kein gespeicherter Auftrag, der aus
   einem Archiv wiederkäme); eines zugleich (409 `backup.restore_running`, oder
   `restore.already_running`, wenn die Kommandozeile oder eine Migration die Sperre hält),
-  nicht während einer Sicherung (409 `backup.already_running`). Scheitert es vor dem
+  nicht während einer Sicherung (409 `backup.already_running`). Zwei Anfragen zugleich
+  („Jetzt sichern“ oder „Einspielen“, etwa aus zwei Tabs) starten nur eine; die andere
+  bekommt 409 `backup.busy` (oder einen der Codes oben). Scheitert es vor dem
   Wartungsmodus (etwa das Sicherheitsarchiv), bleibt alles, wie es war; die Seite nennt
   den Grund (Audit `backup.restore_failed` mit `via=admin`).
 - **Einzelne Bereiche**: ein Hinweis auf den

@@ -147,6 +147,7 @@
   "errors": {
     "backup": {
       "already_running": "Eine Sicherung läuft schon oder wartet auf den Worker.",
+      "busy": "Eine andere Anfrage zur Sicherung wird gerade bearbeitet. Gleich noch einmal versuchen.",
       "restore_running": "Ein Einspielen läuft schon.",
       "confirm_mismatch": "Der Name stimmt nicht mit dem Namen der Organisation überein.",
       "replace_refused": "Die Prüfung meldet Probleme: Einspielen ist gesperrt.",

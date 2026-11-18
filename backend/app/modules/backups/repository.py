@@ -25,6 +25,10 @@ from app.modules.users.models import User
 # takes it knows no backup is running, so every `running` row is one whose process died.
 BACKUP_LOCK = "herd.backup"
 _KEY = func.hashtextextended(BACKUP_LOCK, 0)
+# An owner's "Jetzt sichern" and "Einspielen" take this lock for their first
+# transaction (try, never wait): the look "is one running?" and the write after it are
+# one step across every API process (review M9b F2, F3).
+ADMIN_CLAIM = "herd.backup.admin"
 # The error code of an `interrupted` run: its process died (counts as a failure), or it
 # was the restored archive's own run, running in its snapshot (it made the archive).
 INTERRUPTED = "backup.interrupted"
@@ -192,6 +196,12 @@ class BackupRunRepository:
         if not await self.session.scalar(select(func.pg_try_advisory_xact_lock(_KEY))):
             return 0
         return await self.interrupt_running(at, spare_requests_since=at - REQUEST_GRACE)
+
+    async def claim_admin(self) -> bool:
+        """The administration's claim for this transaction; False while another
+        request holds it."""
+        claim = func.pg_try_advisory_xact_lock(func.hashtextextended(ADMIN_CLAIM, 0))
+        return bool(await self.session.scalar(select(claim)))
 
     async def any_running(self, org_id: uuid.UUID) -> bool:
         """A backup runs, or an administrator's request waits."""

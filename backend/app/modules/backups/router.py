@@ -48,7 +48,8 @@ async def list_backups(
 @router.post("", response_model=BackupRunOut, status_code=status.HTTP_202_ACCEPTED)
 async def start_backup(actor: ActorDep, session: SessionDep, settings: SettingsDep) -> BackupRunOut:
     """Back up now: a worker makes the backup; `backup.changed` tells its progress.
-    409 `backup.already_running` while one runs or waits."""
+    409 `backup.already_running` while one runs or waits, `backup.busy` while another
+    request is being handled."""
     return BackupRunOut.of(await BackupAdmin(session, settings).request(actor))
 
 
@@ -124,6 +125,7 @@ async def replace_installation(
 ) -> ReplaceOut:
     """Replace the whole installation with the archive (a safety archive first, then
     maintenance, then everyone signed out). 422 `backup.confirm_mismatch`, 409
-    `backup.already_running`, `backup.restore_running`, `backup.replace_refused`."""
+    `backup.already_running`, `backup.busy`, `backup.restore_running`,
+    `backup.replace_refused`."""
     archive = await BackupAdmin(session, settings).replace(actor, name, body.confirm)
     return ReplaceOut(archive_name=archive.name)

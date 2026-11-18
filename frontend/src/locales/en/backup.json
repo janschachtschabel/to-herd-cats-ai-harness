@@ -147,6 +147,7 @@
   "errors": {
     "backup": {
       "already_running": "A backup is running or waiting for the worker.",
+      "busy": "Another backup request is being handled. Try again in a moment.",
       "restore_running": "A restore is running already.",
       "confirm_mismatch": "The name does not match the organisation's name.",
       "replace_refused": "The check reports problems: restoring is blocked.",

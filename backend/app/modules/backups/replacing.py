@@ -5,8 +5,9 @@ that took the confirmed request, once that request's transaction (its audit entr
 
 It runs in that process, not as a queued job: a request written down for later could
 travel in a backup and be run again by a restored archive; this one exists only while
-it runs, at most once. One at a time per process; across processes the schema lock
-decides (`restore.already_running`). While it runs the whole installation goes into
+it runs, at most once. One at a time per process (the runner's claim, taken before the
+request's check: `backup.busy`, then `backup.restore_running`); across processes the
+schema lock decides (`restore.already_running`). While it runs the whole installation goes into
 maintenance (this process's API too), everyone is signed out at the end. When the
 process stops, the replace is cancelled: before the swap committed that leaves the old
 state whole (`replace._replace`); after it, maintenance stays on
@@ -40,25 +41,54 @@ VIA = "admin"
 Replace = Callable[..., Awaitable[object]]
 
 
+class ReplaceBusy(Exception):  # noqa: N818 (a verdict)
+    """The runner is taken: `backup.busy` (another request is being checked) or
+    `backup.restore_running` (a replace runs)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 class ReplaceRunner:
+    """At most one replace per process, from the claim on: `claim` looks and takes in
+    one synchronous step (no other request runs between them), the claim spans the
+    request's check of the archive, and `Claim.start` turns it into the running task.
+    Every task started is kept, so `busy` and `stop` see each (review M9b F3)."""
+
     def __init__(self, run: Replace | None = None) -> None:
         self._run = run
-        self._task: asyncio.Task[None] | None = None
+        self._claimed = False
+        self._tasks: set[asyncio.Task[None]] = set()
 
     @property
     def busy(self) -> bool:
-        return self._task is not None and not self._task.done()
+        return self._claimed or self._running()
 
-    def start(self, settings: Settings, archive: Path, confirm: str, clock: Clock) -> None:
-        self._task = asyncio.create_task(self._replace(settings, archive, confirm, clock))
+    def claim(self) -> "Claim":
+        if self._claimed:
+            raise ReplaceBusy("backup.busy")
+        if self._running():
+            raise ReplaceBusy("backup.restore_running")
+        self._claimed = True
+        return Claim(self)
 
     async def stop(self) -> None:
-        """Cancel a replace under way (the process stops) and wait for it to end."""
-        task, self._task = self._task, None
-        if task is not None and not task.done():
+        """Cancel every replace under way (the process stops) and wait for each."""
+        tasks = [task for task in self._tasks if not task.done()]
+        for task in tasks:
             task.cancel()
+        for task in tasks:
             with suppress(asyncio.CancelledError):
                 await task
+
+    def _running(self) -> bool:
+        return any(not task.done() for task in self._tasks)
+
+    def _launch(self, settings: Settings, archive: Path, confirm: str, clock: Clock) -> None:
+        task = asyncio.create_task(self._replace(settings, archive, confirm, clock))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _replace(self, settings: Settings, archive: Path, confirm: str, clock: Clock) -> None:
         run = self._run or replace.replace_running
@@ -84,6 +114,29 @@ class ReplaceRunner:
             await _record_failure(archive.name, ["restore.failed"])
         else:
             logger.info("backup.replaced", extra={"archive": archive.name})
+
+
+class Claim:
+    """A runner taken by one request: `start` it, or `release` it if the request ends
+    without a replace. Either happens once."""
+
+    def __init__(self, runner: ReplaceRunner) -> None:
+        self._runner: ReplaceRunner | None = runner
+
+    def start(self, settings: Settings, archive: Path, confirm: str, clock: Clock) -> None:
+        runner = self._take()
+        runner._launch(settings, archive, confirm, clock)  # noqa: SLF001 (its own claim)
+
+    def release(self) -> None:
+        if self._runner is not None:
+            self._take()
+
+    def _take(self) -> ReplaceRunner:
+        runner, self._runner = self._runner, None
+        if runner is None:
+            raise RuntimeError("claim used twice")
+        runner._claimed = False  # noqa: SLF001 (its own claim)
+        return runner
 
 
 async def _record_failure(archive: str, codes: list[str]) -> None:

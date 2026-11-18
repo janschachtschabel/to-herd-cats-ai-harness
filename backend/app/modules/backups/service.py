@@ -6,12 +6,16 @@ audited with the person as actor, names and figures only.
 - `runs`: the `backup_run` rows, newest first, paginated.
 - `request`: "Jetzt sichern": a `running` row with trigger `admin` that a worker takes
   up (`jobs.py`); refused while a backup runs or waits (409 `backup.already_running`).
+  "Jetzt sichern" and "Einspielen" take one claim for their first transaction (409
+  `backup.busy` while another request holds it), so two at once start one.
 - `archives`, `download`, `upload`: the archives in HERD_BACKUP_DIR (`archives.py`).
 - `check`: an archive against the installation (`checking.py`).
 - `replace`: the organisation's exact name (422 `backup.confirm_mismatch`), no backup
-  running, no replace under way in this process (409 `backup.restore_running`), and a
-  clean check (409 `backup.replace_refused` with the problems); then, after the commit,
-  the replace in this process (`replacing.py`).
+  running, no replace under way or being started in this process (409
+  `backup.restore_running`, or `backup.busy` while another request checks; the
+  runner's claim spans the check), and a clean check (409 `backup.replace_refused`
+  with the problems); then, after the commit, the replace in this process
+  (`replacing.py`).
 - `last_restore`: the newest attempt from the audit log.
 
 A transfer (upload, check) ends the request's transaction first: no database
@@ -26,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import Actor
 from app.core.clock import SYSTEM_CLOCK, Clock
 from app.core.config import Settings
-from app.core.db import after_commit
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.pagination import (
     Page,
@@ -43,7 +46,7 @@ from app.modules.backups.checking import CheckReport, check_archive
 from app.modules.backups.guard import require_backup_manage
 from app.modules.backups.live import tell_managers
 from app.modules.backups.models import BackupRun, BackupTrigger
-from app.modules.backups.replacing import replace_runner
+from app.modules.backups.replacing import ReplaceBusy, replace_runner
 from app.modules.backups.repository import BackupRunRepository
 from app.modules.backups.schemas import RestoreAttemptOut
 
@@ -71,6 +74,7 @@ class BackupAdmin:
 
     async def request(self, actor: Actor) -> BackupRun:
         await require_backup_manage(self.session, actor)
+        await self._claim()
         if await self.runs_repo.any_running(actor.org_id):
             raise Conflict(code="backup.already_running")
         run = await self.runs_repo.start(actor.org_id, BackupTrigger.ADMIN, CLOCK.now())
@@ -126,22 +130,25 @@ class BackupAdmin:
             raise ValidationFailed(
                 "The organisation's name does not match", code="backup.confirm_mismatch"
             )
+        await self._claim()
         if await self.runs_repo.any_running(actor.org_id):
             raise Conflict(code="backup.already_running")
-        runner = replace_runner()
-        if runner.busy:
-            raise Conflict(code="backup.restore_running")
-        await self.session.commit()
-        report = await check_archive(self.session, self.settings, archive.path)
-        if report.problems:
-            raise Conflict(code="backup.replace_refused", details={"problems": report.problems})
-        await self._audit(actor, REQUESTED, archive)
-        await tell_managers(self.session, actor.org_id, None)
-
-        async def start(_session: AsyncSession) -> None:
-            runner.start(self.settings, archive.path, confirm, CLOCK)
-
-        after_commit(self.session, start)
+        try:  # no await between the look and the claim: one step in this process
+            claim = replace_runner().claim()
+        except ReplaceBusy as busy:
+            raise Conflict(code=busy.code) from None
+        try:
+            await self.session.commit()
+            report = await check_archive(self.session, self.settings, archive.path)
+            if report.problems:
+                raise Conflict(code="backup.replace_refused", details={"problems": report.problems})
+            await self._audit(actor, REQUESTED, archive)
+            await tell_managers(self.session, actor.org_id, None)
+            await self.session.commit()  # the request is audited before the replace runs
+        except BaseException:
+            claim.release()
+            raise
+        claim.start(self.settings, archive.path, confirm, CLOCK)
         return archive
 
     async def last_restore(self, actor: Actor) -> RestoreAttemptOut | None:
@@ -156,6 +163,10 @@ class BackupAdmin:
             archive_name=details.get("archive"),
             code=details.get("code"),
         )
+
+    async def _claim(self) -> None:
+        if not await self.runs_repo.claim_admin():
+            raise Conflict(code="backup.busy")
 
     async def _archive(self, actor: Actor, name: str) -> ArchiveFile:
         await require_backup_manage(self.session, actor)

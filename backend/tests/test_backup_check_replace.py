@@ -100,8 +100,7 @@ class FakeReplace:
 
 
 async def _settled() -> None:
-    task = replace_runner()._task
-    if task is not None:
+    for task in list(replace_runner()._tasks):
         await asyncio.wait_for(task, timeout=10)
 
 
