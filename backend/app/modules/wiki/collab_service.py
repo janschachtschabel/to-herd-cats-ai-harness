@@ -129,9 +129,7 @@ class CollabService:
         page = await page_by_id(self.session, page_id)
         if page is None:
             raise page_not_found()
-        return await collab_instances.route(
-            self.session, org_id=page.org_id, page_id=page.id, now=utcnow()
-        )
+        return await collab_instances.route(self.session, org_id=page.org_id, page_id=page.id)
 
     async def join(
         self, grant: str, page_id: uuid.UUID, generation: int, instance_id: uuid.UUID | None = None
@@ -276,7 +274,7 @@ class CollabService:
 
     async def _fence(self, page: Page, owner: Owner, *, lock: bool = False) -> int | None:
         """409 `collab.not_owner` unless the calling instance owns the page."""
-        return await collab_instances.fence(self.session, page, owner, now=utcnow(), lock=lock)
+        return await collab_instances.fence(self.session, page, owner, lock=lock)
 
     async def _editable(self, actor: Actor, page_id: uuid.UUID) -> Page:
         page = await self.reader.readable(actor, page_id)

@@ -13,7 +13,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.core.errors import ValidationFailed
-from app.core.models_base import utcnow
 from app.modules.auth.deps import SessionDep
 from app.modules.maintenance.cache import in_maintenance
 from app.modules.maintenance.middleware import refuse_in_maintenance
@@ -45,7 +44,7 @@ CLOSED_IN_MAINTENANCE = [Depends(refuse_in_maintenance)]
 async def announce(body: InstanceIn, session: SessionDep) -> Response:
     """A collab instance's heartbeat (every 5 s): it is alive, here, maybe draining."""
     await collab_instances.announce(
-        session, instance_id=body.id, url=body.url, draining=body.draining, now=utcnow()
+        session, instance_id=body.id, url=body.url, draining=body.draining
     )
     return Response(status_code=204)
 

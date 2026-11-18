@@ -273,16 +273,15 @@ async def test_two_relays_binding_one_page_at_once_agree(real_db: RealDb) -> Non
                 instance_id=instance,
                 url=f"ws://{instance.int}",
                 draining=False,
-                now=utcnow(),
             )
         page = await _real_page(session, real_db)
         await session.commit()
     async with db.session_factory() as first, db.session_factory() as second:
-        won = await collab_instances.route(first, org_id=page.org_id, page_id=page.id, now=utcnow())
+        won = await collab_instances.route(first, org_id=page.org_id, page_id=page.id)
         # The second relay does not see the first's binding yet and tries to bind the
         # page itself: it waits on the row.
         other = asyncio.create_task(
-            collab_instances.route(second, org_id=page.org_id, page_id=page.id, now=utcnow())
+            collab_instances.route(second, org_id=page.org_id, page_id=page.id)
         )
         await asyncio.sleep(0.3)
         assert not other.done()
@@ -290,3 +289,16 @@ async def test_two_relays_binding_one_page_at_once_agree(real_db: RealDb) -> Non
         taken = await asyncio.wait_for(other, timeout=5)
         await second.commit()
     assert (taken.instance_id, taken.epoch) == (won.instance_id, won.epoch) == (X, 1)
+
+
+async def test_liveness_follows_the_database_clock_not_a_nodes(
+    wiki: Wiki, collab: AsyncClient, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review M9b F11: the API node that takes a heartbeat runs 20 s behind the one
+    that routes; the instance is alive all the same (both ask the database)."""
+    behind = utcnow() - timedelta(seconds=20)
+    monkeypatch.setattr("app.modules.wiki.collab_router.utcnow", lambda: behind, raising=False)
+    assert (await announce(collab, X)).status_code == 204
+    monkeypatch.undo()
+    page = await new_page(wiki.editor, wiki.space_id, "Uhr")
+    assert (await route(session, page)).instance_id == X

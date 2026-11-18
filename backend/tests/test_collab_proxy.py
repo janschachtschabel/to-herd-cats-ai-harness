@@ -65,9 +65,7 @@ async def _stand_in(real_db: RealDb, instance: UUID) -> AsyncIterator[Upstream]:
 
 async def _announce(real_db: RealDb, instance: UUID, url: str) -> None:
     async with real_db.database.session_factory() as session:
-        await collab_instances.announce(
-            session, instance_id=instance, url=url, draining=False, now=utcnow()
-        )
+        await collab_instances.announce(session, instance_id=instance, url=url, draining=False)
         await session.commit()
 
 

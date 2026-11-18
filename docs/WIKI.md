@@ -495,7 +495,8 @@ genau eine Instanz gebunden** (Plan M9, Entscheidung 17; ohne Redis):
   ohne sie startet der Prozess nicht). In Rolle `all` setzt die App selbst
   `ws://127.0.0.1:<HERD_COLLAB_PORT>` (eine Instanz, der Kindprozess); das Chart nimmt
   die Pod-IP (`ws://$(HERD_COLLAB_POD_IP):1234`, Downward-API); in Compose der Name des
-  Containers. Eine Instanz, die 15 s schweigt, gilt als weg; nach einer Stunde Schweigen
+  Containers. Eine Instanz, die 15 s schweigt, gilt als weg (gemessen an der Uhr des
+  Datenbankservers, so dass API-Knoten mit abweichender Uhr sich einig sind); nach einer Stunde Schweigen
   räumt die Fälligkeits-Schleife ihre Zeile auf (`collab_instance`).
 - **Binden:** Das Relay der API schickt jede Verbindung einer Seite an ihre Besitzerin
   (`collab_page_owner`). Hat die Seite keine gültige Besitzerin (Bindung abgelaufen oder

@@ -40,6 +40,13 @@ def _live(alive_since: datetime) -> ColumnElement[bool]:
     return and_(owner.is_not(None), owner.in_(beating))
 
 
+async def database_now(session: AsyncSession) -> datetime:
+    """The database server's clock: one for every API node (review M9b F11)."""
+    now: datetime | None = await session.scalar(select(func.clock_timestamp()))
+    assert now is not None  # clock_timestamp() is never NULL
+    return now
+
+
 class CollabInstanceRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
