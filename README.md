@@ -517,6 +517,11 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
+- **TLS zur Datenbank (seit M9b):** `HERD_DATABASE_SSLMODE` (libpq-Modi; empfohlen für
+  eine externe Datenbank `verify-full`) und `HERD_DATABASE_SSLROOTCERT` (CA-Datei; leer:
+  die CAs des Systems) gelten für jede Verbindung der App und für
+  `pg_dump`/`pg_restore` der Sicherung; sie gewinnen über ein `ssl`/`sslmode` in der
+  URL. Chart `database.sslMode` und `database.caSecret` (Secret mit `ca.crt`).
 - **Geheimnisse als Dateien:** Ebenso lesen `HERD_SECRET_KEY_FILE`,
   `HERD_INTERNAL_TOKEN_FILE`, `HERD_BOOTSTRAP_ADMIN_PASSWORD_FILE` und
   `HERD_S3_SECRET_ACCESS_KEY_FILE` den Wert aus einer Datei (ein Zeilenende am Schluss

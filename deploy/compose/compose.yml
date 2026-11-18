@@ -58,10 +58,17 @@ services:
       # The password is kept out of the URL; the app merges it in (escaped).
       HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
       HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # TLS to an external database: libpq's sslmode (verify-full recommended) and the
+      # CA file to check its certificate against (mount it). Empty: the URL's own
+      # setting; the bundled db speaks no TLS (same host, no network in between).
+      HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+      HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
       HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
       # Shared by the API and the collab process (live editing); at least 32 characters.
       HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+      # During a rotation of the token: the old one, still accepted (docs/WIKI.md).
+      HERD_INTERNAL_TOKEN_PREVIOUS: ${HERD_INTERNAL_TOKEN_PREVIOUS:-}
       # The address browsers use, e.g. https://wiki.example; WebSocket Origins must
       # match it. Empty: they must match the host the request came to.
       HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
@@ -150,6 +157,8 @@ services:
       <<: *storage
       HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
       HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+      HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
       HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
       HERD_BACKUP_KEEP_DAILY: ${HERD_BACKUP_KEEP_DAILY:-7}
       HERD_BACKUP_KEEP_WEEKLY: ${HERD_BACKUP_KEEP_WEEKLY:-4}

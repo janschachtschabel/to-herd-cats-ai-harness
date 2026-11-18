@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
 from app.core.config_auth import AuthSettings
+from app.core.config_database import DatabaseSettings
 from app.core.config_files import SecretFileSettings, read_secret_file
 from app.core.config_ops import OpsSettings
 from app.core.config_security import SecuritySettings
@@ -22,7 +23,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -
 
 
 class Settings(
-    SecretFileSettings, OpsSettings, AuthSettings, SecuritySettings, StorageSettings, BaseSettings
+    SecretFileSettings,
+    DatabaseSettings,
+    OpsSettings,
+    AuthSettings,
+    SecuritySettings,
+    StorageSettings,
+    BaseSettings,
 ):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
     model_config = SettingsConfigDict(
@@ -48,6 +55,10 @@ class Settings(
     # It, HERD_SECRET_KEY and HERD_BOOTSTRAP_ADMIN_PASSWORD may come from a file instead
     # (HERD_<NAME>_FILE, `config_files.py`).
     internal_token: SecretStr | None = None
+    # While the token is being rotated: the one before it, still taken by the API (the
+    # collab process sends only HERD_INTERNAL_TOKEN); remove it once every collab
+    # process runs with the new one (docs/WIKI.md, plan M9 task 18, J12 c).
+    internal_token_previous: SecretStr | None = None
     # The address browsers use (scheme://host[:port]); WebSocket Origins must match it.
     # Unset, an Origin must match the host the request came to.
     public_url: str | None = None
@@ -161,13 +172,16 @@ class Settings(
 
     @model_validator(mode="after")
     def _internal_token_is_long_enough(self) -> Self:
-        if self.internal_token is not None:
-            length = len(self.internal_token.get_secret_value())
+        for field in ("internal_token", "internal_token_previous"):
+            token: SecretStr | None = getattr(self, field)
+            if token is None:
+                continue
+            length = len(token.get_secret_value())
             if length == 0:
-                self.internal_token = None
+                setattr(self, field, None)
             elif length < INTERNAL_TOKEN_MIN_LENGTH:
                 raise ValueError(
-                    f"HERD_INTERNAL_TOKEN must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
+                    f"HERD_{field.upper()} must be at least {INTERNAL_TOKEN_MIN_LENGTH} characters"
                 )
         return self
 

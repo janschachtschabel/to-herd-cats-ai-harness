@@ -11,7 +11,13 @@ from app.core.config_files import FILE_SECRETS
 
 KEY = "k" * 40
 TOKEN = "t" * 40
-ALL = ["secret_key", "internal_token", "bootstrap_admin_password", "s3_secret_access_key"]
+ALL = [
+    "secret_key",
+    "internal_token",
+    "internal_token_previous",
+    "bootstrap_admin_password",
+    "s3_secret_access_key",
+]
 
 
 def _file(tmp_path: Path, name: str, content: str) -> Path:
@@ -25,6 +31,7 @@ def _file(tmp_path: Path, name: str, content: str) -> Path:
     [
         ("secret_key", KEY),
         ("internal_token", TOKEN),
+        ("internal_token_previous", TOKEN),
         ("bootstrap_admin_password", "Zq8!vR2#mLp4"),
         ("s3_secret_access_key", "s3-secret-from-a-file"),
     ],
@@ -58,7 +65,9 @@ def test_an_unreadable_file_is_refused_by_name(
         Settings()
 
 
-@pytest.mark.parametrize("field", ["secret_key", "internal_token", "s3_secret_access_key"])
+@pytest.mark.parametrize(
+    "field", ["secret_key", "internal_token", "internal_token_previous", "s3_secret_access_key"]
+)
 def test_an_empty_file_is_refused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, field: str
 ) -> None:

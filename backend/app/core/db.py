@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
+from app.core.db_tls import connect_args
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,16 @@ AfterCommit = Callable[[AsyncSession], Awaitable[None]]
 _AFTER_COMMIT = "herd.after_commit"
 
 
-def make_engine(url: str | URL | None = None, **kwargs: Any) -> AsyncEngine:
+def make_engine(
+    url: str | URL | None = None, *, settings: Settings | None = None, **kwargs: Any
+) -> AsyncEngine:
     """hide_parameters: a failing statement's error carries no bound values (request
-    data, password hashes, token hashes), so nothing that logs it can leak them."""
+    data, password hashes, token hashes), so nothing that logs it can leak them. TLS as
+    configured (HERD_DATABASE_SSLMODE, `db_tls.py`); without `url`, `settings`' URL."""
+    settings = settings or get_settings()
+    kwargs.setdefault("connect_args", connect_args(settings))
     return create_async_engine(
-        url or get_settings().database(), pool_pre_ping=True, hide_parameters=True, **kwargs
+        url or settings.database(), pool_pre_ping=True, hide_parameters=True, **kwargs
     )
 
 

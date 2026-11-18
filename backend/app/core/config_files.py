@@ -21,6 +21,7 @@ from pydantic_settings import BaseSettings
 FILE_SECRETS: dict[str, bool] = {
     "secret_key": False,
     "internal_token": False,
+    "internal_token_previous": False,
     "bootstrap_admin_password": True,
     "s3_secret_access_key": False,
 }
@@ -43,6 +44,7 @@ def read_secret_file(path: Path, variable: str, *, empty_ok: bool = False) -> st
 class SecretFileSettings(BaseSettings):
     secret_key_file: Path | None = None
     internal_token_file: Path | None = None
+    internal_token_previous_file: Path | None = None
     bootstrap_admin_password_file: Path | None = None
     s3_secret_access_key_file: Path | None = None
 

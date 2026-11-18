@@ -33,6 +33,9 @@ x-database: &database
   # The password is kept out of the URL; the app merges it in (escaped).
   HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
   HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  # TLS to an external database (libpq's sslmode, CA file); empty: the URL's own.
+  HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
+  HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
   HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
 
 # Where attachments live (see compose.yml): the API nodes and the worker.
@@ -51,6 +54,8 @@ x-api-env: &api-env
   HERD_BOOTSTRAP_ADMIN_EMAIL: ${HERD_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
   HERD_BOOTSTRAP_ADMIN_PASSWORD: ${HERD_BOOTSTRAP_ADMIN_PASSWORD:?set HERD_BOOTSTRAP_ADMIN_PASSWORD in .env}
   HERD_INTERNAL_TOKEN: ${HERD_INTERNAL_TOKEN:?set HERD_INTERNAL_TOKEN in .env}
+  # During a rotation: the old token, still accepted by the API (docs/WIKI.md).
+  HERD_INTERNAL_TOKEN_PREVIOUS: ${HERD_INTERNAL_TOKEN_PREVIOUS:-}
   HERD_PUBLIC_URL: ${HERD_PUBLIC_URL:-}
   HERD_COOKIE_SECURE: ${HERD_COOKIE_SECURE:-false}
   HERD_FORWARDED_ALLOW_IPS: ${HERD_FORWARDED_ALLOW_IPS:-127.0.0.1}

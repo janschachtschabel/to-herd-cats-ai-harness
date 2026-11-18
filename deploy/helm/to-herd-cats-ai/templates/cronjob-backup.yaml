@@ -82,6 +82,9 @@ spec:
                 - name: HERD_DATABASE_PASSWORD_FILE
                   value: /var/run/secrets/herd/database/password
                 {{- end }}
+                {{- with include "herd.databaseTlsEnv" . }}
+                {{- . | nindent 16 }}
+                {{- end }}
                 - name: HERD_BACKUP_DIR
                   value: /backups
                 - name: HERD_BACKUP_KEEP_DAILY

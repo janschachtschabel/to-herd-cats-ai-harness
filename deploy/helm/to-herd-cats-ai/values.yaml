@@ -220,7 +220,7 @@ podDisruptionBudget:
 ## @param collab.replicas Collab pods. 1: replaced with Recreate. From 2: each pod announces itself at its pod IP, the API binds every page to one of them and relays all of its browsers there (docs/WIKI.md); the pods roll one at a time and get a PodDisruptionBudget. Each pod holds its own memory budget (collab.resources)
 ## @param collab.resources Resource requests and limits of the collab container. Sizing rule (docs/WIKI.md): memory limit ≥ (130 MiB + 250 MiB × HERD_COLLAB_CHECK_WORKERS + HERD_COLLAB_MEMORY_BUDGET_MB) / 0.8; the defaults (1 worker, budget 400) need 975 MiB. A larger budget (collab.env) needs a larger limit
 ## @param collab.env Extra environment variables of the collab process (name: value); the same refusals as api.env
-## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret)
+## @param collab.internalToken.existingSecret Name of an existing Secret with the token the API and the collab process share (key "token", at least 32 characters); empty: the chart generates one, kept across upgrades and on uninstall (with `helm template` set it, see database.existingSecret). To rotate it without an outage, put the old token under the key "previous" and the new one under "token": the API pods accept both (HERD_INTERNAL_TOKEN_PREVIOUS), the collab pods send the new one once restarted; then remove "previous" (docs/WIKI.md)
 collab:
   enabled: true
   replicas: 1
@@ -244,9 +244,13 @@ secrets:
 
 ## @param database.url Connection URL of an external PostgreSQL without the password, e.g. postgresql+asyncpg://herd@db.example:5432/herd; ignored when postgresql.enabled
 ## @param database.existingSecret Name of an existing Secret with the database password under the key "password"; mounted as a file (HERD_DATABASE_PASSWORD_FILE). Also used by the bundled PostgreSQL; set it there when rendering with `helm template` (Argo CD, Flux): the generated password relies on `lookup`, which is empty then, so every render would make a new one
+## @param database.sslMode TLS to the database, libpq's sslmode (HERD_DATABASE_SSLMODE; API, worker, migration and backup, asyncpg and pg_dump/pg_restore alike): verify-full is recommended for an external database; empty: the URL's own setting. With postgresql.enabled only "", disable, allow or prefer (the bundled PostgreSQL speaks no TLS)
+## @param database.caSecret Name of an existing Secret with the CA certificate to verify the database server against, under the key "ca.crt"; mounted as a file (HERD_DATABASE_SSLROOTCERT). Empty: the image's system CAs
 database:
   url: ""
   existingSecret: ""
+  sslMode: ""
+  caSecret: ""
 
 ## @section Bundled PostgreSQL (for test and staging only)
 

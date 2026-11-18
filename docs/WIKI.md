@@ -461,6 +461,27 @@ die API für jede Live-Verbindung eine eigene, kurzlebige Berechtigung aus
   kommen aus demselben Image und werden zusammen ausgerollt; ein Collab-Prozess, der
   noch Cookies erwartet, lehnt jede Verbindung mit 4401 ab, bis er ersetzt ist.
 
+### Internes Token wechseln
+
+Der Collab-Prozess weist sich bei der internen API zusätzlich mit `HERD_INTERNAL_TOKEN`
+aus. Es lässt sich ohne Ausfall wechseln (seit M9b): Die API nimmt während des Wechsels
+auch `HERD_INTERNAL_TOKEN_PREVIOUS`, der Collab-Prozess sendet immer nur
+`HERD_INTERNAL_TOKEN`.
+
+1. Neues Token erzeugen (`openssl rand -hex 32`). Bei der API das alte als
+   `HERD_INTERNAL_TOKEN_PREVIOUS` (oder `…_PREVIOUS_FILE`) und das neue als
+   `HERD_INTERNAL_TOKEN` setzen und die API-Prozesse neu starten; sie nehmen beide.
+2. Die Collab-Prozesse mit dem neuen `HERD_INTERNAL_TOKEN` neu starten.
+3. `HERD_INTERNAL_TOKEN_PREVIOUS` entfernen und die API-Prozesse noch einmal neu
+   starten; das alte Token gilt dann nicht mehr.
+
+Im Chart steht das Token im Secret `collab.internalToken.existingSecret` (oder dem
+erzeugten `<release>-internal-token`) unter `token`; für den Wechsel kommt das alte unter
+den Schlüssel `previous` (optional, nur die API-Pods lesen ihn), dann folgen ein Neustart
+der API- und der Collab-Pods (`kubectl rollout restart`) und das Entfernen von
+`previous`. In Rolle `all` (Compose) startet der eine Prozess beide Seiten zugleich neu;
+dort genügt es, das Token zu ersetzen.
+
 ## Mehrere Collab-Instanzen (seit M9b)
 
 Der Collab-Prozess hält das Live-Dokument einer Seite im Speicher. Damit mehrere

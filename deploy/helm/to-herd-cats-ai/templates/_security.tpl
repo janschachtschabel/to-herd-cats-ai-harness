@@ -19,3 +19,21 @@
 - name: HERD_WRITE_RATE_PER_MINUTE
   value: {{ .Values.writeLimit.perMinute | quote }}
 {{- end -}}
+
+
+{{/* TLS to the database (J12 a): every pod that connects to it (API, worker, migration,
+backup). The bundled PostgreSQL speaks no TLS, so it refuses the modes that need it. */}}
+{{- define "herd.databaseTlsEnv" -}}
+{{- $mode := .Values.database.sslMode -}}
+{{- if and .Values.postgresql.enabled (has $mode (list "require" "verify-ca" "verify-full")) -}}
+{{- fail (printf "database.sslMode %s needs a database that speaks TLS; the bundled PostgreSQL does not (postgresql.enabled)" $mode) -}}
+{{- end -}}
+{{- if $mode }}
+- name: HERD_DATABASE_SSLMODE
+  value: {{ $mode | quote }}
+{{- end }}
+{{- if .Values.database.caSecret }}
+- name: HERD_DATABASE_SSLROOTCERT
+  value: /var/run/secrets/herd/database-ca/ca.crt
+{{- end }}
+{{- end -}}

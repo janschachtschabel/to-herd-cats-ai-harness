@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **192 erfüllt**, **53 nicht anwendbar**, **8 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 132 erfüllt, 43 nicht anwendbar, 8 Lücke). Mit
+- Ergebnis: **194 erfüllt**, **53 nicht anwendbar**, **6 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 134 erfüllt, 43 nicht anwendbar, 6 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -110,13 +110,21 @@ eingestellten Scanner bleibt V5.4.3 eine **dokumentierte Abweichung**; das ist e
 Entscheidung des Betriebs.
 
 **J12 – Verschlüsselung und Authentisierung im Cluster (V12.3.1, V12.3.3, V12.3.4,
-V13.2.1). Teils geplant (M9b Task 18), teils Abweichung.** *Entscheidung:* (a) TLS zur
-Datenbank: `sslmode` und CA als Einstellungen und im Chart (CA aus einem Secret);
-empfohlen ist `verify-full` (Task 18, V12.3.1). (b) API ↔ Collab-Prozess: **dokumentierte
-Abweichung**; die App leistet kein TLS im Cluster, Betriebsvoraussetzung ist ein
-Service-Mesh mit mTLS oder die NetworkPolicy des Charts (V12.3.3, V12.3.4). (c) Das
-interne Token wird rotierbar: zwei gültige Werte zugleich, wie `HERD_SECRET_KEY_PREVIOUS`
-(Task 18, V13.2.1).
+V13.2.1). (a) und (c) gebaut, M9b Task 18; (b) Abweichung.** *Entscheidung:* (a) TLS zur
+Datenbank: `HERD_DATABASE_SSLMODE` (libpq-Modi, gewinnt über die URL) und
+`HERD_DATABASE_SSLROOTCERT` (CA-Datei) erreichen jede Verbindung der App (asyncpg über
+die Engine und die LISTEN-Verbindung, `core/db_tls.py`) und `pg_dump`/`pg_restore`
+(`PGSSLMODE`/`PGSSLROOTCERT`, `ops/pgtools.child_env`); im Chart `database.sslMode` und
+`database.caSecret` (CA aus einem Secret, in API, Worker, Migration und Sicherung
+eingehängt). Empfohlen ist `verify-full`; das mitgelieferte PostgreSQL (Test und Staging)
+spricht kein TLS, das Chart lehnt mit ihm die Modi ab, die TLS verlangen (V12.3.1).
+(b) API ↔ Collab-Prozess: **dokumentierte Abweichung**; die App leistet kein TLS im
+Cluster, Betriebsvoraussetzung ist ein Service-Mesh mit mTLS oder die NetworkPolicy des
+Charts (V12.3.3, V12.3.4). (c) Das interne Token ist rotierbar: Die API nimmt neben
+`HERD_INTERNAL_TOKEN` während eines Wechsels auch `HERD_INTERNAL_TOKEN_PREVIOUS` (beide
+in konstanter Zeit verglichen), der Collab-Prozess sendet nur das aktuelle; im Chart der
+optionale Schlüssel `previous` im Secret des Tokens (V13.2.1, Ablauf in
+[`WIKI.md`](WIKI.md#internes-token-wechseln)).
 
 **J13 – Mix-up-Schutz für den OAuth-Client der Konnektoren (V10.2.2). Geplant, M9b
 Task 18.** OIDC ist schon geschützt (eigene Rückruf-Adresse je Anbieter, `iss` im
@@ -336,9 +344,9 @@ von einem Admin zurücksetzen).
 | Browser | Ingress → API, öffentlicher Port 8080 (`/`, `/api`, `/api/stream`) | https (B1) | Sitzungs-Cookie, CSRF-Prüfung |
 | Browser | Relay `/collab` → Collab-Prozess | wss (B1), im Cluster ws | Sitzungs-Cookie am Relay, dann Collab-Berechtigung |
 | MCP-Clients | `/mcp` | https (B1) | Zugangstoken |
-| Collab-Prozess | API, interner Port 9090 (`/internal/collab/*`) | http im Cluster (J12) | internes Token und Collab-Berechtigung |
+| Collab-Prozess | API, interner Port 9090 (`/internal/collab/*`) | http im Cluster (J12 b, Abweichung) | internes Token (rotierbar, J12 c) und Collab-Berechtigung |
 | Prometheus, Kubelet | interner Port 9090 (`/metrics`, `/live`, `/ready`) | http im Cluster | keine; nur aus dem Cluster erreichbar (NetworkPolicy) |
-| API, Worker, Migration | PostgreSQL | TLS nur, wenn in der URL verlangt (J12) | Passwort (`HERD_DATABASE_PASSWORD_FILE`) |
+| API, Worker, Migration, Sicherung | PostgreSQL | TLS nach `HERD_DATABASE_SSLMODE` (empfohlen `verify-full`, CA aus `HERD_DATABASE_SSLROOTCERT`; J12 a) | Passwort (`HERD_DATABASE_PASSWORD_FILE`) |
 | API, Worker | KI-Anbieter, MCP-Server, OIDC-Anbieter, OAuth-Server | https über `core/egress.py` (KI optional über `HERD_AI_EGRESS_PROXY`) | Schlüssel bzw. Token des Ziels, nur an seinen Ursprung |
 | Worker | restic-Repository | Protokoll des Repositorys | `HERD_BACKUP_OFFSITE_PASSWORD` und Zugangsdaten des Speichers |
 | alle Prozesse | OTLP-Collector (optional) | `OTEL_EXPORTER_OTLP_ENDPOINT` | nach Betrieb |
@@ -649,7 +657,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V12.1 | V12.1.3 | L2 | mTLS-Clientzertifikate | nicht anwendbar | Keine Anmeldung mit Clientzertifikaten. |
 | V12.2 | V12.2.1 | L1 | TLS zu allen externen Diensten | nicht anwendbar | Wie V12.1.1, liegt beim Betrieb (B1). Die App setzt HSTS und verlangt für OIDC eine https-Adresse. |
 | V12.2 | V12.2.2 | L1 | Öffentlich vertraute Zertifikate | nicht anwendbar | Wie V12.1.1, liegt beim Betrieb (B1). |
-| V12.3 | V12.3.1 | L2 | Verschlüsselt zu Datenbank und Diensten | Lücke | Ausgehende Aufrufe der App (KI, MCP, OIDC, OAuth, restic) nur über https; die Datenbankverbindung nutzt TLS nur, wenn der Betrieb es in der URL verlangt (Standard: ohne). J12 (a), geplant M9b Task 18 (`sslmode` und CA). |
+| V12.3 | V12.3.1 | L2 | Verschlüsselt zu Datenbank und Diensten | erfüllt | Ausgehende Aufrufe der App (KI, MCP, OIDC, OAuth, restic) nur über https; zur Datenbank TLS nach `HERD_DATABASE_SSLMODE` und `HERD_DATABASE_SSLROOTCERT` für asyncpg und `pg_dump`/`pg_restore` (`core/db_tls.py`, `ops/pgtools.py`; Chart `database.sslMode`, `database.caSecret`, empfohlen `verify-full`; M9b Task 18, J12 a). `tests/test_database_tls.py::test_sslmode_reaches_asyncpg_and_pg_dump`. |
 | V12.3 | V12.3.2 | L2 | TLS-Clients prüfen Zertifikate | erfüllt | httpx mit Zertifikatsprüfung, auch bei gepinnter Adresse (`core/egress.py`). `tests/test_egress.py::test_tls_to_a_pinned_address_still_verifies_the_name`. |
 | V12.3 | V12.3.3 | L2 | TLS zwischen internen HTTP-Diensten | Lücke | API ↔ Collab-Prozess (WebSocket und interne API, Port 9090) laufen im Cluster unverschlüsselt; geschützt nur durch NetworkPolicy und das interne Token. J12 (b): Abweichung, Betriebsvoraussetzung Mesh mit mTLS oder NetworkPolicy. |
 | V12.3 | V12.3.4 | L2 | Vertraute Zertifikate intern | Lücke | Folgt aus V12.3.3. J12 (b): Abweichung. |
@@ -659,7 +667,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | Kapitel | Nummer | Stufe | Thema | Status | Beleg |
 |---|---|---|---|---|---|
 | V13.1 | V13.1.1 | L2 | Kommunikation dokumentiert | erfüllt | Abschnitt „Verbindungen“. |
-| V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | Lücke | Collab → API trägt je Aufruf eine kurzlebige Berechtigung, zusätzlich aber das statische, geteilte `HERD_INTERNAL_TOKEN` (keine Rotation ohne Ausfall). Datenbank: eigenes Dienstkonto mit Passwort. J12 (c), geplant M9b Task 18 (zwei gültige Token zum Rotieren). |
+| V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | erfüllt | Collab → API trägt je Aufruf eine kurzlebige Berechtigung und das interne Token, das sich ohne Ausfall wechseln lässt (`HERD_INTERNAL_TOKEN_PREVIOUS`, `web/internal.py`; M9b Task 18, J12 c). Datenbank: eigenes Dienstkonto mit Passwort, auf Wunsch über TLS. `tests/test_internal_token_rotation.py::test_both_internal_tokens_are_accepted`. |
 | V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | Lücke | Container laufen ohne root (uid 10001); aber App und Migration nutzen dieselbe Datenbankrolle, die das Schema besitzt. J14, geplant M9b Task 18 (Migrations- und Laufzeitrolle als Option). |
 | V13.2 | V13.2.3 | L2 | Keine Standard-Zugangsdaten | erfüllt | Compose verlangt `POSTGRES_PASSWORD` und das Bootstrap-Passwort ohne Standardwert (`deploy/compose/compose.yml`); `HERD_INTERNAL_TOKEN` mindestens 32 Zeichen (`tests/test_config.py`). |
 | V13.2 | V13.2.4 | L2 | Allowlist für Ziele nach außen | erfüllt | Nach außen nur zu Zielen, die Admins eintragen (KI-Verbindungen, MCP-Server, OIDC-Anbieter, OAuth-Clients) und nur an öffentliche Adressen (private nur per Allowlist): `core/egress.py`, `core/egress_allowance.py`; im Chart zusätzlich NetworkPolicy-Egress. |

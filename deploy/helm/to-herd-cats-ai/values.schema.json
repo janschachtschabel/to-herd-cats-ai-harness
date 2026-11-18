@@ -363,9 +363,11 @@
       "additionalProperties": false,
       "properties": {
         "url": {"type": "string", "description": "External PostgreSQL URL without the password"},
-        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\""}
+        "existingSecret": {"type": "string", "description": "Existing Secret with the database password under the key \"password\""},
+        "sslMode": {"type": "string", "enum": ["", "disable", "allow", "prefer", "require", "verify-ca", "verify-full"], "description": "HERD_DATABASE_SSLMODE (libpq's sslmode); empty: the URL's own"},
+        "caSecret": {"type": "string", "maxLength": 253, "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$", "description": "Existing Secret with the database's CA certificate under the key \"ca.crt\" (HERD_DATABASE_SSLROOTCERT)"}
       },
-      "required": ["url", "existingSecret"],
+      "required": ["url", "existingSecret", "sslMode", "caSecret"],
       "description": "External database"
     },
     "postgresql": {

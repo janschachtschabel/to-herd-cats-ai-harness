@@ -57,3 +57,45 @@ out=$(render --set 'virusScan.egress[0].ports[0].port=3310')
 if grep -q "^kind: NetworkPolicy" <<<"$out"; then
   fail "virusScan.egress renders a policy without networkPolicy.enabled"
 fi
+
+# J12 a: TLS to the database reaches every pod that connects (API, worker, migration,
+# backup), with the CA mounted from its Secret; nothing by default; the bundled
+# PostgreSQL (no TLS) refuses the modes that need it.
+ext=(--set postgresql.enabled=false --set database.url=postgresql+asyncpg://herd@db.example:5432/herd
+  --set database.existingSecret=db)
+out=$(render "${ext[@]}")
+grep -q "HERD_DATABASE_SSL" <<<"$out" && fail "TLS settings without database.sslMode"
+grep -q "database-ca" <<<"$out" && fail "a CA volume without database.caSecret"
+out=$(render "${ext[@]}" --set database.sslMode=verify-full --set database.caSecret=db-ca)
+for pod in "Deployment t-to-herd-cats-ai-api" "Deployment t-to-herd-cats-ai-worker" \
+  "Job t-to-herd-cats-ai-migrate" "CronJob t-to-herd-cats-ai-backup"; do
+  # shellcheck disable=SC2086
+  manifest=$(doc $pod "$out")
+  grep -A1 -- "- name: HERD_DATABASE_SSLMODE" <<<"$manifest" | grep -q 'value: "verify-full"' \
+    || fail "database.sslMode does not reach $pod"
+  grep -A1 -- "- name: HERD_DATABASE_SSLROOTCERT" <<<"$manifest" \
+    | grep -q "value: /var/run/secrets/herd/database-ca/ca.crt" || fail "no CA path in $pod"
+  grep -A1 -- "- name: database-ca" <<<"$manifest" | grep -q "mountPath: /var/run/secrets/herd/database-ca" \
+    || fail "the CA is not mounted in $pod"
+  grep -A2 -- "- name: database-ca" <<<"$manifest" | grep -q "secretName: db-ca" \
+    || fail "the CA volume of $pod is not database.caSecret"
+done
+grep -q "HERD_DATABASE_SSL" <<<"$(doc Deployment t-to-herd-cats-ai-collab "$out")" \
+  && fail "the collab process gets database settings"
+if render --set database.sslMode=verify-full >/dev/null 2>&1; then
+  fail "the bundled PostgreSQL took database.sslMode verify-full"
+fi
+if render "${ext[@]}" --set database.sslMode=sometimes >/dev/null 2>&1; then
+  fail "database.sslMode took an unknown mode"
+fi
+
+# J12 c: the API takes the previous internal token from the Secret's optional key
+# "previous"; the collab process sends only the current one.
+out=$(render)
+grep -A5 -- "- name: HERD_INTERNAL_TOKEN_PREVIOUS" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | tr -d ' ' | grep -q "key:previous" || fail "the API lacks HERD_INTERNAL_TOKEN_PREVIOUS"
+grep -A6 -- "- name: HERD_INTERNAL_TOKEN_PREVIOUS" <<<"$(doc Deployment t-to-herd-cats-ai-api "$out")" \
+  | grep -q "optional: true" || fail "HERD_INTERNAL_TOKEN_PREVIOUS is not optional"
+if grep -q "HERD_INTERNAL_TOKEN_PREVIOUS" <<<"$(doc Deployment t-to-herd-cats-ai-collab "$out")"; then
+  fail "the collab process gets the previous token"
+fi

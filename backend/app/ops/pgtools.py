@@ -35,7 +35,8 @@ class ToolFailed(Exception):
 
 
 def child_env(settings: Settings) -> dict[str, str]:
-    """The whole environment of a PostgreSQL tool: where to connect and the password."""
+    """The whole environment of a PostgreSQL tool: where to connect, the password and
+    TLS."""
     url = settings.database()
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "LC_ALL": "C.UTF-8"}
     for name, value in (
@@ -51,6 +52,11 @@ def child_env(settings: Settings) -> dict[str, str]:
         mode = url.query.get(key)
         if isinstance(mode, str) and mode:
             env["PGSSLMODE"] = mode
+    # HERD_DATABASE_SSLMODE/-SSLROOTCERT win over the URL (J12 a), as for asyncpg.
+    if settings.database_sslmode:
+        env["PGSSLMODE"] = settings.database_sslmode
+    if settings.database_sslrootcert is not None:
+        env["PGSSLROOTCERT"] = str(settings.database_sslrootcert)
     return env
 
 

@@ -89,6 +89,9 @@ seccompProfile:
 - name: HERD_DATABASE_PASSWORD_FILE
   value: /var/run/secrets/herd/database/password
 {{- end }}
+{{- with include "herd.databaseTlsEnv" $root }}
+{{ . }}
+{{- end }}
 {{- end -}}
 
 {{/* Environment shared by the API and the migration job; `role` is api or migrate. */}}
@@ -157,6 +160,15 @@ entries would win): secrets come from Secrets, the chart's settings from its val
       - key: password
         path: password
 {{- end }}
+{{- with .root.Values.database.caSecret }}
+- name: database-ca
+  secret:
+    secretName: {{ . }}
+    defaultMode: 0444
+    items:
+      - key: ca.crt
+        path: ca.crt
+{{- end }}
 {{- end -}}
 
 {{- define "herd.volumeMounts" -}}
@@ -165,6 +177,11 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{- if include "herd.databaseSecret" . }}
 - name: database-password
   mountPath: /var/run/secrets/herd/database
+  readOnly: true
+{{- end }}
+{{- if .Values.database.caSecret }}
+- name: database-ca
+  mountPath: /var/run/secrets/herd/database-ca
   readOnly: true
 {{- end }}
 {{- end -}}
@@ -198,6 +215,17 @@ entries would win): secrets come from Secrets, the chart's settings from its val
     secretKeyRef:
       name: {{ include "herd.internalTokenSecret" . }}
       key: token
+{{- end -}}
+
+{{/* During a rotation, the token before it (key "previous", optional): the API alone
+accepts it beside the current one; the collab process sends only the current one. */}}
+{{- define "herd.internalTokenPreviousEnv" -}}
+- name: HERD_INTERNAL_TOKEN_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "herd.internalTokenSecret" . }}
+      key: previous
+      optional: true
 {{- end -}}
 
 {{/* AI settings of the API pods (connection tests, personal agents, automations). */}}
@@ -276,6 +304,7 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 # pod that owns the page (each announces its address), which calls back on the
 # internal port with the token.
 {{ include "herd.internalTokenEnv" . }}
+{{ include "herd.internalTokenPreviousEnv" . }}
 {{- end }}
 {{- end -}}
 
