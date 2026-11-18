@@ -7,6 +7,7 @@ from typing import Any
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE
 from app.modules.spaces.service import GENERAL_SPACE_NAME
 from app.modules.users.models import User
 from tests.factories import MakeUser, login
@@ -60,3 +61,24 @@ async def test_a_default_calendar_has_no_stored_name_until_renamed(
     assert (r.status_code, r.json()["name"], r.json()["is_default"]) == (200, "Privat", True)
     r = await client.patch(url, json={"name": None, "version": r.json()["version"]})
     assert r.status_code == 422  # a name once given is not taken back to null
+
+
+async def test_the_default_counts_within_the_limit(
+    session: AsyncSession, make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """R1-M1: an open space that already holds 20 calendars when it becomes the general
+    space (renamed, or a second one of that name) gets no 21st as its default."""
+    person = await make_user()
+    space = await make_space("open", "Bald allgemein", members=[(person, "moderator")])
+    client = await _client(make_client, person)
+    for i in range(MAX_CALENDARS_PER_SPACE):
+        await new_calendar(client, space.id, f"K{i}")
+    space.name = GENERAL_SPACE_NAME
+    await session.flush()
+    url = f"/api/spaces/{space.id}/calendars"
+    for _ in range(2):  # the named way and the list
+        assert len(await listed(client, url)) == MAX_CALENDARS_PER_SPACE
+        assert [c for c in await listed(client) if c["space_id"] == str(space.id)] == [
+            c for c in await listed(client, url)
+        ]
+    assert not any(c["is_default"] for c in await listed(client, url))

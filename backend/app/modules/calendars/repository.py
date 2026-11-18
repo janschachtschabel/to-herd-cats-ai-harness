@@ -7,7 +7,7 @@ from sqlalchemy import Select, and_, exists, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.calendars.models import Calendar, CalendarColor
+from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE, Calendar, CalendarColor
 from app.modules.spaces.models import Space, SpaceKind
 
 
@@ -106,8 +106,13 @@ class CalendarRepository:
     ) -> list[uuid.UUID]:
         """Of `space_ids` (with `only`: that one space of them): the person's own
         personal space and the general open space, each only while it has no default
-        calendar."""
+        calendar and room for one (`ensure_default` counts again under the lock)."""
         has_default = exists().where(Calendar.space_id == Space.id, Calendar.is_default.is_(True))
+        held = (
+            select(func.count())
+            .where(Calendar.space_id == Space.id, Calendar.archived_at.is_(None))
+            .scalar_subquery()
+        )
         stmt = select(Space.id).where(
             Space.org_id == self.org_id,
             Space.id.in_(space_ids),
@@ -116,6 +121,7 @@ class CalendarRepository:
                 and_(Space.kind == SpaceKind.OPEN, Space.name == general_name),
             ),
             ~has_default,
+            held < MAX_CALENDARS_PER_SPACE,
         )
         if only is not None:
             stmt = stmt.where(Space.id == only)

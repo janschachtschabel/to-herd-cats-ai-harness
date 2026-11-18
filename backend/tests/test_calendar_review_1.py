@@ -36,7 +36,7 @@ async def test_ensure_default_never_hands_out_an_archived_calendar(
     except AppError:
         pass  # refusing to archive a default is one valid fix
     found = await ensure_default(session, actor, own.id)
-    assert found.archived_at is None
+    assert found is not None and found.archived_at is None
     assert (await service.readable(actor, found.id)).id == found.id
 
 
