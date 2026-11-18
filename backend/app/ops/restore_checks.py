@@ -87,7 +87,7 @@ async def check_on(
     if await server_major(conn) < manifest.server_major:
         check.problems.append("restore.server_too_old")
     try:
-        if client_major("pg_restore") < int(manifest.pg_dump_version.split(".")[0]):
+        if client_major("pg_restore") < manifest.tools_major():
             check.problems.append("restore.tools_too_old")
     except ToolFailed:
         check.problems.append("restore.tools_too_old")

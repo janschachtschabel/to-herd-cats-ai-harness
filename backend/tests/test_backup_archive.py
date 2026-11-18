@@ -77,6 +77,25 @@ def test_manifest_round_trips_and_refuses_unknown_fields() -> None:
         Manifest.from_json(b"not json")
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"pg_dump_version": "sixteen"},
+        {"pg_dump_version": "16.15 (Ubuntu)"},
+        {"created_at": "yesterday"},
+        {"created_at": "2026-11-15 02:30:00"},
+    ],
+    ids=str,
+)
+def test_manifest_refuses_values_of_the_wrong_form(changes: dict[str, object]) -> None:
+    """Review M9b F6: the check and the replace read both as a number and a time."""
+    data = json.loads(_manifest().to_json())
+    data.update(changes)
+    with pytest.raises(ManifestInvalid):
+        Manifest.from_json(json.dumps(data).encode())
+    assert Manifest.from_json(_manifest(pg_dump_version="17").to_json()).tools_major() == 17
+
+
 async def test_an_archive_holds_its_members_in_order_with_their_checksums(
     tmp_path: Path,
 ) -> None:

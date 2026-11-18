@@ -78,7 +78,7 @@ def _of_manifest(manifest: Manifest) -> Figures:
         app_version=manifest.app_version,
         alembic_revision=manifest.alembic_revision,
         server_major=manifest.server_major,
-        tools_major=int(manifest.pg_dump_version.split(".")[0]),
+        tools_major=manifest.tools_major(),
         storage=manifest.storage,
         tables=len(manifest.tables),
         rows=sum(manifest.tables.values()),

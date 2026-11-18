@@ -3,11 +3,14 @@ content. It travels twice: as the archive's last member (`herd/manifest.json`, w
 SHA-256 and size of every other member) and as a sidecar next to the archive
 (`<name>.manifest.json`, the same plus `archive_sha256`).
 
-`from_json` is strict: a missing field, an unknown one or a value of the wrong type is
-`ManifestInvalid`, so an archive of another format is refused, not half understood.
+`from_json` is strict: a missing field, an unknown one, a value of the wrong type or of
+the wrong form (`created_at` no time in CREATED_AT_FORMAT, `pg_dump_version` no
+`<major>[.<minor>]`) is `ManifestInvalid`, so an archive of another format is refused,
+not half understood (review M9b F6: the check and the replace read both values).
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from typing import TypedDict
 
@@ -16,6 +19,7 @@ from pydantic.dataclasses import dataclass
 
 FORMAT = 1
 CREATED_AT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+_TOOL_VERSION = re.compile(r"[0-9]{1,4}(?:\.[0-9]{1,6})?")
 
 
 class ManifestInvalid(ValueError):  # noqa: N818 (a state of the input)
@@ -54,9 +58,17 @@ class Manifest:
     @classmethod
     def from_json(cls, data: bytes) -> "Manifest":
         try:
-            return _ADAPTER.validate_json(data)
-        except ValidationError:
+            manifest = _ADAPTER.validate_json(data)
+            manifest.created()
+        except (ValidationError, ValueError):
             raise ManifestInvalid("not a manifest of this format") from None
+        if not _TOOL_VERSION.fullmatch(manifest.pg_dump_version):
+            raise ManifestInvalid("not a manifest of this format")
+        return manifest
+
+    def tools_major(self) -> int:
+        """The major version of the `pg_dump` that wrote the dump."""
+        return int(self.pg_dump_version.split(".")[0])
 
 
 _ADAPTER = TypeAdapter(Manifest)
