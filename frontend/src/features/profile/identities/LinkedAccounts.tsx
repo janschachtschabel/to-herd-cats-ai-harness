@@ -9,7 +9,14 @@ import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { SaveError } from '@/features/shared/forms'
 import { ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import { formatDateTime } from '@/lib/format'
-import { useMyIdentities, useStartLink, useUnlinkMine, type Identity } from './queries'
+import {
+  isReauthRequired,
+  useMyIdentities,
+  useStartLink,
+  useUnlinkMine,
+  type Identity,
+} from './queries'
+import { ReauthDialog } from './ReauthDialog'
 
 /** The person's accounts at sign-in providers: link one more, or unlink one. */
 export function LinkedAccounts({ linked, linkError }: { linked?: string; linkError?: string }) {
@@ -19,6 +26,8 @@ export function LinkedAccounts({ linked, linkError }: { linked?: string; linkErr
   const startLink = useStartLink()
   const unlink = useUnlinkMine()
   const [unlinking, setUnlinking] = useState<Identity | null>(null)
+  // The provider whose link waits for the person to sign in again (J9).
+  const [proving, setProving] = useState<{ key: string; name: string } | null>(null)
   const refused = useSignInError(linkError)
   const linkedName = providers.find((p) => p.key === linked)?.name ?? linked
   const linkedKeys = new Set(identities.items.map((i) => i.provider_key))
@@ -103,17 +112,40 @@ export function LinkedAccounts({ linked, linkError }: { linked?: string; linkErr
               key={provider.key}
               variant="outline"
               disabled={startLink.isPending}
-              onClick={() => startLink.mutate(provider.key)}
+              onClick={() =>
+                startLink.mutate(
+                  { key: provider.key },
+                  {
+                    onError: (error) => {
+                      if (!isReauthRequired(error)) return
+                      startLink.reset()
+                      setProving({ key: provider.key, name: provider.name })
+                    },
+                  },
+                )
+              }
             >
               <ProviderIcon kind={provider.kind} />
-              {startLink.isPending && startLink.variables === provider.key
+              {startLink.isPending && startLink.variables.key === provider.key
                 ? t('profile.identities.linking')
                 : t('profile.identities.link', { name: provider.name })}
             </Button>
           ))}
         </div>
       )}
-      <SaveError error={startLink.error} />
+      {proving === null && <SaveError error={startLink.error} />}
+      <ReauthDialog
+        open={proving !== null}
+        providerName={proving?.name ?? ''}
+        pending={startLink.isPending}
+        error={startLink.error}
+        onSubmit={(password) => proving && startLink.mutate({ key: proving.key, password })}
+        onOpenChange={(open) => {
+          if (open) return
+          setProving(null)
+          startLink.reset()
+        }}
+      />
       <ConfirmDialog
         open={unlinking !== null}
         title={t('profile.identities.unlinkTitle')}

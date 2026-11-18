@@ -11,11 +11,12 @@ from app.modules.audit.models import AuditLog
 from app.modules.oidc.models import OidcProvider
 from app.modules.users.models import User
 from tests.conftest import MakeClient
-from tests.factories import login
+from tests.factories import PASSWORD, login
 from tests.factories_oidc import PROVIDERS, error_of, make_provider, sign_in
 from tests.support.oidc_stub import OidcStub
 
 pytestmark = pytest.mark.usefixtures("oidc_egress")
+REAUTH = {"password": PASSWORD}  # linking asks for the password again (J9)
 
 
 async def test_provider_admin_needs_user_manage_and_version(
@@ -208,7 +209,7 @@ async def test_link_from_the_profile_and_unlink(
     """The profile links an account whatever its email; another person's account is
     refused; the last way into a password-less account stays."""
     await make_provider(owner, oidc_stub)
-    started = await member_client.post("/api/auth/me/identities/stub/link")
+    started = await member_client.post("/api/auth/me/identities/stub/link", json=REAUTH)
     assert started.status_code == 200, started.text
     oidc_stub.state.identity.update(sub="max-at-idp", email="max.private@else.test")
     query = oidc_stub.state.authorize(started.json()["url"])
@@ -219,7 +220,7 @@ async def test_link_from_the_profile_and_unlink(
     browser = await make_client()
     assert (await sign_in(browser, oidc_stub, sub="max-at-idp")).headers["location"] == "/"
     # Owner links the same account: taken.
-    started = await owner.post("/api/auth/me/identities/stub/link")
+    started = await owner.post("/api/auth/me/identities/stub/link", json=REAUTH)
     query = oidc_stub.state.authorize(started.json()["url"])
     done = await owner.get("/api/auth/oidc/stub/callback", params=query)
     assert error_of(done) == "oidc.identity_taken"
@@ -244,7 +245,7 @@ async def test_others_identities_need_user_manage_and_unlink_is_audited(
     session: AsyncSession,
 ) -> None:
     await make_provider(owner, oidc_stub, trust_email=True)
-    started = await owner.post("/api/auth/me/identities/stub/link")
+    started = await owner.post("/api/auth/me/identities/stub/link", json=REAUTH)
     query = oidc_stub.state.authorize(started.json()["url"])
     await owner.get("/api/auth/oidc/stub/callback", params=query)
     refused = await member_client.get(f"/api/admin/users/{owner_user.id}/identities")
@@ -264,7 +265,7 @@ async def test_deleting_a_provider_removes_its_links(
     owner: AsyncClient, member_client: AsyncClient, member: User, oidc_stub: OidcStub
 ) -> None:
     created = await make_provider(owner, oidc_stub)
-    started = await member_client.post("/api/auth/me/identities/stub/link")
+    started = await member_client.post("/api/auth/me/identities/stub/link", json=REAUTH)
     await member_client.get(
         "/api/auth/oidc/stub/callback", params=oidc_stub.state.authorize(started.json()["url"])
     )

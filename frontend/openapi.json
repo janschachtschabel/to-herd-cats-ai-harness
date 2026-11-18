@@ -6253,6 +6253,25 @@
         "title": "LastRunOut",
         "type": "object"
       },
+      "LinkStartIn": {
+        "description": "Linking a new account proves the person again (J9): her current password, or\nnone right after a sign-in through a provider (at most 10 minutes ago).",
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "LinkStartIn",
+        "type": "object"
+      },
       "LinkStartOut": {
         "description": "Where the browser goes to link an account (the provider's sign-in page).",
         "properties": {
@@ -23037,7 +23056,7 @@
     },
     "/api/auth/me/identities/{key}/link": {
       "post": {
-        "description": "Start linking the caller's account at the provider (from the profile): the\nbrowser goes to the returned address; the binding cookie comes with this answer.",
+        "description": "Start linking the caller's account at the provider (from the profile): the\nbrowser goes to the returned address; the binding cookie comes with this answer.\nNeeds the current password, or a sign-in through a provider of this session at\nmost 10 minutes old (403 `auth.reauth_required`).",
         "operationId": "link_api_auth_me_identities__key__link_post",
         "parameters": [
           {
@@ -23050,6 +23069,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LinkStartIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

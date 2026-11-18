@@ -32,5 +32,8 @@ class UserSession(UuidPk, OrgScoped, Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     device: Mapped[str | None] = mapped_column(String(64))
+    # When the session was opened by a sign-in through a provider (J9): linking a new
+    # account within 10 minutes of it needs no password (`reauth.py`). None otherwise.
+    reauth_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(lazy="joined")

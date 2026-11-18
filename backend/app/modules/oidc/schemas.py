@@ -177,6 +177,13 @@ class IdentityOut(BaseModel):
         )
 
 
+class LinkStartIn(BaseModel):
+    """Linking a new account proves the person again (J9): her current password, or
+    none right after a sign-in through a provider (at most 10 minutes ago)."""
+
+    password: str | None = Field(default=None, max_length=200)
+
+
 class LinkStartOut(BaseModel):
     """Where the browser goes to link an account (the provider's sign-in page)."""
 

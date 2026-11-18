@@ -20,12 +20,13 @@ from app.modules.auth.cookies import (
 )
 from app.modules.auth.deps import ActorDep, AuthDep, SessionDep, SettingsDep
 from app.modules.auth.handover import hand_over
+from app.modules.auth.reauth import require_recent_sign_in
 from app.modules.oidc.flow import BINDING_COOKIE, COOKIE_PATH, FLOW_MINUTES, LOGIN_PAGE, FlowService
 from app.modules.oidc.identities import IdentityService
 from app.modules.oidc.metrics import count_outcome
 from app.modules.oidc.protocol import ProviderFailure
 from app.modules.oidc.repository import ProviderRepository
-from app.modules.oidc.schemas import IdentityOut, LinkStartOut, PublicProviderOut
+from app.modules.oidc.schemas import IdentityOut, LinkStartIn, LinkStartOut, PublicProviderOut
 from app.modules.orgs.repository import OrganizationRepository
 from app.modules.totp.cookies import set_challenge_cookie
 
@@ -135,9 +136,13 @@ async def link(
     ctx: AuthDep,
     session: SessionDep,
     settings: SettingsDep,
+    body: LinkStartIn | None = None,
 ) -> LinkStartOut:
     """Start linking the caller's account at the provider (from the profile): the
-    browser goes to the returned address; the binding cookie comes with this answer."""
+    browser goes to the returned address; the binding cookie comes with this answer.
+    Needs the current password, or a sign-in through a provider of this session at
+    most 10 minutes old (403 `auth.reauth_required`)."""
+    await require_recent_sign_in(session, settings, ctx, body.password if body else None)
     service = FlowService(session, settings)
     started = await service.start(key, _client(request), link_session=ctx)
     _set_binding(response, request, settings, started.binding)

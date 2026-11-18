@@ -273,6 +273,14 @@ Erwähnungen oder Auswahllisten. Audit: `user.self_registered` (durch die neue P
   (Weiterleitung zum Anbieter, danach zurück ins Profil) und lösen. Die E-Mail beim
   Anbieter muss dafür nicht passen; ein Konto, das schon mit einer anderen Person
   verknüpft ist, wird abgelehnt (`oidc.identity_taken`).
+- **Erneut anmelden vor dem Verknüpfen** (ASVS V7.5.1): Ein neues Konto ist ein weiterer
+  Weg in das Konto, deshalb fragt die App vorher das aktuelle Passwort ab (Dialog
+  „Erneut anmelden“; `POST /api/auth/me/identities/{key}/link` mit `{"password": …}`).
+  Wer kein Passwort hat, meldet sich ab und erneut über einen schon verknüpften
+  Anbieter an: Eine Sitzung, die eine Anmeldung über einen Anbieter geöffnet hat (auch
+  mit TOTP danach), verknüpft 10 Minuten lang ohne Passwort (`user_session.reauth_at`).
+  Sonst 403 `auth.reauth_required`; ein falsches Passwort 422 `auth.wrong_password`,
+  gezählt wie beim Passwortwechsel (`HERD_LOGIN_RATE_LIMIT_PER_MINUTE` je Person).
 - **Verwaltung → Personen → Bearbeiten**: mit `user.manage` die Verknüpfungen jeder
   Person sehen und lösen (die eines Owners nur als Owner).
 - Ein Konto ohne Passwort behält seine letzte Verknüpfung (409 `oidc.last_identity`).

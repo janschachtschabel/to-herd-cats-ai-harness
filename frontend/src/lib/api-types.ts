@@ -1853,6 +1853,8 @@ export interface paths {
          * Link
          * @description Start linking the caller's account at the provider (from the profile): the
          *     browser goes to the returned address; the binding cookie comes with this answer.
+         *     Needs the current password, or a sign-in through a provider of this session at
+         *     most 10 minutes old (403 `auth.reauth_required`).
          */
         post: operations["link_api_auth_me_identities__key__link_post"];
         delete?: never;
@@ -6562,6 +6564,15 @@ export interface components {
             run_id: string | null;
             run_state: components["schemas"]["RunState"] | null;
             stop_reason: components["schemas"]["StopReason"] | null;
+        };
+        /**
+         * LinkStartIn
+         * @description Linking a new account proves the person again (J9): her current password, or
+         *     none right after a sign-in through a provider (at most 10 minutes ago).
+         */
+        LinkStartIn: {
+            /** Password */
+            password?: string | null;
         };
         /**
          * LinkStartOut
@@ -14479,7 +14490,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LinkStartIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

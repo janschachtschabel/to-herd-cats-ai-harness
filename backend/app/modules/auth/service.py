@@ -126,9 +126,11 @@ class AuthService:
             user.password_hash = rehashed
         return user
 
-    async def open_session(self, user: User) -> str:
+    async def open_session(self, user: User, *, through_provider: bool = False) -> str:
         """A new login session for an active person whose sign-in was checked (password
-        or OIDC); the token goes into the cookie and nowhere else (`handover.py`)."""
+        or OIDC); the token goes into the cookie and nowhere else (`handover.py`).
+        `through_provider`: an OIDC sign-in, which counts as a fresh authentication
+        for linking (`reauth.py`)."""
         now = session_clock().now()
         token = new_session_token()
         # Housekeeping without a background task: every login removes a bounded batch
@@ -144,6 +146,7 @@ class AuthService:
                 expires_at=now + timedelta(hours=self.settings.session_ttl_hours),
                 last_used_at=now,
                 signed_in_at=now,
+                reauth_at=now if through_provider else None,
             )
         )
         user.last_login_at = now

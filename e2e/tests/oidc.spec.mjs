@@ -47,6 +47,10 @@ test("a person links an account in the profile and then signs in with it", async
   const profile = await olga.newPage();
   await profile.goto("/profile");
   await profile.getByRole("button", { name: "Mit Firmen-Login verknüpfen" }).click();
+  // A new way into the account: she proves herself again with her password (J9).
+  const reauth = profile.getByRole("dialog", { name: "Erneut anmelden" });
+  await reauth.getByLabel("Aktuelles Passwort").fill(OLGA.password);
+  await reauth.getByRole("button", { name: "Weiter zum Anbieter" }).click();
   await expect(profile).toHaveURL(/\/profile\?linked=firma$/);
   await expect(profile.getByText("Das Konto bei Firmen-Login ist jetzt verknüpft.")).toBeVisible();
   await expect(

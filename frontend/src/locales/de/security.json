@@ -1,7 +1,8 @@
 {
   "errors": {
     "auth": {
-      "session_not_found": "Diese Sitzung gibt es nicht mehr."
+      "session_not_found": "Diese Sitzung gibt es nicht mehr.",
+      "reauth_required": "Bitte melde dich erneut an."
     }
   },
   "security": {
@@ -17,6 +18,13 @@
       "endOthers": "Alle anderen abmelden",
       "endOthersTitle": "Alle anderen Geräte abmelden?",
       "endOthersText": "Alle Sitzungen außer dieser enden sofort. Wer dort angemeldet war, muss sich neu anmelden."
+    },
+    "reauth": {
+      "title": "Erneut anmelden",
+      "hint": "Ein neues Konto bei {{name}} ist ein weiterer Weg in dein Konto. Bestätige deshalb erst, dass du es bist.",
+      "password": "Aktuelles Passwort",
+      "noPassword": "Ohne Passwort: Melde dich ab und erneut über deinen Anbieter an; danach kannst du 10 Minuten lang ohne Passwort verknüpfen.",
+      "submit": "Weiter zum Anbieter"
     }
   }
 }

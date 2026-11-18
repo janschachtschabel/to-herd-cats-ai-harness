@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **190 erfüllt**, **53 nicht anwendbar**, **10 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 130 erfüllt, 43 nicht anwendbar, 10 Lücke). Mit
+- Ergebnis: **191 erfüllt**, **53 nicht anwendbar**, **9 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 131 erfüllt, 43 nicht anwendbar, 9 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -86,7 +86,7 @@ zählt nicht als Nutzung. Einstellung in Compose, Chart und Doku.
 gekürzten User-Agent, Anmeldezeit, letzte Nutzung aus J7) mit „Abmelden“ je Sitzung und
 „Alle anderen abmelden“; `GET/DELETE /api/auth/me/sessions` (paginiert, Audit).
 
-**J9 – Erneute Anmeldung vor sensiblen Änderungen (V7.5.1). Geplant, M9b Task 18.**
+**J9 – Erneute Anmeldung vor sensiblen Änderungen (V7.5.1). Gebaut, M9b Task 18.**
 *Entscheidung:* bauen. Vor dem Verknüpfen einer neuen OIDC-Identität im Profil fragt die
 App das Passwort ab; Personen ohne Passwort brauchen eine Anmeldung über einen schon
 verknüpften Anbieter, die höchstens 10 Minuten alt ist (an der Sitzung gemerkt).
@@ -548,7 +548,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V7.4 | V7.4.3 | L2 | Andere Sitzungen enden nach Änderung eines Faktors | erfüllt | Passwortwechsel (eigener oder durch Admins) und das Lösen einer OIDC-Verknüpfung beenden alle anderen Sitzungen; das Löschen eines Anbieters beendet die Sitzungen aller mit ihm verknüpften Personen. `tests/test_profile.py`, `tests/test_oidc_admin.py::test_unlinking_an_identity_ends_the_persons_other_sessions`, `tests/test_oidc_provider_sessions.py`. |
 | V7.4 | V7.4.4 | L2 | Abmelden überall erreichbar | erfüllt | Personenmenü in der Kopfleiste jeder angemeldeten Seite (`frontend/src/app/shell/UserMenu.tsx`). |
 | V7.4 | V7.4.5 | L2 | Admins beenden Sitzungen | erfüllt | `POST /api/admin/users/{id}/sign-out` und Knopf „Abmelden“ in der Personenverwaltung (`users/service.sign_out`, `UsersPage.tsx`). `tests/test_users.py::test_an_administrator_signs_a_person_out_everywhere`, `AdminPages.test.tsx`. |
-| V7.5 | V7.5.1 | L2 | Erneute Anmeldung vor sensiblen Änderungen | Lücke | E-Mail kann niemand selbst ändern, das Passwort nur mit dem alten. Aber eine neue OIDC-Verknüpfung (ein neuer Anmeldeweg) braucht nur die laufende Sitzung. J9, geplant M9b Task 18. |
+| V7.5 | V7.5.1 | L2 | Erneute Anmeldung vor sensiblen Änderungen | erfüllt | E-Mail kann niemand selbst ändern, das Passwort und TOTP nur mit dem alten Passwort. Eine neue OIDC-Verknüpfung verlangt das Passwort oder eine Anmeldung über einen Anbieter in dieser Sitzung, höchstens 10 Minuten alt; sonst 403 `auth.reauth_required` (`auth/reauth.py`, Dialog `ReauthDialog.tsx`; M9b Task 18, J9). `tests/test_link_reauth.py::test_linking_needs_a_password_or_a_fresh_sign_in`, `LinkReauth.test.tsx`. |
 | V7.5 | V7.5.2 | L2 | Eigene Sitzungen sehen und beenden | erfüllt | Profil „Angemeldete Geräte“: laufende Sitzungen mit Gerätehinweis (ohne Version), Anmeldezeit und letzter Nutzung, je Sitzung „Abmelden“ und „Alle anderen abmelden“; eine fremde Sitzung antwortet wie eine unbekannte, Audit `user.session_ended` (`auth/own_sessions.py`, `features/profile/sessions/`; M9b Task 18, J8). `tests/test_own_sessions.py`, `Sessions.test.tsx`. |
 | V7.6 | V7.6.1 | L2 | Föderierte Lebensdauer wie dokumentiert | erfüllt | Abschnitt „Sitzungen“: höchstens `HERD_SESSION_TTL_HOURS` nach der IdP-Anmeldung, dann neu über den IdP. |
 | V7.6 | V7.6.2 | L2 | Sitzung nur mit Zutun | erfüllt | Eine OIDC-Sitzung entsteht nur nach dem Klick auf den Anbieter und mit gebundenem Ablauf (`oidc/flow.py`, Bindungs-Cookie gegen Login-CSRF). `tests/test_oidc_flow.py`. |

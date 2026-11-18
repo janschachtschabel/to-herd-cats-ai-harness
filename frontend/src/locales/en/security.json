@@ -1,7 +1,8 @@
 {
   "errors": {
     "auth": {
-      "session_not_found": "This session no longer exists."
+      "session_not_found": "This session no longer exists.",
+      "reauth_required": "Please sign in again."
     }
   },
   "security": {
@@ -17,6 +18,13 @@
       "endOthers": "Sign out all others",
       "endOthersTitle": "Sign out all other devices?",
       "endOthersText": "Every session but this one ends at once. Whoever was signed in there must sign in again."
+    },
+    "reauth": {
+      "title": "Sign in again",
+      "hint": "An account at {{name}} is another way into your account. Confirm that it is you first.",
+      "password": "Current password",
+      "noPassword": "Without a password: sign out and sign in again through your provider; for 10 minutes after that you can link without a password.",
+      "submit": "Continue to the provider"
     }
   }
 }

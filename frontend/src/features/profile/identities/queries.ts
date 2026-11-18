@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, unwrap, type Schemas } from '@/lib/api'
+import { api, ApiError, unwrap, type Schemas } from '@/lib/api'
 import { pagedQuery, usePaged } from '@/lib/paging'
 
 export type Identity = Schemas['IdentityOut']
@@ -25,11 +25,22 @@ export function useUnlinkMine() {
   })
 }
 
-/** Start linking an account at the provider: the browser then leaves for its page. */
+/** Start linking an account at the provider: the browser then leaves for its page.
+ *  Without `password` it works only right after a sign-in through a provider; else the
+ *  answer is 403 `auth.reauth_required` (`isReauthRequired`). */
 export function useStartLink() {
   return useMutation({
-    mutationFn: async (key: string) =>
-      unwrap(await api.POST('/api/auth/me/identities/{key}/link', { params: { path: { key } } })),
+    mutationFn: async ({ key, password }: { key: string; password?: string }) =>
+      unwrap(
+        await api.POST('/api/auth/me/identities/{key}/link', {
+          params: { path: { key } },
+          ...(password ? { body: { password } } : {}),
+        }),
+      ),
     onSuccess: ({ url }) => window.location.assign(url),
   })
+}
+
+export function isReauthRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'auth.reauth_required'
 }

@@ -142,7 +142,7 @@ async def test_sessions_store_no_client_details(session: AsyncSession) -> None:
     )
     assert columns == {
         *("id", "org_id", "user_id", "token_hash", "expires_at"),
-        *("last_used_at", "signed_in_at", "device"),
+        *("last_used_at", "signed_in_at", "device", "reauth_at"),
     }
 
 

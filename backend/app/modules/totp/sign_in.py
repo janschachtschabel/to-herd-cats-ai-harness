@@ -85,7 +85,9 @@ class SecondStep:
             raise Unauthorized(code="auth.second_factor_invalid")
         await factor.passed(user.id, attempt)
         await self.challenges.drop(challenge)
-        session_token = await AuthService(self.session, self.settings).open_session(user)
+        session_token = await AuthService(self.session, self.settings).open_session(
+            user, through_provider=challenge.method == "oidc"
+        )
         return SignedIn(user, session_token), f"{challenge.method}+{method}"
 
     async def _user(self, challenge: SignInChallenge | None) -> User | None:
