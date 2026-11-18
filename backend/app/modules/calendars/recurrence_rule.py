@@ -26,8 +26,11 @@ _UNSUPPORTED_PARTS = frozenset({"BYSECOND", "BYMINUTE", "BYHOUR", "BYYEARDAY", "
 _PARTS = frozenset(
     {"FREQ", "INTERVAL", "COUNT", "UNTIL", "BYMONTH", "BYMONTHDAY", "BYDAY", "BYSETPOS", "WKST"}
 )
-_NUMBER = re.compile(r"[+-]?\d{1,4}")
-_DAY = re.compile(r"([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)")
+# ASCII digits only: `\d` and `str.isdigit()` take any Unicode digit ("٣", "²").
+_NUMBER = re.compile(r"[+-]?[0-9]{1,4}")
+_WHOLE = re.compile(r"[0-9]+")
+_DAY = re.compile(r"([+-]?[0-9]{1,2})?(MO|TU|WE|TH|FR|SA|SU)")
+_UNTIL = re.compile(r"[0-9]{8}(T[0-9]{6}Z?)?")
 
 
 class SeriesInvalid(ValueError):
@@ -129,7 +132,7 @@ def _numbers(value: str, low: int, high: int) -> tuple[int, ...]:
 
 
 def _number(value: str, high: int) -> int:
-    if not value.isdigit() or int(value) < 1:
+    if not _WHOLE.fullmatch(value) or int(value) < 1:
         raise _invalid()
     if int(value) > high:
         raise _unsupported()
@@ -137,6 +140,8 @@ def _number(value: str, high: int) -> int:
 
 
 def _until(value: str) -> date | datetime:
+    if not _UNTIL.fullmatch(value):
+        raise _invalid()
     try:
         if len(value) == 8:
             return datetime.strptime(value, "%Y%m%d").date()
