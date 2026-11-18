@@ -288,6 +288,7 @@ entries would win): secrets come from Secrets, the chart's settings from its val
 {{- end }}
 {{ include "herd.aiWorkerEnv" . }}
 {{ include "herd.mcpWorkerEnv" . }}
+{{ include "herd.securityWorkerEnv" . }}
 {{- with include "herd.s3Env" . }}
 {{ . }}
 {{- end }}

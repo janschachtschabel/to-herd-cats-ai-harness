@@ -814,6 +814,17 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   /64), eine IPv4-Adresse für sich; das Audit-Log hält die volle Adresse fest. Die
   Client-Adresse stimmt nur, wenn der Reverse Proxy in `HERD_FORWARDED_ALLOW_IPS`
   steht; sonst teilen sich alle Clients die Adresse des Proxys.
+- **Schreibgrenze je Person (seit M9b):** je Person und Minute höchstens
+  `HERD_WRITE_RATE_PER_MINUTE` (Standard 120) Schreibvorgänge an Inhalten (Seiten,
+  Nachrichten, Reaktionen, Tickets, Vorschläge, Schlagwörter) und getrennt davon
+  `HERD_UPLOAD_RATE_PER_MINUTE` (Standard 30) Uploads (Anhänge, Importe); gezählt in
+  PostgreSQL über alle Knoten, darüber 429 `rate.limited` mit `Retry-After`. Ein Agent
+  hat seinen eigenen Zähler, ebenso groß; ein Werkzeug darüber schreibt nichts und
+  meldet `rate.limited`. Lesen, Lesemarken, Verwaltung und Einstellungen zählen nicht.
+  Die Lasttest-Mischung (200 Personen) bleibt weit darunter; Skripte, die in Massen
+  anlegen (Demo-Daten, `loadsetup.py`), warten bei 429 die genannte Zeit ab. Metrik
+  `herd_rate_limited_total{area}` (`write`, `upload`); Chart `writeLimit.perMinute`,
+  `writeLimit.uploadsPerMinute`. Einzelheiten: [`SICHERHEIT.md`](docs/SICHERHEIT.md).
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion
   ein Ereignis (nur IDs) in `event_outbox`; der Worker verteilt es an Benachrichtigungen,
   Systemmeldungen der Seiten- und Ticket-Diskussionen und die Live-Zustellung. Bis M7 ohne DBOS (Plan

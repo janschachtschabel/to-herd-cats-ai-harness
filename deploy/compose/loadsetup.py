@@ -32,6 +32,11 @@ WORDS = (
 
 async def call(client: httpx.AsyncClient, method: str, path: str, body: Any = None) -> Any:
     response = await client.request(method, path, json=body, headers=HEADERS)
+    # The admin writes faster than the write limit per person (HERD_WRITE_RATE_PER_MINUTE):
+    # wait as long as the 429 says and send again.
+    while response.status_code == 429 and "retry-after" in response.headers:
+        await asyncio.sleep(min(int(response.headers["retry-after"]), 60))
+        response = await client.request(method, path, json=body, headers=HEADERS)
     if response.status_code >= 300:
         raise SystemExit(f"{method} {path}: {response.status_code} {response.text[:200]}")
     return response.json() if response.content else None

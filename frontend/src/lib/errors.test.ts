@@ -11,6 +11,7 @@ describe('errorMessage', () => {
   test.each([
     ['storage.unavailable', 503],
     ['maintenance.active', 503],
+    ['rate.limited', 429],
   ])('%s has its own text', (code, status) => {
     const t = i18n.t.bind(i18n)
     for (const locale of ['de', 'en'] as const) {

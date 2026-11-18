@@ -70,6 +70,9 @@ services:
       # A login session ends after this many hours without a request (0: no idle
       # limit; it still ends after 7 days). docs/ANMELDUNG.md.
       HERD_SESSION_IDLE_HOURS: ${HERD_SESSION_IDLE_HOURS:-24}
+      # Writes per person (and per agent) and minute, uploads apart; beyond: 429.
+      HERD_WRITE_RATE_PER_MINUTE: ${HERD_WRITE_RATE_PER_MINUTE:-120}
+      HERD_UPLOAD_RATE_PER_MINUTE: ${HERD_UPLOAD_RATE_PER_MINUTE:-30}
       HERD_LOG_LEVEL: ${HERD_LOG_LEVEL:-INFO}
       # AI and agents (docs/AGENTEN.md): test call timeout, personal agents and
       # automations per person, hours a run waits for a release or an answer, runs at

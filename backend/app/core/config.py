@@ -12,6 +12,7 @@ from sqlalchemy.engine import URL, make_url
 from app.core.config_auth import AuthSettings
 from app.core.config_files import SecretFileSettings, read_secret_file
 from app.core.config_ops import OpsSettings
+from app.core.config_security import SecuritySettings
 from app.core.config_storage import StorageSettings
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
@@ -20,7 +21,9 @@ SECRET_KEY_MIN_LENGTH = 32
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # backend/app/core/config.py -> repo
 
 
-class Settings(SecretFileSettings, OpsSettings, AuthSettings, StorageSettings, BaseSettings):
+class Settings(
+    SecretFileSettings, OpsSettings, AuthSettings, SecuritySettings, StorageSettings, BaseSettings
+):
     # hide_input_in_errors: a start-up error must not echo secrets from the environment.
     model_config = SettingsConfigDict(
         env_prefix="HERD_", env_file=".env", extra="ignore", hide_input_in_errors=True

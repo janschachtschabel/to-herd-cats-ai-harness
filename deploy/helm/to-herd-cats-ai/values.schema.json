@@ -81,6 +81,16 @@
       "required": ["replicas", "autoscaling", "resources", "cookieSecure", "forwardedAllowIps", "sessionIdleHours", "env"],
       "description": "The API Deployment (HERD_ROLE=api)"
     },
+    "writeLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The write limit per person and minute (J10)",
+      "properties": {
+        "perMinute": {"type": "integer", "minimum": 1, "maximum": 100000, "description": "HERD_WRITE_RATE_PER_MINUTE (API and worker)"},
+        "uploadsPerMinute": {"type": "integer", "minimum": 1, "maximum": 100000, "description": "HERD_UPLOAD_RATE_PER_MINUTE (API)"}
+      },
+      "required": ["perMinute", "uploadsPerMinute"]
+    },
     "publicUrl": {"type": "string", "pattern": "^(https?://[^/?#\\s]+)?$", "description": "The address browsers use (HERD_PUBLIC_URL), scheme://host[:port]; empty: derived from the Ingress"},
     "persistence": {
       "type": "object",
@@ -522,5 +532,5 @@
       "description": "OpenTelemetry"
     }
   },
-  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
+  "required": ["image", "imagePullSecrets", "api", "worker", "ai", "mcp", "oidc", "writeLimit", "publicUrl", "persistence", "s3", "backup", "podDisruptionBudget", "collab", "secrets", "database", "postgresql", "ingress", "networkPolicy", "metrics", "tracing"]
 }

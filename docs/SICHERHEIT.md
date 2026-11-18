@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **191 erfüllt**, **53 nicht anwendbar**, **9 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 131 erfüllt, 43 nicht anwendbar, 9 Lücke). Mit
+- Ergebnis: **192 erfüllt**, **53 nicht anwendbar**, **8 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 132 erfüllt, 43 nicht anwendbar, 8 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -91,7 +91,7 @@ gekürzten User-Agent, Anmeldezeit, letzte Nutzung aus J7) mit „Abmelden“ je
 App das Passwort ab; Personen ohne Passwort brauchen eine Anmeldung über einen schon
 verknüpften Anbieter, die höchstens 10 Minuten alt ist (an der Sitzung gemerkt).
 
-**J10 – Anti-Automatisierung für gewöhnliche Schreibvorgänge (V2.4.1). Geplant, M9b
+**J10 – Anti-Automatisierung für gewöhnliche Schreibvorgänge (V2.4.1). Gebaut, M9b
 Task 18.** *Entscheidung:* bauen. Eine Grenze je Person in PostgreSQL (wie
 `core/ratelimit.py`) für Nachrichten, Seiten, Tickets und Uploads, großzügige Standards
 (etwa 120 Schreibvorgänge und 30 Uploads je Minute), 429 `rate.limited` mit
@@ -186,6 +186,8 @@ einzelne Felder hinausgehen:
 | OIDC-Starts und Rückrufe | 30 je Adresse und Minute | `HERD_OIDC_RATE_PER_MINUTE` |
 | Gleichzeitiges Passwort-Hashing | 2 je Prozess, 16 wartend, sonst 429 `server.busy` | `HERD_PASSWORD_HASH_CONCURRENCY`, `HERD_PASSWORD_HASH_QUEUE` |
 | `/mcp` | 120 Aufrufe je Token und Minute | `HERD_MCP_RATE_PER_MINUTE` |
+| Schreibvorgänge an Inhalten (Seiten, Nachrichten, Tickets …) | 120 je Person oder Agent und Minute, sonst 429 `rate.limited` mit `Retry-After` | `HERD_WRITE_RATE_PER_MINUTE` |
+| Uploads (Anhänge, Importe) | 30 je Person und Minute, getrennt gezählt | `HERD_UPLOAD_RATE_PER_MINUTE` |
 | Externe Aufrufe je Lauf | 20 | `HERD_MCP_MAX_CALLS_PER_RUN` |
 | Persönliche Agenten je Person | 5 | `HERD_AI_PERSONAL_AGENTS_MAX` |
 | Automatisierungen je Person | 20 | `HERD_AI_AUTOMATIONS_MAX` |
@@ -194,8 +196,10 @@ einzelne Felder hinausgehen:
 Zusammenhänge zwischen Feldern (Ticket-Hierarchie, Sprint gehört zum Bereich,
 Statuskategorien) beschreibt [`TICKETS.md`](TICKETS.md), Rollen und Rechte der Bereiche
 [`WIKI.md`](WIKI.md); was Zeit und Geld kostet, der [Steckbrief](STECKBRIEF.md)
-(„Funktionen mit Laufzeit und Kosten“). Für gewöhnliche Schreibvorgänge gibt es keine
-Ratenbegrenzung je Person (J10).
+(„Funktionen mit Laufzeit und Kosten“). Gewöhnliche Schreibvorgänge zählt eine Grenze
+je Person und je Agent (M9b Task 18, J10; `core/write_limit.py`, `web/write_limits.py`,
+`agents/toolbox/writing.effect`): eine Anfrage zählt, bevor sie etwas tut, ein Werkzeug
+in der Transaktion seines Schritts; Metrik `herd_rate_limited_total{area}`.
 
 ## Dateien
 
@@ -435,7 +439,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V2.3 | V2.3.2 | L2 | Grenzen umgesetzt | erfüllt | Budgets je Organisation/Person/Agent (`ai/budgets.py`), Höchstzahlen (persönliche Agenten, Automatisierungen, externe Aufrufe je Lauf), Größen (`HERD_MAX_BODY_BYTES`, Anhänge, Importe). `tests/test_ai_budgets.py`, `tests/test_body_limit.py`. |
 | V2.3 | V2.3.3 | L2 | Transaktionen | erfüllt | Eine Transaktion je Anfrage (`core/db.py`, `auth/deps.py` SessionDep), je Termin, je Ereignis-Charge; Fehler rollen ganz zurück. `tests/test_errors.py::test_a_deadlock_or_serialization_failure_asks_to_try_again`. |
 | V2.3 | V2.3.4 | L2 | Sperren gegen Doppelbuchung | erfüllt | `version`-Spalten mit 409, Zeilensperren (`FOR UPDATE`, `SKIP LOCKED`), eindeutige Schlüssel (z. B. `(automation_id, due_at)`, Ticketnummern). `tests/test_concurrency.py`, `tests/test_budget_races.py`. |
-| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | Lücke | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen. Es fehlt eine Grenze je Person für gewöhnliche Schreibvorgänge (Nachrichten, Seiten, Tickets, Hochladen). J10, geplant M9b Task 18. |
+| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | erfüllt | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen und gewöhnliche Schreibvorgänge je Person und Agent (120 je Minute, Uploads 30 getrennt; 429 `rate.limited` mit `Retry-After`; `core/write_limit.py`; M9b Task 18, J10). `tests/test_write_limit.py::test_writes_beyond_the_limit_answer_429_with_retry_after`, `test_agents_count_like_people`. |
 
 ### V3 Web Frontend Security
 

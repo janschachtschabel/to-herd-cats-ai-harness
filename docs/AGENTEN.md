@@ -1741,6 +1741,7 @@ erst nach der Freigabe einer Person:
 | `HERD_MCP_CATALOG_DIR` | leer | API | Verzeichnis mit eigenen Katalog-Vorlagen der Installation (`*.yaml`, zusätzlich zu GitHub und GitLab; Chart `mcp.catalogConfigMap`; [`MCP.md`](MCP.md#katalog)) |
 | `HERD_MCP_MAX_CALLS_PER_RUN` | 20 | Worker | gesendete Aufrufe externer Werkzeuge je Lauf (1 bis 500); der nächste wird nicht gesendet (Chart `mcp.maxCallsPerRun`) |
 | `HERD_MCP_RATE_PER_MINUTE` | 120 | API | Aufrufe je Zugangstoken und Minute an `/mcp` (Chart `mcp.ratePerMinute`; [`MCP.md`](MCP.md#betrieb)) |
+| `HERD_WRITE_RATE_PER_MINUTE` | 120 | API, Worker | Schreibvorgänge je Person und je Agent und Minute; ein Agent hat seinen eigenen Zähler, ein schreibendes Werkzeug darüber meldet `rate.limited` und schreibt nichts (Chart `writeLimit.perMinute`; [`SICHERHEIT.md`](SICHERHEIT.md)) |
 | `HERD_AI_<NAME>` | – | API, Worker | Anbieterschlüssel, auf die Verbindungen mit `env:` verweisen |
 
 **Compose:** die Schlüssel in der optionalen Datei `deploy/compose/ai.env` (Vorlage

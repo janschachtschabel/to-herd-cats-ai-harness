@@ -112,6 +112,14 @@ oidc:
   existingSecret: ""
   egress: []
 
+## @section Write limit (M9b; docs/SICHERHEIT.md)
+
+## @param writeLimit.perMinute Writes to content (pages, messages, reactions, tickets, proposals, tags) one person, or one agent on its own count, may make per minute, counted in PostgreSQL across all pods, 1 to 100000 (HERD_WRITE_RATE_PER_MINUTE; API and worker). Beyond: 429 rate.limited with Retry-After; an agent's tool is refused and writes nothing
+## @param writeLimit.uploadsPerMinute Uploads (attachments, imports) one person may make per minute, counted apart from other writes, 1 to 100000 (HERD_UPLOAD_RATE_PER_MINUTE; API)
+writeLimit:
+  perMinute: 120
+  uploadsPerMinute: 30
+
 ## @param publicUrl The address browsers use (HERD_PUBLIC_URL), e.g. https://herd.example.com; WebSocket Origins (live editing) must match it. Empty: https://<first ingress host> when the Ingress has TLS, http://<first ingress host> without, and unset without an Ingress (Origins then must match the request's host)
 publicUrl: ""
 

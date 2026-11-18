@@ -3,6 +3,9 @@
     "auth": {
       "session_not_found": "This session no longer exists.",
       "reauth_required": "Please sign in again."
+    },
+    "rate": {
+      "limited": "Too many changes in a short time. Please wait a moment and try again."
     }
   },
   "security": {

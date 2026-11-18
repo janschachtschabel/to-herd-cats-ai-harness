@@ -73,10 +73,12 @@ from app.modules.wiki.versions_router import page_versions
 from app.version import app_version
 from app.web.collab_proxy import router as collab_relay
 from app.web.spa import mount_spa
+from app.web.write_limits import COUNTED
 
 
 def api_router() -> APIRouter:
-    """Everything under /api; unsafe methods need the CSRF header."""
+    """Everything under /api; unsafe methods need the CSRF header. Writes to content
+    count towards the person's write limit (`COUNTED`, `write_limits.py`)."""
     api = APIRouter(prefix="/api", dependencies=[Depends(csrf_guard)])
     api.include_router(maintenance_router)
     api.include_router(auth_router)
@@ -88,42 +90,42 @@ def api_router() -> APIRouter:
     api.include_router(oidc_admin.user_identities)
     api.include_router(groups_router)
     api.include_router(spaces_router)
-    api.include_router(wiki.space_pages)
-    api.include_router(wiki.pages)
-    api.include_router(wiki.space_trash)
-    api.include_router(page_versions)
-    api.include_router(proposals.space_proposals)
-    api.include_router(proposals.proposals)
-    api.include_router(page_attachments)
-    api.include_router(attachments)
-    api.include_router(space_transfer)
+    api.include_router(wiki.space_pages, dependencies=COUNTED)
+    api.include_router(wiki.pages, dependencies=COUNTED)
+    api.include_router(wiki.space_trash, dependencies=COUNTED)
+    api.include_router(page_versions, dependencies=COUNTED)
+    api.include_router(proposals.space_proposals, dependencies=COUNTED)
+    api.include_router(proposals.proposals, dependencies=COUNTED)
+    api.include_router(page_attachments, dependencies=COUNTED)
+    api.include_router(attachments, dependencies=COUNTED)
+    api.include_router(space_transfer, dependencies=COUNTED)
     api.include_router(page_export)
-    api.include_router(tags_router)
-    api.include_router(messaging.space_channels)
-    api.include_router(messaging.channels)
+    api.include_router(tags_router, dependencies=COUNTED)
+    api.include_router(messaging.space_channels, dependencies=COUNTED)
+    api.include_router(messaging.channels, dependencies=COUNTED)
     api.include_router(messaging_social.unread)  # before /conversations/{conversation_id}
-    api.include_router(messaging.conversations)
-    api.include_router(messaging.messages)
-    api.include_router(messaging.page_threads)
-    api.include_router(tickets.ticket_threads)
+    api.include_router(messaging.conversations, dependencies=COUNTED)
+    api.include_router(messaging.messages, dependencies=COUNTED)
+    api.include_router(messaging.page_threads, dependencies=COUNTED)
+    api.include_router(tickets.ticket_threads, dependencies=COUNTED)
     api.include_router(messaging_social.reads)
-    api.include_router(messaging_social.reactions)
+    api.include_router(messaging_social.reactions, dependencies=COUNTED)
     api.include_router(messaging_activity.activity)
-    api.include_router(messaging_dms.dms)
+    api.include_router(messaging_dms.dms, dependencies=COUNTED)
     api.include_router(messaging_dms.dm_inspect)
     api.include_router(messaging_live.live)
-    api.include_router(tickets.space_tickets)
+    api.include_router(tickets.space_tickets, dependencies=COUNTED)
     api.include_router(ticket_views.ticket_counts)  # before /tickets/{number}
     api.include_router(my_board.my_board)  # before /tickets/{number}
-    api.include_router(my_board.ticket_moves)
+    api.include_router(my_board.ticket_moves, dependencies=COUNTED)
     api.include_router(ticket_views.space_views)
-    api.include_router(tickets.tickets)
-    api.include_router(ticket_links.ticket_pages)
-    api.include_router(ticket_links.page_tickets)
+    api.include_router(tickets.tickets, dependencies=COUNTED)
+    api.include_router(ticket_links.ticket_pages, dependencies=COUNTED)
+    api.include_router(ticket_links.page_tickets, dependencies=COUNTED)
     api.include_router(ticket_statuses.space_statuses)
     api.include_router(ticket_statuses.statuses)
-    api.include_router(ticket_sprints.space_sprints)
-    api.include_router(ticket_sprints.sprints)
+    api.include_router(ticket_sprints.space_sprints, dependencies=COUNTED)
+    api.include_router(ticket_sprints.sprints, dependencies=COUNTED)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
@@ -151,7 +153,9 @@ def api_router() -> APIRouter:
     api.include_router(automations_router.automations)
     api.include_router(automations_router.agent_automations)
     api.include_router(automations_router.space_automations)
-    api.include_router(skill_transfer.skill_transfer)  # before /skills/{skill_id}
+    api.include_router(
+        skill_transfer.skill_transfer, dependencies=COUNTED
+    )  # before /skills/{skill_id}
     api.include_router(skills.skills)
     api.include_router(skill_assignments.agent_skills)
     api.include_router(skill_proposals.skill_proposals)

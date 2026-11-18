@@ -20,6 +20,13 @@ HTTP_REQUESTS = Counter(
     ["method", "route", "status"],
     registry=REGISTRY,
 )
+# Writes and uploads refused by the limit per person or agent (J10, `write_limit.py`).
+RATE_LIMITED = Counter(
+    "herd_rate_limited_total",
+    "Writes refused by the write limit per person or agent and minute.",
+    ["area"],
+    registry=REGISTRY,
+)
 HTTP_REQUEST_DURATION = Histogram(
     "herd_http_request_duration_seconds",
     "Duration of HTTP requests on the public port.",
