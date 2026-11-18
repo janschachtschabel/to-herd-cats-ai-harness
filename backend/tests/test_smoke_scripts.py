@@ -43,3 +43,16 @@ def test_the_rule_sees_the_forms_it_forbids() -> None:
     assert not PIPED_QUIET_GREP.search("grep -Eq '^a 1$' <<<\"$metrics\" || fail x")
     assert not PIPED_QUIET_GREP.search("backed_up || fail x")
     assert not PIPED_QUIET_GREP.search("cmd | grep -E x >/dev/null")
+
+
+def test_the_websocket_waits_for_announced_collab_instances() -> None:
+    """`up --wait` means healthy, not announced: a collab instance announces itself every
+    5 s from its start, so one that started before the API nodes listened is unknown to
+    the relay for up to 5 s more, and the relay answers 4502 (CI run 44391448359, the
+    SMOKE_NODES run: both announcements failed, the WebSocket came 0.3 s before the
+    next). The smoke opens the WebSocket only once the instances are live."""
+    commands = "\n".join(_commands(ROOT / "deploy" / "compose" / "smoke.sh"))
+    wait = re.search(r"for _ in \$\(seq \d+\); do \[\[ \$\(live_instances\) == ", commands)
+    websocket = commands.find("ws://127.0.0.1:8080/collab/")
+    assert wait is not None, "no bounded wait for the live collab instances"
+    assert 0 <= wait.start() < websocket

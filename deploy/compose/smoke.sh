@@ -143,6 +143,20 @@ if [[ $s3 == 1 ]]; then
   [[ $checked == "ok s3" ]] || fail "storage check printed: $checked"
 fi
 
+# Collab instances (plan M9 task 15): role all announces its one child, the nodes
+# setup collab-a and collab-b. `up --wait` means healthy, not announced: an instance
+# announces itself every 5 s from its start, and one that started before the API
+# listened is unknown to the relay (4502) until its next heartbeat after that. So the
+# WebSocket below waits until every instance is live (at most 30 s: several heartbeats).
+sql() { "${compose[@]}" exec -T db psql -tA -U herd -d herd -c "$1" | tr -d '\r'; }
+live_instances() {
+  sql "SELECT count(*) FROM collab_instance WHERE heartbeat_at > now() - interval '15 seconds'"
+}
+want_instances=$([[ ${SMOKE_NODES:-0} == 1 ]] && echo 2 || echo 1)
+for _ in $(seq 60); do [[ $(live_instances) == "$want_instances" ]] && break; sleep 0.5; done
+instances=$(live_instances)
+[[ $instances == "$want_instances" ]] || fail "$instances live collab instances announced themselves"
+
 # Live editing: the WebSocket through the API's relay to the collab process. With the
 # owner's cookie the relay hands the collab process a grant for the page, which
 # authenticates the Hocuspocus client (answer: Auth/Authenticated); without a cookie
@@ -185,12 +199,9 @@ with connect(url, additional_headers=origin) as ws:
     except ConnectionClosed as closed:
         assert closed.rcvd is not None and closed.rcvd.code == 4401, closed.rcvd
 PY
-# Collab instances (plan M9 task 15): role all announces its one child, the nodes
-# setup collab-a and collab-b; the page just opened is bound to exactly one of them.
-sql() { "${compose[@]}" exec -T db psql -tA -U herd -d herd -c "$1" | tr -d '\r'; }
-instances=$(sql "SELECT count(*) FROM collab_instance WHERE heartbeat_at > now() - interval '15 seconds'")
-[[ $instances == $([[ ${SMOKE_NODES:-0} == 1 ]] && echo 2 || echo 1) ]] \
-  || fail "$instances live collab instances announced themselves"
+# Still every instance live, and the page just opened bound to exactly one of them.
+instances=$(live_instances)
+[[ $instances == "$want_instances" ]] || fail "$instances live collab instances after the WebSocket"
 [[ $(sql "SELECT count(*) FROM collab_page_owner WHERE page_id = '$page_id' AND epoch = 1") == 1 ]] \
   || fail "the page is not bound to one collab instance"
 
