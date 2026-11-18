@@ -210,3 +210,16 @@ def test_a_duration_must_end_within_the_calendars_years() -> None:
     )
     assert recurrence.last_end(every) is not None
     assert len(recurrence.occurrences(every, *TIME_ENDS[2])) == 500
+
+
+@pytest.mark.parametrize("rule", ["FREQ=DAILY;", "FREQ=DAILY;COUNT=3; ", "rrule:freq=daily;"])
+def test_a_trailing_semicolon_is_taken(rule: str) -> None:
+    # M-7: some producers end a rule with ";"; an empty part elsewhere stays refused.
+    assert recurrence.check_rule(rule).startswith("FREQ=DAILY")
+
+
+@pytest.mark.parametrize("rule", ["FREQ=DAILY;;", "FREQ=DAILY;;COUNT=3", ";FREQ=DAILY", ";"])
+def test_empty_parts_are_refused(rule: str) -> None:
+    with pytest.raises(RuleInvalid) as refused:
+        recurrence.check_rule(rule)
+    assert refused.value.code == "event.rrule_invalid"

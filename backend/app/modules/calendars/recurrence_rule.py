@@ -117,6 +117,8 @@ def _split(text: str) -> dict[str, str]:
     body = text.strip()
     if body.upper().startswith("RRULE:"):
         body = body[len("RRULE:") :]
+    if body.endswith(";"):  # some producers end the rule with one
+        body = body[:-1]
     if not body or len(body) > MAX_CHARS:
         raise _invalid()
     parts: dict[str, str] = {}
