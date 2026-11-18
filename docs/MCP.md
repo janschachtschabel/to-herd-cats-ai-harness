@@ -529,8 +529,21 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
 - Audit `oauth_client.created`, `.updated` (Feldnamen, beim Geheimnis nur seine Art,
   bei neuen Endpunkten `moved` mit den Zahlen getrennter Konnektoren), `.deleted`; nie
   Werte.
-- **Beim Anbieter registrieren**: Als Rückleitungsadresse (Callback-URL) trägt man
-  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` ein, genau so.
+- **Beim Anbieter registrieren**: Jede OAuth-App hat eine eigene Rückleitungsadresse
+  (Callback-URL), `<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback` (seit M9b; `id` ist
+  die der App hier, nicht die Client-ID beim Anbieter). Die Antwort nennt sie als
+  `callback_url`, die Karte der App zeigt sie; sie wird beim Anbieter genau so
+  eingetragen (bei GitHub und GitLab geht das auch nach dem Anlegen). **Nach dem Update
+  auf M9b**: Für jede bestehende OAuth-App die neue Adresse beim Anbieter eintragen;
+  bestehende Verbindungen laufen weiter (das Erneuern braucht keine Rückleitung), nur
+  neues Verbinden braucht sie.
+- **Aussteller** (`issuer`, optional) und `issuer_in_response`: Der Aussteller des
+  Autorisierungsservers (RFC 8414); schickt der Server in seiner Antwort `iss` mit
+  (RFC 9207), muss es genau dieser sein. `issuer_in_response: true` (aus den
+  Metadaten, `authorization_response_iss_parameter_supported`) heißt, der Server
+  schickt `iss` immer; eine Antwort ohne gilt dann als fremd. Ohne Aussteller (422
+  `oauth_client.issuer_required` mit `issuer_in_response`) wird ein gesendetes `iss`
+  nicht verglichen; dann schützt allein die eigene Rückleitungsadresse.
 - **Ermitteln** (`POST /api/ai/oauth-clients/discover` mit `{"url": "<MCP-Server>"}`):
   schlägt die Felder vor, wie die MCP-Autorisierung (Stand 2025-11-25) es vorsieht:
   Zuerst wird der Server ohne Token gefragt; nennt seine 401-Antwort in
@@ -556,15 +569,20 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   `{"authorization_url"}`; die Oberfläche schickt den Browser dorthin. Die Adresse
   trägt `response_type=code`, `client_id`, `redirect_uri`, `state`, die
   S256-`code_challenge`, `scope` und `resource`, nie das Client-Geheimnis.
-- **Rückkehr**: Der Anbieter schickt den Browser an `GET /api/ai/oauth/callback`. Der
-  Code wird eingelöst (mit Prüfwert, derselben Rückleitungsadresse und `resource`),
+- **Rückkehr**: Der Anbieter schickt den Browser an
+  `GET /api/ai/oauth/<id>/callback`, die Rückleitungsadresse seiner App. Ein Ablauf
+  wird nur an der Adresse beendet, mit der er begann (sonst `invalid`, der Ablauf ist
+  verbraucht, nichts wird eingelöst), und `iss` muss passen (sonst `issuer_mismatch`,
+  ebenso). Der Code wird eingelöst (mit Prüfwert, derselben Rückleitungsadresse und `resource`),
   die Token als `enc:` gespeichert, die Version des Konnektors erhöht, Audit
   `connector.connected` (Geltung, ob ein Erneuerungstoken kam). Danach geht der
   Browser auf die Seite `/ai/oauth/done?status=…` (mit `connector` und `scope`, wenn
   bekannt); `status` ist `connected`, `denied` (abgelehnt beim Anbieter), `failed`
-  (Fehler des Anbieters oder beim Einlösen) oder `invalid` (unbekannter, benutzter,
-  abgelaufener oder fremder `state`, Konnektor weg, Rechte weg). Was der Anbieter
-  sagt, steht nie in dieser Adresse.
+  (Fehler des Anbieters oder beim Einlösen), `invalid` (unbekannter, benutzter,
+  abgelaufener oder fremder `state`, falsche Rückleitungsadresse, Konnektor weg,
+  Rechte weg) oder `issuer_mismatch` (`iss` nicht der Aussteller der App, oder es
+  fehlt, obwohl der Server es zugesagt hat). Was der Anbieter sagt, steht nie in
+  dieser Adresse.
 - **Trennen**: `POST …/{id}/disconnect` mit `{"version"}` löscht die Token (Audit
   `connector.disconnected`) und widerruft sie nach dem Commit beim Anbieter (RFC 7009,
   erst das Erneuerungstoken, dann das Zugangstoken), sofern der Client einen
@@ -581,8 +599,12 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   der Anweisung gelöscht, die sie findet, also genau **einmal** eingelöst. Eine
   Rückkehr aus einer anderen Sitzung verbraucht sie nicht. Abgemeldete Sitzungen
   nehmen ihre offenen Abläufe mit.
-- Die **Rückleitungsadresse** ist `HERD_PUBLIC_URL` plus `/api/ai/oauth/callback`, nie
-  aus Kopfzeilen der Anfrage (`Host`, `X-Forwarded-Host`). Ohne `HERD_PUBLIC_URL` oder
+- Die **Rückleitungsadresse** ist `HERD_PUBLIC_URL` plus `/api/ai/oauth/<id>/callback`
+  (je App eine eigene, Schutz gegen Mix-up-Angriffe: die Antwort eines Servers kann
+  keinen Ablauf beenden, der mit einem anderen begann), nie aus Kopfzeilen der Anfrage
+  (`Host`, `X-Forwarded-Host`). Die gemeinsame Adresse früherer Versionen,
+  `/api/ai/oauth/callback`, beendet nur noch Abläufe, die mit ihr begannen (also
+  höchstens 10 Minuten nach dem Update). Ohne `HERD_PUBLIC_URL` oder
   mit `http` außer für `localhost`/`127.0.0.1` gibt es kein OAuth (422
   `connector.oauth_unconfigured`).
 - Das Sitzungs-Cookie ist `SameSite=Lax`; die Rückkehr ist eine Navigation, es kommt
@@ -866,7 +888,8 @@ Werkzeug einzeln: Eine Vorlage schlägt nur vor.
 
 - **GitHub** bietet keine dynamische Client-Registrierung: Für OAuth legt die
   Organisation eine eigene GitHub-App (empfohlen: Token laufen ab und werden erneuert)
-  oder OAuth-App an, Callback-URL `<HERD_PUBLIC_URL>/api/ai/oauth/callback`. GitHub
+  oder OAuth-App an, Callback-URL die der OAuth-App hier
+  (`<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback`, auf ihrer Karte). GitHub
   hat keinen Widerrufs-Endpunkt nach RFC 7009; Zugänge widerruft man bei GitHub in den
   Einstellungen des Kontos. GitHub Enterprise Server hat keinen entfernten MCP-Server.
   Nicht geprüft werden konnte, ob GitHubs Autorisierungsserver den Parameter
@@ -1019,8 +1042,8 @@ im Prozess (keine Sitzungen, keine Streams). Für den Weg dorthin gilt:
   Proxy); private Hosts zusätzlich in `HERD_MCP_ALLOWED_HOSTS`.
 - **OAuth:** `HERD_PUBLIC_URL` (Chart `publicUrl`, sonst aus dem ersten Ingress-Host)
   muss die Adresse sein, unter der Browser die App öffnen; die Rückleitungsadresse
-  `<HERD_PUBLIC_URL>/api/ai/oauth/callback` muss beim Anbieter genau so eingetragen
-  sein. Ihr Query enthält den Code: Er steht im Zugriffsprotokoll des Proxys, ist aber
+  jeder OAuth-App, `<HERD_PUBLIC_URL>/api/ai/oauth/<id>/callback`, muss beim Anbieter
+  genau so eingetragen sein (nach dem Update auf M9b neu eintragen). Ihr Query enthält den Code: Er steht im Zugriffsprotokoll des Proxys, ist aber
   nur einmal und nur mit Prüfwert einlösbar.
 
 ### Einstellungen

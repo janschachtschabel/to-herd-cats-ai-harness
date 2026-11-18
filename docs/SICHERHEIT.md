@@ -11,8 +11,8 @@ Anforderung der Stufen 1 und 2 hat unten eine Zeile; die Stufe 3 ist nicht gepr�
   Lizenz CC BY-SA 4.0. Die Spalte „Thema“ ist eine eigene deutsche Kurzfassung, nicht der
   Wortlaut; maßgeblich ist der Text des Standards zur jeweiligen Nummer.
 - Umfang: 345 Anforderungen, davon 253 in den Stufen 1 und 2 (70 L1, 183 L2).
-- Ergebnis: **194 erfüllt**, **53 nicht anwendbar**, **6 Lücke** (L1: 60 erfüllt,
-  10 nicht anwendbar, 0 Lücke; L2: 134 erfüllt, 43 nicht anwendbar, 6 Lücke). Mit
+- Ergebnis: **195 erfüllt**, **53 nicht anwendbar**, **5 Lücke** (L1: 60 erfüllt,
+  10 nicht anwendbar, 0 Lücke; L2: 135 erfüllt, 43 nicht anwendbar, 5 Lücke). Mit
   M9b Task 16 (TOTP) sind V6.4.4 und V6.5.1 bis V6.5.5 erfüllt.
 - `backend/tests/test_security_doc.py` prüft, dass diese Liste jede Nummer genau einmal
   enthält, nur die drei Status nutzt und jede Lücke ihrer Frage (J3, J7 bis J14) und
@@ -126,12 +126,17 @@ in konstanter Zeit verglichen), der Collab-Prozess sendet nur das aktuelle; im C
 optionale Schlüssel `previous` im Secret des Tokens (V13.2.1, Ablauf in
 [`WIKI.md`](WIKI.md#internes-token-wechseln)).
 
-**J13 – Mix-up-Schutz für den OAuth-Client der Konnektoren (V10.2.2). Geplant, M9b
-Task 18.** OIDC ist schon geschützt (eigene Rückruf-Adresse je Anbieter, `iss` im
-ID-Token exakt). *Entscheidung:* bauen. Eine Rückruf-Adresse je OAuth-Client
-(`/api/ai/oauth/<client_id>/callback`) und die Prüfung von `iss` in der
-Autorisierungsantwort (RFC 9207), wenn der Server ihn schickt. Bestehende Registrierungen
-brauchen die neue Rückruf-Adresse (Hinweis in `docs/MCP.md`).
+**J13 – Mix-up-Schutz für den OAuth-Client der Konnektoren (V10.2.2). Gebaut, M9b
+Task 18.** OIDC war schon geschützt (eigene Rückruf-Adresse je Anbieter, `iss` im
+ID-Token exakt). *Entscheidung:* bauen. Jede OAuth-App hat eine eigene Rückruf-Adresse
+(`/api/ai/oauth/<id>/callback`, `oauth/callbacks.py`); eine Antwort beendet nur den
+Ablauf, der mit genau dieser Adresse begann. `iss` in der Autorisierungsantwort
+(RFC 9207) wird mit dem Aussteller der App verglichen, wenn der Server ihn schickt;
+hat er ihn zugesagt (`authorization_response_iss_parameter_supported`, beim Ermitteln
+übernommen), muss er ihn schicken. Sonst `issuer_mismatch`, und kein Code wird
+eingelöst. Die gemeinsame Adresse früherer Versionen beendet nur Abläufe, die mit ihr
+begannen. Bestehende Registrierungen brauchen die neue Rückruf-Adresse (Hinweis in
+[`MCP.md`](MCP.md)).
 
 **J14 – Getrennte Datenbankrollen (V13.2.2). Geplant, M9b Task 18.** *Entscheidung:*
 bauen, als Option. Eine Migrationsrolle besitzt das Schema, die Laufzeitrolle bekommt nur
@@ -602,7 +607,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V10.1 | V10.1.1 | L2 | Token nur dorthin, wo nötig | erfüllt | OAuth-Token der Konnektoren bleiben im Backend (`enc:`), Klartext nur in `connectors/credentials.headers_for` für ihren Ursprung (`connectors/moving.py`); der Browser sieht sie nie. `tests/test_oauth_secrecy.py`. |
 | V10.1 | V10.1.2 | L2 | Werte nur aus eigenem Ablauf | erfüllt | OIDC: `state`, `nonce`, PKCE je 256 Bit, an den Browser gebunden (Bindungs-Cookie) und einmalig; OAuth der Konnektoren: `state` an die Sitzung gebunden (`oauth/flow.py`). `tests/test_oidc_flow.py`, `tests/test_oauth_flow.py`. |
 | V10.2 | V10.2.1 | L2 | CSRF beim Code-Flow | erfüllt | PKCE S256 und `state` in beiden Clients. `tests/test_oidc_flow.py::test_the_authorization_request_carries_pkce_nonce_and_the_public_callback`. |
-| V10.2 | V10.2.2 | L2 | Mix-up-Schutz | Lücke | OIDC ja (eigene Rückruf-URL je Anbieter, `iss` im ID-Token exakt). Der OAuth-Client der Konnektoren hat eine gemeinsame Rückruf-URL und prüft `iss` (RFC 9207) nicht. J13, geplant M9b Task 18. |
+| V10.2 | V10.2.2 | L2 | Mix-up-Schutz | erfüllt | OIDC: eigene Rückruf-URL je Anbieter, `iss` im ID-Token exakt. Konnektoren: eigene Rückruf-URL je OAuth-App, eine Antwort nur an der Adresse ihres Ablaufs, `iss` (RFC 9207) gegen den Aussteller der App (`oauth/callbacks.py`; M9b Task 18, J13). `tests/test_oauth_mixup.py::test_callback_per_client_and_iss_checked`. |
 | V10.3 | V10.3.1 | L2 | Resource Server: Zielgruppe | erfüllt | `/mcp` nimmt nur eigene Referenztoken (`herd_pat_`/`herd_agt_`), gültig nur dort (`modules/tokens`). `tests/test_token_resolve.py`. |
 | V10.3 | V10.3.2 | L2 | Resource Server: Entscheidung nach Claims | erfüllt | Bei jedem Aufruf: Rechte der Person, Bereiche des Tokens, KI-Richtlinie (`mcp_tools`, `tokens`). `tests/test_token_reach.py`, `tests/test_token_no_ai.py`. |
 | V10.3 | V10.3.3 | L2 | Resource Server: Person eindeutig | erfüllt | Das Token verweist auf genau eine Person oder einen Agenten (`tokens/models.py`). |

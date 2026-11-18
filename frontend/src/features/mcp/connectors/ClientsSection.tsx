@@ -29,6 +29,14 @@ function ClientCard({ client }: { client: OAuthClient }) {
             ? t(`mcp.clients.secretKinds.${client.client_secret_kind ?? 'enc'}`)
             : t('mcp.clients.secretNone')}
         </dd>
+        <dt className="text-muted-foreground">{t('mcp.clients.fields.callback')}</dt>
+        <dd className="font-mono text-xs break-all">
+          {client.callback_url ?? (
+            <span className="font-sans text-muted-foreground">
+              {t('mcp.clients.callbackMissing')}
+            </span>
+          )}
+        </dd>
         {client.scopes && (
           <>
             <dt className="text-muted-foreground">{t('mcp.clients.fields.scopes')}</dt>

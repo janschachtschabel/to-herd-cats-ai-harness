@@ -120,7 +120,13 @@ export function serverSearch(search: Record<string, unknown>): ServerSearch {
   return { read: REMOTE_STATUSES.find((status) => status === search.read) }
 }
 
-const OAUTH_STATUSES: readonly OAuthStatus[] = ['connected', 'denied', 'failed', 'invalid']
+const OAUTH_STATUSES: readonly OAuthStatus[] = [
+  'connected',
+  'denied',
+  'failed',
+  'invalid',
+  'issuer_mismatch',
+]
 
 export interface OAuthDoneSearch {
   /** How the provider's sign-in ended (the API's fixed words; anything else: failed). */

@@ -69,7 +69,8 @@ const MODES_NEW: readonly ClientSecretMode[] = ['none', 'value', 'env']
 const MODES_EDIT: readonly ClientSecretMode[] = ['keep', 'none', 'value', 'env']
 
 /** An OAuth app's fields: where it signs in, its id at the provider, its secret (none
- *  for a public app; only ever written), scopes and the resource it asks for. */
+ *  for a public app; only ever written), scopes, the resource it asks for and the
+ *  issuer its answers must name (mix-up protection). */
 export function ClientFields({
   form,
   creating = false,
@@ -158,6 +159,11 @@ export function ClientFields({
       </fieldset>
       {text('scopes', t('mcp.clients.fields.scopes'), t('mcp.clients.scopesHint'))}
       {text('resource', t('mcp.clients.fields.resource'), t('mcp.clients.resourceHint'))}
+      {text('issuer', t('mcp.clients.fields.issuer'), t('mcp.clients.issuerHint'))}
+      <label className="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" {...form.register('issuer_in_response')} />
+        {t('mcp.clients.fields.issuerInResponse')}
+      </label>
     </>
   )
 }

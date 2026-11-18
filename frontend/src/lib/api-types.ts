@@ -1559,11 +1559,31 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Oauth Callback
-         * @description The authorization server's redirect: finish the flow, then send the browser to
-         *     the result page (`/ai/oauth/done?status=...`).
+         * Oauth Legacy Callback
+         * @description The shared callback of earlier releases: only for flows started with it.
          */
-        get: operations["oauth_callback_api_ai_oauth_callback_get"];
+        get: operations["oauth_legacy_callback_api_ai_oauth_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/oauth/{client_id}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oauth Callback
+         * @description An app's authorization server's redirect: finish the flow started with this
+         *     callback, then send the browser to the result page (`/ai/oauth/done?status=...`).
+         */
+        get: operations["oauth_callback_api_ai_oauth__client_id__callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5471,6 +5491,13 @@ export interface components {
             /** Client Id */
             client_id: string;
             client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Issuer */
+            issuer?: string | null;
+            /**
+             * Issuer In Response
+             * @default false
+             */
+            issuer_in_response?: boolean;
             /** Name */
             name: string;
             /** Resource */
@@ -5491,6 +5518,8 @@ export interface components {
         ClientOut: {
             /** Authorization Endpoint */
             authorization_endpoint: string;
+            /** Callback Url */
+            callback_url: string | null;
             /** Client Id */
             client_id: string;
             client_secret_kind: components["schemas"]["SecretKind"] | null;
@@ -5506,6 +5535,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Issuer */
+            issuer: string | null;
+            /** Issuer In Response */
+            issuer_in_response: boolean;
             /** Name */
             name: string;
             /** Resource */
@@ -5536,6 +5569,10 @@ export interface components {
             /** Client Id */
             client_id?: string | null;
             client_secret?: components["schemas"]["SecretIn"] | null;
+            /** Issuer */
+            issuer?: string | null;
+            /** Issuer In Response */
+            issuer_in_response?: boolean | null;
             /**
              * Keep Shared Connectors
              * @default false
@@ -5987,6 +6024,8 @@ export interface components {
             authorization_endpoint: string | null;
             /** Issuer */
             issuer: string | null;
+            /** Issuer In Response */
+            issuer_in_response: boolean;
             /** Pkce */
             pkce: boolean;
             /** Registration */
@@ -13940,15 +13979,50 @@ export interface operations {
             };
         };
     };
-    oauth_callback_api_ai_oauth_callback_get: {
+    oauth_legacy_callback_api_ai_oauth_callback_get: {
         parameters: {
             query?: {
                 state?: string | null;
                 code?: string | null;
                 error?: string | null;
+                iss?: string | null;
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth_callback_api_ai_oauth__client_id__callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+                iss?: string | null;
+            };
+            header?: never;
+            path: {
+                client_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

@@ -6,7 +6,9 @@ the client secret as a reference (`enc:`/`env:`, absent for a public client, whi
 relies on PKCE alone), how the secret is presented at the token endpoint
 (`token_auth`), the scopes asked for and the `resource` (RFC 8707: the MCP server the
 tokens are for). Connectors of kind `oauth` name one; a personal-scope MCP server may
-name the one its people connect with.
+name the one its people connect with. Its `issuer` (RFC 8414) is compared with the `iss`
+of an authorization response (RFC 9207), which `issuer_in_response` says the server
+always sends (M9b, J13); each app has a callback of its own (`callbacks.py`).
 
 `oauth_flow`: one authorization in progress. Only the SHA-256 of `state` is kept; the
 PKCE verifier is `enc:`; the flow belongs to the login session that started it and
@@ -19,6 +21,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -26,6 +29,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -68,6 +72,10 @@ class OAuthClient(UuidPk, OrgScoped, Timestamps, Base):
     token_auth: Mapped[TokenAuth] = mapped_column(String(32), nullable=False)
     scopes: Mapped[str] = mapped_column(String(MAX_SCOPES_CHARS), nullable=False, default="")
     resource: Mapped[str | None] = mapped_column(String(MAX_URL_CHARS))
+    issuer: Mapped[str | None] = mapped_column(String(MAX_URL_CHARS))
+    issuer_in_response: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 

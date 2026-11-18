@@ -55,12 +55,14 @@ auth:
     note:
       de: >-
         In GitLab eine Anwendung mit dem Scope `mcp` anlegen, „Confidential“ abwählen
-        (dann ohne Client-Geheimnis, nur PKCE); Callback-URL ist
-        <HERD_PUBLIC_URL>/api/ai/oauth/callback.
+        (dann ohne Client-Geheimnis, nur PKCE). Die Callback-URL zeigt die Karte der
+        OAuth-App nach dem Einrichten (<HERD_PUBLIC_URL>/api/ai/oauth/<ID>/callback);
+        sie lässt sich in GitLab nachträglich eintragen.
       en: >-
         Create an application in GitLab with the `mcp` scope and clear "Confidential"
-        (then without a client secret, PKCE only); the callback URL is
-        <HERD_PUBLIC_URL>/api/ai/oauth/callback.
+        (then without a client secret, PKCE only). The OAuth app's card shows the
+        callback URL once set up (<HERD_PUBLIC_URL>/api/ai/oauth/<ID>/callback); it can
+        be entered in GitLab afterwards.
   - kind: bearer
     note:
       de: >-

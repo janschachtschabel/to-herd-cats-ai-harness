@@ -44,6 +44,8 @@ _FIELDS = (
     "token_auth",
     "scopes",
     "resource",
+    "issuer",
+    "issuer_in_response",
 )
 
 
@@ -82,13 +84,13 @@ class ClientService:
         await repo.lock_names()
         if await repo.name_taken(data.name):
             raise Conflict(code="oauth_client.name_taken")
-        client = await repo.add(
-            OAuthClient(
-                org_id=actor.org_id,
-                **{name: getattr(data, name) for name in _FIELDS},
-                client_secret_ref=_secret_ref(data.client_secret),
-            )
+        made = OAuthClient(
+            org_id=actor.org_id,
+            **{name: getattr(data, name) for name in _FIELDS},
+            client_secret_ref=_secret_ref(data.client_secret),
         )
+        _check_issuer(made)
+        client = await repo.add(made)
         details = {"secret": _kind(client.client_secret_ref), "token_auth": client.token_auth}
         await self._audit(actor, "oauth_client.created", client, details)
         return client
@@ -128,6 +130,7 @@ class ClientService:
             if getattr(client, name) != value:
                 setattr(client, name, value)
                 changed.add(name)
+        _check_issuer(client)
         if "client_secret" in data.model_fields_set:
             client.client_secret_ref = _secret_ref(data.client_secret)
             changed.add("client_secret")
@@ -162,6 +165,12 @@ def _found(client: OAuthClient | None) -> OAuthClient:
     if client is None:
         raise client_not_found()
     return client
+
+
+def _check_issuer(client: OAuthClient) -> None:
+    """A server said to send `iss` always (J13) is checked against a known issuer."""
+    if client.issuer_in_response and client.issuer is None:
+        raise ValidationFailed(code="oauth_client.issuer_required")
 
 
 def _check_url(url: str | None) -> None:

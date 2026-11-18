@@ -40,12 +40,15 @@ auth:
     note:
       de: >-
         Eine GitHub-App (empfohlen, Token laufen ab und werden erneuert) oder OAuth-App
-        anlegen; Callback-URL ist <HERD_PUBLIC_URL>/api/ai/oauth/callback. Widerrufen
-        lässt sich nur in den Einstellungen des Kontos bei GitHub.
+        anlegen. Die Callback-URL zeigt die Karte der OAuth-App nach dem Einrichten
+        (<HERD_PUBLIC_URL>/api/ai/oauth/<ID>/callback); sie lässt sich bei GitHub
+        nachträglich eintragen. Widerrufen lässt sich nur in den Einstellungen des Kontos
+        bei GitHub.
       en: >-
         Create a GitHub App (recommended: tokens expire and are renewed) or an OAuth
-        App; the callback URL is <HERD_PUBLIC_URL>/api/ai/oauth/callback. Revoking is
-        only possible in the account's settings at GitHub.
+        App. The OAuth app's card shows the callback URL once set up
+        (<HERD_PUBLIC_URL>/api/ai/oauth/<ID>/callback); it can be entered at GitHub
+        afterwards. Revoking is only possible in the account's settings at GitHub.
   - kind: bearer
     note:
       de: Persönliches Zugriffstoken (fein granular empfohlen), gesendet als Bearer-Token.

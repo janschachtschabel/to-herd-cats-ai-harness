@@ -5,13 +5,15 @@ with PKCE (RFC 7636, S256).
   `ai.use` for a personal one): a fresh `state` (256 bits) and verifier; Postgres
   keeps the state's SHA-256, the verifier `enc:`, the login session and the redirect
   URI, for `FLOW_MINUTES`. The redirect URI is the configured public address
-  (`HERD_PUBLIC_URL`) plus `CALLBACK_PATH`, never taken from the request; without
-  that address, or with plain http other than localhost, there is no OAuth (422
-  `connector.oauth_unconfigured`).
+  (`HERD_PUBLIC_URL`) plus the app's own callback (`callbacks.py`), never taken from
+  the request; without that address, or with plain http other than localhost, there
+  is no OAuth (422 `connector.oauth_unconfigured`).
 - `finish` (the callback, in the browser of the person who started): the flow the
   state names is deleted in the statement that finds it, only for the login session
-  that started it and before it expires, so it is used once. The rights are checked
-  again, the transaction committed, then the code exchanged (with the verifier, the
+  that started it and before it expires, so it is used once. It must have come back to
+  the callback the flow names, and `iss` must fit the app (mix-up, `callbacks.py`). The
+  rights are checked again, the transaction committed, then the code exchanged (with
+  the verifier, the
   same redirect URI and the resource) through the egress guard; the tokens are stored
   `enc:`. The answer is a fixed status for the page the browser goes to next
   (`Outcome`), never the provider's words.
@@ -19,17 +21,17 @@ with PKCE (RFC 7636, S256).
 """
 
 import hashlib
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
 from app.core.access import Actor, actor_for
-from app.core.config import get_settings
 from app.core.errors import NotFound, Unauthorized, ValidationFailed
 from app.core.models_base import utcnow
 from app.modules.audit.recorder import record
@@ -39,15 +41,16 @@ from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
 from app.modules.connectors.repository import ConnectorRepository, scope_of
 from app.modules.connectors.service import ConnectorService, connector_not_found
 from app.modules.oauth import protocol
+from app.modules.oauth.callbacks import arrived_where_sent, issuer_matches, redirect_uri
 from app.modules.oauth.models import OAuthClient, OAuthFlow
 from app.modules.oauth.repository import ClientRepository, FlowRepository
 from app.modules.oauth.revocation import schedule_revocation
 from app.modules.oauth.tokens import credentials_of, forget, store, timed
 
-CALLBACK_PATH = "/api/ai/oauth/callback"
+logger = logging.getLogger(__name__)
+
 DONE_PATH = "/ai/oauth/done"
 FLOW_MINUTES = 10
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 class Outcome(StrEnum):
@@ -55,6 +58,17 @@ class Outcome(StrEnum):
     DENIED = "denied"  # the person declined at the provider
     FAILED = "failed"  # the provider answered with an error, or the exchange failed
     INVALID = "invalid"  # unknown, used, expired or someone else's state; rights gone
+    ISSUER_MISMATCH = "issuer_mismatch"  # `iss` not the app's issuer (RFC 9207)
+
+
+@dataclass(frozen=True, slots=True)
+class Response:
+    """The authorization response's query (RFC 6749 4.1.2, RFC 9207)."""
+
+    state: str | None
+    code: str | None
+    error: str | None
+    iss: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,14 +82,6 @@ class Finished:
         if self.connector is not None:
             query |= {"connector": str(self.connector.id), "scope": self.connector.scope}
         return f"{DONE_PATH}?{urlencode(query)}"
-
-
-def redirect_uri() -> str:
-    public = get_settings().public_url
-    parts = urlsplit(public) if public else None
-    if parts is None or (parts.scheme != "https" and parts.hostname not in _LOCAL_HOSTS):
-        raise ValidationFailed(code="connector.oauth_unconfigured")
-    return public.rstrip("/") + CALLBACK_PATH  # type: ignore[union-attr]
 
 
 def _hash(state: str) -> str:
@@ -113,10 +119,10 @@ class FlowService:
         connector_id: uuid.UUID,
     ) -> str:
         _, connector = await self._oauth(actor, scope, connector_id)
-        uri = redirect_uri()
+        client = await self._client(connector)
+        uri = redirect_uri(client.id)
         if session_id is None:
             raise Unauthorized(code="auth.session_invalid")
-        client = await self._client(connector)
         state, verifier = protocol.new_state(), protocol.new_verifier()
         flows = FlowRepository(self.session, actor.org_id)
         now = utcnow()
@@ -143,13 +149,18 @@ class FlowService:
         )
 
     async def finish(
-        self, auth: AuthContext | None, state: str | None, code: str | None, error: str | None
+        self,
+        auth: AuthContext | None,
+        response: Response,
+        via: uuid.UUID | None,
     ) -> Finished:
+        """`via`: the app whose callback the response came to (None: the shared one)."""
+        state, code, error = response.state, response.code, response.error
         if auth is None or auth.session_id is None or not state:
             return Finished(Outcome.INVALID)
         flows = FlowRepository(self.session, auth.org_id)
         flow = await flows.take(_hash(state), auth.session_id, utcnow())
-        if flow is None:
+        if flow is None or not arrived_where_sent(flow, via):
             return Finished(Outcome.INVALID)
         actor = await actor_for(self.session, auth)
         scope = await scope_of(self.session, auth.org_id, flow.connector_id)
@@ -159,12 +170,18 @@ class FlowService:
             repo, connector = await self._oauth(actor, ConnectorScope(scope), flow.connector_id)
         except (NotFound, ValidationFailed):
             return Finished(Outcome.INVALID)
+        if via is not None and connector.oauth_client_id != via:
+            return Finished(Outcome.INVALID)  # the app changed since the flow began
+        client = await self._client(connector)
+        if not issuer_matches(client, response.iss):
+            await self.session.commit()  # the flow is used up; no code is exchanged
+            logger.warning("oauth.issuer_mismatch", extra={"oauth_client_id": str(client.id)})
+            return Finished(Outcome.ISSUER_MISMATCH, connector)
         if error is not None or not code:
             await self.session.commit()  # the flow is used up either way
             return Finished(
                 Outcome.DENIED if error == "access_denied" else Outcome.FAILED, connector
             )
-        client = await self._client(connector)
         try:
             credentials = credentials_of(client)
             verifier = secrets.resolve(flow.verifier_ref).get_secret_value()

@@ -21,16 +21,20 @@ from app.modules.oauth.models import OAuthFlow
 from tests.factories_connectors import PERSONAL, SHARED, make_connector
 from tests.factories_dms import People
 from tests.factories_oauth import (
-    CALLBACK,
+    LEGACY_CALLBACK,
     PUBLIC_URL,
     authorize,
+    callback_for,
     connect,
     make_oauth_client,
     query_of,
 )
 from tests.support.oauth_stub import OAuthStub
 
-REDIRECT_URI = f"{PUBLIC_URL}/api/ai/oauth/callback"
+
+def _redirect_uri(connector: dict[str, Any], base: str = PUBLIC_URL) -> str:
+    """The callback of the connector's OAuth app (J13)."""
+    return f"{base}/api/ai/oauth/{connector['oauth_client_id']}/callback"
 
 
 async def _oauth_connector(
@@ -66,7 +70,7 @@ async def test_the_authorization_request_carries_pkce_state_scope_and_resource(
     query = dict(parse_qsl(parts.query))
     assert query["response_type"] == "code"
     assert query["client_id"] == oauth_ready.state.client_id
-    assert query["redirect_uri"] == REDIRECT_URI
+    assert query["redirect_uri"] == _redirect_uri(connector)
     assert query["code_challenge_method"] == "S256" and len(query["code_challenge"]) == 43
     assert len(query["state"]) >= 43
     assert query["scope"] == "mcp read" and query["resource"] == f"{oauth_ready.url}/mcp"
@@ -92,7 +96,7 @@ async def test_a_shared_connector_is_connected_and_tokens_stored_encrypted(
     assert row.token_expires_at is not None
     assert timedelta(minutes=55) < row.token_expires_at - utcnow() <= timedelta(hours=1)
     (exchange,) = oauth_ready.state.token_requests("authorization_code")
-    assert exchange.form["redirect_uri"] == REDIRECT_URI
+    assert exchange.form["redirect_uri"] == _redirect_uri(connector)
     assert exchange.form["resource"] == f"{oauth_ready.url}/mcp"
     assert len(exchange.form["code_verifier"]) >= 43
     assert exchange.form["client_secret"] == oauth_ready.state.client_secret
@@ -122,9 +126,9 @@ async def test_state_is_used_once(oauth_ready: OAuthStub, ai_people: People) -> 
     connector = await _oauth_connector(ai_people, oauth_ready)
     url = await authorize(ai_people.admin, SHARED, connector["id"])
     query = oauth_ready.state.authorize(url)
-    first = await ai_people.admin.get(CALLBACK, params=query)
+    first = await ai_people.admin.get(callback_for(url), params=query)
     assert query_of(first.headers["location"])["status"] == "connected"
-    again = await ai_people.admin.get(CALLBACK, params=query)
+    again = await ai_people.admin.get(callback_for(url), params=query)
     assert again.status_code == 303
     assert query_of(again.headers["location"]) == {"status": "invalid"}
     assert len(oauth_ready.state.token_requests("authorization_code")) == 1
@@ -137,11 +141,11 @@ async def test_state_is_bound_to_the_login_session(
     url = await authorize(ai_people.alice, PERSONAL, connector["id"])
     query = oauth_ready.state.authorize(url)
     for other in (ai_people.bob, ai_people.admin, client):
-        response = await other.get(CALLBACK, params=query)
+        response = await other.get(callback_for(url), params=query)
         assert response.status_code == 303
         assert query_of(response.headers["location"]) == {"status": "invalid"}
     assert oauth_ready.state.token_requests("authorization_code") == []
-    done = await ai_people.alice.get(CALLBACK, params=query)
+    done = await ai_people.alice.get(callback_for(url), params=query)
     assert query_of(done.headers["location"])["status"] == "connected"
 
 
@@ -149,17 +153,19 @@ async def test_unknown_and_expired_state_and_a_refusal(
     oauth_ready: OAuthStub, ai_people: People, session: AsyncSession
 ) -> None:
     connector = await _oauth_connector(ai_people, oauth_ready)
-    unknown = await ai_people.admin.get(CALLBACK, params={"state": "x" * 43, "code": "c"})
-    assert query_of(unknown.headers["location"]) == {"status": "invalid"}
+    for path in (LEGACY_CALLBACK, _redirect_uri(connector, "")):
+        unknown = await ai_people.admin.get(path, params={"state": "x" * 43, "code": "c"})
+        assert query_of(unknown.headers["location"]) == {"status": "invalid"}
     url = await authorize(ai_people.admin, SHARED, connector["id"])
     query = oauth_ready.state.authorize(url)
     await session.execute(update(OAuthFlow).values(expires_at=utcnow() - timedelta(seconds=1)))
-    expired = await ai_people.admin.get(CALLBACK, params=query)
+    expired = await ai_people.admin.get(callback_for(url), params=query)
     assert query_of(expired.headers["location"]) == {"status": "invalid"}
     url = await authorize(ai_people.admin, SHARED, connector["id"])
     state = dict(parse_qsl(urlsplit(url).query))["state"]
     denied = await ai_people.admin.get(
-        CALLBACK, params={"state": state, "error": "access_denied", "error_description": "no"}
+        callback_for(url),
+        params={"state": state, "error": "access_denied", "error_description": "no"},
     )
     assert query_of(denied.headers["location"])["status"] == "denied"
     assert oauth_ready.state.token_requests("authorization_code") == []
@@ -182,7 +188,7 @@ async def test_a_deleted_connector_ends_its_flow(oauth_ready: OAuthStub, ai_peop
     url = await authorize(ai_people.admin, SHARED, connector["id"])
     query = oauth_ready.state.authorize(url)
     await ai_people.admin.delete(f"{SHARED}/{connector['id']}?version=1")
-    gone = await ai_people.admin.get(CALLBACK, params=query)
+    gone = await ai_people.admin.get(callback_for(url), params=query)
     assert query_of(gone.headers["location"]) == {"status": "invalid"}
 
 
@@ -216,7 +222,7 @@ async def test_authorize_needs_an_oauth_connector_and_a_public_address(
     monkeypatch.setattr(get_settings(), "public_url", "http://localhost:5173")
     url = await authorize(ai_people.admin, SHARED, connector["id"])
     assert dict(parse_qsl(urlsplit(url).query))["redirect_uri"] == (
-        "http://localhost:5173/api/ai/oauth/callback"
+        _redirect_uri(connector, "http://localhost:5173")
     )
 
 
@@ -229,7 +235,7 @@ async def test_the_redirect_uri_ignores_the_request_headers(
         headers={"Host": "evil.example", "X-Forwarded-Host": "evil.example", "Origin": "x"},
     )
     query = dict(parse_qsl(urlsplit(response.json()["authorization_url"]).query))
-    assert query["redirect_uri"] == REDIRECT_URI
+    assert query["redirect_uri"] == _redirect_uri(connector)
 
 
 async def test_oauth_connectors_take_no_secret_and_keep_their_kind(

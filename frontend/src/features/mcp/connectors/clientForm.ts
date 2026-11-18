@@ -19,6 +19,10 @@ export interface ClientValues {
   token_auth: TokenAuth
   scopes: string
   resource: string
+  /** RFC 8414/9207: the authorization server's issuer, compared with a response's
+   *  `iss`; and whether the server sends `iss` with every response. */
+  issuer: string
+  issuer_in_response: boolean
   /** On new endpoints: shared connectors keep their tokens (personal ones never). */
   keep_shared_connectors: boolean
 }
@@ -36,6 +40,8 @@ export function newClientValues(): ClientValues {
     token_auth: 'client_secret_post',
     scopes: '',
     resource: '',
+    issuer: '',
+    issuer_in_response: false,
     keep_shared_connectors: false,
   }
 }
@@ -53,6 +59,8 @@ export function clientValues(client: OAuthClient): ClientValues {
     token_auth: client.token_auth,
     scopes: client.scopes,
     resource: client.resource ?? '',
+    issuer: client.issuer ?? '',
+    issuer_in_response: client.issuer_in_response,
     keep_shared_connectors: false,
   }
 }
@@ -70,6 +78,8 @@ export function withDiscovery(
     revocation_endpoint: fill(values.revocation_endpoint, found.revocation_endpoint),
     scopes: fill(values.scopes, found.scopes),
     resource: fill(values.resource, found.resource),
+    issuer: fill(values.issuer, found.issuer),
+    issuer_in_response: values.issuer_in_response || found.issuer_in_response,
   }
 }
 
@@ -98,6 +108,8 @@ function fields(values: ClientValues) {
     token_auth: values.token_auth,
     scopes: values.scopes.trim(),
     resource: optional(values.resource),
+    issuer: optional(values.issuer),
+    issuer_in_response: values.issuer_in_response,
   }
 }
 

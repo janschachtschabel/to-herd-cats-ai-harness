@@ -231,6 +231,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PATCH", "/api/ai/oauth-clients/{client_id}", "ai"),
     ("DELETE", "/api/ai/oauth-clients/{client_id}", "ai"),
     ("GET", "/api/ai/oauth/callback", "public"),
+    ("GET", "/api/ai/oauth/{client_id}/callback", "public"),
     ("GET", "/api/ai/my-mcp-servers", "ai"),
     ("GET", "/api/ai/mcp-servers", "ai"),
     ("POST", "/api/ai/mcp-servers", "ai"),

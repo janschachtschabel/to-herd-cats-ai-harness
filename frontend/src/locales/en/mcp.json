@@ -242,7 +242,7 @@
       "create": {
         "open": "Create OAuth app",
         "title": "Create OAuth app",
-        "description": "Enter this as the redirect address at the provider: <HERD_PUBLIC_URL>/api/ai/oauth/callback.",
+        "description": "Once created, the app's card shows its own redirect address; register it with the provider.",
         "submit": "Create"
       },
       "edit": {
@@ -274,7 +274,10 @@
         "secret": "Client secret",
         "secretValue": "Client secret",
         "scopes": "Scopes",
-        "resource": "Resource"
+        "resource": "Resource",
+        "issuer": "Issuer",
+        "issuerInResponse": "The provider sends the issuer with every response (iss, RFC 9207)",
+        "callback": "Redirect address"
       },
       "optional": "Optional.",
       "scopesHint": "Separated by spaces, e.g. \"mcp\".",
@@ -299,7 +302,9 @@
       "deleteTitle": "Delete OAuth app?",
       "deleteText": "{{name}} is deleted. This is not possible while a connector or server uses it.",
       "endpointsDisconnect": "New authorization, token or revocation addresses disconnect every connection through this app: people’s own connections are deleted and revoked at the old address; they connect again. Shared connectors lose their tokens unless you keep them connected.",
-      "keepSharedConnectors": "Keep shared connectors connected (their tokens then go to the new addresses)"
+      "keepSharedConnectors": "Keep shared connectors connected (their tokens then go to the new addresses)",
+      "issuerHint": "Optional: the authorization server's address as it names itself. If it sends it, it must match exactly.",
+      "callbackMissing": "Without HERD_PUBLIC_URL (https) there is no redirect address."
     },
     "catalog": {
       "description": "Templates for external servers, shipped and from the operator's directory. A template only suggests: every tool is still approved one by one.",
@@ -365,6 +370,10 @@
       "invalid": {
         "title": "Sign-in expired",
         "text": "This sign-in has expired or was already used. Please connect again."
+      },
+      "issuer_mismatch": {
+        "title": "Unexpected authorization server",
+        "text": "The answer did not come from the expected authorization server. For safety nothing was stored; an admin checks the OAuth app's issuer."
       }
     }
   },
@@ -404,7 +413,8 @@
       "name_taken": "An OAuth app already has this name.",
       "not_found": "This OAuth app does not exist.",
       "url_not_allowed": "This address is not allowed (https only, no private network).",
-      "version_conflict": "The OAuth app was changed meanwhile."
+      "version_conflict": "The OAuth app was changed meanwhile.",
+      "issuer_required": "Choosing “sends the issuer” needs the issuer, too."
     },
     "mcp_catalog": {
       "base_url_not_allowed": "This instance address is not allowed.",

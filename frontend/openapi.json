@@ -3275,6 +3275,24 @@
               }
             ]
           },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^(https://[^\\s?#]+|http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/[^\\s?#]*)?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "default": false,
+            "title": "Issuer In Response",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 120,
             "minLength": 1,
@@ -3340,6 +3358,17 @@
             "title": "Authorization Endpoint",
             "type": "string"
           },
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
           "client_id": {
             "title": "Client Id",
             "type": "string"
@@ -3367,6 +3396,21 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "title": "Issuer In Response",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -3427,6 +3471,9 @@
           "token_auth",
           "scopes",
           "resource",
+          "issuer",
+          "issuer_in_response",
+          "callback_url",
           "version",
           "created_at",
           "updated_at"
@@ -3474,6 +3521,30 @@
                 "type": "null"
               }
             ]
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "pattern": "^(https://[^\\s?#]+|http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/[^\\s?#]*)?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "issuer_in_response": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer In Response"
           },
           "keep_shared_connectors": {
             "default": false,
@@ -4800,6 +4871,10 @@
             ],
             "title": "Issuer"
           },
+          "issuer_in_response": {
+            "title": "Issuer In Response",
+            "type": "boolean"
+          },
           "pkce": {
             "title": "Pkce",
             "type": "boolean"
@@ -4853,6 +4928,7 @@
           "status",
           "resource",
           "issuer",
+          "issuer_in_response",
           "authorization_endpoint",
           "token_endpoint",
           "revocation_endpoint",
@@ -22133,8 +22209,8 @@
     },
     "/api/ai/oauth/callback": {
       "get": {
-        "description": "The authorization server's redirect: finish the flow, then send the browser to\nthe result page (`/ai/oauth/done?status=...`).",
-        "operationId": "oauth_callback_api_ai_oauth_callback_get",
+        "description": "The shared callback of earlier releases: only for flows started with it.",
+        "operationId": "oauth_legacy_callback_api_ai_oauth_callback_get",
         "parameters": [
           {
             "in": "query",
@@ -22185,6 +22261,128 @@
                 }
               ],
               "title": "Error"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Iss"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Legacy Callback",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/ai/oauth/{client_id}/callback": {
+      "get": {
+        "description": "An app's authorization server's redirect: finish the flow started with this\ncallback, then send the browser to the result page (`/ai/oauth/done?status=...`).",
+        "operationId": "oauth_callback_api_ai_oauth__client_id__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "in": "query",
+            "name": "iss",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Iss"
             }
           }
         ],

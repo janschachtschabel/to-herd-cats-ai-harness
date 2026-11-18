@@ -71,6 +71,8 @@ class Discovery:
     scopes: str = ""
     pkce: bool = False
     registration: bool = False
+    # RFC 9207: the server always sends `iss` in its authorization responses.
+    issuer_in_response: bool = False
 
 
 class _Stop(Exception):  # noqa: N818
@@ -156,6 +158,7 @@ async def _discover(http: _Clients, url: str) -> Discovery:
         scopes=scopes or "",
         pkce=isinstance(methods, list) and "S256" in methods,
         registration=isinstance(server.get("registration_endpoint"), str),
+        issuer_in_response=server.get("authorization_response_iss_parameter_supported") is True,
     )
 
 

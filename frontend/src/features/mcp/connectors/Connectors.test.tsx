@@ -214,6 +214,7 @@ describe('OAuth apps', () => {
         scopes: 'mcp',
         pkce: true,
         registration: false,
+        issuer_in_response: true,
       },
       'POST /api/ai/oauth-clients': { status: 201, body: makeClient() },
     })
@@ -244,7 +245,28 @@ describe('OAuth apps', () => {
       token_auth: 'client_secret_post',
       scopes: 'mcp',
       resource: 'https://gitlab.com/api/v4/mcp',
+      issuer: 'https://gitlab.com',
+      issuer_in_response: true,
       client_secret: { value: 's3cret' },
     })
+  })
+
+  test('each app shows its own redirect address to register at the provider', async () => {
+    const app = makeClient({ id: '0190a0a0-0000-7000-8000-000000000042' })
+    const bare = makeClient({ name: 'Ohne Adresse', callback_url: null })
+    mockApi({
+      ...shell,
+      'GET /api/ai/connectors': page([]),
+      'GET /api/ai/oauth-clients': page([app, bare]),
+    })
+    await renderApp('/admin/ai/connectors')
+    const card = await screen.findByRole('article', { name: 'GitLab-App' })
+    expect(
+      within(card).getByText(
+        'https://herd.example/api/ai/oauth/0190a0a0-0000-7000-8000-000000000042/callback',
+      ),
+    ).toBeVisible()
+    const other = screen.getByRole('article', { name: 'Ohne Adresse' })
+    expect(within(other).getByText(/Ohne HERD_PUBLIC_URL/)).toBeVisible()
   })
 })

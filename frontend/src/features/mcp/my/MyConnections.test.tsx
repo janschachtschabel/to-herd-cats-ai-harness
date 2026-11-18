@@ -142,6 +142,7 @@ describe('coming back from the provider', () => {
     ['denied', 'Nicht verbunden', 'alert'],
     ['failed', 'Verbinden fehlgeschlagen', 'alert'],
     ['invalid', 'Anmeldung abgelaufen', 'alert'],
+    ['issuer_mismatch', 'Unerwarteter Anmeldedienst', 'alert'],
     ['whatever', 'Verbinden fehlgeschlagen', 'alert'],
   ])('status=%s says so in words', async (status, title, role) => {
     mockApi(shell(['ai.use', 'ai.manage']))
