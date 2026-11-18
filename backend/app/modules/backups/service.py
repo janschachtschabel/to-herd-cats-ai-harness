@@ -16,7 +16,9 @@ audited with the person as actor, names and figures only.
   runner's claim spans the check), and a clean check (409 `backup.replace_refused`
   with the problems); then, after the commit, the replace in this process
   (`replacing.py`).
-- `last_restore`: the newest attempt from the audit log.
+- `last_restore`: the newest attempt from the audit log; none once a restore came
+  after it (`backup.restored`: a restored safety archive holds its own replace's
+  request, review M9b F8).
 
 A transfer (upload, check) ends the request's transaction first: no database
 connection waits on a slow line or a long read.
@@ -52,6 +54,7 @@ from app.modules.backups.schemas import RestoreAttemptOut
 
 CLOCK: Clock = SYSTEM_CLOCK  # tests set one of their own
 REQUESTED, FAILED = "backup.restore_requested", "backup.restore_failed"
+RESTORED = "backup.restored"
 _NO_ID = uuid.UUID(int=0)
 
 
@@ -153,8 +156,10 @@ class BackupAdmin:
 
     async def last_restore(self, actor: Actor) -> RestoreAttemptOut | None:
         await require_backup_manage(self.session, actor)
-        entry = await AuditRepository(self.session).latest_of(actor.org_id, (REQUESTED, FAILED))
-        if entry is None:
+        entry = await AuditRepository(self.session).latest_of(
+            actor.org_id, (REQUESTED, FAILED, RESTORED)
+        )
+        if entry is None or entry.action == RESTORED:  # a restore since: nothing pending
             return None
         details = entry.details or {}
         return RestoreAttemptOut(

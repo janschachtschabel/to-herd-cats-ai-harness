@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.modules.audit.models import AuditLog
+from app.modules.audit.recorder import record_system
 from app.modules.backups.replacing import replace_runner
 from app.ops.restore import RestoreRefused
 from app.version import app_version
@@ -187,3 +188,24 @@ async def test_one_replace_at_a_time(  # type: ignore[no-untyped-def]
     assert (again.status_code, again.json()["error"]["code"]) == (409, "backup.restore_running")
     release.set()
     await _settled()
+
+
+async def test_a_restore_after_the_request_clears_the_requested_state(
+    real_db: RealDb, make_real_client: MakeRealClient
+) -> None:
+    """Review M9b F8: a safety archive holds its replace's `backup.restore_requested`
+    as the newest attempt; restoring it brings that along, and `backup.restored`
+    (newer) ends it: the page shows no stale "angefordert"."""
+    owner = await make_real_client()
+    await login(owner, real_db.owner_email)
+    for action in ("backup.restore_requested", "backup.restored"):
+        async with real_db.database.session_factory() as session:
+            await record_system(
+                session, real_db.org_id, action, "organization", real_db.org_id,
+                {"archive": "herd-x.tar"},
+            )  # fmt: skip
+            await session.commit()
+        status = (await owner.get("/api/backups/restore")).json()["attempt"]
+        if action == "backup.restore_requested":
+            assert status["state"] == "requested"
+    assert status is None
