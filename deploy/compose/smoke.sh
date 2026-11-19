@@ -149,6 +149,13 @@ fi
 # listened is unknown to the relay (4502) until its next heartbeat after that. So the
 # WebSocket below waits until every instance is live (at most 30 s: several heartbeats).
 sql() { "${compose[@]}" exec -T db psql -tA -U herd -d herd -c "$1" | tr -d '\r'; }
+# The app's role (db-owner, review M9b F2-1): owner of the database, no superuser.
+[[ $(sql "SELECT rolsuper FROM pg_roles WHERE rolname = 'herd_owner'") == f ]] \
+  || fail "herd_owner is missing or a superuser"
+[[ $(sql "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'herd'") == herd_owner ]] \
+  || fail "herd_owner does not own the database"
+[[ $(sql "SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tableowner <> 'herd_owner'") == 0 ]] \
+  || fail "a table is not herd_owner's"
 live_instances() {
   sql "SELECT count(*) FROM collab_instance WHERE heartbeat_at > now() - interval '15 seconds'"
 }
@@ -356,8 +363,9 @@ backed_up() {
 }
 for _ in $(seq 1 30); do backed_up && break; sleep 1; done
 backed_up || fail "$worker does not export the backup's gauge"
-"${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore' >/dev/null
-target=(-e HERD_DATABASE_URL=postgresql+asyncpg://herd@db:5432/herd_restore
+"${compose[@]}" exec -T db psql -q -U herd -d herd -c 'CREATE DATABASE herd_restore OWNER herd_owner' \
+  >/dev/null
+target=(-e HERD_DATABASE_URL=postgresql+asyncpg://herd_owner@db:5432/herd_restore
   -e HERD_DATA_DIR=/tmp/restore-data)
 [[ $s3 == 1 ]] && target+=(-e HERD_S3_PREFIX=restored)
 applied="$("${compose[@]}" exec -T "${target[@]}" backup python -m app.ops restore apply "$archive" \

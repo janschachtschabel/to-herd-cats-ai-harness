@@ -6,6 +6,10 @@
 # app exits and `restart: unless-stopped` starts it again).
 # compose.nodes.yml runs the roles in separate containers instead (two API nodes);
 # compose.roles.yml separates the database roles (schema owner and runtime role).
+# The app never connects as the bundled PostgreSQL's superuser `herd`: the service
+# db-owner makes the role herd_owner (owner of the database and its schema, no
+# superuser) before the app on every start and generates its password once into the
+# volume secrets (docs/SICHERUNG.md, "Was ein Archiv ausführen darf").
 # Secrets come from .env next to this file (see .env.example), the AI keys from the
 # optional ai.env (see ai.env.example; agent runs work in the same process). Only the public port
 # 8080 is published; 9090 (probes, metrics, the collab process's internal API) and
@@ -45,6 +49,35 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # The app's database role (review M9b F2-1): herd_owner owns the database, its schema
+  # and every object in it and is no superuser, so an archive restored in the
+  # administration cannot run programs on the database host. Run as `herd` on every
+  # start; an installation that ran as `herd` moves by itself. Its password is
+  # generated once into the volume secrets and never replaced. It ends (exit 0).
+  db-owner:
+    image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
+    command: ["db-owner"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HERD_DB_SUPERUSER_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - secrets:/secrets
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   app:
     image: to-herd-cats-ai:${HERD_IMAGE_TAG:-local}
     build:
@@ -53,12 +86,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
     environment:
       <<: *storage
       HERD_ROLE: all
-      # The password is kept out of the URL; the app merges it in (escaped).
-      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # The role db-owner made; its password from a file (never an env value).
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
       # TLS to an external database: libpq's sslmode (verify-full recommended) and the
       # CA file to check its certificate against (mount it). Empty: the URL's own
       # setting; the bundled db speaks no TLS (same host, no network in between).
@@ -137,6 +172,7 @@ services:
     volumes:
       - app-data:/data
       - backups:/backups
+      - secrets:/secrets:ro
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
@@ -160,10 +196,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
     environment:
       <<: *storage
-      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-      HERD_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
       HERD_DATABASE_SSLMODE: ${HERD_DATABASE_SSLMODE:-}
       HERD_DATABASE_SSLROOTCERT: ${HERD_DATABASE_SSLROOTCERT:-}
       HERD_MIGRATE_DATABASE_URL: ${HERD_MIGRATE_DATABASE_URL:-}
@@ -197,6 +235,7 @@ services:
     volumes:
       - app-data:/data:ro
       - backups:/backups
+      - secrets:/secrets:ro
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
@@ -216,3 +255,5 @@ volumes:
   db-data:
   app-data:
   backups:
+  # The password of herd_owner (db-owner writes it once; app and backup read it).
+  secrets:

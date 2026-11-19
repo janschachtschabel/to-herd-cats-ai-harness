@@ -536,7 +536,10 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
 - **Datenbank-Passwort** nur über `HERD_DATABASE_PASSWORD` oder
   `HERD_DATABASE_PASSWORD_FILE` (beides zugleich ist ein Startfehler), nie in
   `HERD_DATABASE_URL`. Das Chart lehnt eine URL mit Passwort ab und legt das Passwort
-  als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
+  als Datei ein. Compose verbindet die App nie als Superuser: Der Dienst `db-owner` legt
+  bei jedem Start die Rolle `herd_owner` an (Besitzerin der Datenbank und ihres Schemas,
+  kein Superuser) und erzeugt ihr Passwort einmal ins Volume `secrets`; `POSTGRES_PASSWORD`
+  braucht nur er ([`SICHERUNG.md`](docs/SICHERUNG.md#was-ein-archiv-ausführen-darf)).
 - **TLS zur Datenbank (seit M9b):** `HERD_DATABASE_SSLMODE` (libpq-Modi; empfohlen für
   eine externe Datenbank `verify-full`) und `HERD_DATABASE_SSLROOTCERT` (CA-Datei; leer:
   bei `verify-full` die CAs des Systems, für `pg_dump`/`pg_restore`/`psql` als

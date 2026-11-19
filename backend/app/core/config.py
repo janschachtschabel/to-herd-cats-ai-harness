@@ -203,6 +203,11 @@ class Settings(
             self.ai_egress_proxy = None  # compose: `${HERD_AI_EGRESS_PROXY:-}`
         return self
 
+    @field_validator("database_password_file", mode="before")
+    @classmethod
+    def _empty_password_file_is_none(cls, value: object) -> object:
+        return None if value == "" else value  # an overlay clears the base's file
+
     @field_validator("mcp_catalog_dir", mode="before")
     @classmethod
     def _empty_catalog_dir_is_none(cls, value: object) -> object:

@@ -228,7 +228,7 @@ live P95 ≤ 2 s, no 5xx).
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `POSTGRES_PASSWORD` | yes | | Database password; the app gets it as `HERD_DATABASE_PASSWORD`, never inside `HERD_DATABASE_URL` |
+| `POSTGRES_PASSWORD` | yes | | Password of the bundled PostgreSQL's superuser `herd`. Only the service `db-owner` uses it: it makes the app's role `herd_owner` (owner of the database and its schema, no superuser) on every start and generates that role's password once into the volume `secrets`; `app`, the nodes and `backup` connect as `herd_owner` with `HERD_DATABASE_PASSWORD_FILE` (review M9b F2-1, `docs/SICHERUNG.md`) |
 | `HERD_BOOTSTRAP_ADMIN_PASSWORD` | yes | | Password of the first owner, used on the first start only; it must pass the password rules (no breached password, no word of the organisation or the address; `docs/ANMELDUNG.md`), or the start stops with exit status 4 |
 | `HERD_BOOTSTRAP_ADMIN_EMAIL` | no | `admin@example.com` | Email of the first owner |
 | `HERD_BIND_ADDRESS` | no | `127.0.0.1` | Host address port 8080 is published on |
