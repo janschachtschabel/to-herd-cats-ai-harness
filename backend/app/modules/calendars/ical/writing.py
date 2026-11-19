@@ -1,7 +1,8 @@
 """Writing iCalendar (plan M10 decision 10: "Schreiben streng"): only the RFC's forms.
 
 - A start with a zone is `DTSTART;TZID=<IANA>:<wall time>` with a VTIMEZONE for that
-  zone (written once, before the first event that names it; from `zoneinfo`); one in
+  zone (written once, before the first event that names it; from `zoneinfo`, covering
+  1900 to 2399 with yearly rules for today's changes: `vtimezone_out`); one in
   UTC is written as an instant (`…Z`); all-day as `VALUE=DATE`.
 - The end is `DTEND` in the start's form, or `DURATION` (hours, minutes, seconds:
   exact) where the end's wall time would not read back as the same instant (the second
@@ -21,14 +22,13 @@
 """
 
 from collections.abc import Iterable, Iterator
-from datetime import UTC, date, datetime, timedelta
-from functools import lru_cache
+from datetime import UTC, datetime, timedelta
 
-from icalendar import Alarm, Calendar, Event, Timezone, vCalAddress, vDuration, vText
+from icalendar import Alarm, Calendar, Event, vCalAddress, vDuration, vText
 from icalendar.prop import vInline
 
 from app.modules.calendars import recurrence, zones
-from app.modules.calendars.ical import lines
+from app.modules.calendars.ical import lines, vtimezone_out
 from app.modules.calendars.ical.drafts import (
     AttendeeDraft,
     Content,
@@ -42,7 +42,6 @@ from app.modules.calendars.recurrence import Series
 
 PRODID = "-//to-herd-cats-ai//calendar//EN"
 _UTC = "UTC"  # written as instants (`…Z`), the zone a series in UTC is read back in
-_VTIMEZONE_YEARS = (1970, 2038)  # widened to an event's year where it lies outside
 _PARTSTAT = {
     Response.NEEDS_ACTION: "NEEDS-ACTION",
     Response.ACCEPTED: "ACCEPTED",
@@ -79,22 +78,9 @@ def _stream(events: Iterable[ExportEvent], name: str | None, now: datetime) -> I
         for series in (event.series, *(o.series for o in event.overrides)):
             if series.tzid is not None and series.tzid != _UTC and series.tzid not in written:
                 written.add(series.tzid)
-                chunk += _vtimezone(series.tzid, *_years(series.start.year))
+                chunk += vtimezone_out.vtimezone(series.tzid)
         yield chunk + b"".join(part.to_ical() for part in _vevents(event, now))
     yield _END
-
-
-def _years(year: int) -> tuple[int, int]:
-    first, last = _VTIMEZONE_YEARS
-    return min(first, year), max(last, year + 1)
-
-
-@lru_cache(maxsize=128)
-def _vtimezone(tzid: str, first: int, last: int) -> bytes:
-    found = Timezone.from_tzinfo(
-        zones.zone(tzid), tzid=tzid, first_date=date(first, 1, 1), last_date=date(last, 1, 1)
-    )
-    return bytes(found.to_ical())
 
 
 def _vevents(event: ExportEvent, now: datetime) -> Iterator[Event]:

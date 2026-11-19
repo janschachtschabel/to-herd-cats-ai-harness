@@ -55,7 +55,7 @@ class Observance:
         if periods < 0 or rest or (rule.count is not None and periods >= rule.count):
             return
         for month in rule.bymonth or (self.start.month,):
-            for day in _days(rule, year, month, self.start.day):
+            for day in days_of(rule, year, month, self.start.day):
                 onset = datetime.combine(date(year, month, day), self.start.time())
                 if onset > self.start and _before_until(rule, onset - self.offset_from):
                     yield onset
@@ -70,7 +70,9 @@ def _before_until(rule: ParsedRule, moment: datetime) -> bool:
     return moment.date() <= until
 
 
-def _days(rule: ParsedRule, year: int, month: int, start_day: int) -> list[int]:
+def days_of(rule: ParsedRule, year: int, month: int, start_day: int = 1) -> list[int]:
+    """The days of `month` in `year` a yearly rule picks (its start's day without
+    BYMONTHDAY or BYDAY); `vtimezone_out` writes rules this reader reads."""
     last = calendar.monthrange(year, month)[1]
     if not rule.bymonthday and not rule.byday:
         return [start_day] if start_day <= last else []
