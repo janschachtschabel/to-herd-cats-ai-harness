@@ -52,7 +52,7 @@ export function TimeGrid({
   )
   const body = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (body.current) body.current.scrollTop = FIRST_HOUR_SHOWN * HOUR_PX
+    if (body.current) body.current.scrollTop = FIRST_HOUR_SHOWN * HOUR_PX - HOUR_PX / 4 // its label in sight
   }, [])
   const view = { calendars, zone, onOpen }
   const template = { gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` }

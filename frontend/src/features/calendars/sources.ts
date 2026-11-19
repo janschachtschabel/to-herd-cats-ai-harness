@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useMe } from '@/features/auth/queries'
+import { isOwnPersonal } from '@/features/spaces/display'
 import type { Space } from '@/lib/api'
 import { calendarAbilities } from './abilities'
 import type { CalendarGroup } from './CalendarList'
@@ -14,6 +16,7 @@ const KIND_ORDER: Record<Space['kind'], number> = { personal: 0, open: 1, team: 
  *  space's `my_role`, grouped by space (one's personal space first). */
 export function useCalendarSources(spaceId: string | undefined) {
   const { t } = useTranslation()
+  const me = useMe()
   const own = useCalendars({ enabled: !spaceId })
   const inSpace = useSpaceCalendars(spaceId)
   const spaces = useCalendarSpaces({ enabled: !spaceId })
@@ -39,7 +42,11 @@ export function useCalendarSources(spaceId: string | undefined) {
       infos.set(calendar.id, info)
       const group = bySpace.get(calendar.space_id) ?? {
         spaceId: calendar.space_id,
-        spaceName: space?.name ?? t('calendar.list.unknownSpace'),
+        spaceName: !space
+          ? t('calendar.list.unknownSpace')
+          : isOwnPersonal(space, me?.user.id)
+            ? t('spaces.mine')
+            : space.name,
         calendars: [],
       }
       group.calendars.push({ id: calendar.id, ...info })
@@ -53,7 +60,7 @@ export function useCalendarSources(spaceId: string | undefined) {
       (a, b) => rank(a) - rank(b) || a.spaceName.localeCompare(b.spaceName),
     )
     return { infos, groups }
-  }, [calendars.items, spaceById, t])
+  }, [calendars.items, spaceById, me?.user.id, t])
 
   return { calendars, infos, groups, namedSpace: named.data }
 }

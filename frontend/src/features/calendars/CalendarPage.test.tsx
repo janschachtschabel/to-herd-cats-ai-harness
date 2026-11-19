@@ -8,7 +8,14 @@ import { renderApp } from '@/test/render'
 import { dayStart } from './dates'
 
 const SPACE_ID = '0190a2b3-c4d5-7e6f-8a9b-0c1d2e3f4a5b'
-const mine = makeSpace({ id: 'space-me', name: 'Ich', kind: 'personal', my_role: 'admin' })
+const me = makeMe([], { id: 'user-me' })
+const mine = makeSpace({
+  id: 'space-me',
+  name: 'Mia Muster',
+  kind: 'personal',
+  owner_user_id: 'user-me',
+  my_role: 'admin',
+})
 const team = makeSpace({ id: SPACE_ID, name: 'Projekt Apfel', my_role: 'editor' })
 const open = makeSpace({ id: 'space-open', name: 'Handbuch', kind: 'open', my_role: 'viewer' })
 const own = makeCalendar({ id: 'cal-me', space_id: 'space-me', name: null, is_default: true })
@@ -19,7 +26,7 @@ type Window = (call: Call) => unknown
 
 function calendarApi(window: Window, extra: Record<string, unknown> = {}) {
   return mockApi({
-    ...shellRoutes(makeMe([]), [mine, team, open]),
+    ...shellRoutes(me, [mine, team, open]),
     'GET /api/calendars': page([own, apfel, manual]),
     'GET /api/calendar/events': window,
     ...extra,
@@ -58,7 +65,8 @@ describe('calendar page', () => {
     calendarApi(() => page([]))
     await renderApp('/calendar?date=2026-11-19')
     const list = await screen.findByRole('region', { name: 'Kalender' })
-    const personal = within(list).getByRole('group', { name: 'Ich' })
+    // One's own personal space as the sidebar names it.
+    const personal = await within(list).findByRole('group', { name: 'Mein Bereich' })
     expect(await within(personal).findByRole('checkbox', { name: 'Mein Kalender' })).toBeChecked()
     const editor = within(list).getByRole('group', { name: 'Projekt Apfel' })
     expect(within(editor).getByRole('checkbox', { name: 'Apfel' })).toBeInTheDocument()

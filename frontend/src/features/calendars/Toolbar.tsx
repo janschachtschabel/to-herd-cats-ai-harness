@@ -51,7 +51,7 @@ export function Toolbar({
           <ChevronRight aria-hidden />
         </Button>
       </div>
-      <h2 className="min-w-0 flex-1 truncate text-lg font-semibold" aria-live="polite">
+      <h2 className="flex-1 text-lg font-semibold whitespace-nowrap" aria-live="polite">
         {title}
       </h2>
       <div className="relative">
