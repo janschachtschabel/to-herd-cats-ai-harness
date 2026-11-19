@@ -17,7 +17,6 @@
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
@@ -118,8 +117,7 @@ class EventService:
         """The event and how much of it the actor sees (404 `event.not_found` for
         none)."""
         repo = EventRepository(self.session, actor.org_id)
-        seen = or_(CalendarEvent.space_id.in_(visible_space_ids(actor)), sight.attends_sql(actor))
-        event = await repo.find(event_id, seen)
+        event = await repo.find(event_id, sight.by_id_sql(actor))
         if event is None:
             raise event_not_found()
         if sight.attends(actor, event):

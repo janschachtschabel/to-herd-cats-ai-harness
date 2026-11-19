@@ -23,7 +23,6 @@ of the events the caller may list, by (start, event id), a page at a time.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, and_, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
@@ -80,12 +79,7 @@ async def list_window(
     named = space_id is not None
     if space_id is not None:
         await require(session, actor, Action.CALENDAR_READ, space_id)
-        rule: ColumnElement[bool] = sight.named_events_sql(space_id)
-        reads: ColumnElement[bool] = true()
-    else:
-        rule, reads = sight.listed_events_sql(actor), sight.reads_sql(actor)
-    if mine:
-        rule = and_(rule, sight.attends_sql(actor))
+    rule, reads = sight.window_sql(actor, space_id=space_id, mine=mine)
     repo = EventRepository(session, actor.org_id)
     budget = expansion.Budget()
     rows = await repo.in_window(

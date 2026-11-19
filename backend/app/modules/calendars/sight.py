@@ -23,7 +23,7 @@ from enum import StrEnum
 
 from sqlalchemy import ColumnElement, and_, or_, true
 
-from app.core.access import member_space_ids
+from app.core.access import member_space_ids, visible_space_ids
 from app.core.actor import Actor
 from app.core.permissions import ADMIN_ROLES
 from app.modules.calendars.event_models import CalendarEvent, EventVisibility
@@ -94,6 +94,23 @@ def listed_events_sql(actor: Actor) -> ColumnElement[bool]:
 def named_events_sql(space_id: uuid.UUID) -> ColumnElement[bool]:
     """The named way: the events of the one space the call named (after `require`)."""
     return CalendarEvent.space_id == space_id
+
+
+def window_sql(
+    actor: Actor, *, space_id: uuid.UUID | None, mine: bool
+) -> tuple[ColumnElement[bool], ColumnElement[bool]]:
+    """(rule, reads) of a window: the named space's events, all read (after `require`),
+    or the lists' rule with `reads_sql` per row; `mine` keeps what the actor attends."""
+    rule = listed_events_sql(actor) if space_id is None else named_events_sql(space_id)
+    reads: ColumnElement[bool] = reads_sql(actor) if space_id is None else true()
+    return (and_(rule, attends_sql(actor)) if mine else rule), reads
+
+
+def by_id_sql(actor: Actor) -> ColumnElement[bool]:
+    """The events an id may find, before `access.require` decides on the space: those
+    of spaces the actor may read (admin power included) and those it attends; any
+    other answers like an unknown id, in the same one statement."""
+    return or_(CalendarEvent.space_id.in_(visible_space_ids(actor)), attends_sql(actor))
 
 
 def full_sql(actor: Actor, *, named: bool) -> ColumnElement[bool]:
