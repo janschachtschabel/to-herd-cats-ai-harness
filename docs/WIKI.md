@@ -524,8 +524,13 @@ genau eine Instanz gebunden** (Plan M9, Entscheidung 17; ohne Redis):
   einer Sekunde) bekommen sie 4502 und versuchen es weiter. Das Chart rollt bei
   `collab.replicas` ≥ 2 je einen Pod (`maxSurge` 1, `maxUnavailable` 0) und legt ein
   PodDisruptionBudget an; mit einer Replika bleibt es bei `Recreate`. Wird eine Instanz
-  hart beendet (SIGKILL, Absturz), sind ihre Seiten nach 15 s frei; was sie nicht mehr
-  speichern konnte, ist verloren (wie bisher beim einen Collab-Prozess).
+  hart beendet (SIGKILL, Absturz), sind ihre Seiten frei, sobald ihr letzter Herzschlag
+  15 s alt ist, also 10 bis 15 s nach dem Absturz; dazu kommt die Wartezeit des
+  Browsers bis zum nächsten Verbindungsversuch. Was sie nicht mehr speichern konnte, ist
+  verloren (wie bisher beim einen Collab-Prozess). Vorgeführt ([`demo/m9.md`](demo/m9.md),
+  Abschluss M9b): nach SIGTERM die Seite nach 1,1 s auf der anderen Instanz, nach
+  SIGKILL nach 11,7 s und in einem Probelauf nach 17,7 s; Messung mit 40 Editoren im
+  [Steckbrief](STECKBRIEF.md).
 - **Keine Instanz:** Meldet sich keine lebende Instanz (etwa kurz nach dem Start, bevor
   der Collab-Prozess sich angemeldet hat), schließt das Relay mit 4502
   `collab.unavailable`; der Editor versucht es weiter.
