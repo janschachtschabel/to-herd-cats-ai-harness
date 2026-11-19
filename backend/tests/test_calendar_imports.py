@@ -1,5 +1,6 @@
 """The calendar's libraries each stay behind one boundary (plan M10, tech stack):
-`python-dateutil` only in `modules/calendars/recurrence.py` and `recurrence_jump.py`,
+`python-dateutil` only in `modules/calendars/recurrence_scan.py` (split off
+`recurrence.py`, review M10 task 3c R3c-7) and `recurrence_jump.py`,
 `icalendar` only in the package `modules/calendars/ical`, in `app` and in `scripts`
 alike."""
 
@@ -10,7 +11,7 @@ import app
 import scripts
 
 DATEUTIL_HOMES = {
-    Path("modules/calendars/recurrence.py"),
+    Path("modules/calendars/recurrence_scan.py"),
     Path("modules/calendars/recurrence_jump.py"),
 }
 
@@ -40,7 +41,7 @@ def _importers(library: str) -> set[Path]:
 def test_only_recurrence_imports_dateutil() -> None:
     root = Path(app.__file__).parent
     assert _importers("dateutil") - {Path("app") / home for home in DATEUTIL_HOMES} == set()
-    used = _imports(root / "modules/calendars/recurrence.py")
+    used = _imports(root / "modules/calendars/recurrence_scan.py")
     assert any(name.startswith("dateutil") for name in used)  # the check is not vacuous
 
 

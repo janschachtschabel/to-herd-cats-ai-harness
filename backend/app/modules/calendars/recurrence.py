@@ -1,6 +1,7 @@
-"""Series and their occurrences (plan M10 decision 6): pure, no database. The module
-that imports `dateutil` (`tests/test_calendar_imports.py` allows it here and in
-`recurrence_jump`, which needs none so far).
+"""Series and their occurrences (plan M10 decision 6): pure, no database. The rule's
+matches come from `recurrence_scan`, the one module that talks to `dateutil`
+(`tests/test_calendar_imports.py` allows it there and in `recurrence_jump`, which
+needs none so far).
 
 - A series is expanded in the **wall time of its zone** (naive `datetime`s) and each
   occurrence localised afterwards (`zones.localise`: a gap moves on, a doubled hour
@@ -23,27 +24,25 @@ that imports `dateutil` (`tests/test_calendar_imports.py` allows it here and in
   weekdays and leap years) ahead of us, where its `MAXYEAR` 9999 is our 2399.
   `check_series` refuses a rule that never matches (it would scan on every call):
   **every write path calls it** (create, update, split, import, sync); an alive but
-  sparse rule still scans to its next match on each call, bounded by the horizon.
+  sparse rule still scans to its next match on each call, bounded by the horizon
+  (`recurrence_scan`).
 """
 
 import heapq
 from collections.abc import Iterator, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from itertools import chain, islice
-from typing import Any
 
-from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, weekday
-
-from app.modules.calendars.recurrence_jump import Counter, counted_jump, jump, week_start
+from app.modules.calendars.recurrence_jump import Counter, counted_jump, jump
 from app.modules.calendars.recurrence_rule import (
     FIRST_YEAR,
     LAST_YEAR,
-    Freq,
     ParsedRule,
     RuleInvalid,
     SeriesInvalid,
     check_rule,
 )
+from app.modules.calendars.recurrence_scan import HORIZON, matches
 from app.modules.calendars.recurrence_series import (
     Occurrence,
     Series,
@@ -56,6 +55,7 @@ from app.modules.calendars.recurrence_series import (
 
 __all__ = [
     "FIRST_YEAR",
+    "HORIZON",
     "LAST_YEAR",
     "Occurrence",
     "RuleInvalid",
@@ -69,84 +69,12 @@ __all__ = [
 
 DEFAULT_LIMIT = 2000
 LAST_END_CAP = 5000
-HORIZON = datetime(LAST_YEAR, 12, 31, 23, 59, 59)
-_AHEAD_YEARS = 7600
 # Offsets of one zone differ by up to a day (Pacific/Apia skipped 30 December 2011).
 SLACK = timedelta(hours=26)
-_FREQS = {Freq.DAILY: DAILY, Freq.WEEKLY: WEEKLY, Freq.MONTHLY: MONTHLY, Freq.YEARLY: YEARLY}
 
 
 class TooDense(Exception):
     code = "calendar.window_too_dense"
-
-
-def _ahead(wall: datetime) -> datetime:
-    return wall.replace(year=wall.year + _AHEAD_YEARS)
-
-
-def _byweekday(rule: ParsedRule) -> list[weekday]:
-    """BYDAY as `dateutil` takes it. RFC 5545 reads BYDAY as one list, but `dateutil`
-    keeps plain and numbered days as two filters that must both hold; where a rule
-    mixes them, each plain day becomes all its numbered ones (within the month, or the
-    year of a YEARLY rule without BYMONTH), which is the same set of days."""
-    numbered = [weekday(day, n) for day, n in rule.byday if n]
-    plain = [day for day, n in rule.byday if not n]
-    if not (numbered and plain):
-        return numbered or [weekday(day) for day in plain]
-    top = 53 if rule.freq is Freq.YEARLY and not rule.bymonth else 5
-    return numbered + [weekday(day, n) for day in plain for n in range(1, top + 1)]
-
-
-def _kwargs(rule: ParsedRule, start: datetime) -> dict[str, Any]:
-    """`dateutil`'s arguments with the defaults taken from the original start, so the
-    rule can run from a jumped one."""
-    byweekday = _byweekday(rule)
-    bymonth, bymonthday = list(rule.bymonth), list(rule.bymonthday)
-    if not (bymonthday or byweekday):
-        if rule.freq is Freq.YEARLY:
-            bymonth, bymonthday = bymonth or [start.month], [start.day]
-        elif rule.freq is Freq.MONTHLY:
-            bymonthday = [start.day]
-        elif rule.freq is Freq.WEEKLY:
-            byweekday = [weekday(start.weekday())]
-    return {
-        "freq": _FREQS[rule.freq],
-        "interval": rule.interval,
-        "wkst": rule.wkst,
-        "bymonth": bymonth or None,
-        "bymonthday": bymonthday or None,
-        "byweekday": byweekday or None,
-        "bysetpos": list(rule.bysetpos) or None,
-        "byhour": start.hour,
-        "byminute": start.minute,
-        "bysecond": start.second,
-    }
-
-
-def _matches(
-    rule: ParsedRule, start: datetime, begin: datetime, stop: datetime, counter: Counter
-) -> Iterator[datetime]:
-    """The rule's matches from `begin` on, in order, until one lies past `stop`."""
-    if begin > HORIZON:
-        return
-    first = begin
-    if rule.freq is Freq.WEEKLY and rule.bysetpos:
-        # `dateutil` builds a weekly period's set from DTSTART's day on, so BYSETPOS
-        # would count in a cut first week; run it from the week's start (WKST) and drop
-        # what lies before `begin` (RFC 5545 3.3.10: the whole set, then >= DTSTART).
-        first = datetime.combine(week_start(begin.date(), rule.wkst), begin.time())
-    # `dateutil` checks an UNTIL at candidates only: it scans to the first one past it
-    # either way; stopping there here lets the counter see how far the scan reached.
-    until = min(stop, HORIZON)
-    for found in rrule(dtstart=_ahead(first), cache=False, **_kwargs(rule, start)):
-        counter.candidates += 1
-        wall = found.replace(year=found.year - _AHEAD_YEARS)
-        counter.reached = wall
-        if wall > until:
-            return
-        if wall >= begin:
-            yield wall
-    counter.reached = HORIZON  # scanned to `dateutil`'s last year
 
 
 def _last_instant(series: Series, rule: ParsedRule) -> datetime | None:
@@ -174,18 +102,18 @@ def rule_walls(
     last = _last_instant(series, rule)
     if last is not None:
         stop = min(stop, wall_of(series, last) + SLACK)
-    matches = (
+    ruled = (
         wall
-        for wall in _matches(rule, start, begin, stop, counter)
+        for wall in matches(rule, start, begin, stop, counter)
         if wall != start and (last is None or instant(series, wall) <= last)
     )
-    ordered = chain([start] if begin == start else [], matches)
+    ordered = chain([start] if begin == start else [], ruled)
     yield from islice(ordered, max(rule.count - done, 0)) if rule.count is not None else ordered
 
 
 def _between(rule: ParsedRule, start: datetime, stop: datetime, counter: Counter) -> int:
     """The rule's matches after DTSTART and before `stop`."""
-    return sum(start < wall < stop for wall in _matches(rule, start, start, stop, counter))
+    return sum(start < wall < stop for wall in matches(rule, start, start, stop, counter))
 
 
 def walls(
@@ -219,7 +147,7 @@ def check_series(series: Series) -> datetime | None:
     rule = series.rule
     if rule is None:
         return None
-    first = next(_matches(rule, series.start, series.start, HORIZON, Counter()), None)
+    first = next(matches(rule, series.start, series.start, HORIZON, Counter()), None)
     if first is None:
         raise RuleInvalid("event.rrule_invalid")
     return first
