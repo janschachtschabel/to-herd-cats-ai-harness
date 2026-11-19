@@ -5,6 +5,7 @@ where the browser goes next; calendar apps are managed with `calendar.manage`; M
 connectors and apps behave as before."""
 
 import uuid
+from types import MappingProxyType
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
@@ -57,29 +58,53 @@ async def _fresh(session: AsyncSession, connector_id: uuid.UUID) -> Connector | 
     return await session.get(Connector, connector_id, populate_existing=True)
 
 
-def test_the_authorization_url_carries_the_purposes_extra_parameters() -> None:
-    def url(**extra: str) -> dict[str, str]:
-        made = protocol.authorization_url(
-            "https://as.example.com/authorize",
-            client_id="c",
-            redirect_uri="https://herd.example/api/ai/oauth/x/callback",
-            state="s",
-            verifier="v" * 64,
-            scopes="calendar",
-            resource=None,
-            extra=extra,
-        )
-        return _query(made)
+def _url(allowed: frozenset[str] = frozenset(), **extra: str) -> dict[str, str]:
+    made = protocol.authorization_url(
+        "https://as.example.com/authorize",
+        client_id="c",
+        redirect_uri="https://herd.example/api/ai/oauth/x/callback",
+        state="s",
+        verifier="v" * 64,
+        scopes="calendar",
+        resource=None,
+        extra=extra,
+        allowed_extra=allowed,
+    )
+    return _query(made)
 
-    plain = url()
+
+def test_the_authorization_url_carries_the_purposes_extra_parameters() -> None:
+    plain = _url()
     assert "access_type" not in plain and "prompt" not in plain
-    extended = url(**purposes.rule_for(Purpose.CALENDAR).extra_authorization)
+    calendar = purposes.rule_for(Purpose.CALENDAR)
+    extended = _url(calendar.extra_keys, **calendar.extra_authorization)
     assert {k: extended[k] for k in CALENDAR_EXTRA} == CALENDAR_EXTRA
     assert {k: v for k, v in extended.items() if k not in CALENDAR_EXTRA} == plain
     assert purposes.rule_for(Purpose.MCP).extra_authorization == {}
     for taken in ("state", "redirect_uri", "client_id", "code_challenge", "response_type"):
         with pytest.raises(ValueError):  # an extra never replaces what the flow sets
-            url(**{taken: "x"})
+            _url(frozenset({taken}), **{taken: "x"})
+
+
+@pytest.mark.parametrize(
+    "key", ["response_mode", "request", "request_uri", "nonce", "login_hint", "state", "scope"]
+)
+def test_an_extra_parameter_outside_the_purposes_allow_list_is_refused(key: str) -> None:
+    """R13a-9: an allow-list per purpose, not a deny-list of what the flow sets."""
+    calendar = purposes.rule_for(Purpose.CALENDAR)
+    for allowed in (frozenset(), calendar.extra_keys, purposes.rule_for(Purpose.MCP).extra_keys):
+        with pytest.raises(ValueError):
+            _url(allowed, **{key: "x"})
+    assert calendar.extra_keys == frozenset(CALENDAR_EXTRA)
+    assert purposes.rule_for(Purpose.MCP).extra_keys == frozenset()
+    with pytest.raises(ValueError):  # a rule cannot carry an extra it does not allow
+        purposes.Rule(
+            calendar.use,
+            calendar.manage,
+            calendar.return_to,
+            MappingProxyType({key: "x"}),
+            calendar.extra_keys,
+        )
 
 
 async def test_the_callback_returns_to_the_page_of_its_purpose(

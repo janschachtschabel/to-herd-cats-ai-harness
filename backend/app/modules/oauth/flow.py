@@ -144,6 +144,7 @@ class FlowService:
         _, connector = await self._oauth(actor, scope, connector_id, purpose)
         client = await self._client(connector)
         uri = redirect_uri(client.id)
+        rule = purposes.rule_for(purpose)
         if session_id is None:
             raise Unauthorized(code="auth.session_invalid")
         state, verifier = protocol.new_state(), protocol.new_verifier()
@@ -169,7 +170,8 @@ class FlowService:
             verifier=verifier,
             scopes=client.scopes,
             resource=client.resource,
-            extra=purposes.rule_for(purpose).extra_authorization,
+            extra=rule.extra_authorization,
+            allowed_extra=rule.extra_keys,
         )
 
     async def finish(

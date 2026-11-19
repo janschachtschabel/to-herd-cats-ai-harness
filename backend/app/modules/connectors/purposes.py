@@ -61,10 +61,20 @@ class Rule:
     manage: Action  # managing the purpose's OAuth apps (and shared connectors: `mcp`)
     return_to: str  # the page the OAuth callback sends the browser to
     extra_authorization: Mapping[str, str]  # added to the authorization request
+    # What `extra_authorization` may name (`oauth.protocol.authorization_url` refuses
+    # anything else): an allow-list, so no purpose adds a parameter that changes how
+    # the response comes back or what is asked (`response_mode`, `request`, `nonce`).
+    extra_keys: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not set(self.extra_authorization) <= self.extra_keys:
+            raise ValueError("an extra authorization parameter outside the allow-list")
 
 
 _RULES: Mapping[Purpose, Rule] = {
-    Purpose.MCP: Rule(Action.AI_USE, Action.AI_MANAGE, "/ai/oauth/done", MappingProxyType({})),
+    Purpose.MCP: Rule(
+        Action.AI_USE, Action.AI_MANAGE, "/ai/oauth/done", MappingProxyType({}), frozenset()
+    ),
     Purpose.CALENDAR: Rule(
         Action.CALENDAR_SYNC,
         Action.CALENDAR_MANAGE,
@@ -72,6 +82,7 @@ _RULES: Mapping[Purpose, Rule] = {
         # Google gives a refresh token only for offline access, and again only when
         # asked to show the consent once more (a reconnect after a revocation).
         MappingProxyType({"access_type": "offline", "prompt": "consent"}),
+        frozenset({"access_type", "prompt"}),
     ),
 }
 

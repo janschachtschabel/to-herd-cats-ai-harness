@@ -7,7 +7,8 @@ redirects; the operator's `HERD_AI_EGRESS_PROXY` if set, except for listed hosts
 - The authorization URL carries `response_type=code`, `client_id`, `redirect_uri`,
   `state`, the S256 `code_challenge`, `scope` and `resource` (when the client names
   them), plus the extra parameters of the connector's purpose (`connectors/purposes.py`:
-  Google's `access_type=offline`, `prompt=consent`), which never replace one of those.
+  Google's `access_type=offline`, `prompt=consent`), each on the purpose's allow-list
+  and never one of those.
   Never the client secret.
 - Token requests are form-encoded with `Accept: application/json` (GitHub answers
   form-encoded without it); the client authenticates with HTTP Basic or in the form
@@ -92,21 +93,6 @@ def egress_for(url: str) -> tuple[EgressRules, str | None]:
     return allowance.rules(RULES), None if allowance.covers(url) else egress_proxy()
 
 
-# What the flow itself sets, whether or not this request carries it.
-_FLOW_PARAMETERS = frozenset(
-    {
-        "response_type",
-        "client_id",
-        "redirect_uri",
-        "state",
-        "code_challenge",
-        "code_challenge_method",
-        "scope",
-        "resource",
-    }
-)
-
-
 def new_state() -> str:
     return random.token_urlsafe(32)
 
@@ -131,7 +117,11 @@ def authorization_url(
     scopes: str,
     resource: str | None,
     extra: Mapping[str, str] = MappingProxyType({}),
+    allowed_extra: frozenset[str] = frozenset(),
 ) -> str:
+    """`extra`: the purpose's own parameters, each named in `allowed_extra` (the
+    purpose's allow-list, `connectors/purposes.py`) and none replacing one set here;
+    ValueError otherwise (a programming error: both are constants in code)."""
     query: dict[str, str] = {
         "response_type": "code",
         "client_id": client_id,
@@ -144,7 +134,9 @@ def authorization_url(
         query["scope"] = scopes
     if resource:
         query["resource"] = resource
-    if set(extra) & (set(query) | _FLOW_PARAMETERS):
+    if not set(extra) <= allowed_extra:
+        raise ValueError("an extra parameter outside the purpose's allow-list")
+    if allowed_extra & {*query, "scope", "resource"}:  # also when not sent this time
         raise ValueError("an extra parameter would replace one the flow sets")
     query |= extra
     return f"{endpoint}?{urlencode(query, quote_via=quote)}"
