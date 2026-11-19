@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.outbox import Event, EventOutbox
 from app.modules.messaging.live_decode import decode
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.messaging.models import Conversation, ConversationKind, Message
 from app.modules.messaging.notification_models import Notification
 from app.modules.proposals.events import PROPOSAL_EVENTS

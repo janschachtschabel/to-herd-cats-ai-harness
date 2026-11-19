@@ -1,6 +1,5 @@
-"""A `herd_live` NOTIFY payload read back into its event (`live_events.py` describes the
-payload); every API process's hub (`live.py`) decodes what arrives. Anything it cannot
-use is dropped."""
+"""The API processes' side of live delivery (spec 6.4, `live_events.py`): a NOTIFY
+payload back to the `LiveEvent` it carries; anything else is dropped."""
 
 import json
 import uuid

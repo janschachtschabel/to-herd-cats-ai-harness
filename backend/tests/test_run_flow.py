@@ -14,7 +14,7 @@ from app.modules.agents.executor_repository import claim
 from app.modules.agents.run_models import EventKind, Run, RunEvent, RunState, StopReason
 from app.modules.ai.models import UsageRecord
 from app.modules.messaging.live_decode import decode
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.messaging.models import Message
 from app.runtime.models import wrap_model
 from tests.factories_agents import Bench

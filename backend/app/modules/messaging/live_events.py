@@ -42,6 +42,10 @@ admin power), with the space's and the calendar's id `l`. Every
 API process's hub (`live.py`) decodes it again (`live_decode.py`); anything it cannot use
 is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
+
+This module is the shape (`LiveEvent`, names, the frame); the worker's side, from an
+outbox event to the NOTIFY, is `live_publish.py`; the API processes' side, from the
+payload back to a `LiveEvent`, is `live_decode.py`.
 """
 
 import json
@@ -49,10 +53,6 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.outbox import Event
 from app.core.permissions import Action
 
 LIVE_CHANNEL = "herd_live"
@@ -224,60 +224,3 @@ def sse_frame(name: str, data: dict[str, Any]) -> bytes:
 
 def _text(value: uuid.UUID | None) -> str | None:
     return None if value is None else str(value)
-
-
-def of_event(event: Event) -> LiveEvent | None:
-    """The live event of an outbox event; None for types that are not delivered live."""
-    name = LIVE_TYPES.get(event.type)
-    if name is None:
-        return None
-    payload = event.payload
-    ticket = event.type in TICKET_TYPES
-    if event.type in SPACE_TYPES:
-        if event.space_id is None:
-            return None
-        return LiveEvent(
-            name=name,
-            org_id=event.org_id,
-            conversation_id=None,
-            message_id=None,
-            parent_id=None,
-            user_id=None,
-            space_id=event.space_id,
-            sprint_id=_uuid(payload.get("sprint_id")),
-            proposal_id=_uuid(payload.get("proposal_id")),
-            author_id=_uuid(payload.get("author_id")) if event.type in PROPOSAL_TYPES else None,
-        )
-    run = event.type == "run.progress"
-    step = payload.get("step")
-    automation = name == AUTOMATION
-    return LiveEvent(
-        name=name,
-        org_id=event.org_id,
-        conversation_id=_uuid(payload.get("conversation_id")),
-        message_id=_uuid(payload.get("message_id")),
-        parent_id=_uuid(payload.get("parent_id")),
-        user_id=_uuid(payload.get("user_id")) if event.type in FOR_ONE_PERSON else None,
-        ticket_id=_uuid(payload.get("ticket_id")) if ticket else None,
-        space_id=event.space_id if ticket or automation else None,
-        run_id=_uuid(payload.get("run_id")) if run else None,
-        step=step if run and isinstance(step, int) else None,
-        proposal_id=_uuid(payload.get("proposal_id")) if name == SKILL_PROPOSAL else None,
-        automation_id=_uuid(payload.get("automation_id")) if automation else None,
-    )
-
-
-def _uuid(value: object) -> uuid.UUID | None:
-    return uuid.UUID(value) if isinstance(value, str) else None
-
-
-async def publish_live(session: AsyncSession, event: Event) -> None:
-    """Outbox handler: NOTIFY every API process. A second delivery notifies again,
-    which costs a client one reload of what it shows, nothing more."""
-    live = of_event(event)
-    if live is None:
-        return
-    payload = live.payload()
-    if len(payload.encode()) > MAX_PAYLOAD_BYTES:  # ids only: cannot happen
-        raise ValueError("live payload too large")
-    await session.execute(select(func.pg_notify(LIVE_CHANNEL, payload)))

@@ -21,7 +21,7 @@ from app.modules.agents import control
 from app.modules.agents.approvals.gate import fingerprint
 from app.modules.agents.approvals.models import Approval
 from app.modules.agents.run_models import Run, StopReason
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.proposals.models import PageProposal
 from app.modules.spaces.repository import SpaceRepository
 from app.modules.wiki.models import Page

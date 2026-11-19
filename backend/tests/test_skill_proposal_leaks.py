@@ -14,7 +14,7 @@ from app.core.permissions import SpaceRole
 from app.core.principal import Principal
 from app.modules.agents.toolbox import skill_tools
 from app.modules.agents.toolbox.writing import LEAKS
-from app.modules.messaging.live_events import of_event
+from app.modules.messaging.live_publish import of_event
 from app.modules.skills.proposal_handlers import notify_on_skill_proposal
 from app.modules.skills.proposals import SkillProposalService
 from app.modules.spaces.models import SpaceKind

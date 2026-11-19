@@ -158,7 +158,8 @@ class OccurrenceOut(BaseModel):
     the wall time it is named by (ISO 8601 without offset), which changing or deleting
     just this one takes back (task 3b); null for an event that is no series.
     `series_id`: for an override, which is listed as an event of its own, the series
-    it belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and "busy" (`title`, `location` null)."""
+    it belongs to (to change the whole series from it); null otherwise. `redacted`:
+    the caller sees only times and "busy" (`title`, `location` null)."""
 
     event_id: uuid.UUID
     calendar_id: uuid.UUID
