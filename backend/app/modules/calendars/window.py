@@ -66,7 +66,10 @@ async def list_window(
     query: str | None,
     params: PageParams,
     viewer_zone: str | None = None,
+    budget: expansion.Budget | None = None,
 ) -> pagination.Page[OccurrenceOut]:
+    """See the module's docstring. `budget`: a caller that measures hands its own in
+    and reads what the call spent (rows, candidates); a new one otherwise."""
     if not (_in_years(start) and _in_years(end)):
         raise ValidationFailed(code="calendar.window_out_of_range")
     if end <= start:
@@ -83,7 +86,7 @@ async def list_window(
         await require(session, actor, Action.CALENDAR_READ, space_id)
     rule, reads = sight.window_sql(actor, space_id=space_id, mine=mine)
     repo = EventRepository(session, actor.org_id)
-    budget = expansion.Budget()
+    budget = budget if budget is not None else expansion.Budget()
     rows = await repo.in_window(
         rule,
         reads,

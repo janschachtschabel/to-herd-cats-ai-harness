@@ -13,13 +13,15 @@ from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import uuid7
 
+from app.core.pagination import PageParams
 from app.core.principal import PrincipalType
 from app.modules.calendars import expansion
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.event_repository import EventRepository
 from app.modules.calendars.expansion import Budget, effective
+from app.modules.calendars.window import list_window
 from tests.factories import MakeUser
-from tests.factories_calendar import logged_in, new_calendar, new_event
+from tests.factories_calendar import actor_of, logged_in, new_calendar, new_event
 from tests.factories_spaces import MakeSpace
 
 WEEK = (datetime(2026, 11, 23, tzinfo=UTC), datetime(2026, 11, 30, tzinfo=UTC))
@@ -129,3 +131,33 @@ async def test_the_window_loads_no_description(
     assert "description" in inspect(event).unloaded
     with pytest.raises(InvalidRequestError):
         _ = event.description
+
+
+async def test_the_window_spends_from_a_budget_its_caller_hands_over(
+    session: AsyncSession, make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """A caller that measures (scripts/measure_calendar.py, plan M10 Task 3c) hands its
+    own `Budget` in and reads the rows and candidates the call spent from it."""
+    author = await make_user()
+    space = await make_space("team", members=[(author, "moderator")])
+    client = await logged_in(make_client, author)
+    calendar = await new_calendar(client, space.id, "Team")
+    await new_event(client, calendar["id"], rrule="FREQ=WEEKLY")
+    await new_event(client, calendar["id"])
+    budget = Budget()
+    page = await list_window(
+        session,
+        await actor_of(session, author),
+        start=WEEK[0],
+        end=WEEK[1],
+        calendar_ids=None,
+        space_id=None,
+        mine=False,
+        query=None,
+        params=PageParams(limit=100),
+        budget=budget,
+    )
+    assert len(page.items) == 2
+    assert budget.rows == 2
+    assert budget.counter.candidates >= 1
+    assert budget.spent() == 2 * expansion.ROW_WORK + budget.counter.candidates
