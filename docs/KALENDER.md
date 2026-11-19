@@ -78,7 +78,47 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   eines Termins (seine Serie läuft in ihrer Ortszeit; die Spalte heißt wie in
   iCalendar `tzid`) und die der Betrachterin im Fenster.
 - **Serien und Ausnahmen:** Ein einzeln geändertes Vorkommen (Ausnahme) steht im
-  Fenster als eigener Termin und nennt seine Serie in `series_id`.
+  Fenster als eigener Termin und nennt seine Serie in `series_id` (der Einzelabruf
+  dazu in `recurrence_id` das Vorkommen, an dessen Stelle es steht).
+- **Ändern** (`PATCH /api/events/<id>`) und **Löschen** (`DELETE /api/events/<id>`)
+  nennen die gelesene Version (`version` im Körper bzw. als Parameter; sonst 409
+  `event.version_conflict` mit `current_version`). Sie verlangen Autorin im Bereich
+  des Kalenders **und** volle Sicht: Wer einen privaten Termin nur als „Belegt“ sieht,
+  bekommt auf jeden Schreibversuch 403 `event.private` (ohne Inhalt, ohne Version);
+  ohne Autorenrecht 403 `auth.permission_denied`. Die Sichtbarkeit (`visibility`)
+  ändern nur die Organisatorin und Admins (403 `event.visibility_organiser_only`). Die
+  Organisatorin bleibt, wer den Termin angelegt hat. Eine Änderung wird geprüft wie ein
+  neuer Termin (dieselben 422-Codes); nur gesendete Felder ändern sich, Zeiten gehen vom
+  gespeicherten Stand aus (`all_day` wechselt die Art und braucht dann deren Grenzen).
+- **Welche Vorkommen** (`scope`, mit `occurrence` = `recurrence_id` aus dem Fenster,
+  also die Ortszeit des Vorkommens):
+  - `scope=all` (Standard; für einzelne Termine und Ausnahmen der einzige) ändert die
+    Serie selbst; ihre Zeiten sind die des ersten Vorkommens. Rückt der Anfang auf der
+    Uhr der Zone (09:00 → 10:00, ein anderer Tag; dieselbe Uhrzeit in einer anderen
+    Zone rückt nicht), rücken gelöschte Vorkommen, Zusatztermine und die Vorkommen der
+    Ausnahmen mit: Gelöschtes bleibt gelöscht, Ausnahmen bleiben (zu ihrer eigenen
+    Zeit). Was danach kein Vorkommen der neuen Serie mehr trifft (etwa nach einer neuen
+    Regel), entfällt; die Antwort nennt es (`dropped_overrides`, `dropped_exdates`), und
+    `dry_run=true` rechnet nur, ohne zu schreiben. Selbst gesendete Listen
+    `rdates`/`exdates` gelten, wie sie sind.
+  - `scope=this` legt eine Ausnahme an: eine eigene Zeile mit UID, Inhalt und
+    Organisatorin der Serie, zur Zeit des Vorkommens, wenn die Änderung keine andere
+    nennt; sie ist keine Serie (`rrule`, `rdates`, `exdates` antworten 422
+    `event.scope_invalid`), und ein schon einzeln geändertes Vorkommen 409
+    `event.occurrence_overridden`. Löschen mit `scope=this` macht das Vorkommen zu einem
+    gelöschten (höchstens 500, sonst 422 `event.too_many_dates`); eine Ausnahme zu
+    löschen löscht ihr Vorkommen ebenso.
+  - `scope=following` teilt die Serie: Die alte endet eine Sekunde vor dem Vorkommen
+    (ganztägig: am Tag davor; `UNTIL` statt `COUNT`), die neue beginnt dort mit eigener
+    UID, Inhalt und Organisatorin der alten. Eine gezählte Serie behält ihre Summe (die
+    neue zählt den Rest, gelöschte Vorkommen mitgezählt); spätere Ausnahmen, gelöschte
+    Vorkommen und Zusatztermine wandern zur neuen. Am ersten Vorkommen ist das
+    `scope=all`. Löschen mit `scope=following` beendet die Serie dort.
+  - Ein fehlendes Vorkommen ist 422 `event.occurrence_required`, eines, das es nicht
+    (mehr) gibt, 422 `event.occurrence_unknown`; `this`/`following` für einen
+    einzelnen Termin oder eine Ausnahme 422 `event.scope_invalid`.
+- **Gelöschte Termine** bleiben 30 Tage als Grabstein (unsichtbar, ohne UID-Sperre;
+  eine Serie nimmt ihre Ausnahmen mit), dann entfernt sie die Fälligkeits-Schleife.
 - **Wer was sieht:** Wer den Bereich des Kalenders lesen darf, sieht seine Termine; die
   Organisatorin sieht ihren Termin auch ohne den Bereich (nur diesen Termin, nie den
   Kalender). Einen **privaten** Termin sehen andere Leser nur als Zeit und „Belegt“
@@ -87,7 +127,9 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   Termin, den man nicht sehen darf, gibt es nicht: 404 `event.not_found` wie für eine
   unbekannte ID.
 - **Live:** Jede Änderung meldet `calendar.changed` mit den IDs von Bereich und Kalender
-  an die Mitglieder des Bereichs, nie an Admins außerhalb, nie mit Inhalt.
+  an die Mitglieder des Bereichs, nie an Admins außerhalb, nie mit Inhalt. Die Outbox
+  trägt `calendar_event.created`, `.updated` (mit den Namen der geänderten Felder) und
+  `.deleted`, nur mit IDs.
 
 ## Was Admins sehen und was im Audit steht
 
@@ -113,14 +155,22 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   (409 wegen veralteter Version, der Grenze oder eines Standardkalenders), rollt die
   Anfrage samt ihrem `admin.access`-Eintrag zurück. Das gilt heute ebenso für Tickets und
   Sprints. Der Admin erfährt dabei nur, dass es den Kalender gibt, und seine Version;
-  die ID kannte er schon. Termine (M10 Task 3b) schreiben den Eintrag vor jeder
-  Ablehnung, weil eine Ablehnung dort mehr verrät.
+  die ID kannte er schon. Termine (M10 Task 3b) behalten ihn: Ändern und Löschen
+  laufen in einem Sicherungspunkt; eine Ablehnung (403, 409, 422) rollt nur diesen
+  zurück und schreibt den Eintrag (und ein `calendar.private_read`) fest, bevor sie
+  antwortet.
+- **Schreiben kraft Admin-Recht steht immer im Audit:** Ändert oder löscht ein Admin
+  einen Termin, den er ohne Admin-Recht nicht schreiben dürfte (einen privaten Termin
+  eines anderen, oder ohne Autorenrecht im Bereich), entsteht je Schreibvorgang
+  `calendar.admin_write` (Ziel der Termin; dazu die IDs von Bereich und Kalender, die
+  Art `update`/`delete`, `scope` und die Namen der geänderten Felder, nie ihre Werte).
 - **Der Schalter für den Abgleich** (`PUT /api/admin/calendar-settings`, Recht
   `calendar.manage`) steht im Audit (`calendar.settings_set`), wenn er sich ändert.
 
 ## Schreibgrenze
 
-Anlegen, Ändern und Archivieren eines Kalenders und das Anlegen eines Termins zählen zur Schreibgrenze je Person
+Anlegen, Ändern und Archivieren eines Kalenders und das Anlegen, Ändern (auch mit
+`dry_run`) und Löschen eines Termins zählen zur Schreibgrenze je Person
 (`HERD_WRITE_RATE_PER_MINUTE`, darüber 429 `rate.limited` mit `Retry-After`; siehe
 [`SICHERHEIT.md`](SICHERHEIT.md)), wie Seiten und Nachrichten. Lesen zählt nicht, der
 Schalter für den Abgleich als Einstellung der Verwaltung auch nicht.
