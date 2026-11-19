@@ -1,6 +1,6 @@
 """The due loop's expiry upkeep (plan M9 task 8): login sessions, OAuth and OIDC flows,
-collab grants, rate-limit hits, AI rate windows and sign-ins waiting for a second
-factor go once their time column is older than the catalogue's period, across
+collab grants, rate-limit hits, AI rate windows, sign-ins waiting for a second factor
+and calendar events deleted 30 days ago go once their time column is older than the catalogue's period, across
 organisations, in bounded batches; younger rows stay. `remove_expired` is given its time; the due loop gives it the wall time, never
 its `SettableClock`."""
 
@@ -21,6 +21,8 @@ from app.models_registry import Base as Registry
 from app.modules.agents.run_control_models import RateWindow
 from app.modules.ai.models import AiConnection
 from app.modules.auth.models import UserSession
+from app.modules.calendars.event_models import CalendarEvent
+from app.modules.calendars.models import Calendar, CalendarColor
 from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
 from app.modules.oauth.models import OAuthClient, OAuthFlow
 from app.modules.oidc.models import OidcFlow, OidcProvider, ProviderKind
@@ -158,7 +160,32 @@ async def _challenge(session: AsyncSession, org: Organization, user: User, at: d
     )
 
 
+async def _tombstone(session: AsyncSession, org: Organization, user: User, at: datetime) -> Base:
+    """A calendar event deleted at `at`."""
+    space = await session.scalar(select(Space).where(Space.owner_user_id == user.id))
+    if space is None:
+        space = await SpaceService(session).create_personal(user)
+    calendar = Calendar(org_id=org.id, space_id=space.id, name="K", color=CalendarColor.BLUE)
+    session.add(calendar)
+    await session.flush()
+    return CalendarEvent(
+        org_id=org.id,
+        calendar_id=calendar.id,
+        space_id=space.id,
+        uid=f"{uuid.uuid4()}@test",
+        title="T",
+        starts_at=at,
+        ends_at=at,
+        tzid="UTC",
+        recurs_until=at,
+        organizer_type="user",
+        organizer_id=user.id,
+        deleted_at=at,
+    )
+
+
 MAKERS: dict[str, Make] = {
+    "calendar_event": _tombstone,
     "user_session": _login,
     "rate_limit_hit": _hit,
     "ai_rate_window": _window,

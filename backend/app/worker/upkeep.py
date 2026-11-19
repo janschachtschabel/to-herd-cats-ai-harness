@@ -2,7 +2,8 @@
 the period of their rule in `app/core/retention.py` has passed (`Upkeep` with `by =
 EXPIRY`): ended login sessions after an hour (live editing may still save for them),
 OAuth and OIDC flows at their expiry, collab grants an hour after theirs, rate-limit
-hits after the limiter's window, AI rate windows an hour after they began. The
+hits after the limiter's window, AI rate windows an hour after they began, calendar
+events 30 days after they were deleted (tombstones for sync and feeds). The
 modules still clear their own on the way (a login, a new flow, a new grant, a limit
 check); the upkeep catches what nobody comes back for.
 
