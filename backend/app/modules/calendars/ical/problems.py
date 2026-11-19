@@ -20,7 +20,8 @@ TIME_OUT_OF_RANGE = "ical.time_out_of_range"  # outside the years 1900 to 2399
 TIME_ZONE_UNKNOWN = "ical.time_zone_unknown"  # no IANA, Windows or matching VTIMEZONE
 RRULE_INVALID = "ical.rrule_invalid"
 RRULE_UNSUPPORTED = "ical.rrule_unsupported"  # below DAILY, BYHOUR, EXRULE, two RRULEs
-OVERRIDE_UNMATCHED = "ical.override_unmatched"  # no series, or no such occurrence
+OVERRIDE_UNMATCHED = "ical.override_unmatched"  # no such occurrence of its series
+OVERRIDE_ORPHANED = "ical.override_orphaned"  # its series is not in the file
 OVERRIDE_UNSUPPORTED = "ical.override_unsupported"  # RANGE=THISANDFUTURE
 
 RRULE_NEVER_MATCHES = "ical.rrule_never_matches"  # read as its start alone
@@ -45,6 +46,7 @@ CODES = frozenset(
         RRULE_INVALID,
         RRULE_UNSUPPORTED,
         OVERRIDE_UNMATCHED,
+        OVERRIDE_ORPHANED,
         OVERRIDE_UNSUPPORTED,
         RRULE_NEVER_MATCHES,
         ATTENDEE_DROPPED,

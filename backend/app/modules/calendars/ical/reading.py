@@ -78,6 +78,9 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
         if budget.exhausted:
             found[problems.OVER_BUDGET] += 1
             continue
+        if group.master is None:  # occurrences without their series (RFC 4791 4.1)
+            found[problems.OVERRIDE_ORPHANED] += len(group.overrides)
+            continue
         notes: Counter[str] = Counter()
         try:
             frame = times.Frame.of(default_zone, resolver, group.parts(), budget)
@@ -120,9 +123,7 @@ def _broken(part: lines.Component) -> int:
 
 def _draft(uid: str, group: _Group, frame: times.Frame, notes: Counter[str]) -> EventDraft:
     master = group.master
-    if master is None:
-        notes[problems.OVERRIDE_UNMATCHED] += len(group.overrides) - 1
-        raise Skip(problems.OVERRIDE_UNMATCHED)
+    assert master is not None  # orphaned overrides are counted by `parse`
     begin, series = _series(master, frame, notes, single=False)
     parts = group.overrides[:MAX_OVERRIDES]
     notes[problems.OVER_LIMIT] += len(group.overrides) - len(parts)

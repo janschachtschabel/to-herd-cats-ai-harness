@@ -2082,7 +2082,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=46" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "httpx", specifier = ">=0.28" },
-    { name = "icalendar", specifier = ">=7.3,<8" },
+    { name = "icalendar", specifier = ">=7.3,<7.4" },
     { name = "mcp", specifier = ">=2.3" },
     { name = "openai", specifier = ">=3.31" },
     { name = "opentelemetry-api", specifier = ">=1.45.2" },

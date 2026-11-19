@@ -151,11 +151,14 @@ def test_overrides_that_match_nothing_are_counted() -> None:
                 "series", "RECURRENCE-ID;RANGE=THISANDFUTURE;TZID=Europe/Berlin:20260711T090000"
             ),
             _event("orphan", "RECURRENCE-ID;TZID=Europe/Berlin:20260711T090000"),
+            _event("orphan", "RECURRENCE-ID;TZID=Europe/Berlin:20260712T090000"),
         )
     )
     assert [(d.uid, d.overrides) for d in parsed.events] == [("series", ())]
+    # an override whose series is not in the file (one occurrence a person is invited
+    # to, RFC 4791 4.1) has a code of its own, once per override (R7a-14)
     assert parsed.problems == Counter(
-        {"ical.override_unmatched": 2, "ical.override_unsupported": 1}
+        {"ical.override_unmatched": 1, "ical.override_unsupported": 1, "ical.override_orphaned": 2}
     )
 
 
