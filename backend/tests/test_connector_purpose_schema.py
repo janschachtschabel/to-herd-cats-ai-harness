@@ -24,7 +24,7 @@ from tests.support.mcp_stub import McpStub
 from tests.support.oauth_stub import OAuthStub
 
 REVISION = "d5f8a1c3e7b9"  # m10 connector purpose
-BEFORE = "b1c4e7a90d23"
+BEFORE = "c5e8a1d4f7b2"  # m10 events, the revision below
 NOW = datetime(2026, 11, 19, 8, 0, tzinfo=UTC)
 
 

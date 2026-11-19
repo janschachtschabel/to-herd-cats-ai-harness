@@ -24,8 +24,8 @@ before apps; the M10 tables that reference them are dropped by later revisions'
 downgrades before this one runs.
 
 Revision ID: d5f8a1c3e7b9
-Revises: b1c4e7a90d23
-Create Date: 2027-01-15 09:00:00.000000
+Revises: c5e8a1d4f7b2
+Create Date: 2027-01-16 09:00:00.000000
 """
 
 from collections.abc import Sequence
@@ -34,7 +34,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d5f8a1c3e7b9"
-down_revision: str | None = "b1c4e7a90d23"
+down_revision: str | None = "c5e8a1d4f7b2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
