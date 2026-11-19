@@ -20,6 +20,13 @@ oder das Helm-Chart (README, „Kubernetes mit Helm“).
   im hPanel beim VPS). Der hat schon DNS und bekommt ebenfalls ein Zertifikat.
 - Eine E-Mail-Adresse und ein Passwort für die erste Person (die Inhaberin).
 
+**Noch nicht freigegeben (Stand 19.11.2026):** Das Image
+`ghcr.io/janschachtschabel/to-herd-cats-ai` erscheint erst mit der ersten
+veröffentlichten Freigabe (ein Tag `vX.Y.Z`, siehe README, „Freigaben und Updates“).
+Bis dahin findet der Docker Manager kein Image zu `HERD_IMAGE_TAG`, und die
+Bereitstellung scheitert beim Holen. Was die nächste Freigabe gegenüber 1.0.0 ändert,
+steht in [`RELEASE-NEXT.md`](RELEASE-NEXT.md).
+
 ## Schritt für Schritt
 
 ### 1. Bereitstellen ohne Werte
@@ -234,8 +241,22 @@ dieser Stack nicht; dafür die Referenz unter `deploy/compose/` nehmen.
 
 ### Wiederherstellen
 
-Eingespielt wird nur in eine **leere** Datenbank; die Schritte unten leeren sie. Die
-Einzelheiten und alle Meldungen stehen in [`SICHERUNG.md`](SICHERUNG.md)
+**Auf demselben VPS, solange die App läuft,** geht es am einfachsten in der App:
+**Verwaltung → Sicherung**, beim Archiv „Einspielen …“ (nur Inhaber; zur Bestätigung den
+Namen der Organisation eintippen). Die App sichert vorher den jetzigen Stand
+(`pre_restore`), zeigt allen die Wartungsseite, ersetzt Datenbank und Anhänge und meldet
+danach alle ab. In der Webkonsole dasselbe:
+
+```bash
+docker compose exec app python -m app.ops restore apply /backups/<archiv>.tar \
+  --replace --confirm '<Name der Organisation>'
+```
+
+Die Einzelheiten stehen in [`SICHERUNG.md`](SICHERUNG.md) („Einspielen in eine
+laufende Installation“, „In der Verwaltung“).
+
+**Auf einem neuen VPS** (oder wenn die App nicht mehr startet) wird in eine **leere**
+Datenbank eingespielt; die Schritte unten leeren sie. Die Einzelheiten und alle Meldungen stehen in [`SICHERUNG.md`](SICHERUNG.md)
 („Wiederherstellen“). In der Webkonsole, `<projekt>` ist der Projektname,
 `<archiv>` der Dateiname der Sicherung (z. B. `herd-20261116T023000Z-1.0.2`):
 
@@ -375,6 +396,14 @@ Häufige Fälle:
   Schlüssel wäre ein Wert in der `.env`, und der Dienst `backup` hat keinen Weg nach
   draußen. Dafür die Referenz unter `deploy/compose/` (`compose.s3.yml`) oder das
   Chart nehmen.
+- Die Schutzschichten aus M9b sind mit ihren Standardwerten an und lassen sich in diesem
+  Stack nicht einstellen: Sitzungen enden nach 24 Stunden ohne Nutzung
+  (`HERD_SESSION_IDLE_HOURS`), je Person höchstens 120 Schreibvorgänge und 30 Uploads
+  je Minute (`HERD_WRITE_RATE_PER_MINUTE`, `HERD_UPLOAD_RATE_PER_MINUTE`). Ohne
+  Gegenstück bleiben: der Virenscan (`HERD_CLAMAV_ADDRESS`), TLS zur Datenbank
+  (`HERD_DATABASE_SSLMODE`; die Datenbank liegt hier im internen Netz des Projekts) und
+  getrennte Datenbankrollen (`HERD_MIGRATE_DATABASE_URL`). Wer sie braucht, nimmt die
+  Referenz unter `deploy/compose/` oder das Chart (README, Betriebshinweise).
 - Sehr große Uploads (bis 25 MB je Anhang, 100 MB je Import) über eine langsame
   Leitung können an Zeitgrenzen von Hostingers Traefik scheitern; dessen Einstellungen
   gehören zu `/docker/traefik`, nicht zu diesem Stack.

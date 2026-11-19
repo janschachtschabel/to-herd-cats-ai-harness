@@ -2,9 +2,12 @@
 
 Stand: M9a (Archiv und Sicherung über die Kommandozeile, Wiederherstellung in eine leere
 Installation mit Probe, Zeitplan, Aufbewahrung, Offsite mit restic, Alarme, Aufbewahrung
-je Tabelle) und aus M9b der Wartungsmodus mit dem Einspielen in eine **laufende**
-Installation über die Kommandozeile, dazu die Sicherung in der Verwaltung (Verwaltung →
-Sicherung, nur Inhaber; [unten](#in-der-verwaltung)).
+je Tabelle) und M9b (Abschluss 19.11.2026): der Wartungsmodus mit dem Einspielen in eine
+**laufende** Installation über die Kommandozeile und aus der Verwaltung (Verwaltung →
+Sicherung, nur Inhaber; [unten](#in-der-verwaltung)), Anhänge in S3
+([unten](#anhänge-in-s3)), optional getrennte Datenbankrollen, und aus den Reviews die
+Schutzschichten beim Einspielen ([Was ein Archiv ausführen darf](#was-ein-archiv-ausführen-darf)).
+Was sich gegenüber 1.0.0 ändert: [`RELEASE-NEXT.md`](RELEASE-NEXT.md).
 
 **Kurz für den Betrieb:**
 
@@ -55,7 +58,7 @@ Eine unkomprimierte tar-Datei `herd-<UTC JJJJMMTTThhmmssZ>-<Version>.tar` (Recht
 Daneben liegt `<Name>.manifest.json`: dasselbe Manifest plus `archive_sha256`, die
 Prüfsumme der ganzen tar-Datei. Das Manifest enthält nur Kennzahlen, nie Inhalte:
 Format, App-Version, Alembic-Revision, Erstellzeit (UTC), Hauptversion des Servers,
-Version von `pg_dump`, Speicherart (`local`), Zeilen je Tabelle, Dateien (Anzahl,
+Version von `pg_dump`, Speicherart (`local` oder `s3`), Zeilen je Tabelle, Dateien (Anzahl,
 Bytes), SHA-256 und Größe je Mitglied, die **Schlüsselkennung** von `HERD_SECRET_KEY`,
 die Anzahl der `enc:`-Werte je Geheimnis-Spalte (jede Textspalte `*_ref`) und die
 Namen der `env:`-Verweise.

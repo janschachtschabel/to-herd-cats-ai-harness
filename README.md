@@ -6,12 +6,14 @@ Menschen. Die Spezifikation steht in
 [`docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md`](docs/superpowers/specs/2026-11-12-to-herd-cats-ai-design.md).
 
 **Version 1.0.0** (erste Freigabe; was sie enthält, Hinweise zum Update und bekannte
-Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)).
+Grenzen: [`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md)). Was seitdem dazukam und beim
+Update von einem 1.0.0-Build zu beachten ist (noch nicht veröffentlicht; ein Tag folgt,
+wenn die ganze App fertig ist): [`docs/RELEASE-NEXT.md`](docs/RELEASE-NEXT.md).
 
-**Stand: M9a (Produktion, erster Teil) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
-M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7), dazu aus M9b der Wartungsmodus mit
-dem Einspielen in eine laufende Installation und Anhänge in S3; hybride Suche und
-Embeddings (M5 Tasks 8 bis 11) und der Rest von M9b fehlen noch.** Aus M1:
+**Stand: M9 (Produktion, M9a und M9b) ist gebaut, auf Meilenstein 8 (Öffnung: MCP),
+M7, M6 und aus M5 der KI-Grundlage (Tasks 1 bis 7); M10 (Kalender) hat begonnen
+([`docs/KALENDER.md`](docs/KALENDER.md)); hybride Suche und Embeddings (M5 Tasks 8 bis
+11) fehlen noch.** Aus M1:
 Anmeldung, Personen, Gruppen, Bereiche (offen, Team, persönlich), Rollen, die eine
 Rechteprüfung, Audit, die Oberfläche mit Navigation und Verwaltung, Image, Compose,
 Helm-Chart und CI. Aus M2 ein Wiki in jedem Bereich:
@@ -161,6 +163,20 @@ Aus M9a der Betrieb in Produktion:
 - **Chart** mit Autoskalierung (HPA) für API und Worker, PodDisruptionBudgets,
   Sicherungs-CronJob und gemessenen Requests; **Lasttest** mit 200 Personen
   ([Steckbrief](docs/STECKBRIEF.md#gemessen-lasttest-mit-200-personen-m9)).
+
+Aus M9b der Rest des Betriebs:
+
+- **Anhänge in S3** (`HERD_STORAGE=s3`, eigener S3-Client, Umzug mit `python -m app.ops
+  storage copy --to s3`) und **mehrere Collab-Instanzen** (jede Seite in PostgreSQL an
+  eine gebunden, ohne Redis; ein Rollout schickt die Browser ohne Verlust auf eine andere
+  Instanz).
+- **Zweiter Faktor mit TOTP**, freiwillig für jedes Konto mit Passwort (QR-Code,
+  Wiederherstellungscodes, Zurücksetzen durch Admins); **„Angemeldete Geräte“** im
+  Profil (einzelne oder alle anderen abmelden); Sitzungen enden nach 24 Stunden ohne
+  Nutzung; erneute Anmeldung vor dem Verknüpfen eines Anbieters.
+- **Härtung nach ASVS J7 bis J14:** Schreibgrenze je Person und Minute, optionaler
+  Virenscan (clamd), TLS zur Datenbank, wechselbares internes Token, eigener Rückruf je
+  OAuth-App mit Prüfung von `iss`, optional getrennte Datenbankrollen.
 
 Bedienung und Betrieb des Wikis: [`docs/WIKI.md`](docs/WIKI.md), der Nachrichten:
 [`docs/NACHRICHTEN.md`](docs/NACHRICHTEN.md), der Tickets:
@@ -485,7 +501,7 @@ Helm-Chart, Lizenzprüfung und Release stehen in `CLAUDE.md`. Die CI
 
 ## Betriebshinweise
 
-Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M9a. Wer betreibt, sollte sie
+Bekannte Grenzen und bewusste Entscheidungen aus M1 bis M9. Wer betreibt, sollte sie
 kennen. Was beim Update auf eine neue Version zu beachten ist, steht unter
 [Freigaben und Updates](#freigaben-und-updates).
 
@@ -684,14 +700,19 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   weiter. Der Zähler `herd_collab_connections` zeigt offene Verbindungen,
   `herd_collab_saves_total{result}` die Speicherungen (`unrepresentable`: ein Stand,
   der sich nicht als Markdown speichern ließ, siehe `docs/WIKI.md`).
-- **Genau ein Collab-Prozess.** Ein Live-Dokument liegt im Speicher dieses einen
-  Prozesses; zwei Prozesse würden die Bearbeitenden einer Seite aufteilen, und keiner
-  sähe die Änderungen des anderen. Das Chart setzt deshalb `replicas: 1` und
-  `strategy: Recreate` (beim Update erst den alten Pod beenden, der dabei speichert).
-  Fällt der Prozess aus, verbinden sich die Browser neu; Änderungen der letzten
-  Sekunden (höchstens 10 s), die noch nicht gespeichert waren, spielt ein noch offener
-  Browser beim Wiederverbinden erneut ein; ist er geschlossen, sind sie verloren. Mehrere Collab-Replikas (mit Redis/Valkey) sind für M9
-  geplant. In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
+- **Collab-Instanzen (seit M9b).** Ein Live-Dokument liegt im Speicher genau einer
+  Collab-Instanz: Jede Seite ist in PostgreSQL an eine gebunden (`collab_page_owner`,
+  ohne Redis), und das Relay der API schickt alle Verbindungen der Seite dorthin. Jede
+  Instanz meldet sich alle 5 s mit `HERD_COLLAB_ADVERTISE_URL` an und gilt nach 15 s
+  Schweigen als weg. Das Chart setzt `collab.replicas` (Standard 1, dann `Recreate`; ab
+  2 `RollingUpdate` mit `maxUnavailable: 0` und einem PodDisruptionBudget),
+  `compose.nodes.yml` startet `collab-a` und `collab-b`. Wird eine Instanz beendet
+  (SIGTERM), speichert sie, schließt mit 1012 und gibt ihre Seiten frei; die Browser
+  landen in rund einer Sekunde auf einer anderen. Stürzt sie ab, sind ihre Seiten nach
+  15 s frei (gemessen bis zur neuen Bindung: [`docs/demo/m9.md`](docs/demo/m9.md));
+  ungespeicherte Änderungen der letzten Sekunden (höchstens 10 s) spielt ein noch offener
+  Browser beim Wiederverbinden erneut ein, ist er geschlossen, sind sie verloren.
+  Einzelheiten: [`docs/WIKI.md`](docs/WIKI.md#mehrere-collab-instanzen-seit-m9b). In Compose (`HERD_ROLE=all`) ist der Collab-Prozess ein Kindprozess der API;
   er erbt von ihrer Umgebung nur `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`, `NODE_*` und
   `HERD_COLLAB_*` und bekommt dazu Token und öffentliche URL, nie die
   Datenbank-Zugangsdaten oder andere Geheimnisse der API. Endet dieser Kindprozess (etwa
@@ -787,7 +808,8 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   einmal (`attachments/<org_id>/<sha256>`). Mehrere API-Replikas brauchen dasselbe
   Volume (Compose: `app-data`, Helm: `<release>-data`, siehe oben). Mit
   `HERD_STORAGE=s3` liegen sie stattdessen in einem S3-kompatiblen Bucket
-  (`HERD_S3_*`; Compose `compose.s3.yml`, Helm `s3.*`; Umzug mit `python -m app.ops
+  (`HERD_S3_ENDPOINT`, `HERD_S3_REGION`, `HERD_S3_BUCKET`, `HERD_S3_PREFIX`,
+  `HERD_S3_ACCESS_KEY_ID`, `HERD_S3_SECRET_ACCESS_KEY[_FILE]`; Compose `compose.s3.yml`, Helm `s3.*`; Umzug mit `python -m app.ops
   storage copy --to s3`, siehe [`docs/SICHERUNG.md`](docs/SICHERUNG.md#anhänge-in-s3)). Das Image legt
   `/data` mit dem Besitzer 10001 an, damit ein neues benanntes Volume dort beschreibbar
   ist; das Wurzeldateisystem bleibt nur lesbar. Ein Anhang hat
@@ -819,6 +841,26 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `HERD_DIFF_MAX_LINES` (Standard 20000) Zeilen, beide Versionen zusammen; darüber
   antwortet die API mit 422 (`page.diff_too_large`). Die Rechenzeit wächst mit den
   Zeilen und läuft in einem Worker-Thread.
+- **Sitzungen und zweiter Faktor (seit M9b):** Eine Sitzung gilt höchstens
+  `HERD_SESSION_TTL_HOURS` (168) und endet schon nach `HERD_SESSION_IDLE_HOURS` (24;
+  `0` = aus) ohne Nutzung; Anfragen, die ein Tab ohne Eingabe von selbst stellt, zählen
+  nicht (Chart `api.sessionIdleHours`). Jede Person sieht und beendet ihre Sitzungen im
+  Profil („Angemeldete Geräte“). TOTP ist freiwillig; für eine Person mit TOTP
+  antwortet `POST /api/auth/login` mit 202, die Sitzung öffnet erst
+  `POST /api/auth/login/second-factor`. 10 falsche Codes in 24 Stunden sperren den
+  zweiten Faktor für eine Stunde. TOTP braucht `HERD_SECRET_KEY`. Einzelheiten:
+  [`docs/ANMELDUNG.md`](docs/ANMELDUNG.md).
+- **Wartungsmodus (seit M9b):** Während eines Einspielens antworten `/api/*` und `/mcp`
+  mit 503 `maintenance.active` (`Retry-After: 30`), außer `GET /api/maintenance`; die
+  Oberfläche zeigt eine Wartungsseite, der Worker pausiert, die Live-Bearbeitung
+  schließt mit 4503. Hängt die Wartung nach einem Abbruch, beendet sie
+  `python -m app.ops maintenance off` ([`docs/SICHERUNG.md`](docs/SICHERUNG.md#einspielen-in-eine-laufende-installation-wartungsmodus)).
+  Sicherungen in der Verwaltung brauchen `HERD_BACKUP_DIR` auch in API und Worker;
+  hochgeladene Archive dürfen höchstens `HERD_BACKUP_UPLOAD_MAX_BYTES` (2 GiB) groß
+  sein, ein Proxy davor muss das durchlassen.
+- **Internes Token wechseln (seit M9b):** Die API nimmt während eines Wechsels auch
+  `HERD_INTERNAL_TOKEN_PREVIOUS` (oder `…_PREVIOUS_FILE`); Ablauf in
+  [`docs/WIKI.md`](docs/WIKI.md#internes-token-wechseln).
 - **Anmeldelimits**: je Client-Adresse `HERD_LOGIN_IP_RATE_LIMIT_PER_MINUTE` (Standard
   30) Versuche je Minute, gleich mit welcher E-Mail; je Adresse und E-Mail
   `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (Standard 5) fehlgeschlagene Versuche; es zählen
@@ -928,7 +970,11 @@ das Image `ghcr.io/<owner>/to-herd-cats-ai:X.Y.Z` und `:X.Y` und das Chart als O
 `appVersion` des Charts müssen gleich sein (`deploy/helm/scripts/check-chart-version.sh`).
 Getaggt wird nur auf Jans Wort; die erste Freigabe ist `v1.0.0` nach dem Modul-Review
 von M9a und seiner Fix-Welle (Antwort J1), beschrieben in
-[`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md).
+[`docs/RELEASE-1.0.0.md`](docs/RELEASE-1.0.0.md). Der Tag ist noch nicht veröffentlicht:
+Jan hat am 18.11.2026 entschieden, dass er erst kommt, wenn die ganze App fertig ist.
+Bis dahin gibt es kein Image und kein Chart in der Registry (also auch nicht für den
+Hostinger-Stack), und was nach dem Stand von 1.0.0 dazukam, sammelt
+[`docs/RELEASE-NEXT.md`](docs/RELEASE-NEXT.md).
 
 **Vor dem Taggen, von Hand:**
 
