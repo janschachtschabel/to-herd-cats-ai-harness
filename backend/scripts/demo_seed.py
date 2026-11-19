@@ -11,11 +11,14 @@ scripts/demo_mcp.py): the switch on and Anna's read token, with a model an exter
 agent with a ticket waiting for pick-up, and with `--mcp-stub URL` a server on that
 stub (never the outside network by default); sign-in (M9, scripts/demo_oidc.py): with
 `--oidc-stub URL` only, an OIDC provider on that stub with self-registration for
-demo.example (sign-ups wait for an admin's approval).
+demo.example (sign-ups wait for an admin's approval); the second factor (M9b,
+scripts/demo_totp.py): with `--totp-file PATH` only, Ben signs in with TOTP, his key and
+recovery codes in PATH (0600).
 
     cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \\
         uv run python -m scripts.demo_seed --base http://127.0.0.1:8080 --admin admin@example.com \\
-        [--mcp-stub https://localhost:8098/mcp] [--oidc-stub https://localhost:8100]
+        [--mcp-stub https://localhost:8098/mcp] [--oidc-stub https://localhost:8100] \
+        [--totp-file ben-totp.txt]
 
 `HERD_DEMO_ADMIN_PASSWORD` is the admin's password, `HERD_DEMO_PASSWORD` (at least 10
 characters) becomes the demo people's password. Passwords are read from the
@@ -31,6 +34,7 @@ import os
 import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import httpx
 
@@ -40,8 +44,10 @@ from scripts import (
     demo_mcp,
     demo_messaging,
     demo_oidc,
+    demo_pages,
     demo_sprints,
     demo_tickets,
+    demo_totp,
 )
 from scripts.demo_api import DemoFailed, call
 from scripts.demo_tickets import SeededTickets
@@ -74,6 +80,7 @@ class Seeded:
     automations: demo_automations.SeededAutomations | None = None
     mcp: demo_mcp.SeededMcp = field(default_factory=demo_mcp.SeededMcp)
     oidc: demo_oidc.SeededOidc = field(default_factory=demo_oidc.SeededOidc)
+    totp: demo_totp.SeededTotp = field(default_factory=demo_totp.SeededTotp)
 
 
 async def _login(connect: Connect, email: str, password: str) -> httpx.AsyncClient:
@@ -101,29 +108,6 @@ async def _space(admin: httpx.AsyncClient, seeded: Seeded) -> None:
         await call(admin, "PUT", f"/api/spaces/{seeded.space_id}/members", member)
 
 
-async def _pages(anna: httpx.AsyncClient, seeded: Seeded) -> None:
-    """Two published pages; the second is changed and restored, so its discussion gets
-    three system entries (created, published, version restored)."""
-    pages = f"/api/spaces/{seeded.space_id}/pages"
-    handbook = await call(anna, "POST", pages, {"title": "Handbuch", "content_md": HANDBOOK})
-    publish = {"version": handbook["version"]}
-    await call(anna, "POST", f"/api/pages/{handbook['id']}/publish", publish)
-    leave = await call(
-        anna,
-        "POST",
-        pages,
-        {"title": "Urlaub", "content_md": LEAVE, "parent_id": handbook["id"]},
-    )
-    seeded.handbook_id, page_id = str(handbook["id"]), str(leave["id"])
-    publish = {"version": leave["version"]}
-    leave = await call(anna, "POST", f"/api/pages/{page_id}/publish", publish)
-    edit = {"content_md": LEAVE + "\nEntwurf: 35 Tage für alle.\n", "version": leave["version"]}
-    leave = await call(anna, "PATCH", f"/api/pages/{page_id}", edit)
-    restore = {"version": leave["version"]}
-    await call(anna, "POST", f"/api/pages/{page_id}/versions/1/restore", restore)
-    seeded.page_id = page_id
-
-
 async def seed(
     connect: Connect,
     *,
@@ -135,13 +119,15 @@ async def seed(
     ai: demo_ai.Ai | None = None,
     mcp_stub: str | None = None,
     oidc_stub: str | None = None,
+    totp_file: Path | None = None,
 ) -> Seeded:
     """Creates the demo. `connect()` gives a new client (own cookies, CSRF header) of
     the installation; `settle()` is awaited before the page discussion is used (a
     no-op against a running installation, whose worker writes the system entries);
     `ai`: the model for the agents (none: no agents); `mcp_stub`: an MCP server's
     address for the demo's server (none: no server); `oidc_stub`: an OIDC stub's issuer
-    for the demo's sign-in provider (none: no provider)."""
+    for the demo's sign-in provider (none: no provider); `totp_file`: TOTP for Ben, his
+    key and recovery codes into this new file (none: no TOTP)."""
     seeded = Seeded()
     admin = await _login(connect, admin_email, admin_password)
     await _people(admin, people_password, seeded)
@@ -149,7 +135,7 @@ async def seed(
     people = {
         key: await _login(connect, email, people_password) for key, email in seeded.emails.items()
     }
-    await _pages(people["anna"], seeded)
+    seeded.handbook_id, seeded.page_id = await demo_pages.build(people["anna"], seeded.space_id)
     await demo_messaging.channels(people, seeded)
     await demo_messaging.direct_message(people, seeded)
     await settle()
@@ -197,25 +183,19 @@ async def seed(
         mcp_stub=mcp_stub,
     )
     seeded.oidc = await demo_oidc.build(admin, oidc_stub=oidc_stub)
+    seeded.totp = await demo_totp.build(  # last: it ends Ben's other sessions
+        people["ben"],
+        key="ben",
+        email=seeded.emails["ben"],
+        password=people_password,
+        totp_file=totp_file,
+    )
     return seeded
 
 
-HANDBOOK = """# Handbuch
-
-Wie wir im Team Nord arbeiten. Fragen gern in **#team-nord** oder in der Diskussion
-einer Seite.
-
-- [[Urlaub]]
-"""
-
-LEAVE = """# Urlaub
-
-- 30 Tage im Jahr, Teilzeit anteilig.
-- Anträge zwei Wochen vorher im Team abstimmen.
-"""
-
-
-async def _main(base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None) -> int:
+async def _main(
+    base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None, totp_file: Path | None
+) -> int:
     admin_password = os.environ.get("HERD_DEMO_ADMIN_PASSWORD", "")
     people_password = os.environ.get("HERD_DEMO_PASSWORD", "")
     if not admin_password or len(people_password) < 10:
@@ -242,6 +222,7 @@ async def _main(base: str, admin_email: str, mcp_stub: str | None, oidc_stub: st
             ai=ai,
             mcp_stub=mcp_stub,
             oidc_stub=oidc_stub,
+            totp_file=totp_file,
         )
     except DemoExists as exists:
         print(f"demo data present already ({exists}); nothing changed")
@@ -272,6 +253,7 @@ async def _main(base: str, admin_email: str, mcp_stub: str | None, oidc_stub: st
             if seeded.oidc.provider_id
             else ""
         )
+        + (f", TOTP for Ben (key in {totp_file})" if seeded.totp.enabled_for else "")
     )
     return 0
 
@@ -286,8 +268,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--oidc-stub", help="an OIDC stub's issuer for the demo's sign-in provider; none: none"
     )
+    parser.add_argument(
+        "--totp-file",
+        type=Path,
+        help="a new file for Ben's TOTP key and recovery codes; none: none",
+    )
     args = parser.parse_args(argv)
-    return asyncio.run(_main(args.base.rstrip("/"), args.admin, args.mcp_stub, args.oidc_stub))
+    if args.totp_file is not None and args.totp_file.exists():
+        print(f"{args.totp_file} exists already; choose a new file for the TOTP key")
+        return 2
+    stubs = (args.mcp_stub, args.oidc_stub)
+    return asyncio.run(_main(args.base.rstrip("/"), args.admin, *stubs, args.totp_file))
 
 
 if __name__ == "__main__":

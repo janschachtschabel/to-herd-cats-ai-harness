@@ -79,7 +79,7 @@ def test_the_seed_takes_an_oidc_stub_address_by_argument(monkeypatch: Any) -> No
     seen: dict[str, Any] = {}
 
     async def fake_main(
-        base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None
+        base: str, admin_email: str, mcp_stub: str | None, oidc_stub: str | None, *_: Any
     ) -> int:
         seen.update(mcp_stub=mcp_stub, oidc_stub=oidc_stub)
         return 0

@@ -440,6 +440,10 @@ Selbstregistrierung für `demo.example`, Konten warten auf Freigabe). Dafür bra
 App `HERD_PUBLIC_URL`, den Host des Stubs in `HERD_OIDC_ALLOWED_HOSTS`, das Secret des
 Stubs als `HERD_OIDC_STUB_SECRET` und sein Zertifikat in `SSL_CERT_FILE`
 ([Demo M9](docs/demo/m9.md)). Ohne diese Schalter erreicht die Demo kein fremdes Netz.
+Mit `--totp-file <Datei>` meldet sich Ben mit zweitem Faktor an: Das Skript richtet TOTP
+für ihn über die API ein und schreibt den Schlüssel (für eine Authenticator-App) und
+seine zehn Wiederherstellungscodes in die neue Datei (nur für ihre Besitzerin lesbar,
+Modus 0600; eine vorhandene Datei überschreibt es nie). Ausgegeben wird davon nichts.
 
 ### KI ausprobieren
 
