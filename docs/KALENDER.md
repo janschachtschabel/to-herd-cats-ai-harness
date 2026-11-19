@@ -4,8 +4,8 @@ Der Kalender entsteht mit Meilenstein 10 (Plan
 `docs/superpowers/plans/2026-11-18-m10-kalender.md`, Entscheidungen 2 und 3). Diese
 Seite wächst mit jeder Aufgabe; vollständig wird sie mit Task 21 (Bedienung, Serien,
 Einladungen, Feeds und Abos, Abgleich, Betrieb). Bisher beschreibt sie Kalender,
-Standardkalender, Rechte, Termine (anlegen, lesen, sehen; Task 3a) und die
-Kalenderseite (Task 10).
+Standardkalender, Rechte, Termine (anlegen, lesen, sehen; Task 3a), Einladungen und
+Antworten (Task 4), Überlagerungen (Task 9) und die Kalenderseite (Task 10).
 
 ## Kalender und Bereiche
 
@@ -319,7 +319,7 @@ ihrem Zeitpunkt; ein Cursor gilt nur mit der Zone, mit der er entstand (422
   Statuszeile); „Keine Termine“ sagt sie erst, wenn der Zeitraum geantwortet hat.
 - **Live:** Ändert sich ein Kalender oder ein Termin in einem Bereich, lädt die Seite
   die betroffenen Listen und Zeiträume neu (`calendar.changed` mit Bereich und Kalender,
-  nur IDs).
+  nur IDs); eine Einladung (`event.invited`) lädt alle Kalenderansichten neu.
 
 ## Was Admins sehen und was im Audit steht
 
