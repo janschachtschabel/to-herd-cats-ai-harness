@@ -1128,69 +1128,100 @@ CPU der API-Prozesse die Grenze.
 Tor für M10 Tasks 4 bis 9 (Plan M10, Task 3c, Entscheidung 6: Serien werden beim Lesen
 entfaltet, keine Vorkommen-Tabelle). Gemessen am 19.11.2026 mit
 `backend/scripts/measure_calendar.py window` als Prozess gegen eine eigene Datenbank
-(PostgreSQL 16.15, Python 3.13, Code-Stand `2717bce`), ausgewertet mit
-`measure_calendar_report.py`. Bestand (direkt geschrieben, jeder Termin durch
-`event_times.check` wie über die API): 20 Kalender in vier Team-Bereichen mit 500 Serien
-(gemischte Regeln von werktäglich bis jährlich, ein Drittel endlos, ein Drittel mit
-`UNTIL`, ein Drittel mit `COUNT`, Beginn bis fünf Jahre zurück, einige `EXDATE`s und
-verschobene Vorkommen) und 5.000 Einzelterminen (ein Jahr um den Stichtag, 8 %
-ganztägig, 10 % privat, einige vorläufig oder abgesagt); dazu 20 persönliche Kalender
-mit derselben Mischung (zusammen noch einmal 500 und 5.000), 4.001 Geburtstage und
-12.000 Jahresserien für die Sonderfälle; 27.030 Zeilen. Die Betrachterin ist Mitglied
-der vier Team-Bereiche (Zone Europe/Berlin). Je Fall 10 Aufwärmaufrufe, dann 200
-Aufrufe (Sonderfälle und „alle Seiten“: 50), reihum über zehn Fenster um Montag,
-23.11.2026. **Abfragen** zählt der Engine-Zähler (jedes SQL-Statement); **Arbeit** ist
-die gezählte Arbeit der Entfaltung (`expansion.Budget`: Zeilen × 40 plus erzeugte
-Kandidaten der Regeln).
+(PostgreSQL 16.15, Python 3.13), ausgewertet mit `measure_calendar_report.py`. Bestand
+(direkt geschrieben, jeder Termin durch `event_times.check` wie über die API): 20
+Kalender in vier Team-Bereichen mit 500 Serien (gemischte Regeln von werktäglich bis
+jährlich, ein Drittel endlos, ein Drittel mit `UNTIL`, ein Drittel mit `COUNT`, Beginn
+bis fünf Jahre zurück, einige `EXDATE`s und verschobene Vorkommen) und 5.000
+Einzelterminen (ein Jahr um den Stichtag, 8 % ganztägig, 10 % privat, einige vorläufig
+oder abgesagt); dazu 20 persönliche Kalender mit derselben Mischung (zusammen noch
+einmal 500 und 5.000), 4.001 Geburtstage und 12.000 Jahresserien für die Sonderfälle;
+27.030 Zeilen. Die Betrachterin ist Mitglied der vier Team-Bereiche (Zone
+Europe/Berlin). Je Fall 10 Aufwärmaufrufe, dann 200 Aufrufe (Monatsraster mit allen
+Seiten und Sonderfälle: 50), reihum über zehn Fenster um Montag, 23.11.2026.
+**Abfragen** zählt der Engine-Zähler (jedes SQL-Statement); **Arbeit** ist die gezählte
+Arbeit der Entfaltung (`expansion.Budget`: Zeilen × 40 plus erzeugte Kandidaten der
+Regeln). Die Maschine (4 vCPU) teilten andere Arbeiten mit Testläufen; darum je drei
+Läufe hintereinander, angegeben ist die Spanne über die drei Läufe.
 
-Die Maschine war nicht ruhig: Neben der Messung liefen Testläufe anderer Arbeiten
-(4 vCPU, Lastmittel vor/nach den drei Läufen 6,3/7,2, 7,3/5,3 und 5,3/4,4). Darum drei
-Läufe hintereinander; angegeben ist die Spanne über die drei Läufe.
+**Nach den Abhilfen** (Code-Stand `4c4e3c0`): (a) eine spätere Seite lädt und entfaltet
+nur ab dem Anfang ihres Cursors, nicht das ganze Fenster neu; (b) Serien mit `COUNT`
+springen vor, wo jede Periode gleich viele Vorkommen hat (`recurrence_count.per_block`),
+und zählen die übersprungenen; sonst laufen sie weiter ab ihrem Beginn. Lastmittel
+vor/nach den Läufen 0,8/1,4, 1,3/4,0 und 4,2/2,9.
 
 | Fall | p50 ms | p95 ms | Abfragen je Aufruf | Zeilen / Kandidaten / Arbeit je Aufruf | Vorkommen |
 |---|---|---|---|---|---|
-| (1) Woche, `list_window`, eine Seite (100) | 58–68 | **79–107** | 2 | 415 / 4.837 / 21.453 | – |
-| (1) Woche, echte Route `GET /api/calendar/events` | 63–73 | 78–101 | 5 | (wie oben) | – |
-| (1) Woche, alle Seiten (4 Aufrufe) | 217–271 | 259–505 | 7,8 Ø | 1.621 / 18.833 / 83.673 | 327 Ø, 360 max |
+| (1) Woche, `list_window`, eine Seite (100) | 41–46 | **53–58** | 2 | 415 / 755 / 17.371 | – |
+| (1) Woche, echte Route `GET /api/calendar/events` | 47–51 | 58–71 | 5 | (wie oben) | – |
+| (1) Woche, alle Seiten (3–4 Aufrufe) | 158–174 | **216–259** | 7,8 Ø | 1.541 / 2.305 / 63.941 | 327 Ø, 360 max |
+| (2) Monatsraster (42 Tage), eine Seite | 59–61 | 89–141 | 2 | 654 / 2.089 / 28.241 | – |
+| (2) Monatsraster, echte Route | 70–71 | 106–243 | 5 | (wie oben) | – |
+| (2) Monatsraster, alle Seiten (rund 20 Aufrufe) | 1.075–1.188 | 1.260–1.377 | 39,2 Ø | 10.035 / 23.926 / 425.322 | 1.908 Ø, 1.965 max |
+| (3) Verfügbarkeit, 20 Personen, 14 Tage | 31,5–32,8 | **35–40** | 2 | 387 / 781 / 16.261 | 448 |
+| (3) Verfügbarkeit, 20 Personen, 62 Tage | 48–51 | 69–72 | 2 | 673 / 2.269 / 29.169 | 1.982 |
+| 4.001 ruhende Jahresserien (März), Novemberwoche | 355–371 | 616–654 | 2 | 4.001 / 4.001 / 164.041 | 0 |
+| Kalender nahe der Arbeitsgrenze (12.000 Serien) | 1.219–1.352 | 1.323–1.543 | 2 | 12.000 / 12.000 / 492.000 | 0 |
+
+Ein vierter Lauf unter starker fremder Last (Lastmittel 8,3/6,4, nur die drei Ziele):
+Woche eine Seite p95 71 ms, ganze Woche p50 181 ms und p95 262 ms, Verfügbarkeit 14
+Tage p95 47 ms. Zum Vergleich der Code-Stand vor den Abhilfen (`0f846d1`) direkt davor
+gemessen (Lastmittel 2,6/9,5): Woche eine Seite p95 73 ms, ganze Woche p50 222 ms und
+p95 317 ms, Monatsraster alle Seiten p50 1.789 ms, Verfügbarkeit 14 Tage p95 76 ms.
+
+**Vor den Abhilfen** (Code-Stand `2717bce`, erste Messung; Lastmittel 6,3/7,2, 7,3/5,3
+und 5,3/4,4; „alle Seiten“ mit 50 Aufrufen):
+
+| Fall | p50 ms | p95 ms | Abfragen je Aufruf | Zeilen / Kandidaten / Arbeit je Aufruf | Vorkommen |
+|---|---|---|---|---|---|
+| (1) Woche, `list_window`, eine Seite (100) | 58–68 | 79–107 | 2 | 415 / 4.837 / 21.453 | – |
+| (1) Woche, echte Route | 63–73 | 78–101 | 5 | (wie oben) | – |
+| (1) Woche, alle Seiten (3–4 Aufrufe) | 217–271 | 259–505 | 7,8 Ø | 1.621 / 18.833 / 83.673 | 327 Ø, 360 max |
 | (2) Monatsraster (42 Tage), eine Seite | 72–82 | 104–144 | 2 | 654 / 6.142 / 32.294 | – |
 | (2) Monatsraster, echte Route | 83–92 | 111–314 | 5 | (wie oben) | – |
-| (2) Monatsraster, alle Seiten (20 Aufrufe) | 1.717–1.940 | 1.998–2.316 | 39,2 Ø | 12.824 / 120.350 / 633.290 | 1.908 Ø, 1.965 max |
-| (3) Verfügbarkeit, 20 Personen, 14 Tage | 47–57 | **62–79** | 2 | 387 / 5.644 / 21.124 | 448 |
+| (2) Monatsraster, alle Seiten (rund 20 Aufrufe) | 1.717–1.940 | 1.998–2.316 | 39,2 Ø | 12.824 / 120.350 / 633.290 | 1.908 Ø, 1.965 max |
+| (3) Verfügbarkeit, 20 Personen, 14 Tage | 47–57 | 62–79 | 2 | 387 / 5.644 / 21.124 | 448 |
 | (3) Verfügbarkeit, 20 Personen, 62 Tage | 63–77 | 83–106 | 2 | 673 / 7.132 / 34.032 | 1.982 |
 | 4.001 ruhende Jahresserien (März), Novemberwoche | 373–458 | 673–837 | 2 | 4.001 / 4.001 / 164.041 | 0 |
 | Kalender nahe der Arbeitsgrenze (12.000 Serien) | 1.311–1.575 | 1.481–1.748 | 2 | 12.000 / 12.000 / 492.000 | 0 |
 
 Kein Aufruf antwortete anders als 200. Einzelne Aufrufe bis rund 450 ms (max) kommen
-in jedem Fall mit einer Seite vor, auch bei 47 ms Median; sie gehen auf die fremde Last
+in jedem Fall mit einer Seite vor, auch bei 32 ms Median; sie gehen auf die fremde Last
 zurück.
 
-- **Urteil: Tor erfüllt.** Wochenansicht p95 79–107 ms je Aufruf (Ziel unter 300 ms),
-  Verfügbarkeit über 14 Tage p95 62–79 ms (Ziel unter 300 ms), in allen drei Läufen.
-  Keine Abhilfe nötig; Tasks 4 bis 9 können auf der Entfaltung beim Lesen aufbauen.
-- **Wofür die Zeit geht** (Woche, eine Seite, p50 aus 100 Aufrufen bei Lastmittel 4,4,
-  eigene Zerlegung): Laden der rund
-  400 Zeilen samt Ausnahmen (zwei Statements, SQL und ORM) 24 ms, Entfalten 38 ms (rund
-  95 µs je Zeile: Serie bauen, `rrule` aufsetzen, Kandidaten). Die Regel wird schon
-  gecacht geparst (`parse_rule`, `lru_cache`). Serien mit `COUNT` springen nicht vor
-  (Entscheidung 6) und laufen bei jedem Aufruf ab ihrem Beginn; sie machen den größten
-  Teil der rund 4.800 Kandidaten je Wochenaufruf aus.
-- **Jede Seite entfaltet das ganze Fenster neu** (kein Übertrag zwischen Seiten,
-  höchstens 100 Vorkommen je Seite): Eine Woche mit rund 330 Vorkommen braucht vier
-  Aufrufe, zusammen p50 217–271 ms und p95 259–505 ms; das Monatsraster mit 20 Kalendern
-  und rund 1.900 Vorkommen braucht 20 Aufrufe, zusammen rund 2 s. Das Tor misst den
-  einzelnen Aufruf; für die Oberfläche (Task 10 lädt Seiten nach) heißt das: die erste
-  Seite steht nach unter 110 ms, die ganze Woche nach rund einer Viertelsekunde.
+- **Urteil: Tor erfüllt, auch das Ziel für die ganze Woche.** Wochenansicht p95
+  53–58 ms je Aufruf, Verfügbarkeit über 14 Tage p95 35–40 ms (Tor: je unter 300 ms);
+  die ganze Woche mit allen Seiten p95 216–259 ms (Ziel unter 300 ms; unter starker Last
+  262 ms), in jedem Lauf. Schon vor den Abhilfen hielt das Tor je Aufruf (p95 79–107 und
+  62–79 ms); die ganze Woche lag damals bei p95 259–505 ms.
+- **Wirkung der Abhilfen:** (b) senkt die Kandidaten einer Wochenseite von 4.837 auf
+  755 (−84 %) und der Verfügbarkeit über 14 Tage von 5.644 auf 781; (a) dazu die der
+  ganzen Woche auf 2.305 statt rund 3.000 (vier Seiten zu je 755) und ihre Zeilen von
+  1.621 auf 1.541. Die Arbeit der ganzen Woche sinkt von 83.673 auf 63.941 (−24 %), die
+  des Monatsrasters mit allen Seiten von 633.290 auf 425.322; dessen Zeit von rund 1,9 s
+  auf rund 1,1 s.
+- **Wofür die Zeit jetzt geht:** vor allem die Zeilen. Jede noch laufende Serie wird auf
+  jeder Seite geladen und angesetzt (vor den Abhilfen gemessen: Laden der rund 400
+  Zeilen samt Ausnahmen 24 ms, Entfalten 38 ms, rund 95 µs je Zeile), denn (a) spart nur
+  Zeilen, die vor dem Cursor enden. Die Regel wird schon gecacht geparst (`parse_rule`,
+  `lru_cache`). Serien mit `COUNT`, deren Zahl je Periode schwankt (der 31., jeder
+  Montag eines Monats, der 20. Montag eines Jahres, `BYSETPOS` in Wochen, ein Tag, den
+  nicht jeder Monat hat), laufen weiter ab ihrem Beginn.
+- **Seiten:** höchstens 100 Vorkommen je Seite; eine Woche mit rund 330 Vorkommen
+  braucht vier Aufrufe, das Monatsraster mit 20 Kalendern und rund 1.900 Vorkommen
+  braucht 20 (zusammen rund 1,1 s). Die erste Seite steht nach unter 60 ms (p95).
 - **Grenze von 2.000 Vorkommen:** Das Monatsraster dieses Bestands kommt mit bis zu
   1.965 Vorkommen nahe an die Grenze (darüber 422 `calendar.window_too_dense`); ein
   dichterer Monat mit 20 Kalendern bekäme die Antwort. Die Verfügbarkeit entfaltet je
   Person mit eigenem Budget (62 Tage: rund 100 Vorkommen je Person); mit einem Budget für
   alle 20 Personen läge sie mit 1.998 knapp unter der Grenze.
 - **Sonderfälle der Prüfung (R3a-2):** 4.001 endlose Geburtstage im März lesen sich in
-  einer Novemberwoche leer, kosten aber jeden Aufruf 0,37–0,46 s (p50; p95 bis 0,84 s), weil
-  jede Zeile geladen und angesetzt wird. Ein Kalender mit 12.000 solcher Serien (Arbeit
-  492.000 von 500.000, `expansion.MAX_WORK`) braucht 1,3–1,6 s je Aufruf (p50; max
-  1,8 s): So lange dauert ein Aufruf an der Arbeitsgrenze auf dieser Maschine, darüber
-  bricht er mit 422 ab.
+  einer Novemberwoche leer, kosten aber jeden Aufruf 0,35–0,37 s (p50; p95 bis 0,65 s),
+  weil jede Zeile geladen und angesetzt wird. Ein Kalender mit 12.000 solcher Serien
+  (Arbeit 492.000 von 500.000, `expansion.MAX_WORK`) braucht 1,2–1,4 s je Aufruf (p50;
+  max 1,7 s): So lange dauert ein Aufruf an der Arbeitsgrenze auf dieser Maschine,
+  darüber bricht er mit 422 ab. Beide ändern die Abhilfen nicht (endlose Serien sprangen
+  schon, die Kosten sind die der Zeilen).
 - **Abfragen:** `list_window` stellt zwei Statements (Termine, Ausnahmen), die Route
   fünf (dazu Sitzung, Person und Mitgliedschaften); unabhängig von der Zahl der Kalender
   und Zeilen.
