@@ -234,3 +234,28 @@ async def test_an_exdate_sent_for_an_overridden_occurrence_drops_the_override(
     assert (await client.get(f"/api/events/{override['id']}")).status_code == 404
     titles = [o["title"] for o in await window(client, *SPAN)]
     assert titles == ["Termin", "Termin", "Termin"]
+
+
+async def test_a_value_the_series_already_holds_reaches_no_override(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    """The organiser showed one occurrence of her private series: sending `private`
+    again for the series leaves that override as she made it."""
+    team = await _team(make_client, make_user, make_space)
+    client = team.organiser_client
+    made = await new_event(
+        client,
+        team.calendar["id"],
+        visibility="private",
+        rrule="FREQ=WEEKLY;COUNT=4",
+        **MONDAYS,
+    )
+    shown = await patch(
+        client, made, visibility="default", query={"scope": "this", "occurrence": SECOND}
+    )
+    override = shown.json()["event"]
+
+    assert (await patch(client, made, visibility="private", title="Neu")).status_code == 200
+
+    read = (await client.get(f"/api/events/{override['id']}")).json()
+    assert (read["visibility"], read["title"]) == ("default", "Neu")

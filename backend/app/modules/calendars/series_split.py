@@ -124,7 +124,7 @@ async def split(
     strays = {
         r: check(occurrence_after(series, effect, r), zone)
         for r in parts.strays
-        if r not in taken and change.values
+        if r not in taken and (effect is not None or change.content())
     }
     counts = rebased.counts() if rebased else Dropped()
     if dry_run:

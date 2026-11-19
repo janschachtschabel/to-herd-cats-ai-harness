@@ -8,7 +8,8 @@
   admin power alone showed one of them (the write is then audited).
 - `spread`: a content change of a series reaches each override field whose value
   still equals the series' old value (what the override did not change itself);
-  making the series private, or cancelling it, reaches every override.
+  making the series private, or cancelling it, reaches every override. A value the
+  series already holds reaches nothing.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -49,7 +50,8 @@ def spread(
         values = {
             name: new
             for name, new in content.items()
-            if getattr(override, name) != new
+            if before[name] != new  # the series' value changes
+            and getattr(override, name) != new
             and (getattr(override, name) == before[name] or EVERYWHERE.get(name) == new)
         }
         if values:
