@@ -70,3 +70,10 @@ def test_all_day_bounds_are_midnights_in_utc() -> None:
     )
     with pytest.raises(ValueError, match="before"):
         zones.all_day_bounds(date(2026, 2, 2), date(2026, 2, 1))
+
+
+def test_names_are_the_zones_zone_takes() -> None:
+    names = zones.names()
+    assert {"Europe/Berlin", "UTC", "Asia/Tokyo"} <= names
+    assert names.isdisjoint({"localtime", "posixrules", "Factory"})
+    assert all(zones.zone(name).key == name for name in sorted(names)[:50])

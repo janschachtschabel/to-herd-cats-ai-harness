@@ -25,6 +25,11 @@ def _zone_names() -> frozenset[str]:
     return frozenset(available_timezones()) - _NOT_ZONES
 
 
+def names() -> frozenset[str]:
+    """Every IANA zone name the calendar takes."""
+    return _zone_names()
+
+
 def zone(tzid: str) -> ZoneInfo:
     if tzid not in _zone_names():
         raise ZoneUnknown(tzid)

@@ -1,6 +1,7 @@
 """The calendar's libraries each stay behind one boundary (plan M10, tech stack):
 `python-dateutil` only in `modules/calendars/recurrence.py` and `recurrence_jump.py`,
-in `app` and in `scripts` alike."""
+`icalendar` only in the package `modules/calendars/ical`, in `app` and in `scripts`
+alike."""
 
 import ast
 from pathlib import Path
@@ -24,17 +25,27 @@ def _imports(path: Path) -> set[str]:
     return found
 
 
-def test_only_recurrence_imports_dateutil() -> None:
+def _importers(library: str) -> set[Path]:
+    """Every file of `app` and `scripts` that imports `library`, relative to `app`'s
+    parent."""
     root = Path(app.__file__).parent
-    backend = root.parent
-    offenders = {
-        f"{path.relative_to(backend)}: {name}"
+    return {
+        path.relative_to(root.parent)
         for top in (root, Path(scripts.__file__).parent)
         for path in sorted(top.rglob("*.py"))
-        if path.relative_to(backend) not in {Path("app") / home for home in DATEUTIL_HOMES}
-        for name in _imports(path)
-        if name.split(".")[0] == "dateutil"
+        if any(name.split(".")[0] == library for name in _imports(path))
     }
-    assert offenders == set()
+
+
+def test_only_recurrence_imports_dateutil() -> None:
+    root = Path(app.__file__).parent
+    assert _importers("dateutil") - {Path("app") / home for home in DATEUTIL_HOMES} == set()
     used = _imports(root / "modules/calendars/recurrence.py")
     assert any(name.startswith("dateutil") for name in used)  # the check is not vacuous
+
+
+def test_only_the_ical_package_imports_icalendar() -> None:
+    home = Path("app/modules/calendars/ical")
+    found = _importers("icalendar")
+    assert {path for path in found if home not in path.parents} == set()
+    assert {home / "lines.py", home / "writing.py"} <= found  # the check is not vacuous
