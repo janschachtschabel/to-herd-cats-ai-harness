@@ -5,7 +5,9 @@
 #
 # The first deploy needs no value at all: the service init generates every secret once
 # into the volumes secrets and db-secret (read through *_FILE, never env values) and
-# skips what still lacks a value. Then fill .env (DOMAIN, ADMIN_EMAIL, ADMIN_PASSWORD)
+# skips what still lacks a value. db-owner then makes the app's database role herd_owner
+# (owner of the database, no superuser; the superuser herd serves only the database
+# itself), on every deploy. Then fill .env (DOMAIN, ADMIN_EMAIL, ADMIN_PASSWORD)
 # and deploy again. HTTPS comes from Hostinger's Traefik through the labels of app; no
 # port of this stack is published.
 #
@@ -62,6 +64,37 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # The app's database role (docs/HOSTINGER.md, "Datenbankrolle"): herd_owner owns the
+  # database, its schema and every object in it and is no superuser, so an archive
+  # restored under Verwaltung -> Sicherung cannot run programs on the database host.
+  # Made by the superuser herd on every deploy (a database that served herd moves by
+  # itself); its password comes from init. It ends with exit 0.
+  db-owner:
+    image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
+    pull_policy: always
+    entrypoint: ["/usr/bin/tini", "--", "python", "-m", "app.stack"]
+    command: ["db-owner", "--superuser-password-file", "/db-secret/db_password", "--owner-password-file", "/secrets/db_owner_password"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        restart: true
+      db:
+        condition: service_healthy
+    volumes:
+      - secrets:/secrets:ro
+      - db-secret:/db-secret:ro
+    networks:
+      - internal
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   app:
     image: ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}
     pull_policy: always
@@ -71,10 +104,12 @@ services:
         restart: true
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
     environment:
       HERD_ROLE: all
-      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-      HERD_DATABASE_PASSWORD_FILE: /db-secret/db_password
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
       HERD_SECRET_KEY_FILE: /secrets/secret_key
       HERD_INTERNAL_TOKEN_FILE: /secrets/internal_token
       # The first owner, created only while nobody exists; init checked both values and
@@ -96,7 +131,6 @@ services:
       - app-data:/data
       - backups:/backups
       - secrets:/secrets:ro
-      - db-secret:/db-secret:ro
     networks:
       - default
       - internal
@@ -131,9 +165,11 @@ services:
         restart: true
       db:
         condition: service_healthy
+      db-owner:
+        condition: service_completed_successfully
     environment:
-      HERD_DATABASE_URL: postgresql+asyncpg://herd@db:5432/herd
-      HERD_DATABASE_PASSWORD_FILE: /db-secret/db_password
+      HERD_DATABASE_URL: postgresql+asyncpg://herd_owner@db:5432/herd
+      HERD_DATABASE_PASSWORD_FILE: /secrets/db_owner_password
       # Only its key id goes into the archive, for the restore's check.
       HERD_SECRET_KEY_FILE: /secrets/secret_key
       HERD_BACKUP_SCHEDULE: ${HERD_BACKUP_SCHEDULE:-30 2 * * *}
@@ -145,7 +181,6 @@ services:
       - app-data:/data:ro
       - backups:/backups
       - secrets:/secrets:ro
-      - db-secret:/db-secret:ro
     networks:
       - internal
     # The image's own check asks the API; this one asks whether the backup directory is

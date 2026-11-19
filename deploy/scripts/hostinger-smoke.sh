@@ -4,8 +4,8 @@
 # .env.example as .env, and a Traefik in the host's network in front.
 #
 #  1. `docker compose config -q` without .env and with .env.example as .env.
-#  2. First deploy with that empty .env: init ends with 0, db, app and backup run, no
-#     port is published.
+#  2. First deploy with that empty .env: init and db-owner end with 0, db, app and backup
+#     run, no port is published; the app connects as herd_owner (no superuser).
 #  3. DOMAIN with https:// is refused by init with a clear message, and the stack stays
 #     stopped (depends_on init restart: true stops db, app and backup first;
 #     docs/HOSTINGER.md says so).
@@ -52,7 +52,10 @@ trap cleanup EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 started() { docker inspect -f '{{.State.StartedAt}}' "$("${compose[@]}" ps -q app)" 2>/dev/null || true; }
-secrets() { "${compose[@]}" exec -T app sh -c 'cat /secrets/secret_key /secrets/internal_token /db-secret/db_password | sha256sum'; }
+secrets() {
+  "${compose[@]}" exec -T app sh -c 'cat /secrets/secret_key /secrets/internal_token /secrets/db_owner_password | sha256sum'
+  "${compose[@]}" exec -T db sh -c 'sha256sum < /run/herd-db/db_password'
+}
 
 # Wait until app runs a container started after $1 (empty: any) and reports healthy.
 wait_app() {
@@ -73,6 +76,7 @@ check_states() {
   local states
   states="$("${compose[@]}" ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}')"
   grep -qx 'init exited 0' <<<"$states" || fail "init did not end with 0: $states"
+  grep -qx 'db-owner exited 0' <<<"$states" || fail "db-owner did not end with 0: $states"
   for service in db app backup; do
     grep -q "^$service running" <<<"$states" || fail "$service is not running: $states"
   done
@@ -123,6 +127,12 @@ wait_app ""
 check_states
 grep -q 'DOMAIN is empty: skipped' <<<"$("${compose[@]}" logs init)" || fail "init did not skip DOMAIN"
 first_secrets="$(secrets)"
+# The app's role (review M9b F2-1): herd_owner owns the database and is no superuser; the
+# app container has no file of the superuser's password.
+owner="$("${compose[@]}" exec -T db psql -tA -U herd -d herd -c \
+  "SELECT rolsuper, pg_get_userbyid(datdba) FROM pg_roles, pg_database WHERE rolname = 'herd_owner' AND datname = 'herd'" | tr -d '\r')"
+[[ $owner == "f|herd_owner" ]] || fail "herd_owner is not the database's owner without superuser: $owner"
+if "${compose[@]}" exec -T app test -e /db-secret/db_password; then fail "app sees the superuser's password"; fi
 echo "first deploy ok: every container runs or ended with 0"
 
 # 3. A URL in DOMAIN stops the deploy with a clear message.

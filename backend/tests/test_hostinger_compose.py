@@ -17,6 +17,8 @@ COMPOSE = ROOT / "docker-compose.yml"
 ENV_EXAMPLE = ROOT / ".env.example"
 IMAGE = "ghcr.io/janschachtschabel/to-herd-cats-ai:${HERD_IMAGE_TAG:-1.0}"
 PREFIX = "herd-"
+# Services that run once per deploy and end with exit 0.
+ONE_SHOT = {"init", "db-owner"}
 _VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)([^}]*)\}")
 
 
@@ -94,11 +96,11 @@ def test_the_network_is_named_and_never_external(stack: dict[str, Any]) -> None:
 
 
 def test_everything_waits_for_init(services: dict[str, dict[str, Any]]) -> None:
-    assert services["init"]["restart"] == "no"
     for name, service in services.items():
         if name == "init":
+            assert service["restart"] == "no"
             continue
-        assert service["restart"] == "unless-stopped", name
+        assert service["restart"] == ("no" if name in ONE_SHOT else "unless-stopped"), name
         assert service["depends_on"]["init"] == {
             "condition": "service_completed_successfully",
             "restart": True,
@@ -143,10 +145,36 @@ def test_no_long_running_service_of_the_image_disables_its_check(
     services: dict[str, dict[str, Any]],
 ) -> None:
     """The image has a HEALTHCHECK; `disable: true` fails `up --wait` ("no healthcheck
-    configured"). Only init, which ends, may disable it."""
+    configured"). Only the services that end (init, db-owner) may disable it."""
     for name, service in services.items():
-        if service["image"] == IMAGE and name != "init":
+        if service["image"] == IMAGE and name not in ONE_SHOT:
             check = service.get("healthcheck", {})
             assert not check.get("disable"), name
     backup = services["backup"]["healthcheck"]["test"]
     assert "HERD_BACKUP_DIR" in " ".join(backup) and "os.W_OK" in " ".join(backup)
+
+
+def test_the_app_never_connects_as_the_superuser(services: dict[str, dict[str, Any]]) -> None:
+    """Review M9b final, F2-1: an archive's dump runs as the app's role, and a superuser
+    may run programs on the database host. db-owner makes herd_owner (owner of the
+    database, no superuser) as the superuser before app and backup on every deploy;
+    they connect as herd_owner and never see the superuser's password."""
+    superuser = services["db"]["environment"]["POSTGRES_USER"]
+    owner = services["db-owner"]
+    assert owner["command"][0] == "db-owner"
+    assert owner["depends_on"]["db"] == {"condition": "service_healthy"}
+    assert f"/db-secret/{DB_PASSWORD}" in owner["command"]
+    assert "/secrets/db_owner_password" in owner["command"]
+    for name in ("app", "backup"):
+        service = services[name]
+        url = service["environment"]["HERD_DATABASE_URL"]
+        assert url.startswith("postgresql+asyncpg://herd_owner@"), name
+        assert superuser != "herd_owner"
+        assert service["environment"]["HERD_DATABASE_PASSWORD_FILE"] == (
+            "/secrets/db_owner_password"
+        ), name
+        mounts = [m.split(":", 1)[0] for m in service["volumes"]]
+        assert "db-secret" not in mounts, f"{name} sees the superuser's password"
+        assert service["depends_on"]["db-owner"] == {
+            "condition": "service_completed_successfully"
+        }, name
