@@ -413,7 +413,9 @@ trennt zwei Rollen:
   Lauf neu vergeben.
 - **Einspielen in die laufende Installation aus der Verwaltung** geht mit getrennten
   Rollen nicht: Die Prüfung meldet `restore.not_schema_owner`, weil die App nur die
-  Laufzeitrolle hat. Eingespielt wird dann auf der Kommandozeile mit der
+  Laufzeitrolle hat (geprüft wird, dass die Rolle das Schema `public` besitzt oder
+  Besitzerin der Datenbank ist; `CREATE` im Schema genügt nicht, denn der Tausch löscht
+  es). Eingespielt wird dann auf der Kommandozeile mit der
   Migrationsrolle (`python -m app.ops restore apply --replace --confirm NAME`, im
   Container des Backup-Dienstes bzw. ‑Jobs, der sie kennt). Sichern aus der Verwaltung
   („Jetzt sichern“) bleibt möglich: Der Worker liest mit der Laufzeitrolle alles.

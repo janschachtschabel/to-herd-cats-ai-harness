@@ -42,10 +42,14 @@ def grant_runtime_role(connection: Connection, role: str) -> None:
         connection.execute(text(statement))
 
 
-# The connected role may restore: it can create in `public` and owns (or is a member of
-# the owner of) every table there.
+# The connected role may restore: it owns (or is a member of the owner of) schema
+# `public`, which the swap drops (the database's owner is a member of
+# `pg_database_owner`, the default owner; review M9b F2-6), can create in it, and owns
+# every table there.
 _OWNS_SCHEMA = text(
-    "SELECT has_schema_privilege('public', 'CREATE') AND NOT EXISTS ("
+    "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public'"
+    " AND pg_has_role(current_user, nspowner, 'USAGE'))"
+    " AND has_schema_privilege('public', 'CREATE') AND NOT EXISTS ("
     " SELECT 1 FROM pg_tables WHERE schemaname = 'public'"
     " AND NOT pg_has_role(current_user, tableowner, 'USAGE'))"
 )
