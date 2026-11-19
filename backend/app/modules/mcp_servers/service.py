@@ -159,11 +159,14 @@ class ServerService:
             check_connector(ConnectorUse(server.connector_scope), server.connector_id)
         except ValueError:
             raise ValidationFailed(code="mcp_server.connector_invalid") from None
-        if server.connector_id is not None and server.connector_id != before["connector_id"]:
-            await self._hold_connector(actor, server.connector_id)
-        client_id = server.oauth_client_id
-        if client_id is not None and client_id != before["oauth_client_id"]:
-            await self._hold_oauth_client(actor, client_id)
+        # Checked before anything is flushed: an unknown id is a 422, never the
+        # foreign key's error (the same answer as for a connector one may not name).
+        with self.session.no_autoflush:
+            if server.connector_id is not None and server.connector_id != before["connector_id"]:
+                await self._hold_connector(actor, server.connector_id)
+            client_id = server.oauth_client_id
+            if client_id is not None and client_id != before["oauth_client_id"]:
+                await self._hold_oauth_client(actor, client_id)
         changed = changes(before, server)
         if "url" in changed:
             await ToolRepository(self.session, actor.org_id).withdraw_approvals(server.id)

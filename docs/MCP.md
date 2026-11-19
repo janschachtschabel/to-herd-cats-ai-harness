@@ -609,6 +609,15 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   `connector.oauth_unconfigured`).
 - Das Sitzungs-Cookie ist `SameSite=Lax`; die Rückkehr ist eine Navigation, es kommt
   also mit. Ohne gültige Sitzung endet sie mit `invalid`.
+- **Zweck (M10):** Konnektoren und OAuth-Apps haben einen Zweck, `mcp` (alles hier)
+  oder `calendar` (der Zugang einer Person zu ihrem externen Kalender, die Google-App
+  des Kalenders). Diese Seiten zeigen und ändern nur `mcp`; ein Kalender-Zugang oder
+  eine Kalender-App ist hier in keiner Liste und antwortet wie eine unbekannte ID, und
+  ein Kalender-Zugang geht nie an einen MCP-Server (umgekehrt ebenso). Die
+  Rückleitungsadresse bleibt die der App; nach der Rückkehr entscheidet der Zweck des
+  Konnektors, welches Recht noch einmal geprüft wird (`ai.use` bzw. `calendar.sync`) und
+  wohin der Browser geht (`/ai/oauth/done` bzw. `/calendar/accounts`). Namen sind über
+  beide Zwecke eindeutig (je Person bzw. Organisation), wie in M8.
 
 ### Erneuerung
 

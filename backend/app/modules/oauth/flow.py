@@ -18,6 +18,15 @@ with PKCE (RFC 7636, S256).
   `enc:`. The answer is a fixed status for the page the browser goes to next
   (`Outcome`), never the provider's words.
 - `disconnect`: the tokens dropped, revoked at the provider after the commit.
+
+Purpose (plan M10 decision 18): the M8 routes start, finish and disconnect `mcp`
+connectors alone. A connector of another purpose is started by its own routes (the
+calendar's, task 13c) with `purpose=`; the request carries the purpose's extra
+parameters. The callback stays the app's own (one address at the provider, J13); at
+the end the connector's purpose decides which right is checked again (`rule.use`:
+`calendar.sync`, not `ai.use`, for a calendar access) and the page the browser goes
+to (`rule.return_to`). A response no flow explains goes to the page of the purpose of
+the app whose callback it came to.
 """
 
 import hashlib
@@ -32,13 +41,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import secrets
 from app.core.access import Actor, actor_for
-from app.core.errors import NotFound, Unauthorized, ValidationFailed
+from app.core.errors import Forbidden, NotFound, Unauthorized, ValidationFailed
 from app.core.models_base import utcnow
 from app.modules.audit.recorder import record
 from app.modules.auth.context import AuthContext
+from app.modules.connectors import purposes
 from app.modules.connectors.credentials import CredentialUnavailable
-from app.modules.connectors.models import AuthKind, Connector, ConnectorScope
-from app.modules.connectors.repository import ConnectorRepository, scope_of
+from app.modules.connectors.models import AuthKind, Connector, ConnectorScope, Purpose
+from app.modules.connectors.repository import ConnectorRepository, standing_of
 from app.modules.connectors.service import ConnectorService, connector_not_found
 from app.modules.oauth import protocol
 from app.modules.oauth.callbacks import arrived_where_sent, issuer_matches, redirect_uri
@@ -49,7 +59,7 @@ from app.modules.oauth.tokens import credentials_of, forget, store, timed
 
 logger = logging.getLogger(__name__)
 
-DONE_PATH = "/ai/oauth/done"
+DONE_PATH = purposes.rule_for(Purpose.MCP).return_to
 FLOW_MINUTES = 10
 
 
@@ -75,13 +85,16 @@ class Response:
 class Finished:
     outcome: Outcome
     connector: Connector | None = None
+    purpose: Purpose = Purpose.MCP
 
     def location(self) -> str:
-        """Where the browser goes next: a page of the app, same origin."""
+        """Where the browser goes next: the purpose's page of the app, same origin."""
         query = {"status": self.outcome.value}
         if self.connector is not None:
-            query |= {"connector": str(self.connector.id), "scope": self.connector.scope}
-        return f"{DONE_PATH}?{urlencode(query)}"
+            query["connector"] = str(self.connector.id)
+            if self.purpose == Purpose.MCP:
+                query["scope"] = self.connector.scope
+        return f"{purposes.rule_for(self.purpose).return_to}?{urlencode(query)}"
 
 
 def _hash(state: str) -> str:
@@ -93,9 +106,18 @@ class FlowService:
         self.session = session
 
     async def _oauth(
-        self, actor: Actor, scope: ConnectorScope, connector_id: uuid.UUID
+        self,
+        actor: Actor,
+        scope: ConnectorScope,
+        connector_id: uuid.UUID,
+        purpose: Purpose = Purpose.MCP,
     ) -> tuple[ConnectorRepository, Connector]:
-        repo = await ConnectorService(self.session).repo(actor, scope)
+        if purpose == Purpose.MCP:
+            repo = await ConnectorService(self.session).repo(actor, scope)
+        elif scope == ConnectorScope.PERSONAL:
+            repo = await purposes.personal_repository(self.session, actor, purpose)
+        else:
+            raise connector_not_found()
         connector = await repo.get(connector_id)
         if connector is None:
             raise connector_not_found()
@@ -105,10 +127,9 @@ class FlowService:
 
     async def _client(self, connector: Connector) -> OAuthClient:
         assert connector.oauth_client_id is not None
-        client = await ClientRepository(self.session, connector.org_id).get(
-            connector.oauth_client_id
-        )
-        assert client is not None  # the foreign key keeps it
+        clients = ClientRepository(self.session, connector.org_id, Purpose(connector.purpose))
+        client = await clients.get(connector.oauth_client_id)
+        assert client is not None  # the foreign key keeps it, of the connector's purpose
         return client
 
     async def start(
@@ -117,8 +138,10 @@ class FlowService:
         session_id: uuid.UUID | None,
         scope: ConnectorScope,
         connector_id: uuid.UUID,
+        *,
+        purpose: Purpose = Purpose.MCP,
     ) -> str:
-        _, connector = await self._oauth(actor, scope, connector_id)
+        _, connector = await self._oauth(actor, scope, connector_id, purpose)
         client = await self._client(connector)
         uri = redirect_uri(client.id)
         if session_id is None:
@@ -146,6 +169,7 @@ class FlowService:
             verifier=verifier,
             scopes=client.scopes,
             resource=client.resource,
+            extra=purposes.rule_for(purpose).extra_authorization,
         )
 
     async def finish(
@@ -161,32 +185,32 @@ class FlowService:
         flows = FlowRepository(self.session, auth.org_id)
         flow = await flows.take(_hash(state), auth.session_id, utcnow())
         if flow is None or not arrived_where_sent(flow, via):
-            return Finished(Outcome.INVALID)
+            return Finished(Outcome.INVALID, purpose=await self._purpose_of(auth, via))
         actor = await actor_for(self.session, auth)
-        scope = await scope_of(self.session, auth.org_id, flow.connector_id)
-        if scope is None:
-            return Finished(Outcome.INVALID)
+        standing = await standing_of(self.session, auth.org_id, flow.connector_id)
+        if standing is None:
+            return Finished(Outcome.INVALID, purpose=await self._purpose_of(auth, via))
+        scope, purpose = ConnectorScope(standing[0]), standing[1]
         try:
-            repo, connector = await self._oauth(actor, ConnectorScope(scope), flow.connector_id)
-        except (NotFound, ValidationFailed):
-            return Finished(Outcome.INVALID)
+            repo, connector = await self._oauth(actor, scope, flow.connector_id, purpose)
+        except (NotFound, Forbidden, ValidationFailed):
+            return Finished(Outcome.INVALID, purpose=purpose)
         if via is not None and connector.oauth_client_id != via:
-            return Finished(Outcome.INVALID)  # the app changed since the flow began
+            return Finished(Outcome.INVALID, purpose=purpose)  # the app changed meanwhile
         client = await self._client(connector)
         if not issuer_matches(client, response.iss):
             await self.session.commit()  # the flow is used up; no code is exchanged
             logger.warning("oauth.issuer_mismatch", extra={"oauth_client_id": str(client.id)})
-            return Finished(Outcome.ISSUER_MISMATCH, connector)
+            return Finished(Outcome.ISSUER_MISMATCH, connector, purpose)
         if error is not None or not code:
             await self.session.commit()  # the flow is used up either way
-            return Finished(
-                Outcome.DENIED if error == "access_denied" else Outcome.FAILED, connector
-            )
+            outcome = Outcome.DENIED if error == "access_denied" else Outcome.FAILED
+            return Finished(outcome, connector, purpose)
         try:
             credentials = credentials_of(client)
             verifier = secrets.resolve(flow.verifier_ref).get_secret_value()
         except (CredentialUnavailable, secrets.SecretUnavailable):
-            return Finished(Outcome.FAILED, connector)
+            return Finished(Outcome.FAILED, connector, purpose)
         client_id = client.id
         await self.session.commit()  # nothing held while the provider answers
         exchange = protocol.exchange_code(
@@ -196,21 +220,40 @@ class FlowService:
             tokens = await timed(connector.id, "authorization_code", exchange)
             locked = await repo.get(connector.id, lock=True)
             if locked is None or locked.oauth_client_id != client_id:
-                return Finished(Outcome.INVALID)
+                return Finished(Outcome.INVALID, purpose=purpose)
             store(locked, tokens, keep_refresh=False)
         except protocol.TokenFailure:
-            return Finished(Outcome.FAILED, connector)
+            return Finished(Outcome.FAILED, connector, purpose)
         locked.version += 1
         await self.session.flush()
-        details = {"scope": locked.scope, "refresh_token": locked.refresh_token_ref is not None}
+        details: dict[str, object] = {
+            "scope": locked.scope,
+            "refresh_token": locked.refresh_token_ref is not None,
+        }
+        if purpose != Purpose.MCP:
+            details["purpose"] = purpose.value
         await record(self.session, actor, "connector.connected", "connector", locked.id, details)
-        return Finished(Outcome.CONNECTED, locked)
+        return Finished(Outcome.CONNECTED, locked, purpose)
+
+    async def _purpose_of(self, auth: AuthContext, via: uuid.UUID | None) -> Purpose:
+        """The purpose of the app whose callback a response came to (`mcp` for the
+        shared callback of earlier releases, or an app this organisation does not have)."""
+        if via is None:
+            return Purpose.MCP
+        found = await ClientRepository(self.session, auth.org_id).purpose_of(via)
+        return found or Purpose.MCP
 
     async def disconnect(
-        self, actor: Actor, scope: ConnectorScope, connector_id: uuid.UUID, version: int
+        self,
+        actor: Actor,
+        scope: ConnectorScope,
+        connector_id: uuid.UUID,
+        version: int,
+        *,
+        purpose: Purpose = Purpose.MCP,
     ) -> Connector:
         service = ConnectorService(self.session)
-        repo, _ = await self._oauth(actor, scope, connector_id)
+        repo, _ = await self._oauth(actor, scope, connector_id, purpose)
         connector = await service.current(repo, connector_id, version)
         schedule_revocation(self.session, connector, await self._client(connector))
         forget(connector)

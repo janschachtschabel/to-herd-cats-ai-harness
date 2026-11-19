@@ -11,6 +11,11 @@ connected" with the new address and connects again, knowingly), a shared OAuth o
 the client loses its tokens unless the change keeps it explicitly. OAuth tokens are
 revoked at the old provider after the commit (`oauth/revocation.py`, best effort).
 The shared connector of a moved server is the server's to detach (`mcp_servers`).
+
+The rule holds for every purpose (plan M10 decision 18): a calendar app's new endpoints
+disconnect the calendar accesses through it exactly so (they are personal; managed with
+`calendar.manage`, `oauth/clients.py`). A server's connectors are `mcp` ones; a
+client's are of the client's purpose (the foreign key on `(oauth_client_id, purpose)`).
 """
 
 import uuid
@@ -19,7 +24,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.connectors.models import Connector, ConnectorScope
+from app.modules.connectors.models import Connector, ConnectorScope, Purpose
 from app.modules.connectors.repository import bound_connectors, delete_connectors
 from app.modules.oauth.models import OAuthClient
 from app.modules.oauth.repository import ClientRepository
@@ -52,9 +57,9 @@ async def disconnect_server(
     """Every personal connector bound to the moved server: revoked (OAuth, at the
     provider it was connected with) and deleted."""
     bound = await bound_connectors(session, org_id, server_id=server_id)
-    clients = ClientRepository(session, org_id)
     for connector in bound:
         if connector.oauth_client_id is not None:
+            clients = ClientRepository(session, org_id, Purpose(connector.purpose))
             client = await clients.get(connector.oauth_client_id)
             if client is not None:
                 schedule_revocation(session, connector, client)

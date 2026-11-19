@@ -10,6 +10,9 @@ name the one its people connect with. Its `issuer` (RFC 8414) is compared with t
 of an authorization response (RFC 9207), which `issuer_in_response` says the server
 always sends (M9b, J13); each app has a callback of its own (`callbacks.py`).
 
+`purpose` (plan M10 decision 18): `mcp` (managed with `ai.manage`, M8) or `calendar`
+(the Google app, managed with `calendar.manage`); `connectors/purposes.py` decides.
+
 `oauth_flow`: one authorization in progress. Only the SHA-256 of `state` is kept; the
 PKCE verifier is `enc:`; the flow belongs to the login session that started it and
 is consumed by the first callback that names it from that session (or expires).
@@ -35,6 +38,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
+from app.modules.connectors.models import Purpose
 
 MAX_NAME_CHARS = 120
 MAX_URL_CHARS = 500
@@ -53,6 +57,9 @@ class OAuthClient(UuidPk, OrgScoped, Timestamps, Base):
     __tablename__ = "oauth_client"
     __table_args__ = (
         UniqueConstraint("org_id", "name"),
+        # The target of `connector`'s (oauth_client_id, purpose) foreign key.
+        UniqueConstraint("id", "purpose"),
+        CheckConstraint("purpose IN ('mcp', 'calendar')", name="purpose"),
         CheckConstraint(
             "token_auth IN ('client_secret_basic', 'client_secret_post')", name="token_auth"
         ),
@@ -75,6 +82,9 @@ class OAuthClient(UuidPk, OrgScoped, Timestamps, Base):
     issuer: Mapped[str | None] = mapped_column(String(MAX_URL_CHARS))
     issuer_in_response: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
+    )
+    purpose: Mapped[Purpose] = mapped_column(
+        String(16), nullable=False, default=Purpose.MCP, server_default=Purpose.MCP.value
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 

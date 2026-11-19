@@ -207,3 +207,16 @@ Anlegen, Ändern und Archivieren eines Kalenders und das Anlegen, Ändern (auch 
 (`HERD_WRITE_RATE_PER_MINUTE`, darüber 429 `rate.limited` mit `Retry-After`; siehe
 [`SICHERHEIT.md`](SICHERHEIT.md)), wie Seiten und Nachrichten. Lesen zählt nicht, der
 Schalter für den Abgleich als Einstellung der Verwaltung auch nicht.
+
+## Zugänge zu externen Kalendern (Grundlage)
+
+Ein verbundener externer Kalender (ab Task 13c) nutzt die Konnektoren und OAuth-Apps
+aus M8 mit dem Zweck `calendar` (`connectors/purposes.py`): Der Zugang gehört der
+Person (persönlich, nie geteilt, nie an einem MCP-Server), verbinden darf, wer
+`calendar.sync` hat (kein `ai.use` nötig: der Kalender geht ohne KI), die Google-App
+verwaltet, wer `calendar.manage` hat. Die Rückleitungsadresse beim Anbieter ist die der
+App (`/api/ai/oauth/<id>/callback`); danach geht der Browser auf
+`/calendar/accounts?status=…`. Die Anfrage an Google trägt `access_type=offline` und
+`prompt=consent` aus dem Zweck. Ein Zugang wird nur für seinen Zweck benutzt; ändert
+sich der Endpunkt einer Kalender-App, werden ihre Zugänge getrennt wie in M8. Die
+Verwaltung der KI zeigt Kalender-Zugänge und -Apps nie.

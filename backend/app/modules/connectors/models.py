@@ -12,6 +12,11 @@
   `token_expires_at` come with it and go with it.
 - `mcp_server_id` (personal only, task 6): the external MCP server a personal
   connector serves, at most one per person and server; it goes with the server.
+- `purpose` (plan M10 decision 18): `mcp` (every connector of M8) or `calendar` (a
+  person's access to her external calendar). The M8 services see `mcp` alone; what a
+  purpose needs is `connectors/purposes.py`. A `calendar` connector is personal, serves
+  no MCP server and names only an OAuth client of its own purpose (the composite
+  foreign key holds that in the database, too).
 """
 
 import uuid
@@ -22,6 +27,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -35,6 +41,13 @@ from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
 
 MAX_NAME_CHARS = 120
 MAX_HEADER_CHARS = 100
+
+
+class Purpose(StrEnum):
+    """What a connector or an OAuth client is for (`connectors/purposes.py`)."""
+
+    MCP = "mcp"
+    CALENDAR = "calendar"
 
 
 class ConnectorScope(StrEnum):
@@ -98,6 +111,18 @@ class Connector(UuidPk, OrgScoped, Timestamps, Base):
             unique=True,
             postgresql_where=text("mcp_server_id IS NOT NULL"),
         ),
+        CheckConstraint(_in("purpose", Purpose), name="purpose"),
+        CheckConstraint(
+            "purpose = 'mcp' OR (scope = 'personal' AND mcp_server_id IS NULL)",
+            name="purpose_personal",
+        ),
+        # An OAuth connector connects through an app of its own purpose.
+        ForeignKeyConstraint(
+            ["oauth_client_id", "purpose"],
+            ["oauth_client.id", "oauth_client.purpose"],
+            name="fk_connector_oauth_client_purpose",
+            ondelete="RESTRICT",
+        ),
     )
 
     scope: Mapped[ConnectorScope] = mapped_column(String(16), nullable=False)
@@ -116,6 +141,9 @@ class Connector(UuidPk, OrgScoped, Timestamps, Base):
     mcp_server_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("mcp_server.id", ondelete="CASCADE", use_alter=True),
+    )
+    purpose: Mapped[Purpose] = mapped_column(
+        String(16), nullable=False, default=Purpose.MCP, server_default=Purpose.MCP.value
     )
     # Bumped by every write; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
