@@ -2483,6 +2483,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar/overlays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendar Overlays
+         * @description Ticket due dates, sprints and automations' next terms in the days `[from, to)`,
+         *     stored nowhere: of the spaces one belongs to (never by admin power), automations
+         *     as their sight rule shows them. By (starts_on, kind, id); a cursor holds
+         *     `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).
+         */
+        get: operations["list_calendar_overlays_api_calendar_overlays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendars": {
         parameters: {
             query?: never;
@@ -7834,6 +7857,45 @@ export interface components {
          */
         Outcome: "ok" | "refused" | "invalid" | "failed";
         /**
+         * OverlayKind
+         * @enum {string}
+         */
+        OverlayKind: "automations" | "sprints" | "tickets";
+        /**
+         * OverlayOut
+         * @description Something the calendar shows beside events, stored nowhere: a ticket's due day
+         *     (`ref` its key), a sprint from its first to its last day, or an automation's next
+         *     term (`at`, on its day in the viewer's zone; `space_id` null in a DM). `ref` is
+         *     what the interface links with: a ticket's key, else the id. `title`: the ticket's
+         *     title, the sprint's name, the automation's agent.
+         */
+        OverlayOut: {
+            /** At */
+            at: string | null;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["OverlayKind"];
+            /** Ref */
+            ref: string;
+            /** Space Id */
+            space_id: string | null;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * OwnSessionOut
          * @description One of the caller's running login sessions. `device`: browser and system, no
          *     version (null for an unknown client); `current`: the session of this request.
@@ -8229,6 +8291,13 @@ export interface components {
         Page_OccurrenceOut_: {
             /** Items */
             items: components["schemas"]["OccurrenceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** Page[OverlayOut] */
+        Page_OverlayOut_: {
+            /** Items */
+            items: components["schemas"]["OverlayOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -16371,6 +16440,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_OccurrenceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendar_overlays_api_calendar_overlays_get: {
+        parameters: {
+            query: {
+                from: string;
+                /** @description the first day after the range */
+                to: string;
+                limit?: number;
+                cursor?: string | null;
+                /** @description comma-separated: tickets, sprints, automations (default: all) */
+                kinds?: string | null;
+                /** @description the viewer's zone (an automation's day), default UTC */
+                time_zone?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OverlayOut_"];
                 };
             };
             /** @description Validation Error */

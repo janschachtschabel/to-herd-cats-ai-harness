@@ -8896,6 +8896,82 @@
         "title": "Outcome",
         "type": "string"
       },
+      "OverlayKind": {
+        "enum": [
+          "automations",
+          "sprints",
+          "tickets"
+        ],
+        "title": "OverlayKind",
+        "type": "string"
+      },
+      "OverlayOut": {
+        "description": "Something the calendar shows beside events, stored nowhere: a ticket's due day\n(`ref` its key), a sprint from its first to its last day, or an automation's next\nterm (`at`, on its day in the viewer's zone; `space_id` null in a DM). `ref` is\nwhat the interface links with: a ticket's key, else the id. `title`: the ticket's\ntitle, the sprint's name, the automation's agent.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/OverlayKind"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "space_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space Id"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "space_id",
+          "starts_on",
+          "ends_on",
+          "ref",
+          "title",
+          "at"
+        ],
+        "title": "OverlayOut",
+        "type": "object"
+      },
       "OwnSessionOut": {
         "description": "One of the caller's running login sessions. `device`: browser and system, no\nversion (null for an unknown client); `current`: the session of this request.",
         "properties": {
@@ -10182,6 +10258,33 @@
           "items"
         ],
         "title": "Page[OccurrenceOut]",
+        "type": "object"
+      },
+      "Page_OverlayOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OverlayOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[OverlayOut]",
         "type": "object"
       },
       "Page_PersonalServerOut_": {
@@ -26313,6 +26416,128 @@
         "summary": "List Events",
         "tags": [
           "calendar events"
+        ]
+      }
+    },
+    "/api/calendar/overlays": {
+      "get": {
+        "description": "Ticket due dates, sprints and automations' next terms in the days `[from, to)`,\nstored nowhere: of the spaces one belongs to (never by admin power), automations\nas their sight rule shows them. By (starts_on, kind, id); a cursor holds\n`time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
+        "operationId": "list_calendar_overlays_api_calendar_overlays_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "the first day after the range",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "the first day after the range",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "comma-separated: tickets, sprints, automations (default: all)",
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated: tickets, sprints, automations (default: all)",
+              "title": "Kinds"
+            }
+          },
+          {
+            "description": "the viewer's zone (an automation's day), default UTC",
+            "in": "query",
+            "name": "time_zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the viewer's zone (an automation's day), default UTC",
+              "title": "Time Zone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OverlayOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Calendar Overlays",
+        "tags": [
+          "calendars"
         ]
       }
     },

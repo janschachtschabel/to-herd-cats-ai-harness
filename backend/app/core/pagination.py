@@ -152,6 +152,30 @@ def decode_score_cursor(cursor: str) -> tuple[float, uuid.UUID]:
         raise _invalid(exc) from exc
 
 
+def encode_parts_cursor(*parts: str) -> str:
+    """A cursor of several texts (the list parses them); `decode_parts_cursor` reads
+    exactly that many back."""
+    raw = json.dumps(list(parts)).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_parts_cursor(cursor: str, count: int) -> list[str]:
+    try:
+        parts = json.loads(_b64(cursor).decode())
+        if not isinstance(parts, list) or len(parts) != count:
+            raise ValueError("wrong number of parts")
+        if not all(isinstance(part, str) for part in parts):
+            raise TypeError("cursor parts are not text")
+        return [_storable(part) for part in parts]
+    except Exception as exc:
+        raise _invalid(exc) from exc
+
+
+def invalid_cursor(exc: Exception | None = None) -> ValidationFailed:
+    """The answer to a cursor whose parts do not parse (422 `validation_failed`)."""
+    return _invalid(exc)
+
+
 def id_page[T](rows: list[T], limit: int, key: Callable[[T], uuid.UUID]) -> Page[T]:
     """`rows` were fetched with `limit + 1`: the extra row tells whether there is more."""
     items = rows[:limit]

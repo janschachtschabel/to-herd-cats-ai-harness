@@ -225,6 +225,39 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   `event.invited` (nur die ID des Termins), die Mitglieder des Bereichs wie bei jeder
   Änderung `calendar.changed`.
 
+## Überlagerungen
+
+`GET /api/calendar/overlays?from&to&kinds=tickets,sprints,automations` zeigt neben den
+Terminen, was andere Bereiche der App ohnehin wissen, ohne etwas zu speichern (keine
+Tabelle, kein Audit, keine Kopie):
+
+- **Tickets** (`tickets`): Fälligkeiten (`due_on`) im Zeitraum, nur Tickets, die nicht
+  erledigt oder abgebrochen sind (nach der Kategorie ihres Status). `ref` ist der
+  Schlüssel (`HC-12`), `title` der Titel.
+- **Sprints** (`sprints`): jeder Sprint jeden Zustands, der einen Tag des Zeitraums
+  enthält, vom ersten bis zum letzten Tag (`starts_on`, `ends_on`); `title` ist sein
+  Name.
+- **Aufgaben** (`automations`): der nächste Termin aktiver Aufgaben (pausierte, erledigte
+  und Ereignisregeln haben keinen), an seinem Tag in der Zone der Betrachterin
+  (`time_zone`, Standard UTC), der Zeitpunkt in `at`; `title` ist der Name des Agenten,
+  `space_id` bei einer Aufgabe in einer Direktnachricht leer.
+
+Wer was sieht: Tickets und Sprints aus den Bereichen, in denen man Mitglied ist (offene
+über die Rolle), **auch für Admins nur diese**; fremde Bereiche kommen hier nie vor.
+Aufgaben nach ihrer eigenen Sichtregel (Besitzerin, verantwortliche Person des Agenten,
+wer den Bereich ihres Orts verwaltet, Admins mit `agent.manage`; ohne `ai.use` keine),
+und auch davon nur die, deren Ort in einem eigenen Bereich liegt, oder die eigenen
+(die Aufgabe in der eigenen Direktnachricht mit einem Agenten). Gefiltert wird in der
+Datenbank, je Art eine Abfrage.
+
+`from` und `to` sind Tage, `to` gehört nicht mehr dazu (wie beim Fenster), beide
+zwischen 1900-01-01 und 2400-01-01 (422 `calendar.window_out_of_range`, `from` vor `to`
+sonst `calendar.invalid_window`). Ohne `kinds` kommen alle drei Arten; eine unbekannte
+Art ist 422 `calendar.overlay_kind_unknown` (so schaltet die Oberfläche Überlagerungen
+ab). Die Liste ist seitenweise nach (Tag, Art, ID) sortiert, Aufgaben eines Tages nach
+ihrem Zeitpunkt; ein Cursor gilt nur mit der Zone, mit der er entstand (422
+`calendar.cursor_time_zone`).
+
 ## Was Admins sehen und was im Audit steht
 
 - **Listen gelten für alle gleich, auch für Admins:** `/api/calendars` enthält nur

@@ -34,6 +34,7 @@ from app.modules.backups.replacing import replace_runner
 from app.modules.backups.router import router as backups_router
 from app.modules.calendars import event_router as calendar_events
 from app.modules.calendars import invitation_router as calendar_invitations
+from app.modules.calendars import overlay_router as calendar_overlays
 from app.modules.calendars import router as calendars
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
@@ -136,6 +137,7 @@ def api_router() -> APIRouter:
     api.include_router(calendar_events.window)
     api.include_router(calendar_events.events, dependencies=COUNTED)
     api.include_router(calendar_invitations.invitations, dependencies=COUNTED)
+    api.include_router(calendar_overlays.overlays)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)
