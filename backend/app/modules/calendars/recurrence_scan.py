@@ -8,10 +8,13 @@ calendar that talks to it (`tests/test_calendar_imports.py`), pure.
 - `dateutil` scans periods without a candidate until its `MAXYEAR`, so it runs 7,600
   years (19 Gregorian cycles: the same weekdays and leap years) ahead of us, where its
   `MAXYEAR` 9999 is our 2399 (`HORIZON`): the scan of a sparse rule is bounded there.
+  A weekly rule's week that holds 31 December 2399 reaches into `dateutil`'s year
+  10000 and breaks its scan; that week is scanned again 7,200 years ahead (18 cycles),
+  so the series keeps its last occurrences and ends at the horizon like any other.
 """
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any
 
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, rrule, weekday
@@ -21,11 +24,9 @@ from app.modules.calendars.recurrence_rule import LAST_YEAR, Freq, ParsedRule
 
 HORIZON = datetime(LAST_YEAR, 12, 31, 23, 59, 59)
 _AHEAD_YEARS = 7600
+# Where a scan of the last weeks of 2399 is run again (18 cycles: our 2399 is 9599).
+_LAST_AHEAD_YEARS = 7200
 _FREQS = {Freq.DAILY: DAILY, Freq.WEEKLY: WEEKLY, Freq.MONTHLY: MONTHLY, Freq.YEARLY: YEARLY}
-
-
-def _ahead(wall: datetime) -> datetime:
-    return wall.replace(year=wall.year + _AHEAD_YEARS)
 
 
 def _byweekday(rule: ParsedRule) -> list[weekday]:
@@ -82,12 +83,48 @@ def matches(
     # `dateutil` checks an UNTIL at candidates only: it scans to the first one past it
     # either way; stopping there here lets the counter see how far the scan reached.
     until = min(stop, HORIZON)
-    for found in rrule(dtstart=_ahead(first), cache=False, **_kwargs(rule, start)):
-        counter.candidates += 1
-        wall = found.replace(year=found.year - _AHEAD_YEARS)
-        counter.reached = wall
-        if wall > until:
+    seen: datetime | None = None  # the last candidate of the scan
+    for found in _scan(rule, start, first, _AHEAD_YEARS, counter):
+        if found is None:  # the week holding 31 December 2399 broke the scan
+            break
+        seen = counter.reached = found
+        if found > until:
             return
-        if wall >= begin:
-            yield wall
-    counter.reached = HORIZON  # scanned to `dateutil`'s last year
+        if found >= begin:
+            yield found
+    else:
+        counter.reached = HORIZON  # scanned to `dateutil`'s last year
+        return
+    # Scan that week again where `dateutil`'s years go on: from the start of the week
+    # of the last candidate (a week of the rule's, so INTERVAL keeps its phase), or
+    # from where it began, taking only what comes after that candidate.
+    again = first if seen is None else datetime.combine(week_start(seen.date(), rule.wkst), time())
+    for found in _scan(rule, start, again, _LAST_AHEAD_YEARS, counter):
+        assert found is not None  # its years end centuries after ours
+        counter.reached = found
+        if found > until:
+            return
+        if found >= begin and (seen is None or found > seen):
+            yield found
+
+
+def _scan(
+    rule: ParsedRule, start: datetime, first: datetime, ahead: int, counter: Counter
+) -> Iterator[datetime | None]:
+    """`dateutil`'s candidates from `first` on, as our wall times, run `ahead` years on
+    (whole Gregorian cycles); None ends them where a weekly rule's last week of 2399
+    reaches into `dateutil`'s year 10000 (it builds a week's days, and with BYSETPOS
+    its whole set, before it looks at a bound: `ValueError`; review M10 task 3c,
+    R3c-6)."""
+    dtstart = first.replace(year=first.year + ahead)
+    candidates = iter(rrule(dtstart=dtstart, cache=False, **_kwargs(rule, start)))
+    while True:
+        try:
+            found = next(candidates)
+        except StopIteration:
+            return
+        except ValueError:
+            yield None
+            return
+        counter.candidates += 1
+        yield found.replace(year=found.year - ahead)
