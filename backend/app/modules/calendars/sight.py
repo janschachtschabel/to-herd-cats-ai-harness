@@ -116,12 +116,17 @@ def listed_events_sql(actor: Actor) -> ColumnElement[bool]:
     return or_(reads_sql(actor), attends_sql(actor))
 
 
+# Made once: an alias made per call is a reference cycle of a few thousand objects
+# that only the cyclic collector frees (full collections twice as often in the window).
+_OTHER_EVENT = aliased(CalendarEvent, name="attended_event")
+
+
 def listed_calendars_sql(actor: Actor) -> ColumnElement[bool]:
     """A guard on the joined `calendar` that `listed_events_sql` implies (it adds no
     event): the calendars of member spaces and those holding an event the actor
     organises or is invited to. The window walks events per calendar; without it every
     calendar of the organisation is walked for the rare attended row."""
-    event = aliased(CalendarEvent)
+    event = _OTHER_EVENT
     organised = select(event.calendar_id).where(
         event.org_id == actor.org_id,
         event.organizer_type == actor.principal.type,

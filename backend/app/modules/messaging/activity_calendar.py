@@ -51,6 +51,9 @@ ATTENDEE = table(
     column("response", String),
 )
 CALENDAR = table("calendar", column("id", Uuid), column("archived_at", DateTime(timezone=True)))
+# The aliases `seen` looks through, made once (one per call is garbage in cycles).
+SHOWN = EVENT.alias("seen_calendar_event")
+SHOWN_CALENDAR = CALENDAR.alias("seen_calendar")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,8 +76,7 @@ def _mine(person: uuid.UUID) -> ColumnElement[bool]:
 
 def seen(person: uuid.UUID) -> ColumnElement[bool]:
     """Whether the notification's event is one the person attends now."""
-    shown = EVENT.alias("seen_calendar_event")
-    calendar = CALENDAR.alias("seen_calendar")
+    shown, calendar = SHOWN, SHOWN_CALENDAR
     invited = (
         select(ATTENDEE.c.event_id)
         .where(ATTENDEE.c.event_id == shown.c.id, _mine(person))
