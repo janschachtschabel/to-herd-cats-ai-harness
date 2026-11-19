@@ -105,6 +105,13 @@ Task 18.** *Entscheidung:* bauen. Eine Grenze je Person in PostgreSQL (wie
 `core/ratelimit.py`) für Nachrichten, Seiten, Tickets und Uploads, großzügige Standards
 (etwa 120 Schreibvorgänge und 30 Uploads je Minute), 429 `rate.limited` mit
 `Retry-After`; Agenten zählen wie Personen. Der Lasttest (Task 10) darf nicht anschlagen.
+Gezählt wird je Route, nie nach dem Pfad: `COUNTED` am Router oder an der Route
+(`auth/write_limits.py`), Uploads tragen dazu `UPLOAD`. Jede unsichere `/api`-Route ist
+gezählt oder steht mit Grund auf der Ausnahmeliste von
+`tests/test_write_limit_routes.py` (Anmeldung und eigenes Konto, Lesemarken,
+Verwaltung, KI-Konfiguration, Einstellungen eines Bereichs, Einrichtung von
+Automationen, Entscheidungen über die Arbeit eines Agenten); eine neue Route ohne
+Entscheidung lässt den Test scheitern.
 
 **J11 – Virenscan (V5.4.3). Gebaut, M9b Task 18 (optional).** *Entscheidung:* optional
 bauen. ClamAV (`clamd`, vom Betrieb als eigener Dienst betrieben und über TCP mit
@@ -229,7 +236,7 @@ Zusammenhänge zwischen Feldern (Ticket-Hierarchie, Sprint gehört zum Bereich,
 Statuskategorien) beschreibt [`TICKETS.md`](TICKETS.md), Rollen und Rechte der Bereiche
 [`WIKI.md`](WIKI.md); was Zeit und Geld kostet, der [Steckbrief](STECKBRIEF.md)
 („Funktionen mit Laufzeit und Kosten“). Gewöhnliche Schreibvorgänge zählt eine Grenze
-je Person und je Agent (M9b Task 18, J10; `core/write_limit.py`, `web/write_limits.py`,
+je Person und je Agent (M9b Task 18, J10; `core/write_limit.py`, `auth/write_limits.py`,
 `agents/toolbox/writing.effect`): eine Anfrage zählt, bevor sie etwas tut, ein Werkzeug
 in der Transaktion seines Schritts; Metrik `herd_rate_limited_total{area}`.
 
@@ -474,7 +481,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V2.3 | V2.3.2 | L2 | Grenzen umgesetzt | erfüllt | Budgets je Organisation/Person/Agent (`ai/budgets.py`), Höchstzahlen (persönliche Agenten, Automatisierungen, externe Aufrufe je Lauf), Größen (`HERD_MAX_BODY_BYTES`, Anhänge, Importe). `tests/test_ai_budgets.py`, `tests/test_body_limit.py`. |
 | V2.3 | V2.3.3 | L2 | Transaktionen | erfüllt | Eine Transaktion je Anfrage (`core/db.py`, `auth/deps.py` SessionDep), je Termin, je Ereignis-Charge; Fehler rollen ganz zurück. `tests/test_errors.py::test_a_deadlock_or_serialization_failure_asks_to_try_again`. |
 | V2.3 | V2.3.4 | L2 | Sperren gegen Doppelbuchung | erfüllt | `version`-Spalten mit 409, Zeilensperren (`FOR UPDATE`, `SKIP LOCKED`), eindeutige Schlüssel (z. B. `(automation_id, due_at)`, Ticketnummern). `tests/test_concurrency.py`, `tests/test_budget_races.py`. |
-| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | erfüllt | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen und gewöhnliche Schreibvorgänge je Person und Agent (120 je Minute, Uploads 30 getrennt; 429 `rate.limited` mit `Retry-After`; `core/write_limit.py`; M9b Task 18, J10). `tests/test_write_limit.py::test_writes_beyond_the_limit_answer_429_with_retry_after`, `test_agents_count_like_people`. |
+| V2.4 | V2.4.1 | L2 | Anti-Automatisierung | erfüllt | Begrenzt sind Anmeldung, OIDC, `/mcp` je Token, KI-Kosten (Budgets), Hash-Warteschlange, Größen und gewöhnliche Schreibvorgänge je Person und Agent (120 je Minute, Uploads 30 getrennt; 429 `rate.limited` mit `Retry-After`; `core/write_limit.py`; M9b Task 18, J10). `tests/test_write_limit.py::test_writes_beyond_the_limit_answer_429_with_retry_after`, `test_agents_count_like_people`; `tests/test_write_limit_routes.py::test_every_unsafe_route_is_counted_or_exempt`. |
 
 ### V3 Web Frontend Security
 

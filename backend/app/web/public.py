@@ -28,6 +28,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.auth.deps import csrf_guard
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.sessions_router import router as own_sessions_router
+from app.modules.auth.write_limits import COUNTED
 from app.modules.automations import router as automations_router
 from app.modules.backups.replacing import replace_runner
 from app.modules.backups.router import router as backups_router
@@ -73,7 +74,6 @@ from app.modules.wiki.versions_router import page_versions
 from app.version import app_version
 from app.web.collab_proxy import router as collab_relay
 from app.web.spa import mount_spa
-from app.web.write_limits import COUNTED
 
 
 def api_router() -> APIRouter:
@@ -146,7 +146,7 @@ def api_router() -> APIRouter:
     api.include_router(agents_router.agents)
     api.include_router(run_router.agent_runs)
     api.include_router(run_router.runs)
-    api.include_router(fresh_start_router.fresh_start)
+    api.include_router(fresh_start_router.fresh_start, dependencies=COUNTED)
     api.include_router(agent_spaces.agent_spaces)
     api.include_router(approvals_router.approvals)
     api.include_router(approvals_router.questions)
@@ -156,9 +156,9 @@ def api_router() -> APIRouter:
     api.include_router(
         skill_transfer.skill_transfer, dependencies=COUNTED
     )  # before /skills/{skill_id}
-    api.include_router(skills.skills)
+    api.include_router(skills.skills, dependencies=COUNTED)
     api.include_router(skill_assignments.agent_skills)
-    api.include_router(skill_proposals.skill_proposals)
+    api.include_router(skill_proposals.skill_proposals, dependencies=COUNTED)
     api.include_router(backups_router)
     return api
 

@@ -86,3 +86,13 @@ async def test_agents_count_like_people(work: Work, monkeypatch: pytest.MonkeyPa
     # Alice herself is a different count.
     said = await work.bench.say("Ich schreibe noch")
     assert said["id"]
+
+
+async def test_creating_spaces_counts_as_writing(
+    wiki: Wiki, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One of the routes the review found uncounted (R18-5)."""
+    monkeypatch.setattr(get_settings(), "write_rate_per_minute", 1)
+    made = await wiki.admin.post("/api/spaces", json={"kind": "team", "name": "Eins"})
+    assert made.status_code == 201, made.text
+    _refused(await wiki.admin.post("/api/spaces", json={"kind": "team", "name": "Zwei"}))

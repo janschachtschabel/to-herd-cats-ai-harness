@@ -12,6 +12,7 @@ from app.core.downloads import content_disposition
 from app.core.pagination import Page, PageParams
 from app.core.security_headers import API_POLICY
 from app.modules.auth.deps import ActorDep, SessionDep
+from app.modules.auth.write_limits import UPLOAD
 from app.modules.wiki import filetypes
 from app.modules.wiki.ai_lock import AiLockService
 from app.modules.wiki.attachment_schemas import AttachmentOut
@@ -47,7 +48,11 @@ def download_headers(attachment: Attachment, inline: bool) -> dict[str, str]:
 
 
 @page_attachments.post(
-    "", response_model=AttachmentOut, status_code=201, openapi_extra=_UPLOAD_BODY
+    "",
+    response_model=AttachmentOut,
+    status_code=201,
+    openapi_extra=_UPLOAD_BODY,
+    dependencies=UPLOAD,
 )
 async def upload_attachment(
     page_id: uuid.UUID,
