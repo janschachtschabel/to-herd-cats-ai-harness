@@ -10,8 +10,8 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
 `2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
-release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 are built after it; next are
-M9b (Tasks 17 and 18) and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
+release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 and 18 are built after it; next
+are M9b Task 17 and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
 `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
@@ -55,9 +55,12 @@ in the administration with the maintenance page (Task 13); attachments in
 S3-compatible storage (Task 14: own SigV4 client, copy between storages, backups
 through the store); several collab instances, each page bound to one in Postgres, no
 Redis (Task 15); optional TOTP for every password account (Task 16: profile setup,
-two-step sign-in, recovery codes, admin reset, second factor for new access tokens).
-Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11),
-ASVS gaps J7–J14 (M9b). Operations: `README.md` (Betriebshinweise),
+two-step sign-in, recovery codes, admin reset, second factor for new access tokens);
+the ASVS gaps J7–J14 (Task 18: idle timeout, own sessions, re-authentication before
+linking, write limits, optional virus scan, database TLS, internal token rotation, OAuth
+callback per app with `iss`, optional separate database roles).
+Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11).
+Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
 and reverse-proxy operation), `docs/NACHRICHTEN.md` (messaging use, worker/outbox, SSE
 behind a proxy), `docs/TICKETS.md` (ticket use and operation, sprints and the new
@@ -261,6 +264,42 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   `SettableClock` through the fixture `totp_time`). New access tokens of a person with
   TOTP need a code (`gate.py`). Frontend `features/profile/totp`, the QR code with
   `uqr`; e2e `tests/totp.spec.mjs` with an authenticator in `totp-helpers.mjs`.
+- Security (M9b Task 18, ASVS J7–J14; rows in `docs/SICHERHEIT.md`):
+  - Sessions are judged at the wall time (`auth/timing.SESSION_CLOCK`, not the e2e
+    clock). A session unused for `HERD_SESSION_IDLE_HOURS` (24, 0 = off) ends; the touch
+    in `current_auth` commits at once and never waits (`SKIP LOCKED`); `/api/stream` and
+    collab's checks do not touch. `user_session.device` ("Browser · System", never a
+    version, `auth/device.py`) and `signed_in_at` are noted by the one hand-over helper
+    `auth/handover.py` (password, OIDC, second factor). `/api/auth/me/sessions`
+    (`sessions_router.py`, `own_sessions.py`): list, end one, end all others.
+  - Linking a provider account needs the password or a provider sign-in of this
+    session at most 10 min ago (`auth/reauth.py`, 403 `auth.reauth_required`; frontend
+    `profile/identities/ReauthDialog.tsx`).
+  - Writes count per person/agent and minute in PostgreSQL (`core/write_limit.py`,
+    `HERD_WRITE_RATE_PER_MINUTE` 120, uploads apart `HERD_UPLOAD_RATE_PER_MINUTE` 30;
+    429 `rate.limited`): content routers include `web/write_limits.COUNTED`; agent and
+    `/mcp` writes count in `writing.effect` inside the step's transaction. A new content
+    write route adds `COUNTED`. Bulk scripts wait out a 429 (`Retry-After`).
+  - `HERD_CLAMAV_ADDRESS` (optional clamd, `core/virus_scan.py`): attachments and
+    imports are scanned before storing; a find is 422 `attachment.rejected_by_scan`, a
+    failed scan 503 `attachment.scan_unavailable` (fail closed). Stub
+    `tests/support/clamd_stub.py`.
+  - `HERD_DATABASE_SSLMODE`/`HERD_DATABASE_SSLROOTCERT` (`core/config_database.py`,
+    `core/db_tls.py`) reach every engine (`make_engine` sets `connect_args`), the LISTEN
+    connection and `pgtools.child_env` (`PGSSLMODE`); the setting wins over the URL's.
+    `HERD_INTERNAL_TOKEN_PREVIOUS` is accepted besides the current token during a
+    rotation (API only; collab sends the current one).
+  - OAuth apps have their own callback `/api/ai/oauth/{oauth_client.id}/callback`
+    (`oauth/callbacks.py`); a response at another callback uses the flow up (`invalid`);
+    `iss` is compared with `oauth_client.issuer` when sent or promised
+    (`issuer_in_response`, `issuer_mismatch`). The old shared callback only finishes
+    flows whose stored `redirect_uri` is the shared one.
+  - Optional separate roles: `HERD_MIGRATE_DATABASE_URL` (+ `_PASSWORD`) owns the
+    schema and is used by Alembic and every `python -m app.ops` command and pg tool;
+    `HERD_DATABASE_RUNTIME_ROLE` gets data rights after every migration run
+    (`core/db_roles.py`, also `ALTER DEFAULT PRIVILEGES`). With them, restoring from the
+    administration is refused (`restore.not_schema_owner`). Overlay
+    `deploy/compose/compose.roles.yml`; chart `database.migrate`.
 - Browser tests (`e2e/`, Node 22, ESM): Playwright (`@playwright/test`), live editing,
   messaging, tickets, agents, automations, MCP, backups and TOTP in the real app (role all, worker
   included) on a throwaway database, with the OpenAI stub
