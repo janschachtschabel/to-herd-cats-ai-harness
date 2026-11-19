@@ -31,7 +31,7 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 
 class EventCreate(BaseModel):
     """An event with a time of day names `starts_at`, `ends_at` (instants) and its
-    `tzid` (default: the calendar's zone); an all-day one `all_day`, `first_day` and
+    `time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and
     `last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall
     times in the event's zone, without offset) make it a series. `busy` defaults to
     true, for all-day events to false."""
@@ -46,7 +46,7 @@ class EventCreate(BaseModel):
     ends_at: AwareDatetime | None = None
     first_day: date | None = None
     last_day: date | None = None
-    tzid: Annotated[str, StringConstraints(max_length=TZID_MAX)] | None = None
+    time_zone: Annotated[str, StringConstraints(max_length=TZID_MAX)] | None = None
     rrule: Annotated[str, StringConstraints(max_length=RRULE_MAX)] | None = None
     rdates: list[datetime] = Field(default_factory=list, max_length=DATES_MAX)
     exdates: list[datetime] = Field(default_factory=list, max_length=DATES_MAX)
@@ -65,7 +65,7 @@ class EventCreate(BaseModel):
             ends_at=self.ends_at,
             first_day=self.first_day,
             last_day=self.last_day,
-            tzid=self.tzid,
+            tzid=self.time_zone,
             rrule=self.rrule,
             rdates=tuple(self.rdates),
             exdates=tuple(self.exdates),
@@ -91,8 +91,9 @@ class EventOut(BaseModel):
     """`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
     (null: endless). `series_id`: for an override (one occurrence changed on its own),
-    the series it belongs to; null otherwise. `redacted`: the caller sees only times
-    and "busy"; content fields are null."""
+    the series it belongs to; null otherwise. `time_zone`: the zone its series runs
+    in (null for all-day). `redacted`: the caller sees only times and "busy"; content
+    fields are null."""
 
     id: uuid.UUID
     calendar_id: uuid.UUID
@@ -107,7 +108,7 @@ class EventOut(BaseModel):
     ends_at: datetime
     first_day: date | None
     last_day: date | None
-    tzid: str | None
+    time_zone: str | None
     rrule: str | None
     rdates: list[datetime]
     exdates: list[datetime]
@@ -137,7 +138,7 @@ class EventOut(BaseModel):
             ends_at=event.ends_at,
             first_day=days[0] if days else None,
             last_day=days[1] if days else None,
-            tzid=event.tzid,
+            time_zone=event.tzid,
             rrule=event.rrule,
             rdates=list(event.rdates),
             exdates=list(event.exdates),

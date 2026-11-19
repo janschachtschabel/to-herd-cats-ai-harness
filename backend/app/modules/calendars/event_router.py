@@ -41,13 +41,15 @@ async def list_events(
         uuid.UUID | None, Query(description="the named way: this space's events only")
     ] = None,
     q: Annotated[str | None, Query(min_length=1, max_length=QUERY_MAX)] = None,
-    tz: Annotated[
-        str | None, Query(max_length=64, description="the viewer's zone (all-day days)")
+    time_zone: Annotated[
+        str | None,
+        Query(max_length=64, description="the viewer's zone (all-day days), default UTC"),
     ] = None,
 ) -> Page[OccurrenceOut]:
     """Every occurrence overlapping `[from, to)` of the events one may list (member
     spaces and one's own; another space's only by naming it with `space_id`), by
-    start. Private events of others come `redacted`; `q` searches titles one sees."""
+    start. Private events of others come `redacted`; `q` searches titles one sees. A
+    cursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`)."""
     return await list_window(
         session,
         actor,
@@ -58,7 +60,7 @@ async def list_events(
         mine=False,
         query=q,
         params=params,
-        viewer_zone=tz,
+        viewer_zone=time_zone,
     )
 
 

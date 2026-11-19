@@ -58,7 +58,7 @@ async def new_event(client: AsyncClient, calendar_id: object, **fields: Any) -> 
         "title": "Termin",
         "starts_at": "2026-11-23T10:00:00+01:00",
         "ends_at": "2026-11-23T11:00:00+01:00",
-        "tzid": "Europe/Berlin",
+        "time_zone": "Europe/Berlin",
         **fields,
     }
     r = await client.post(f"/api/calendars/{calendar_id}/events", json=body)

@@ -14,6 +14,8 @@ of the events the caller may list, by (start, event id), a page at a time.
   so a viewer in UTC+13 or UTC−11 sees the day's event and not the neighbours').
 - Its bounds lie in the years 1900 to 2399 as sent (422
   `calendar.window_out_of_range`), `from` before `to` (`calendar.invalid_window`).
+- Paged by (start, event id); a cursor holds the viewer zone and is valid with it
+  only (422 `calendar.cursor_time_zone`).
 - At most 2,000 occurrences per call, and the expansion's counted work bounded
   (`expansion.Budget`: rows and rule candidates, so a calendar full of series that do
   not occur in the window stays readable); beyond, 422 `calendar.window_too_dense`,
@@ -28,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import pagination
 from app.core.access import Action, Actor, require
 from app.core.errors import ValidationFailed
-from app.core.pagination import PageParams, decode_cursor, encode_cursor
+from app.core.pagination import PageParams, decode_tagged_cursor, encode_tagged_cursor
 from app.modules.audit.recorder import record_private_event_reads
 from app.modules.calendars import expansion, recurrence, sight, zones
 from app.modules.calendars.event_models import CalendarEvent
@@ -74,7 +76,7 @@ async def list_window(
         zones.zone(zone)
     except zones.ZoneUnknown:
         raise ValidationFailed(code="calendar.invalid_time_zone") from None
-    after = decode_cursor(params.cursor) if params.cursor else None
+    after = _after(params.cursor, zone)
     start, end = bounded(start), bounded(end)
     named = space_id is not None
     if space_id is not None:
@@ -124,8 +126,19 @@ async def list_window(
         await record_private_event_reads(session, actor, shown_by_power)
     return pagination.Page[OccurrenceOut](
         items=[OccurrenceOut.of(event, occurrence, seen) for occurrence, event, seen in page],
-        next_cursor=encode_cursor(page[-1][0].start, page[-1][1].id) if more else None,
+        next_cursor=encode_tagged_cursor(page[-1][0].start, page[-1][1].id, zone) if more else None,
     )
+
+
+def _after(cursor: str | None, zone: str) -> tuple[datetime, uuid.UUID] | None:
+    """Where the page starts: a cursor is valid only with the viewer zone it was made
+    with, whose days decided which all-day events the earlier pages held."""
+    if not cursor:
+        return None
+    start, event_id, made_in = decode_tagged_cursor(cursor)
+    if made_in != zone:
+        raise ValidationFailed(code="calendar.cursor_time_zone")
+    return start, event_id
 
 
 def _in_years(bound: datetime) -> bool:

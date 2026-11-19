@@ -16,7 +16,7 @@ from tests.factories import MakeUser
 from tests.factories_calendar import SECRET, logged_in, new_calendar, new_event
 from tests.factories_spaces import MakeSpace
 
-BERLIN = {"tzid": "Europe/Berlin"}
+BERLIN = {"time_zone": "Europe/Berlin"}
 
 
 async def _team(
@@ -44,8 +44,8 @@ async def test_create_checks_times_zone_and_rule(
     }
     cases: list[tuple[dict[str, Any], str]] = [
         ({"ends_at": "2026-11-23T09:59:00+01:00"}, "event.invalid_time"),
-        ({"tzid": "Mars/Olympus"}, "event.invalid_time_zone"),
-        ({"tzid": "Europe/Berlin", "rrule": "FREQ=HOURLY"}, "event.rrule_unsupported"),
+        ({"time_zone": "Mars/Olympus"}, "event.invalid_time_zone"),
+        ({"time_zone": "Europe/Berlin", "rrule": "FREQ=HOURLY"}, "event.rrule_unsupported"),
         ({"rrule": "FREQ=MONTHLY;BYMONTH=2;BYMONTHDAY=30"}, "event.rrule_invalid"),
         ({"rrule": "FREQ=DAILY;UNTIL=24000101T000000Z"}, "event.time_out_of_range"),
         ({"rrule": "FREQ=DAILY;UNTIL=20261231"}, "event.rrule_invalid"),  # a date: all-day
@@ -79,7 +79,7 @@ async def test_create_checks_times_zone_and_rule(
                 "ends_at": None,
                 "first_day": "2026-11-23",
                 "last_day": "2026-11-23",
-                "tzid": "Europe/Berlin",
+                "time_zone": "Europe/Berlin",
             },
             "event.invalid_time",
         ),
@@ -128,7 +128,7 @@ async def test_a_new_event_shows_what_was_stored(
         "ends_at": "2026-11-23T10:00:00Z",
         "first_day": None,
         "last_day": None,
-        "tzid": "Europe/Berlin",
+        "time_zone": "Europe/Berlin",
         "rrule": "FREQ=WEEKLY;COUNT=3",  # canonical
         "rdates": ["2026-12-24T10:00:00"],
         "exdates": ["2026-11-30T10:00:00"],
@@ -167,7 +167,7 @@ async def test_an_all_day_event_floats_on_utc_days_and_is_free(
     )
     assert r.status_code == 201, r.text
     made = r.json()
-    assert (made["starts_at"], made["ends_at"], made["tzid"], made["busy"]) == (
+    assert (made["starts_at"], made["ends_at"], made["time_zone"], made["busy"]) == (
         "2026-11-23T00:00:00Z",
         "2026-11-26T00:00:00Z",
         None,
@@ -180,7 +180,7 @@ async def test_an_all_day_event_floats_on_utc_days_and_is_free(
         all_day=True,
         starts_at=None,
         ends_at=None,
-        tzid=None,
+        time_zone=None,
         first_day="2026-11-23",
         last_day="2026-11-23",
         busy=True,
@@ -196,14 +196,14 @@ async def test_a_new_event_without_a_zone_takes_the_calendars(
     space_id = (await client.get("/api/calendars")).json()["items"][0]["space_id"]
     made = await new_calendar(client, space_id, "New York", time_zone="America/New_York")
     assert made["time_zone"] == "America/New_York"
-    event = await new_event(client, made["id"], tzid=None)
-    assert event["tzid"] == "America/New_York"
+    event = await new_event(client, made["id"], time_zone=None)
+    assert event["time_zone"] == "America/New_York"
     r = await client.patch(
         f"/api/calendars/{made['id']}", json={"time_zone": "Asia/Tokyo", "version": 1}
     )
     assert (r.status_code, r.json()["time_zone"]) == (200, "Asia/Tokyo")
-    assert (await new_event(client, made["id"], tzid=None))["tzid"] == "Asia/Tokyo"
-    assert event["tzid"] == "America/New_York"  # what was made keeps its zone
+    assert (await new_event(client, made["id"], time_zone=None))["time_zone"] == "Asia/Tokyo"
+    assert event["time_zone"] == "America/New_York"  # what was made keeps its zone
     # Without a word, a calendar is in Berlin (plan M10 task 3a ruling).
     assert (await new_calendar(client, space_id, "Standard"))["time_zone"] == "Europe/Berlin"
     for body in (

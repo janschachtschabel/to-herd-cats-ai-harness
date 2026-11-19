@@ -40,7 +40,7 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
 
 - **Anlegen** (`POST /api/calendars/<id>/events`) darf, wer im Bereich des Kalenders
   Autor ist. Wer anlegt, ist Organisatorin. Ein Termin mit Uhrzeit nennt Anfang und Ende
-  als Zeitpunkte und seine Zone (sonst die des Kalenders); ein ganztägiger nennt ersten
+  als Zeitpunkte und seine Zone `time_zone` (sonst die des Kalenders); ein ganztägiger nennt ersten
   und letzten Tag und liegt „schwebend“ auf diesen Tagen. Ganztägige Termine sind im
   Standard „frei“, alle anderen „belegt“. Titel ≤ 300 Zeichen, Ort ≤ 500, Text ≤ 20.000
   (reiner Text, nie als HTML gezeigt). Zeitpunkte tragen immer ihren Versatz (ohne:
@@ -65,9 +65,16 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   Arbeit des Entfaltens 500.000 Schritte übersteigt (je geladener Termin 40, je
   Kandidat einer Regel 1; etwa 12.500 Serien): Serien, die im Zeitraum nicht vorkommen,
   kosten nur ihren Schritt. Die Grenzen `from` und `to` liegen in den Jahren 1900 bis
-  2399 (422 `calendar.window_out_of_range`). `tz` nennt die Zone der Betrachterin: Dort
-  beginnen die Tage ganztägiger Termine (Standard UTC). `calendar_ids` filtert, `q`
-  sucht im Titel.
+  2399 (422 `calendar.window_out_of_range`). `time_zone` nennt die Zone der
+  Betrachterin: Dort beginnen die Tage ganztägiger Termine (Standard UTC; die
+  Oberfläche schickt immer die Zone des Browsers, sonst zeigt sie den Nachbartag).
+  Ein Cursor gilt nur mit der Zone, mit der er entstand (sonst 422
+  `calendar.cursor_time_zone`). `calendar_ids` filtert, `q` sucht im Titel.
+- **Ein Name für Zonen:** Die API heißt jede Zone `time_zone`: die des Kalenders, die
+  eines Termins (seine Serie läuft in ihrer Ortszeit; die Spalte heißt wie in
+  iCalendar `tzid`) und die der Betrachterin im Fenster.
+- **Serien und Ausnahmen:** Ein einzeln geändertes Vorkommen (Ausnahme) steht im
+  Fenster als eigener Termin und nennt seine Serie in `series_id`.
 - **Wer was sieht:** Wer den Bereich des Kalenders lesen darf, sieht seine Termine; die
   Organisatorin sieht ihren Termin auch ohne den Bereich (nur diesen Termin, nie den
   Kalender). Einen **privaten** Termin sehen andere Leser nur als Zeit und „Belegt“

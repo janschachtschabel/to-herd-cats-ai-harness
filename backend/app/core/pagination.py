@@ -71,6 +71,27 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
         raise _invalid(exc) from exc
 
 
+def encode_tagged_cursor(moment: datetime, id_: uuid.UUID, tag: str) -> str:
+    """A (timestamp, id) cursor that also holds a text the list compares on the next
+    page (the event window's viewer zone)."""
+    raw = json.dumps([moment.isoformat(), str(id_), tag]).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_tagged_cursor(cursor: str) -> tuple[datetime, uuid.UUID, str]:
+    """`decode_cursor`'s timestamp and id, and the tag."""
+    try:
+        moment, id_, tag = json.loads(_b64(cursor).decode())
+        if not all(isinstance(part, str) for part in (moment, id_, tag)):
+            raise TypeError("cursor parts are not text")
+        at = datetime.fromisoformat(moment)
+        if at.tzinfo is None:
+            raise ValueError("naive timestamp")
+        return at.astimezone(UTC), uuid.UUID(id_), _storable(tag)
+    except Exception as exc:
+        raise _invalid(exc) from exc
+
+
 def encode_id_cursor(id_: uuid.UUID) -> str:
     return base64.urlsafe_b64encode(id_.bytes).decode().rstrip("=")
 

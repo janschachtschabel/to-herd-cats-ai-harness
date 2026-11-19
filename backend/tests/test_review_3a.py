@@ -80,7 +80,7 @@ async def test_endless_series_that_do_not_occur_leave_the_window_readable(
         last_day="2020-03-01",
         starts_at=None,
         ends_at=None,
-        tzid=None,
+        time_zone=None,
         rrule="FREQ=YEARLY",
     )
     row = (

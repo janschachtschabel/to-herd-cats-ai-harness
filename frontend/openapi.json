@@ -5497,7 +5497,7 @@
       },
       "EventCreate": {
         "additionalProperties": false,
-        "description": "An event with a time of day names `starts_at`, `ends_at` (instants) and its\n`tzid` (default: the calendar's zone); an all-day one `all_day`, `first_day` and\n`last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall\ntimes in the event's zone, without offset) make it a series. `busy` defaults to\ntrue, for all-day events to false.",
+        "description": "An event with a time of day names `starts_at`, `ends_at` (instants) and its\n`time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and\n`last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall\ntimes in the event's zone, without offset) make it a series. `busy` defaults to\ntrue, for all-day events to false.",
         "properties": {
           "all_day": {
             "default": false,
@@ -5609,13 +5609,7 @@
             "$ref": "#/components/schemas/EventStatus",
             "default": "confirmed"
           },
-          "title": {
-            "maxLength": 300,
-            "minLength": 1,
-            "title": "Title",
-            "type": "string"
-          },
-          "tzid": {
+          "time_zone": {
             "anyOf": [
               {
                 "maxLength": 64,
@@ -5625,7 +5619,13 @@
                 "type": "null"
               }
             ],
-            "title": "Tzid"
+            "title": "Time Zone"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
           },
           "uid": {
             "anyOf": [
@@ -5710,7 +5710,7 @@
         "type": "string"
       },
       "EventOut": {
-        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to; null otherwise. `redacted`: the caller sees only times\nand \"busy\"; content fields are null.",
+        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to; null otherwise. `time_zone`: the zone its series runs\nin (null for all-day). `redacted`: the caller sees only times and \"busy\"; content\nfields are null.",
         "properties": {
           "all_day": {
             "title": "All Day",
@@ -5859,6 +5859,17 @@
           "status": {
             "$ref": "#/components/schemas/EventStatus"
           },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
           "title": {
             "anyOf": [
               {
@@ -5869,17 +5880,6 @@
               }
             ],
             "title": "Title"
-          },
-          "tzid": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tzid"
           },
           "uid": {
             "anyOf": [
@@ -5914,7 +5914,7 @@
           "ends_at",
           "first_day",
           "last_day",
-          "tzid",
+          "time_zone",
           "rrule",
           "rdates",
           "exdates",
@@ -8198,7 +8198,7 @@
         "type": "object"
       },
       "OccurrenceOut": {
-        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`series_id`: for an override, which is listed as an event of its own, the series\nit belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and \"busy\" (`title`, `location` null).",
+        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`series_id`: for an override, which is listed as an event of its own, the series\nit belongs to (to change the whole series from it); null otherwise. `redacted`:\nthe caller sees only times and \"busy\" (`title`, `location` null).",
         "properties": {
           "all_day": {
             "title": "All Day",
@@ -25608,7 +25608,7 @@
     },
     "/api/calendar/events": {
       "get": {
-        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and one's own; another space's only by naming it with `space_id`), by\nstart. Private events of others come `redacted`; `q` searches titles one sees.",
+        "description": "Every occurrence overlapping `[from, to)` of the events one may list (member\nspaces and one's own; another space's only by naming it with `space_id`), by\nstart. Private events of others come `redacted`; `q` searches titles one sees. A\ncursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).",
         "operationId": "list_events_api_calendar_events_get",
         "parameters": [
           {
@@ -25718,9 +25718,9 @@
             }
           },
           {
-            "description": "the viewer's zone (all-day days)",
+            "description": "the viewer's zone (all-day days), default UTC",
             "in": "query",
-            "name": "tz",
+            "name": "time_zone",
             "required": false,
             "schema": {
               "anyOf": [
@@ -25732,8 +25732,8 @@
                   "type": "null"
                 }
               ],
-              "description": "the viewer's zone (all-day days)",
-              "title": "Tz"
+              "description": "the viewer's zone (all-day days), default UTC",
+              "title": "Time Zone"
             }
           }
         ],

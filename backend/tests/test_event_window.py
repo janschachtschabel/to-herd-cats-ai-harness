@@ -1,7 +1,7 @@
 """The event window (plan M10 task 3a, decision 6): every occurrence overlapping
 `[from, to)` of the events one may list, series expanded in their zone's wall time,
 paged by (start, id); all-day events float on their days, compared in the viewer's
-zone (`tz`), so viewers in UTC+13 and UTC−11 see the day's event and not the
+zone (`time_zone`), so viewers in UTC+13 and UTC−11 see the day's event and not the
 neighbours'; at most 2,000 occurrences per call."""
 
 import uuid
@@ -65,7 +65,7 @@ async def test_window_lists_occurrences_across_a_dst_change(
         calendar["id"],
         starts_at="2026-03-06T02:30:00-05:00",
         ends_at="2026-03-06T03:30:00-05:00",
-        tzid="America/New_York",
+        time_zone="America/New_York",
         rrule="FREQ=DAILY;COUNT=4",
     )
     items = await window(client, "2026-03-06T00:00:00Z", "2026-03-10T00:00:00Z")
@@ -118,7 +118,7 @@ async def test_all_day_events_show_for_viewers_far_east_and_west(
             all_day=True,
             starts_at=None,
             ends_at=None,
-            tzid=None,
+            time_zone=None,
             first_day=day,
             last_day=day,
         )
@@ -128,7 +128,7 @@ async def test_all_day_events_show_for_viewers_far_east_and_west(
         all_day=True,
         starts_at=None,
         ends_at=None,
-        tzid=None,
+        time_zone=None,
         first_day="2020-11-19",
         last_day="2020-11-19",
         rrule="FREQ=YEARLY",
@@ -142,7 +142,7 @@ async def test_all_day_events_show_for_viewers_far_east_and_west(
         ("UTC", "2026-11-19T00:00:00Z", "2026-11-20T00:00:00Z"),
     ]
     for tz, start, end in viewers:
-        items = await window(client, start, end, tz=tz)
+        items = await window(client, start, end, time_zone=tz)
         assert {i["event_id"] for i in items} == expected, tz
         mine = next(i for i in items if i["event_id"] == days["2026-11-19"]["id"])
         assert (mine["start"], mine["end"], mine["all_day"]) == (
@@ -152,7 +152,7 @@ async def test_all_day_events_show_for_viewers_far_east_and_west(
         )
     r = await client.get(
         "/api/calendar/events",
-        params={"from": viewers[0][1], "to": viewers[0][2], "tz": "Mars/Olympus"},
+        params={"from": viewers[0][1], "to": viewers[0][2], "time_zone": "Mars/Olympus"},
     )
     assert (r.status_code, r.json()["error"]["code"]) == (422, "calendar.invalid_time_zone")
 

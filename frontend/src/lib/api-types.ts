@@ -2470,7 +2470,8 @@ export interface paths {
          * List Events
          * @description Every occurrence overlapping `[from, to)` of the events one may list (member
          *     spaces and one's own; another space's only by naming it with `space_id`), by
-         *     start. Private events of others come `redacted`; `q` searches titles one sees.
+         *     start. Private events of others come `redacted`; `q` searches titles one sees. A
+         *     cursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`).
          */
         get: operations["list_events_api_calendar_events_get"];
         put?: never;
@@ -6419,7 +6420,7 @@ export interface components {
         /**
          * EventCreate
          * @description An event with a time of day names `starts_at`, `ends_at` (instants) and its
-         *     `tzid` (default: the calendar's zone); an all-day one `all_day`, `first_day` and
+         *     `time_zone` (IANA; default: the calendar's); an all-day one `all_day`, `first_day` and
          *     `last_day`. `rrule` (RFC 5545, `DAILY` or slower), `rdates` and `exdates` (wall
          *     times in the event's zone, without offset) make it a series. `busy` defaults to
          *     true, for all-day events to false.
@@ -6458,10 +6459,10 @@ export interface components {
             starts_at?: string | null;
             /** @default confirmed */
             status?: components["schemas"]["EventStatus"];
+            /** Time Zone */
+            time_zone?: string | null;
             /** Title */
             title: string;
-            /** Tzid */
-            tzid?: string | null;
             /** Uid */
             uid?: string | null;
             /** @default default */
@@ -6494,8 +6495,9 @@ export interface components {
          * @description `starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
          *     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
          *     (null: endless). `series_id`: for an override (one occurrence changed on its own),
-         *     the series it belongs to; null otherwise. `redacted`: the caller sees only times
-         *     and "busy"; content fields are null.
+         *     the series it belongs to; null otherwise. `time_zone`: the zone its series runs
+         *     in (null for all-day). `redacted`: the caller sees only times and "busy"; content
+         *     fields are null.
          */
         EventOut: {
             /** All Day */
@@ -6549,10 +6551,10 @@ export interface components {
              */
             starts_at: string;
             status: components["schemas"]["EventStatus"];
+            /** Time Zone */
+            time_zone: string | null;
             /** Title */
             title: string | null;
-            /** Tzid */
-            tzid: string | null;
             /** Uid */
             uid: string | null;
             /** Version */
@@ -7498,7 +7500,8 @@ export interface components {
          *     the wall time it is named by (ISO 8601 without offset), which changing or deleting
          *     just this one takes back (task 3b); null for an event that is no series.
          *     `series_id`: for an override, which is listed as an event of its own, the series
-         *     it belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and "busy" (`title`, `location` null).
+         *     it belongs to (to change the whole series from it); null otherwise. `redacted`:
+         *     the caller sees only times and "busy" (`title`, `location` null).
          */
         OccurrenceOut: {
             /** All Day */
@@ -16088,8 +16091,8 @@ export interface operations {
                 /** @description the named way: this space's events only */
                 space_id?: string | null;
                 q?: string | null;
-                /** @description the viewer's zone (all-day days) */
-                tz?: string | null;
+                /** @description the viewer's zone (all-day days), default UTC */
+                time_zone?: string | null;
             };
             header?: never;
             path?: never;
