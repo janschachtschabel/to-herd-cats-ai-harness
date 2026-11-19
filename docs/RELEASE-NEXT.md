@@ -26,7 +26,7 @@ dahin gilt:
   (`docker build`, README „Schnellstart mit Docker Compose“).
 - Auch `RELEASE-1.0.0.md` ist nicht endgültig; beide Notizen werden zur Freigabe
   zusammengeführt.
-- Auf dem Arbeitszweig liegt außerdem der Anfang von M10 (Kalender, Tasks 1 bis 3c, 7a
+- Auf dem Arbeitszweig liegt außerdem der Anfang von M10 (Kalender, Tasks 1 bis 4, 7a
   und 13a, [`KALENDER.md`](KALENDER.md)). Er ist hier nur bei den Migrationen erwähnt und wird
   beschrieben, wenn M10 fertig ist.
 
@@ -130,19 +130,24 @@ sich keine Instanz an, schließt das Relay mit 4502 `collab.unavailable`.
 
 Vorher sichern (README, „Update einer Installation“), dann:
 
-- **Migrationen:** zwölf neue Revisionen nach `9e4b6d2f8a17`, alle erweiternd (neue
+- **Migrationen:** dreizehn neue Revisionen nach `9e4b6d2f8a17`, alle erweiternd (neue
   Tabellen, neue Spalten mit Standard): `a3c5e7f9b2d4` Wartung, `c4d8e1f7a2b9` TOTP,
   `daa60bc7c565` Collab-Instanzen, `e1f4a7c2b9d3`, `f2a5b8c3d6e9`, `a6c9d2e5f8b1`
   Sitzungen (letzte Nutzung, Gerät und Anmeldezeit, erneute Anmeldung), `b7d0e3f6a9c2`
   Aussteller der OAuth-Apps, `e4b6c8d0f2a3` TOTP-Sperre, `c8e1f4a7b0d3` frische
   Anbieter-Anmeldung, `b1c4e7a90d23` Kalender, `c5e8a1d4f7b2` Termine und
-  `d5f8a1c3e7b9` Zweck der Zugänge und OAuth-Apps (M10). Eine einzige ersetzt eine
-  Bedingung: `e4b6c8d0f2a3` erweitert die erlaubten Gründe einer Benachrichtigung um
-  `totp_locked` (`contract_of` `7c2e9a4f1b86`; der alte Code schreibt weiter nur
-  erlaubte Werte). Ein Prozess von 1.0.0 liefe also gegen die neue Datenbank weiter,
-  bis er ersetzt ist (`check_migrations.py` mit `RELEASED=9e4b6d2f8a17`), mit einer
-  Lücke: Die Aktivität einer Person mit der neuen Benachrichtigung `totp_locked`
-  beantwortete er mit 500, weil sein Schema den Grund nicht kennt. Da 1.0.0 nirgends
+  `d5f8a1c3e7b9` Zweck der Zugänge und OAuth-Apps (M10) sowie `e2c7a9f4b6d1`
+  Einladungen (M10 Task 4). Zwei ersetzen Bedingungen: `e4b6c8d0f2a3` erweitert die
+  erlaubten Gründe einer Benachrichtigung um `totp_locked` (`contract_of`
+  `7c2e9a4f1b86`), `e2c7a9f4b6d1` um die fünf Kalendergründe und ihr Ziel, den Termin
+  (`contract_of` `9e4b6d2f8a17`); jede Zeile, die vorher galt, gilt weiter, und der
+  alte Code schreibt weiter nur erlaubte Werte. Ein Prozess von 1.0.0 liefe also gegen
+  die neue Datenbank weiter, bis er ersetzt ist (`check_migrations.py` mit
+  `RELEASED=9e4b6d2f8a17`), mit einer Lücke: Die Aktivität einer Person mit einer
+  neuen Benachrichtigung (`totp_locked`, eine Einladung) beantwortete er mit 500, weil
+  sein Schema den Grund nicht kennt. **Alle API-Prozesse ersetzen, bevor jemand
+  einlädt.** Ab diesem Stand lässt die Aktivität Gründe, die sie nicht kennt, aus
+  (statt 500), damit ein späterer Stand neben ihm laufen kann. Da 1.0.0 nirgends
   läuft (oben), betrifft das nur einen selbst gebauten Stand. Nicht auf 1.0.0
   zurückgehen, sobald jemand TOTP eingeschaltet hat: 1.0.0 kennt die TOTP-Tabellen
   nicht und meldet diese Personen nur mit dem Passwort an.

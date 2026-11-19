@@ -149,8 +149,9 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
 - **Gelöschte Termine** bleiben 30 Tage als Grabstein (unsichtbar, ohne UID-Sperre;
   eine Serie nimmt ihre Ausnahmen mit), dann entfernt sie die Fälligkeits-Schleife.
 - **Wer was sieht:** Wer den Bereich des Kalenders lesen darf, sieht seine Termine; die
-  Organisatorin sieht ihren Termin auch ohne den Bereich (nur diesen Termin, nie den
-  Kalender). Einen **privaten** Termin sehen andere Leser nur als Zeit und „Belegt“
+  Organisatorin und jede Eingeladene sehen den Termin auch ohne den Bereich (nur diesen
+  Termin, nie den Kalender, seine anderen Termine oder den Bereich), und zwar ganz, auch
+  einen privaten. Einen **privaten** Termin sehen andere Leser nur als Zeit und „Belegt“
   (`redacted: true`, ohne Titel, Ort, Text, UID und Organisatorin), in der Liste, im
   Einzelabruf und in der Suche (die Suche findet ihn nicht über seinen Titel). Einen
   Termin, den man nicht sehen darf, gibt es nicht: 404 `event.not_found` wie für eine
@@ -161,6 +162,60 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   etwa `tzid`) und `.deleted`, nur mit IDs; schreibt eine Änderung der Serie auch
   Ausnahmen (verschoben, mitgenommen, geändert, gelöscht), nennt ihr Ereignis deren IDs
   in `overrides`. Eine neue Ausnahme meldet sich mit ihrem eigenen `.created`.
+
+## Einladungen und Antworten
+
+- **Eingeladene** (`PUT /api/events/<id>/attendees`, die ganze Liste mit der gelesenen
+  `version`; 409 `event.version_conflict`) setzt, wer den Termin ändern darf (Autorin im
+  Bereich und volle Sicht, wie beim Ändern). Eingeladen werden Personen und Agenten des
+  Systems (`type` `user`/`agent` mit `id`) und Adressen (`type` `email` mit
+  `email` und optional `name`), jede `required` oder `optional`, höchstens 100 (422
+  `event.too_many_attendees`), niemand doppelt (422 `event.attendee_duplicate`,
+  Adressen ohne Rücksicht auf Groß- und Kleinschreibung). Wer `directory.read` hat (alle
+  außer Gästen), lädt jede aktive Person der Organisation ein; ein Gast nur, wer den
+  Bereich des Kalenders liest. Agenten nur mit `ai.use`, keine Entwürfe, ein
+  persönlicher Agent nur von seiner Besitzerin (ein Gast: nur Agenten des Bereichs).
+  Wen man nicht einladen kann, antwortet 422 `event.attendee_unknown`. Die Liste zu
+  setzen erhöht die Version des Termins.
+- **Lesen** (`GET /api/events/<id>/attendees`, seitenweise) darf, wer den Termin ganz
+  sieht (bei „Belegt“ 403 `event.private`). Personen und Agenten erscheinen mit
+  `principal_id` und Namen, nie mit ihrer Adresse; Adressen mit `email` und dem
+  angegebenen Namen. `delivery` sagt, wie die Einladung ankommt: `internal` (in der
+  Aktivität), `not_sent` (eine Adresse: nichts wird verschickt; die `.ics`-Datei des
+  Termins gibt man selbst weiter).
+- **Antworten** (`POST /api/events/<id>/response` mit `accepted`, `tentative` oder
+  `declined` und der gelesenen `version`) darf nur, wer eingeladen ist (403
+  `event.not_invited`, auch für die Organisatorin, die nicht eingeladen ist). Hat sich
+  der Termin seit dem Lesen geändert, 409; die Antwort selbst ändert die Version nicht.
+  Ein Agent gilt sofort als zugesagt; eine Einladung startet keinen Lauf.
+- **Serien:** Die Eingeladenen und ihre Antworten gelten für die ganze Serie. Eine
+  Ausnahme (ein einzeln geändertes Vorkommen) und der abgeteilte Teil einer Serie
+  (`scope=following`) übernehmen sie; danach hat die Ausnahme ihre eigene Liste. Wer
+  nur zu einer Ausnahme eingeladen ist, sieht nur dieses Vorkommen; wer daraus
+  entfernt ist, sieht es nicht. Wer bei der Serie dazukommt oder geht, kommt dazu oder
+  geht auch bei ihren Ausnahmen; eine Antwort auf die Serie erreicht die Ausnahmen, auf
+  denen noch dieselbe Antwort stand.
+- **Zeit geändert:** Rücken Anfang oder Ende (einer Serie, eines Vorkommens), stehen
+  die Antworten der anderen Eingeladenen wieder auf offen (`needs_action`), und sie
+  werden benachrichtigt; wer geändert hat, behält ihre. Titel, Ort und Text ändern
+  keine Antwort.
+- **Benachrichtigungen** stehen nur in der Aktivität, nie in einem Kanal oder einer
+  Direktnachricht: `invitation` für jede neu eingeladene Person, nach einer
+  Zeitänderung, einer Absage (`status=cancelled`) und dem Löschen; `invite_reply` für
+  die Organisatorin (eine Person, kein Agent), wenn jemand absagt oder „vielleicht“
+  antwortet (nie für ihre eigene Antwort). Je Person, Termin und Grund gibt es eine
+  Benachrichtigung; eine weitere Änderung frischt sie auf (wieder ungelesen, oben).
+  Sie nennt Titel, Anfang und die eigene Antwort und bleibt sichtbar, solange die
+  Person den Termin besucht (eingeladen oder Organisatorin; ein gelöschter Termin
+  erscheint als abgesagt) und sein Kalender nicht archiviert ist; wer ausgeladen ist,
+  sieht sie nicht mehr.
+- **Meine Termine:** Das Fenster mit `mine=true` zeigt nur, was man organisiert oder
+  wozu man eingeladen ist, über alle Bereiche; ohne `mine` zeigt es dazu die Termine
+  der eigenen Bereiche.
+- **Live und Outbox:** `calendar_event.invited` (je eingeladene Person, nur IDs) und
+  `calendar_event.responded` (mit der Antwort); die Eingeladene bekommt live
+  `event.invited` (nur die ID des Termins), die Mitglieder des Bereichs wie bei jeder
+  Änderung `calendar.changed`.
 
 ## Was Admins sehen und was im Audit steht
 
