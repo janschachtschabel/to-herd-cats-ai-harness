@@ -41,22 +41,23 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
     times; an unknown zone is the caller's error: `zones.ZoneUnknown`)."""
     zones.zone(default_zone)
     tops, found = lines.read(data)
-    calendars = [top for top in tops if top.name == "VCALENDAR"]
-    if not calendars:
+    if not any(top.name == "VCALENDAR" for top in tops):
         return Parsed([], Counter({problems.UNREADABLE: 1}))
     timezones: dict[str, lines.Component] = {}
     events: list[lines.Component] = []
-    for calendar in calendars:
-        for child in calendar.children:
-            if child.name == "VEVENT":
-                events.append(child)
-            elif child.name == "VTIMEZONE":
-                tzid = child.first("TZID")
-                if tzid is not None:  # TEXT: some write it escaped (`\,`), some not
-                    timezones.setdefault(tzid.text.strip(), child)
-                    timezones.setdefault(tzid.raw.strip(), child)
-            else:
-                found[problems.NOT_AN_EVENT] += 1
+    # the components of every VCALENDAR, and those found beside one (after an early
+    # END:VCALENDAR, R7a-8)
+    children = [c for top in tops for c in (top.children if top.name == "VCALENDAR" else [top])]
+    for child in children:
+        if child.name == "VEVENT":
+            events.append(child)
+        elif child.name == "VTIMEZONE":
+            tzid = child.first("TZID")
+            if tzid is not None:  # TEXT: some write it escaped (`\,`), some not
+                timezones.setdefault(tzid.text.strip(), child)
+                timezones.setdefault(tzid.raw.strip(), child)
+        else:
+            found[problems.NOT_AN_EVENT] += 1
     resolver = Resolver(timezones)
     drafts: list[EventDraft] = []
     for uid, group in _groups(events, found).items():
@@ -91,7 +92,12 @@ def _groups(events: list[lines.Component], found: Counter[str]) -> dict[str, _Gr
 
 
 def _broken(part: lines.Component) -> int:
-    return part.broken + sum(_broken(child) for child in part.children)
+    count, todo = 0, [part]
+    while todo:
+        each = todo.pop()
+        count += each.broken
+        todo.extend(each.children)
+    return count
 
 
 def _draft(uid: str, group: _Group, frame: times.Frame, found: Counter[str]) -> EventDraft:

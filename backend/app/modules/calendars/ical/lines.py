@@ -26,6 +26,12 @@ _DURATION = re.compile(
 _OFFSET = re.compile(r"([+-])([0-9]{2})([0-9]{2})([0-9]{2})?")
 # C0 controls but tab and line feed, and DEL: never in a text (Postgres takes no NUL).
 _CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# RFC 5545 3.1: a line break followed by a space or tab continues the line.
+_FOLD = re.compile(rb"\r?\n[ \t]")
+_FOLD_TEXT = re.compile(r"\r?\n[ \t]")
+# A calendar needs three levels (VCALENDAR, VEVENT or VTIMEZONE, VALARM or an
+# observance); a little more for producers' own components, nothing deeper.
+MAX_DEPTH = 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,31 +92,60 @@ def _prop(line: Contentline) -> Prop:
 
 
 def read(data: bytes) -> tuple[list[Component], Counter[str]]:
-    """The top-level components of `data` and what could not be read of it. A component
-    that never ends, or an END without its BEGIN, counts as `ical.unreadable` (once);
-    such a component is dropped."""
-    found: Counter[str] = Counter()
-    text = data.decode("utf-8", errors="replace").removeprefix("﻿")
+    """The top-level components of `data` and what could not be read of it, in one pass
+    over the lines (work linear in the data, R7a-2):
+
+    - an END without its BEGIN, a component that never ends and components nested
+      deeper than `MAX_DEPTH` count as `ical.unreadable` (once); the latter two are
+      dropped;
+    - a `BEGIN:VEVENT` while a VEVENT is open closes that one first, so one missing
+      `END:VEVENT` does not swallow every later event (R7a-8);
+    - text that is no UTF-8 (or UTF-16 with its byte order mark) is read with
+      replacement characters and counts as `ical.text_replaced` (once).
+    """
+    text, found = _decode(data)
     try:
         lines = Contentlines.from_ical(text)  # type: ignore[no-untyped-call]
     except ValueError:
         return [], Counter({problems.UNREADABLE: 1})
     tops: list[Component] = []
     stack: list[Component] = []
+    open_names: Counter[str] = Counter()  # how many of each name `stack` holds
+    ignored = 0  # depth inside components dropped for nesting too deep
+
+    def close(name: str) -> None:
+        while True:
+            done = stack.pop()
+            open_names[done.name] -= 1
+            if done.name == name:
+                (stack[-1].children if stack else tops).append(done)
+                return
+            found[problems.UNREADABLE] = 1  # a component inside that never ended
+
     for line in lines:
         head = line[:6].upper()
         if head == "BEGIN:":
-            stack.append(Component(line[6:].strip().upper()))
+            name = line[6:].strip().upper()
+            if ignored or len(stack) >= MAX_DEPTH:
+                ignored += 1
+                found[problems.UNREADABLE] = 1
+                continue
+            if name == "VEVENT" and open_names["VEVENT"]:
+                close("VEVENT")
+                found[problems.UNREADABLE] = 1
+            stack.append(Component(name))
+            open_names[name] += 1
         elif head[:4] == "END:":
+            if ignored:
+                ignored -= 1
+                continue
             name = line[4:].strip().upper()
-            if not any(open_.name == name for open_ in stack):
+            if not open_names[name]:
                 found[problems.UNREADABLE] = 1  # an END without its BEGIN
                 continue
-            while stack[-1].name != name:
-                stack.pop()  # a component inside that never ended
-                found[problems.UNREADABLE] = 1
-            done = stack.pop()
-            (stack[-1].children if stack else tops).append(done)
+            close(name)
+        elif ignored:
+            continue
         elif stack:
             stack[-1].lines.append(line)
         elif line.strip():
@@ -118,6 +153,25 @@ def read(data: bytes) -> tuple[list[Component], Counter[str]]:
     if stack:
         found[problems.UNREADABLE] = 1
     return tops, found
+
+
+def _decode(data: bytes) -> tuple[str, Counter[str]]:
+    """`data` as text: UTF-16 by its byte order mark, otherwise UTF-8 (RFC 5545 3.1),
+    unfolded on the octets first, so a fold between the octets of one character
+    joins them again (R7a-7)."""
+    found: Counter[str] = Counter()
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        text = data.decode("utf-16", errors="replace")
+        if "\ufffd" in text:
+            found[problems.TEXT_REPLACED] = 1
+        return _FOLD_TEXT.sub("", text).removeprefix("\ufeff"), found
+    unfolded = _FOLD.sub(b"", data)
+    try:
+        text = unfolded.decode("utf-8")
+    except UnicodeDecodeError:
+        text = unfolded.decode("utf-8", errors="replace")
+        found[problems.TEXT_REPLACED] = 1
+    return text.removeprefix("\ufeff"), found
 
 
 def clean(text: str) -> str:
