@@ -228,7 +228,7 @@ async def window(args: argparse.Namespace) -> dict[str, Any]:
     plan: list[tuple[str, Measured, int]] = [
         ("week", bench.window(actors["viewer"], weeks(), every_page=False), calls),
         ("week_route", bench.route(client, weeks()), calls),
-        ("week_all_pages", bench.window(actors["viewer"], weeks(), every_page=True), extra),
+        ("week_all_pages", bench.window(actors["viewer"], weeks(), every_page=True), calls),
         ("month", bench.window(actors["viewer"], month_grids(), every_page=False), calls),
         ("month_route", bench.route(client, month_grids()), calls),
         ("month_all_pages", bench.window(actors["viewer"], month_grids(), every_page=True), extra),
