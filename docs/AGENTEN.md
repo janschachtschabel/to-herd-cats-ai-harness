@@ -140,7 +140,9 @@ Beschreibung seiner Skills und holt den Text, wenn er ihn braucht. **Nichts in e
 Skill wird ausgeführt**: Ein Skill ist Text, auch wenn er Code enthält. Skills stehen
 unter **Skills** im Bereich (für alle mit KI, die den Bereich lesen) und in der
 Verwaltung; Moderatoren eines Bereichs pflegen dessen Skills, organisationsweite die
-Admins. Versionen, Wiederherstellen, Import (SKILL.md oder ZIP) und Export gibt es dort.
+Admins. Versionen, Wiederherstellen, Import (SKILL.md oder ZIP) und Export gibt es dort. Mit
+einem Virenscanner (`HERD_CLAMAV_ADDRESS`, [`WIKI.md`](WIKI.md)) wird ein Import vor dem
+Speichern geprüft (Fund 422 `attachment.rejected_by_scan`).
 
 ### Gedächtnis
 

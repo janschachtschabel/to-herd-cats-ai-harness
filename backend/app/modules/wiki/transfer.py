@@ -79,8 +79,8 @@ class PageImport:
         self, actor: Actor, space_id: uuid.UUID, stream: AsyncIterator[bytes]
     ) -> ImportResult:
         """Rights first: nothing is read from someone who may not import. The body is
-        read with no transaction open (no pooled connection held); the rights are
-        checked again afterwards."""
+        read and scanned with no transaction open (no pooled connection held); the
+        rights are checked again afterwards."""
         await require(self.session, actor, Action.SPACE_MANAGE, space_id)
         await self.session.commit()
         self.actor, self.space_id = actor, space_id
@@ -92,8 +92,10 @@ class PageImport:
         self.new_ids: dict[uuid.UUID, uuid.UUID] = {}  # that attachment → the new one
         limit = get_settings().import_max_bytes
         with await spool(stream, limit, code="import.too_large") as body:
+            # The whole archive, once, before the rights are read again: no transaction
+            # and so no pooled connection waits while clamd works (R18-6).
+            await virus_scan.scan(get_settings(), body.chunks())
             await require(self.session, actor, Action.SPACE_MANAGE, space_id)
-            await virus_scan.scan(get_settings(), body.chunks())  # the whole archive, once
             zipped = await asyncio.to_thread(archive.open_archive, body.file)
             # One operation in one transaction: rights as checked just now, slugs and
             # order per parent read once (thousands of pages, review M2 R19).

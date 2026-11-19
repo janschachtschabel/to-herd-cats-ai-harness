@@ -1,8 +1,9 @@
 """An optional virus scan of uploads (ASVS 5.0 V5.4.3, plan M9 task 18, J11): clamd,
 run by the operator as a service of its own and reached over TCP with its `zINSTREAM`
 command (our own client, no library and nothing linked). Off unless
-HERD_CLAMAV_ADDRESS (`host:port`) is set; then attachments and imports are scanned
-before they are stored, and the scan fails closed:
+HERD_CLAMAV_ADDRESS (`host:port`) is set; then attachments, wiki imports and skill
+imports are scanned before they are stored, while the request holds no transaction (so
+no pooled connection waits for clamd), and the scan fails closed:
 
 - a find: 422 `attachment.rejected_by_scan`;
 - a scanner that cannot be reached, answers with an error (clamd's StreamMaxLength
@@ -10,7 +11,8 @@ before they are stored, and the scan fails closed:
   `attachment.scan_unavailable`; nothing is stored.
 
 Neither the file's name nor its content goes into a log line or a metric: the outcome
-alone (`herd_virus_scans_total{outcome}`, `clean`, `found`, `failed`)."""
+alone (`herd_virus_scans_total{outcome}`, `clean`, `found`, `failed`). Uploaded backup
+archives are not scanned: owner-only, a database dump, never served to others."""
 
 import asyncio
 import logging

@@ -6,13 +6,14 @@ Import: the body is a SKILL.md or a ZIP, into the organisation (`skill.manage`) 
 space (`page.moderate` there); rights are checked before the body is read and again
 after, as the wiki import does. A ZIP is read defensively by `wiki/archive.py`
 (directory walked with bounded memory, no zip64, declared sizes capped, unsafe names
-refused). Each `SKILL.md` in it (at most `MAX_SKILL_DEPTH` path segments deep) is one
-skill, whose front matter name must equal its folder's name; at most
-`MAX_IMPORT_SKILLS` per import, each at most `MAX_SKILL_MD_BYTES`. Any other file is
-not taken: a skill here is its SKILL.md only, and nothing of it is ever executed.
-Every entry that does not become a skill is reported with a reason; an existing name
-in the scope is not overwritten (`exists`). One transaction; audited as
-`skill.imported` (counts), each skill as `skill.created`.
+refused). With a virus scanner configured (`core/virus_scan.py`) the whole body is
+scanned once before anything is taken (J11). Each `SKILL.md` in it (at most
+`MAX_SKILL_DEPTH` path segments deep) is one skill, whose front matter name must equal
+its folder's name; at most `MAX_IMPORT_SKILLS` per import, each at most
+`MAX_SKILL_MD_BYTES`. Any other file is not taken: a skill here is its SKILL.md only,
+and nothing of it is ever executed. Every entry that does not become a skill is reported
+with a reason; an existing name in the scope is not overwritten (`exists`). One
+transaction; audited as `skill.imported` (counts), each skill as `skill.created`.
 """
 
 import asyncio
@@ -24,7 +25,9 @@ from typing import IO
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import virus_scan
 from app.core.access import Actor
+from app.core.config import get_settings
 from app.core.errors import Conflict
 from app.core.uploads import spool
 from app.modules.audit.recorder import record
@@ -77,6 +80,9 @@ class SkillTransfer:
         self.result = ImportResult()
         self.names: set[str] = set()
         with await spool(stream, MAX_IMPORT_BYTES, code="import.too_large") as body:
+            # The optional virus scan (J11, R18-7), before the rights are read again: no
+            # transaction and so no pooled connection waits while clamd works (R18-6).
+            await virus_scan.scan(get_settings(), body.chunks())
             await self._allowed(actor, space_id)
             if body.head.startswith(b"PK"):
                 zipped = await asyncio.to_thread(archive.open_archive, body.file)

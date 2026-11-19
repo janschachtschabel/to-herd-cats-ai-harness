@@ -841,7 +841,8 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   `writeLimit.uploadsPerMinute`. Einzelheiten: [`SICHERHEIT.md`](docs/SICHERHEIT.md).
 - **Virenscan (optional, seit M9b):** `HERD_CLAMAV_ADDRESS` (`host:port` eines eigenen
   `clamd`, nicht mitgeliefert; Chart `virusScan.clamavAddress`, Freigabe im Netz
-  `virusScan.egress`) prüft Anhänge und Importe vor dem Speichern; Fund 422, Scanner
+  `virusScan.egress`) prüft Anhänge, Wiki- und Skill-Importe vor dem Speichern (nicht
+  hochgeladene Sicherungsarchive); Fund 422, Scanner
   nicht verfügbar 503 (fail closed). Leer (Standard): kein Scan. Einzelheiten:
   [`WIKI.md`](docs/WIKI.md).
 - **Worker und Outbox (seit M3):** Jede ändernde Aktion schreibt in ihrer Transaktion

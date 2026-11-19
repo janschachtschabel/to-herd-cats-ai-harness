@@ -205,7 +205,11 @@ Archiv (404 `backup.not_found`), und der Menüpunkt fehlt.
   `backup.uploaded`). Die Aufbewahrung räumt nur `herd-*.tar` auf: Hochgeladene Archive
   bleiben, bis jemand sie im Verzeichnis löscht. Ein hochgeladenes Archiv läuft beim
   Einspielen als Skript ([Was ein Archiv ausführen darf](#was-ein-archiv-ausführen-darf)):
-  nur Archive der eigenen Installationen hochladen. Teildateien, die älter als ein Tag sind
+  nur Archive der eigenen Installationen hochladen. Ein eingestellter Virenscanner
+  (`HERD_CLAMAV_ADDRESS`) prüft hochgeladene Archive nicht: Nur Owner laden sie hoch, sie
+  sind ein Datenbankabzug mit den Dateien, den die App nie an andere ausliefert, und ein
+  Scan eines Archivs bis 2 GiB bräuchte die Grenzen des Scanners weit über den Importen
+  ([`SICHERHEIT.md`](SICHERHEIT.md), J11). Teildateien, die älter als ein Tag sind
   (abgebrochene Uploads), entfernt der nächste Upload. Ein Proxy davor muss so große
   Anfragen durchlassen (ingress-nginx: `proxy-body-size`).
 - **„Prüfen“** liest das Archiv vollständig (wie `verify`) und stellt Archiv und

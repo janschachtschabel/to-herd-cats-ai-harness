@@ -102,7 +102,9 @@ zählt sie nicht mit.
   Datenbank-Stands (M9).
 - **Virenscan (optional, seit M9b):** Mit `HERD_CLAMAV_ADDRESS` (`host:port` eines
   `clamd`, den der Betrieb selbst betreibt; Chart `virusScan.clamavAddress`) prüft die
-  App jeden Anhang und jeden Import (das ganze Archiv) vor dem Speichern. Ein Fund lehnt
+  App jeden Anhang, jeden Wiki-Import (das ganze Archiv) und jeden Skill-Import vor dem
+  Speichern; während des Scans hält die Anfrage keine Datenbankverbindung. Hochgeladene
+  Sicherungsarchive prüft er nicht ([`SICHERUNG.md`](SICHERUNG.md)). Ein Fund lehnt
   mit 422 `attachment.rejected_by_scan` ab („Die Datei wurde vom Virenscan
   abgelehnt.“). Ist der Scanner nicht erreichbar, antwortet er mit einem Fehler oder
   braucht er länger als 120 s, wird nichts gespeichert: 503
