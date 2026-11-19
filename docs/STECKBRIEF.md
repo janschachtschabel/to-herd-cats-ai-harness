@@ -1,9 +1,12 @@
 # Steckbrief to-herd-cats-ai
 
-Stand: M9a (Produktion, erster Teil: Sicherung und Wiederherstellung, Anmeldung über
-OIDC mit Freigabe, Collab-Berechtigungen, volles Chart, ASVS-Prüfung, Lasttest) auf
-Meilenstein 8 (Öffnung: MCP), M7 (Automatisierung), M6 (Agenten als Mitarbeiter) und
-M5 Tasks 1 bis 7 (KI-Grundlage), 16.11.2026, Version 0.1.0. Der Steckbrief wird mit jedem Meilenstein aktualisiert
+Stand: M9 (Produktion) ganz: M9a (Sicherung und Wiederherstellung, Anmeldung über
+OIDC mit Freigabe, Collab-Berechtigungen, volles Chart, ASVS-Prüfung, Lasttest) und M9b
+(Einspielen im Betrieb und in der Verwaltung, S3, mehrere Collab-Instanzen, TOTP, die
+ASVS-Lücken J7–J14, Hostinger-Stack), auf Meilenstein 8 (Öffnung: MCP), M7
+(Automatisierung), M6 (Agenten als Mitarbeiter) und M5 Tasks 1 bis 7 (KI-Grundlage),
+19.11.2026, Version 1.0.0 (nicht veröffentlicht; was seitdem dazukam:
+[`RELEASE-NEXT.md`](RELEASE-NEXT.md)). Der Steckbrief wird mit jedem Meilenstein aktualisiert
 (Spezifikation 12.7). Die Messwerte aus M2 (Image, Compose, `docker stats`) bleiben
 stehen. Ohne Docker, an Prozessen auf der Maschine, sind gemessen: die Nachrichten aus
 M3, die Tickets aus M4, die Sprints und Boards aus M4b, die Agenten aus M6, die
@@ -16,7 +19,10 @@ Personen auf zwei API-Prozessen, die tatsächlich genutzten Datenbankverbindunge
 Sicherung und Wiederherstellung von 10.000 Seiten mit 1 GiB Anhängen und die
 Schreibgrenze durch `NOTIFY` ([Lasttest](#gemessen-lasttest-mit-200-personen-m9),
 [Sicherung](#gemessen-sicherung-und-wiederherstellung-m9),
-[NOTIFY](#gemessen-schreibgrenze-durch-notify-m9)). Was nicht gemessen ist, steht unter
+[NOTIFY](#gemessen-schreibgrenze-durch-notify-m9)), und aus M9b die Live-Bearbeitung
+mit zwei Collab-Instanzen und Sicherung und Wiederherstellung mit S3
+([zwei Instanzen](#gemessen-live-bearbeitung-mit-40-editoren-und-zwei-instanzen-m9b),
+[S3](#gemessen-sicherung-und-wiederherstellung-mit-s3-m9b)). Was nicht gemessen ist, steht unter
 [Nicht gemessen](#nicht-gemessen-hier-nicht-möglich-oder-nicht-gemacht).
 
 ## Kurzbeschreibung
@@ -67,9 +73,17 @@ erlaubte Domains nur mit Freigabe durch einen Admin ([`ANMELDUNG.md`](ANMELDUNG.
 der Collab-Prozess bekommt kurzlebige, seitengebundene Berechtigungen statt des
 Sitzungs-Cookies; Autoskalierung und PodDisruptionBudgets im Chart; Aufbewahrungsregel
 für jede Tabelle; Prüfung gegen OWASP ASVS 5.0 Stufe 2 ([`SICHERHEIT.md`](SICHERHEIT.md)).
-**Vorhanden (M9b):** mehrere Collab-Instanzen, jede Seite in PostgreSQL an eine
-gebunden (ohne Redis). Hybride Suche und Embeddings (M5 Tasks 8 bis 11) und der Rest von
-M9b (Einspielen im Betrieb und in der Verwaltung, S3, TOTP, ASVS-Lücken J7–J14) folgen.
+**Vorhanden (M9b):** Wartungsmodus und Ersetzen einer laufenden Installation aus einem
+Archiv, über die Kommandozeile und in der Verwaltung (Sicherungen dort auch anlegen,
+herunter- und hochladen, prüfen; [`SICHERUNG.md`](SICHERUNG.md)); Anhänge in
+S3-kompatiblem Speicher mit eigenem Client und Kopie zwischen den Speichern; mehrere
+Collab-Instanzen, jede Seite in PostgreSQL an eine gebunden (ohne Redis,
+[`WIKI.md`](WIKI.md)); optional TOTP für jedes Passwortkonto, eigene Sitzungen,
+Leerlaufgrenze, erneute Anmeldung vor dem Verknüpfen ([`ANMELDUNG.md`](ANMELDUNG.md));
+Schreibgrenzen je Person, optionaler Virenscan, TLS zur Datenbank, Wechsel des internen
+Tokens, getrennte Datenbankrollen ([`SICHERHEIT.md`](SICHERHEIT.md)); der Stack für den
+Hostinger-VPS ([`HOSTINGER.md`](HOSTINGER.md)). Hybride Suche und Embeddings (M5 Tasks 8
+bis 11) folgen; M10 (Kalender) hat begonnen und ist hier nicht beschrieben.
 
 | | |
 |---|---|
@@ -78,7 +92,7 @@ M9b (Einspielen im Betrieb und in der Verwaltung, S3, TOTP, ASVS-Lücken J7–J1
 | Chart | `oci://ghcr.io/<owner>/charts/to-herd-cats-ai`, `version` = `appVersion` = Dienstversion |
 | Prozesse | API (Python, Uvicorn: öffentlicher und interner Server in einem Prozess); Collab-Prozess (Node 22, Hocuspocus) für die Live-Bearbeitung. `HERD_ROLE=all`: die API startet ihn als Kindprozess auf `127.0.0.1:1234`; im Chart ein eigenes Deployment (`HERD_ROLE=collab`, `collab.replicas`, Standard 1, mehrere seit M9b: jede Seite an eine Instanz gebunden). Worker (Python, Verteiler der Outbox und seit M5 die Läufe der Agenten, nur interner Port): in `HERD_ROLE=all` im API-Prozess, im Chart ein eigenes Deployment (`HERD_ROLE=worker`, Standard 1 Replika, mehrere sicher) |
 | Ports | 8080 öffentlich (API, SPA, WebSocket `/collab/`, Server-Sent Events `/api/stream`, MCP `/mcp`); 9090 intern (`/health`, `/ready`, `/metrics`, `/internal/*`); 1234 Collab-Prozess (nur von der API erreichbar; mit mehreren Instanzen meldet jede ihre Adresse in `HERD_COLLAB_ADVERTISE_URL`) |
-| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export; seit M9 ein Volume für Sicherungsarchive (`HERD_BACKUP_DIR`, Standard `/backups`) |
+| Speicher | PostgreSQL (alle Daten, auch Seiten, Versionen, Yjs-Stände); Volume `/data` (`HERD_DATA_DIR`) für Anhänge und temporäre Dateien von Upload, Import und Export; seit M9 ein Volume für Sicherungsarchive (`HERD_BACKUP_DIR`, Standard `/backups`; seit M9b auch an API und Worker für die Verwaltung); seit M9b statt `/data` für Anhänge wahlweise ein S3-kompatibler Speicher (`HERD_STORAGE=s3`, `HERD_S3_*`) |
 | Lizenz | Apache-2.0 |
 
 ## Funktionen mit Laufzeit und Kosten
@@ -577,6 +591,8 @@ mitbenutzt; das Lastmittel steht bei jedem Lauf. Zwei Läufe.
 | Volume für Sicherungen (seit M9) | für Sicherungen | Archive von `python -m app.ops backup …`; Compose: Volume `backups` des Dienstes `backup`; Chart: PVC `<release>-backups` des CronJobs (`backup.persistence.*`, bleibt beim Deinstallieren). Archive sind unverschlüsselt: wie die Datenbank schützen |
 | restic-Repository (seit M9) | nein | Offsite-Kopie der Archive (`HERD_BACKUP_OFFSITE_REPOSITORY`, S3, B2, SFTP …), clientseitig verschlüsselt; ausgehend nur vom Sicherungsdienst bzw. -Job; Chart: `backup.offsite.egress` |
 | OIDC-Anbieter (seit M9) | nein | Anmeldung über Google oder einen eigenen Anbieter (Keycloak, Entra ID …); ausgehend nur von der API (Discovery, Token-Endpunkt, JWKS) über die SSRF-Sperre, nie über den KI-Proxy; private Hosts nur aus `HERD_OIDC_ALLOWED_HOSTS`; Chart: `oidc.egress`. Ohne Anbieter gilt die Anmeldung mit Passwort |
+| S3-kompatibler Speicher (seit M9b) | nein | Anhänge statt auf `/data` (`HERD_STORAGE=s3`, Endpunkt, Bucket, Präfix, Schlüssel; eigener Client mit SigV4, Pfad-Adressen). Ausgehend von API, Worker und Sicherung, durch die SSRF-Sperre mit dem Host des Endpunkts als einziger privater Ausnahme; Chart: `s3.*` mit eigener Egress-Regel. Fällt er aus, antworten Anhänge 503 `storage.unavailable`. Erprobt mit SeaweedFS (Apache-2.0; `compose.s3.yml`, `SMOKE_S3=1`) |
+| clamd (seit M9b) | nein | Virenscan von Anhängen und Importen vor dem Speichern (`HERD_CLAMAV_ADDRESS`, nur API; Chart: `virusScan.*`). Nicht erreichbar: 503 `attachment.scan_unavailable` (schließt ab). Ohne Adresse kein Scan |
 | OTLP-Collector | nein | Tracing nur, wenn `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist (Chart: `tracing.otlpEndpoint`) |
 | Prometheus | nein | scrapt `/metrics` auf 9090; ServiceMonitor und PrometheusRule im Chart |
 | kube-state-metrics | nur für Alarm | `HerdNotReady` braucht es |
@@ -888,8 +904,14 @@ anderen Person derselben Seite. CPU und Speicher mit `deploy/scripts/measure-pro
 - **Ergebnis:** Zwei Instanzen teilen sich die Seiten gleichmäßig; die Zustellung bleibt
   bei 79 Änderungen/s weit unter dem Ziel (2 s), und die meiste CPU kostet die
   Weiterleitung in der API (rund 0,1 Kerne), nicht der Collab-Prozess (unter 0,04 Kernen
-  je Instanz). Nicht gemessen: Absturz einer Instanz (SIGKILL; die Seiten wechseln nach
-  15 s), Pods im Cluster.
+  je Instanz). Absturz einer Instanz ohne Last (Demo `docs/demo/m9.md`, Abschluss M9b,
+  19.11.2026): SIGKILL 3,9 s nach dem letzten Herzschlag, die Seite war 11,7 s später
+  an die andere Instanz gebunden (15,6 s nach dem Herzschlag; Grenze 15 s plus die
+  Wartezeit des Browsers bis zum nächsten Versuch), der Tab nach 11,7 s synchron, nichts
+  Gespeichertes verloren; ein Probelauf brauchte 17,7 s. Nach einem Absturz dauert der
+  Umzug also je nach Zeitpunkt rund 10 bis 18 s. In derselben Demo nach SIGTERM: Prozess
+  nach 76 ms fertig, Seite nach 1,1 s neu gebunden. Nicht gemessen: Absturz unter Last,
+  Pods im Cluster.
 
 ### Gemessen: Nachrichten (M3, ohne Docker)
 
@@ -1038,6 +1060,41 @@ Code-Stand `709d006`; Lastmittel 0,7–0,9. Spitze RSS: der größte Prozess (Py
   kalten Datenträger (rund 32 MB/s), die übrigen aus dem Cache des Hosts. Auf
   Netzspeicher ist mit der Lesegeschwindigkeit des Volumes zu rechnen.
 
+### Gemessen: Sicherung und Wiederherstellung mit S3 (M9b)
+
+Ohne Docker, Code-Stand `c5d287b` (Branch `m9b-task17`), 19.11.2026: eine
+Wegwerf-Datenbank A mit einer Seite und 32 Anhängen zu 16 MiB (je eine ZIP-Datei mit
+zufälligen, nicht komprimierbaren Bytes; zusammen 536.874.688 Bytes = 512 MiB), über die
+API einer App in Rolle `all` hochgeladen, die vor dem Messen beendet wurde. S3 ist ein
+SeaweedFS 4.53 (aus den Quellen gebaut, `weed server -s3`) **auf derselben Maschine**
+über Loopback, also ohne Netz dazwischen. Gemessen mit `python -m app.ops` ohne
+laufende App, je Schritt ein Lauf; Spitze RSS des größten Prozesses (Python oder
+`pg_dump`/`pg_restore`). Die Maschine war von anderen Läufen belegt (Lastmittel 3,3–3,7
+bei 4 vCPU), die Zeiten sind also eher zu hoch.
+
+| Schritt | Dauer | Spitze RSS | Ausgabe |
+|---|---|---|---|
+| `backup create` (lokal) | 5,9 s | 115 MiB | Archiv |
+| `backup verify` (lokales Archiv) | 2,0 s | 101 MiB | `ok` |
+| `storage copy --to s3` | 6,7 s | 108 MiB | `copied 32, present 0, gone 0, 536874688 bytes` |
+| `storage copy --to s3` (zweites Mal) | 1,0 s | 103 MiB | `copied 0, present 32, gone 0, 0 bytes` |
+| `storage check` (S3) | 1,1 s | 103 MiB | `ok s3` |
+| `backup create` (aus S3) | 6,6 s | 117 MiB | Archiv |
+| `backup verify` (S3-Archiv) | 2,0 s | 101 MiB | `ok` |
+| `restore check` (leere Datenbank B, leeres S3-Präfix) | 2,2 s | 110 MiB | `ok` |
+| `restore apply` (nach S3, 77 Tabellen, 32 Dateien) | 6,9 s | 116 MiB | `restored …` |
+| `restore apply` (lokal in leeres C, 77 Tabellen, 32 Dateien) | 4,5 s | 112 MiB | `restored …` |
+
+- **Archivgröße:** beide Archive 537.251.840 Bytes: Das Archiv aus S3 ist so groß wie das
+  lokale; der Speicher ändert am Format nichts.
+- **Durchsatz:** Kopieren nach S3 rund 80 MB/s, Sichern aus S3 rund 81 MB/s,
+  Einspielen nach S3 rund 78 MB/s, lokal rund 120 MB/s. Der Speicher bleibt flach
+  (unter 120 MiB): Dateien gehen als Strom durch, nicht als Ganzes in den Speicher.
+- Die Kopie ist idempotent: Der zweite Lauf vergleicht nur die Listen beider Seiten
+  (Schlüssel und Größe; die Schlüssel folgen dem Inhalt) und schreibt nichts.
+- Messskript: nicht eingecheckt (Wegwerf-Datenbanken, eigene Ports); es startet
+  SeaweedFS, lädt über die API hoch und misst je Schritt einen eigenen Kindprozess.
+
 ### Gemessen: Schreibgrenze durch NOTIFY (M9)
 
 Ein Python-Skript (asyncpg, nicht eingecheckt) an einer eigenen Datenbank desselben
@@ -1106,7 +1163,8 @@ CPU der API-Prozesse die Grenze.
   echte Browser (SPA-Dateien, Neuladen), Live-Bearbeitung, Hochladen und Importe im Mix,
   Agenten-Läufe und Aufgaben unter dieser Last, die Dauer der 200 Anmeldungen vor dem
   Lauf (nur ihr Speicher), eine Sicherung während des Lasttests, Sicherung auf
-  Netzspeicher, S3 oder mit vielen kleinen Dateien (gemessen: 64 große), Offsite-Kopie
+  Netzspeicher, S3 über ein echtes Netz (gemessen: SeaweedFS auf derselben Maschine,
+  M9b) oder mit vielen kleinen Dateien (gemessen: 64 bzw. 32 große), Offsite-Kopie
   mit restic, Wiederherstellung einer Datenbank mit Millionen Zeilen, die
   Schreibgrenze mit der App selbst (gemessen: PostgreSQL allein).
 - Nachrichten: Speicher und CPU der Datenbank für Nachrichten allein (seit M9 nur im
@@ -1115,6 +1173,14 @@ CPU der API-Prozesse die Grenze.
   unter Last, die Suche über viele Nachrichten, die Wirkung eines Proxys vor
   `/api/stream`, der Verlust der LISTEN-Verbindung unter Last (`resync`) und ein
   Neustart eines API-Pods mit 100 offenen Verbindungen.
+- **M9b:** das Ersetzen einer laufenden Installation mit großem Archiv (vorgeführt mit
+  rund 350 KB; die Wartungszeit wächst mit Dump und Dateien, siehe die Zeiten von
+  `restore apply` oben) und unter Last; die Kosten der Schutzschichten aus Task 18 unter
+  Last (der Lasttest mit 200 Personen lief davor): das Vermerken der letzten Nutzung je
+  Anfrage, die Zählzeile der Schreibgrenze je Schreibvorgang, der Virenscan (eigener
+  clamd), TLS zur Datenbank; die Anmeldung mit TOTP unter Last; der Hostinger-Stack auf
+  einem echten VPS (in der CI startet `hostinger-smoke.sh` ihn mit Docker); zwei
+  Collab-Pods im Cluster.
 - **Agenten (M6):** ein echter Anbieter (Netz, Latenz, Token-Zahlen, Kosten); der
   Worker im Image und mit `docker stats`; CPU von Worker, API und Datenbank während der
   Durchläufe; der Speicher der API; große Gesprächsverläufe, Werkzeugergebnisse und
@@ -1301,10 +1367,11 @@ und `HerdAutoscalerAtMax` (ein Autoscaler des Charts 30 Minuten am Maximum, Warn
 braucht kube-state-metrics). Alle mit promtool-Tests (`tests/rules-test.yaml`). Nachrichteninhalte
 stehen nie in Labels.
 
-## Tests (Stand M9a; ältere Zeilen zum Vergleich)
+## Tests (Stand M9b; ältere Zeilen zum Vergleich)
 
 | Paket | Tests | Stand |
 |---|---|---|
+| Alle Jobs der CI, M9b | Lauf 44428037881 auf `94e4c3a` (GitHub Actions) | 19.11.2026: alle grün. Backend 3.174 grün, 5 übersprungen, 1 Warnung, 37:42 min; Frontend 664 in 122 Dateien; Collab 288 (286 grün, 2 übersprungen: die Integration läuft eigens) und Integration 2 grün; Browser 76 grün, 11,0 min; dazu `restore` (Probe mit Ersetzen), Image mit `smoke.sh` (einfach, `SMOKE_NODES=1`, `SMOKE_S3=1`), Hostinger-Stack, Trivy, Chart und Lizenzen. Hier lokal nicht neu gezählt |
 | Backend (`pytest`, echtes PostgreSQL), Fix-Welle M9a | 2.832 (mit dem Test gegen echtes restic 0.18.1) | 16.11.2026: 2.832 grün, 1 Warnung (SADeprecationWarning); 41:14 min. ruff, ruff format, mypy (strict, 561 Dateien) sauber, `check_migrations` grün |
 | Frontend (`vitest`), Fix-Welle M9a | 633 in 113 Dateien | 16.11.2026: 633 grün im ersten Lauf |
 | Backend (`pytest`, echtes PostgreSQL), M9a | 2.813 (Backend-Stand von Commit `2f5207f`, Abschluss M9a) | 16.11.2026: 2.813 grün, 1 Warnung (SADeprecationWarning); 41:27 min. ruff, ruff format, mypy (strict, 560 Dateien) sauber, `check_migrations` grün |
