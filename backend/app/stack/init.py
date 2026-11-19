@@ -3,8 +3,10 @@ docs/HOSTINGER.md). Every other service waits until it has ended with exit 0.
 
 - Generates the secrets once, 256 random bits each as hex, into two volumes: the
   database password alone into `--db-secret` (the database container sees nothing
-  else), the key for stored secrets (`HERD_SECRET_KEY_FILE`) and the internal token
-  (`HERD_INTERNAL_TOKEN_FILE`) into `--secrets`. An existing secret is never replaced;
+  else), the key for stored secrets (`HERD_SECRET_KEY_FILE`), the internal token
+  (`HERD_INTERNAL_TOKEN_FILE`) and the password of the app's database role
+  (`db_owner_password`, set by `db_owner.py`, read as `HERD_DATABASE_PASSWORD_FILE`)
+  into `--secrets`. An existing secret is never replaced;
   an empty one is a broken volume (exit 1), since a new database password would lock
   the app out of its own database.
 - Checks DOMAIN: a bare host name (the Traefik labels take it unchanged, and
@@ -34,7 +36,8 @@ from app.core.password_check import context_words, refuse_guessable
 from app.core.password_rule import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 
 DB_PASSWORD = "db_password"  # noqa: S105 (a file name)
-GENERATED = ("secret_key", "internal_token")
+# The owner role's password (`db_owner.py`) beside the app's own secrets.
+GENERATED = ("secret_key", "internal_token", "db_owner_password")
 PASSWORD_FILE = "bootstrap_admin_password"  # noqa: S105 (a file name)
 INVALID = 2
 BROKEN = 1
@@ -62,8 +65,8 @@ async def run_init(
         say(str(refused))
         return INVALID
     try:
-        created = _ensure_secret(db_secret_dir / DB_PASSWORD)
-        created += sum(_ensure_secret(secrets_dir / name) for name in GENERATED)
+        created = ensure_secret(db_secret_dir / DB_PASSWORD)
+        created += sum(ensure_secret(secrets_dir / name) for name in GENERATED)
         write_secret(secrets_dir / PASSWORD_FILE, password)
     except Refused as refused:
         say(str(refused))
@@ -71,7 +74,7 @@ async def run_init(
     except OSError as failed:
         say(unusable(failed))
         return BROKEN
-    say(f"secrets ready ({created} created, {3 - created} kept)")
+    say(f"secrets ready ({created} created, {1 + len(GENERATED) - created} kept)")
     if domain:
         say(f"DOMAIN {domain}: Traefik serves https://{domain}")
     else:
@@ -155,7 +158,7 @@ async def _admin(email: str, password: str) -> str:
     return password
 
 
-def _ensure_secret(path: Path) -> int:
+def ensure_secret(path: Path) -> int:
     """1 when `path` was created, 0 when it was there; Refused when it is empty."""
     if path.exists():
         if not path.read_text(encoding="utf-8").strip():

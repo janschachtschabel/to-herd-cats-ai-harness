@@ -208,4 +208,4 @@ def test_the_command_line_runs_it_with_the_environment(
     assert main(argv) == 2
     monkeypatch.setenv("DOMAIN", "wiki.example.org")
     assert main(argv) == 0
-    assert "secrets ready (3 created, 0 kept)" in capsys.readouterr().out
+    assert "secrets ready (4 created, 0 kept)" in capsys.readouterr().out
