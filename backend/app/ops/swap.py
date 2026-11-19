@@ -29,9 +29,9 @@ whole); committed by us after all returns, or raises `SwapCommitted` after a can
 anything else raises `SwapUncertain` (`restore.swap_broken`,
 `restore.swap_unknown`): the old state may be gone.
 
-As in `pgtools.py`: the children get only the environment built there, nothing of
-their output is logged, a failure is a code (`restore.tool_missing`,
-`restore.pg_restore_failed`, `restore.swap_failed`).
+As in `pgtools.py`: the children get only the environment built there, of their
+output only a connection-level error line is logged (`tool_errors.py`), a failure is
+a code (`restore.tool_missing`, `restore.pg_restore_failed`, `restore.swap_failed`).
 """
 
 import asyncio
@@ -41,6 +41,7 @@ from collections.abc import AsyncIterator
 from contextlib import suppress
 
 from app.core.config import Settings
+from app.ops import tool_errors
 from app.ops.dump_toc import list_dump
 from app.ops.pgtools import ToolFailed, child_env, require_restrict, use_list_file
 from app.ops.swap_outcome import (
@@ -111,7 +112,7 @@ async def swap_database(settings: Settings, dump: AsyncIterator[bytes], *, tail_
             env={**env, "PGAPPNAME": app_name(token)},
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
         )
         script = await _start_or_kill(
             session,
@@ -124,21 +125,33 @@ async def swap_database(settings: Settings, dump: AsyncIterator[bytes], *, tail_
             env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
             pass_fds=(list_fd,),
         )
+    said = {"psql": tool_errors.collect(session.stderr)}
+    said["pg_restore"] = tool_errors.collect(script.stderr)
     try:
         await _run(session, script, listing.dump, token, tail_sql)
     except BaseException as exc:
-        for process in (session, script):  # the session first: nothing commits
-            with suppress(ProcessLookupError):
-                process.kill()
-            await process.wait()
+        await _stop(session, script)
+        if type(exc) is ToolFailed:
+            tool = "pg_restore" if exc.code == "restore.pg_restore_failed" else "psql"
+            await tool_errors.log_failure(tool, exc.code, exc.status, said[tool])
         await _after_failure(settings, token, before, exc)
         return
+    finally:
+        for task in said.values():
+            task.cancel()
     if await settle(settings, token, before) != Outcome.SWAPPED:
         raise SwapUncertain("restore.swap_unknown")
     await clear_marker(settings)
+
+
+async def _stop(session: asyncio.subprocess.Process, script: asyncio.subprocess.Process) -> None:
+    for process in (session, script):  # the session first: nothing commits
+        with suppress(ProcessLookupError):
+            process.kill()
+        await process.wait()
 
 
 async def _start_or_kill(

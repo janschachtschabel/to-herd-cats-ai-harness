@@ -3,8 +3,9 @@ backups, `pg_restore` for restores.
 
 A child gets an environment built here and nothing else of the app's: `PATH`, the
 `PG*` connection variables and `PGPASSWORD`. The password is never in an argument list
-(`ps` shows those) or a URL. What a tool writes to stderr is not logged (it may name
-tables or values); a failure is a code and the exit status.
+(`ps` shows those) or a URL. A failure is a code and the exit status; of what the tool
+wrote to stderr only its connection-level error line goes into the log
+(`tool_errors.py`), never an SQL error that may quote data.
 """
 
 import asyncio
@@ -20,10 +21,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import Settings
+from app.ops import tool_errors
 
 _VERSION = re.compile(r"\(PostgreSQL\)\s+(\d+)(?:\.(\d+))?")
 # The asyncpg URL's TLS option, as libpq names it.
 _SSL_QUERY = ("sslmode", "ssl")
+_VERIFYING = frozenset({"verify-ca", "verify-full"})
 
 
 class ToolFailed(Exception):
@@ -58,6 +61,10 @@ def child_env(settings: Settings) -> dict[str, str]:
         env["PGSSLMODE"] = settings.database_sslmode
     if settings.database_sslrootcert is not None:
         env["PGSSLROOTCERT"] = str(settings.database_sslrootcert)
+    elif env.get("PGSSLMODE") in _VERIFYING:
+        # Without a file asyncpg verifies against the system's CAs; libpq does so only
+        # when told (PostgreSQL 16+), else it looks for ~/.postgresql/root.crt (R18-2).
+        env["PGSSLROOTCERT"] = "system"
     return env
 
 
@@ -124,11 +131,14 @@ async def dump(settings: Settings, snapshot_id: str, out: Path) -> None:
         env=child_env(settings),
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
     )
+    said = tool_errors.collect(process.stderr)
     status = await process.wait()
     if status != 0:
+        await tool_errors.log_failure("pg_dump", "backup.dump_failed", status, said)
         raise ToolFailed("backup.dump_failed", status)
+    said.cancel()
 
 
 async def restore(settings: Settings, dump: AsyncIterator[bytes], *, use_list: str) -> None:
@@ -153,9 +163,10 @@ async def restore(settings: Settings, dump: AsyncIterator[bytes], *, use_list: s
             env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
             pass_fds=(list_fd,),
         )
+    said = tool_errors.collect(process.stderr)
     stdin = process.stdin
     assert stdin is not None  # PIPE above
     try:
@@ -167,12 +178,15 @@ async def restore(settings: Settings, dump: AsyncIterator[bytes], *, use_list: s
     except (BrokenPipeError, ConnectionResetError):
         pass  # pg_restore stopped reading: its exit status says why
     except BaseException:
+        said.cancel()
         process.kill()
         await process.wait()
         raise
     status = await process.wait()
     if status != 0:
+        await tool_errors.log_failure("pg_restore", "restore.pg_restore_failed", status, said)
         raise ToolFailed("restore.pg_restore_failed", status)
+    said.cancel()
 
 
 @contextmanager

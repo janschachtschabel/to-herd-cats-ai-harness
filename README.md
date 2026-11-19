@@ -519,9 +519,12 @@ in [`docs/SICHERHEIT.md`](docs/SICHERHEIT.md).
   als Datei ein; Compose reicht `POSTGRES_PASSWORD` als `HERD_DATABASE_PASSWORD` durch.
 - **TLS zur Datenbank (seit M9b):** `HERD_DATABASE_SSLMODE` (libpq-Modi; empfohlen für
   eine externe Datenbank `verify-full`) und `HERD_DATABASE_SSLROOTCERT` (CA-Datei; leer:
-  die CAs des Systems) gelten für jede Verbindung der App und für
-  `pg_dump`/`pg_restore` der Sicherung; sie gewinnen über ein `ssl`/`sslmode` in der
-  URL. Chart `database.sslMode` und `database.caSecret` (Secret mit `ca.crt`).
+  die CAs des Systems, für `pg_dump`/`pg_restore`/`psql` als `PGSSLROOTCERT=system`, was
+  PostgreSQL 16 oder neuer verlangt; das Image bringt 17) gelten für jede Verbindung der
+  App und für `pg_dump`/`pg_restore` der Sicherung; sie gewinnen über ein `ssl`/`sslmode`
+  in der URL. Scheitert ein Werkzeug, steht seine Verbindungsfehlerzeile im Log
+  (`backup.tool_failed`, Feld `reason`; ein SQL-Fehler nur als `query failed`). Chart
+  `database.sslMode` und `database.caSecret` (Secret mit `ca.crt`).
 - **Getrennte Datenbankrollen (seit M9b, optional):** `HERD_MIGRATE_DATABASE_URL`
   (+ `HERD_MIGRATE_DATABASE_PASSWORD[_FILE]`) für Migration, Sicherung und
   Wiederherstellung, `HERD_DATABASE_RUNTIME_ROLE` für die Rolle von
