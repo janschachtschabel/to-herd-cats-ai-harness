@@ -9,13 +9,19 @@ before the change (`TZOFFSETFROM`), which is exact away from the changes themsel
 """
 
 import calendar
+from bisect import bisect_right
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import MAXYEAR, MINYEAR, date, datetime, timedelta
 
 from app.modules.calendars.ical import lines
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.recurrence_rule import Freq, ParsedRule, RuleInvalid, parse_rule
+
+_LARGEST = timedelta.max
+# icalendar writes one observance per kind of change over the years it covers; a
+# definition with more is not compared.
+MAX_OBSERVANCES = 1000
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,11 +32,9 @@ class Observance:
     rule: ParsedRule | None
     rdates: tuple[datetime, ...]
 
-    def onsets_near(self, year: int) -> Iterator[datetime]:
-        """Onsets in the years before and of `year`, the last ones of a rule that ended
-        earlier, and the fixed ones."""
-        yield self.start
-        yield from self.rdates
+    def rule_onsets_near(self, year: int) -> Iterator[datetime]:
+        """The rule's onsets in the years before and of `year`, and the last ones of a
+        rule that ended earlier; years outside 1 to 9999 have none."""
         rule = self.rule
         if rule is None:
             return
@@ -40,7 +44,8 @@ class Observance:
         if rule.count is not None:
             years.add(self.start.year + (rule.count - 1) * rule.interval)
         for each in sorted(years):
-            yield from self._onsets_in(rule, each)
+            if MINYEAR < each < MAXYEAR:  # a neighbour's onset stays a datetime
+                yield from self._onsets_in(rule, each)
 
     def _onsets_in(self, rule: ParsedRule, year: int) -> Iterator[datetime]:
         periods, rest = divmod(year - self.start.year, rule.interval)
@@ -86,15 +91,34 @@ def _days(rule: ParsedRule, year: int, month: int, start_day: int) -> list[int]:
 class Definition:
     observances: tuple[Observance, ...]
     location: str | None  # X-LIC-LOCATION, a hint only
+    fixed: tuple[tuple[datetime, timedelta], ...] = ()  # every DTSTART and RDATE, sorted
+
+    @classmethod
+    def of(cls, observances: tuple[Observance, ...], location: str | None) -> "Definition":
+        fixed = sorted((onset, o.offset_to) for o in observances for onset in (o.start, *o.rdates))
+        return cls(observances, location, tuple(fixed))
+
+    @property
+    def ruled(self) -> int:
+        """How many observances follow a rule: the work of one `offset_at`."""
+        return sum(o.rule is not None for o in self.observances)
 
     def offset_at(self, wall: datetime) -> timedelta:
-        best: tuple[datetime, Observance] | None = None
+        """The offset the definition gives at the wall time `wall`; never raises."""
+        best: tuple[datetime, timedelta] | None = None
+        index = bisect_right(self.fixed, (wall, _LARGEST))
+        if index:
+            best = self.fixed[index - 1]
         for observance in self.observances:
-            for onset in observance.onsets_near(wall.year):
+            try:
+                onsets = list(observance.rule_onsets_near(wall.year))
+            except (ValueError, OverflowError):
+                continue  # a year the rule cannot reach
+            for onset in onsets:
                 if onset <= wall and (best is None or onset > best[0]):
-                    best = (onset, observance)
+                    best = (onset, observance.offset_to)
         if best is not None:
-            return best[1].offset_to
+            return best[1]
         return min(self.observances, key=lambda o: o.start).offset_from
 
 
@@ -108,10 +132,10 @@ def definition(component: lines.Component) -> Definition | None:
         )
     except (Skip, RuleInvalid, ValueError):
         return None
-    if not observances:
+    if not observances or len(observances) > MAX_OBSERVANCES:
         return None
     location = component.first("X-LIC-LOCATION")
-    return Definition(observances, location.text.strip() if location else None)
+    return Definition.of(observances, location.text.strip() if location else None)
 
 
 def _observance(child: lines.Component) -> Observance:

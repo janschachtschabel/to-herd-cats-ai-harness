@@ -40,7 +40,10 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
     """The events of `data`, read in the calendar's zone `default_zone` (for floating
     times; an unknown zone is the caller's error: `zones.ZoneUnknown`)."""
     zones.zone(default_zone)
-    tops, found = lines.read(data)
+    try:
+        tops, found = lines.read(data)
+    except (ValueError, ArithmeticError, RecursionError):  # the last guard
+        return Parsed([], Counter({problems.UNREADABLE: 1}))
     if not any(top.name == "VCALENDAR" for top in tops):
         return Parsed([], Counter({problems.UNREADABLE: 1}))
     timezones: dict[str, lines.Component] = {}
@@ -64,11 +67,13 @@ def parse(data: bytes, *, default_zone: str, limit: int) -> Parsed:
         if len(drafts) >= limit:
             found[problems.OVER_LIMIT] += 1
             continue
-        frame = times.Frame.of(default_zone, resolver, group.parts())
         try:
+            frame = times.Frame.of(default_zone, resolver, group.parts())
             drafts.append(_draft(uid, group, frame, found))
         except Skip as skip:
             found[skip.code] += 1
+        except (ValueError, ArithmeticError, RecursionError):
+            found[problems.EVENT_UNREADABLE] += 1  # the last guard: never raise for a file
         found[problems.LINE_UNREADABLE] += sum(_broken(part) for part in group.parts())
     return Parsed(drafts, +found)
 

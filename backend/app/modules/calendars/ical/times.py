@@ -89,6 +89,13 @@ def start(part: lines.Component, frame: Frame, *, recurring: bool) -> Start:
 
 def length(part: lines.Component, begin: Start, frame: Frame) -> timedelta:
     """The exact duration from DTEND or DURATION; none: a day, or no time at all."""
+    try:
+        return _length(part, begin, frame)
+    except OverflowError:  # `DURATION:P999999W` leaves `datetime`'s years
+        raise Skip(problems.TIME_OUT_OF_RANGE) from None
+
+
+def _length(part: lines.Component, begin: Start, frame: Frame) -> timedelta:
     end = part.first("DTEND")
     if end is not None:
         value = _first(end)

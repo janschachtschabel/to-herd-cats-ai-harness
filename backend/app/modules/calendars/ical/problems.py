@@ -10,6 +10,7 @@ UNREADABLE = "ical.unreadable"  # no calendar in the data, or a component never 
 LINE_UNREADABLE = "ical.line_unreadable"  # a content line without a name or value
 NOT_AN_EVENT = "ical.not_an_event"  # VTODO, VJOURNAL, VFREEBUSY and others
 OVER_LIMIT = "ical.over_limit"  # an event beyond the caller's limit
+EVENT_UNREADABLE = "ical.event_unreadable"  # an event the reader failed on (last guard)
 
 UID_MISSING = "ical.uid_missing"  # no UID, or one longer than drafts.MAX_UID
 DUPLICATE_UID = "ical.duplicate_uid"  # a second series with a UID already read
@@ -33,6 +34,7 @@ CODES = frozenset(
         LINE_UNREADABLE,
         NOT_AN_EVENT,
         OVER_LIMIT,
+        EVENT_UNREADABLE,
         UID_MISSING,
         DUPLICATE_UID,
         TIME_INVALID,
