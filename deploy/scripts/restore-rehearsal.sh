@@ -4,6 +4,12 @@
 # processes (role all, worker included) from backend/ with uv, against a PostgreSQL
 # server reached with the PG* variables (default localhost:5433, user herd).
 #
+# Like every shipped stack (review M9b F2-1), the apps and every `python -m app.ops`
+# command connect as a role of their own that owns the databases and is no superuser
+# (LOGIN only, made here; the PG* role needs CREATEROLE and CREATEDB). The PG* role
+# only creates and drops; a replace as that role, if it is a superuser, is refused
+# with restore.superuser_refused.
+#
 #   1. database A, app A, demo data (scripts/demo_seed.py) and an attachment, a login;
 #   2. `python -m app.ops backup create` while A runs;
 #   3. empty database B and empty file storage: `restore check` (no problem),
@@ -14,7 +20,8 @@
 #   5. app B: /ready, the demo admin signs in, A's session cookie does not, the
 #      attachment downloaded from B has A's SHA-256;
 #   6. B changed (a page "Nach der Sicherung"), then replaced while it runs (plan M9
-#      task 12): `restore apply --replace --confirm "<organisation>"` answers with the
+#      task 12; first as the PG* role, refused if that is a superuser):
+#      `restore apply --replace --confirm "<organisation>"` answers with the
 #      safety archive, B answered 503 in between, B's session is gone, the page made
 #      after the archive is gone, the attachment is still there, the safety archive
 #      is listed (`backup list`, trigger pre_restore);
@@ -24,7 +31,8 @@
 #      archive; its safety archive passes `restore check` against an empty C too;
 #   8. a manipulated copy of the archive fails `restore check` with
 #      archive.member_checksum;
-#   9. every app stopped, every database dropped, the scratch directory removed.
+#   9. every app stopped, every database and the owner role dropped, the scratch
+#      directory removed.
 #
 # Prints "REHEARSAL OK" and exits 0 only if every step holds.
 #
@@ -46,6 +54,8 @@ suffix="$$_$RANDOM"
 db_a="herd_rehearsal_a_${suffix}"
 db_b="herd_rehearsal_b_${suffix}"
 db_c="herd_rehearsal_c_${suffix}"
+owner="herd_rehearsal_owner_${suffix}"
+owner_password="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 work="$(mktemp -d)"
 pids=()
 admin_email="admin@rehearsal.example"
@@ -66,14 +76,15 @@ cleanup() {
   dropdb --if-exists --force "$db_a" 2>/dev/null || true
   dropdb --if-exists --force "$db_b" 2>/dev/null || true
   dropdb --if-exists --force "$db_c" 2>/dev/null || true
+  dropuser --if-exists "$owner" 2>/dev/null || true
   rm -rf "$work"
 }
 trap cleanup EXIT
 
-# The app's settings for database $1, files in $2 (the password from PGPASSWORD).
+# The app's settings for database $1, files in $2 (as the owner role, never PG*).
 app_vars() {
-  vars=(HERD_DATABASE_URL="postgresql+asyncpg://${PGUSER}@${PGHOST}:${PGPORT}/$1"
-    HERD_DATABASE_PASSWORD="$PGPASSWORD" HERD_DATA_DIR="$2" HERD_SECRET_KEY="$secret_key"
+  vars=(HERD_DATABASE_URL="postgresql+asyncpg://${owner}@${PGHOST}:${PGPORT}/$1"
+    HERD_DATABASE_PASSWORD="$owner_password" HERD_DATA_DIR="$2" HERD_SECRET_KEY="$secret_key"
     HERD_BACKUP_DIR="$work/backups" HERD_LOG_FORMAT=text HERD_LOG_LEVEL=WARNING
     HERD_ENVIRONMENT=development)
   if [[ $s3 == 1 ]]; then vars+=(HERD_S3_PREFIX="rehearsal/$1"); fi
@@ -110,9 +121,16 @@ login() {  # base, cookie jar: the HTTP status of the admin's login
     --data "{\"email\": \"$admin_email\", \"password\": \"$admin_password\"}"
 }
 
-say "database A ($db_a), app A, storage ${HERD_STORAGE:-local}"
-createdb "$db_a"
-createdb "$db_b"
+say "role $owner (no superuser), database A ($db_a), app A, storage ${HERD_STORAGE:-local}"
+# The password as a SCRAM verifier, so that its clear text never reaches the server.
+verifier="$("$py" -c 'import sys; from app.stack.db_owner import scram_verifier; print(scram_verifier(sys.argv[1]))' "$owner_password")"
+psql -d postgres -v ON_ERROR_STOP=1 -q -v owner="$owner" -v verifier="$verifier" \
+  <<<"CREATE ROLE :\"owner\" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'verifier';" \
+  || fail "cannot create the role $owner (the PG* role needs CREATEROLE)"
+[[ $(psql -d postgres -Atc "SELECT rolsuper FROM pg_roles WHERE rolname = '$owner'") == f ]] \
+  || fail "$owner is a superuser"
+createdb -O "$owner" "$db_a"
+createdb -O "$owner" "$db_b"
 base_a="http://127.0.0.1:${port}"
 start_app "$db_a" "$work/data-a" "$port"
 [[ $(login "$base_a" "$work/jar-a") == 200 ]] || fail "login on A"
@@ -153,8 +171,8 @@ grep -q '^restored ' "$work/apply.out" || fail "restore apply"
 no_local_files "$work/data-b"
 
 say "compare A and B"
-url() { echo "postgresql+asyncpg://${PGUSER}@${PGHOST}:${PGPORT}/$1"; }
-HERD_DATABASE_PASSWORD="$PGPASSWORD" "$py" -m scripts.compare_databases \
+url() { echo "postgresql+asyncpg://${owner}@${PGHOST}:${PGPORT}/$1"; }
+HERD_DATABASE_PASSWORD="$owner_password" "$py" -m scripts.compare_databases \
   "$(url "$db_a")" "$(url "$db_b")" \
   --ignore user_session oauth_flow audit_log backup_run || fail "A and B differ"
 
@@ -173,6 +191,15 @@ say "replace B while it runs, from the same archive"
 api_b() { curl -s -b "$work/jar-b" -H 'X-Requested-With: herd' "$@"; }
 json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
 org_name="$(api_b "$base_b/api/auth/me" | json '["org"]["name"]')"
+if [[ $(psql -d postgres -Atc "SELECT rolsuper FROM pg_roles WHERE rolname = current_user") == t ]]; then
+  if app_env "$db_b" "$work/data-b" HERD_DATABASE_URL="postgresql+asyncpg://${PGUSER}@${PGHOST}:${PGPORT}/$db_b" \
+    HERD_DATABASE_PASSWORD="$PGPASSWORD" "$py" -m app.ops restore apply "$archive" --replace \
+    --confirm "$org_name" >"$work/super.out" 2>&1; then
+    fail "a replace as the superuser $PGUSER was not refused"
+  fi
+  grep -qx restore.superuser_refused "$work/super.out" || fail "superuser replace: $(cat "$work/super.out")"
+  echo "   as the superuser $PGUSER: restore.superuser_refused"
+fi
 later_id="$(api_b -H 'Content-Type: application/json' -X POST "$base_b/api/spaces/$space_id/pages" \
   --data '{"title": "Nach der Sicherung"}' | json '["id"]')"
 code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar-b" "$base_b/api/pages/$later_id")"
@@ -207,7 +234,7 @@ grep -q $'\tpre_restore\tok\t' <<<"$runs" || fail "the safety archive is not lis
 say "back up the replaced B, restore that into empty C ($db_c), replace B with it again"
 archive_r="$(app_env "$db_b" "$work/data-b" "$py" -m app.ops backup create | tail -1)"
 [[ -f $archive_r ]] || fail "backup create on the replaced B printed $archive_r"
-createdb "$db_c"
+createdb -O "$owner" "$db_c"
 app_env "$db_c" "$work/data-c" "$py" -m app.ops restore check "$archive_r" \
   >"$work/check-r.out" || { cat "$work/check-r.out" >&2; fail "restore check of B's backup"; }
 [[ "$(tail -1 "$work/check-r.out")" == ok ]] || fail "restore check of B's backup: $(cat "$work/check-r.out")"
@@ -226,7 +253,7 @@ app_env "$db_b" "$work/data-b" "$py" -m app.ops restore apply "$archive_r" --rep
 grep -q '^replaced by .*safety archive herd-' "$work/replace-r.out" || fail "the second replace"
 safety_r="$work/backups/$(sed 's/.*safety archive //' "$work/replace-r.out")"
 [[ -f $safety_r ]] || fail "the second safety archive $safety_r is missing"
-dropdb --force "$db_c" && createdb "$db_c"
+dropdb --force "$db_c" && createdb -O "$owner" "$db_c"
 app_env "$db_c" "$work/data-c2" "$py" -m app.ops restore check "$safety_r" \
   >"$work/check-s.out" || { cat "$work/check-s.out" >&2; fail "restore check of the safety archive"; }
 [[ "$(tail -1 "$work/check-s.out")" == ok ]] || fail "the safety archive: $(cat "$work/check-s.out")"
