@@ -90,12 +90,14 @@ class OrganizerOut(BaseModel):
 class EventOut(BaseModel):
     """`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
-    (null: endless). `redacted`: the caller sees only times and "busy"; content fields
-    are null."""
+    (null: endless). `series_id`: for an override (one occurrence changed on its own),
+    the series it belongs to; null otherwise. `redacted`: the caller sees only times
+    and "busy"; content fields are null."""
 
     id: uuid.UUID
     calendar_id: uuid.UUID
     space_id: uuid.UUID
+    series_id: uuid.UUID | None
     uid: str | None
     title: str | None
     description: str | None
@@ -125,6 +127,7 @@ class EventOut(BaseModel):
             id=event.id,
             calendar_id=event.calendar_id,
             space_id=event.space_id,
+            series_id=event.series_id,
             uid=event.uid if full else None,
             title=event.title if full else None,
             description=event.description if full else None,
@@ -154,11 +157,13 @@ class OccurrenceOut(BaseModel):
     """One occurrence in the window. `recurrence_id`: for an occurrence of a series,
     the wall time it is named by (ISO 8601 without offset), which changing or deleting
     just this one takes back (task 3b); null for an event that is no series.
-    `redacted`: the caller sees only times and "busy" (`title`, `location` null)."""
+    `series_id`: for an override, which is listed as an event of its own, the series
+    it belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and "busy" (`title`, `location` null)."""
 
     event_id: uuid.UUID
     calendar_id: uuid.UUID
     space_id: uuid.UUID
+    series_id: uuid.UUID | None
     start: datetime
     end: datetime
     all_day: bool
@@ -178,6 +183,7 @@ class OccurrenceOut(BaseModel):
             event_id=event.id,
             calendar_id=event.calendar_id,
             space_id=event.space_id,
+            series_id=event.series_id,
             start=occurrence.start,
             end=occurrence.end,
             all_day=event.all_day,

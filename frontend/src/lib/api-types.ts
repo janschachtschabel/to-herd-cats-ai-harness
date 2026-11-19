@@ -6493,8 +6493,9 @@ export interface components {
          * EventOut
          * @description `starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`
          *     and of the day after `last_day`). `recurs_until`: when the last occurrence ends
-         *     (null: endless). `redacted`: the caller sees only times and "busy"; content fields
-         *     are null.
+         *     (null: endless). `series_id`: for an override (one occurrence changed on its own),
+         *     the series it belongs to; null otherwise. `redacted`: the caller sees only times
+         *     and "busy"; content fields are null.
          */
         EventOut: {
             /** All Day */
@@ -6535,6 +6536,8 @@ export interface components {
             redacted: boolean;
             /** Rrule */
             rrule: string | null;
+            /** Series Id */
+            series_id: string | null;
             /**
              * Space Id
              * Format: uuid
@@ -7494,7 +7497,8 @@ export interface components {
          * @description One occurrence in the window. `recurrence_id`: for an occurrence of a series,
          *     the wall time it is named by (ISO 8601 without offset), which changing or deleting
          *     just this one takes back (task 3b); null for an event that is no series.
-         *     `redacted`: the caller sees only times and "busy" (`title`, `location` null).
+         *     `series_id`: for an override, which is listed as an event of its own, the series
+         *     it belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and "busy" (`title`, `location` null).
          */
         OccurrenceOut: {
             /** All Day */
@@ -7524,6 +7528,8 @@ export interface components {
             recurring: boolean;
             /** Redacted */
             redacted: boolean;
+            /** Series Id */
+            series_id: string | null;
             /**
              * Space Id
              * Format: uuid

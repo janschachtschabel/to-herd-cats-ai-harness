@@ -119,6 +119,7 @@ async def test_a_new_event_shows_what_was_stored(
     assert {k: v for k, v in made.items() if k not in ("id", "uid")} == {
         "calendar_id": calendar["id"],
         "space_id": calendar["space_id"],
+        "series_id": None,
         "title": "Planung",
         "location": "Raum 1",
         "description": "<b>kein HTML</b>",  # plain text, never rendered

@@ -5710,7 +5710,7 @@
         "type": "string"
       },
       "EventOut": {
-        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `redacted`: the caller sees only times and \"busy\"; content fields\nare null.",
+        "description": "`starts_at`/`ends_at`: the first occurrence (all-day: 00:00 UTC of `first_day`\nand of the day after `last_day`). `recurs_until`: when the last occurrence ends\n(null: endless). `series_id`: for an override (one occurrence changed on its own),\nthe series it belongs to; null otherwise. `redacted`: the caller sees only times\nand \"busy\"; content fields are null.",
         "properties": {
           "all_day": {
             "title": "All Day",
@@ -5834,6 +5834,18 @@
             ],
             "title": "Rrule"
           },
+          "series_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
           "space_id": {
             "format": "uuid",
             "title": "Space Id",
@@ -5892,6 +5904,7 @@
           "id",
           "calendar_id",
           "space_id",
+          "series_id",
           "uid",
           "title",
           "description",
@@ -8185,7 +8198,7 @@
         "type": "object"
       },
       "OccurrenceOut": {
-        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`redacted`: the caller sees only times and \"busy\" (`title`, `location` null).",
+        "description": "One occurrence in the window. `recurrence_id`: for an occurrence of a series,\nthe wall time it is named by (ISO 8601 without offset), which changing or deleting\njust this one takes back (task 3b); null for an event that is no series.\n`series_id`: for an override, which is listed as an event of its own, the series\nit belongs to (to change the whole series from it); null otherwise. `redacted`: the caller sees only times and \"busy\" (`title`, `location` null).",
         "properties": {
           "all_day": {
             "title": "All Day",
@@ -8240,6 +8253,18 @@
             "title": "Redacted",
             "type": "boolean"
           },
+          "series_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
           "space_id": {
             "format": "uuid",
             "title": "Space Id",
@@ -8272,6 +8297,7 @@
           "event_id",
           "calendar_id",
           "space_id",
+          "series_id",
           "start",
           "end",
           "all_day",

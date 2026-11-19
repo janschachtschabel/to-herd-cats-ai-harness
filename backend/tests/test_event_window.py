@@ -290,6 +290,10 @@ async def test_an_override_takes_the_place_of_its_occurrence(
         ("2026-11-30T13:00:00Z", "Verschoben", False),
         ("2026-12-14T09:00:00Z", "Termin", True),
     ]
+    # R3a-5: an override names its series (the master answers null), here and by id.
+    assert [i["series_id"] for i in items] == [None, master["id"], None]
+    by_id = [(await client.get(f"/api/events/{e}")).json() for e in (moved.id, master["id"])]
+    assert [e["series_id"] for e in by_id] == [master["id"], None]
     await session.execute(
         update(CalendarEvent)
         .where(CalendarEvent.id == moved.id)
