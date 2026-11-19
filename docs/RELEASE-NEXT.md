@@ -76,6 +76,19 @@ dahin gilt:
   schreibenden Routen; Skill-Importe werden mitgescannt; die Laufzeitrolle darf
   `alembic_version` nur lesen; der Beweis vor dem Verknüpfen über einen Anbieter
   verlangt eine frische Anmeldung (`prompt=login`, `max_age=600`, `auth_time`).
+- **Kein Superuser mehr für die App (review M9b F2-1):** Ein Dump läuft beim Einspielen
+  mit der Rolle der App; als Superuser könnte ein manipuliertes Archiv Programme auf
+  dem Datenbankserver starten. Jeder mitgelieferte Stack mit eigenem PostgreSQL
+  verbindet App, Migration und Sicherung darum als `herd_owner` (nur `LOGIN`,
+  Besitzerin der Datenbank, ihres Schemas und aller Objekte darin), die
+  `python -m app.stack db-owner` bei jedem Start als Superuser anlegt bzw. nachzieht:
+  Compose (`compose.yml` und die Überlagerungen `nodes`, `s3`, `roles`; neuer Dienst
+  `db-owner`, Passwort im neuen Volume `secrets`), Hostinger (Dienst `db-owner`, das
+  Passwort erzeugt `init` als `db_owner_password`) und das Chart mit
+  `postgresql.enabled` (Init-Container `db-owner` im Migrations-Job, Schlüssel
+  `owner-password` im erzeugten Secret). Die Verwaltung lehnt das Einspielen als
+  Superuser ab (409 `restore.superuser_refused`), `restore apply --replace` ebenso,
+  außer mit `--allow-superuser` ([das Risiko](SICHERUNG.md#was-ein-archiv-ausführen-darf)).
 - **Hostinger-Stack:** `app` hängt jetzt auch das Volume `backups` ein (für
   Verwaltung → Sicherung) und kennt `HERD_BACKUP_UPLOAD_MAX_BYTES`
   ([`HOSTINGER.md`](HOSTINGER.md)).
@@ -100,6 +113,9 @@ anders gesagt):
 | `HERD_S3_ENDPOINT`, `HERD_S3_REGION` (`us-east-1`), `HERD_S3_BUCKET`, `HERD_S3_PREFIX`, `HERD_S3_ACCESS_KEY_ID`, `HERD_S3_SECRET_ACCESS_KEY` (`_FILE`) | – | der S3-Speicher | `s3.endpoint`, `s3.region`, `s3.bucket`, `s3.prefix`, `s3.existingSecret` |
 | `HERD_COLLAB_ADVERTISE_URL` | – | Adresse, unter der die API einen Collab-Prozess erreicht (`ws://host:port`); **Pflicht für jeden Collab-Prozess**, in Rolle `all` und im Chart gesetzt | aus der Pod-IP |
 | `HERD_BACKUP_UPLOAD_MAX_BYTES` | `2147483648` | größtes Archiv, das ein Inhaber hochlädt (nur API) | `backup.uploadMaxBytes` |
+
+Ein leerer Wert von `HERD_DATABASE_PASSWORD_FILE` gilt jetzt als nicht gesetzt (so hebt
+`compose.roles.yml` die Datei aus `compose.yml` für die Laufzeitrolle auf).
 
 Der Hostinger-Stack reicht von diesen nur `HERD_BACKUP_UPLOAD_MAX_BYTES` durch; dort
 gelten für die übrigen die Standards ([`HOSTINGER.md`](HOSTINGER.md#grenzen)).
@@ -129,6 +145,19 @@ Vorher sichern (README, „Update einer Installation“), dann:
   läuft (oben), betrifft das nur einen selbst gebauten Stand. Nicht auf 1.0.0
   zurückgehen, sobald jemand TOTP eingeschaltet hat: 1.0.0 kennt die TOTP-Tabellen
   nicht und meldet diese Personen nur mit dem Passwort an.
+- **Datenbankrolle `herd_owner` (Compose, Hostinger, Chart mit eigenem PostgreSQL):**
+  Kein Schritt von Hand. Beim ersten Start nach dem Update legt `db-owner` die Rolle an,
+  erzeugt ihr Passwort (Compose: Volume `secrets`; Hostinger: `init`; Chart: Schlüssel
+  `owner-password`, den `lookup` im bestehenden Secret ergänzt) und übergibt ihr die
+  Datenbank, das Schema `public` und alles, was der Superuser bis dahin angelegt hatte;
+  die App verbindet sich danach als `herd_owner`. `POSTGRES_PASSWORD` bleibt das
+  Passwort des Superusers und wird nur noch von `db-owner` benutzt. Wer im Chart
+  `database.existingSecret` mit dem eigenen PostgreSQL nutzt, legt dort vorher den
+  Schlüssel `owner-password` an (sonst startet der Migrations-Job nicht). Eine
+  Datenbank zum Einspielen in eine leere Installation wird jetzt mit
+  `OWNER herd_owner` angelegt ([`SICHERUNG.md`](SICHERUNG.md)). Wer selbst als
+  Superuser einspielen muss: `--allow-superuser`, nur mit Archiven aus der eigenen
+  Installation.
 - **Kürzere Sitzungen.** Eine Sitzung endet jetzt auch nach 24 Stunden ohne Nutzung
   (vorher nur nach 7 Tagen). Wer das nicht will: `HERD_SESSION_IDLE_HOURS=0`.
 - **Schreibgrenze.** Mehr als 120 Schreibaktionen einer Person in einer Minute
@@ -171,7 +200,8 @@ Vorher sichern (README, „Update einer Installation“), dann:
   ab (erst diese Versionen kennen `\restrict`). Das Image bringt `postgresql-client-17`
   aus Debian mit; prüfen muss das nur, wer mit eigenen Werkzeugen einspielt
   (Entwicklungsrechner, eigenes Image). Die Datenbankrolle, die einspielt, muss das
-  Schema `public` löschen dürfen.
+  Schema `public` besitzen (oder Besitzerin der Datenbank sein, der es gehört) und darf
+  kein Superuser sein (oben).
 - **Getrennte Datenbankrollen (optional):** Mit `HERD_MIGRATE_DATABASE_URL` und
   `HERD_DATABASE_RUNTIME_ROLE` lehnt die Verwaltung das Einspielen ab
   (`restore.not_schema_owner`): Die App hat dann nur die Laufzeitrolle. Eingespielt

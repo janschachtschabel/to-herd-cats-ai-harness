@@ -223,7 +223,10 @@ Archiv (404 `backup.not_found`), und der Menüpunkt fehlt.
   `backup.checked`). Ein manipuliertes Archiv zeigt `archive.checksum`.
 - **„Einspielen …“** gibt es nur, wenn die Prüfung nichts meldet. Bestätigt wird durch
   das Eintippen des Namens der Organisation (der Dialog nennt ihn; 422
-  `backup.confirm_mismatch` sonst). Dann läuft dasselbe wie
+  `backup.confirm_mismatch` sonst). Verbindet sich die App als **Superuser**, lehnt die
+  Verwaltung das Einspielen ab (409 `restore.superuser_refused`, [Was ein Archiv
+  ausführen darf](#was-ein-archiv-ausführen-darf)); die mitgelieferten Stacks tun das
+  nie. Dann läuft dasselbe wie
   `restore apply ARCHIV --replace` (`via=admin`, Audit `backup.restore_requested`):
   zuerst das Sicherheitsarchiv, dann der Wartungsmodus. Jede Seite, die danach eine
   Anfrage stellt, zeigt die **Wartungsseite** und fragt alle 3 Sekunden
@@ -423,8 +426,9 @@ trennt zwei Rollen:
 **Compose:** `deploy/compose/compose.roles.yml` über `compose.yml`
 (`docker compose -f compose.yml -f compose.roles.yml up -d`, `HERD_APP_DB_PASSWORD` in
 `.env`): Der Dienst `db-roles` legt die Rolle `herd_app` einmal an und setzt bei jedem
-Start ihr Passwort; die App bedient Anfragen als `herd_app` und migriert als `herd`,
-der Dienst `backup` sichert als `herd`. Mit `compose.nodes.yml` nimmt der Dienst
+Start ihr Passwort; die App bedient Anfragen als `herd_app` und migriert als
+`herd_owner` (die Rolle von `db-owner`, kein Superuser), der Dienst `backup` sichert
+als `herd_owner`. Mit `compose.nodes.yml` nimmt der Dienst
 `migrate` die drei Variablen; die Laufzeitrolle der Knoten setzt man dort über eine
 eigene Überlagerung von `HERD_DATABASE_URL` und `HERD_DATABASE_PASSWORD`.
 
@@ -454,11 +458,13 @@ anzuhalten. Mit den `HERD_*`-Einstellungen der Installation (Datenbank,
 
 ```bash
 python -m app.ops restore check ARCHIV         # erwartet: restore.target_not_empty, sonst nichts
-python -m app.ops restore apply ARCHIV --replace --confirm "<Name der Organisation>" [--without-secrets]
+python -m app.ops restore apply ARCHIV --replace --confirm "<Name der Organisation>" [--without-secrets] [--allow-superuser]
 python -m app.ops maintenance status           # "off" oder "on restore since <Zeit>"
 python -m app.ops maintenance off              # nur nach einem Abbruch (unten)
 ```
 
+Als Superuser verbunden endet der Befehl mit `restore.superuser_refused`, bevor er
+etwas tut; `--allow-superuser` hebt das auf ([das Risiko](#was-ein-archiv-ausführen-darf)).
 `--confirm` verlangt den Namen der Organisation der **laufenden** Installation, genau
 (Groß- und Kleinschreibung zählen): ein Schutz gegen das Einspielen in die falsche
 Installation. Es ist der Name aus `HERD_BOOTSTRAP_ORG_NAME` beim ersten Start (Standard
@@ -608,13 +614,45 @@ fremdes oder verändertes Archiv anrichten kann:
 Eine Datei des Archivs muss unter dem Schlüssel liegen, der ihre SHA-256 nennt
 (`attachments/<org>/<sha256>`), sonst `archive.member_checksum`.
 
-Die Definitionen erlaubter Einträge bleiben Text aus dem Archiv. Wer auch das begrenzen
-will, lässt mit einer **Rolle ohne Superuser-Recht** einspielen (Besitzerin der
-Datenbank, nicht `POSTGRES_USER`; bei getrennten Rollen die Migrationsrolle): Dann kann
-auch ein manipulierter Eintrag keine Programme auf dem Datenbankserver starten
-(`COPY … TO PROGRAM`) oder Dateien lesen. Die
-mitgelieferten Compose-Stacks verbinden die App der Einfachheit halber mit der Rolle aus
-`POSTGRES_USER` (ein Superuser).
+Die Definitionen erlaubter Einträge bleiben Text aus dem Archiv: Ein erlaubter Eintrag
+kann eine erlaubte Funktion aufrufen, etwa aus einem `CHECK`-Constraint. Darum spielt
+nur eine **Rolle ohne Superuser-Recht** ein (review M9b F2-1): die Besitzerin der
+Datenbank und ihres Schemas `public`, bei getrennten Rollen die Migrationsrolle. Sie
+kann auch mit einem manipulierten Eintrag keine Programme auf dem Datenbankserver
+starten (`COPY … TO PROGRAM`) und keine Dateien des Servers lesen; was sie anrichten
+kann, bleibt in ihrer eigenen Datenbank.
+
+- **Die mitgelieferten Stacks** verbinden die App nie als Superuser. Ein mitgeliefertes
+  PostgreSQL legt nur seinen Superuser an (`POSTGRES_USER`, im Chart `herd`); vor der
+  App läuft darum bei jedem Start `python -m app.stack db-owner` als dieser Superuser
+  (`app/stack/db_owner.py`): Er legt die Rolle `herd_owner` an (`LOGIN`, sonst nichts;
+  eine bestehende Rolle dieses Namens wird auf genau das zurückgesetzt), setzt ihr
+  Passwort aus einer Datei, die einmal zufällig erzeugt wird (256 Bit, Modus 0400; als
+  SCRAM-Verifier gesetzt, so dass der Klartext nie das Log des Servers erreicht), und
+  übergibt ihr die Datenbank, das Schema `public` und jedes Objekt darin. Compose
+  (`deploy/compose/compose.yml` und die Überlagerungen `nodes`, `s3`, `roles`): Dienst
+  `db-owner`, Passwort im Volume `secrets` (`db_owner_password`). Hostinger
+  (`docker-compose.yml`): Dienst `db-owner`, das Passwort erzeugt `init`. Chart mit
+  `postgresql.enabled`: ein Init-Container `db-owner` im Migrations-Job, das Passwort
+  im erzeugten Secret unter `owner-password` (mit `database.existingSecret` dort von
+  Hand anlegen). Eine externe Datenbank ändern die Stacks nicht: Deren Rolle legt der
+  Betrieb an, ohne Superuser-Recht.
+- **Bestehende Installationen** ziehen beim nächsten Start ohne Schritt von Hand um:
+  `db-owner` legt die Rolle an und übergibt ihr alles, was der Superuser bis dahin
+  angelegt hatte (Tabellen, Sequenzen, Funktionen, Typen), die App verbindet sich danach
+  als `herd_owner`. Was ein Betreiber später als Superuser anlegt, übergibt der nächste
+  Start ebenso.
+- **Die Verwaltung** lehnt das Einspielen ab, wenn die App doch als Superuser verbunden
+  ist (409 `restore.superuser_refused`, mit Text in der Oberfläche).
+- **Die Kommandozeile** (`restore apply --replace`) lehnt einen Superuser ebenso ab
+  (`restore.superuser_refused`, Exit 1), es sei denn, `--allow-superuser` steht dabei.
+  **Das Risiko:** Mit `--allow-superuser` läuft der Dump eines Archivs mit allen Rechten
+  des Superusers; ein manipuliertes Archiv kann dann über einen erlaubten Eintrag
+  Programme auf dem Datenbankserver starten und dessen Dateien lesen oder schreiben,
+  als Benutzer des Datenbankservers. Nur für Archive, die nachweislich aus der eigenen
+  Installation stammen und seitdem nicht in fremden Händen waren (etwa direkt aus dem
+  eigenen Sicherungsverzeichnis), und nur, wenn keine eigene Rolle möglich ist.
+  Besser: eine Rolle wie `herd_owner` anlegen und mit ihr einspielen.
 
 Das Recht `backup.manage` (Sicherungen und Einspielen in der Verwaltung, M9b) hat nur die
 Rolle `owner`, nicht `admin`: Ein Archiv enthält Direktnachrichten, die Admins nur über
@@ -837,9 +875,10 @@ docker compose run --rm --no-deps -v to-herd-cats-ai_backups:/backups \
 # Ein Weg zurück: der jetzige Stand als eigene Sicherung (bleibt im Volume)
 docker compose exec backup python -m app.ops backup run
 docker compose stop app backup             # mit compose.nodes.yml: api-a api-b worker collab backup
-# Datenbank leeren (das Volume bleibt; nur die Datenbank herd wird neu angelegt)
+# Datenbank leeren (das Volume bleibt; nur die Datenbank herd wird neu angelegt, im
+# Besitz der Rolle der App, herd_owner, die db-owner angelegt hat; nie OWNER herd)
 docker compose exec db psql -U herd -d postgres \
-  -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
+  -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd_owner'
 # noch einmal prüfen (jetzt: ok), dann einspielen
 docker compose run --rm --no-deps -v to-herd-cats-ai_backups:/backups \
   --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
@@ -890,7 +929,8 @@ Revision des Archivs passt oder neuer ist:
    kubectl patch cronjob/<f>-backup -p '{"spec":{"suspend":true}}'
    ```
 3. Die Datenbank leeren. Mitgeliefertes PostgreSQL:
-   `kubectl exec <f>-postgresql-0 -- psql -U herd -d postgres -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd'`;
+   `kubectl exec <f>-postgresql-0 -- psql -U herd -d postgres -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd_owner'`
+   (die Rolle der App, die der Init-Container `db-owner` angelegt hat);
    eine externe Datenbank leert ihr Betrieb (neu anlegen, Besitzer die Rolle aus
    `database.url`).
 4. Einen Job aus dem CronJob ableiten, der einspielt statt sichert:

@@ -40,10 +40,10 @@ Im hPanel: VPS → **Docker Manager** → **Compose** → **Compose from URL**.
 
 Hostinger nimmt die `docker-compose.yml` aus dem Hauptordner (Zweig `main`) und legt
 `.env.example` als `.env` an. Der erste Start kommt ganz ohne Werte aus: Der Dienst
-`init` erzeugt einmalig das Datenbankpasswort und die Schlüssel der App und legt sie in
-eigene Volumes; Domain und erste Person überspringt er, solange sie fehlen. Danach
-laufen `db`, `app` und `backup`; `init` steht auf „beendet“ (Exit 0) – das ist richtig
-so.
+`init` erzeugt einmalig die Datenbankpasswörter und die Schlüssel der App und legt sie in
+eigene Volumes; Domain und erste Person überspringt er, solange sie fehlen. Danach legt
+`db-owner` die Datenbankrolle der App an. Es laufen `db`, `app` und `backup`; `init` und
+`db-owner` stehen auf „beendet“ (Exit 0) – das ist richtig so.
 
 ### 2. `.env` ausfüllen und neu bereitstellen
 
@@ -155,10 +155,12 @@ wieder nachsehen.
 
 ### Was nicht in die `.env` gehört
 
-**Nicht in die `.env`:** Datenbankpasswort, `HERD_SECRET_KEY` und das interne Token der
-Live-Bearbeitung. Sie erzeugt `init` beim ersten Start (je 256 Zufallsbits) und legt
+**Nicht in die `.env`:** die Datenbankpasswörter, `HERD_SECRET_KEY` und das interne Token
+der Live-Bearbeitung. Sie erzeugt `init` beim ersten Start (je 256 Zufallsbits) und legt
 sie in die Volumes `<projekt>_secrets` und `<projekt>_db-secret`; die Dienste lesen sie
-als Dateien (`HERD_*_FILE`, `POSTGRES_PASSWORD_FILE`). Sie bleiben bei jeder weiteren
+als Dateien (`HERD_*_FILE`, `POSTGRES_PASSWORD_FILE`). Das Passwort des Superusers der
+Datenbank (`db-secret`) kennen nur `db` und `db-owner`; die App und die Sicherung
+verbinden sich als `herd_owner` mit `/secrets/db_owner_password`. Sie bleiben bei jeder weiteren
 Bereitstellung gleich. **KI-Schlüssel** und **Client-Secrets** (OIDC, OAuth) trägst du
 in der App ein; gespeichert werden sie verschlüsselt unter diesem `HERD_SECRET_KEY`
 ([`KI.md`](KI.md)).
@@ -168,6 +170,7 @@ in der App ein; gespeichert werden sie verschlüsselt unter diesem `HERD_SECRET_
 | Dienst | Aufgabe |
 |---|---|
 | `init` | einmal je Bereitstellung: Geheimnisse erzeugen (nur beim ersten Mal), `DOMAIN` und die Einmal-Werte prüfen; endet mit Exit 0 |
+| `db-owner` | einmal je Bereitstellung, nach `init` und `db`: legt die Datenbankrolle der App `herd_owner` an (Besitzerin der Datenbank, kein Superuser) und übergibt ihr die Datenbank und alles darin; endet mit Exit 0 |
 | `db` | PostgreSQL 17 mit pgvector; nur im internen Netz des Projekts |
 | `app` | die ganze App in einem Container (`HERD_ROLE=all`): beim Start die Migrationen, dann API und Oberfläche, Worker (Benachrichtigungen, Agenten, Automationen) und die Live-Bearbeitung (unter `/collab` über die API) |
 | `backup` | Sicherungen nach `HERD_BACKUP_SCHEDULE` in das Volume `<projekt>_backups` |
@@ -187,6 +190,10 @@ Kein Dienst belegt einen Port des VPS; Traefik erreicht die App über das Netz
    versuchen.
 3. Die App migriert beim Start selbst. Zurück auf eine ältere Version nur mit der
    Sicherung aus Schritt 1 (README, „Freigaben und Updates“).
+   Ein Stack von 1.0.0, in dem die App noch als Superuser verbunden war, zieht dabei
+   ohne Schritt von Hand um: `init` erzeugt `db_owner_password`, `db-owner` legt
+   `herd_owner` an und übergibt ihr alles, die App verbindet sich danach als
+   `herd_owner`.
 
 ## Sicherungen
 
@@ -311,7 +318,7 @@ Datenbank eingespielt; die Schritte unten leeren sie. Die Einzelheiten und alle 
 
    ```bash
    docker compose exec db psql -U herd -d postgres \
-     -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd'
+     -c 'DROP DATABASE herd WITH (FORCE)' -c 'CREATE DATABASE herd OWNER herd_owner'
    docker compose run --rm --no-deps -v <projekt>_backups:/backups \
      --entrypoint "python -m app.ops" app restore check /backups/<archiv>.tar
    docker compose run --rm --no-deps -v <projekt>_backups:/backups \
@@ -322,8 +329,10 @@ Datenbank eingespielt; die Schritte unten leeren sie. Die Einzelheiten und alle 
    Alle melden sich neu an, mit ihren Passwörtern aus der Sicherung.
 
 Spiele nur Archive ein, die aus deiner eigenen Installation stammen: Ein Archiv läuft
-beim Einspielen als Skript mit der Datenbankrolle der App, und in diesem Stack ist das
-der Superuser aus `POSTGRES_USER` ([Was ein Archiv ausführen darf](SICHERUNG.md#was-ein-archiv-ausführen-darf)).
+beim Einspielen als Skript mit der Datenbankrolle der App. In diesem Stack ist das
+`herd_owner`, kein Superuser: Auch ein manipuliertes Archiv startet so keine Programme
+auf dem Datenbankserver, kann aber die Daten der App verändern ([Was ein Archiv
+ausführen darf](SICHERUNG.md#was-ein-archiv-ausführen-darf)).
 Ein Dump mit mehr als dem Schema der App lehnt die Prüfung ab
 (`archive.dump_foreign`).
 
@@ -340,6 +349,7 @@ cat /docker/<projekt>/.build.log                     # echte Ursache von „Bere
 cd /docker/<projekt> && docker compose config -q && echo CONFIG-OK
 docker compose ps -a                                 # init: exited (0), die anderen: running
 docker compose logs init                             # was init geprüft und übersprungen hat
+docker compose logs db-owner                         # role herd_owner created/kept: owns database herd …
 docker compose logs --tail 50 app                    # Start, Migrationen, Fehler der App
 docker network ls                                    # herd-web ist da
 ss -tlnp | grep -E ':(80|443) '                      # Traefik hält 80/443 (Host-Modus)
@@ -364,6 +374,7 @@ und `backup` dann schon angehalten, und sie bleiben gestoppt, bis der Wert in de
 | `ADMIN_PASSWORD is easy to guess (auth.password_common)` | Das Passwort steht auf einer Liste geleakter Passwörter: ein anderes wählen. |
 | `ADMIN_PASSWORD is easy to guess (auth.password_context)` | Es enthält ein Wort aus der E-Mail-Adresse oder dem Produktnamen: ein anderes wählen. |
 | `… is empty: the volume is broken` (Exit 1) | Eine Geheimnis-Datei im Volume ist leer. Aus einer Kopie zurückholen; ein neues Datenbankpasswort würde die App aus ihrer Datenbank aussperren. |
+| `db-owner: cannot reach herd on db:5432 as herd: …` (Exit 1) | Die Datenbank antwortete nicht binnen 60 Sekunden, oder ihr Passwort im Volume `db-secret` passt nicht mehr zum Datenbank-Volume. Erneut bereitstellen; hilft das nicht, `docker compose logs db` lesen. |
 | `/secrets/secret_key: Permission denied. The stack's secret files must be files of user 10001 …` (Exit 1) | Die Schlüsseldatei wurde von Hand (als root) ins Volume gelegt. Mit `docker compose run --rm --no-deps init set-secret-key` neu schreiben (siehe [Wiederherstellen](#wiederherstellen)), dann neu bereitstellen. |
 
 Hinweise (Exit 0): `DOMAIN is empty: skipped` und `ADMIN_PASSWORD is empty: no one-time
