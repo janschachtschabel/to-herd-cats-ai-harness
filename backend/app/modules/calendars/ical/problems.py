@@ -18,6 +18,9 @@ DUPLICATE_UID = "ical.duplicate_uid"  # a second series with a UID already read
 TIME_INVALID = "ical.time_invalid"  # no or unreadable start, end or duration
 TIME_OUT_OF_RANGE = "ical.time_out_of_range"  # outside the years 1900 to 2399
 TIME_ZONE_UNKNOWN = "ical.time_zone_unknown"  # no IANA, Windows or matching VTIMEZONE
+# a TZID or a VTIMEZONE beyond a structural cap (`zones.MAX_TZID`, `MAX_TZID_SEGMENTS`,
+# `vtimezone.MAX_*`): never looked up or compared
+TIME_ZONE_TOO_LARGE = "ical.time_zone_too_large"
 RRULE_INVALID = "ical.rrule_invalid"
 RRULE_UNSUPPORTED = "ical.rrule_unsupported"  # below DAILY, BYHOUR, EXRULE, two RRULEs
 OVERRIDE_UNMATCHED = "ical.override_unmatched"  # no such occurrence of its series
@@ -43,6 +46,7 @@ CODES = frozenset(
         TIME_INVALID,
         TIME_OUT_OF_RANGE,
         TIME_ZONE_UNKNOWN,
+        TIME_ZONE_TOO_LARGE,
         RRULE_INVALID,
         RRULE_UNSUPPORTED,
         OVERRIDE_UNMATCHED,

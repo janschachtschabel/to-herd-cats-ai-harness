@@ -17,6 +17,10 @@ through `icalendar`'s process-wide zone cache:
    `REFERENCE_YEARS` (US Eastern rules: `America/New_York`, not `Grand_Turk`), then
    by name: the same choice every time.
 
+A TZID longer than `MAX_TZID` characters or of more than `MAX_TZID_SEGMENTS` parts is
+never looked up (`ical.time_zone_too_large`, re-check RC7a-3): an IANA name has at most
+three parts, so only the last three of a globally unique TZID are tried.
+
 Nothing fits: `ical.time_zone_unknown`. A comparison scans every zone of `tzdata`,
 so one file gets at most `MAX_COMPARISONS` of them (one per TZID and year); beyond, a
 zone stays unknown. Every comparison is charged to the parse's budget.
@@ -24,7 +28,7 @@ zone stays unknown. Every comparison is charged to the parse's budget.
 
 import re
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -39,6 +43,11 @@ from app.modules.calendars.ical.vtimezone import Definition, definition
 from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
 
 MAX_COMPARISONS = 100
+# The longest IANA name has 32 characters and three parts; producers put a prefix of
+# two or three more before it (`/mozilla.org/20050126_1/America/New_York`).
+MAX_TZID = 255
+MAX_TZID_SEGMENTS = 8
+_IANA_PARTS = 3
 MAX_YEARS = 6  # years compared for one event
 # Years after these follow `tzdata`'s last rule (and a definition's), so later ones
 # tell nothing new.
@@ -57,17 +66,31 @@ _AREAS = frozenset(
 _NOT_LETTERS = re.compile(r"[^a-z]+")
 
 
-def by_name(tzid: str) -> str | None:
-    """The IANA zone `tzid` names (steps 1 to 3), or None."""
+def too_large(tzid: str) -> bool:
+    """Whether `tzid` is beyond `MAX_TZID` characters or `MAX_TZID_SEGMENTS` parts."""
+    return len(tzid) > MAX_TZID or tzid.strip().strip("/").count("/") >= MAX_TZID_SEGMENTS
+
+
+def _free(units: int) -> None:
+    pass
+
+
+def by_name(tzid: str, spend: Callable[[int], None] = _free) -> str | None:
+    """The IANA zone `tzid` names (steps 1 to 3), or None; one unit per name looked up
+    goes to `spend`."""
+    if too_large(tzid):
+        return None
     known = zones.names()
     cleaned = tzid.strip().strip("/")
+    spend(3)
     for candidate in (tzid, cleaned, WINDOWS_TO_OLSON.get(cleaned)):
         if candidate is not None and candidate in known:
             return candidate
     if tzid.strip().startswith("/"):
         parts = cleaned.split("/")
-        for first in range(1, len(parts)):
-            if (suffix := "/".join(parts[first:])) in known:
+        for size in range(min(_IANA_PARTS, len(parts) - 1), 0, -1):
+            spend(1)
+            if (suffix := "/".join(parts[-size:])) in known:
                 return suffix
     return None
 
@@ -144,7 +167,9 @@ class Resolver:
         (the first is its start) that spans the years `compared` (the first is its
         start's); `Skip(ical.time_zone_unknown)` if none. The work is charged to
         `budget`."""
-        named = by_name(tzid)
+        if too_large(tzid):
+            raise Skip(problems.TIME_ZONE_TOO_LARGE)
+        named = by_name(tzid, budget.spend)
         if named is not None:
             return named
         found = self._definition(tzid)
