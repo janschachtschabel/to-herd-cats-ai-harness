@@ -7,8 +7,8 @@ Expand only: two new tables. The previous release (1.0.0) neither reads nor writ
 them.
 
 Revision ID: b1c4e7a90d23
-Revises: daa60bc7c565
-Create Date: 2027-01-08 09:00:00.000000
+Revises: b7d0e3f6a9c2
+Create Date: 2027-01-12 09:00:00.000000
 """
 
 from collections.abc import Sequence
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b1c4e7a90d23"
-down_revision: str | None = "daa60bc7c565"
+down_revision: str | None = "b7d0e3f6a9c2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
