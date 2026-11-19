@@ -15,7 +15,12 @@
   "security": {
     "sessions": {
       "title": "Signed-in devices",
-      "description": "Where you are signed in right now. A session ends after 24 hours without use and after 7 days at the latest.",
+      "description": "You are signed in here. A session ends after {{idle}} without use and at the latest after {{ttl}}.",
+      "descriptionNoIdle": "You are signed in here. A session ends at the latest after {{ttl}}.",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
       "current": "This device",
       "unknownDevice": "Unknown device",
       "signedInAt": "Signed in {{date}}",

@@ -51,7 +51,9 @@ eigenes Passwort im Profil (mit dem alten).
   Anmeldezeit, letzte Nutzung; „Dieses Gerät“ markiert die eigene) und meldet eine
   einzelne oder „Alle anderen“ ab (ASVS V7.5.2). Das beendet die Sitzung sofort, auch
   ihre Live-Verbindungen; Audit `user.session_ended` mit der Kennung der Sitzung bzw.
-  der Anzahl, nie dem Gerät. API: `GET /api/auth/me/sessions` (paginiert),
+  der Anzahl der Sitzungen, die noch liefen, nie dem Gerät. Die Beschreibung darüber
+  nennt die eingestellten Grenzen (`GET /api/auth/me` → `session_limits`:
+  `idle_hours`, `null` ohne Inaktivitätsgrenze, und `ttl_hours`). API: `GET /api/auth/me/sessions` (paginiert),
   `DELETE /api/auth/me/sessions/{id}` (eine fremde oder beendete Sitzung antwortet wie
   eine unbekannte: 404 `auth.session_not_found`),
   `POST /api/auth/me/sessions/sign-out-others`. Die Adresse eines Geräts speichert die

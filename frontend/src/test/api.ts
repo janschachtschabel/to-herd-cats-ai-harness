@@ -143,6 +143,7 @@ export function makeMe(permissions: Permission[], user: Partial<User> = {}): Me 
     org: { id: id(), name: 'Beispiel GmbH' },
     permissions,
     ai_model: null,
+    session_limits: { idle_hours: 24, ttl_hours: 168 },
   }
 }
 

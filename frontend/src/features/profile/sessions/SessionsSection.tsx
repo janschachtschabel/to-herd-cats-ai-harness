@@ -6,12 +6,14 @@ import { ConfirmDialog } from '@/features/shared/ConfirmDialog'
 import { SaveError } from '@/features/shared/forms'
 import { ErrorState, LoadingState, LoadMore } from '@/features/shared/states'
 import { formatDateTime } from '@/lib/format'
+import { useMe } from '@/features/auth/queries'
 import { useEndSession, useMySessions, useSignOutOthers } from './queries'
 
 /** Where the person is signed in: each running session with its device and times; she
  *  ends one, or every one but this browser's (ASVS V7.5.2). */
 export function SessionsSection() {
   const { t, i18n } = useTranslation()
+  const limits = useMe()?.session_limits
   const sessions = useMySessions()
   const end = useEndSession()
   const others = useSignOutOthers()
@@ -23,7 +25,7 @@ export function SessionsSection() {
         <h2 id="own-sessions" className="text-base font-semibold">
           {t('security.sessions.title')}
         </h2>
-        <p className="text-sm text-muted-foreground">{t('security.sessions.description')}</p>
+        {limits && <p className="text-sm text-muted-foreground">{describeLimits(t, limits)}</p>}
       </div>
       {sessions.isPending ? (
         <LoadingState />
@@ -100,4 +102,24 @@ export function SessionsSection() {
       />
     </section>
   )
+}
+
+type Translate = ReturnType<typeof useTranslation>['t']
+
+/** "24 Stunden", "7 Tagen": two or more whole days as days, otherwise hours (the
+ *  dative forms the sentence needs). */
+function duration(t: Translate, hours: number): string {
+  return hours >= 48 && hours % 24 === 0
+    ? t('security.sessions.days', { count: hours / 24 })
+    : t('security.sessions.hours', { count: hours })
+}
+
+/** What ends a session here, from the installation's own limits (`/auth/me`). */
+function describeLimits(
+  t: Translate,
+  limits: { idle_hours: number | null; ttl_hours: number },
+): string {
+  const ttl = duration(t, limits.ttl_hours)
+  if (limits.idle_hours === null) return t('security.sessions.descriptionNoIdle', { ttl })
+  return t('security.sessions.description', { idle: duration(t, limits.idle_hours), ttl })
 }

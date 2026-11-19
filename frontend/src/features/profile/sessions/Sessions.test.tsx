@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import { makeMe, mockApi, page } from '@/test/api'
+import { apiError, makeMe, mockApi, page } from '@/test/api'
 import { renderApp } from '@/test/render'
 import type { OwnSession } from './queries'
 
@@ -73,5 +73,55 @@ describe('own sessions in the profile', () => {
     )
     await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(1))
     expect(within(section).queryByRole('button', { name: 'Alle anderen abmelden' })).toBeNull()
+  })
+
+  test('says the limits of this installation', async () => {
+    sessionsApi([HERE])
+    await renderApp('/profile')
+    expect(
+      await screen.findByText(
+        'Hier bist du gerade angemeldet. Eine Sitzung endet nach 24 Stunden ohne Nutzung und spätestens nach 7 Tagen.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  test('without an idle limit it names only the absolute one', async () => {
+    const me = makeMe([])
+    mockApi({
+      'GET /api/auth/me': { ...me, session_limits: { idle_hours: null, ttl_hours: 36 } },
+      'GET /api/spaces': page([]),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/identities': page([]),
+      'GET /api/auth/providers': page([]),
+      'GET /api/auth/me/sessions': page([HERE]),
+    })
+    await renderApp('/profile')
+    expect(
+      await screen.findByText(
+        'Hier bist du gerade angemeldet. Eine Sitzung endet spätestens nach 36 Stunden.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  test('a session already gone answers 404 and the list is asked again', async () => {
+    let sessions = [HERE, PHONE]
+    const api = mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([]),
+      'GET /api/auth/me/totp': TOTP_OFF,
+      'GET /api/auth/me/identities': page([]),
+      'GET /api/auth/providers': page([]),
+      'GET /api/auth/me/sessions': () => page(sessions),
+      'DELETE /api/auth/me/sessions/:id': () => {
+        sessions = [HERE] // it ended elsewhere meanwhile
+        return apiError(404, 'auth.session_not_found')
+      },
+    })
+    const { user } = await renderApp('/profile')
+    const section = await screen.findByRole('region', { name: 'Angemeldete Geräte' })
+    const items = await within(section).findAllByRole('listitem')
+    await user.click(within(items[1]!).getByRole('button', { name: 'Safari · iOS abmelden' }))
+    await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(1))
+    expect(api.find('GET', '/api/auth/me/sessions').length).toBeGreaterThanOrEqual(2)
   })
 })

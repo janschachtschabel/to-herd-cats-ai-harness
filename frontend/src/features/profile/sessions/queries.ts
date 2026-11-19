@@ -27,7 +27,8 @@ export function useEndSession() {
           params: { path: { session_id: sessionId } },
         }),
       ),
-    onSuccess: () => void refresh(),
+    // A session already gone answers 404: the list is out of date either way.
+    onSettled: () => void refresh(),
   })
 }
 
@@ -35,6 +36,6 @@ export function useSignOutOthers() {
   const refresh = useRefresh()
   return useMutation({
     mutationFn: async () => unwrap(await api.POST('/api/auth/me/sessions/sign-out-others')),
-    onSuccess: () => void refresh(),
+    onSettled: () => void refresh(),
   })
 }

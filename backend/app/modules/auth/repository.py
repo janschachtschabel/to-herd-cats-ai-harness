@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 
-from sqlalchemy import ColumnElement, delete, or_, select, update
+from sqlalchemy import ColumnElement, delete, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import locked_batch
@@ -123,16 +123,28 @@ class SessionRepository:
         await self.session.execute(delete(UserSession).where(UserSession.id == doomed.c.id))
 
     async def delete_for_user(
-        self, org_id: uuid.UUID, user_id: uuid.UUID, *, keep: uuid.UUID | None = None
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        *,
+        keep: uuid.UUID | None = None,
+        now: datetime | None = None,
     ) -> int:
-        """All of the person's sessions, except `keep` if given; how many there were."""
-        return await self.delete_for_users(org_id, [user_id], keep=keep)
+        """All of the person's sessions, except `keep` if given; how many there were
+        (with `now`: how many of them were still running)."""
+        return await self.delete_for_users(org_id, [user_id], keep=keep, now=now)
 
     async def delete_for_users(
-        self, org_id: uuid.UUID, user_ids: Sequence[uuid.UUID], *, keep: uuid.UUID | None = None
+        self,
+        org_id: uuid.UUID,
+        user_ids: Sequence[uuid.UUID],
+        *,
+        keep: uuid.UUID | None = None,
+        now: datetime | None = None,
     ) -> int:
         """All of these people's sessions, except `keep` if given, and every sign-in of
-        theirs that waits for the second factor; how many sessions there were."""
+        theirs that waits for the second factor; how many sessions there were (with
+        `now`: how many of them were still running, R18-11)."""
         if not user_ids:
             return 0
         await ChallengeRepository(self.session).delete_for_users(org_id, user_ids)
@@ -141,8 +153,9 @@ class SessionRepository:
         )
         if keep is not None:
             stmt = stmt.where(UserSession.id != keep)
-        deleted = await self.session.scalars(stmt.returning(UserSession.id))
-        return len(deleted.all())
+        counted = running(now, self.idle) if now is not None else true()
+        deleted = await self.session.scalars(stmt.returning(counted))
+        return sum(1 for alive in deleted.all() if alive)
 
     async def note_device(self, token_hash: str, device: str | None) -> None:
         """The device hint of the session just opened with this token."""

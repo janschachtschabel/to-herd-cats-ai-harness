@@ -15,7 +15,12 @@
   "security": {
     "sessions": {
       "title": "Angemeldete Geräte",
-      "description": "Hier bist du gerade angemeldet. Eine Sitzung endet nach 24 Stunden ohne Nutzung und spätestens nach 7 Tagen.",
+      "description": "Hier bist du gerade angemeldet. Eine Sitzung endet nach {{idle}} ohne Nutzung und spätestens nach {{ttl}}.",
+      "descriptionNoIdle": "Hier bist du gerade angemeldet. Eine Sitzung endet spätestens nach {{ttl}}.",
+      "hours_one": "{{count}} Stunde",
+      "hours_other": "{{count}} Stunden",
+      "days_one": "{{count}} Tag",
+      "days_other": "{{count}} Tagen",
       "current": "Dieses Gerät",
       "unknownDevice": "Unbekanntes Gerät",
       "signedInAt": "Angemeldet am {{date}}",

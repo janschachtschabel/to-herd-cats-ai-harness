@@ -8,6 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.modules.audit.models import AuditLog
 from app.modules.auth.device import device_hint
 from app.modules.users.models import User
@@ -123,3 +124,33 @@ def test_the_device_hint_names_browser_and_system_without_versions(
     agent: str | None, hint: str | None
 ) -> None:
     assert device_hint(agent) == hint
+
+
+async def test_signing_out_the_others_counts_only_running_sessions(
+    make_client: MakeClient, owner_user: User, session: AsyncSession
+) -> None:
+    """A session already ended (signed out, not yet cleared away) is no session ended
+    now (R18-11)."""
+    here = await _signed_in(make_client, owner_user.email, FIREFOX)
+    gone = await _signed_in(make_client, owner_user.email, SAFARI)
+    await _signed_in(make_client, owner_user.email, SAFARI)
+    assert (await gone.post("/api/auth/logout")).status_code == 204
+    assert (await here.post(f"{SESSIONS}/sign-out-others")).status_code == 204
+    audit = await session.scalar(select(AuditLog).where(AuditLog.action == "user.session_ended"))
+    assert audit is not None and audit.details == {"others": 1}
+
+
+@pytest.mark.parametrize(("idle", "expected"), [(24, 24), (0, None)])
+async def test_me_names_the_session_limits(
+    make_client: MakeClient,
+    owner_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+    idle: int,
+    expected: int | None,
+) -> None:
+    """The sessions list says the installation's limits, not fixed numbers (R18-11)."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "session_idle_hours", idle)
+    here = await _signed_in(make_client, owner_user.email, FIREFOX)
+    limits = (await here.get("/api/auth/me")).json()["session_limits"]
+    assert limits == {"idle_hours": expected, "ttl_hours": settings.session_ttl_hours}

@@ -6573,7 +6573,7 @@
         "type": "object"
       },
       "MeOut": {
-        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without.",
+        "description": "`permissions`: the system-wide actions the caller holds; clients decide what to\nshow from these (and from a space's `my_role`), never from the role's name.\n`ai_model`: with `ai.use`, the name of the model the caller's AI assignment gives\nthem (nothing else about the connection); null without. `session_limits`: what the\nsessions list tells the person (R18-11).",
         "properties": {
           "ai_model": {
             "anyOf": [
@@ -6596,6 +6596,9 @@
             "title": "Permissions",
             "type": "array"
           },
+          "session_limits": {
+            "$ref": "#/components/schemas/SessionLimitsOut"
+          },
           "user": {
             "$ref": "#/components/schemas/UserOut"
           }
@@ -6604,7 +6607,8 @@
           "user",
           "org",
           "permissions",
-          "ai_model"
+          "ai_model",
+          "session_limits"
         ],
         "title": "MeOut",
         "type": "object"
@@ -12312,6 +12316,32 @@
           "version"
         ],
         "title": "ServerUpdate",
+        "type": "object"
+      },
+      "SessionLimitsOut": {
+        "description": "The installation's limits of a login session: it ends after `idle_hours` without\nuse (null: no idle limit, HERD_SESSION_IDLE_HOURS=0) and at the latest after\n`ttl_hours` (HERD_SESSION_TTL_HOURS).",
+        "properties": {
+          "idle_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Hours"
+          },
+          "ttl_hours": {
+            "title": "Ttl Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "idle_hours",
+          "ttl_hours"
+        ],
+        "title": "SessionLimitsOut",
         "type": "object"
       },
       "SignupDecisionIn": {

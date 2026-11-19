@@ -49,7 +49,9 @@ class OwnSessions:
 
     async def end_others(self, actor: Actor, current: uuid.UUID) -> None:
         """Every session of hers but `current` ends, and her sign-ins waiting for the
-        second factor."""
-        count = await self.sessions.delete_for_user(actor.org_id, actor.principal.id, keep=current)
+        second factor; the audit counts those that were still running."""
+        count = await self.sessions.delete_for_user(
+            actor.org_id, actor.principal.id, keep=current, now=session_clock().now()
+        )
         if count:
             await record(self.session, actor, ENDED, "user", actor.principal.id, {"others": count})
