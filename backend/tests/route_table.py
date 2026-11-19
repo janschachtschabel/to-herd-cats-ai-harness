@@ -59,6 +59,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/auth/me", "session"),
     ("PATCH", "/api/auth/me", "session"),
     ("POST", "/api/auth/me/password", "session"),
+    ("POST", "/api/auth/me/touch", "session"),
     ("POST", "/api/auth/login/second-factor", "public"),
     ("GET", "/api/auth/me/totp", "session"),
     ("POST", "/api/auth/me/totp/setup", "session"),

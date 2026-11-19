@@ -21,6 +21,11 @@ UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Opening the live stream (`messaging/router_live.py`) is no use of the session (J7):
 # an open tab must not keep an unattended session alive.
 LIVE_STREAM_PATH = "/api/stream"
+# The SPA marks the requests no person caused (a refetch after a live event or on an
+# interval, sent when the tab saw no input for a while; `frontend/src/lib/attention.ts`)
+# with this header; they are no use of the session either (R18-1). The mark only has to
+# be honest in an honest browser, the case the idle limit is for.
+UNATTENDED_HEADER = "x-herd-unattended"
 
 # scope="function": the session's exit (commit or rollback) runs when the endpoint
 # returns, before the response is sent. With the default scope it would run after the
@@ -37,11 +42,12 @@ async def current_auth(
 ) -> AsyncIterator[AuthContext]:
     """The caller, from the session cookie; every log line of the request names them,
     the request line included. The request is a use of the session (J7), except the
-    opening of the live stream, which only checks it."""
+    opening of the live stream and a request marked unattended, which only check it."""
     token = session_token(request, settings)
     if not token:
         raise Unauthorized(code="auth.required")
-    use = request.url.path != LIVE_STREAM_PATH
+    unattended = request.headers.get(UNATTENDED_HEADER) == "1"
+    use = request.url.path != LIVE_STREAM_PATH and not unattended
     ctx = await AuthService(session, settings).resolve(token, use=use, settle=True)
     if ctx is None:
         raise Unauthorized(code="auth.session_invalid")

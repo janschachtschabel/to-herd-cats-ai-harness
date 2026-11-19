@@ -81,3 +81,39 @@ async def test_the_live_stream_is_no_use(
     session_time.advance(timedelta(minutes=5))
     await client.get("/api/stream")  # 503 here (no hub): the session was checked
     assert await _last_used(session, owner_user) == signed_in
+
+
+async def test_a_request_marked_unattended_is_no_use(
+    client: AsyncClient,
+    session: AsyncSession,
+    owner_user: User,
+    session_time: SettableClock,
+) -> None:
+    """The SPA marks the requests no input caused (R18-1); unmarked ones still count."""
+    signed_in = session_time.now()
+    await login(client, owner_user.email)
+    session_time.advance(timedelta(minutes=5))
+    marked = await client.get("/api/auth/me", headers={"X-Herd-Unattended": "1"})
+    assert marked.status_code == 200
+    assert await _last_used(session, owner_user) == signed_in
+    assert (await client.get("/api/auth/me")).status_code == 200
+    assert await _last_used(session, owner_user) == session_time.now()
+
+
+async def test_the_touch_is_a_use_and_no_write(
+    client: AsyncClient,
+    session: AsyncSession,
+    owner_user: User,
+    session_time: SettableClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An active tab that asked nothing for a while touches the session (R18-4): a use,
+    never counted by the write limit."""
+    monkeypatch.setattr(get_settings(), "write_rate_per_minute", 1)
+    await login(client, owner_user.email)
+    csrf = {"X-Requested-With": "herd"}
+    for _ in range(3):
+        session_time.advance(timedelta(minutes=5))
+        touched = await client.post("/api/auth/me/touch", headers=csrf)
+        assert touched.status_code == 204, touched.text
+        assert await _last_used(session, owner_user) == session_time.now()

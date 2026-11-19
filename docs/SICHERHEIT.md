@@ -82,7 +82,13 @@ Workspace, Entra ID, Keycloak …); wer ASVS L2 ohne Abweichung braucht, meldet 
 auch wenn niemand sie nutzte. *Entscheidung:* bauen. `HERD_SESSION_IDLE_HOURS` (Standard
 24, 0 = aus); die Sitzung merkt `last_used_at`, bei der Auflösung höchstens einmal je
 Minute geschrieben; danach 401 `auth.session_invalid`. Die offene Live-Verbindung (SSE)
-zählt nicht als Nutzung. Einstellung in Compose, Chart und Doku.
+zählt nicht als Nutzung, ebenso wenig die Anfragen, die die App ohne Eingabe der Person
+stellt: Nach über 60 Sekunden ohne Eingabe im Tab tragen sie `X-Herd-Unattended: 1`
+(`frontend/src/lib/attention.ts`, `auth/deps.current_auth`); wer nur im Live-Editor
+tippt, hält die Sitzung mit `POST /api/auth/me/touch` (höchstens alle 5 Minuten) am
+Leben. Das Ende durch Inaktivität wird an der Sitzung vermerkt (Anfrage, Abmeldung oder
+Worker), eine spätere längere Grenze belebt sie nicht. Einstellung in Compose, Chart und
+Doku.
 
 **J8 – Eigene Sitzungen sehen und beenden (V7.5.2). Gebaut, M9b Task 18.**
 *Entscheidung:* bauen, im Profil: Liste der eigenen Sitzungen (Gerätehinweis aus dem
@@ -574,7 +580,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 | V7.2 | V7.2.2 | L1 | Dynamische Token | erfüllt | Zufällige Referenztoken je Anmeldung (`core/security.new_session_token`). |
 | V7.2 | V7.2.3 | L1 | 128 Bit aus CSPRNG | erfüllt | 256 Bit aus `secrets.token_urlsafe(32)`, nur SHA-256 gespeichert. `tests/test_auth.py::test_session_token_is_stored_hashed`. |
 | V7.2 | V7.2.4 | L1 | Neues Token bei Anmeldung, altes endet | erfüllt | Jede Anmeldung (Passwort, OIDC) erzeugt ein neues Token und beendet das mitgebrachte (`auth/service.end_replaced`). `tests/test_cookie_security.py::test_signing_in_again_ends_the_session_it_replaces`, `test_an_oidc_sign_in_ends_the_session_it_replaces`. |
-| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | erfüllt | `HERD_SESSION_IDLE_HOURS` (Standard 24, 0 = aus): ohne Anfrage endet die Sitzung; `user_session.last_used_at`, höchstens einmal je Minute geschrieben, die Live-Verbindung zählt nicht (`auth/repository.running`, `touch`; M9b Task 18, J7). `tests/test_session_idle.py::test_an_idle_session_ends_after_the_idle_hours`, `test_last_used_is_written_at_most_once_a_minute`. |
+| V7.3 | V7.3.1 | L2 | Inaktivitätsgrenze | erfüllt | `HERD_SESSION_IDLE_HOURS` (Standard 24, 0 = aus): ohne Anfrage endet die Sitzung; `user_session.last_used_at`, höchstens einmal je Minute geschrieben; weder die Live-Verbindung noch die Anfragen, die die App nach über 60 s ohne Eingabe im Tab von sich aus stellt (`X-Herd-Unattended`), zählen, ein Tab mit Eingabe meldet sich höchstens alle 5 Minuten (`POST /api/auth/me/touch`); das Ende wird an der Sitzung vermerkt (`auth/repository.running`, `touch`, `end_idle`; M9b Task 18, J7). `tests/test_session_idle.py::test_an_idle_session_ends_after_the_idle_hours`, `test_last_used_is_written_at_most_once_a_minute`, `test_a_request_marked_unattended_is_no_use`, `test_the_touch_is_a_use_and_no_write`; `tests/test_review_t18_idle.py`; `tests/test_session_idle_end.py`; `frontend/src/lib/attention.test.ts`. |
 | V7.3 | V7.3.2 | L2 | Absolute Höchstdauer | erfüllt | `HERD_SESSION_TTL_HOURS` (Standard 168), nie verlängert (`auth/service.open_session`). `tests/test_auth.py::test_expired_session_is_rejected`. |
 | V7.4 | V7.4.1 | L1 | Abmelden beendet die Sitzung im Backend | erfüllt | `end_by_hash` setzt den Ablauf auf jetzt (`auth/repository.py`). `tests/test_auth.py::test_logout_invalidates_session`. Bewusste Ausnahme (Review M2 R2): eine bereits offene Live-Bearbeitung speichert ihre letzten Änderungen noch bis zu einer Stunde, lässt aber niemanden neu zu. |
 | V7.4 | V7.4.2 | L1 | Deaktivieren beendet alle Sitzungen | erfüllt | `users/service.deactivate` löscht sie. `tests/test_users.py::test_deactivate_deletes_sessions_and_blocks_login`. |

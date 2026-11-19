@@ -96,3 +96,9 @@ export function useSignInProviders(): SignInProvider[] {
 export function signInHref(key: string): string {
   return `/api/auth/oidc/${encodeURIComponent(key)}/start`
 }
+
+/** A use of the session and nothing else, for a person who works in the tab while the
+ *  app asks the API nothing (R18-4, `lib/attention.ts`); the answer does not matter. */
+export async function touchSession(): Promise<void> {
+  await api.POST('/api/auth/me/touch')
+}

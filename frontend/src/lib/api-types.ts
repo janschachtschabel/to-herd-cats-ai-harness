@@ -2058,6 +2058,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/me/touch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Touch Me
+         * @description The person works in this tab (typing in the live editor, say) though it asked
+         *     the API nothing for a while: a use of the session (J7, R18-4), nothing else. No
+         *     write for the write limit.
+         */
+        post: operations["touch_me_api_auth_me_touch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/oidc/{key}/callback": {
         parameters: {
             query?: never;
@@ -14849,6 +14871,24 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    touch_me_api_auth_me_touch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

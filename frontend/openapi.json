@@ -23643,6 +23643,21 @@
         ]
       }
     },
+    "/api/auth/me/touch": {
+      "post": {
+        "description": "The person works in this tab (typing in the live editor, say) though it asked\nthe API nothing for a while: a use of the session (J7, R18-4), nothing else. No\nwrite for the write limit.",
+        "operationId": "touch_me_api_auth_me_touch_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Touch Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/oidc/{key}/callback": {
       "get": {
         "description": "The provider's redirect: finish the flow, then the app's start page signed in,\nor the sign-in (profile) page with `?error=` (`?link_error=`) and a fixed code.",

@@ -26,14 +26,23 @@ eigenes Passwort im Profil (mit dem alten).
   (30) Versuche je Minute, je Adresse und E-Mail `HERD_LOGIN_RATE_LIMIT_PER_MINUTE` (5)
   Fehlversuche; gezählt in PostgreSQL über alle API-Knoten. Keine Kontosperre.
 - **Sitzung:** ein Cookie, gültig `HERD_SESSION_TTL_HOURS` (168, also 7 Tage) ab der
-  Anmeldung, durch Nutzung nicht verlängert. Ohne Anfrage endet sie schon nach
+  Anmeldung, durch Nutzung nicht verlängert. Ohne Nutzung endet sie schon nach
   `HERD_SESSION_IDLE_HOURS` Stunden (Standard 24, `0` schaltet die Grenze ab; ASVS
   V7.3.1, [`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)): Die Sitzung merkt ihre letzte
   Nutzung, höchstens einmal je Minute geschrieben; danach antwortet die API 401
   `auth.session_invalid` und die App zeigt die Anmeldung. Dieses Ende wird an der
   Sitzung vermerkt wie eine Abmeldung (bei der nächsten Anfrage, sonst vom Worker), eine
-  später längere oder abgeschaltete Grenze belebt sie nicht wieder. Ein offener Tab mit der
-  Live-Verbindung (`/api/stream`) zählt nicht als Nutzung; Compose setzt den Wert in
+  später längere oder abgeschaltete Grenze belebt sie nicht wieder. Nutzung ist, was
+  die Person tut: Ein offener Tab ohne Eingabe hält die Sitzung nicht am Leben. Die
+  Live-Verbindung (`/api/stream`) zählt nie; die Anfragen, die die App von sich aus
+  stellt (nach einem Live-Ereignis, im Intervall, beim Fokus), zählen nicht, wenn der Tab
+  über 60 Sekunden keine Eingabe sah (Zeiger, Taste, Mausrad, Berührung, Fokus, Tab
+  wieder sichtbar): Die App schickt sie dann mit `X-Herd-Unattended: 1`. Umgekehrt
+  meldet ein Tab, in dem jemand arbeitet, ohne dass die App die API fragt (etwa nur
+  Tippen im Live-Editor), höchstens alle 5 Minuten eine Nutzung
+  (`POST /api/auth/me/touch`, 204, keine Schreibaktion für die Schreibgrenze). Die
+  Markierung ist ein Hinweis eines ehrlichen Browsers, kein Schutz gegen ein Programm,
+  das die Sitzung absichtlich am Leben hält. Compose setzt den Wert in
   beiden Dateien, Helm als `api.sessionIdleHours`. Abmelden beendet sie; ein
   Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
   beenden alle Sitzungen einer Person.

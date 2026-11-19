@@ -1,5 +1,6 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { components, paths } from './api-types'
+import { markRequest } from './attention'
 import { retryingOnConflict } from './retry'
 
 export type Schemas = components['schemas']
@@ -123,6 +124,10 @@ async function inMaintenance(response: Response): Promise<boolean> {
 }
 
 const sessionGuard: Middleware = {
+  // Requests nobody's input caused do not keep the session alive (`attention.ts`).
+  onRequest({ request }) {
+    return markRequest(request)
+  },
   async onResponse({ response, request }) {
     const path = new URL(request.url).pathname
     if (response.status === 401 && !SESSION_PATHS.includes(path)) unauthorizedHandler?.()

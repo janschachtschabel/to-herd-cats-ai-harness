@@ -58,6 +58,13 @@ async def me(ctx: AuthDep, session: SessionDep, settings: SettingsDep) -> MeOut:
     return await _me(ctx, session, settings)
 
 
+@router.post("/me/touch", status_code=204)
+async def touch_me(ctx: AuthDep) -> None:
+    """The person works in this tab (typing in the live editor, say) though it asked
+    the API nothing for a while: a use of the session (J7, R18-4), nothing else. No
+    write for the write limit."""
+
+
 @router.patch("/me", response_model=MeOut)
 async def update_me(
     body: ProfileUpdateIn,

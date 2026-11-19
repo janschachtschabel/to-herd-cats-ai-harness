@@ -9,9 +9,9 @@ Each of those is an ordinary request and counts as a use of the session, so in a
 organisation where anybody writes, an open tab never becomes idle, although
 `docs/ANMELDUNG.md` says an open tab does not count as use.
 
-The test sends exactly what the SPA sends for such a refetch today. A fix lets the
-server tell the app's own requests from the person's (a header the SPA sets on
-refetches no input caused, say); the requests here then carry that mark."""
+The fix (R18-1): the SPA marks requests sent while the tab saw no input for more than
+60 s with `X-Herd-Unattended: 1` (`frontend/src/lib/attention.ts`), and the server does
+not count those as use; the requests here carry that mark."""
 
 from datetime import timedelta
 
@@ -36,7 +36,11 @@ async def test_an_unattended_tab_does_not_keep_the_session_alive(
     # `message.created` makes the tab refetch the unread counts by itself.
     for _ in range(30):
         session_time.advance(timedelta(hours=1))
-        await client.get("/api/conversations/unread", params={"limit": 100})
+        await client.get(
+            "/api/conversations/unread",
+            params={"limit": 100},
+            headers={"X-Herd-Unattended": "1"},
+        )
     # 30 hours without any input of the person: the session has ended.
     answer = await client.get("/api/auth/me")
     assert answer.status_code == 401, "the tab's own refetches kept the session alive"
