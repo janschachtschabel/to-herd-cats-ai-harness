@@ -135,3 +135,25 @@ def test_the_runtime_role_must_be_a_plain_name() -> None:
     assert Settings(database_runtime_role="herd_app").database_runtime_role == "herd_app"
     with pytest.raises(ValidationError, match="needs HERD_DATABASE_RUNTIME_ROLE"):
         Settings(migrate_database_url="postgresql+asyncpg://herd_owner@db:5432/herd")
+
+
+async def test_the_runtime_role_only_reads_the_recorded_revision(
+    runtime_role: tuple[str, str],
+) -> None:
+    """`/ready` reads `alembic_version`; writing it is the migration role's alone, so
+    code running as the app cannot make the next migration replay or skip revisions
+    (review M9b Task 18, R18-8)."""
+    name, password = runtime_role
+    runtime = make_engine(make_url(OWNER_URL).set(username=name, password=password))
+    try:
+        async with runtime.connect() as conn:
+            assert await conn.scalar(text("SELECT version_num FROM alembic_version"))
+            for statement in (
+                "UPDATE alembic_version SET version_num = 'r18_8'",
+                "INSERT INTO alembic_version (version_num) VALUES ('r18_8')",
+                "DELETE FROM alembic_version",
+                "TRUNCATE alembic_version",
+            ):
+                await _refused(conn, statement)
+    finally:
+        await runtime.dispose()

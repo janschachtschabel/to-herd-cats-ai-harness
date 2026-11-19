@@ -166,8 +166,12 @@ besitzt das Schema; Migration, Sicherung und Wiederherstellung verbinden sich mi
 Die Laufzeitrolle (`HERD_DATABASE_RUNTIME_ROLE`, die Rolle von `HERD_DATABASE_URL`)
 bekommt am Ende jeder Migration nur Datenrechte auf alle Tabellen und Sequenzen und per
 `ALTER DEFAULT PRIVILEGES` auf künftige (`core/db_roles.py`); Schemaänderungen sind ihr
-verwehrt. Compose (`compose.roles.yml`) und Chart (`database.migrate.*`) können zwei
-Rollen nutzen. Der Standard bleibt eine Rolle für kleine Installationen
+verwehrt, `alembic_version` darf sie nur lesen. Compose (`compose.roles.yml`) und Chart
+(`database.migrate.*`) können zwei Rollen nutzen. Im Chart und in `compose.nodes.yml`
+kennen nur Migration und Sicherung die Migrationsrolle; in `compose.roles.yml` migriert
+der Dienst `app` selbst und kennt ihr Passwort: Dort schützt die Trennung vor
+SQL-Injection, nicht vor Code, der im Container läuft. Der Standard bleibt eine Rolle für
+kleine Installationen
 ([`SICHERUNG.md`](SICHERUNG.md#getrennte-datenbankrollen-seit-m9b-optional)).
 
 ## Betriebsvoraussetzungen und Hinweise
@@ -702,7 +706,7 @@ Abmelden überall), steht zusätzlich im Audit-Log der Organisation (Datenbank, 
 |---|---|---|---|---|---|
 | V13.1 | V13.1.1 | L2 | Kommunikation dokumentiert | erfüllt | Abschnitt „Verbindungen“. |
 | V13.2 | V13.2.1 | L2 | Dienste untereinander authentifiziert | erfüllt | Collab → API trägt je Aufruf eine kurzlebige Berechtigung und das interne Token, das sich ohne Ausfall wechseln lässt (`HERD_INTERNAL_TOKEN_PREVIOUS`, `web/internal.py`; M9b Task 18, J12 c). Datenbank: eigenes Dienstkonto mit Passwort, auf Wunsch über TLS. `tests/test_internal_token_rotation.py::test_both_internal_tokens_are_accepted`. |
-| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | erfüllt | Container laufen ohne root (uid 10001). Datenbank: getrennte Rollen als Option, die Laufzeitrolle nur mit Datenrechten, Migration, Sicherung und Wiederherstellung mit der Rolle, die das Schema besitzt (`core/db_roles.py`, `HERD_MIGRATE_DATABASE_URL`, `HERD_DATABASE_RUNTIME_ROLE`; Compose `compose.roles.yml`, Chart `database.migrate.*`; M9b Task 18, J14). Standard eine Rolle (dokumentiert). `tests/test_database_roles.py::test_the_runtime_role_cannot_alter_the_schema`. |
+| V13.2 | V13.2.2 | L2 | Geringste Rechte der Dienstkonten | erfüllt | Container laufen ohne root (uid 10001). Datenbank: getrennte Rollen als Option, die Laufzeitrolle nur mit Datenrechten (`alembic_version` nur lesend), Migration, Sicherung und Wiederherstellung mit der Rolle, die das Schema besitzt (`core/db_roles.py`, `HERD_MIGRATE_DATABASE_URL`, `HERD_DATABASE_RUNTIME_ROLE`; Compose `compose.roles.yml`, Chart `database.migrate.*`; M9b Task 18, J14). Standard eine Rolle (dokumentiert); in `compose.roles.yml` kennt der Dienst `app` (Rolle `all`) das Passwort der Migrationsrolle, die Trennung schützt dort vor SQL-Injection, nicht vor Code im Container (`SICHERUNG.md`). `tests/test_database_roles.py::test_the_runtime_role_cannot_alter_the_schema`, `test_the_runtime_role_only_reads_the_recorded_revision`. |
 | V13.2 | V13.2.3 | L2 | Keine Standard-Zugangsdaten | erfüllt | Compose verlangt `POSTGRES_PASSWORD` und das Bootstrap-Passwort ohne Standardwert (`deploy/compose/compose.yml`); `HERD_INTERNAL_TOKEN` mindestens 32 Zeichen (`tests/test_config.py`). |
 | V13.2 | V13.2.4 | L2 | Allowlist für Ziele nach außen | erfüllt | Nach außen nur zu Zielen, die Admins eintragen (KI-Verbindungen, MCP-Server, OIDC-Anbieter, OAuth-Clients) und nur an öffentliche Adressen (private nur per Allowlist): `core/egress.py`, `core/egress_allowance.py`; im Chart zusätzlich NetworkPolicy-Egress. |
 | V13.2 | V13.2.5 | L2 | Server mit Allowlist | erfüllt | Wie V13.2.4; Dateien nur unter `HERD_DATA_DIR`, SPA nur aus `HERD_STATIC_DIR`. |

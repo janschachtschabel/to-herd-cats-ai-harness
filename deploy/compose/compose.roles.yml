@@ -9,6 +9,12 @@
 # installation from the administration is refused with separate roles
 # (restore.not_schema_owner); use `docker compose exec app python -m app.ops restore
 # apply --replace ...`, which connects as the owner.
+# What it protects and what not: `app` runs in role all and migrates at its start, so it
+# holds the owner's password (HERD_MIGRATE_DATABASE_PASSWORD) for as long as it runs.
+# Requests use the runtime role's connections, so an SQL injection cannot alter or drop
+# the schema or rewrite alembic_version; code running inside the app container can read
+# the owner's password from its environment. Only the chart and compose.nodes.yml keep
+# the owner's credentials out of the serving processes.
 
 services:
   db-roles:

@@ -6,7 +6,8 @@ restores connect with it (`Settings.migrate_database`). The runtime role
 `grant_runtime_role` runs at the end of every migration run (`alembic/env.py`), so the
 rights cover every table and sequence, including a role named only later, and
 `ALTER DEFAULT PRIVILEGES` covers what later migrations create. CREATE on schema
-`public` is taken from PUBLIC (PostgreSQL 15 and later do that already).
+`public` is taken from PUBLIC (PostgreSQL 15 and later do that already). Of
+`alembic_version` the runtime role may only read (for `/ready`).
 
 Without HERD_DATABASE_RUNTIME_ROLE nothing is granted: one role does everything, as
 before."""
@@ -29,6 +30,9 @@ def runtime_grants(role: str) -> list[str]:
         f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT {DATA} ON TABLES TO {who}",
         f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT {NUMBERS} ON SEQUENCES TO {who}",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+        # The recorded revision is the migration role's to write; `/ready` only reads
+        # it (R18-8). The runs before granted it with ALL TABLES above.
+        f"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON alembic_version FROM {who}",
     ]
 
 

@@ -400,7 +400,9 @@ trennt zwei Rollen:
   `UPDATE` und `DELETE` auf alle Tabellen, `USAGE`, `SELECT` und `UPDATE` auf alle
   Sequenzen, und über `ALTER DEFAULT PRIVILEGES` dasselbe auf alles, was spätere
   Migrationen anlegen. Ändern, Anlegen oder Löschen von Tabellen darf sie nicht;
-  `CREATE` im Schema `public` wird `PUBLIC` entzogen (`core/db_roles.py`).
+  `CREATE` im Schema `public` wird `PUBLIC` entzogen (`core/db_roles.py`). Die Tabelle
+  `alembic_version` (der Stand der Migrationen) darf sie nur lesen, für `/ready`;
+  schreiben darf sie nur die Migrationsrolle.
   `HERD_MIGRATE_DATABASE_URL` ohne `HERD_DATABASE_RUNTIME_ROLE` ist ein Startfehler.
 - Die Rollen legt der Betrieb an (die Laufzeitrolle mit `LOGIN` und Passwort, sonst
   nichts). Wird die Laufzeitrolle erst später benannt, genügt eine Migration
@@ -420,6 +422,18 @@ Start ihr Passwort; die App bedient Anfragen als `herd_app` und migriert als `he
 der Dienst `backup` sichert als `herd`. Mit `compose.nodes.yml` nimmt der Dienst
 `migrate` die drei Variablen; die Laufzeitrolle der Knoten setzt man dort über eine
 eigene Überlagerung von `HERD_DATABASE_URL` und `HERD_DATABASE_PASSWORD`.
+
+**Was die Trennung in `compose.roles.yml` schützt und was nicht:** Der Dienst `app`
+läuft dort in Rolle `all` und migriert beim Start, darum kennt er das Passwort der
+Migrationsrolle (`HERD_MIGRATE_DATABASE_PASSWORD`), solange er läuft. Die Trennung
+verhindert, dass eine Anfrage, etwa über eine SQL-Injection, das Schema ändert,
+Tabellen löscht oder den Stand der Migrationen umschreibt: Anfragen laufen über die
+Verbindungen der Laufzeitrolle. Sie verhindert **nicht**, dass Code, der im Container
+der App ausgeführt wird (eine Lücke, die Befehle oder Python ausführen lässt), die
+Umgebung liest und sich als Migrationsrolle verbindet. Gegen diesen Fall hilft nur,
+die Zugangsdaten der Migrationsrolle aus den dienenden Prozessen herauszuhalten: Das
+Chart tut das (nur Migrations- und Backup-Job bekommen sie), ebenso
+`compose.nodes.yml` (nur der Dienst `migrate` und der Backup-Dienst).
 
 **Helm:** `database.migrate.url`, `database.migrate.existingSecret` (Schlüssel
 `password`) und `database.migrate.runtimeRole` (nur zusammen, nur mit externer
