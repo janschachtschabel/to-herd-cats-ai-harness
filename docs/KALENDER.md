@@ -58,6 +58,10 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   `event.rrule_invalid`).
 - **Eine UID je Kalender:** Zwei Termine mit derselben UID in einem Kalender gibt es
   nicht (409 `event.uid_taken`); ein gelöschter Termin blockiert seine UID nicht.
+  Diese Antwort verrät einer Autorin, dass es die UID im Kalender gibt, auch die eines
+  privaten Termins, dessen UID sie sonst nicht sieht. Für erzeugte UIDs ist das ohne
+  Belang, importierte können erratbar sein; die Antwort nennt nichts weiter, und kein
+  späterer Schreibweg (Ändern, Import) fügt ihr etwas hinzu.
 - **Das Fenster** (`GET /api/calendar/events?from&to`) liefert jedes Vorkommen im
   Zeitraum, nach Anfang sortiert und seitenweise (höchstens 100 je Seite, höchstens
   2.000 Vorkommen je Abfrage, sonst 422 `calendar.window_too_dense`, gezählt in
