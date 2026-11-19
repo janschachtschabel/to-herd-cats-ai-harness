@@ -220,3 +220,22 @@ App (`/api/ai/oauth/<id>/callback`); danach geht der Browser auf
 `prompt=consent` aus dem Zweck. Ein Zugang wird nur für seinen Zweck benutzt; ändert
 sich der Endpunkt einer Kalender-App, werden ihre Zugänge getrennt wie in M8. Die
 Verwaltung der KI zeigt Kalender-Zugänge und -Apps nie.
+
+- **Ursprung:** Ein Zugang mit Passwort (CalDAV) wird für einen Ursprung angelegt,
+  `https://host[:port]` in genau einer Schreibweise (`connectors/origins.py`, dieselbe,
+  mit der M8 einen umgezogenen Server erkennt): nur https, Host klein geschrieben und
+  geprüft (internationale Namen IDNA-kodiert, keine Leer- oder Sonderzeichen, IPv4 nur
+  in Punktschreibweise, IPv6 in eckigen Klammern), Port 443 entfällt. Alles andere ist
+  422 `connector.origin_invalid`; ein leeres oder nur aus Leerzeichen bestehendes
+  Passwort 422 `connector.secret_invalid`.
+- **Rückkehr ohne Sitzung:** Endet die Sitzung während der Zustimmung beim Anbieter,
+  landet der Browser trotzdem auf `/calendar/accounts?status=invalid` (der Zweck der
+  App, deren Rückleitungsadresse getroffen wurde), nicht auf der Seite der KI. Dass die
+  Rückleitungsadresse einer Kalender-App so anders antwortet als eine unbekannte ID,
+  ist gewollt (siehe [`MCP.md`](MCP.md), OAuth).
+- **Namen:** Der Name der Kalender-App teilt sich den Namensraum mit den MCP-Apps der
+  Organisation (409 `oauth_client.name_taken`, siehe [`MCP.md`](MCP.md)). Eine
+  Kalender-App sollte also nicht wie ein Katalogeintrag heißen („GitHub“, „GitLab“).
+- **Zurückgehen unter die Migration** `d5f8a1c3e7b9` löscht alle Kalender-Zugänge und
+  Kalender-Apps (sonst zählten sie als MCP-Zugänge); nach dem erneuten Hochgehen
+  verbinden die Personen neu.

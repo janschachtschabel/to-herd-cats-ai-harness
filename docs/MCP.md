@@ -616,8 +616,29 @@ mit `ai.manage` (sonst 404 `ai.not_found`): `GET`/`POST`, `GET`/`PATCH`/`DELETE
   ein Kalender-Zugang geht nie an einen MCP-Server (umgekehrt ebenso). Die
   Rückleitungsadresse bleibt die der App; nach der Rückkehr entscheidet der Zweck des
   Konnektors, welches Recht noch einmal geprüft wird (`ai.use` bzw. `calendar.sync`) und
-  wohin der Browser geht (`/ai/oauth/done` bzw. `/calendar/accounts`). Namen sind über
-  beide Zwecke eindeutig (je Person bzw. Organisation), wie in M8.
+  wohin der Browser geht (`/ai/oauth/done` bzw. `/calendar/accounts`); ohne Sitzung
+  oder ohne passenden Ablauf entscheidet der Zweck der App, deren Rückleitungsadresse
+  getroffen wurde. Die Datenbank hält das auch: ein Kalender-Zugang ist persönlich und
+  an keinem Server, er verbindet sich nur über eine App seines Zwecks, und ein
+  MCP-Server nennt nur Zugänge und Apps des Zwecks `mcp` (zusammengesetzte
+  Fremdschlüssel über `purpose`).
+- **Zwei bewusste Ausnahmen von „wie eine unbekannte ID“:**
+  - **Rückleitungsadresse:** `GET /api/ai/oauth/<ID einer Kalender-App>/callback` mit
+    einem unbekannten oder fehlenden `state` schickt jeden, auch ohne Sitzung, auf
+    `/calendar/accounts?status=invalid`, eine unbekannte ID dagegen auf
+    `/ai/oauth/done?status=invalid`. Verraten wird nur, dass eine nicht zu erratende ID
+    eine Kalender-App ist; jede Autorisierungsanfrage der App zeigt diese ID ihrer
+    Nutzerin ohnehin. Eine eigene Rückleitungsadresse je Zweck würde dagegen den Schutz
+    gegen Verwechslung der Anbieter (M9b, J13) aufheben.
+  - **Namen:** Namen sind über beide Zwecke eindeutig (je Person bzw. Organisation), wie
+    in M8 (der eindeutige Index umfasst beide; ihn aufzuteilen wäre ein Contract). Eine
+    MCP-App mit dem Namen der Kalender-App antwortet daher 409
+    `oauth_client.name_taken`, obwohl keine Liste hier die andere zeigt. Heute liegen
+    `ai.manage` und `calendar.manage` in denselben Rollen, niemand erfährt also etwas
+    Neues. Weil die Installation aus dem Katalog den Namen des Eintrags nimmt, blockiert
+    eine Kalender-App namens „GitHub“ die Installation von GitHub mit diesem 409: dann
+    die Kalender-App umbenennen. Kalender-Zugänge tragen einen erzeugten Namen
+    (`calendar:<id>`), der nie mit einem getippten zusammenstößt.
 
 ### Erneuerung
 
