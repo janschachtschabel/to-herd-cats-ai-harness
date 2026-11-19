@@ -39,7 +39,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.models_base import Base, OrgScoped, UuidPk
 from app.core.principal import PrincipalType
 
-UID_MAX = 255
+UID_MAX = 500
 TITLE_MAX = 300
 LOCATION_MAX = 500
 DESCRIPTION_MAX = 20_000

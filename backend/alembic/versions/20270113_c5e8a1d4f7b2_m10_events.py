@@ -36,7 +36,7 @@ def upgrade() -> None:
         "calendar_event",
         sa.Column("calendar_id", sa.UUID(), nullable=False),
         sa.Column("space_id", sa.UUID(), nullable=False),
-        sa.Column("uid", sa.String(length=255), nullable=False),
+        sa.Column("uid", sa.String(length=500), nullable=False),
         sa.Column("title", sa.String(length=300), nullable=False),
         sa.Column("description", sa.Text(), server_default="", nullable=False),
         sa.Column("location", sa.String(length=500), server_default="", nullable=False),

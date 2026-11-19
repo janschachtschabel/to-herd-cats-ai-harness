@@ -92,7 +92,7 @@ async def test_create_checks_times_zone_and_rule(
         {"description": "x" * 20_001},
         {"status": "maybe"},
         {"visibility": "secret"},
-        {"uid": "x" * 256},
+        {"uid": "x" * 501},
         {"organizer": "someone"},
     ):
         r = await client.post(url, json={**base, **BERLIN, **change})
@@ -138,6 +138,8 @@ async def test_a_new_event_shows_what_was_stored(
         "version": 1,
     }
     assert made["uid"].endswith("@to-herd-cats-ai")
+    imported = await new_event(client, calendar["id"], uid="u" * 500)  # as iCalendar keeps
+    assert imported["uid"] == "u" * 500
     endless = await new_event(client, calendar["id"], rrule="FREQ=DAILY")
     assert endless["recurs_until"] is None  # endless
     single = await new_event(client, calendar["id"])
