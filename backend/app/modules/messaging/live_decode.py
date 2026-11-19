@@ -14,7 +14,7 @@ def decode(raw: str) -> LiveEvent | None:
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("t") not in LIVE_NAMES:
             return None
-        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a", "y", "b")
+        keys = ("c", "m", "p", "u", "w", "s", "r", "n", "x", "a", "y", "b", "l")
         ids = {key: _strict_uuid(data.get(key)) for key in keys}
         org_id = _strict_uuid(data.get("o"))
         step = data.get("k")
@@ -40,6 +40,7 @@ def decode(raw: str) -> LiveEvent | None:
         ids["a"],
         ids["y"],
         ids["b"],
+        ids["l"],
     )
 
 

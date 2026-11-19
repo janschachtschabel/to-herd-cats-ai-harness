@@ -39,6 +39,7 @@ from tests.factories_ai import (  # noqa: E402, F401
     stub_egress,
     stub_network,
 )
+from tests.factories_calendar import private_event  # noqa: E402, F401
 from tests.factories_catalog import catalog_dir  # noqa: E402, F401
 from tests.factories_collab import collab, internal, internal_token  # noqa: E402, F401
 from tests.factories_connectors import ai_people, secret_key  # noqa: E402, F401

@@ -23,6 +23,10 @@ from app.core.models_base import Base, OrgScoped, UuidPk
 
 MAX_CALENDARS_PER_SPACE = 20
 NAME_MAX = 120
+# A calendar's zone unless one is named (plan M10 task 3a ruling: the interface's
+# default language is German).
+DEFAULT_TIME_ZONE = "Europe/Berlin"
+TIME_ZONE_MAX = 64
 
 
 class CalendarColor(StrEnum):
@@ -75,6 +79,13 @@ class Calendar(UuidPk, OrgScoped, Base):
         Boolean, nullable=False, default=False, server_default=text("false")
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # IANA name: the zone of a new event that names none (`events.EventService.create`).
+    time_zone: Mapped[str] = mapped_column(
+        String(TIME_ZONE_MAX),
+        nullable=False,
+        default=DEFAULT_TIME_ZONE,
+        server_default=DEFAULT_TIME_ZONE,
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 

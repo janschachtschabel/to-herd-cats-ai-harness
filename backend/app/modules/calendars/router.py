@@ -49,7 +49,7 @@ async def list_space_calendars(
 async def create_calendar(
     space_id: uuid.UUID, body: CalendarCreate, actor: ActorDep, session: SessionDep
 ) -> CalendarOut:
-    new = NewCalendar(name=body.name, color=body.color)
+    new = NewCalendar(name=body.name, color=body.color, time_zone=body.time_zone)
     return CalendarOut.of(await CalendarService(session).create(actor, space_id, new))
 
 

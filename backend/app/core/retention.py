@@ -166,6 +166,7 @@ RETENTION: Mapping[str, Retention] = {
     # Calendars (M10)
     "calendar": Keep(_CONTENT + "; archived calendars stay (their events and links point at them)"),
     "calendar_setting": Keep(_SETTING),
+    "calendar_event": Keep(_CONTENT + "; a deleted one stays as a tombstone (task 3b)"),
 }
 
 

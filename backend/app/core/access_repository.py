@@ -204,19 +204,22 @@ def _person_member(min_role: SpaceRole | None = None) -> ColumnElement[bool]:
     return exists().where(*clauses).correlate_except(SpaceMember)
 
 
-def person_reads_space(space_id: SQLColumnExpression[uuid.UUID | None]) -> ColumnElement[bool]:
+def person_reads_space(
+    space_id: SQLColumnExpression[uuid.UUID | None], *, by_admin_power: bool = True
+) -> ColumnElement[bool]:
     """The rule of `visible_ids_stmt` seen from the other side: whether the (correlated)
     `User` row may read the space `space_id`, with the person's groups as they are now.
     For questions about many people at once ("who of these may see it?", review M3
     focus 4 and 5) in one statement; `tests/test_conversation_readers.py` holds both
-    forms to the same answers."""
+    forms to the same answers. Without `by_admin_power`, `member_ids_stmt`'s rule."""
     open_to_role = and_(Space.kind == SpaceKind.OPEN, User.system_role.in_(OPEN_SPACE_READERS))
+    admins = [User.system_role.in_(ADMIN_ROLES)] if by_admin_power else []
     readable = (
         exists()
         .where(
             Space.id == space_id,
             Space.org_id == User.org_id,
-            or_(User.system_role.in_(ADMIN_ROLES), _person_member(), open_to_role),
+            or_(*admins, _person_member(), open_to_role),
         )
         .correlate_except(Space)
     )

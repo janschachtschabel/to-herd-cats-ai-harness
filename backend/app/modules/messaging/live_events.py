@@ -12,7 +12,8 @@ only, never content:
      "a": <author_id> (proposal events of a person's proposal only),
      "n": <run_id>, "k": <step> (`run.progress` only),
      "y": <automation_id> (`automation.changed`, with "u" and "s"),
-     "b": <backup_run_id|null> (`backup.changed`, with "u")}
+     "b": <backup_run_id|null> (`backup.changed`, with "u"),
+     "l": <calendar_id> (`calendar.changed`, with "s")}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -35,7 +36,9 @@ handler writes one per person), with the proposal's id; so is `automation.change
 its steps so far as `k`, for whoever may see its conversation `c`; a heartbeat's run
 before it delivers anything names no `c` but its asker `u` (review M7, finding 5).
 `backup.changed` (plan M9 task 13, `u` an owner, `b` the run) is sent directly, not
-through the outbox (`modules/backups/live.py`). Every
+through the outbox (`modules/backups/live.py`). `calendar.changed` (plan M10, from
+`modules/calendars/live.py`) is for the space `s`, for its members alone (never by
+admin power), with the space's and the calendar's id `l`. Every
 API process's hub (`live.py`) decodes it again (`live_decode.py`); anything it cannot use
 is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
@@ -89,7 +92,8 @@ LIVE_TYPES: dict[str, str] = {
     "automation.changed": "automation.changed",
 }
 BACKUP = "backup.changed"  # sent directly (`modules/backups/live.py`), not from the outbox
-LIVE_NAMES = frozenset(LIVE_TYPES.values()) | {BACKUP}
+CALENDAR = "calendar.changed"  # published by `modules/calendars/live.py`
+LIVE_NAMES = frozenset(LIVE_TYPES.values()) | {BACKUP, CALENDAR}
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
 # Events for a space (no conversation, no person): sprints for whoever may read tickets
 # there, proposals for whoever may edit pages there (`LiveEvent.space_action`).
@@ -129,6 +133,7 @@ class LiveEvent:
     author_id: uuid.UUID | None = None  # a person's proposal: its author gets it too
     automation_id: uuid.UUID | None = None  # automation.changed only (with `space_id`)
     backup_id: uuid.UUID | None = None  # backup.changed only
+    calendar_id: uuid.UUID | None = None  # calendar.changed only (with `space_id`)
 
     @property
     def for_space(self) -> bool:
@@ -139,6 +144,8 @@ class LiveEvent:
     @property
     def space_action(self) -> Action:
         """What a space event's recipients may do in the space."""
+        if self.name == CALENDAR:
+            return Action.CALENDAR_READ
         return Action.PAGE_EDIT if self.name == "proposal.changed" else Action.TICKET_READ
 
     def payload(self) -> str:
@@ -167,12 +174,18 @@ class LiveEvent:
             data["y"] = str(self.automation_id)
         if self.backup_id is not None:
             data["b"] = str(self.backup_id)
+        if self.calendar_id is not None:
+            data["l"] = str(self.calendar_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
         """The server-sent event: its name and the ids a client reloads by (a ticket
         event also `ticket_id` and `space_id`; a sprint event only `space_id` and
         `sprint_id`; a proposal event only `space_id` and `proposal_id`)."""
+        if self.for_space and self.name == CALENDAR:
+            return sse_frame(
+                self.name, {"space_id": str(self.space_id), "calendar_id": _text(self.calendar_id)}
+            )
         if self.for_space and self.name == "proposal.changed":
             return sse_frame(
                 self.name, {"space_id": str(self.space_id), "proposal_id": _text(self.proposal_id)}

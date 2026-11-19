@@ -25,6 +25,10 @@ ship without a decision on who may call it. Guards:
 - `calendar`: a role in the calendar's space; otherwise 404 `calendar.not_found`, as for
   an id nobody has (plan M10). An admin outside the space reaches it by naming the
   space (`/api/spaces/{space_id}/calendars`, audited); the calendar lists are `session`.
+  Making an event is `calendar` too; the event window is `session` (another space's
+  events only by naming it with `space_id`, which is `require`d and audited).
+- `event`: whoever sees the event (a role in its calendar's space, or its organiser);
+  otherwise 404 `event.not_found`, as for an id nobody has (plan M10 task 3a).
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
 - `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
@@ -184,6 +188,9 @@ ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/calendars/{calendar_id}", "calendar"),
     ("GET", "/api/admin/calendar-settings", "admin"),
     ("PUT", "/api/admin/calendar-settings", "admin"),
+    ("POST", "/api/calendars/{calendar_id}/events", "calendar"),
+    ("GET", "/api/calendar/events", "session"),
+    ("GET", "/api/events/{event_id}", "event"),
     ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
     ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
@@ -360,6 +367,7 @@ def concrete(
     proposal_id: object | None = None,
     skill_id: object | None = None,
     calendar_id: object | None = None,
+    event_id: object | None = None,
 ) -> str:
     versioned_delete = template in (
         "/api/ai/connections/{connection_id}",
@@ -399,6 +407,7 @@ def concrete(
         "{tool_id}": str(uuid7()),
         "{sprint_id}": str(sprint_id or uuid7()),
         "{calendar_id}": str(calendar_id or uuid7()),
+        "{event_id}": str(event_id or uuid7()),
         "{agent_id}": str(uuid7()),
         "{run_id}": str(uuid7()),
         "{approval_id}": str(uuid7()),
@@ -419,6 +428,7 @@ def concrete(
         "/diff": "?from=1&to=1",
         "/attachments": "?filename=x.txt",
         "/dm-inspect": f"?user_id={uuid7()}",
+        "/calendar/events": "?from=2026-11-23T00:00:00Z&to=2026-11-24T00:00:00Z",
     }
     if "/ticket-statuses/" in template or versioned_delete:
         return template + "?version=1"
@@ -471,6 +481,11 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/spaces/{space_id}/calendars"): {"name": "X"},
     ("PATCH", "/api/calendars/{calendar_id}"): {"name": "X", "version": 1},
     ("PUT", "/api/admin/calendar-settings"): {"sync_enabled": True, "version": 1},
+    ("POST", "/api/calendars/{calendar_id}/events"): {
+        "title": "X",
+        "starts_at": "2026-11-23T10:00:00Z",
+        "ends_at": "2026-11-23T11:00:00Z",
+    },
     ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
     ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},

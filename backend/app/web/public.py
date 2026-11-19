@@ -32,6 +32,7 @@ from app.modules.auth.write_limits import COUNTED
 from app.modules.automations import router as automations_router
 from app.modules.backups.replacing import replace_runner
 from app.modules.backups.router import router as backups_router
+from app.modules.calendars import event_router as calendar_events
 from app.modules.calendars import router as calendars
 from app.modules.connectors import router as connectors
 from app.modules.directory.router import router as directory_router
@@ -130,6 +131,9 @@ def api_router() -> APIRouter:
     api.include_router(calendars.calendars, dependencies=COUNTED)
     api.include_router(calendars.space_calendars, dependencies=COUNTED)
     api.include_router(calendars.calendar_settings)
+    api.include_router(calendar_events.calendar_events, dependencies=COUNTED)
+    api.include_router(calendar_events.window)
+    api.include_router(calendar_events.events, dependencies=COUNTED)
     api.include_router(search_router)
     api.include_router(directory_router)
     api.include_router(audit_router)

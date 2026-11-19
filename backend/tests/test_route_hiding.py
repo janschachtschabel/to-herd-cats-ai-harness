@@ -5,7 +5,7 @@ answers 404 exactly like something that does not exist; so does a page proposal,
 skill proposal one may not decide, a skill for people without AI, one's access
 tokens without `mcp.use`, and the backups for anyone but an owner."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -14,6 +14,8 @@ from uuid_utils.compat import uuid7
 
 from app.core.actor import Actor
 from app.core.principal import Principal, SystemRole
+from app.modules.calendars.event_times import Times
+from app.modules.calendars.events import EventService, NewEvent
 from app.modules.calendars.service import CalendarService, NewCalendar
 from app.modules.messaging.channels import ChannelService
 from app.modules.messaging.service import MessageService
@@ -246,3 +248,23 @@ async def test_calendar_routes_hide_calendars_of_unseen_spaces(
             response = await member_client.request(method, path, json=body)
             assert response.status_code == 404, (method, template, response.text)
             assert response.json()["error"]["code"] == "calendar.not_found"
+
+
+async def test_event_routes_hide_events_of_unseen_spaces(
+    member_client: AsyncClient, team_space: Space, session: AsyncSession, owner_user: User
+) -> None:
+    actor = Actor(owner_user.org_id, Principal.user(owner_user.id), SystemRole.OWNER, frozenset())
+    calendar = await CalendarService(session).create(actor, team_space.id, NewCalendar("Geheim"))
+    times = Times(
+        starts_at=datetime(2026, 11, 23, 10, tzinfo=UTC),
+        ends_at=datetime(2026, 11, 23, 11, tzinfo=UTC),
+    )
+    made = await EventService(session).create(actor, calendar.id, NewEvent("Geheim", times))
+    for method, template, guard in ROUTES:
+        if guard == "event":
+            path = concrete(template, event_id=made.id)
+            response = await member_client.request(
+                method, path, json=BODIES.get((method, template))
+            )
+            assert response.status_code == 404, (method, template, response.text)
+            assert response.json()["error"]["code"] == "event.not_found"

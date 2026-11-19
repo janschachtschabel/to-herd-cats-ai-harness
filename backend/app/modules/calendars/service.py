@@ -31,24 +31,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import pagination
 from app.core.access import Action, Actor, member_space_ids, require, visible_space_ids
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.models_base import utcnow
 from app.core.pagination import PageParams, decode_id_cursor
+from app.modules.calendars import zones
 from app.modules.calendars.defaults import ensure_default, ensure_defaults, wants_default
-from app.modules.calendars.models import MAX_CALENDARS_PER_SPACE, Calendar, CalendarColor
+from app.modules.calendars.models import (
+    DEFAULT_TIME_ZONE,
+    MAX_CALENDARS_PER_SPACE,
+    Calendar,
+    CalendarColor,
+)
 from app.modules.calendars.repository import CalendarRepository
 
-EDITABLE = ("name", "color")
+EDITABLE = ("name", "color", "time_zone")
 
 
 @dataclass(frozen=True, slots=True)
 class NewCalendar:
     name: str
     color: CalendarColor = CalendarColor.BLUE
+    time_zone: str = DEFAULT_TIME_ZONE
 
 
 def calendar_not_found() -> NotFound:
     return NotFound(code="calendar.not_found")
+
+
+def _check_zone(time_zone: str) -> None:
+    try:
+        zones.zone(time_zone)
+    except zones.ZoneUnknown:
+        raise ValidationFailed(code="calendar.invalid_time_zone") from None
 
 
 class CalendarService:
@@ -86,6 +100,7 @@ class CalendarService:
 
     async def create(self, actor: Actor, space_id: uuid.UUID, new: NewCalendar) -> Calendar:
         await require(self.session, actor, Action.CALENDAR_MODERATE, space_id)
+        _check_zone(new.time_zone)
         repo = self._repo(actor)
         space = await repo.lock_space(space_id)
         if space is None:  # gone since the check
@@ -98,7 +113,13 @@ class CalendarService:
                 code="calendar.limit",
             )
         return await repo.add(
-            Calendar(org_id=actor.org_id, space_id=space_id, name=new.name, color=new.color)
+            Calendar(
+                org_id=actor.org_id,
+                space_id=space_id,
+                name=new.name,
+                color=new.color,
+                time_zone=new.time_zone,
+            )
         )
 
     async def update(
@@ -106,6 +127,8 @@ class CalendarService:
     ) -> Calendar:
         """`values`: the fields the client sent (none of them null)."""
         calendar = await self._managed(actor, calendar_id, version)
+        if "time_zone" in values:
+            _check_zone(values["time_zone"])
         changed = [n for n in EDITABLE if n in values and values[n] != getattr(calendar, n)]
         if not changed:
             return calendar
