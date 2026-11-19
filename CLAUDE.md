@@ -12,9 +12,9 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
 release note `docs/RELEASE-1.0.0.md`; the tag is not published: Jan tags only when the
 whole app is finished); M9b (Tasks 12 to 19, closed by Task 17: docs, Steckbrief, spec,
-demo `docs/demo/m9.md`) and M10 Tasks 1–3c, 7a and 13a (`2026-11-18-m10-kalender.md`) are built
+demo `docs/demo/m9.md`) and M10 Tasks 1–4, 7a, 9, 10 and 13a (`2026-11-18-m10-kalender.md`) are built
 after it, collected for operators of 1.0.0 builds in `docs/RELEASE-NEXT.md` (unreleased;
-versions and `RELEASED` unchanged); next are M10 from Task 4 (with 7b and 13b) and M5
+versions and `RELEASED` unchanged); next are M10 from Task 5 (with 7b and 13b) and M5
 Tasks 8–12.
 Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
@@ -67,9 +67,13 @@ far): calendars per space with their rights and defaults (Task 1); time zones an
 RFC 5545 recurrence as pure functions on `python-dateutil` (Task 2); events with
 recurrence and private visibility, the window, sight and expansion (Task 3a); changing
 and deleting events and series by occurrence, split and rule (Task 3b); the measured
-expansion with its two remedies (Task 3c); reading and writing iCalendar as pure
-functions on `icalendar` (Task 7a); a purpose on connectors and OAuth apps, so calendar
-accesses reuse M8's without AI rights (Task 13a).
+expansion with its two remedies (Task 3c); invitations of people, agents and addresses
+with their answers, notifications in the activity view and „Meine Termine“
+(`mine=true`) (Task 4); reading and writing iCalendar as pure
+functions on `icalendar` (Task 7a); overlays of ticket due dates, sprints and
+automation terms, stored nowhere (Task 9); the calendar page with month, week, day and
+agenda views, the calendar list and live refresh (Task 10); a purpose on connectors and OAuth apps, so
+calendar accesses reuse M8's without AI rights (Task 13a).
 Planned, not present: embeddings, hybrid search, Docling conversion (M5 Tasks 8–11).
 Operations: `README.md` (Betriebshinweise),
 `docs/STECKBRIEF.md` (update its measurements each milestone), `docs/WIKI.md` (wiki use
@@ -158,12 +162,14 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   one), `recurrence_rule.py` (the RRULE subset: `DAILY` up, `COUNT` ≤ 5,000, ASCII
   digits, codes `event.rrule_invalid`/`event.rrule_unsupported`, UNTIL outside
   1900–2399 `event.time_out_of_range`; the canonical text reads back as itself),
-  `recurrence_series.py` (`Series`, `Occurrence`, `bounded`), `recurrence.py` (the only
-  code that imports `python-dateutil`, `tests/test_calendar_imports.py` scans `app` and
-  `scripts`; `recurrence_jump.py` may too). A `Series` is wall times in its zone (start,
+  `recurrence_series.py` (`Series`, `Occurrence`, `bounded`), `recurrence.py` (series
+  and occurrences), `recurrence_scan.py` (the rule's matches: the only code that imports
+  `python-dateutil`, `tests/test_calendar_imports.py` scans `app` and `scripts`;
+  `recurrence_jump.py` may too). A `Series` is wall times in its zone (start,
   RDATE, EXDATE, RECURRENCE-ID; all-day: 00:00 UTC, no zone); DTSTART is always the
   first occurrence; series lie in 1900–2399 and `dateutil` runs 7,600 years ahead so its
-  scan ends at our 2399; an endless rule jumps whole periods to the window
+  scan ends at our 2399 (a weekly rule's week holding 31 December 2399 breaks its scan
+  in its year 10000: that week is scanned again 7,200 years ahead); an endless rule jumps whole periods to the window
   (`recurrence_jump.jump`). Where `dateutil` departs from RFC 5545 our layer corrects it
   (BYDAY mixing plain and numbered days is one list; a weekly BYSETPOS counts in the
   whole first week); `test_calendar_recurrence_oracle.py` compares with a brute-force
@@ -219,6 +225,50 @@ Demos per milestone in `docs/demo/m*.md` (each executed and logged).
   to decision 5's lengths; status, visibility, busy, sequence ≤ 2^31 − 1, attendees),
   overrides by recurrence id (a cancelled one is an EXDATE; one without its series is
   `ical.override_orphaned`), alarms as minutes before the start; a UID is one line.
+- Overlays (M10 Task 9, `calendars/overlays.py`, `GET /api/calendar/overlays`): open
+  tickets' due days, sprints and active automations' next terms in `[from, to)` days,
+  stored nowhere, one statement per kind in the module's own repository
+  (`ViewRepository.due_between`, `SprintRepository.overlapping`,
+  `ManageRepository.terms_between`). Tickets and sprints of `member_space_ids` only
+  (never admin power, no audit); automations by `automations/sight.py` and only in a
+  member space or one's own. Paged by (starts_on, kind, id), automations within a day
+  by their term (`at`); a term's day is the viewer's (`time_zone`) whose midnights
+  hold it (`_day_of`, rising with the instant; computed in Python, as PostgreSQL's
+  zone names lack tzdata's links), the cursor bound to it. Private events never show
+  (`tests/test_private_path_overlays.py`); done/cancelled tickets do not either.
+- Calendar page (M10 Task 10, `frontend/src/features/calendars`; the plan's
+  `features/calendar/` is this one folder): route `/calendar` (`search.ts`: `space`
+  the named way, `view` month|week|day|agenda, `date`), sidebar „Kalender“ under
+  „Arbeit“, a „Kalender“ link in a space's tabs. Own components, no calendar or date
+  library: `dates.ts` (plain `YYYY-MM-DD` days on UTC dates; `weekStart(locale)` from
+  `Intl.Locale` week info; a view's window = its days' starts in the viewer's zone,
+  `dayStart` moves a skipped midnight on; an all-day occurrence floats on 00:00 UTC, so
+  its days are the same in every zone), `layout.ts` (`columns` for overlaps, wall
+  minutes per grid day, `byDay`), `views/` (MonthView: WAI-ARIA grid, roving tab stop,
+  arrows/Home/End, Enter opens the day, 3 events then „+N weitere“; TimeGrid for week
+  and day; AgendaView pages with „Weitere Termine laden“; `EventChip` a button whose
+  name starts with its visible text). The viewer zone is the browser's until the
+  profile has one (Task 12a). `queries.ts`: `useCalendars`, `useSpaceCalendars`,
+  `useWindow` (pages of 100; grid views fetch page after page, the agenda on request;
+  the last answer stays while the next window loads, so a view stays mounted and the
+  month keeps its focus; a 422 `calendar.window_too_dense` keeps what loaded; calendar
+  queries never retry a 4xx, `retryCalendar`). `sources.ts` words calendars
+  (`name.ts`), tones them (`display.ts`, eight fixed tones as edge and dot only) and
+  takes their abilities from the space's `my_role` (`calendarAbilities`; none, and a
+  default named „Standardkalender“, until the spaces are known). Hidden calendars live
+  in localStorage (`visibility.ts`) and are filtered from the loaded window (never
+  `calendar_ids`, no refetch: events of calendars the list does not hold stay, named
+  „Kalender“). Tones in `display.ts` keep ≥ 3:1 against page, muted and accent in
+  both themes.
+  Opening an event shows the read-only `EventPeek` until Task 11's dialog replaces it.
+  `calendar.changed` → `calendars/live.ts` (`calendarEventKeys(spaceId)`: lists,
+  the space's list, every window, events); keys in `calendars/keys.ts`.
+- Heap: `app/core/heap.freeze_startup_heap` (gc.collect + gc.freeze) runs in
+  `app.launch.serve` once the servers are built (api, all, worker): full collections no
+  longer walk the start-up heap (200–300 ms each before); `scripts/measure_calendar.py`
+  does the same. Tests never freeze the pytest process: the autouse fixture
+  `no_heap_freeze` (`tests/conftest.py`) replaces it; `test_launch.py` proves serving
+  calls it.
 - MCP (M8): `app/mcp/` is the only code that imports the MCP SDK (`mcp`, `mcp_types`;
   `tests/test_mcp_imports.py`): the endpoint (`endpoint.py`: Origin, token, POST only;
   `server.py`: one stateless SDK server per request, JSON answers), the client
@@ -673,6 +723,47 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   (`deleted_at`, 30 days, `core/retention.py`); the series' outbox event names the
   overrides it wrote (`overrides`). The in-session test client shares one session:
   test what must survive a rollback on `real_db`.
+- Calendar invitations (M10 Task 4, `modules/calendars`): `calendar_event_attendee`
+  (a principal `user`/`agent` or an `email` with a display `name`; `role`, `response`;
+  ≤ 100 per event, `attendee_models.MAX_ATTENDEES`; unique per principal and per
+  lower-cased address). Attending (organiser or an attendee row of that row) is SQL
+  only, `sight.attends_sql(actor)`, read per row as a column (`EventRepository.find`
+  returns `(event, attends)`, `in_window` `(event, reads, attends)` triples,
+  `attended(events, …)`; `Seen.attends`); an attendee sees the row in FULL, private
+  included, and nothing else of the calendar or space. `InvitationService`
+  (`invitations.py`): `set_attendees` (the event write check, version + 1, a series'
+  added/removed reach its overrides, `calendar_event.updated` fields `["attendees"]`),
+  `attendees` (FULL else 403 `event.private`), `respond` (403 `event.not_invited`,
+  version checked not bumped; a series' answer follows overrides that held the same
+  answer). Inviting checks `attendee_repository.known` (`directory.read`: any active
+  person, else readers of the space; agents need `ai.use`). Agents are `accepted` at
+  once and are never told; addresses are `delivery` `not_sent` (Task 16 adds
+  `provider`). `invitation_effects.py`: the hooks `copy_attendees` on
+  `series.ON_OVERRIDE` and `series_split.CARRY` (registered when it is imported, by
+  `events.py`; `calendars/__init__.py` stays empty: `core.access` imports
+  `calendars.standing`), a time change of the named row resets the other attendees'
+  answers and tells them, cancel/delete tells them (deleting one occurrence or the
+  following ones too: an overridden occurrence's people, else the series'); the people
+  of each override a series write makes a tombstone or cancels with the series are
+  told too, each person once per write (`invitation_effects.tell`, the series first).
+  Deleting an agent deletes its attendee rows (`AgentRepository.delete`, like its
+  memberships). Outbox `calendar_event.invited`
+  (one per person, `calendar_id` + `user_id`) and `.responded` (`response`); live
+  `event.invited` (`{"event_id"}`, for that person alone). Notifications
+  (`calendars/notifications.py`): `invitation`, `invite_reply` (organiser, a person,
+  on declined/tentative, never her own) in the activity view only, one per (person,
+  event, reason), renewed by `NotificationRepository.renew_about_event` only when the
+  stored one is older than the cause's outbox event (a redelivery leaves a read one
+  read; a new one is dated no earlier than its cause); the activity
+  shows one only while the person attends the row and its calendar is not archived
+  (`messaging/activity_calendar.py`, table stubs: messaging never imports calendars),
+  and lists only reasons it knows (`activity_repository.KNOWN`; the reason check
+  admits all five calendar reasons since migration `e2c7a9f4b6d1`).
+  Without `space_id` the window's rule carries `sight.listed_calendars_sql` (a guard on
+  the joined `calendar`: member spaces, or a calendar holding an event one organises or
+  is invited to, each by its own index), so the window walks only calendars it can list
+  from. Make SQLAlchemy aliases once at module level, never per call (an alias is a
+  reference cycle of a few thousand objects).
 - AI and agents:
   - Only `app/runtime/` imports Pydantic AI (and DBOS, should it ever come); nothing
     else does.
