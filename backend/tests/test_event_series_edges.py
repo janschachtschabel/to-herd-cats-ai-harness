@@ -253,3 +253,16 @@ async def test_deleting_a_series_names_the_overrides_it_took(
         "calendar_event.deleted",
         {"calendar_id": calendar_id, "overrides": [override["id"]]},
     )
+
+
+async def test_a_change_that_deletes_every_occurrence_deletes_the_series(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace
+) -> None:
+    client, calendar_id = await _calendar(make_client, make_user, make_space)
+    made = await new_event(client, calendar_id, rrule="FREQ=WEEKLY;COUNT=2", **MONDAYS)
+    gone = ["2026-11-23T09:00:00", "2026-11-30T09:00:00"]
+
+    assert (await patch(client, made, exdates=gone)).status_code == 200
+
+    assert (await client.get(f"/api/events/{made['id']}")).status_code == 404
+    assert await window(client, *SPAN) == []
