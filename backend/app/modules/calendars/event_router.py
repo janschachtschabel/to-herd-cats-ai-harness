@@ -1,12 +1,19 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from pydantic import AwareDatetime
 
 from app.core.pagination import Page, PageParams
 from app.modules.auth.deps import ActorDep, SessionDep
-from app.modules.calendars.event_schemas import EventCreate, EventOut, OccurrenceOut
+from app.modules.calendars.event_schemas import (
+    EventChangeOut,
+    EventCreate,
+    EventOut,
+    EventUpdate,
+    OccurrenceOut,
+)
+from app.modules.calendars.event_writes import Scope
 from app.modules.calendars.events import EventService
 from app.modules.calendars.sight import Sight
 from app.modules.calendars.window import list_window
@@ -68,3 +75,60 @@ async def list_events(
 async def get_event(event_id: uuid.UUID, actor: ActorDep, session: SessionDep) -> EventOut:
     seen = await EventService(session).get(actor, event_id)
     return EventOut.of(seen.event, seen.sight)
+
+
+Occurrence = Annotated[
+    str | None,
+    Query(
+        max_length=32,
+        description="with scope this or following: the occurrence's recurrence_id "
+        "(its wall time, as the window names it)",
+    ),
+]
+
+
+@events.patch("/{event_id}", response_model=EventChangeOut)
+async def update_event(
+    event_id: uuid.UUID,
+    body: EventUpdate,
+    actor: ActorDep,
+    session: SessionDep,
+    scope: Scope = Scope.ALL,
+    occurrence: Occurrence = None,
+    dry_run: Annotated[bool, Query(description="only count what the change drops")] = False,
+) -> EventChangeOut:
+    """Changes the event (`calendar.write` and full sight; 403 `event.private` with
+    "busy" sight), at the version read (409 `event.version_conflict`): the whole series
+    (`scope=all`), one occurrence (`this`: an override) or this and the following
+    (`following`: the series is split)."""
+    changed = await EventService(session).update(
+        actor,
+        event_id,
+        body.change(),
+        scope=scope,
+        occurrence=occurrence,
+        version=body.version,
+        dry_run=dry_run,
+    )
+    return EventChangeOut(
+        event=EventOut.of(changed.event, changed.sight),
+        dropped_overrides=changed.dropped_overrides,
+        dropped_exdates=changed.dropped_exdates,
+    )
+
+
+@events.delete("/{event_id}", status_code=204)
+async def delete_event(
+    event_id: uuid.UUID,
+    version: Annotated[int, Query()],
+    actor: ActorDep,
+    session: SessionDep,
+    scope: Scope = Scope.ALL,
+    occurrence: Occurrence = None,
+) -> Response:
+    """Deletes the event (a tombstone for 30 days): the series with its overrides, one
+    occurrence (`this`), or this and the following (`following`)."""
+    await EventService(session).delete(
+        actor, event_id, scope=scope, occurrence=occurrence, version=version
+    )
+    return Response(status_code=204)

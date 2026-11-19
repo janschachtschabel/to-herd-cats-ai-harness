@@ -20,8 +20,10 @@ event as the `Series` it is expanded from (plan M10 decisions 5 and 6).
   `event.rrule_invalid`, `event.rrule_unsupported`).
 """
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Any
 
 from app.core.errors import ValidationFailed
 from app.modules.calendars import recurrence, zones
@@ -60,6 +62,7 @@ class Checked:
     rdates: tuple[datetime, ...]
     exdates: tuple[datetime, ...]
     recurs_until: datetime | None
+    series: Series  # what is stored, as the series it is expanded from
 
 
 def invalid(code: str) -> ValidationFailed:
@@ -134,7 +137,68 @@ def check(times: Times, default_zone: str) -> Checked:
         rdates=tuple(sorted(set(times.rdates))),
         exdates=tuple(sorted(set(times.exdates))),
         recurs_until=recurrence.last_end(series) if recurring else ends_at,
+        series=series,
     )
+
+
+def wall_start(times: Times, default_zone: str) -> datetime:
+    """The wall time `times` start at in their zone (all-day: 00:00 of the first day),
+    or 422 as `check` would answer."""
+    return _bounds(times, default_zone)[2]
+
+
+def times_of(event: CalendarEvent) -> Times:
+    """A stored event's times as a client would send them (a change starts from it)."""
+    days = days_of(event)
+    if days is not None:
+        return Times(
+            all_day=True,
+            first_day=days[0],
+            last_day=days[1],
+            rrule=event.rrule,
+            rdates=tuple(event.rdates),
+            exdates=tuple(event.exdates),
+        )
+    return Times(
+        starts_at=event.starts_at,
+        ends_at=event.ends_at,
+        tzid=event.tzid,
+        rrule=event.rrule,
+        rdates=tuple(event.rdates),
+        exdates=tuple(event.exdates),
+    )
+
+
+# What a change may name about when, as the API calls it, and the field of `Times`.
+TIME_FIELDS = {
+    "all_day": "all_day",
+    "starts_at": "starts_at",
+    "ends_at": "ends_at",
+    "first_day": "first_day",
+    "last_day": "last_day",
+    "time_zone": "tzid",
+    "rrule": "rrule",
+    "rdates": "rdates",
+    "exdates": "exdates",
+}
+
+
+def overlay(times: Times, values: Mapping[str, Any]) -> Times:
+    """`times` with what a change names (`TIME_FIELDS`). Turning an event all-day, or
+    back, drops the bounds and the zone of the other kind: the change names the new
+    ones."""
+    if "all_day" in values and values["all_day"] != times.all_day:
+        times = Times(
+            all_day=bool(values["all_day"]),
+            rrule=times.rrule,
+            rdates=times.rdates,
+            exdates=times.exdates,
+        )
+    named = {TIME_FIELDS[name]: value for name, value in values.items() if name in TIME_FIELDS}
+    for name in ("rdates", "exdates"):
+        if name in named:
+            named[name] = tuple(named[name])
+    return replace(times, **named)
 
 
 def series_of(event: CalendarEvent) -> Series:

@@ -75,6 +75,7 @@ __all__ = [
     "actor_for",
     "can",
     "draft_space_ids",
+    "held_by_admin_power",
     "member_space_ids",
     "my_roles",
     "require",
@@ -180,6 +181,21 @@ async def require(
     if space_id is not None and facts.kind is not None and _by_admin_power(facts):
         if first_time(session, (ADMIN_ACCESS, actor.principal, space_id)):
             await record_admin_access(session, actor, space_id, facts.kind)
+
+
+async def held_by_admin_power(
+    session: AsyncSession, actor: Actor, action: Action, space_id: uuid.UUID
+) -> bool:
+    """Whether the actor may do the space action in the space only through its admin
+    role: it may, and its membership (own, through a group, or an open space its role
+    reads) would not let it. For audits of writes by admin power (plan M10 task 3b)."""
+    if actor.system_role not in ADMIN_ROLES:
+        return False
+    facts = await AccessRepository(session).facts(actor, space_id)
+    if not _allows(facts, action):
+        return False
+    role = _effective_role(facts)
+    return role is None or role < SPACE_ACTION_MIN_ROLE[action]
 
 
 async def _derived(session: AsyncSession, actor: Actor, action: Action) -> bool:

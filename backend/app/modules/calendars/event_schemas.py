@@ -6,7 +6,14 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from app.core.principal import PrincipalType
 from app.modules.calendars.event_models import (
@@ -22,6 +29,7 @@ from app.modules.calendars.event_models import (
     EventVisibility,
 )
 from app.modules.calendars.event_times import Times, days_of
+from app.modules.calendars.event_writes import Change
 from app.modules.calendars.events import NewEvent
 from app.modules.calendars.recurrence import Occurrence
 from app.modules.calendars.sight import Sight
@@ -80,6 +88,49 @@ class EventCreate(BaseModel):
             busy=self.busy,
             uid=self.uid,
         )
+
+
+NOT_NULL = ("title", "description", "location", "all_day", "status", "visibility", "busy")
+
+
+class EventUpdate(BaseModel):
+    """A change: `version` (the one read) and only the fields that change, named as
+    when making an event. Times start from the stored ones: an event moves by its
+    `starts_at`/`ends_at` (all-day: `first_day`/`last_day`); `all_day` switches the kind
+    and then needs the other kind's bounds. With `scope=all` the times are the series'
+    (its first occurrence); with `scope=this` the occurrence's; with `scope=following`
+    those of the part from the occurrence on. `rrule: null` ends the rule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    title: Title | None = None
+    description: Annotated[str, StringConstraints(max_length=DESCRIPTION_MAX)] | None = None
+    location: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=LOCATION_MAX)] | None
+    ) = None
+    all_day: bool | None = None
+    starts_at: AwareDatetime | None = None
+    ends_at: AwareDatetime | None = None
+    first_day: date | None = None
+    last_day: date | None = None
+    time_zone: Annotated[str, StringConstraints(max_length=TZID_MAX)] | None = None
+    rrule: Annotated[str, StringConstraints(max_length=RRULE_MAX)] | None = None
+    rdates: list[datetime] | None = Field(default=None, max_length=DATES_MAX)
+    exdates: list[datetime] | None = Field(default=None, max_length=DATES_MAX)
+    status: EventStatus | None = None
+    visibility: EventVisibility | None = None
+    busy: bool | None = None
+
+    @model_validator(mode="after")
+    def _not_null(self) -> "EventUpdate":
+        for name in (*NOT_NULL, "rdates", "exdates"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
+    def change(self) -> Change:
+        return Change({name: getattr(self, name) for name in self.model_fields_set - {"version"}})
 
 
 class OrganizerOut(BaseModel):
@@ -152,6 +203,17 @@ class EventOut(BaseModel):
             redacted=not full,
             version=event.version,
         )
+
+
+class EventChangeOut(BaseModel):
+    """The answer to a change: the event it shows (the series; with `scope=this` the
+    new override; with `scope=following` the new series; with `dry_run` the event as
+    it is) and what the change drops: overrides and deleted occurrences (EXDATEs) that
+    no longer name an occurrence of the series (with `dry_run`: would drop)."""
+
+    event: EventOut
+    dropped_overrides: int
+    dropped_exdates: int
 
 
 class OccurrenceOut(BaseModel):

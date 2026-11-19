@@ -19,6 +19,7 @@ SQL, for filters that must not answer by hidden content (the title search).
 """
 
 import uuid
+from dataclasses import dataclass
 from enum import StrEnum
 
 from sqlalchemy import ColumnElement, and_, or_, true
@@ -35,16 +36,30 @@ class Sight(StrEnum):
     NONE = "none"
 
 
-def _admin(actor: Actor) -> bool:
+@dataclass(frozen=True, slots=True)
+class Seen:
+    """An event and how much of it the caller sees (`events.EventService.get`)."""
+
+    event: CalendarEvent
+    sight: Sight
+
+
+def admin_power(actor: Actor) -> bool:
     """Admin power over content: an admin acting for herself (a run's scope caps it)."""
     return actor.system_role in ADMIN_ROLES and actor.read_scope is None
+
+
+def organises(actor: Actor, event: CalendarEvent) -> bool:
+    """Whether the actor is the event's organiser (who alone, besides an admin on the
+    named way, changes its visibility; task 3b)."""
+    return event.organizer_type == actor.principal.type and event.organizer_id == actor.principal.id
 
 
 def of(actor: Actor, event: CalendarEvent, *, reads: bool, attends: bool, named: bool) -> Sight:
     """`reads`: the actor reads the event's space (lists: as a member; named: through
     `access.require`); `attends`: it organises the event (task 4: or is invited);
     `named`: the call is the named way, the only one on which admin power counts."""
-    if attends or (named and reads and _admin(actor)):
+    if attends or (named and reads and admin_power(actor)):
         return Sight.FULL
     if not reads:
         return Sight.NONE
@@ -66,7 +81,7 @@ def attends(actor: Actor, event: CalendarEvent) -> bool:
     scope = actor.read_scope
     if scope is not None and event.space_id not in scope.ids():
         return False
-    return event.organizer_type == actor.principal.type and event.organizer_id == actor.principal.id
+    return organises(actor, event)
 
 
 def attends_sql(actor: Actor) -> ColumnElement[bool]:
@@ -116,6 +131,6 @@ def by_id_sql(actor: Actor) -> ColumnElement[bool]:
 def full_sql(actor: Actor, *, named: bool) -> ColumnElement[bool]:
     """`of(...) == FULL` as SQL, for events that already pass the call's rule (one it
     does not read it passes only as its organiser)."""
-    if named and _admin(actor):
+    if named and admin_power(actor):
         return true()
     return or_(attends_sql(actor), CalendarEvent.visibility == EventVisibility.DEFAULT)

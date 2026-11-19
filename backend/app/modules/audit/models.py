@@ -13,6 +13,9 @@ ADMIN_ACCESS = "space.admin_access"
 AGENT_ADMIN_ACCESS = "agent.admin_access"  # someone else's personal agent (plan M6)
 # A private calendar event's content read by admin power alone (plan M10, R3a-4).
 CALENDAR_PRIVATE_READ = "calendar.private_read"
+# A calendar event changed or deleted by admin power alone (plan M10, task 3b): every
+# write, ids and field names only.
+CALENDAR_ADMIN_WRITE = "calendar.admin_write"
 
 
 class AuditLog(UuidPk, OrgScoped, Base):

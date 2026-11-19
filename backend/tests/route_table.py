@@ -191,6 +191,8 @@ ROUTES: list[tuple[str, str, str]] = [
     ("POST", "/api/calendars/{calendar_id}/events", "calendar"),
     ("GET", "/api/calendar/events", "session"),
     ("GET", "/api/events/{event_id}", "event"),
+    ("PATCH", "/api/events/{event_id}", "event"),
+    ("DELETE", "/api/events/{event_id}", "event"),
     ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
     ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
@@ -380,6 +382,7 @@ def concrete(
         "/api/agents/{agent_id}",
         "/api/automations/{automation_id}",
         "/api/calendars/{calendar_id}",
+        "/api/events/{event_id}",  # GET and PATCH ignore the query
     )
     ids = {
         "{message_id}": str(message_id or uuid7()),
@@ -486,6 +489,7 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "starts_at": "2026-11-23T10:00:00Z",
         "ends_at": "2026-11-23T11:00:00Z",
     },
+    ("PATCH", "/api/events/{event_id}"): {"title": "X", "version": 1},
     ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
     ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},

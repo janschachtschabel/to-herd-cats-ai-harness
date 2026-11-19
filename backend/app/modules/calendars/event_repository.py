@@ -51,6 +51,46 @@ class EventRepository:
         )
         return found
 
+    async def lock(self, event_id: uuid.UUID) -> CalendarEvent | None:
+        """The live event, locked until the transaction ends and read afresh (a write
+        checks the version it read under this lock). A series is locked before its
+        overrides, everywhere."""
+        found: CalendarEvent | None = await self.session.scalar(
+            self._select()
+            .where(CalendarEvent.id == event_id)
+            .with_for_update(of=CalendarEvent)
+            .execution_options(populate_existing=True)
+        )
+        return found
+
+    async def overrides_of(
+        self, series_id: uuid.UUID, *, since: datetime | None = None
+    ) -> list[CalendarEvent]:
+        """The series' live overrides (those for occurrences from the wall time `since`
+        on, if given), locked, by recurrence id."""
+        stmt = (
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.org_id == self.org_id,
+                CalendarEvent.deleted_at.is_(None),
+                CalendarEvent.series_id == series_id,
+            )
+            .order_by(CalendarEvent.recurrence_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if since is not None:
+            stmt = stmt.where(CalendarEvent.recurrence_id >= since)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def calendar_zone(self, calendar_id: uuid.UUID) -> str:
+        """The zone of the event's calendar, for times sent without one."""
+        stmt = select(Calendar.time_zone).where(
+            Calendar.org_id == self.org_id, Calendar.id == calendar_id
+        )
+        zone: str = (await self.session.execute(stmt)).scalar_one()
+        return zone
+
     async def add(self, event: CalendarEvent) -> CalendarEvent:
         """Stores the event; `UidTaken` when the calendar has a live event with its UID
         (and recurrence id). The rest of the transaction stays (a savepoint)."""

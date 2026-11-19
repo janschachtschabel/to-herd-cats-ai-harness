@@ -85,3 +85,17 @@ async def test_making_events_counts_reading_them_does_not(
             },
         )
     )
+
+
+async def test_changing_and_deleting_events_count(
+    make_client: Any, make_user: MakeUser, make_space: MakeSpace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    moderator = await make_user()
+    team = await make_space("team", members=[(moderator, "moderator")])
+    mod = await _other(make_client, moderator.email)
+    made = await new_event(mod, (await new_calendar(mod, team.id, "Termine"))["id"])
+    monkeypatch.setattr(get_settings(), "write_rate_per_minute", 3)  # 2 so far, a change: 3
+    changed = await mod.patch(f"/api/events/{made['id']}", json={"version": 1, "title": "Y"})
+    assert changed.status_code == 200, changed.text
+    _refused(await mod.patch(f"/api/events/{made['id']}", json={"version": 2, "title": "Z"}))
+    _refused(await mod.delete(f"/api/events/{made['id']}", params={"version": 2}))

@@ -15,6 +15,7 @@ from app.core.request_context import client_ip
 from app.modules.audit.models import (
     ADMIN_ACCESS,
     AGENT_ADMIN_ACCESS,
+    CALENDAR_ADMIN_WRITE,
     CALENDAR_PRIVATE_READ,
     AuditLog,
 )
@@ -115,6 +116,35 @@ async def record_private_event_reads(
         for event_id, space_id, calendar_id in sorted(set(events))
     ]
     await AuditRepository(session).add_many_unless_present(rows)
+
+
+async def record_event_admin_write(
+    session: AsyncSession,
+    actor: Actor,
+    event: tuple[uuid.UUID, uuid.UUID, uuid.UUID],
+    *,
+    change: str,
+    scope: str,
+    fields: Iterable[str],
+) -> None:
+    """An admin changed or deleted a calendar event by admin power alone (plan M10,
+    task 3b): one entry per write; `event` is (event, space, calendar) ids, the details
+    name the change, its scope and the changed fields, never their values."""
+    event_id, space_id, calendar_id = event
+    await record(
+        session,
+        actor,
+        CALENDAR_ADMIN_WRITE,
+        "calendar_event",
+        event_id,
+        {
+            "space_id": str(space_id),
+            "calendar_id": str(calendar_id),
+            "change": change,
+            "scope": scope,
+            "fields": sorted(fields),
+        },
+    )
 
 
 def snapshot(entity: object, fields: Iterable[str]) -> dict[str, Any]:

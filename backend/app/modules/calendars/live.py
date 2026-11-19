@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.outbox import Event
 from app.modules.messaging.live_events import CALENDAR, LIVE_CHANNEL, MAX_PAYLOAD_BYTES, LiveEvent
 
-TYPES = ("calendar_event.created",)
+TYPES = ("calendar_event.created", "calendar_event.updated", "calendar_event.deleted")
 
 
 def live_event(event: Event) -> LiveEvent | None:

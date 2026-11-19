@@ -67,7 +67,14 @@ async def test_the_organiser_shortcut_stays_inside_a_read_scope(
 def test_the_event_services_build_no_sql() -> None:
     """R3a-6 (hard rule 3): the services of events take their SQL from `sight.py` and
     the repository; they import nothing from SQLAlchemy but the session."""
-    for name in ("events.py", "window.py"):
+    for name in (
+        "events.py",
+        "window.py",
+        "event_writes.py",
+        "series.py",
+        "series_rebase.py",
+        "series_split.py",
+    ):
         tree = ast.parse((CALENDARS / name).read_text())
         imported = {
             (node.module, alias.name)
