@@ -6,6 +6,10 @@ hits after the limiter's window, AI rate windows an hour after they began. The
 modules still clear their own on the way (a login, a new flow, a new grant, a limit
 check); the upkeep catches what nobody comes back for.
 
+Before that it records the end of login sessions the idle limit ended
+(`HERD_SESSION_IDLE_HOURS`, R18-3), so a longer or no idle limit later does not revive
+a session nobody came back to.
+
 It also marks backups whose process died (`backup_run` rows still `running` while no
 backup holds the backup lock, plan M9 task 8) `interrupted`, so a backup killed by its
 job's time limit does not stay `running`.
@@ -17,13 +21,15 @@ clock that schedules, which can run ahead of the wall time (the browser tests mo
 and would end logins still valid; the backups at the clock's `now`, which their runs
 are written with (`app/ops`)."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.db import Database
 from app.core.retention import EXPIRY, RETENTION, Upkeep
 from app.models_registry import Base
+from app.modules.auth.repository import SessionRepository
 from app.modules.backups.repository import BackupRunRepository
 from app.worker.upkeep_repository import delete_older
 
@@ -41,9 +47,22 @@ async def remove_expired(session: AsyncSession, table: str, now: datetime, limit
     return await delete_older(session, target, target.c[rule.since], now - rule.after, limit)
 
 
+async def end_idle_sessions(session: AsyncSession, wall: datetime, limit: int) -> int:
+    """Up to `limit` sessions that went idle by `wall` get that end recorded; how many."""
+    hours = get_settings().session_idle_hours
+    idle = timedelta(hours=hours) if hours else None
+    return await SessionRepository(session, idle).end_idle(wall, limit=limit)
+
+
 async def run_upkeep(database: Database, *, wall: datetime, now: datetime, limit: int) -> int:
-    """Every expiring table at `wall`, batch by batch (one transaction each), then the
-    dead backups at `now`; how many rows were removed."""
+    """The idle sessions' ends, then every expiring table at `wall`, batch by batch
+    (one transaction each), then the dead backups at `now`; how many rows were
+    removed."""
+    while True:
+        async with database.session_factory() as session, session.begin():
+            count = await end_idle_sessions(session, wall, limit)
+        if count < limit:
+            break
     removed = 0
     for table in EXPIRING:
         while True:

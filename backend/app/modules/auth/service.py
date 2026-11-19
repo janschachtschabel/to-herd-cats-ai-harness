@@ -163,13 +163,23 @@ class AuthService:
         if ended is not None:
             log_sign_out(ended)
 
-    async def resolve(self, token: str, *, use: bool = False) -> AuthContext | None:
+    async def resolve(
+        self, token: str, *, use: bool = False, settle: bool = False
+    ) -> AuthContext | None:
         """The caller of a running session. `use`: the request counts as the session's
         use (J7): its last use is noted, at most once a minute, and committed at once,
-        so no row lock is held for the rest of the request."""
+        so no row lock is held for the rest of the request. A session the idle limit
+        ended has that end recorded (R18-3), committed at once with `settle` (the
+        request's own dependency, which holds nothing else yet); otherwise it is left
+        to the caller's transaction and the worker's upkeep."""
         now = session_clock().now()
-        user_session = await self.sessions.get_active(hash_token(token), now)
-        if user_session is None or not user_session.user.is_active:
+        token_hash = hash_token(token)
+        user_session = await self.sessions.get_active(token_hash, now)
+        if user_session is None:
+            if await self.sessions.end_idle(now, token_hash=token_hash) and settle:
+                await self.session.commit()
+            return None
+        if not user_session.user.is_active:
             return None
         if use and await self.sessions.touch(user_session.id, now):
             await self.session.commit()

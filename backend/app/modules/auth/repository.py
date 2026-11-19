@@ -60,6 +60,29 @@ class SessionRepository:
         )
         return touched is not None
 
+    async def end_idle(
+        self, now: datetime, *, token_hash: str | None = None, limit: int = 1
+    ) -> int:
+        """Record the end of up to `limit` sessions (with this token, if given) that the idle limit
+        ended: their expiry becomes the moment they went idle, as a sign-out ends a
+        session, so a longer or no idle limit later does not revive them (R18-3). How
+        many."""
+        if self.idle is None:
+            return 0
+        stmt = select(UserSession.id).where(
+            UserSession.expires_at > now, UserSession.last_used_at <= now - self.idle
+        )
+        if token_hash is not None:
+            stmt = stmt.where(UserSession.token_hash == token_hash)
+        idle = locked_batch(stmt.limit(limit).with_for_update(skip_locked=True), "idle")
+        ended = await self.session.scalars(
+            update(UserSession)
+            .where(UserSession.id == idle.c.id)
+            .values(expires_at=UserSession.last_used_at + self.idle)
+            .returning(UserSession.id)
+        )
+        return len(ended.all())
+
     def ended(self, user_session: UserSession, now: datetime) -> bool:
         """The session has ended: expired, logged out or idle too long."""
         if user_session.expires_at <= now:
@@ -72,10 +95,12 @@ class SessionRepository:
 
     async def end_by_hash(self, token_hash: str, now: datetime) -> uuid.UUID | None:
         """The session ends now; the row stays until `delete_expired` clears it. The
-        person whose session it was, None if no running session had this hash."""
+        person whose session it was, None if no session with this hash was still to
+        end. A session the idle limit ended whose end is not recorded yet ends too
+        (R18-3)."""
         ended: uuid.UUID | None = await self.session.scalar(
             update(UserSession)
-            .where(UserSession.token_hash == token_hash, running(now, self.idle))
+            .where(UserSession.token_hash == token_hash, UserSession.expires_at > now)
             .values(expires_at=now)
             .returning(UserSession.user_id)
         )

@@ -42,7 +42,7 @@ async def current_auth(
     if not token:
         raise Unauthorized(code="auth.required")
     use = request.url.path != LIVE_STREAM_PATH
-    ctx = await AuthService(session, settings).resolve(token, use=use)
+    ctx = await AuthService(session, settings).resolve(token, use=use, settle=True)
     if ctx is None:
         raise Unauthorized(code="auth.session_invalid")
     fields = {"org_id": str(ctx.org_id), "actor": str(ctx.principal)}

@@ -30,7 +30,9 @@ eigenes Passwort im Profil (mit dem alten).
   `HERD_SESSION_IDLE_HOURS` Stunden (Standard 24, `0` schaltet die Grenze ab; ASVS
   V7.3.1, [`SICHERHEIT.md`](SICHERHEIT.md#sitzungen)): Die Sitzung merkt ihre letzte
   Nutzung, höchstens einmal je Minute geschrieben; danach antwortet die API 401
-  `auth.session_invalid` und die App zeigt die Anmeldung. Ein offener Tab mit der
+  `auth.session_invalid` und die App zeigt die Anmeldung. Dieses Ende wird an der
+  Sitzung vermerkt wie eine Abmeldung (bei der nächsten Anfrage, sonst vom Worker), eine
+  später längere oder abgeschaltete Grenze belebt sie nicht wieder. Ein offener Tab mit der
   Live-Verbindung (`/api/stream`) zählt nicht als Nutzung; Compose setzt den Wert in
   beiden Dateien, Helm als `api.sessionIdleHours`. Abmelden beendet sie; ein
   Passwortwechsel, eine Deaktivierung und **Verwaltung → Personen → „Abmelden“** („überall abmelden“, Audit)
