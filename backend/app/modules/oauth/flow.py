@@ -26,7 +26,7 @@ parameters. The callback stays the app's own (one address at the provider, J13);
 the end the connector's purpose decides which right is checked again (`rule.use`:
 `calendar.sync`, not `ai.use`, for a calendar access) and the page the browser goes
 to (`rule.return_to`). A response no flow explains goes to the page of the purpose of
-the app whose callback it came to.
+the app whose callback it came to, with or without a session (R13a-5).
 """
 
 import hashlib
@@ -53,7 +53,7 @@ from app.modules.connectors.service import ConnectorService, connector_not_found
 from app.modules.oauth import protocol
 from app.modules.oauth.callbacks import arrived_where_sent, issuer_matches, redirect_uri
 from app.modules.oauth.models import OAuthClient, OAuthFlow
-from app.modules.oauth.repository import ClientRepository, FlowRepository
+from app.modules.oauth.repository import ClientRepository, FlowRepository, callback_purpose
 from app.modules.oauth.revocation import schedule_revocation
 from app.modules.oauth.tokens import credentials_of, forget, store, timed
 
@@ -183,7 +183,7 @@ class FlowService:
         """`via`: the app whose callback the response came to (None: the shared one)."""
         state, code, error = response.state, response.code, response.error
         if auth is None or auth.session_id is None or not state:
-            return Finished(Outcome.INVALID)
+            return Finished(Outcome.INVALID, purpose=await self._purpose_of(auth, via))
         flows = FlowRepository(self.session, auth.org_id)
         flow = await flows.take(_hash(state), auth.session_id, utcnow())
         if flow is None or not arrived_where_sent(flow, via):
@@ -237,12 +237,17 @@ class FlowService:
         await record(self.session, actor, "connector.connected", "connector", locked.id, details)
         return Finished(Outcome.CONNECTED, locked, purpose)
 
-    async def _purpose_of(self, auth: AuthContext, via: uuid.UUID | None) -> Purpose:
-        """The purpose of the app whose callback a response came to (`mcp` for the
-        shared callback of earlier releases, or an app this organisation does not have)."""
+    async def _purpose_of(self, auth: AuthContext | None, via: uuid.UUID | None) -> Purpose:
+        """The purpose of the app whose callback a response came to, in the caller's
+        organisation, or by the app's id alone without a session (R13a-5: a calendar
+        user whose session ended during the consent lands on the calendar's page);
+        `mcp` for the shared callback of earlier releases or an unknown app."""
         if via is None:
             return Purpose.MCP
-        found = await ClientRepository(self.session, auth.org_id).purpose_of(via)
+        if auth is None or auth.session_id is None:
+            found = await callback_purpose(self.session, via)
+        else:
+            found = await ClientRepository(self.session, auth.org_id).purpose_of(via)
         return found or Purpose.MCP
 
     async def disconnect(

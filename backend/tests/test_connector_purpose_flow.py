@@ -9,6 +9,7 @@ from types import MappingProxyType
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
+from httpx import AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -142,12 +143,21 @@ async def test_the_callback_returns_to_the_page_of_its_purpose(
     # A stale state at the calendar app's callback goes back to the calendar page too.
     stale = await people.alice.get(callback_for(url), params={"state": "x", "code": "y"})
     assert stale.headers["location"] == "/calendar/accounts?status=invalid"
-    # Without `calendar.sync` by the time the provider answers: invalid, nothing stored.
+    # Without `calendar.sync` by the time the provider answers: invalid, nothing stored
+    # (R13a-7: the tokens of the first connect stay as they were, no code exchanged).
     url = await start()
     await sync_on(people.admin, enabled=False)
+    held = await _fresh(session, connector.id)
+    assert held is not None
+    kept = (held.secret_ref, held.refresh_token_ref, held.token_expires_at, held.version)
+    exchanges = len(oauth_egress.state.token_requests("authorization_code"))
     r = await people.alice.get(callback_for(url), params=oauth_egress.state.authorize(url))
     assert query_of(r.headers["location"]) == {"status": "invalid"}
     assert urlsplit(r.headers["location"]).path == "/calendar/accounts"
+    row = await _fresh(session, connector.id)
+    assert row is not None
+    assert (row.secret_ref, row.refresh_token_ref, row.token_expires_at, row.version) == kept
+    assert len(oauth_egress.state.token_requests("authorization_code")) == exchanges
     # The MCP routes never start a calendar connector's flow.
     with pytest.raises(NotFound):
         await flows.start(
@@ -156,6 +166,34 @@ async def test_the_callback_returns_to_the_page_of_its_purpose(
             ConnectorScope.PERSONAL,
             connector.id,
         )
+
+
+async def test_without_a_session_the_callback_returns_to_the_page_of_the_apps_purpose(
+    people: People,
+    client: AsyncClient,
+    oauth_egress: OAuthStub,
+    public_url: str,
+    secret_key: None,
+    session: AsyncSession,
+) -> None:
+    """R13a-5: a calendar user whose session ended during the provider's consent lands
+    on the calendar's page, not on the AI one she may have no right to."""
+    google = await calendar_client(session, people.users["admin"], oauth_egress)
+    mcp = await make_oauth_client(people.admin, oauth_egress, name="Stub-App")
+    expected = {
+        google.id: "/calendar/accounts?status=invalid",
+        uuid.UUID(mcp["id"]): "/ai/oauth/done?status=invalid",
+        uuid.uuid4(): "/ai/oauth/done?status=invalid",  # no such app
+    }
+    for app_id, location in expected.items():
+        path = f"/api/ai/oauth/{app_id}/callback"
+        for params in ({"state": "x", "code": "y"}, {"error": "access_denied"}, {}):
+            r = await client.get(path, params=params)  # no session at all
+            assert (r.status_code, r.headers["location"]) == (303, location)
+        signed_in = await people.alice.get(path, params={"code": "y"})  # no state
+        assert signed_in.headers["location"] == location
+    legacy = await client.get("/api/ai/oauth/callback", params={"state": "x"})
+    assert legacy.headers["location"] == "/ai/oauth/done?status=invalid"
 
 
 async def test_an_mcp_flow_returns_to_the_ai_page_as_before(

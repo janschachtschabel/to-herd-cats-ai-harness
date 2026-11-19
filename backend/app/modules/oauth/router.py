@@ -4,7 +4,8 @@ each app's own, and the shared one of earlier releases for flows started with it
 (`callbacks.py`, J13).
 
 A callback needs no session to answer: without one, or with a state that is not the
-caller's, it sends the browser to the result page with `status=invalid`. Its query
+caller's, it sends the browser to the result page of the app's purpose with
+`status=invalid` (`/calendar/accounts` for a calendar app, else `/ai/oauth/done`). Its query
 (code, state, iss) is in no log line or trace span (`core/telemetry.py` leaves the
 routes out); the result page's address carries a fixed status only."""
 
@@ -112,7 +113,7 @@ async def oauth_callback(
     iss: Iss = None,
 ) -> RedirectResponse:
     """An app's authorization server's redirect: finish the flow started with this
-    callback, then send the browser to the result page (`/ai/oauth/done?status=...`)."""
+    callback, then send the browser to its purpose's result page (`?status=...`)."""
     return await _finish(request, session, settings, Response(state, code, error, iss), client_id)
 
 

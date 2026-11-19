@@ -1,5 +1,6 @@
 """The SQL of OAuth clients and flows; every statement is scoped by the organisation
-(the key rotation alone reads every organisation's rows).
+(the key rotation alone reads every organisation's rows, and `callback_purpose` finds
+an app by its id alone for a callback reached without a session).
 
 A client repository serves one purpose (plan M10 decision 18): `mcp` unless named, so
 the AI administration and the MCP servers see `mcp` apps alone. `name_taken` spans
@@ -90,6 +91,16 @@ class ClientRepository:
     async def delete(self, client: OAuthClient) -> None:
         await self.session.delete(client)
         await self.session.flush()
+
+
+async def callback_purpose(session: AsyncSession, client_id: uuid.UUID) -> Purpose | None:
+    """The purpose of the app whose callback a response reached without a session
+    (None: no such app). There is no organisation to scope by: the app's id is the
+    callback's own path, and the answer only picks the page the browser goes to
+    (`oauth/flow.py`, review of M10 task 13a R13a-5), which tells no more than the
+    app's authorization requests already show (`docs/MCP.md`)."""
+    found = await session.scalar(select(OAuthClient.purpose).where(OAuthClient.id == client_id))
+    return None if found is None else Purpose(found)
 
 
 class FlowRepository:
