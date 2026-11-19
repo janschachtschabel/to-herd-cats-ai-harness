@@ -10,10 +10,12 @@ M5 Tasks 1–7, M6, M7 and M8 (plans `docs/superpowers/plans/2026-11-12-m1-funda
 `2026-11-14-m6-agenten-als-mitarbeiter.md`, `2026-11-14-m7-automatisierung.md`,
 `2026-11-15-m8-oeffnung.md`) and M9a (`2026-11-15-m9-produktion.md`, Tasks 1–11 and 5b)
 are built and make v1.0.0 (version 1.0.0, `backend/alembic/RELEASED` = `9e4b6d2f8a17`,
-release note `docs/RELEASE-1.0.0.md`); M9b Tasks 12 to 16 and 18 and M10 Tasks 1 and 2
-(`2026-11-18-m10-kalender.md`) are built after it; next are M9b Task 17, M10 from
-Task 3a and M5 Tasks 8–12. Present: identity, groups, spaces, roles,
-`can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
+release note `docs/RELEASE-1.0.0.md`; the tag is not published: Jan tags only when the
+whole app is finished); M9b (Tasks 12 to 19, closed by Task 17: docs, Steckbrief, spec,
+demo `docs/demo/m9.md`) and M10 Tasks 1 and 2 (`2026-11-18-m10-kalender.md`) are built
+after it, collected for operators of 1.0.0 builds in `docs/RELEASE-NEXT.md` (unreleased;
+versions and `RELEASED` unchanged); next are M10 from Task 3a and M5 Tasks 8–12.
+Present: identity, groups, spaces, roles, `can()`, audit (M1); the wiki: pages and tree, Markdown and live editor (`collab/`
 process, generations), versions, trash, tags, attachments (`HERD_DATA_DIR`), full-text
 search, import/export (M2); messaging: event outbox and worker role, channels, direct
 messages (2–9 people), threads, mentions, reactions, read state, page threads with a
@@ -75,7 +77,8 @@ external agents, servers, connectors, catalogue, operation, metrics and alerts),
 `docs/SICHERUNG.md` (backup, restore, retention), `docs/HOSTINGER.md` (install on a
 Hostinger VPS, the simplest path), `docs/ANMELDUNG.md` (password and
 OIDC sign-in, approval), `docs/SICHERHEIT.md` (ASVS rows; `tests/test_security_doc.py`),
-`docs/RELEASE-<version>.md` (release notes, linked from the README).
+`docs/RELEASE-<version>.md` (release notes, linked from the README; `docs/RELEASE-NEXT.md`
+collects what comes after the last one until the next tag, then becomes its note).
 Demos per milestone in `docs/demo/m*.md` (each executed and logged).
 
 ## Stack (present)
@@ -529,7 +532,9 @@ cd backend && HERD_DEMO_ADMIN_PASSWORD=… HERD_DEMO_PASSWORD=… \
   sprints before tickets.
 - Demo data: `backend/scripts/demo_seed.py` (+ `demo_tickets.py`, `demo_sprints.py`,
   `demo_messaging.py`, `demo_ai.py`, `demo_ai_model.py`, `demo_automations.py`,
-  `demo_mcp.py`, `demo_oidc.py` (only with `--oidc-stub`), shared API helpers in
+  `demo_mcp.py`, `demo_oidc.py` (only with `--oidc-stub`), `demo_totp.py` (only with
+  `--totp-file PATH`: Ben with TOTP, key and recovery codes in a new 0600 file),
+  `demo_pages.py`, shared API helpers in
   `demo_api.py`) goes through the public API only; extend it and its test with each
   milestone.
 - AI and agents:
