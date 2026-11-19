@@ -13,6 +13,7 @@ from sqlalchemy import MetaData, text  # noqa: E402
 from sqlalchemy.engine import Connection  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession  # noqa: E402
 
+from app import launch  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import get_session, make_engine  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
@@ -110,6 +111,14 @@ def _drop_everything(connection: Connection) -> None:
     ).scalars()
     for signature in list(functions):
         connection.execute(text(f"DROP FUNCTION {signature}"))
+
+
+@pytest.fixture(autouse=True)
+def no_heap_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`launch.serve` freezes the heap of the process it runs in; in a test that would
+    be the whole pytest process (review M10 task 4, R4-5). `test_launch.py` sees that
+    serving calls it; `test_heap.py` calls the function itself and unfreezes."""
+    monkeypatch.setattr(launch, "freeze_startup_heap", lambda: None)
 
 
 @pytest.fixture(autouse=True)
