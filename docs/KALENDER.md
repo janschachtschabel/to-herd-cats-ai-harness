@@ -169,8 +169,9 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   `version`; 409 `event.version_conflict`) setzt, wer den Termin ändern darf (Autorin im
   Bereich und volle Sicht, wie beim Ändern). Eingeladen werden Personen und Agenten des
   Systems (`type` `user`/`agent` mit `id`) und Adressen (`type` `email` mit
-  `email` und optional `name`), jede `required` oder `optional`, höchstens 100 (422
-  `event.too_many_attendees`), niemand doppelt (422 `event.attendee_duplicate`,
+  `email` und optional `name`), jede `required` oder `optional`, höchstens 100
+  Einträge (422 `validation_failed`; `event.too_many_attendees`, wenn ein Neuer der
+  Serie eine Ausnahme über 100 brächte), niemand doppelt (422 `event.attendee_duplicate`,
   Adressen ohne Rücksicht auf Groß- und Kleinschreibung). Wer `directory.read` hat (alle
   außer Gästen), lädt jede aktive Person der Organisation ein; ein Gast nur, wer den
   Bereich des Kalenders liest. Agenten nur mit `ai.use`, keine Entwürfe, ein
@@ -187,7 +188,9 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   `declined` und der gelesenen `version`) darf nur, wer eingeladen ist (403
   `event.not_invited`, auch für die Organisatorin, die nicht eingeladen ist). Hat sich
   der Termin seit dem Lesen geändert, 409; die Antwort selbst ändert die Version nicht.
-  Ein Agent gilt sofort als zugesagt; eine Einladung startet keinen Lauf.
+  Ein Agent gilt sofort als zugesagt; eine Einladung startet keinen Lauf. Wird ein
+  eingeladener Agent gelöscht, verschwinden seine Einladungen mit ihm (wie seine
+  Mitgliedschaften).
 - **Serien:** Die Eingeladenen und ihre Antworten gelten für die ganze Serie. Eine
   Ausnahme (ein einzeln geändertes Vorkommen) und der abgeteilte Teil einer Serie
   (`scope=following`) übernehmen sie; danach hat die Ausnahme ihre eigene Liste. Wer
@@ -201,10 +204,15 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   keine Antwort.
 - **Benachrichtigungen** stehen nur in der Aktivität, nie in einem Kanal oder einer
   Direktnachricht: `invitation` für jede neu eingeladene Person, nach einer
-  Zeitänderung, einer Absage (`status=cancelled`) und dem Löschen; `invite_reply` für
+  Zeitänderung, einer Absage (`status=cancelled`) und dem Löschen, auch eines einzelnen
+  Vorkommens oder „dieses und der folgenden“ (das wie die Absage dieses Vorkommens:
+  hatte es eine Ausnahme, deren Eingeladene). Fallen dabei Ausnahmen einer Serie weg
+  oder werden mit ihr abgesagt, hören auch die nur dort Eingeladenen davon; wer bei
+  Serie und Ausnahme steht, einmal (über die Serie). `invite_reply` für
   die Organisatorin (eine Person, kein Agent), wenn jemand absagt oder „vielleicht“
   antwortet (nie für ihre eigene Antwort). Je Person, Termin und Grund gibt es eine
-  Benachrichtigung; eine weitere Änderung frischt sie auf (wieder ungelesen, oben).
+  Benachrichtigung; eine spätere Änderung frischt sie auf (wieder ungelesen, oben),
+  dieselbe noch einmal zugestellt nicht (eine gelesene bleibt gelesen).
   Sie nennt Titel, Anfang und die eigene Antwort und bleibt sichtbar, solange die
   Person den Termin besucht (eingeladen oder Organisatorin; ein gelöschter Termin
   erscheint als abgesagt) und sein Kalender nicht archiviert ist; wer ausgeladen ist,
