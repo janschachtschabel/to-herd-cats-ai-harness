@@ -22,10 +22,17 @@ from datetime import UTC, date, datetime, time, timedelta
 
 from app.modules.calendars import zones
 from app.modules.calendars.ical import lines, problems
+from app.modules.calendars.ical import zones as ical_zones
 from app.modules.calendars.ical.budget import Budget, OverBudget
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.zones import Resolver
-from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
+from app.modules.calendars.recurrence_rule import (
+    FIRST_YEAR,
+    LAST_YEAR,
+    Freq,
+    RuleInvalid,
+    parse_rule,
+)
 
 DAY = timedelta(days=1)
 _UNTIL = re.compile(r"(?i)^(\s*UNTIL\s*=\s*)([0-9]{8}(?:T[0-9]{6}Z?)?)\s*$")
@@ -45,6 +52,7 @@ class Frame:
     default_zone: str
     resolver: Resolver
     walls: dict[str, list[datetime]]  # per TZID, the wall times written in it (sampled)
+    years: dict[str, tuple[int, ...]]  # per TZID, the years its VTIMEZONE is compared in
     budget: Budget
     _zones: dict[str, str] = field(default_factory=dict)  # a zone, or a problem code
 
@@ -57,7 +65,11 @@ class Frame:
         budget: Budget,
     ) -> "Frame":
         walls: dict[str, list[datetime]] = {}
+        end: int | None = None  # the year a rule ends in (at the latest)
         for part in parts:
+            rule = part.first("RRULE")
+            if rule is not None and (start := part.first("DTSTART")) is not None:
+                end = _rule_end(rule.raw, start.raw)
             for name in _WALL_PROPS:
                 for prop in part.all(name):
                     tzid = prop.param("TZID")
@@ -67,14 +79,20 @@ class Frame:
                         values = lines.date_times(prop)
                     except Skip:
                         continue
-                    walls.setdefault(tzid, []).extend(v for v in values if isinstance(v, datetime))
-        return cls(default_zone, resolver, {k: _spread(v) for k, v in walls.items()}, budget)
+                    found = [v for v in values if isinstance(v, datetime)]
+                    if found:
+                        walls.setdefault(tzid, []).extend(found)
+        spans = {
+            tzid: ical_zones.years(values[0].year, max(end or 0, *(v.year for v in values)))
+            for tzid, values in walls.items()
+        }
+        return cls(default_zone, resolver, {k: _spread(v) for k, v in walls.items()}, spans, budget)
 
     def zone(self, tzid: str) -> str:
         if tzid not in self._zones:
             try:
                 self._zones[tzid] = self.resolver.resolve(
-                    tzid, self.walls.get(tzid, []), self.budget
+                    tzid, self.walls.get(tzid, []), self.years.get(tzid, ()), self.budget
                 )
             except Skip as skip:
                 self._zones[tzid] = skip.code
@@ -84,6 +102,22 @@ class Frame:
         if found in problems.CODES:
             raise Skip(found)
         return found
+
+
+def _rule_end(rule: str, start: str) -> int | None:
+    """The year a rule written at the start `start` ends in at the latest (its UNTIL,
+    or its COUNT of whole periods); None if it cannot be read; endless: the last year."""
+    try:
+        parsed = parse_rule(rule.strip().removeprefix("RRULE:"))
+        first = lines.date_time(start.split(",", 1)[0]).year
+    except (RuleInvalid, Skip):
+        return None
+    if parsed.until is not None:
+        return parsed.until.year
+    if parsed.count is None:
+        return LAST_YEAR
+    days = {Freq.DAILY: 1, Freq.WEEKLY: 7, Freq.MONTHLY: 31, Freq.YEARLY: 366}[parsed.freq]
+    return min(first + parsed.count * parsed.interval * days // 365 + 1, LAST_YEAR)
 
 
 def _spread(walls: list[datetime]) -> list[datetime]:

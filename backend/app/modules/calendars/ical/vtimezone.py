@@ -95,16 +95,13 @@ class Definition:
     observances: tuple[Observance, ...]
     location: str | None  # X-LIC-LOCATION, a hint only
     fixed: tuple[tuple[datetime, timedelta], ...] = ()  # every DTSTART and RDATE, sorted
+    ruled: int = 0  # observances that follow a rule: the work of one `offset_at`
 
     @classmethod
     def of(cls, observances: tuple[Observance, ...], location: str | None) -> "Definition":
         fixed = sorted((onset, o.offset_to) for o in observances for onset in (o.start, *o.rdates))
-        return cls(observances, location, tuple(fixed))
-
-    @property
-    def ruled(self) -> int:
-        """How many observances follow a rule: the work of one `offset_at`."""
-        return sum(o.rule is not None for o in self.observances)
+        ruled = sum(o.rule is not None for o in observances)
+        return cls(observances, location, tuple(fixed), ruled)
 
     def offset_at(self, wall: datetime) -> timedelta:
         """The offset the definition gives at the wall time `wall`; never raises."""
