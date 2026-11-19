@@ -87,6 +87,7 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/ai/mcp/tokens",
         "/api/tokens/{token_id}/calls",
         "/api/ai/mcp/tokens/{token_id}/calls",
+        "/api/calendar/events",
     } <= set(endpoints)
 
 
@@ -101,6 +102,11 @@ NEED_A_RUN = {
 }
 
 SERVER_TOOLS = "/api/ai/mcp-servers/{server_id}/tools"
+
+# Lists that need more than a cursor (besides the DM inspection's person).
+EXTRA: dict[str, dict[str, str]] = {
+    "/api/calendar/events": {"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z"},
+}
 
 AGENT_TOKENS = {
     "/api/agents/{agent_id}/tokens",
@@ -156,7 +162,9 @@ async def test_hostile_cursors_answer_422_everywhere(
             path = path.replace(placeholder, value)
         assert "{" not in path, f"no id for {path}: add one above"
         # Lists that need more than a cursor.
-        extra = {"user_id": str(member.id)} if template == "/api/admin/dm-inspect" else {}
+        extra = EXTRA.get(template, {})
+        if template == "/api/admin/dm-inspect":
+            extra = {"user_id": str(member.id)}
         response = await owner.get(path, params={"cursor": HOSTILE[name], **extra})
         if name == "empty":
             # An empty cursor means "first page".
