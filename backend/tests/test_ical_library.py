@@ -2,10 +2,11 @@
 `pyproject.toml` pins 7.3.x; this fails loudly when an upgrade moves or changes one of
 these, before anything else can break quietly."""
 
+from datetime import datetime
 from importlib.metadata import version
 
 import icalendar
-from icalendar import Timezone, vCalAddress
+from icalendar import Timezone, TimezoneStandard, vCalAddress
 from icalendar.parser import Contentline, Contentlines, rfc_6868_unescape
 from icalendar.parser.property import unescape_backslash
 from icalendar.prop import vInline
@@ -49,7 +50,12 @@ def test_the_windows_table_maps_names_to_iana_zones() -> None:
 
 
 def test_what_writing_builds_on() -> None:
-    """`writing.py` and `vtimezone_out.py`: `vInline` writes a value as it is,
-    `Timezone.from_tzinfo` takes our own `ZoneInfo` and a span."""
+    """`writing.py` and `vtimezone_out.py`: `vInline` writes a value as it is; a
+    VTIMEZONE is built from our own observances (no `Timezone.from_tzinfo` since
+    re-check RC7a-6), an RDATE from a list of wall times."""
     assert vInline("FREQ=DAILY;COUNT=3").to_ical() == b"FREQ=DAILY;COUNT=3"
-    assert callable(Timezone.from_tzinfo)
+    part = TimezoneStandard()
+    part.add("RDATE", [datetime(1949, 5, 1), datetime(1949, 9, 10)])
+    found = Timezone()
+    found.add_component(part)
+    assert b"RDATE:19490501T000000,19490910T000000" in found.to_ical()

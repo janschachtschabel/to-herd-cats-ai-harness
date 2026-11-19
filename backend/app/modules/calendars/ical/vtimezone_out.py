@@ -8,10 +8,13 @@ not only the first, and a client that follows the definition (Outlook) agrees wi
   falls at 24:00 or -1:00, or a fixed day), found from `zoneinfo`'s transitions and
   checked over a whole 28-year cycle after 2037 (`tzdata`'s last rule there). This is
   the form Outlook, Google and Apple write themselves.
-- The years before are `icalendar`'s `Timezone.from_tzinfo` from 1900 (one onset per
-  change, as RDATEs).
-- A zone whose changes follow no yearly rule (Casablanca's until 2087) is written as
-  RDATEs up to 2400; one without changes needs none.
+- The years before are the zone's own changes from 1900 (`_changes`, day by day: every
+  change `tzdata` has, also one undone within weeks such as Casablanca's Ramadan pause:
+  re-check RC7a-6), one observance per kind of change (offsets, name, summer time), its
+  first onset as DTSTART and the others as RDATEs, after one observance for the offset
+  of 1900.
+- A zone whose changes follow no yearly rule (Casablanca's until 2087) is written so up
+  to 2400; one without changes is the observance of 1900 alone.
 """
 
 import calendar
@@ -66,11 +69,35 @@ def vtimezone(tzid: str) -> bytes:
 
 
 def _history(zone: ZoneInfo, tzid: str, last_year: int) -> Timezone:
-    found = Timezone.from_tzinfo(
-        zone, tzid=tzid, first_date=date(FIRST_YEAR, 1, 1), last_date=date(last_year, 1, 1)
-    )
-    found.pop("COMMENT", None)  # "only works from … to …": the rules carry it on
+    """The zone's changes from 1900 to the start of `last_year`, by kind."""
+    found = _empty(tzid)
+    first = datetime(FIRST_YEAR, 1, 1, tzinfo=UTC)
+    offset = _offset(zone, first)
+    initial = _Change(first - offset, offset, offset, first.astimezone(zone).tzname() or "")
+    found.add_component(_part(TimezoneStandard(), initial, []))
+    kinds: dict[tuple[timedelta, timedelta, str, bool], list[_Change]] = {}
+    for year in range(FIRST_YEAR, last_year):
+        for change in _changes(zone, year):
+            summer = bool(change.instant.astimezone(zone).dst())
+            kinds.setdefault(
+                (change.offset_from, change.offset_to, change.name, summer), []
+            ).append(change)
+    for (_, _, _, summer), onsets in kinds.items():
+        part = TimezoneDaylight() if summer else TimezoneStandard()
+        found.add_component(_part(part, onsets[0], onsets[1:]))
     return found
+
+
+def _part(
+    part: TimezoneStandard | TimezoneDaylight, change: _Change, more: list[_Change]
+) -> TimezoneStandard | TimezoneDaylight:
+    part.add("DTSTART", change.wall)
+    if more:
+        part.add("RDATE", [later.wall for later in more])
+    part.add("TZNAME", change.name)
+    part.add("TZOFFSETFROM", change.offset_from)
+    part.add("TZOFFSETTO", change.offset_to)
+    return part
 
 
 def _empty(tzid: str) -> Timezone:
