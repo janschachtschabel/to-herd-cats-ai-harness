@@ -3,6 +3,7 @@ tombstones and the events of archived calendars; who may see what comes in as SQ
 (`sight.py`), so lists filter in the statement."""
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from sqlalchemy import ColumnElement, Select, and_, any_, bindparam, or_, select
@@ -12,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from app.core.principal import Principal, PrincipalType
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.models import Calendar
 
@@ -43,13 +45,32 @@ class EventRepository:
             .where(CalendarEvent.org_id == self.org_id, _live())
         )
 
-    async def find(self, event_id: uuid.UUID, seen: ColumnElement[bool]) -> CalendarEvent | None:
-        """The event if it passes `seen`, in one statement: one the caller may not see
-        costs what an unknown id costs."""
-        found: CalendarEvent | None = await self.session.scalar(
-            self._select().where(CalendarEvent.id == event_id, seen)
+    async def find(
+        self, event_id: uuid.UUID, seen: ColumnElement[bool], attends: ColumnElement[bool]
+    ) -> tuple[CalendarEvent, bool] | None:
+        """The event if it passes `seen`, with whether the caller attends it, in one
+        statement: one the caller may not see costs what an unknown id costs."""
+        stmt = (
+            select(CalendarEvent, attends)
+            .join(Calendar, Calendar.id == CalendarEvent.calendar_id)
+            .where(CalendarEvent.org_id == self.org_id, _live(), CalendarEvent.id == event_id, seen)
         )
-        return found
+        row = (await self.session.execute(stmt)).first()
+        return None if row is None else (row[0], bool(row[1]))
+
+    async def attended(
+        self, events: Iterable[CalendarEvent], attends: ColumnElement[bool]
+    ) -> set[uuid.UUID]:
+        """Which of `events` (tombstones too) the caller attends, in one statement."""
+        ids = [event.id for event in events]
+        if not ids:
+            return set()
+        stmt = select(CalendarEvent.id).where(
+            CalendarEvent.org_id == self.org_id,
+            CalendarEvent.id == any_(bindparam("attended_ids", ids, type_=UUID_ARRAY)),
+            attends,
+        )
+        return set((await self.session.scalars(stmt)).all())
 
     async def lock(self, event_id: uuid.UUID) -> CalendarEvent | None:
         """The live event, locked until the transaction ends and read afresh (a write
@@ -98,6 +119,14 @@ class EventRepository:
         )
         return found
 
+    async def organiser(self, event_id: uuid.UUID) -> Principal | None:
+        """Who organises the event (a tombstone too); None for no such event."""
+        stmt = select(CalendarEvent.organizer_type, CalendarEvent.organizer_id).where(
+            CalendarEvent.org_id == self.org_id, CalendarEvent.id == event_id
+        )
+        row = (await self.session.execute(stmt)).first()
+        return None if row is None else Principal(PrincipalType(row[0]), row[1])
+
     async def calendar_zone(self, calendar_id: uuid.UUID) -> str:
         """The zone of the event's calendar, for times sent without one."""
         stmt = select(Calendar.time_zone).where(
@@ -129,16 +158,18 @@ class EventRepository:
         calendar_ids: list[uuid.UUID] | None,
         title: str | None,
         full: ColumnElement[bool],
+        attends: ColumnElement[bool],
         limit: int,
-    ) -> list[tuple[CalendarEvent, bool]]:
+    ) -> list[tuple[CalendarEvent, bool, bool]]:
         """The events passing `rule` that can reach `[start, end)` (all-day ones
-        within `ALL_DAY_REACH` of it), each with whether the caller reads its space;
-        at most `limit`. With `title`, only those whose title holds it among those the
-        caller sees in full (`full`): a search never answers by hidden content. The
+        within `ALL_DAY_REACH` of it), each with whether the caller reads its space
+        and whether it attends the event; at most `limit`. With `title`, only those
+        whose title holds it among those the caller sees in full (`full`): a search
+        never answers by hidden content. The
         rows come without `description` (up to 20,000 characters, never in a list);
         reading it raises."""
         stmt = (
-            select(CalendarEvent, reads)
+            select(CalendarEvent, reads, attends)
             .options(defer(CalendarEvent.description, raiseload=True))
             .join(Calendar, Calendar.id == CalendarEvent.calendar_id)
             .where(
@@ -171,7 +202,7 @@ class EventRepository:
             stmt = stmt.where(CalendarEvent.calendar_id.in_(calendar_ids))
         if title is not None:
             stmt = stmt.where(full, CalendarEvent.title.icontains(title, autoescape=True))
-        return [(row[0], bool(row[1])) for row in await self.session.execute(stmt)]
+        return [(row[0], bool(row[1]), bool(row[2])) for row in await self.session.execute(stmt)]
 
     async def overridden(self, series_ids: list[uuid.UUID]) -> set[tuple[uuid.UUID, datetime]]:
         """(series, recurrence id) of every live override of the series, wherever it

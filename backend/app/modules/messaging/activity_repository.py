@@ -14,11 +14,13 @@ it (`automations/sight.py`: its owner, its agent's responsible person, a manager
 its place's space, `agent.manage`): it names only the automation, its agent and why
 it is paused now. One bound to an account awaiting approval (plan M9 task 5b) is
 seen while the person holds `user.manage`; the account is its author, and whether
-it still waits comes with it.
+it still waits comes with it. One bound to a calendar event (plan M10 task 4) is seen
+while the person attends that event row (`activity_calendar.py`). Only reasons this
+release knows are listed (a later release may write others, plan M10 decision 7).
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import (
     ColumnElement,
@@ -44,6 +46,8 @@ from sqlalchemy.orm import aliased
 
 from app.modules.automations.sight import AutomationSight
 from app.modules.automations.sight import seen as automation_seen
+from app.modules.messaging import activity_calendar
+from app.modules.messaging.activity_calendar import EventEntry
 from app.modules.messaging.models import Conversation, ConversationKind, Message, MessageKind
 from app.modules.messaging.notification_models import Notification, NotificationReason
 from app.modules.messaging.repository import ConversationScope, visible_conversations
@@ -53,6 +57,7 @@ from app.modules.skills.sight import seen as skill_proposal_seen
 from app.modules.users.models import User
 
 SNIPPET_CHARS = 140
+KNOWN = [reason.value for reason in NotificationReason]
 
 # The proposals a notification may name (`proposals` builds on messaging, so it is not
 # imported): who made one, for the activity's author.
@@ -101,6 +106,7 @@ class ActivityEntry:
     author_type: str | None = None  # `user` or `agent` (as the message or proposal says)
     automation_paused: str | None = None  # an automation's: why it is paused now
     account_awaiting: bool | None = None  # an account's: whether it still awaits approval
+    calendar_event: EventEntry | None = None  # a calendar event's (plan M10 task 4)
 
 
 class ActivityRepository:
@@ -174,10 +180,12 @@ class ActivityRepository:
             Notification.account_id.is_not(None),
             or_(true() if self.manages_users else false(), own_lock),
         )
+        about_event = activity_calendar.seen(self.scope.principal.id)
         return and_(
             Notification.org_id == self.scope.org_id,
             Notification.user_id == self.scope.principal.id,
-            or_(bound, about_proposal, about_skill, about_automation, about_account),
+            Notification.reason.in_(KNOWN),
+            or_(bound, about_proposal, about_skill, about_automation, about_account, about_event),
         )
 
     async def page(
@@ -228,12 +236,17 @@ class ActivityRepository:
                 author_type,
                 AUTOMATION.c.paused_reason,
                 case((about_account, User.awaiting_approval_since.is_not(None)), else_=None),
+                *activity_calendar.columns(self.scope.principal.id),
             )
             .outerjoin(Conversation, Conversation.id == Notification.conversation_id)
             .outerjoin(Message, Message.id == Notification.message_id)
             .outerjoin(PROPOSAL, PROPOSAL.c.id == Notification.proposal_id)
             .outerjoin(SKILL_PROPOSAL, SKILL_PROPOSAL.c.id == Notification.skill_proposal_id)
             .outerjoin(AUTOMATION, AUTOMATION.c.id == Notification.automation_id)
+            .outerjoin(
+                activity_calendar.EVENT,
+                activity_calendar.EVENT.c.id == Notification.calendar_event_id,
+            )
             .outerjoin(User, and_(User.id == author_id, User.org_id == Notification.org_id))
             .where(self._mine())
             .order_by(Notification.id.desc())
@@ -243,7 +256,10 @@ class ActivityRepository:
             stmt = stmt.where(Notification.done_at.is_(None))
         if before is not None:
             stmt = stmt.where(Notification.id < before)
-        return [ActivityEntry(*row) for row in await self.session.execute(stmt)]
+        return [
+            replace(ActivityEntry(*row[:13]), calendar_event=activity_calendar.entry(row[13:]))
+            for row in await self.session.execute(stmt)
+        ]
 
     async def counts(self) -> tuple[int, int]:
         """(open, unread): not done; not done and not read."""

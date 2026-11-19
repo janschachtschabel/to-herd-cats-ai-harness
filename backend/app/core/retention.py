@@ -91,7 +91,7 @@ RETENTION: Mapping[str, Retention] = {
     "reaction": Keep("goes with its message"),
     "notification": Keep(
         "the person's own inbox; read and done are states, nothing deletes one but its"
-        " message, thread, proposal or account going"
+        " message, thread, proposal, account or event going"
     ),
     "dm_inspection": Keep(_PROOF),
     "event_outbox": Cleans(
@@ -169,6 +169,9 @@ RETENTION: Mapping[str, Retention] = {
     # A deleted event stays a tombstone for sync and feeds, then goes; a series takes
     # its overrides along (foreign key, ON DELETE CASCADE).
     "calendar_event": Upkeep("deleted_at", timedelta(days=30), EXPIRY),
+    "calendar_event_attendee": Keep(
+        "an event's invitations and answers; go with the event (also its tombstone's upkeep)"
+    ),
 }
 
 

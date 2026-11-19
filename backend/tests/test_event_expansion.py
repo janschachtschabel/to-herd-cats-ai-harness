@@ -131,9 +131,9 @@ async def test_the_window_loads_no_description(
     await new_event(client, calendar["id"], description="x" * 20_000)
     session.expunge_all()
     rows = await EventRepository(session, author.org_id).in_window(
-        true(), true(), *WEEK, calendar_ids=None, title=None, full=true(), limit=10
+        true(), true(), *WEEK, calendar_ids=None, title=None, full=true(), attends=true(), limit=10
     )
-    [(event, _)] = rows
+    [(event, _, _)] = rows
     assert "description" in inspect(event).unloaded
     with pytest.raises(InvalidRequestError):
         _ = event.description

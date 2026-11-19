@@ -56,11 +56,19 @@ async def busy_times(
     )
     limit = expansion.Budget().rows_allowed() * len(people) + 1
     rows = await repo.in_window(
-        rule, true(), start, end, calendar_ids=None, title=None, full=true(), limit=limit
+        rule,
+        true(),
+        start,
+        end,
+        calendar_ids=None,
+        title=None,
+        full=true(),
+        attends=true(),
+        limit=limit,
     )
-    taken = await repo.overridden([e.id for e, _ in rows if e.recurring])
+    taken = await repo.overridden([e.id for e, _, _ in rows if e.recurring])
     by_person: dict[Any, list[CalendarEvent]] = {}
-    for event_row, _ in rows:
+    for event_row, _, _ in rows:
         by_person.setdefault(people[event_row.space_id], []).append(event_row)
     busy: dict[Any, list[tuple[datetime, datetime]]] = {}
     budgets = []

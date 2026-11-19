@@ -1,7 +1,8 @@
 """Who sees an event, and how much (plan M10 decision 3): the one rule.
 
-- `FULL`: its organiser (task 4: and its attendees), whatever space it lies in (an
-  actor with a read scope, a run: only inside it, as `core/access.py` holds it); an
+- `FULL`: its organiser and its attendees (of that row: an override has attendees of
+  its own), whatever space it lies in (an actor with a read scope, a run: only inside
+  it, as `core/access.py` holds it); an
   admin on the named way (the call names the space or the event and went through
   `access.require`, which audits a foreign team or personal space; E4); and, for an
   event that is not private, whoever reads its calendar's space. A `FULL` that comes
@@ -13,20 +14,24 @@
 - `NONE`: everyone else; such an event answers like an unknown id.
 
 "Reads" comes from the lists' rule (`access.member_space_ids`: never by admin power)
-unless the call is the named way. `listed_events_sql` is the lists' rule as SQL: the
-events of member spaces and those one organises. `full_sql` is the rule for `FULL` as
-SQL, for filters that must not answer by hidden content (the title search).
+unless the call is the named way. "Attends" (organises or is invited to the row)
+needs the database: it is SQL alone (`attends_sql`), read as a column beside the row
+(`EventRepository.find`, `in_window`, `attended`). `listed_events_sql` is the lists'
+rule as SQL: the events of member spaces and those one attends. `full_sql` is the rule
+for `FULL` as SQL, for filters that must not answer by hidden content (the title
+search).
 """
 
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import ColumnElement, and_, or_, true
+from sqlalchemy import ColumnElement, and_, or_, select, true
 
 from app.core.access import member_space_ids, visible_space_ids
 from app.core.actor import Actor
 from app.core.permissions import ADMIN_ROLES
+from app.modules.calendars.attendee_models import CalendarEventAttendee
 from app.modules.calendars.event_models import CalendarEvent, EventVisibility
 
 
@@ -38,10 +43,12 @@ class Sight(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Seen:
-    """An event and how much of it the caller sees (`events.EventService.get`)."""
+    """An event, how much of it the caller sees (`events.EventService.get`), and
+    whether the caller attends it (organises it or is invited to it)."""
 
     event: CalendarEvent
     sight: Sight
+    attends: bool = False
 
 
 def admin_power(actor: Actor) -> bool:
@@ -57,8 +64,9 @@ def organises(actor: Actor, event: CalendarEvent) -> bool:
 
 def of(actor: Actor, event: CalendarEvent, *, reads: bool, attends: bool, named: bool) -> Sight:
     """`reads`: the actor reads the event's space (lists: as a member; named: through
-    `access.require`); `attends`: it organises the event (task 4: or is invited);
-    `named`: the call is the named way, the only one on which admin power counts."""
+    `access.require`); `attends`: it organises the event or is invited to it
+    (`attends_sql`); `named`: the call is the named way, the only one on which admin
+    power counts."""
     if attends or (named and reads and admin_power(actor)):
         return Sight.FULL
     if not reads:
@@ -75,20 +83,20 @@ def by_admin_power(
     return full and of(actor, event, reads=reads, attends=attends, named=False) is not Sight.FULL
 
 
-def attends(actor: Actor, event: CalendarEvent) -> bool:
-    """Whether the actor organises the event (task 4: or is invited), inside its read
-    scope if it has one (a run sees no event outside its scope, organised or not)."""
-    scope = actor.read_scope
-    if scope is not None and event.space_id not in scope.ids():
-        return False
-    return organises(actor, event)
-
-
 def attends_sql(actor: Actor) -> ColumnElement[bool]:
-    """`attends` as SQL."""
-    clause = and_(
-        CalendarEvent.organizer_type == actor.principal.type,
-        CalendarEvent.organizer_id == actor.principal.id,
+    """Whether the actor organises the event row or is invited to it, inside its read
+    scope if it has one (a run sees no event outside its scope, attended or not)."""
+    invited = select(CalendarEventAttendee.event_id).where(
+        CalendarEventAttendee.org_id == actor.org_id,
+        CalendarEventAttendee.principal_type == actor.principal.type,
+        CalendarEventAttendee.principal_id == actor.principal.id,
+    )
+    clause = or_(
+        and_(
+            CalendarEvent.organizer_type == actor.principal.type,
+            CalendarEvent.organizer_id == actor.principal.id,
+        ),
+        CalendarEvent.id.in_(invited),
     )
     if actor.read_scope is not None:
         clause = and_(clause, CalendarEvent.space_id.in_(actor.read_scope.ids()))
@@ -102,7 +110,7 @@ def reads_sql(actor: Actor) -> ColumnElement[bool]:
 
 def listed_events_sql(actor: Actor) -> ColumnElement[bool]:
     """The lists' rule (decision 3, C1): events of the spaces the actor belongs to (or
-    open ones its role reads) and events it organises; never by admin power."""
+    open ones its role reads) and events it attends; never by admin power."""
     return or_(reads_sql(actor), attends_sql(actor))
 
 

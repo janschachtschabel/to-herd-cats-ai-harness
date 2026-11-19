@@ -192,3 +192,35 @@ class NotificationRepository:
             )
         )
         await self.add_for_account(account_id, [(user_id, reason)])
+
+    async def renew_about_event(
+        self, user_id: uuid.UUID, event_id: uuid.UUID, reason: NotificationReason
+    ) -> Notification | None:
+        """The one notification about a calendar event for `user_id` and `reason`, new
+        each time (unread, on top: an earlier one goes); None if a concurrent delivery
+        wrote it first."""
+        await self.session.execute(
+            delete(Notification).where(
+                Notification.org_id == self.org_id,
+                Notification.user_id == user_id,
+                Notification.calendar_event_id == event_id,
+                Notification.reason == reason,
+            )
+        )
+        row = {
+            "org_id": self.org_id,
+            "user_id": user_id,
+            "reason": reason,
+            "calendar_event_id": event_id,
+        }
+        stmt = (
+            insert(Notification)
+            .values([row])
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "calendar_event_id", "reason"],
+                index_where=Notification.calendar_event_id.is_not(None),
+            )
+            .returning(Notification)
+        )
+        renewed: Notification | None = await self.session.scalar(stmt)
+        return renewed

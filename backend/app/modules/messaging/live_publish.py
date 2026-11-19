@@ -10,6 +10,7 @@ from app.core.outbox import Event
 from app.modules.messaging.live_events import (
     AUTOMATION,
     FOR_ONE_PERSON,
+    INVITED,
     LIVE_CHANNEL,
     LIVE_TYPES,
     MAX_PAYLOAD_BYTES,
@@ -59,6 +60,7 @@ def of_event(event: Event) -> LiveEvent | None:
         step=step if run and isinstance(step, int) else None,
         proposal_id=_uuid(payload.get("proposal_id")) if name == SKILL_PROPOSAL else None,
         automation_id=_uuid(payload.get("automation_id")) if automation else None,
+        event_id=event.subject_id if name == INVITED else None,
     )
 
 

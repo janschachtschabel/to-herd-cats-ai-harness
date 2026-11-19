@@ -22,6 +22,7 @@ from app.modules.auth.models import UserSession
 from app.modules.automations.event_models import AutomationEvent
 from app.modules.automations.models import Automation, AutomationFiring
 from app.modules.backups.models import BackupRun
+from app.modules.calendars.attendee_models import CalendarEventAttendee
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.models import Calendar, CalendarSetting
 from app.modules.connectors.models import Connector
@@ -75,6 +76,7 @@ __all__ = [
     "Calendar",
     "CalendarSetting",
     "CalendarEvent",
+    "CalendarEventAttendee",
     "AgentTool",
     "AiBudget",
     "AiConnection",

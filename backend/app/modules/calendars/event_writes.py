@@ -189,10 +189,9 @@ async def audit_admin_write(
     private event of someone else (the event, or an override the write reached:
     `overrides_by_power`), or `calendar.write` only through the admin role."""
     event = seen.event
-    attends = sight.attends(actor, event)
     by_power = (
         overrides_by_power
-        or sight.by_admin_power(actor, event, reads=True, attends=attends, named=True)
+        or sight.by_admin_power(actor, event, reads=True, attends=seen.attends, named=True)
         or await held_by_admin_power(session, actor, Action.CALENDAR_WRITE, event.space_id)
     )
     if by_power:

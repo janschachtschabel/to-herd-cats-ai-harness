@@ -13,7 +13,8 @@ only, never content:
      "n": <run_id>, "k": <step> (`run.progress` only),
      "y": <automation_id> (`automation.changed`, with "u" and "s"),
      "b": <backup_run_id|null> (`backup.changed`, with "u"),
-     "l": <calendar_id> (`calendar.changed`, with "s")}
+     "l": <calendar_id> (`calendar.changed`, with "s"),
+     "e": <event_id> (`event.invited`, with "u")}
 
 `u` names the one person an event is for (`notification.created`,
 `conversation.read`, `activity.changed`, `access.changed`); without it, whoever may
@@ -38,7 +39,9 @@ before it delivers anything names no `c` but its asker `u` (review M7, finding 5
 `backup.changed` (plan M9 task 13, `u` an owner, `b` the run) is sent directly, not
 through the outbox (`modules/backups/live.py`). `calendar.changed` (plan M10, from
 `modules/calendars/live.py`) is for the space `s`, for its members alone (never by
-admin power), with the space's and the calendar's id `l`. Every
+admin power), with the space's and the calendar's id `l`; `event.invited` (plan M10
+task 4: invited, the time changed, called off) is for the one person `u` invited to
+the event `e`, who may not be a member of its space. Every
 API process's hub (`live.py`) decodes it again (`live_decode.py`); anything it cannot use
 is dropped.
 Payloads stay far below Postgres' 8000-byte limit (about 330 bytes).
@@ -90,9 +93,11 @@ LIVE_TYPES: dict[str, str] = {
     "question.answered": "card.changed",
     "skill_proposal.changed": "skill_proposal.changed",
     "automation.changed": "automation.changed",
+    "calendar_event.invited": "event.invited",
 }
 BACKUP = "backup.changed"  # sent directly (`modules/backups/live.py`), not from the outbox
 CALENDAR = "calendar.changed"  # published by `modules/calendars/live.py`
+INVITED = "event.invited"
 LIVE_NAMES = frozenset(LIVE_TYPES.values()) | {BACKUP, CALENDAR}
 TICKET_TYPES = frozenset({"ticket.created", "ticket.updated"})
 # Events for a space (no conversation, no person): sprints for whoever may read tickets
@@ -112,6 +117,7 @@ FOR_ONE_PERSON = frozenset(
         "skill_proposal.changed",
         "automation.changed",
         "run.progress",  # a heartbeat's before it delivers: its asker alone, no `c`
+        "calendar_event.invited",
     }
 )
 
@@ -134,6 +140,7 @@ class LiveEvent:
     automation_id: uuid.UUID | None = None  # automation.changed only (with `space_id`)
     backup_id: uuid.UUID | None = None  # backup.changed only
     calendar_id: uuid.UUID | None = None  # calendar.changed only (with `space_id`)
+    event_id: uuid.UUID | None = None  # event.invited only (with `user_id`)
 
     @property
     def for_space(self) -> bool:
@@ -176,6 +183,8 @@ class LiveEvent:
             data["b"] = str(self.backup_id)
         if self.calendar_id is not None:
             data["l"] = str(self.calendar_id)
+        if self.event_id is not None:
+            data["e"] = str(self.event_id)
         return json.dumps(data, separators=(",", ":"))
 
     def frame(self) -> bytes:
@@ -196,6 +205,8 @@ class LiveEvent:
             )
         if self.name == BACKUP:
             return sse_frame(self.name, {"backup_id": _text(self.backup_id)})
+        if self.name == INVITED:
+            return sse_frame(self.name, {"event_id": _text(self.event_id)})
         if self.name == AUTOMATION:
             return sse_frame(
                 self.name,

@@ -52,9 +52,13 @@ async def list_events(
         str | None,
         Query(max_length=64, description="the viewer's zone (all-day days), default UTC"),
     ] = None,
+    mine: Annotated[
+        bool, Query(description="my events: only those I organise or am invited to")
+    ] = False,
 ) -> Page[OccurrenceOut]:
     """Every occurrence overlapping `[from, to)` of the events one may list (member
-    spaces and one's own; another space's only by naming it with `space_id`), by
+    spaces and the events one organises or is invited to; another space's only by
+    naming it with `space_id`; `mine`: only one's own and those one is invited to), by
     start. Private events of others come `redacted`; `q` searches titles one sees. A
     cursor holds `time_zone` and is valid with it only (422 `calendar.cursor_time_zone`)."""
     return await list_window(
@@ -64,7 +68,7 @@ async def list_events(
         end=end,
         calendar_ids=calendar_ids,
         space_id=space_id,
-        mine=False,
+        mine=mine,
         query=q,
         params=params,
         viewer_zone=time_zone,

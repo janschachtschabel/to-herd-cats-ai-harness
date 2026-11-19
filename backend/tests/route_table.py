@@ -28,7 +28,8 @@ ship without a decision on who may call it. Guards:
   Making an event is `calendar` too; the event window is `session` (another space's
   events only by naming it with `space_id`, which is `require`d and audited).
 - `event`: whoever sees the event (a role in its calendar's space, or its organiser);
-  otherwise 404 `event.not_found`, as for an id nobody has (plan M10 task 3a).
+  otherwise 404 `event.not_found`, as for an id nobody has (plan M10 task 3a); an
+  attendee sees it too (task 4).
 - `ai`: an AI right (`ai.manage`); everyone else gets 404 `ai.not_found`, so people
   without it learn nothing about the AI set-up (plan M5).
 - `agent`: `agent.manage` (managing) or `ai.use` (an agent's profile); everyone else
@@ -193,6 +194,9 @@ ROUTES: list[tuple[str, str, str]] = [
     ("GET", "/api/events/{event_id}", "event"),
     ("PATCH", "/api/events/{event_id}", "event"),
     ("DELETE", "/api/events/{event_id}", "event"),
+    ("GET", "/api/events/{event_id}/attendees", "event"),
+    ("PUT", "/api/events/{event_id}/attendees", "event"),
+    ("POST", "/api/events/{event_id}/response", "event"),
     ("POST", "/api/sprints/{sprint_id}/start", "sprint"),
     ("POST", "/api/sprints/{sprint_id}/close", "sprint"),
     ("GET", "/api/stream", "session"),  # live delivery (server-sent events)
@@ -490,6 +494,8 @@ BODIES: dict[tuple[str, str], dict[str, object]] = {
         "ends_at": "2026-11-23T11:00:00Z",
     },
     ("PATCH", "/api/events/{event_id}"): {"title": "X", "version": 1},
+    ("PUT", "/api/events/{event_id}/attendees"): {"version": 1, "attendees": []},
+    ("POST", "/api/events/{event_id}/response"): {"response": "accepted", "version": 1},
     ("POST", "/api/sprints/{sprint_id}/start"): {"version": 1},
     ("POST", "/api/sprints/{sprint_id}/close"): {"version": 1, "move_open_to": "backlog"},
     ("POST", "/api/ai/connections"): {"name": "X"},

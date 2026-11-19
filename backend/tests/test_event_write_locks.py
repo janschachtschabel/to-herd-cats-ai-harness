@@ -32,8 +32,8 @@ def _after_the_read(
     locked: list[uuid.UUID] = []
     find, lock = EventRepository.find, EventRepository.lock
 
-    async def found(self: EventRepository, event_id: uuid.UUID, seen: Any) -> Any:
-        event = await find(self, event_id, seen)
+    async def found(self: EventRepository, event_id: uuid.UUID, seen: Any, attends: Any) -> Any:
+        event = await find(self, event_id, seen, attends)
         # as another connection would: the row read keeps what it read
         await session.execute(stmt.execution_options(synchronize_session=False))
         return event

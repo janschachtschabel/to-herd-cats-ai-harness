@@ -2,10 +2,11 @@
 of the events the caller may list, by (start, event id), a page at a time.
 
 - Which events: without `space_id` the lists' rule (`sight.listed_events_sql`: member
-  spaces and what one organises; never by admin power, C1); with `space_id` the named
+  spaces and what one attends; never by admin power, C1); with `space_id` the named
   way, through `access.require(calendar.read)` (an admin's look into a foreign team or
-  personal space is audited), the events of that space alone. `mine`: only those the
-  caller organises (task 4 adds those it is invited to). `query`: a title search among
+  personal space is audited), the events of that space alone. `mine` ("my events"):
+  only those the caller attends, organises or is invited to (per row: who is invited
+  to one override finds that occurrence). `query`: a title search among
   the events the caller sees in full, so hidden content answers nothing. The private
   events a page shows by admin power alone are audited (`calendar.private_read`).
 - One statement loads every event that can reach the window (`recurs_until`), without
@@ -102,17 +103,16 @@ async def list_window(
         calendar_ids=calendar_ids,
         title=query,
         full=sight.full_sql(actor, named=named),
+        attends=sight.attends_sql(actor),
         limit=budget.rows_allowed() + 1,
     )
     seen: dict[uuid.UUID, Sight] = {}
-    reads_of = {event.id: reading for event, reading in rows}
-    for event, reading in rows:
-        found_sight = sight.of(
-            actor, event, reads=reading, attends=sight.attends(actor, event), named=named
-        )
+    facts = {event.id: (reading, attending) for event, reading, attending in rows}
+    for event, reading, attending in rows:
+        found_sight = sight.of(actor, event, reads=reading, attends=attending, named=named)
         if found_sight is not Sight.NONE:
             seen[event.id] = found_sight
-    shown = [event for event, _ in rows if event.id in seen]
+    shown = [event for event, _, _ in rows if event.id in seen]
     try:
         budget.charge(len(rows) - len(shown))
         taken = await repo.overridden([event.id for event in shown if event.recurring])
@@ -132,8 +132,8 @@ async def list_window(
         and sight.by_admin_power(
             actor,
             event,
-            reads=reads_of[event.id],
-            attends=sight.attends(actor, event),
+            reads=facts[event.id][0],
+            attends=facts[event.id][1],
             named=named,
         )
     ]

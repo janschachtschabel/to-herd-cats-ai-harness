@@ -46,6 +46,12 @@ from app.modules.calendars.event_writes import (
     require_version,
     require_writable,
 )
+from app.modules.calendars.invitation_effects import (
+    after_change,
+    after_delete,
+    moved,
+    named_times,
+)
 from app.modules.calendars.repository import CalendarRepository
 from app.modules.calendars.series_reach import require_full_sight
 from app.modules.calendars.service import calendar_not_found
@@ -126,10 +132,10 @@ class EventService:
         """The event and how much of it the actor sees (404 `event.not_found` for
         none)."""
         repo = EventRepository(self.session, actor.org_id)
-        event = await repo.find(event_id, sight.by_id_sql(actor))
-        if event is None:
+        found = await repo.find(event_id, sight.by_id_sql(actor), sight.attends_sql(actor))
+        if found is None:
             raise event_not_found()
-        return await self._named(actor, event)
+        return await self._named(actor, *found)
 
     async def update(
         self,
@@ -142,15 +148,21 @@ class EventService:
         version: int,
         dry_run: bool = False,
     ) -> Changed:
-        seen = await self._for_write(actor, event_id)
+        seen = await self.for_write(actor, event_id)
         event = seen.event
         async with refusals_roll_back(self.session):
             unhides = change.values.get("visibility", event.visibility) != event.visibility
             await require_writable(self.session, actor, seen, changes_visibility=unhides)
             require_version(event, version)
+            natural, was = named_times(event, scope, occurrence), EventStatus(event.status)
             edited = await edit(self.session, actor, event, change, scope, occurrence, dry_run)
-            by_power = require_full_sight(actor, edited.reached)
+            by_power = await require_full_sight(self.session, actor, edited.reached)
             if edited.wrote:
+                zone = await EventRepository(self.session, actor.org_id).calendar_zone(
+                    event.calendar_id
+                )
+                shifted = moved(natural, change, edited, zone)
+                await after_change(self.session, actor, edited.event, moved=shifted, was=was)
                 await audit_admin_write(
                     self.session,
                     actor,
@@ -161,8 +173,10 @@ class EventService:
                     overrides_by_power=by_power,
                 )
         target = edited.event
-        attends = sight.attends(actor, target)
-        shown = sight.of(actor, target, reads=True, attends=attends, named=True)
+        attended = await EventRepository(self.session, actor.org_id).attended(
+            [target], sight.attends_sql(actor)
+        )
+        shown = sight.of(actor, target, reads=True, attends=target.id in attended, named=True)
         return Changed(target, shown, edited.dropped.overrides, edited.dropped.exdates)
 
     async def delete(
@@ -174,13 +188,14 @@ class EventService:
         occurrence: str | None,
         version: int,
     ) -> None:
-        seen = await self._for_write(actor, event_id)
+        seen = await self.for_write(actor, event_id)
         event = seen.event
         async with refusals_roll_back(self.session):
             await require_writable(self.session, actor, seen)
             require_version(event, version)
             removed = await remove(self.session, actor, event, scope, occurrence)
-            by_power = require_full_sight(actor, removed.reached)
+            by_power = await require_full_sight(self.session, actor, removed.reached)
+            await after_delete(self.session, actor, event)
             await audit_admin_write(
                 self.session,
                 actor,
@@ -191,21 +206,24 @@ class EventService:
                 overrides_by_power=by_power,
             )
 
-    async def _for_write(self, actor: Actor, event_id: uuid.UUID) -> Seen:
+    async def for_write(self, actor: Actor, event_id: uuid.UUID) -> Seen:
         """The event as the named way sees it, locked (a series before its override)
         and read afresh; how much of it the actor sees is judged on that row (review
-        M10 task 3b, R3b-6)."""
+        M10 task 3b, R3b-6), whether the actor attends it too. Every write of an event
+        found by id starts here (its attendees and answers too: `invitations.py`)."""
         repo = EventRepository(self.session, actor.org_id)
-        event = await repo.find(event_id, sight.by_id_sql(actor))
-        if event is None:
+        found = await repo.find(event_id, sight.by_id_sql(actor), sight.attends_sql(actor))
+        if found is None:
             raise event_not_found()
-        return await self._named(actor, await lock_for_write(self.session, event))
+        locked = await lock_for_write(self.session, found[0])
+        attended = await repo.attended([locked], sight.attends_sql(actor))
+        return await self._named(actor, locked, locked.id in attended)
 
-    async def _named(self, actor: Actor, event: CalendarEvent) -> Seen:
+    async def _named(self, actor: Actor, event: CalendarEvent, attends: bool) -> Seen:
         """How much of the event found by id the actor sees; audited when admin power
         alone shows its content."""
-        if sight.attends(actor, event):
-            return Seen(event, Sight.FULL)
+        if attends:
+            return Seen(event, Sight.FULL, attends=True)
         try:
             await require(self.session, actor, Action.CALENDAR_READ, event.space_id)
         except (NotFound, Forbidden):

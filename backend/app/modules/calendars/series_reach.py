@@ -15,9 +15,12 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.actor import Actor
 from app.modules.calendars import sight
 from app.modules.calendars.event_models import CalendarEvent, EventStatus, EventVisibility
+from app.modules.calendars.event_repository import EventRepository
 from app.modules.calendars.event_writes import private
 from app.modules.calendars.sight import Sight
 
@@ -25,12 +28,19 @@ from app.modules.calendars.sight import Sight
 EVERYWHERE = {"visibility": EventVisibility.PRIVATE, "status": EventStatus.CANCELLED}
 
 
-def require_full_sight(actor: Actor, overrides: Iterable[CalendarEvent]) -> bool:
+async def require_full_sight(
+    session: AsyncSession, actor: Actor, overrides: Iterable[CalendarEvent]
+) -> bool:
     """403 `event.private` unless the actor sees each override in full (on the named
-    way, as a writer of their space); whether admin power alone shows any."""
+    way, as a writer of their space; one it attends it sees in full); whether admin
+    power alone shows any."""
+    overrides = list(overrides)
+    attended = await EventRepository(session, actor.org_id).attended(
+        overrides, sight.attends_sql(actor)
+    )
     by_power = False
     for override in overrides:
-        attends = sight.attends(actor, override)
+        attends = override.id in attended
         found = sight.of(actor, override, reads=True, attends=attends, named=True)
         if found is not Sight.FULL:
             raise private()

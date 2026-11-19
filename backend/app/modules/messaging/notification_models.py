@@ -17,7 +17,14 @@ owner when it kept failing); `review_due` (a page's review is due: plan M7 decis
 approval: plan M9 task 5b; it names the account, `account_id`, and no conversation:
 for everyone who holds `user.manage`, `users/handlers.py`); `totp_locked` (my own
 second factor was locked after too many wrong codes: review M9b F9; it names my own
-account, for me alone, `totp/factor.py`).
+account, for me alone, `totp/factor.py`); `invitation` (I was invited to an event, its
+time changed, or it was cancelled or deleted: plan M10 task 4) and `invite_reply`
+(someone declined or answered "maybe" to an event I organise); both name the event,
+`calendar_event_id`, and no conversation, and are seen while I attend that event row
+(`messaging/activity_calendar.py`). One row per person, event and reason, renewed by
+each further change. The database knows three more calendar reasons that later tasks
+read (`event_reminder`, `event_proposal`, `calendar_sync`): a reason gets its member
+here with its reader, and the activity view lists only the reasons it knows.
 
 A person gets at most one notification per message and reason: the unique key is
 what makes the outbox handler that writes them idempotent (an event handled twice
@@ -57,6 +64,20 @@ class NotificationReason(StrEnum):
     REVIEW_DUE = "review_due"  # a page I moderate is due for review (plan M7 task 6)
     SIGNUP = "signup"  # a self-registered account waits for approval (plan M9 task 5b)
     TOTP_LOCKED = "totp_locked"  # my second factor locked after wrong codes (M9b F9)
+    INVITATION = "invitation"  # invited to an event; its time changed; it was called off
+    INVITE_REPLY = "invite_reply"  # an attendee of my event declined or said "maybe"
+
+
+# Every reason the database accepts: the members above and those later releases read
+# (plan M10 decision 7: the check is widened once, by the migration of M10 task 4).
+STORED_REASONS = (
+    *(reason.value for reason in NotificationReason),
+    *(
+        "event_reminder",
+        "event_proposal",
+        "calendar_sync",
+    ),
+)
 
 
 _TARGET_BEFORE_ACCOUNTS = (
@@ -69,11 +90,17 @@ _TARGET_BEFORE_ACCOUNTS = (
     " OR (message_id IS NULL AND conversation_id IS NULL AND proposal_id IS NULL"
     " AND skill_proposal_id IS NULL AND space_id IS NULL AND automation_id IS NOT NULL)"
 )
-TARGET = (
+_TARGET_BEFORE_EVENTS = (
     f"(account_id IS NULL AND ({_TARGET_BEFORE_ACCOUNTS}))"
     " OR (account_id IS NOT NULL AND message_id IS NULL AND conversation_id IS NULL"
     " AND proposal_id IS NULL AND skill_proposal_id IS NULL AND space_id IS NULL"
     " AND automation_id IS NULL)"
+)
+TARGET = (
+    f"(calendar_event_id IS NULL AND ({_TARGET_BEFORE_EVENTS}))"
+    " OR (calendar_event_id IS NOT NULL AND message_id IS NULL AND conversation_id IS NULL"
+    " AND proposal_id IS NULL AND skill_proposal_id IS NULL AND space_id IS NULL"
+    " AND automation_id IS NULL AND account_id IS NULL)"
 )
 
 
@@ -82,9 +109,7 @@ class Notification(UuidPk, OrgScoped, Base):
     __table_args__ = (
         UniqueConstraint("user_id", "message_id", "reason"),
         CheckConstraint(
-            "reason IN ('mention', 'reply', 'assignment', 'ticket_comment', 'proposal',"
-            " 'approval', 'question', 'run_stopped', 'skill_proposal', 'automation',"
-            " 'review_due', 'signup', 'totp_locked')",
+            "reason IN (" + ", ".join(f"'{reason}'" for reason in STORED_REASONS) + ")",
             name="reason",
         ),
         Index("ix_notification_user_id_id", "user_id", "id"),
@@ -121,6 +146,15 @@ class Notification(UuidPk, OrgScoped, Base):
             postgresql_where=text("account_id IS NOT NULL"),
         ),
         Index("ix_notification_account_id", "account_id"),
+        Index(
+            "uq_notification_calendar_event",
+            "user_id",
+            "calendar_event_id",
+            "reason",
+            unique=True,
+            postgresql_where=text("calendar_event_id IS NOT NULL"),
+        ),
+        Index("ix_notification_calendar_event_id", "calendar_event_id"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -154,6 +188,10 @@ class Notification(UuidPk, OrgScoped, Base):
     # `user.manage` now (`activity_repository`).
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="CASCADE")
+    )
+    # An event (plan M10 task 4); who sees it: whoever attends that event row now.
+    calendar_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("calendar_event.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
