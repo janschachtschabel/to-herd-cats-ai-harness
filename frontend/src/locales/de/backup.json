@@ -109,7 +109,11 @@
         "member_missing": "Dem Archiv fehlt ein Teil.",
         "member_checksum": "Ein Teil des Archivs wurde verändert.",
         "truncated": "Das Archiv ist unvollständig (abgeschnitten).",
-        "dump_foreign": "Die Datenbank im Archiv enthält mehr als das Schema dieser Software (etwa fremde Funktionen oder Erweiterungen)."
+        "dump_foreign": "Die Datenbank im Archiv enthält mehr als das Schema dieser Software (etwa fremde Funktionen oder Erweiterungen).",
+        "unreadable": "Das Archiv ließ sich nicht lesen.",
+        "exists": "Ein Archiv dieses Namens gibt es schon.",
+        "member_twice": "Ein Teil wäre doppelt ins Archiv gekommen.",
+        "member_size": "Ein Teil hatte beim Schreiben eine andere Größe als erwartet."
       },
       "restore": {
         "archive_newer": "Das Archiv stammt von einer neueren Version.",
@@ -128,7 +132,13 @@
         "finish_failed": "Nach dem Einspielen ist ein Schritt gescheitert; die Installation bleibt in Wartung.",
         "not_schema_owner": "Mit getrennten Datenbankrollen darf die App selbst nicht einspielen; das geht nur auf der Kommandozeile mit der Migrationsrolle (docs/SICHERUNG.md).",
         "swap_broken": "Das Archiv hat die Transaktion des Tauschs selbst beendet; der alte Stand ist womöglich nicht mehr da. Die Installation bleibt in Wartung.",
-        "swap_unknown": "Nach dem Tausch ließ sich nicht feststellen, welchen Stand die Datenbank hat. Die Installation bleibt in Wartung."
+        "swap_unknown": "Nach dem Tausch ließ sich nicht feststellen, welchen Stand die Datenbank hat. Die Installation bleibt in Wartung.",
+        "swap_failed": "Der Tausch der Datenbank ist gescheitert (ein SQL-Fehler, fehlende Rechte oder eine Sperre, die länger als 60 Sekunden hielt); der alte Stand ist vollständig da.",
+        "pg_restore_failed": "pg_restore konnte den Dump des Archivs nicht lesen; der alte Stand ist vollständig da.",
+        "tool_missing": "pg_restore oder psql fehlt auf dem Server.",
+        "target_not_empty": "Die Zieldatenbank ist nicht leer.",
+        "backup_running": "Eine Sicherung läuft gerade; danach noch einmal versuchen.",
+        "confirm_missing": "Der Name der Organisation fehlt (--confirm)."
       },
       "backup": {
         "interrupted": "Der Prozess endete vor dem Abschluss.",
@@ -143,7 +153,8 @@
         "schema_behind": "Die Datenbank ist nicht auf dem Stand dieser Version.",
         "schema_ahead": "Die Datenbank ist neuer als diese Version.",
         "no_schema": "Die Datenbank hat kein Schema.",
-        "failed": "Die Sicherung ist gescheitert."
+        "failed": "Die Sicherung ist gescheitert.",
+        "already_running": "Eine Sicherung lief gerade; danach noch einmal versuchen."
       }
     }
   },
