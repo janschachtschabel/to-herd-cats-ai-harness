@@ -7,7 +7,8 @@ against the gate.
 
 Gate: the week view (`week`) and the availability load over 14 days
 (`availability_14`) at p95 under 300 ms per call, and the whole week with every page
-(`week_all_pages`) too, every call answered (status 200), in every run given.
+(`week_all_pages`) too, every call answered (status 200), over at least 200 calls
+(`MIN_CALLS`; the plan reads the gate "über 200 Aufrufe"), in every run given.
 Several runs (repeated because other work shares the machine) are judged each, and
 the spread of each case's p95 is shown. Exit 0 when the gate holds.
 
@@ -26,6 +27,7 @@ from typing import Any
 # The plan's gate (week view and availability over 14 days, per call), and the whole
 # week with every page as one more target (the coordinator's, after remedies a and b).
 GATES_MS = {"week": 300.0, "availability_14": 300.0, "week_all_pages": 300.0}
+MIN_CALLS = 200
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,7 @@ class Verdict:
     p95_ms: float | None  # None: never measured
     target_ms: float
     met: bool
+    n: int = 0  # the calls it was read over
 
 
 @dataclass(frozen=True)
@@ -105,15 +108,16 @@ def summarise(case: str, calls: Sequence[Call]) -> Summary:
 
 
 def verdicts(summaries: Mapping[str, Summary]) -> list[Verdict]:
-    """One per gated case: met when measured, every call answered, p95 under target."""
+    """One per gated case: met when measured over at least `MIN_CALLS` calls, every
+    call answered, p95 under target."""
     found = []
     for case, target in GATES_MS.items():
         summary = summaries.get(case)
         if summary is None:
             found.append(Verdict(case, None, target, False))
             continue
-        met = summary.errors == 0 and summary.p95_ms < target
-        found.append(Verdict(case, summary.p95_ms, target, met))
+        met = summary.n >= MIN_CALLS and summary.errors == 0 and summary.p95_ms < target
+        found.append(Verdict(case, summary.p95_ms, target, met, summary.n))
     return found
 
 
@@ -161,8 +165,10 @@ def render(runs: Sequence[Run]) -> tuple[str, bool]:
     lines.append("")
     for number, v in judged:
         state = "met" if v.met else "FAILED"
+        enough = ">=" if v.n >= MIN_CALLS else "<"
         lines.append(
-            f"Gate run {number} {v.case}: p95 {_num(v.p95_ms)} < {v.target_ms:.0f} ms {state}"
+            f"Gate run {number} {v.case}: n {v.n} {enough} {MIN_CALLS},"
+            f" p95 {_num(v.p95_ms)} < {v.target_ms:.0f} ms {state}"
         )
     ok = all(v.met for _, v in judged)
     lines.append(f"Verdict: {'gate met' if ok else 'gate FAILED'}")

@@ -87,18 +87,37 @@ def test_the_gate_fails_at_300_ms_a_missing_case_or_an_error() -> None:
     erring = [*_calls([10] * 199), report.Call(ms=10.0, queries=2, status=422)]
     summaries = {
         "week": report.summarise("week", erring),
-        "availability_14": report.summarise("availability_14", _calls([10])),
-        "week_all_pages": report.summarise("week_all_pages", _calls([40])),
+        "availability_14": report.summarise("availability_14", _calls([10] * 200)),
+        "week_all_pages": report.summarise("week_all_pages", _calls([40] * 200)),
     }
     assert [v.met for v in report.verdicts(summaries)] == [False, True, True]
+
+
+def test_the_gate_needs_200_calls_per_case() -> None:
+    """The plan's gate is read over more than 200 calls (review M10 task 3c, R3c-3): a
+    case with fewer is not met however fast, and the verdict names `n`."""
+    summaries = {
+        "week": report.summarise("week", _calls([10] * 199)),
+        "availability_14": report.summarise("availability_14", _calls([10] * 200)),
+        "week_all_pages": report.summarise("week_all_pages", _calls([10] * 5)),
+    }
+    verdicts = report.verdicts(summaries)
+    assert [(v.case, v.n, v.met) for v in verdicts] == [
+        ("week", 199, False),
+        ("availability_14", 200, True),
+        ("week_all_pages", 5, False),
+    ]
+    text, ok = report.render([report.Run(cases={c: _calls([10] * 5) for c in summaries})])
+    assert not ok
+    assert "Gate run 1 week: n 5 < 200, p95 10.0 < 300 ms FAILED" in text
 
 
 def test_several_runs_are_judged_each_and_their_spread_shown(tmp_path: Path) -> None:
     def run(path: Path, week_ms: int, load: float) -> Path:
         cases = {
-            "week": [{"ms": week_ms, "queries": 3, "work": 900} for _ in range(10)],
-            "availability_14": [{"ms": 20, "queries": 2} for _ in range(10)],
-            "week_all_pages": [{"ms": 90, "queries": 8} for _ in range(10)],
+            "week": [{"ms": week_ms, "queries": 3, "work": 900} for _ in range(200)],
+            "availability_14": [{"ms": 20, "queries": 2} for _ in range(200)],
+            "week_all_pages": [{"ms": 90, "queries": 8} for _ in range(200)],
         }
         path.write_text(json.dumps({"context": {"load_average": load}, "cases": cases}))
         return path
@@ -110,8 +129,8 @@ def test_several_runs_are_judged_each_and_their_spread_shown(tmp_path: Path) -> 
 
     text, ok = report.render(loaded)
     assert not ok  # the second run misses the week's gate
-    assert "| week | 1 | 10 | 120.0 | 120.0 |" in text
-    assert "| week | 2 | 10 | 310.0 | 310.0 |" in text
+    assert "| week | 1 | 200 | 120.0 | 120.0 |" in text
+    assert "| week | 2 | 200 | 310.0 | 310.0 |" in text
     assert "week: p95 120.0–310.0 ms over 2 runs" in text
     assert "load_average 2.5" in text and "load_average 9.0" in text
     assert "FAILED" in text

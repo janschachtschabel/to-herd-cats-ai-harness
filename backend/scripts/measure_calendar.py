@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.access import actor_for
 from app.core.actor import Actor
 from app.core.db import Database, set_database
+from app.core.errors import ValidationFailed
 from app.core.heap import freeze_startup_heap
 from app.core.migrations import upgrade_head
 from app.core.pagination import PageParams
@@ -53,6 +54,7 @@ from scripts.measure_calendar_report import Call
 from scripts.measure_calendar_shapes import busy_times, month_grids, spans, weeks
 
 WARM_UP = 10
+TOO_DENSE = "calendar.window_too_dense"
 
 
 class Queries:
@@ -78,10 +80,18 @@ class Bench:
         return [asdict(await measured(i)) for i in range(calls)]
 
     async def timed(self, work: Callable[[AsyncSession], Awaitable[Call]]) -> Call:
+        """One call of `work`, timed; a window or an expansion refused as too dense is
+        a call answered 422 (as through the route), which the report counts."""
         before, started = self.queries.count, time.perf_counter()
         async with self.database.session_factory() as session:
-            found = await work(session)
-            await session.commit()
+            try:
+                found = await work(session)
+                await session.commit()
+            except (ValidationFailed, expansion.TooDense) as refused:
+                if isinstance(refused, ValidationFailed) and refused.code != TOO_DENSE:
+                    raise
+                await session.rollback()
+                found = Call(ms=0, queries=0, status=422)
         ms = (time.perf_counter() - started) * 1000
         return Call(**{**asdict(found), "ms": ms, "queries": self.queries.count - before})
 
