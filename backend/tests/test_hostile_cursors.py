@@ -51,6 +51,14 @@ HOSTILE: dict[str, str] = {
     "non_ascii": "äöü",
     "invalid_utf8": _b64(b"\xff\xfe\xfd|x"),
     "short_id": _b64(b"\x01\x02\x03"),
+    # The overlays' five parts (day, kind, id, zone, term), a term past `datetime`'s
+    # range once read in UTC (review M10 task 9, R9-1).
+    "parts_term_overflow_high": _b64(
+        json.dumps(["2026-11-23", "automations", UUID, "UTC", "9999-12-31T23:59:59-01:00"])
+    ),
+    "parts_term_overflow_low": _b64(
+        json.dumps(["2026-11-23", "tickets", UUID, "UTC", "0001-01-01T00:00:00+01:00"])
+    ),
     "empty": "",
 }
 

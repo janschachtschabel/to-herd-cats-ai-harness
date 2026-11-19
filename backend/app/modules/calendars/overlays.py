@@ -223,7 +223,7 @@ def _after(cursor: str | None, zone: str) -> _After | None:
             uuid.UUID(id_),
             term.astimezone(UTC) if term is not None else None,
         )
-    except ValueError as exc:
+    except Exception as exc:  # untrusted input: any failure is 422 (`core/pagination.py`)
         raise pagination.invalid_cursor(exc) from exc
     if made_in != zone:
         raise ValidationFailed(code="calendar.cursor_time_zone")
