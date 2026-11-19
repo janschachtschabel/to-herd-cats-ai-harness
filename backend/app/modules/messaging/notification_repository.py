@@ -3,11 +3,13 @@ A person's activity view: `activity_repository.py`."""
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.models_base import utcnow
 from app.modules.messaging.models import Message
 from app.modules.messaging.notification_models import Notification, NotificationReason
 
@@ -194,17 +196,25 @@ class NotificationRepository:
         await self.add_for_account(account_id, [(user_id, reason)])
 
     async def renew_about_event(
-        self, user_id: uuid.UUID, event_id: uuid.UUID, reason: NotificationReason
+        self,
+        user_id: uuid.UUID,
+        event_id: uuid.UUID,
+        reason: NotificationReason,
+        cause_at: datetime,
     ) -> Notification | None:
-        """The one notification about a calendar event for `user_id` and `reason`, new
-        each time (unread, on top: an earlier one goes); None if a concurrent delivery
-        wrote it first."""
+        """The one notification about a calendar event for `user_id` and `reason`,
+        renewed for a cause written at `cause_at` (unread, on top: an earlier one goes)
+        unless the stored one is not older than the cause (a redelivered cause leaves it
+        as it is, read or not: review M10 task 4, R4-2); None if nothing new was written
+        (that, or a concurrent delivery wrote it first). A new one is dated no earlier
+        than its cause, so a node whose clock is behind still sees it as current."""
         await self.session.execute(
             delete(Notification).where(
                 Notification.org_id == self.org_id,
                 Notification.user_id == user_id,
                 Notification.calendar_event_id == event_id,
                 Notification.reason == reason,
+                Notification.created_at < cause_at,
             )
         )
         row = {
@@ -212,6 +222,7 @@ class NotificationRepository:
             "user_id": user_id,
             "reason": reason,
             "calendar_event_id": event_id,
+            "created_at": max(utcnow(), cause_at),
         }
         stmt = (
             insert(Notification)

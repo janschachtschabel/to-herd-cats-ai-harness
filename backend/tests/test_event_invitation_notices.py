@@ -99,6 +99,9 @@ async def test_a_second_change_refreshes_the_one_notification(
     assert renewed.reason == "invitation"
     assert renewed.read_at is None
     assert renewed.id > first.id  # newer: on top of the list again
+    await calendar_handlers(session, again=True)  # both causes again: neither is newer
+    (kept,) = await notes(session, t.outsider)
+    assert kept.id == renewed.id
 
 
 async def test_a_time_change_resets_the_others_responses(

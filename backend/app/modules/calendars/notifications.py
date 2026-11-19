@@ -10,8 +10,9 @@ handlers in the delivery's transaction, idempotent:
   and never for an agent organiser.
 
 `tell` keeps one notification per person, event and reason: a further change renews it
-(the old row goes, a new one comes: unread, on top), so delivering an event twice
-leaves one. Each new one is announced (`notification.created`, ids only, for that
+(the old row goes, a new one comes: unread, on top) when the stored one is older than
+the change's outbox event, so delivering an event twice leaves one, and a read one
+stays read (review M10 task 4, R4-2). Each new one is announced (`notification.created`, ids only, for that
 person alone).
 """
 
@@ -39,9 +40,10 @@ async def tell(
     event_id: uuid.UUID,
     reason: NotificationReason,
 ) -> None:
-    """The one notification of the person about the event for `reason`, renewed."""
+    """The one notification of the person about the event for `reason`, renewed
+    unless it is not older than `cause`."""
     renewed = await NotificationRepository(session, cause.org_id).renew_about_event(
-        user_id, event_id, reason
+        user_id, event_id, reason, cause.created_at
     )
     if renewed is not None:
         await announce(session, cause, renewed)
