@@ -95,6 +95,7 @@ async def list_window(
         limit=budget.rows_allowed() + 1,
     )
     seen: dict[uuid.UUID, Sight] = {}
+    reads_of = {event.id: reading for event, reading in rows}
     for event, reading in rows:
         found_sight = sight.of(
             actor, event, reads=reading, attends=sight.attends(actor, event), named=named
@@ -119,7 +120,11 @@ async def list_window(
         for _, event, event_sight in page
         if event_sight is Sight.FULL
         and sight.by_admin_power(
-            actor, event, reads=True, attends=sight.attends(actor, event), named=named
+            actor,
+            event,
+            reads=reads_of[event.id],
+            attends=sight.attends(actor, event),
+            named=named,
         )
     ]
     if shown_by_power:
