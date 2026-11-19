@@ -6,11 +6,18 @@ import type { Occurrence } from './queries'
 
 export type CalendarColor = Schemas['CalendarColor']
 
-/** What the views show of a calendar: its worded name, tone, and what one may do. */
+/** What the views show of a calendar: its worded name, tone, and what one may do
+ *  (null while its space's role is not known). */
 export interface CalendarInfo {
   label: string
   color: CalendarColor
-  abilities: CalendarAbilities
+  abilities: CalendarAbilities | null
+}
+
+/** A calendar's name in chips, the agenda and the look at an event; one the list does
+ *  not hold (an event one sees in another space's calendar) is „Kalender“. */
+export function calendarLabel(t: TFunction, calendar: CalendarInfo | undefined): string {
+  return calendar?.label ?? t('calendar.event.otherCalendar')
 }
 
 /** The eight fixed tones (plan M10 decision 17) as a dot and a chip's edge. Colour is

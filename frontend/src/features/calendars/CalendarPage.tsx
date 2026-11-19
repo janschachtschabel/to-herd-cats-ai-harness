@@ -18,10 +18,6 @@ import { MonthView } from './views/MonthView'
 import { WeekView } from './views/WeekView'
 import { useHiddenCalendars } from './visibility'
 
-/** The most calendars the window takes by id (`calendar_ids`); beyond, the page asks
- *  without and leaves the hidden ones out itself. */
-const MAX_CALENDAR_IDS = 100
-
 /** The calendar (`/calendar`, plan M10 decision 17): the calendars of one's spaces, or
  *  with `space` one space's (the named way, audited for an admin outside it), in four
  *  views; view and day stand in the address. The server expands the series, judges
@@ -47,21 +43,10 @@ export function CalendarPage({
   const [opened, setOpened] = useState<Occurrence | null>(null)
 
   const listed = sources.calendars.items
-  const shownIds = listed.filter((c) => !hidden.has(c.id)).map((c) => c.id)
-  const anyHidden = shownIds.length < listed.length
-  const waitForList = hidden.size > 0 && sources.calendars.isPending
+  // Hidden calendars are left out of what loaded: hiding asks nothing again, and the
+  // window keeps what one sees in calendars the list does not hold.
   const events = useWindow(
-    {
-      ...windowOf(range, zone),
-      timeZone: zone,
-      calendarIds: waitForList
-        ? []
-        : anyHidden && shownIds.length <= MAX_CALENDAR_IDS
-          ? shownIds
-          : undefined,
-      spaceId: search.space,
-      q: q || undefined,
-    },
+    { ...windowOf(range, zone), timeZone: zone, spaceId: search.space, q: q || undefined },
     { everything: view !== 'agenda' },
   )
   const occurrences = useMemo(
@@ -72,9 +57,10 @@ export function CalendarPage({
   const go = (next: Partial<CalendarSearch>) => onSearch({ ...search, ...next })
   const openDay = (day: Day) => go({ view: 'day', date: day })
   const shared = { occurrences, calendars: sources.infos, zone, today, onOpen: setOpened }
-  const allHidden = listed.length > 0 && shownIds.length === 0
-  const loaded = !events.isPending && !events.isError && !events.hasMore
-  const empty = loaded && occurrences.length === 0
+  const allHidden = listed.length > 0 && listed.every((c) => hidden.has(c.id))
+  // Only a window that answered for what is shown may say it is empty.
+  const answered = !events.isPending && !events.isPlaceholder && !events.isError
+  const empty = answered && !events.hasMore && occurrences.length === 0
 
   return (
     <div>
@@ -97,12 +83,17 @@ export function CalendarPage({
       </PageHeader>
       <div className="flex flex-col gap-6 lg:flex-row">
         <aside className="lg:w-56 lg:shrink-0">
-          {sources.calendars.isPending ? (
+          {sources.calendars.isPending || sources.spaces.isPending ? (
             <LoadingState rows={3} />
           ) : sources.calendars.isError ? (
             <ErrorState error={sources.calendars.error} onRetry={sources.calendars.refetch} />
           ) : (
-            <CalendarList groups={sources.groups} hidden={hidden} onToggle={toggle} />
+            <div className="flex flex-col gap-3">
+              {sources.spaces.isError && (
+                <ErrorState error={sources.spaces.error} onRetry={sources.spaces.refetch} />
+              )}
+              <CalendarList groups={sources.groups} hidden={hidden} onToggle={toggle} />
+            </div>
           )}
         </aside>
         <div className="min-w-0 flex-1">
@@ -118,21 +109,25 @@ export function CalendarPage({
           <div className="mb-2 min-h-5 text-sm text-muted-foreground" role="status">
             {allHidden
               ? t('calendar.window.hidden')
-              : !events.isError && (events.loadingMore || (events.hasMore && view !== 'agenda'))
-                ? t('calendar.window.loadingMore')
-                : empty
-                  ? t('calendar.window.empty')
-                  : null}
+              : events.isPlaceholder
+                ? t('states.loading')
+                : !events.isError && (events.loadingMore || (events.hasMore && view !== 'agenda'))
+                  ? t('calendar.window.loadingMore')
+                  : empty
+                    ? t('calendar.window.empty')
+                    : null}
           </div>
           {events.isError && (
             <div className="mb-3">
               <ErrorState error={events.error} onRetry={events.refetch} />
             </div>
           )}
-          {events.isPending && !allHidden ? (
+          {events.isPending ? (
             <LoadingState />
           ) : (
-            <div className="overflow-x-auto">
+            // Kept while the next window loads (its last answer stays): the grid keeps
+            // the keyboard's focus when a step turns the month.
+            <div className="overflow-x-auto" aria-busy={events.isPlaceholder || undefined}>
               {view === 'month' && (
                 <MonthView
                   {...shared}

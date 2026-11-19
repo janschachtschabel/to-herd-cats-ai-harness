@@ -76,18 +76,21 @@ describe('calendar page', () => {
     expect(await screen.findByText('Keine Termine in diesem Zeitraum.')).toBeInTheDocument()
   })
 
-  test('hiding a calendar asks the window for the others only', async () => {
+  test('hiding a calendar leaves its events out of what loaded, without asking again', async () => {
     const api = calendarApi(() => page([meeting]))
     const { user } = await renderApp('/calendar?date=2026-11-19')
+    expect(await screen.findByRole('button', { name: /Teamrunde/ })).toBeInTheDocument()
+    const asked = api.find('GET', '/api/calendar/events').length
     await user.click(await screen.findByRole('checkbox', { name: 'Apfel' }))
-    await waitFor(() =>
-      expect(api.find('GET', '/api/calendar/events').at(-1)!.query.getAll('calendar_ids')).toEqual([
-        'cal-me',
-        'cal-open',
-      ]),
-    )
     await waitFor(() => expect(screen.queryByRole('button', { name: /Teamrunde/ })).toBeNull())
+    expect(api.find('GET', '/api/calendar/events')).toHaveLength(asked)
+    expect(api.find('GET', '/api/calendar/events').every((c) => !c.query.has('calendar_ids'))).toBe(
+      true,
+    )
     expect(JSON.parse(localStorage.getItem('herd.calendars.hidden')!)).toEqual(['cal-team'])
+    await user.click(screen.getByRole('checkbox', { name: 'Apfel' }))
+    expect(await screen.findByRole('button', { name: /Teamrunde/ })).toBeInTheDocument()
+    expect(api.find('GET', '/api/calendar/events')).toHaveLength(asked)
   })
 
   test('a loading window shows that it loads', async () => {

@@ -49,7 +49,7 @@ export function CalendarList({
                 className={cn('size-2.5 shrink-0 rounded-full', TONE_DOT[calendar.color])}
               />
               <span className="min-w-0 flex-1 truncate">{calendar.label}</span>{' '}
-              {!calendar.abilities.write && (
+              {calendar.abilities && !calendar.abilities.write && (
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {t('calendar.list.readOnly')}
                 </span>

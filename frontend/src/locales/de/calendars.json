@@ -2,14 +2,15 @@
   "calendars": {
     "default": {
       "personal": "Mein Kalender",
-      "general": "Allgemein"
+      "general": "Allgemein",
+      "unknown": "Standardkalender"
     }
   },
   "errors": {
     "calendar": {
       "window_out_of_range": "Der Kalender reicht von 1900 bis 2399.",
       "cursor_time_zone": "Die Ansicht hat die Zeitzone gewechselt; bitte von vorn laden.",
-      "window_too_dense": "In diesem Zeitraum liegen zu viele Termine (mehr als 2.000). Blende Kalender aus oder wähle eine kürzere Ansicht."
+      "window_too_dense": "In diesem Zeitraum liegen zu viele Termine (mehr als 2.000). Wähle eine kürzere Ansicht (Woche oder Tag) oder nur einen Bereich."
     },
     "event": {
       "too_long": "Ein Termin dauert höchstens ein Jahr und einen Tag.",
@@ -71,7 +72,8 @@
       "title": "Kalender",
       "readOnly": "nur lesen",
       "empty": "Noch keine Kalender.",
-      "unknownSpace": "Weiterer Bereich"
+      "unknownSpace": "Weiterer Bereich",
+      "spaceNotLoaded": "Bereich (Name nicht geladen)"
     },
     "event": {
       "busy": "Belegt",
@@ -83,7 +85,10 @@
       "location": "Ort",
       "calendar": "Kalender",
       "redacted": "Du siehst diesen Termin nur als belegt.",
-      "cancelledNote": "Dieser Termin ist abgesagt."
+      "cancelledNote": "Dieser Termin ist abgesagt.",
+      "otherCalendar": "Kalender",
+      "until": "bis {{time}}",
+      "continued": "Fortsetzung"
     },
     "month": {
       "more_one": "+{{count}} weiterer",

@@ -18,6 +18,13 @@ describe('calendar names', () => {
     expect(calendarName(t, unnamed, 'open')).toBe('General')
   })
 
+  test('while its space is unknown a default calendar is not named from a guess', async () => {
+    const unnamed = { name: null, is_default: true }
+    expect(calendarName(t, unnamed, undefined)).toBe('Standardkalender')
+    await i18n.changeLanguage('en')
+    expect(calendarName(t, unnamed, undefined)).toBe('Default calendar')
+  })
+
   test('a name someone gave is shown as given', () => {
     expect(calendarName(t, { name: 'Urlaub', is_default: false }, 'team')).toBe('Urlaub')
     expect(calendarName(t, { name: 'Privat', is_default: true }, 'personal')).toBe('Privat')
