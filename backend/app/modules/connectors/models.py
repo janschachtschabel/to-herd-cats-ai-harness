@@ -32,6 +32,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -112,6 +113,8 @@ class Connector(UuidPk, OrgScoped, Timestamps, Base):
             postgresql_where=text("mcp_server_id IS NOT NULL"),
         ),
         CheckConstraint(_in("purpose", Purpose), name="purpose"),
+        # The target of `mcp_server`'s (connector_id, purpose) foreign key (R13a-8).
+        UniqueConstraint("id", "purpose"),
         CheckConstraint(
             "purpose = 'mcp' OR (scope = 'personal' AND mcp_server_id IS NULL)",
             name="purpose_personal",

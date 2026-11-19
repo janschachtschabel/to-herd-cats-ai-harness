@@ -7,6 +7,10 @@ credential it uses: `none`, `shared` (one shared connector, `connector_id`) or
 `oauth_client_id` names the OAuth client people connect it with, if any).
 `catalog_id` names the catalogue entry it was created from (plan M8 task 9), whose
 suggested classifications a refresh applies to the tools it adds.
+`purpose` is always `mcp` (a CHECK): the target of the composite foreign keys
+`(connector_id, purpose)` and `(oauth_client_id, purpose)`, so the database, too, keeps a
+server from naming a calendar connector or app (review of M10 task 13a, R13a-8). No
+code sets it (the ORM's default and, for 1.0.0's inserts, the server default do).
 
 `mcp_server_tool`: one tool as the server listed it. `fingerprint` is the SHA-256 over
 name, description and input schema as last read; `approved_fingerprint` the one an
@@ -30,6 +34,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -42,6 +47,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models_base import Base, OrgScoped, Timestamps, UuidPk
 from app.modules.ai.models import DataLocation
+from app.modules.connectors.models import Purpose
 
 MAX_NAME_CHARS = 120
 MAX_URL_CHARS = 500
@@ -84,6 +90,20 @@ class McpServer(UuidPk, OrgScoped, Timestamps, Base):
         CheckConstraint(
             "oauth_client_id IS NULL OR connector_scope = 'personal'", name="oauth_client"
         ),
+        # A server names only `mcp` connectors and apps (R13a-8).
+        CheckConstraint("purpose = 'mcp'", name="purpose"),
+        ForeignKeyConstraint(
+            ["connector_id", "purpose"],
+            ["connector.id", "connector.purpose"],
+            name="fk_mcp_server_connector_purpose",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["oauth_client_id", "purpose"],
+            ["oauth_client.id", "oauth_client.purpose"],
+            name="fk_mcp_server_oauth_client_purpose",
+            ondelete="RESTRICT",
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_NAME_CHARS), nullable=False)
@@ -100,6 +120,9 @@ class McpServer(UuidPk, OrgScoped, Timestamps, Base):
     # The catalogue entry it was created from (`modules/mcp_catalog`), if any.
     catalog_id: Mapped[str | None] = mapped_column(String(MAX_CATALOG_ID_CHARS))
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    purpose: Mapped[Purpose] = mapped_column(
+        String(16), nullable=False, default=Purpose.MCP, server_default=Purpose.MCP.value
+    )
     # Bumped by every write; a write names the version it read (409).
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
