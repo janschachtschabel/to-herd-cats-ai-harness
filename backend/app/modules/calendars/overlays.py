@@ -14,12 +14,16 @@ automations, each read from its own module's repository, read only.
   SQL.
 - The range `[start, end)` is in days (the end excluded, like the window's `to`),
   within 1900-01-01 and 2400-01-01. A ticket lies on its due day, a sprint from its
-  first to its last day; an automation's term on its day in `viewer_zone` (default
-  UTC), the instant beside it (`at`).
+  first to its last day; an automation's term on the day in `viewer_zone` (default
+  UTC) whose span, from its midnight to the next day's (`_midnight`), holds it, the
+  instant beside it (`at`). That is the term's wall date, except where clocks went
+  back across midnight (America/St_Johns until 2010): the repeated time before
+  midnight belongs to the new day, as the range's filter on instants has it.
 - Paged by (starts_on, kind, id); automations, of which a day may hold several
-  terms, by (starts_on, kind, at, id), which is the same order refined (the day of a
-  term rises with its instant). A cursor holds the viewer zone and is valid with it
-  only (422 `calendar.cursor_time_zone`).
+  terms, by (starts_on, kind, at, id), which is the same order refined, since the
+  day of a term so defined rises with its instant (review M10 task 9, R9-2). A
+  cursor holds the viewer zone and is valid with it only (422
+  `calendar.cursor_time_zone`).
 """
 
 import uuid
@@ -166,7 +170,7 @@ async def _terms(
     for term in terms:
         at = term.automation.next_due_at
         assert at is not None  # an active automation in the range has a term
-        day = zones.wall(at, zone).date()
+        day = _day_of(at, zone)
         automation_id = term.automation.id
         found.append(
             Overlay(
@@ -194,6 +198,18 @@ def _key(kind: OverlayKind, after: _After | None) -> DayKey | None:
     if kind == after.kind:
         return DayKey(after.day, after.id)
     return DayKey(after.day)
+
+
+def _day_of(at: datetime, zone: str) -> date:
+    """The day whose span `[_midnight(day), _midnight(next day))` holds `at`: its wall
+    date, moved where the midnights say otherwise (a fold across midnight, a gap
+    around it, a skipped day)."""
+    day = zones.wall(at, zone).date()
+    while at < _midnight(day, zone):
+        day -= timedelta(days=1)
+    while _midnight(day + timedelta(days=1), zone) <= at:
+        day += timedelta(days=1)
+    return day
 
 
 def _midnight(day: date, zone: str) -> datetime:

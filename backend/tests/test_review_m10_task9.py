@@ -100,7 +100,9 @@ async def test_pages_hold_where_a_days_terms_do_not_come_in_order(work: Work) ->
     """R9-2 (theoretical: no zone has done this since 2010, and next terms lie ahead).
     America/St_Johns, 29 October 2006: at 00:01 the clocks went back to 23:01 of the
     28th, so a term at 00:00:30 of the 29th comes before one at 23:15 of the 28th.
-    The paging rests on "the day of a term rises with its instant"."""
+    The paging rests on "the day of a term rises with its instant": a term lies on
+    the day whose span (its midnight to the next) holds it, so the repeated 23:15
+    belongs to the 29th, as the range's filter has it."""
     bench, admin, alice = work.bench, work.bench.people.admin, work.bench.people.alice
     channel = await new_channel(admin, work.space.id, "takt")
     for hour, minute, second in ((2, 30, 30), (2, 45, 0), (3, 40, 0)):
@@ -112,5 +114,13 @@ async def test_pages_hold_where_a_days_terms_do_not_come_in_order(work: Work) ->
         "kinds": "automations",
     }
     whole = await overlays(alice, **span)
-    assert [i["starts_on"] for i in whole] == ["2006-10-28", "2006-10-29", "2006-10-29"]
-    assert await overlays(alice, limit=1, **span) == whole  # the 00:00:30 term is skipped
+    assert [i["at"][:19] for i in whole] == [
+        "2006-10-29T02:30:30",
+        "2006-10-29T02:45:00",
+        "2006-10-29T03:40:00",
+    ]
+    assert [i["starts_on"] for i in whole] == ["2006-10-29"] * 3
+    for limit in (1, 2):
+        assert await overlays(alice, limit=limit, **span) == whole, limit
+    assert await overlays(alice, **{**span, "to": "2006-10-29"}) == []
+    assert await overlays(alice, **{**span, "from": "2006-10-29"}) == whole
