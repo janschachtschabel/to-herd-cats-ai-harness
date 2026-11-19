@@ -157,7 +157,7 @@ async def create_personal(
             raise ValidationFailed(code="connector.oauth_client_invalid")
     connector_id = uuid7()
     connector = await repo.create(
-        id=connector_id,
+        connector_id=connector_id,
         scope=ConnectorScope.PERSONAL,
         name=f"{purpose.value}:{connector_id}",
         auth_kind=kind,

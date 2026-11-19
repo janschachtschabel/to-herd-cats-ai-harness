@@ -15,7 +15,7 @@ from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import advisory_xact_lock
-from app.modules.connectors.models import Connector, Purpose
+from app.modules.connectors.models import AuthKind, Connector, ConnectorScope, Purpose
 
 
 class ConnectorRepository:
@@ -81,11 +81,31 @@ class ConnectorRepository:
         stmt = select(Connector).where(self._mine(), Connector.mcp_server_id == server_id)
         return await self.session.scalar(stmt)
 
-    async def create(self, **fields: object) -> Connector:
+    async def create(
+        self,
+        *,
+        connector_id: uuid.UUID,
+        scope: ConnectorScope,
+        name: str,
+        auth_kind: AuthKind,
+        header_name: str | None = None,
+        secret_ref: str | None = None,
+        oauth_client_id: uuid.UUID | None = None,
+    ) -> Connector:
         """A new connector of this owner and this repository's purpose."""
-        return await self.add(
-            Connector(org_id=self.org_id, owner_id=self.owner_id, purpose=self.purpose, **fields)
+        connector = Connector(
+            id=connector_id,
+            org_id=self.org_id,
+            owner_id=self.owner_id,
+            purpose=self.purpose,
+            scope=scope,
+            name=name,
+            auth_kind=auth_kind,
+            header_name=header_name,
+            secret_ref=secret_ref,
+            oauth_client_id=oauth_client_id,
         )
+        return await self.add(connector)
 
     async def add(self, connector: Connector) -> Connector:
         given = connector.purpose or Purpose.MCP  # unset: the column's default
