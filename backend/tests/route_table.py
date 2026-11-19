@@ -26,7 +26,8 @@ ship without a decision on who may call it. Guards:
   an id nobody has (plan M10). An admin outside the space reaches it by naming the
   space (`/api/spaces/{space_id}/calendars`, audited); the calendar lists are `session`.
   Making an event is `calendar` too; the event window is `session` (another space's
-  events only by naming it with `space_id`, which is `require`d and audited).
+  events only by naming it with `space_id`, which is `require`d and audited); the
+  overlays are `session` (member spaces only, plan M10 task 9).
 - `event`: whoever sees the event (a role in its calendar's space, or its organiser);
   otherwise 404 `event.not_found`, as for an id nobody has (plan M10 task 3a); an
   attendee sees it too (task 4).
@@ -191,6 +192,7 @@ ROUTES: list[tuple[str, str, str]] = [
     ("PUT", "/api/admin/calendar-settings", "admin"),
     ("POST", "/api/calendars/{calendar_id}/events", "calendar"),
     ("GET", "/api/calendar/events", "session"),
+    ("GET", "/api/calendar/overlays", "session"),
     ("GET", "/api/events/{event_id}", "event"),
     ("PATCH", "/api/events/{event_id}", "event"),
     ("DELETE", "/api/events/{event_id}", "event"),
@@ -436,6 +438,7 @@ def concrete(
         "/attachments": "?filename=x.txt",
         "/dm-inspect": f"?user_id={uuid7()}",
         "/calendar/events": "?from=2026-11-23T00:00:00Z&to=2026-11-24T00:00:00Z",
+        "/calendar/overlays": "?from=2026-11-23&to=2026-11-24",
     }
     if "/ticket-statuses/" in template or versioned_delete:
         return template + "?version=1"

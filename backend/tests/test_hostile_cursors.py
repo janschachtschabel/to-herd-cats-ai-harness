@@ -88,6 +88,7 @@ def test_the_list_endpoints_are_found() -> None:
         "/api/tokens/{token_id}/calls",
         "/api/ai/mcp/tokens/{token_id}/calls",
         "/api/calendar/events",
+        "/api/calendar/overlays",
     } <= set(endpoints)
 
 
@@ -106,6 +107,7 @@ SERVER_TOOLS = "/api/ai/mcp-servers/{server_id}/tools"
 # Lists that need more than a cursor (besides the DM inspection's person).
 EXTRA: dict[str, dict[str, str]] = {
     "/api/calendar/events": {"from": "2026-11-23T00:00:00Z", "to": "2026-11-24T00:00:00Z"},
+    "/api/calendar/overlays": {"from": "2026-11-23", "to": "2026-11-24"},
 }
 
 AGENT_TOKENS = {
