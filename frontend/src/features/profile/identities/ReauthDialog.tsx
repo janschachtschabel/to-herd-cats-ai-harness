@@ -9,13 +9,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { signInHref } from '@/features/auth/queries'
 import { Field, FormActions, SaveError } from '@/features/shared/forms'
 
 /** Before a new account is linked the person proves herself again (ASVS V7.5.1): her
- *  current password, or, without one, a fresh sign-in through her provider. */
+ *  current password, or, without one, a fresh sign-in through a provider she already
+ *  uses (`proofs`). */
 export function ReauthDialog({
   open,
   providerName,
+  proofs,
   pending,
   error,
   onSubmit,
@@ -23,6 +26,7 @@ export function ReauthDialog({
 }: {
   open: boolean
   providerName: string
+  proofs: { key: string; name: string }[]
   pending: boolean
   error: unknown
   onSubmit: (password: string) => void
@@ -59,6 +63,17 @@ export function ReauthDialog({
             )}
           </Field>
           <p className="text-sm text-muted-foreground">{t('security.reauth.noPassword')}</p>
+          {proofs.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {proofs.map((proof) => (
+                <Button key={proof.key} type="button" variant="outline" size="sm" asChild>
+                  <a href={signInHref(proof.key, { reauth: true })}>
+                    {t('security.reauth.viaProvider', { name: proof.name })}
+                  </a>
+                </Button>
+              ))}
+            </div>
+          )}
           <SaveError error={error} />
           <FormActions>
             <Button type="button" variant="outline" onClick={() => change(false)}>

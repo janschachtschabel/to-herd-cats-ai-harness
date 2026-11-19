@@ -50,3 +50,28 @@ async def test_without_totp_an_oidc_sign_in_opens_the_session(
     back = await sign_in(browser, oidc_stub, email=member.email, sub="s-plain")
     assert back.headers["location"] == "/"
     assert (await browser.get("/api/auth/me")).status_code == 200
+
+
+@pytest.mark.parametrize("reauth", [False, True])
+async def test_only_a_fresh_proof_counts_after_the_second_factor(
+    owner: AsyncClient,
+    member: User,
+    member_client: AsyncClient,
+    make_client: MakeClient,
+    oidc_stub: OidcStub,
+    session: AsyncSession,
+    totp_time: SettableClock,
+    reauth: bool,
+) -> None:
+    """The waiting sign-in carries whether it was the fresh proof before linking
+    (R18-10); only then may the session link without the password."""
+    await make_provider(owner, oidc_stub, trust_email=True)
+    enrolled = await enroll(member_client, totp_time)
+    browser = await make_client(csrf=True)
+    await sign_in(browser, oidc_stub, reauth=reauth, email=member.email, sub="s-proof")
+    challenge = (await session.scalars(select(SignInChallenge))).one()
+    assert challenge.reauth is reauth
+    done = await browser.post("/api/auth/login/second-factor", json={"code": enrolled.next_code()})
+    assert done.status_code == 200, done.text
+    linking = await browser.post("/api/auth/me/identities/stub/link")
+    assert linking.status_code == (200 if reauth else 403), linking.text

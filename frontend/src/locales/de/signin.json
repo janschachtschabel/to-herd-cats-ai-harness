@@ -21,7 +21,8 @@
       "issuer_mismatch": "Der Anbieter hat unerwartet geantwortet. Bitte versuche es später noch einmal.",
       "id_token_invalid": "Die Antwort des Anbieters konnte nicht geprüft werden. Bitte versuche es später noch einmal.",
       "public_url_missing": "Die Anmeldung über Anbieter ist nicht eingerichtet.",
-      "account_pending": "Dein Konto wartet auf Freigabe durch eine Administratorin oder einen Administrator."
+      "account_pending": "Dein Konto wartet auf Freigabe durch eine Administratorin oder einen Administrator.",
+      "reauth_stale": "Die Anmeldung beim Anbieter war älter als 10 Minuten und zählt nicht als Bestätigung. Bitte melde dich dort noch einmal an."
     },
     "hintWithProviders": "Melde dich mit dem Konto deiner Organisation oder mit E-Mail-Adresse und Passwort an.",
     "pending": {

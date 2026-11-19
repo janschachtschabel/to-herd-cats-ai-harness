@@ -92,9 +92,12 @@ export function useSignInProviders(): SignInProvider[] {
   return useQuery(providersQuery).data ?? []
 }
 
-/** Where a provider's sign-in starts: a full page load (the API redirects to it). */
-export function signInHref(key: string): string {
-  return `/api/auth/oidc/${encodeURIComponent(key)}/start`
+/** Where a provider's sign-in starts: a full page load (the API redirects to it).
+ *  `reauth`: the sign-in is the proof before linking a new account; the provider is
+ *  asked for a fresh login and the browser comes back to the profile. */
+export function signInHref(key: string, { reauth = false }: { reauth?: boolean } = {}): string {
+  const start = `/api/auth/oidc/${encodeURIComponent(key)}/start`
+  return reauth ? `${start}?reauth=true` : start
 }
 
 /** A use of the session and nothing else, for a person who works in the tab while the

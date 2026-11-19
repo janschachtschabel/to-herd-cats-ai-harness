@@ -32,7 +32,7 @@ describe('linking an account asks to sign in again', () => {
     const { user } = await renderApp('/profile')
     await user.click(await screen.findByRole('button', { name: 'Mit Firmen-Login verknüpfen' }))
     const dialog = await screen.findByRole('dialog', { name: 'Erneut anmelden' })
-    expect(within(dialog).getByText(/über deinen Anbieter/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/über einen Anbieter/)).toBeInTheDocument()
     expect(screen.queryByText('Bitte melde dich erneut an.')).not.toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText('Aktuelles Passwort'), 'falsch-falsch')
@@ -51,5 +51,38 @@ describe('linking an account asks to sign in again', () => {
       { password: 'falsch-falsch' },
       { password: 'richtiges-passwort' },
     ])
+  })
+})
+
+describe('without a password the proof is a fresh sign-in at a linked provider', () => {
+  test('the dialog offers it, and a stale one comes back with its reason', async () => {
+    mockApi({
+      'GET /api/auth/me': makeMe([]),
+      'GET /api/spaces': page([]),
+      'GET /api/auth/me/totp': { enabled_at: null, recovery_codes_left: 0, unavailable: null },
+      'GET /api/auth/me/sessions': page([]),
+      'GET /api/auth/providers': page([
+        { key: 'firma', name: 'Firmen-Login', kind: 'generic' },
+        { key: 'google', name: 'Google', kind: 'google' },
+      ]),
+      'GET /api/auth/me/identities': page([
+        {
+          id: '00000000-0000-0000-0000-0000000000a1',
+          provider_key: 'firma',
+          provider_name: 'Firmen-Login',
+          provider_kind: 'generic',
+          created_at: '2026-11-01T09:00:00Z',
+          last_login_at: null,
+        },
+      ]),
+      'POST /api/auth/me/identities/:key/link': () => apiError(403, 'auth.reauth_required'),
+    })
+    const { user } = await renderApp('/profile?link_error=oidc.reauth_stale')
+    expect(await screen.findByText(/älter als 10 Minuten/)).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Mit Google verknüpfen' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Erneut anmelden' })
+    const proof = within(dialog).getByRole('link', { name: 'Erneut über Firmen-Login anmelden' })
+    expect(proof).toHaveAttribute('href', '/api/auth/oidc/firma/start?reauth=true')
+    expect(within(dialog).queryByRole('link', { name: /Google/ })).not.toBeInTheDocument()
   })
 })

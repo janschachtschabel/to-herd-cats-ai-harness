@@ -30,8 +30,9 @@
       "title": "Erneut anmelden",
       "hint": "Ein neues Konto bei {{name}} ist ein weiterer Weg in dein Konto. Bestätige deshalb erst, dass du es bist.",
       "password": "Aktuelles Passwort",
-      "noPassword": "Ohne Passwort: Melde dich ab und erneut über deinen Anbieter an; danach kannst du 10 Minuten lang ohne Passwort verknüpfen.",
-      "submit": "Weiter zum Anbieter"
+      "noPassword": "Ohne Passwort: Melde dich erneut über einen Anbieter an, mit dem du dich schon anmeldest; er fragt dann nach deinem Login. Danach kannst du 10 Minuten lang ohne Passwort verknüpfen.",
+      "submit": "Weiter zum Anbieter",
+      "viaProvider": "Erneut über {{name}} anmelden"
     }
   }
 }

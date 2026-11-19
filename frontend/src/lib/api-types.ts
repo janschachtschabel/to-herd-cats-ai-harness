@@ -2112,6 +2112,8 @@ export interface paths {
          * Start
          * @description To the provider's sign-in page, with the browser binding as a cookie; a provider
          *     that is unknown, off or unreachable sends the browser back to the sign-in page.
+         *     `reauth`: the sign-in is the proof before linking (`fresh.py`): the provider is
+         *     asked for a fresh login, and the browser comes back to the profile.
          */
         get: operations["start_api_auth_oidc__key__start_get"];
         put?: never;
@@ -14927,7 +14929,10 @@ export interface operations {
     };
     start_api_auth_oidc__key__start_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description a fresh login as the proof before linking */
+                reauth?: boolean;
+            };
             header?: never;
             path: {
                 key: string;

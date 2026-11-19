@@ -32,6 +32,8 @@ export function LinkedAccounts({ linked, linkError }: { linked?: string; linkErr
   const linkedName = providers.find((p) => p.key === linked)?.name ?? linked
   const linkedKeys = new Set(identities.items.map((i) => i.provider_key))
   const offered = providers.filter((p) => !linkedKeys.has(p.key))
+  // Where she may sign in again as the proof: her linked providers that are enabled.
+  const proofs = providers.filter((p) => linkedKeys.has(p.key))
   if (providers.length === 0 && identities.items.length === 0 && !identities.isPending) return null
   return (
     <section className="mt-8 flex flex-col gap-3 border-t pt-6" aria-labelledby="linked-accounts">
@@ -137,6 +139,7 @@ export function LinkedAccounts({ linked, linkError }: { linked?: string; linkErr
       <ReauthDialog
         open={proving !== null}
         providerName={proving?.name ?? ''}
+        proofs={proofs}
         pending={startLink.isPending}
         error={startLink.error}
         onSubmit={(password) => proving && startLink.mutate({ key: proving.key, password })}

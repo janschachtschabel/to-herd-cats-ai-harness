@@ -27,9 +27,15 @@ class Challenge:
 
 
 async def open_challenge(
-    session: AsyncSession, user: User, method: str, clock: Clock | None = None
+    session: AsyncSession,
+    user: User,
+    method: str,
+    clock: Clock | None = None,
+    *,
+    reauth: bool = False,
 ) -> Challenge:
-    """A waiting sign-in for `user` whose first step (`password` or `oidc`) passed."""
+    """A waiting sign-in for `user` whose first step (`password` or `oidc`) passed;
+    `reauth`: a fresh provider sign-in meant as the proof before linking."""
     token = random.token_urlsafe(32)
     expires_at = (clock or totp_clock()).now() + timedelta(minutes=CHALLENGE_MINUTES)
     await ChallengeRepository(session).add(
@@ -38,6 +44,7 @@ async def open_challenge(
             user_id=user.id,
             token_hash=hash_token(token),
             method=method,
+            reauth=reauth,
             expires_at=expires_at,
         )
     )

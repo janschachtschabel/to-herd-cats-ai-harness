@@ -43,7 +43,8 @@ from app.core.ratelimit import RateLimiter, limit_key
 from app.modules.auth.context import AuthContext
 from app.modules.auth.service import AuthService
 from app.modules.auth.sign_in_log import log_sign_in
-from app.modules.oidc import protocol
+from app.modules.auth.timing import session_clock
+from app.modules.oidc import fresh, protocol
 from app.modules.oidc.accounts import Accounts, Admitted
 from app.modules.oidc.admission import Refuse
 from app.modules.oidc.keys import ProviderKeys
@@ -126,8 +127,15 @@ class FlowService:
         return providers, provider
 
     async def start(
-        self, key: str, ip: str | None, *, link_session: AuthContext | None = None
+        self,
+        key: str,
+        ip: str | None,
+        *,
+        link_session: AuthContext | None = None,
+        reauth: bool = False,
     ) -> Started:
+        """The provider's address for a sign-in, a link (`link_session`) or a sign-in
+        meant as the proof before linking (`reauth`, `fresh.py`)."""
         if not await self._limit(ip):
             raise RateLimited(code="oidc.rate_limited")
         _, provider = await self._provider(key)
@@ -147,6 +155,7 @@ class FlowService:
                 nonce=nonce,
                 verifier=verifier,
                 link_session_id=link_session.session_id if link_session else None,
+                reauth=reauth and link_session is None,
                 expires_at=now + timedelta(minutes=FLOW_MINUTES),
             )
         )
@@ -160,6 +169,7 @@ class FlowService:
             "code_challenge": _challenge(verifier),
             "code_challenge_method": "S256",
             **extra_parameters(provider),
+            **(fresh.PARAMETERS if reauth and link_session is None else {}),
         }
         return Started(f"{authorization}?{urlencode(query, quote_via=quote)}", binding)
 
@@ -236,9 +246,14 @@ class FlowService:
         admitted = await Accounts(self.session, provider.org_id).admit(provider, claims, now)
         if isinstance(admitted, Refuse):
             return _refused(admitted.code, None)
-        return await self._signed_in(admitted, now)
+        proof = fresh.recent(claims, session_clock().now()) if flow.reauth else None
+        return await self._signed_in(admitted, now, proof)
 
-    async def _signed_in(self, admitted: Admitted, now: datetime) -> Finished:
+    async def _signed_in(self, admitted: Admitted, now: datetime, proof: bool | None) -> Finished:
+        """`proof`: None for an ordinary sign-in; for one meant as the proof before
+        linking, whether the provider's login was fresh (`fresh.py`): only then does
+        the session count as re-authenticated, and the browser goes back to the
+        profile."""
         if admitted.outcome == "signup":  # waits for approval (plan M9 task 5b)
             count_outcome(admitted.outcome)
             location = f"{LOGIN_PAGE}?{urlencode({'error': PENDING})}"
@@ -246,13 +261,16 @@ class FlowService:
         count_outcome(admitted.outcome)
         user = admitted.user
         if await TotpRepository(self.session, user.org_id).active(user.id) is not None:
-            challenge = await open_challenge(self.session, user, "oidc")
+            challenge = await open_challenge(self.session, user, "oidc", reauth=proof is True)
             location = f"{LOGIN_PAGE}?{urlencode({'second_factor': 'totp'})}"
             return Finished(location, admitted.outcome, None, user.id, challenge.token)
         token = await AuthService(self.session, self.settings).open_session(
-            user, through_provider=True
+            user, reauthenticated=proof is True
         )
-        return Finished("/", admitted.outcome, token, user.id)
+        location = "/" if proof is None else PROFILE_PAGE
+        if proof is False:
+            location = f"{PROFILE_PAGE}?{urlencode({'link_error': fresh.STALE})}"
+        return Finished(location, admitted.outcome, token, user.id)
 
     async def _link(self, provider: OidcProvider, session_id: uuid.UUID, subject: str) -> Finished:
         auth = await AuthService(self.session, self.settings).resolve_session(session_id)

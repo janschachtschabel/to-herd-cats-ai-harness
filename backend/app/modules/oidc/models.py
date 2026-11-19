@@ -32,6 +32,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -99,6 +100,11 @@ class OidcFlow(UuidPk, OrgScoped, Base):
     verifier: Mapped[str] = mapped_column(String(128), nullable=False)
     link_session_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("user_session.id", ondelete="CASCADE"), index=True
+    )
+    # A sign-in meant as the proof before linking (`prompt=login`, R18-10): only such a
+    # one, freshly made at the provider, opens a session that counts as re-authenticated.
+    reauth: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, nullable=False

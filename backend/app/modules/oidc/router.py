@@ -78,12 +78,18 @@ async def list_providers(
 
 @router.get(f"{_FLOW}/{{key}}/start", status_code=302, response_class=RedirectResponse)
 async def start(
-    key: str, request: Request, session: SessionDep, settings: SettingsDep
+    key: str,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    reauth: Annotated[bool, Query(description="a fresh login as the proof before linking")] = False,
 ) -> RedirectResponse:
     """To the provider's sign-in page, with the browser binding as a cookie; a provider
-    that is unknown, off or unreachable sends the browser back to the sign-in page."""
+    that is unknown, off or unreachable sends the browser back to the sign-in page.
+    `reauth`: the sign-in is the proof before linking (`fresh.py`): the provider is
+    asked for a fresh login, and the browser comes back to the profile."""
     try:
-        started = await FlowService(session, settings).start(key, _client(request))
+        started = await FlowService(session, settings).start(key, _client(request), reauth=reauth)
     except (AppError, ProviderFailure) as refused:
         count_outcome(refused.code.removeprefix("oidc."))
         return RedirectResponse(f"{LOGIN_PAGE}?error={refused.code}", status_code=302)

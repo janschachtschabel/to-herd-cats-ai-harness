@@ -6,6 +6,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -73,6 +75,11 @@ class SignInChallenge(UuidPk, OrgScoped, Base):
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     method: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The first step was a fresh provider sign-in meant as the proof before linking
+    # (`oidc_flow.reauth`, R18-10): the session it opens counts as re-authenticated.
+    reauth: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, nullable=False

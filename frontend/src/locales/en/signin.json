@@ -21,7 +21,8 @@
       "issuer_mismatch": "The provider answered unexpectedly. Please try again later.",
       "id_token_invalid": "The provider's answer could not be verified. Please try again later.",
       "public_url_missing": "Signing in through providers is not set up.",
-      "account_pending": "Your account is waiting for approval by an administrator."
+      "account_pending": "Your account is waiting for approval by an administrator.",
+      "reauth_stale": "The sign-in at the provider was older than 10 minutes and does not count as confirmation. Please sign in there once more."
     },
     "hintWithProviders": "Sign in with your organisation's account or with your email address and password.",
     "pending": {

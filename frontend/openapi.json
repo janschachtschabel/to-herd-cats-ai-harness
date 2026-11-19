@@ -23747,7 +23747,7 @@
     },
     "/api/auth/oidc/{key}/start": {
       "get": {
-        "description": "To the provider's sign-in page, with the browser binding as a cookie; a provider\nthat is unknown, off or unreachable sends the browser back to the sign-in page.",
+        "description": "To the provider's sign-in page, with the browser binding as a cookie; a provider\nthat is unknown, off or unreachable sends the browser back to the sign-in page.\n`reauth`: the sign-in is the proof before linking (`fresh.py`): the provider is\nasked for a fresh login, and the browser comes back to the profile.",
         "operationId": "start_api_auth_oidc__key__start_get",
         "parameters": [
           {
@@ -23757,6 +23757,18 @@
             "schema": {
               "title": "Key",
               "type": "string"
+            }
+          },
+          {
+            "description": "a fresh login as the proof before linking",
+            "in": "query",
+            "name": "reauth",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "a fresh login as the proof before linking",
+              "title": "Reauth",
+              "type": "boolean"
             }
           }
         ],

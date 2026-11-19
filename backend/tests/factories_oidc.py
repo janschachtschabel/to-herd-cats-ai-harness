@@ -67,17 +67,24 @@ async def make_provider(owner: AsyncClient, stub: OidcStub, **fields: Any) -> di
     return created
 
 
-async def start(browser: AsyncClient, key: str = "stub") -> Response:
-    return await browser.get(f"/api/auth/oidc/{key}/start")
+async def start(browser: AsyncClient, key: str = "stub", *, reauth: bool = False) -> Response:
+    params = {"reauth": "true"} if reauth else None
+    return await browser.get(f"/api/auth/oidc/{key}/start", params=params)
 
 
 async def sign_in(
-    browser: AsyncClient, stub: OidcStub, key: str = "stub", **identity: Any
+    browser: AsyncClient,
+    stub: OidcStub,
+    key: str = "stub",
+    *,
+    reauth: bool = False,
+    **identity: Any,
 ) -> Response:
-    """Start, approve at the stub as `identity`, and come back; the callback's answer."""
+    """Start, approve at the stub as `identity`, and come back; the callback's answer.
+    `reauth`: the sign-in meant as the proof before linking."""
     if identity:
         stub.state.identity = {**stub.state.identity, **identity}
-    started = await start(browser, key)
+    started = await start(browser, key, reauth=reauth)
     assert started.status_code == 302, started.text
     query = stub.state.authorize(started.headers["location"])
     return await browser.get(f"/api/auth/oidc/{key}/callback", params=query)

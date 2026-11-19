@@ -86,7 +86,7 @@ class SecondStep:
         await factor.passed(user.id, attempt)
         await self.challenges.drop(challenge)
         session_token = await AuthService(self.session, self.settings).open_session(
-            user, through_provider=challenge.method == "oidc"
+            user, reauthenticated=challenge.reauth
         )
         return SignedIn(user, session_token), f"{challenge.method}+{method}"
 

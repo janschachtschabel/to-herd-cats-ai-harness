@@ -48,6 +48,8 @@ class IdClaims:
     hd: str | None
     name: str | None
     locale: str | None
+    # When the person last authenticated at the provider (epoch seconds), if it says.
+    auth_time: float | None = None
 
 
 def verify_id_token(
@@ -172,4 +174,5 @@ def _claims(claims: Mapping[str, Any]) -> IdClaims:
         hd=_text(claims, "hd", 253),
         name=_text(claims, "name", 120),
         locale=_text(claims, "locale", 16),
+        auth_time=_number(claims, "auth_time", required=False),
     )
