@@ -1,6 +1,8 @@
 # Anmeldung: Passwort, zweiter Faktor und OIDC (Google und andere)
 
-Stand M9a (Tasks 4, 5, 5b und 9) und M9b Task 16 (zweiter Faktor mit TOTP). Neben der Anmeldung mit E-Mail und Passwort kann sich
+Stand M9a (Tasks 4, 5, 5b und 9) und M9b (Task 16: zweiter Faktor mit TOTP; Task 18:
+Leerlaufgrenze, eigene Sitzungen, erneute Anmeldung vor dem Verknüpfen; mit den
+Korrekturen der Reviews, Abschluss 19.11.2026). Neben der Anmeldung mit E-Mail und Passwort kann sich
 eine Person über einen OpenID-Connect-Anbieter (OIDC) anmelden: Google als fertige
 Vorlage, jeder andere Anbieter mit Discovery (Keycloak, Entra ID, Authentik …) als
 „allgemein“. Optional legen sich Personen aus erlaubten Domains dabei selbst ein Konto
@@ -361,6 +363,16 @@ Auf der Anmeldeseite (`/login?error=<code>`) bzw. im Profil (`/profile?link_erro
 | `oidc.provider_unreachable` | Anbieter nicht erreichbar (Egress-Sperre, Netz, Zeitüberschreitung). |
 | `oidc.provider_error`, `oidc.issuer_mismatch`, `oidc.id_token_invalid` | Antwort des Anbieters unbrauchbar bzw. ID-Token ungültig. |
 | `oidc.public_url_missing` | `HERD_PUBLIC_URL` fehlt (Verwaltung). |
+| `oidc.reauth_stale` | Die erneute Anmeldung beim Anbieter vor dem Verknüpfen ist älter als 10 Minuten (`auth_time`); noch einmal anmelden. |
+
+Sitzungen und Verknüpfen (Antworten der API):
+
+| Code | Bedeutung |
+|---|---|
+| `auth.session_invalid` | Die Sitzung ist abgelaufen, beendet oder war länger als `HERD_SESSION_IDLE_HOURS` ungenutzt: neu anmelden. |
+| `auth.session_not_found` | Eine Sitzung beenden, die nicht die eigene ist oder schon endete. |
+| `auth.reauth_required` | Verknüpfen ohne Passwort und ohne eine Anmeldung beim Anbieter in den letzten 10 Minuten. |
+| `auth.wrong_password` | Das Passwort zur Bestätigung (Verknüpfen, TOTP einrichten, Passwort ändern) ist falsch. |
 
 Zweiter Faktor (Antworten der API):
 
