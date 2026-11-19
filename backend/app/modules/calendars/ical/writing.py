@@ -9,11 +9,17 @@
 - RRULE is the canonical text (`UNTIL` in UTC for a start with a zone, a date for an
   all-day one); RDATE, EXDATE and every RECURRENCE-ID are in the start's form.
 - TRANSP is always written (all-day events are free by default here, not in RFC 5545).
-- A redacted event (decision 3) carries its time, status, TRANSP and `CLASS:PRIVATE`
-  only, under an opaque UID derived from its own (stable, so a feed stays a feed).
+- A redacted series or override (decision 3, R7a-13) carries only what busy time needs:
+  its times (DTSTART, DTEND or DURATION, RRULE, RDATE, EXDATE, RECURRENCE-ID), TRANSP,
+  `CLASS:PRIVATE`, `STATUS:CONFIRMED` (`CANCELLED` for a cancelled one: a feed's
+  tombstone must free the time; tentative is not told) and a DTSTAMP of the moment of
+  writing (`now`), never the last change. A redacted series is written under the
+  caller's opaque UID (`ExportEvent.opaque_uid`, R7a-5), its overrides too.
+- Texts lose control characters; U+2028, U+2029 and U+0085 become line breaks
+  (escaped `\\n`), so no reader that splits lines on them sees a property begin (R7a-12);
+  a UID is one line.
 """
 
-import hashlib
 from collections.abc import Iterable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
@@ -29,6 +35,7 @@ from app.modules.calendars.ical.drafts import (
     ExportEvent,
     Response,
     Role,
+    Status,
     Visibility,
 )
 from app.modules.calendars.recurrence import Series
@@ -45,17 +52,19 @@ _PARTSTAT = {
 _END = b"END:VCALENDAR\r\n"
 
 
-def calendar_ics(events: Iterable[ExportEvent], *, name: str) -> Iterator[bytes]:
+def calendar_ics(events: Iterable[ExportEvent], *, name: str, now: datetime) -> Iterator[bytes]:
     """A calendar named `name`, one chunk per event (with the VTIMEZONEs it needs
-    first)."""
-    yield from _stream(events, name)
+    first); `now` (aware) is the moment of writing, a redacted part's DTSTAMP."""
+    yield from _stream(events, name, now)
 
 
-def event_ics(event: ExportEvent) -> bytes:
-    return b"".join(_stream([event], None))
+def event_ics(event: ExportEvent, *, now: datetime) -> bytes:
+    return b"".join(_stream([event], None, now))
 
 
-def _stream(events: Iterable[ExportEvent], name: str | None) -> Iterator[bytes]:
+def _stream(events: Iterable[ExportEvent], name: str | None, now: datetime) -> Iterator[bytes]:
+    if now.tzinfo is None:
+        raise ValueError("now must be aware: it is never read in the process's zone")
     head = Calendar()
     head.add("VERSION", "2.0")
     head.add("PRODID", PRODID)
@@ -71,7 +80,7 @@ def _stream(events: Iterable[ExportEvent], name: str | None) -> Iterator[bytes]:
             if series.tzid is not None and series.tzid != _UTC and series.tzid not in written:
                 written.add(series.tzid)
                 chunk += _vtimezone(series.tzid, *_years(series.start.year))
-        yield chunk + b"".join(part.to_ical() for part in _vevents(event))
+        yield chunk + b"".join(part.to_ical() for part in _vevents(event, now))
     yield _END
 
 
@@ -88,9 +97,10 @@ def _vtimezone(tzid: str, first: int, last: int) -> bytes:
     return bytes(found.to_ical())
 
 
-def _vevents(event: ExportEvent) -> Iterator[Event]:
-    uid = _opaque(event.uid) if event.redacted else event.uid
-    master = _vevent(uid, event.stamp, event.series, event.content, event.redacted)
+def _vevents(event: ExportEvent, now: datetime) -> Iterator[Event]:
+    uid = (event.opaque_uid or "") if event.redacted else event.uid
+    stamp = now if event.redacted else event.stamp
+    master = _vevent(uid, stamp, event.series, event.content, event.redacted)
     if not event.redacted:
         organiser = lines.valid_address(event.organiser or "")
         if organiser is not None:
@@ -99,14 +109,15 @@ def _vevents(event: ExportEvent) -> Iterator[Event]:
             master.add_component(_alarm(minutes, event.content.title))
     yield master
     for override in event.overrides:
-        part = _vevent(uid, event.stamp, override.series, override.content, event.redacted)
+        own = now if event.redacted or override.redacted else event.stamp
+        part = _vevent(uid, own, override.series, override.content, override.redacted)
         part.add(*_moment("RECURRENCE-ID", event.series, override.recurrence_id))
         yield part
 
 
 def _vevent(uid: str, stamp: datetime, series: Series, content: Content, redacted: bool) -> Event:
     part = Event()
-    part.add("UID", _text(uid))
+    part.add("UID", _uid(uid))
     part.add("DTSTAMP", stamp.astimezone(UTC))
     part.add(*_moment("DTSTART", series, series.start))
     _end(part, series)
@@ -116,7 +127,10 @@ def _vevent(uid: str, stamp: datetime, series: Series, content: Content, redacte
         part.add(*_moments("RDATE", series, series.rdates))
     if series.exdates:
         part.add(*_moments("EXDATE", series, series.exdates))
-    part.add("STATUS", content.status.value.upper())
+    status = content.status
+    if redacted and status is not Status.CANCELLED:
+        status = Status.CONFIRMED
+    part.add("STATUS", status.value.upper())
     part.add("TRANSP", "OPAQUE" if content.busy else "TRANSPARENT")
     if redacted or content.visibility is Visibility.PRIVATE:
         part.add("CLASS", "PRIVATE")
@@ -196,10 +210,10 @@ def _attendee(attendee: AttendeeDraft) -> vCalAddress | None:
 
 
 def _text(text: str) -> str:
-    """A text as TEXT can carry it: line breaks as `\\n` (escaped by `vText`), no
-    other control character, never a bare carriage return."""
+    """A text as TEXT can carry it: line breaks (also U+2028, U+2029, U+0085) as `\\n`
+    (escaped by `vText`), no other control character, never a bare carriage return."""
     return lines.clean(text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
-def _opaque(uid: str) -> str:
-    return f"{hashlib.sha256(uid.encode()).hexdigest()[:32]}@busy.invalid"
+def _uid(uid: str) -> str:
+    return lines.one_word(uid)

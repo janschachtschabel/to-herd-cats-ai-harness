@@ -26,6 +26,8 @@ _DURATION = re.compile(
 _OFFSET = re.compile(r"([+-])([0-9]{2})([0-9]{2})([0-9]{2})?")
 # C0 controls but tab and line feed, and DEL: never in a text (Postgres takes no NUL).
 _CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+_SEPARATORS = re.compile("[\u2028\u2029\x85]")
+_BREAKS = re.compile(r"[\t\n]")
 # RFC 5545 3.1: a line break followed by a space or tab continues the line.
 _FOLD = re.compile(rb"\r?\n[ \t]")
 _FOLD_TEXT = re.compile(r"\r?\n[ \t]")
@@ -175,7 +177,15 @@ def _decode(data: bytes) -> tuple[str, Counter[str]]:
 
 
 def clean(text: str) -> str:
-    return _CONTROLS.sub("", text)
+    """`text` without control characters but tab and line feed; the line separators
+    U+2028, U+2029 and U+0085 become line feeds (R7a-12)."""
+    return _CONTROLS.sub("", _SEPARATORS.sub("\n", text))
+
+
+def one_word(text: str) -> str:
+    """`text` without any control character, line break or tab (a UID: one line,
+    never a file name's neighbour on another, R7a-12)."""
+    return _BREAKS.sub("", clean(text)).strip()
 
 
 def date_time(value: str) -> date | datetime:

@@ -30,14 +30,14 @@ def test_written_texts_and_addresses_cannot_break_lines() -> None:
         organiser="o@x.org\nX-INJECTED:1",
         alarms=(5,),
     )
-    data = writing.event_ics(ExportEvent.of(draft, stamp=utc(2026, 11, 19)))
+    data = writing.event_ics(ExportEvent.of(draft, stamp=utc(2026, 11, 19)), now=utc(2026, 11, 19))
     assert b"\r" not in data.replace(b"\r\n", b"") and b"\n" not in data.replace(b"\r\n", b"")
     lines = data.decode().split("\r\n")
     assert not any(
         line.startswith(("SUMMARY:evil", "ATTENDEE:mailto:evil", "X-INJECTED")) for line in lines
     )
     (back,) = reading.parse(data, default_zone="Europe/Berlin", limit=10).events
-    assert back.uid == "uid\nwith\nbreaks"
+    assert back.uid == "uidwithbreaks"  # a UID is one line (R7a-12)
     assert back.content.title == "a\nb"
     assert back.content.description == "x\nSUMMARY:evil\nmore"
     assert back.content.attendees == (AttendeeDraft("ok@x.org", "Na me"),)
@@ -76,6 +76,8 @@ def test_a_series_reads_back_alike_in_every_kind_of_zone(year: int) -> None:
             ),
             content=Content(),
         )
-        data = writing.event_ics(ExportEvent.of(draft, stamp=utc(2026, 11, 19)))
+        data = writing.event_ics(
+            ExportEvent.of(draft, stamp=utc(2026, 11, 19)), now=utc(2026, 11, 19)
+        )
         (back,) = reading.parse(data, default_zone="Asia/Tokyo", limit=5).events
         assert (back.series.tzid, effective(back)) == (name, effective(draft)), name

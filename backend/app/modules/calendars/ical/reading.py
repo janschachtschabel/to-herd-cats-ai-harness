@@ -95,7 +95,7 @@ def _groups(events: list[lines.Component], found: Counter[str]) -> dict[str, _Gr
     groups: dict[str, _Group] = {}
     for event in events:
         written = event.quick("UID")
-        uid = lines.clean(written.text).strip() if written else ""
+        uid = lines.one_word(written.text) if written else ""
         if not uid or len(uid) > MAX_UID:
             found[problems.UID_MISSING] += 1
             continue

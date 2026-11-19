@@ -47,7 +47,9 @@ def _read_back(data: bytes, zone: str = "Europe/Berlin") -> reading.Parsed:
 @pytest.mark.parametrize("name", SAMPLES)
 def test_round_trip_keeps_times_rules_exceptions_and_attendees(name: str) -> None:
     first = _read_back(sample(name))
-    data = b"".join(writing.calendar_ics([_export(d) for d in first.events], name="Export"))
+    data = b"".join(
+        writing.calendar_ics([_export(d) for d in first.events], name="Export", now=STAMP)
+    )
     second = _read_back(data, zone="Asia/Tokyo")  # another zone: nothing floats
     assert second.problems == Counter()
     assert [d.uid for d in second.events] == [d.uid for d in first.events]
@@ -98,7 +100,7 @@ def test_a_built_event_round_trips_with_every_field() -> None:
         ),
         alarms=(0, 40320),
     )
-    data = writing.event_ics(ExportEvent.of(draft, stamp=STAMP))
+    data = writing.event_ics(ExportEvent.of(draft, stamp=STAMP), now=STAMP)
     (back,) = _read_back(data).events
     assert back == draft
 
@@ -117,7 +119,7 @@ def test_writing_is_strict() -> None:
         ),
         content=Content(title="t"),
     )
-    text = writing.event_ics(ExportEvent.of(zoned, stamp=STAMP)).decode()
+    text = writing.event_ics(ExportEvent.of(zoned, stamp=STAMP), now=STAMP).decode()
     lines = text.split("\r\n")
     assert text.endswith("\r\n") and "\n" not in text.replace("\r\n", "")
     assert all(len(line.encode()) <= 75 for line in lines)
@@ -147,7 +149,9 @@ def test_writing_is_strict() -> None:
         ),
         content=Content(busy=True),
     )
-    lines = writing.event_ics(ExportEvent.of(all_day, stamp=STAMP)).decode().split("\r\n")
+    lines = (
+        writing.event_ics(ExportEvent.of(all_day, stamp=STAMP), now=STAMP).decode().split("\r\n")
+    )
     assert "DTSTART;VALUE=DATE:20260701" in lines
     assert "DTEND;VALUE=DATE:20260703" in lines
     assert "EXDATE;VALUE=DATE:20260708" in lines
@@ -162,7 +166,7 @@ def test_writing_is_strict() -> None:
         ),
         content=Content(),
     )
-    lines = writing.event_ics(ExportEvent.of(in_utc, stamp=STAMP)).decode().split("\r\n")
+    lines = writing.event_ics(ExportEvent.of(in_utc, stamp=STAMP), now=STAMP).decode().split("\r\n")
     assert "DTSTART:20260701T080000Z" in lines and "BEGIN:VTIMEZONE" not in lines
 
 
@@ -174,7 +178,7 @@ def test_an_end_in_a_doubled_hour_is_written_as_a_duration() -> None:
         series=Series(datetime(2026, 10, 25, 0, 30), timedelta(hours=3), "Europe/Berlin", False),
         content=Content(),
     )
-    lines = writing.event_ics(ExportEvent.of(draft, stamp=STAMP)).decode().split("\r\n")
+    lines = writing.event_ics(ExportEvent.of(draft, stamp=STAMP), now=STAMP).decode().split("\r\n")
     assert "DURATION:PT3H" in lines
     assert not any(line.startswith("DTEND") for line in lines)
     (back,) = _read_back("\r\n".join(lines).encode()).events
@@ -191,7 +195,9 @@ def test_a_calendar_streams_one_vtimezone_per_zone() -> None:
         for n, zone in enumerate(["Europe/Berlin", "America/New_York", "Europe/Berlin"])
     ]
     chunks = list(
-        writing.calendar_ics((ExportEvent.of(e, stamp=STAMP) for e in events), name="Team; Herd")
+        writing.calendar_ics(
+            (ExportEvent.of(e, stamp=STAMP) for e in events), name="Team; Herd", now=STAMP
+        )
     )
     assert len(chunks) > 3  # a stream, not one buffer
     text = b"".join(chunks).decode()
@@ -230,7 +236,10 @@ def test_a_redacted_event_writes_no_content() -> None:
         ),
         alarms=(10,),
     )
-    data = writing.event_ics(ExportEvent.of(draft, stamp=STAMP, redacted=True))
+    data = writing.event_ics(
+        ExportEvent.of(draft, stamp=STAMP, redacted=True, opaque_uid="0f1e@busy.invalid"),
+        now=STAMP,
+    )
     text = data.decode()
     for leak in (
         "Falke",
@@ -246,4 +255,4 @@ def test_a_redacted_event_writes_no_content() -> None:
     (back,) = _read_back(data).events
     assert effective(back) == effective(draft)  # the time stays, busy and private
     assert back.content.busy and back.content.visibility is Visibility.PRIVATE
-    assert back.uid != draft.uid and back.uid == _read_back(data).events[0].uid  # stable, opaque
+    assert back.uid == "0f1e@busy.invalid"  # the caller's opaque UID (`opaque.opaque_uid`)

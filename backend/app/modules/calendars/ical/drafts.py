@@ -7,7 +7,7 @@ role and response); the limits are decision 5's (title, place, text, 100 attende
 and 8's (three reminders, at most four weeks before).
 """
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
@@ -91,25 +91,64 @@ class EventDraft:
 
 
 @dataclass(frozen=True, slots=True)
+class ExportOverride:
+    """An override to write, with its own decision (decision 6, I6: an override is a
+    row with its own visibility and attendees): `redacted` writes only its time and
+    "busy", whatever the series shows."""
+
+    recurrence_id: datetime
+    series: Series
+    content: Content
+    redacted: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class ExportEvent:
     """An event to write: a draft's fields, the time it was last changed (`DTSTAMP`)
     and whether the reader sees only its time (`redacted`: time and "busy", nothing
-    else, decision 3)."""
+    else, decision 3). A redacted series is written under `opaque_uid`, which the
+    caller makes with `opaque.opaque_uid` (a keyed hash: nobody can confirm a guessed
+    UID, R7a-5); it is required then."""
 
     uid: str
     series: Series
     content: Content
     stamp: datetime  # aware
     organiser: str | None = None
-    overrides: tuple[OverrideDraft, ...] = ()
+    overrides: tuple[ExportOverride, ...] = ()
     alarms: tuple[int, ...] = ()
     redacted: bool = False
+    opaque_uid: str | None = None
 
     def __post_init__(self) -> None:
         if self.stamp.tzinfo is None:
             raise ValueError("the stamp must be aware: it is never read in the process's zone")
+        if self.redacted and not self.opaque_uid:
+            raise ValueError("a redacted event is written under its opaque UID only")
 
     @classmethod
-    def of(cls, draft: EventDraft, *, stamp: datetime, redacted: bool = False) -> Self:
-        shared = {field.name: getattr(draft, field.name) for field in fields(EventDraft)}
-        return cls(**shared, stamp=stamp, redacted=redacted)
+    def of(
+        cls,
+        draft: EventDraft,
+        *,
+        stamp: datetime,
+        redacted: bool = False,
+        opaque_uid: str | None = None,
+    ) -> Self:
+        """`draft` to write; its overrides take the series' decision (build
+        `ExportOverride`s for one of their own)."""
+        overrides = tuple(
+            ExportOverride(o.recurrence_id, o.series, o.content, redacted=redacted)
+            for o in draft.overrides
+        )
+        return cls(
+            uid=draft.uid,
+            series=draft.series,
+            content=draft.content,
+            stamp=stamp,
+            organiser=draft.organiser,
+            overrides=overrides,
+            alarms=draft.alarms,
+            redacted=redacted,
+            opaque_uid=opaque_uid,
+        )

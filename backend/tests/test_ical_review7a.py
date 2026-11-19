@@ -13,7 +13,7 @@ from types import FrameType
 
 import pytest
 
-from app.modules.calendars.ical import reading, writing
+from app.modules.calendars.ical import opaque, reading, writing
 from app.modules.calendars.ical.drafts import Content, ExportEvent
 from app.modules.calendars.recurrence import Series
 from tests.support.ical_occurrences import effective, utc
@@ -165,7 +165,7 @@ def test_a_redacted_uid_cannot_be_found_by_guessing_the_uid() -> None:
     event = ExportEvent(
         uid=secret, series=series, content=Content(title="Selbsthilfegruppe"), stamp=utc(2026, 1, 1)
     )
-    written = writing.event_ics(_redacted(event))
+    written = writing.event_ics(_redacted(event), now=utc(2026, 11, 19))
     guesses = [f"event_{number}@meetup.example" for number in range(305123000, 305124000)]
     found = [
         guess
@@ -176,8 +176,15 @@ def test_a_redacted_uid_cannot_be_found_by_guessing_the_uid() -> None:
 
 
 def _redacted(event: ExportEvent) -> ExportEvent:
+    # fix wave (R7a-5): the caller names the opaque UID, a keyed hash of the real one
+    key = opaque.key_from_secret("an installation's secret key, 32+ characters")
     return ExportEvent(
-        uid=event.uid, series=event.series, content=event.content, stamp=event.stamp, redacted=True
+        uid=event.uid,
+        series=event.series,
+        content=event.content,
+        stamp=event.stamp,
+        redacted=True,
+        opaque_uid=opaque.opaque_uid(event.uid, key=key, audience="feed-1"),
     )
 
 

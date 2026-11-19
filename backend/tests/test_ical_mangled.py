@@ -70,7 +70,9 @@ def test_mangled_files_never_raise_and_read_back_alike() -> None:
         )
         exported = [ExportEvent.of(draft, stamp=stamp) for draft in parsed.events]
         back = reading.parse(
-            b"".join(writing.calendar_ics(exported, name="x")), default_zone="Asia/Tokyo", limit=50
+            b"".join(writing.calendar_ics(exported, name="x", now=stamp)),
+            default_zone="Asia/Tokyo",
+            limit=50,
         )
         assert not back.problems
         for before, after in zip(parsed.events, back.events, strict=True):
