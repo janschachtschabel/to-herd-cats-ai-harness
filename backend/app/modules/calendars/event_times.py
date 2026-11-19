@@ -11,9 +11,13 @@ event as the `Series` it is expanded from (plan M10 decisions 5 and 6).
   start (the window loads a series from its start on).
 - Instants are aware (naive: `event.invalid_time`) and lie in the years 1900 to 2399
   as sent (`event.time_out_of_range`), so nothing overflows.
+- One event lasts at most `MAX_DURATION` (`event.too_long`), and no occurrence of a
+  series lasts past the start of the next (`recurrence_gaps`, `event.series_overlaps`),
+  so no event fills a window with copies of itself.
 - Every write path checks its series here (`recurrence.check_series`); a problem is
   422 with the problem's code (`event.invalid_time`, `event.invalid_time_zone`,
-  `event.time_out_of_range`, `event.rrule_invalid`, `event.rrule_unsupported`).
+  `event.time_out_of_range`, `event.too_long`, `event.series_overlaps`,
+  `event.rrule_invalid`, `event.rrule_unsupported`).
 """
 
 from dataclasses import dataclass
@@ -23,6 +27,11 @@ from app.core.errors import ValidationFailed
 from app.modules.calendars import recurrence, zones
 from app.modules.calendars.event_models import CalendarEvent
 from app.modules.calendars.recurrence import FIRST_YEAR, LAST_YEAR, Series
+from app.modules.calendars.recurrence_gaps import overlaps_itself
+
+# The longest one event may last (review M10 task 3a, R3a-1): a year and a day, so a
+# whole leap year fits, all-day or not.
+MAX_DURATION = timedelta(days=366)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +121,11 @@ def check(times: Times, default_zone: str) -> Checked:
         rule = recurrence.check_rule(times.rrule) if times.rrule else None
     except recurrence.SeriesInvalid as exc:
         raise invalid(exc.code) from None
+    if series.duration > MAX_DURATION:
+        raise invalid("event.too_long")
     recurring = rule is not None or bool(times.rdates)
+    if recurring and overlaps_itself(series):
+        raise invalid("event.series_overlaps")
     return Checked(
         starts_at=starts_at,
         ends_at=ends_at,

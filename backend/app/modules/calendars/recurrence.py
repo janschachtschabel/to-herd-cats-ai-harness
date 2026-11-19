@@ -168,11 +168,11 @@ def _rule_walls(
         for wall in _matches(rule, start, begin, stop, counter)
         if wall != start and (last is None or instant(series, wall) <= last)
     )
-    walls = chain([start] if begin == start else [], matches)
-    yield from islice(walls, rule.count) if rule.count is not None else walls
+    every = chain([start] if begin == start else [], matches)
+    yield from islice(every, rule.count) if rule.count is not None else every
 
 
-def _walls(
+def walls(
     series: Series, lo: datetime, hi: datetime, counter: Counter, *, keep_exdates: bool = False
 ) -> Iterator[datetime]:
     """Every occurrence's wall time from `lo` to `hi` (inclusive), in order, once."""
@@ -214,7 +214,7 @@ def occurrences(
     lo = wall_of(series, window_from - series.duration) - SLACK
     hi = min(wall_of(series, window_to) + SLACK, HORIZON)
     found: dict[datetime, Occurrence] = {}
-    for wall in _walls(series, lo, hi, counter):
+    for wall in walls(series, lo, hi, counter):
         start = instant(series, wall)
         end = start + series.duration
         in_window = start < window_to and (end > window_from or end == start >= window_from)
@@ -230,7 +230,7 @@ def next_after(series: Series, after: datetime) -> Occurrence | None:
     one instant the earlier recurrence id)."""
     after = bounded(after)
     best: Occurrence | None = None
-    for wall in _walls(series, wall_of(series, after) - SLACK, HORIZON, Counter()):
+    for wall in walls(series, wall_of(series, after) - SLACK, HORIZON, Counter()):
         if best is not None and wall > best.recurrence_id + 2 * SLACK:
             break
         start = instant(series, wall)
@@ -247,7 +247,7 @@ def last_end(series: Series, *, cap: int = LAST_END_CAP) -> datetime | None:
         return None
     lo = min((series.start, *series.rdates))
     ends = []
-    for number, wall in enumerate(_walls(series, lo, HORIZON, Counter()), start=1):
+    for number, wall in enumerate(walls(series, lo, HORIZON, Counter()), start=1):
         if rule is not None and number > cap + len(series.rdates):
             return None
         ends.append(instant(series, wall) + series.duration)
@@ -258,8 +258,8 @@ def is_occurrence(series: Series, recurrence_id: datetime) -> bool:
     """Whether the series names an occurrence `recurrence_id` (deleted ones too); an
     aware id is read as the series' wall time of that instant."""
     wall = as_wall(series, recurrence_id)
-    walls = _walls(series, wall, wall, Counter(), keep_exdates=True)
-    return any(found == wall for found in walls)
+    named = walls(series, wall, wall, Counter(), keep_exdates=True)
+    return any(found == wall for found in named)
 
 
 def recurrence_id_at(series: Series, moment: datetime) -> datetime | None:
@@ -269,8 +269,8 @@ def recurrence_id_at(series: Series, moment: datetime) -> datetime | None:
     if bounded(moment) != moment:
         return None
     wall = wall_of(series, moment)
-    walls = _walls(series, wall - SLACK, wall + SLACK, Counter(), keep_exdates=True)
-    return next((found for found in walls if instant(series, found) == moment), None)
+    near = walls(series, wall - SLACK, wall + SLACK, Counter(), keep_exdates=True)
+    return next((found for found in near if instant(series, found) == moment), None)
 
 
 def count_before(series: Series, recurrence_id: datetime) -> int:

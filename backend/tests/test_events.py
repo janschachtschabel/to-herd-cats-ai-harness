@@ -55,6 +55,8 @@ async def test_create_checks_times_zone_and_rule(
             "event.time_out_of_range",
         ),
         ({"starts_at": "2026-11-23T10:00:00.5+01:00"}, "event.invalid_time"),
+        ({"ends_at": "2027-11-24T10:00:01+01:00"}, "event.too_long"),
+        ({"rrule": "FREQ=DAILY", "ends_at": "2026-11-24T12:00:00+01:00"}, "event.series_overlaps"),
         ({"first_day": "2026-11-23"}, "event.invalid_time"),  # days belong to all-day ones
         ({"ends_at": None}, "event.invalid_time"),
         ({"rdates": ["2026-11-20T10:00:00"]}, "event.invalid_time"),  # before the start
