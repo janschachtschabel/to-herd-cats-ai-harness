@@ -37,7 +37,7 @@ from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
 
 from app.modules.calendars import zones
 from app.modules.calendars.ical import lines, problems
-from app.modules.calendars.ical.budget import Budget, offset_cost
+from app.modules.calendars.ical.budget import Budget
 from app.modules.calendars.ical.problems import Skip
 from app.modules.calendars.ical.vtimezone import Definition, definition
 from app.modules.calendars.recurrence_rule import FIRST_YEAR, LAST_YEAR
@@ -154,7 +154,7 @@ class Resolver:
 
     def __init__(self, timezones: Mapping[str, lines.Component]) -> None:
         self._components = dict(timezones)
-        self._definitions: dict[str, Definition | None] = {}
+        self._definitions: dict[str, Definition | str] = {}  # a definition or a code
         self._candidates: dict[tuple[str, int], list[str]] = {}
         self._same: dict[Definition, Definition] = {}  # one instance per content
         self._references: dict[tuple[int, str], int] = {}
@@ -172,13 +172,12 @@ class Resolver:
         named = by_name(tzid, budget.spend)
         if named is not None:
             return named
-        found = self._definition(tzid)
-        if found is None or not walls:
+        found = self._definition(tzid, budget)
+        if not walls:
             raise Skip(problems.TIME_ZONE_UNKNOWN)
         if not FIRST_YEAR <= walls[0].year <= LAST_YEAR:
             raise Skip(problems.TIME_OUT_OF_RANGE)
-        budget.spend(len(walls) * offset_cost(found.ruled))
-        expected = [(wall, found.offset_at(wall)) for wall in walls]
+        expected = [(wall, found.offset_at(wall, budget.spend)) for wall in walls]
         fits: Counter[str] = Counter()
         for index, year in enumerate(compared or (walls[0].year,)):
             try:
@@ -194,22 +193,33 @@ class Resolver:
                 return name
         raise Skip(problems.TIME_ZONE_UNKNOWN)
 
-    def _definition(self, tzid: str) -> Definition | None:
+    def _definition(self, tzid: str, budget: Budget) -> Definition:
+        """The definition of `tzid` (built once per TZID, its size charged);
+        `Skip(ical.time_zone_unknown)` without one, `ical.time_zone_too_large` beyond a
+        cap."""
         if tzid not in self._definitions:
             component = self._components.get(tzid)
-            found = definition(component) if component is not None else None
-            if found is not None:
-                found = self._same.setdefault(found, found)
-            self._definitions[tzid] = found
-        return self._definitions[tzid]
+            try:
+                found = definition(component) if component is not None else None
+            except Skip as refused:
+                self._definitions[tzid] = refused.code
+            else:
+                if found is None:
+                    self._definitions[tzid] = problems.TIME_ZONE_UNKNOWN
+                else:
+                    budget.spend(found.size)
+                    self._definitions[tzid] = self._same.setdefault(found, found)
+        known = self._definitions[tzid]
+        if isinstance(known, str):
+            raise Skip(known)
+        return known
 
     def _matching(self, tzid: str, found: Definition, year: int, budget: Budget) -> list[str]:
         key = (tzid, year)
         if key not in self._candidates:
             if len(self._candidates) >= MAX_COMPARISONS:
                 raise Skip(problems.TIME_ZONE_UNKNOWN)
-            budget.spend(_WEEKS * offset_cost(found.ruled))
-            samples = [(s, found.offset_at(s)) for s in _samples(year)]
+            samples = [(s, found.offset_at(s, budget.spend)) for s in _samples(year)]
             looked, matching = _fitting(samples, _zones())
             budget.spend(looked // 4)
             self._candidates[key] = matching
@@ -237,8 +247,9 @@ class Resolver:
         `_same` keeps one instance per content, kept alive by the resolver)."""
         if id(found) not in self._reference_offsets:
             samples = [s for year in REFERENCE_YEARS for s in _samples(year)]
-            budget.spend(len(samples) * offset_cost(found.ruled))
-            self._reference_offsets[id(found)] = [(s, found.offset_at(s)) for s in samples]
+            self._reference_offsets[id(found)] = [
+                (s, found.offset_at(s, budget.spend)) for s in samples
+            ]
         key = (id(found), name)
         if key not in self._references:
             offsets = self._reference_offsets[id(found)]

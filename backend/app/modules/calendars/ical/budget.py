@@ -2,8 +2,11 @@
 R7a-4): operations are counted, never the clock, so the same file always gets as far.
 
 What costs more than reading its own bytes is charged, in units of about a microsecond
-of work (two Python calls): comparing a file's VTIMEZONE with `tzdata` (a definition's
-offset at one wall time: `offset_cost`; four `tzdata` look-ups: one), checking a rule
+of work (two Python calls), where the work is done and before it (re-check RC7a-1 to
+RC7a-5: cost is work): comparing a file's VTIMEZONE with `tzdata` (building a
+definition: its size; a definition's offset at one wall time:
+`vtimezone.Definition.offset_at` tells its own work; four `tzdata` look-ups: one; a
+name looked up: one), checking a rule
 (`check_cost`: the periods `dateutil` scanned to its first match, or to the horizon), and
 expanding a series to match recurrence ids (one per wall time).
 Once `WORK_LIMIT` is spent, the event being read and every later one are skipped and
@@ -21,7 +24,6 @@ WORK_LIMIT = 2_000_000
 # a year's masks, a daily one tests a day).
 _PERIOD = {Freq.DAILY: 1, Freq.WEEKLY: 3, Freq.MONTHLY: 4, Freq.YEARLY: 25}
 _PERIOD_DAYS = {Freq.DAILY: 1, Freq.WEEKLY: 7, Freq.MONTHLY: 28, Freq.YEARLY: 365}
-_RULED = 12  # one observance's rule, asked for its onsets near one year
 
 
 def check_cost(rule: ParsedRule, start: datetime, first: datetime | None) -> int:
@@ -30,12 +32,6 @@ def check_cost(rule: ParsedRule, start: datetime, first: datetime | None) -> int
     end = first if first is not None else datetime(LAST_YEAR, 12, 31)
     periods = max((end - start).days, 0) // (_PERIOD_DAYS[rule.freq] * rule.interval) + 1
     return 10 + periods * _PERIOD[rule.freq]
-
-
-def offset_cost(ruled: int) -> int:
-    """What one `vtimezone.Definition.offset_at` costs for a definition with `ruled`
-    observances that follow a rule."""
-    return 1 + ruled * _RULED
 
 
 class OverBudget(Skip):
