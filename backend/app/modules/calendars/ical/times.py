@@ -9,10 +9,13 @@ RECURRENCE-ID as a wall time of the series, whatever form the file wrote them in
 - A DATE start is all-day; an end before the start is `ical.time_invalid`.
 - `UNTIL` as a date for a start with a time ends after that day in the series' zone;
   as a local time it is read in that zone; as an instant for an all-day series it is
-  that instant's day in the calendar's zone. An `UNTIL` past 2399 ends nothing a series
-  of the calendar has, so it is dropped; one before 1900 ends the series at its start.
+  that instant's day in UTC (RFC 5545 3.3.10: the day's midnight, at which the series
+  floats, is compared with it), the same in every calendar (R7a-9). An `UNTIL` past
+  2399 ends nothing a series of the calendar has, so it is dropped; one before 1900
+  ends the series at its start.
 - An EXDATE or RDATE as a date for a series with a time means that day at the series'
-  time; one in another zone or in UTC means the series' wall time of that instant.
+  time; one in another zone or in UTC means the series' wall time of that instant, or
+  the occurrence in a gap that starts at it (`moments`, R7a-6).
 """
 
 import re
@@ -241,8 +244,8 @@ def until(rule: str, begin: Start, frame: Frame) -> str:
             return ";".join(parts)
         if written.year < FIRST_YEAR:  # ends the series at its start
             written = date(FIRST_YEAR, 1, 1) if begin.all_day else _EARLIEST
-        if begin.all_day:
-            day = _day_of(written, None, frame)
+        if begin.all_day:  # occurrences float at midnight UTC: the instant's UTC day
+            day = written.astimezone(UTC).date() if isinstance(written, datetime) else written
             moment = datetime.combine(day, time(), tzinfo=UTC)
         elif isinstance(written, datetime):
             moment = written if written.tzinfo else _localise(written, begin.tzid or "UTC")
