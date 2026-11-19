@@ -74,6 +74,11 @@ Standardkalender, Rechte und Termine (anlegen, lesen, sehen; Task 3a).
   Oberfläche schickt immer die Zone des Browsers, sonst zeigt sie den Nachbartag).
   Ein Cursor gilt nur mit der Zone, mit der er entstand (sonst 422
   `calendar.cursor_time_zone`). `calendar_ids` filtert, `q` sucht im Titel.
+  Die Grenze gilt **je Abfrage, nicht je Zeitraum:** Eine Folgeseite entfaltet nur ab
+  ihrem Cursor. Ein Zeitraum über der Grenze antwortet schon auf der ersten Seite 422,
+  aber eine Seite mit einem späteren Cursor kann 200 antworten (ein Cursor ist ein
+  beliebiger Zeitpunkt mit ID). Ein 200 auf einer Folgeseite heißt also nicht, dass
+  der ganze Zeitraum passt; wer das wissen will, liest ihn von der ersten Seite an.
 - **Ein Name für Zonen:** Die API heißt jede Zone `time_zone`: die des Kalenders, die
   eines Termins (seine Serie läuft in ihrer Ortszeit; die Spalte heißt wie in
   iCalendar `tzid`) und die der Betrachterin im Fenster.

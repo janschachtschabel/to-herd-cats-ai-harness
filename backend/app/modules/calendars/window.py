@@ -23,7 +23,11 @@ of the events the caller may list, by (start, event id), a page at a time.
 - At most 2,000 occurrences per call, and the expansion's counted work bounded
   (`expansion.Budget`: rows and rule candidates, so a calendar full of series that do
   not occur in the window stays readable); beyond, 422 `calendar.window_too_dense`,
-  counted.
+  counted. The bound is per call, not per window: a later page expands from its
+  cursor only, so a window over the bound answers 422 on its first page, but a page
+  from a later cursor (any instant and id is one) may answer 200. That shows nothing
+  new and keeps every call bounded; a 200 on a later page does not mean the window
+  fits (review M10 task 3c, R3c-5).
 """
 
 import uuid
