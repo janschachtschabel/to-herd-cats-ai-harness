@@ -65,10 +65,10 @@ def _bounds(times: Times, default_zone: str) -> tuple[datetime, datetime, dateti
         if not times.last_day or times.last_day < times.first_day:
             raise invalid("event.invalid_time")
         try:
-            starts_at, ends_at = zones.all_day_bounds(times.first_day, times.last_day)
+            first, after = zones.all_day_bounds(times.first_day, times.last_day)
         except OverflowError:
             raise invalid("event.time_out_of_range") from None
-        return starts_at, ends_at, starts_at.replace(tzinfo=None), None
+        return first, after, first.replace(tzinfo=None), None
     starts_at, ends_at = times.starts_at, times.ends_at
     if times.first_day or times.last_day or not starts_at or not ends_at:
         raise invalid("event.invalid_time")
